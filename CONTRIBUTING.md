@@ -21,4 +21,5 @@ uvx --from skills-ref agentskills validate "$PWD"      # run from the parent dir
 - kubegap is read-only. Do not add commands that change the cluster (apply, delete, scale, patch, exec).
 - Secret values are never read or recorded anywhere. Names, types and key names only.
 - Raw cluster data (snapshots), personal configuration (`config.yaml`) and tool binaries (`.tools/`) are not committed (`.gitignore`).
-- Commit messages: at least one line in English saying what changed and why. Do not add co-author trailers for code-generation tools.
+- Commit messages: at least one line in English saying what changed and why.
+- The code and documentation here were written with coding agents. What to collect, what counts as a problem, and which verdicts were wrong on real clusters were decided by the author. Contributions made the same way are welcome; the review bar is the same either way.

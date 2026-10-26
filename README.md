@@ -8,6 +8,8 @@
 
 Auditing a cluster is toil. Google's *Site Reliability Engineering* book calls work toil when it is manual, repetitive, automatable and grows with the service, and says reducing it is the point of SRE. kubegap takes that toil off your hands so your time goes to engineering.
 
+kubegap comes out of running three clusters alone on three platforms: a small k3s cluster, EKS at work, and a client's Kubernetes on Azure. Alerts and dashboards catch only what someone already defined. Everything else shows up only when you go digging through the cluster by hand, and three clusters do not leave time for that every day. kubegap does the digging: it reads the cluster, judges it against 403 written checks, and writes a report a person can read.
+
 kubegap is a skill in the [Agent Skills](https://agentskills.io) standard, the open format that coding agents such as Claude Code and Codex read, so any of them can run it with one command. It reads your cluster, read-only, and never touches a Secret value. It grades the cluster against 403 checks in 12 areas. Then it writes you a report: what is wrong, what the evidence is, why it happened, what to do, and, when the check definition records one, a public case that looked the same.
 
 ![A kubegap daily run on an 8-node EKS cluster: collection, first-pass evaluation, two report files](docs/media/kubegap-run.gif)
