@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Exploitable defect
+    url: https://github.com/KyungHwanKim-devs/kubegap/security/advisories/new
+    about: A defect someone could use against a cluster before it is fixed. Report it privately. Permission scope and unsafe defaults go in a Hardening issue instead.

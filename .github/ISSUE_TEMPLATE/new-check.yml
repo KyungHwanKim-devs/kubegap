@@ -1,0 +1,23 @@
+name: New check
+description: Something the audit should look at and does not.
+labels: [check]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What to check and why it matters
+      description: What state is the problem, what happens in production when it is missed.
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Where the data comes from
+      description: kubectl object, PromQL metric, AWS API, node command. Read-only only.
+    validations:
+      required: true
+  - type: textarea
+    id: cases
+    attributes:
+      label: Public cases
+      description: Postmortems, docs or talks that show this failing, with links.

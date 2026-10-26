@@ -1,0 +1,25 @@
+name: Bug report
+description: Collection failed, a script crashed, or the report was not produced.
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Command and output
+      description: The kubegap command you ran and the error text. Mask names.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Platform, Kubernetes version, which coding agent, OS, kubegap version.
+    validations:
+      required: true

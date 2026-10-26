@@ -1,0 +1,23 @@
+name: Hardening
+description: Permission scope, an unsafe default, data collected that is not needed, or documentation that overstates the read-only promise.
+labels: [hardening]
+body:
+  - type: textarea
+    id: gap
+    attributes:
+      label: What is wider than it needs to be
+      description: The file or code path, and what it currently allows or collects.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: The narrower permission, default or collection, and what it would stop working if anything.
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Checks affected
+      description: Check ids that would change or be dropped, if any.

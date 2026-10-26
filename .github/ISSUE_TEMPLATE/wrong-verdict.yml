@@ -1,0 +1,41 @@
+name: Wrong verdict
+description: A check fired when it should not have, or stayed quiet when it should have fired.
+labels: [verdict]
+body:
+  - type: input
+    id: check
+    attributes:
+      label: Check id
+      placeholder: resources.cpu-throttling
+    validations:
+      required: true
+  - type: dropdown
+    id: direction
+    attributes:
+      label: What happened
+      options:
+        - Fired but should not have
+        - Did not fire but should have
+        - Wrong severity
+        - Wrong evidence or numbers
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Cluster
+      description: Platform, node count, profile, and whether the workload is production.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: What the report said and what is true
+      description: The finding line from report-details.md, and what the cluster actually looks like. Mask names.
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: kubegap and rubric version
+      description: Both are printed at the bottom of report.md.
