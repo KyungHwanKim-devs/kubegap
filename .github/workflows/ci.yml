@@ -1,0 +1,37 @@
+# kubegap CI: lint, unit tests, embedded check self-tests and the Agent Skills folder validator. No cluster, no network beyond package downloads.
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      # Check out the repository into a folder named kubegap (the Agent Skills validator requires the folder name to match the skill name)
+      - uses: actions/checkout@v4
+
+      # Install the matrix Python; pipx ships with the GitHub runner image
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Lint (ruff rules in pyproject.toml)
+      - run: pipx run ruff check .
+
+      # Formatting must already be applied (line length 240 on purpose)
+      - run: pipx run ruff format --check .
+
+      # Unit tests in tests/ (yamlite parser, rubric resolution, diff, platform detection, snapshot readers, evaluate helpers)
+      - run: pipx run pytest -q
+
+      # Embedded test cases of every check in collectors/*/checks.yaml, no snapshot needed
+      - run: scripts/kubegap selftest
+
+      # Agent Skills folder validation; run from the parent directory because the validator wants the folder itself named kubegap
+      - run: cd "$(dirname "$GITHUB_WORKSPACE")" && pipx run --spec skills-ref agentskills validate "$(basename "$GITHUB_WORKSPACE")"

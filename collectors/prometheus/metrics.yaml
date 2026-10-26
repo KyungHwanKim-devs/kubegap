@@ -1,0 +1,124 @@
+# Observability coverage PromQL. The ALERTS series is only meaningful within the Prometheus retention window (often 15d).
+- id: alerts_fired_15d
+  why: Alert names that were firing at least once in 15 days. Compared with the rule list this yields "alerts that never fired"
+  query: count by (alertname) (count_over_time(ALERTS{alertstate="firing"}[15d]))
+- id: alerts_firing_samples_7d
+  why: Top alerts by samples observed firing over 7 days (fatigue). At a 30s evaluation interval one day is 2,880; 20,160 means firing for all 7 days
+  query: topk(20, sum by (alertname) (count_over_time(ALERTS{alertstate="firing"}[7d])))
+- id: alerts_firing_now
+  why: Alerts firing right now (name, severity, namespace)
+  query: ALERTS{alertstate="firing"}
+- id: alerts_pending_now
+  why: Alerts currently pending (waiting on `for`)
+  query: ALERTS{alertstate="pending"}
+- id: rule_evaluation_failures
+  why: Rule groups whose evaluation failed (syntax, missing metric). A failing rule is a rule that never fires
+  query: sum by (rule_group) (increase(prometheus_rule_evaluation_failures_total[1h])) > 0
+- id: rule_group_duration_top
+  why: Slowest rule groups. If evaluation exceeds the interval, alerts are late or skipped
+  query: topk(10, prometheus_rule_group_last_duration_seconds)
+- id: http_metric_namespaces
+  why: Namespaces with application-level HTTP/gRPC server metrics (the latency, traffic and error inputs of the 4 golden signals). Without them you depend on ingress/ALB metrics
+  query: >
+    count by (namespace) ({__name__=~"http_request_duration_seconds_(bucket|count)|http_requests_total|http_server_requests_seconds_(count|bucket)|http_server_duration_milliseconds_(count|bucket)|grpc_server_handled_total|grpc_server_handling_seconds_(count|bucket)|django_http_requests_total_by_method_total|flask_http_request_duration_seconds_(count|bucket)|nginx_http_requests_total|express_http_request_duration_seconds_(count|bucket)|fastapi_requests_total|starlette_requests_total|aspnetcore_requests_total"})
+- id: saturation_metric_namespaces
+  why: Namespaces with saturation metrics (queue length, connection pool, thread pool, in-flight). The golden signal most often missing
+  query: >
+    count by (namespace) ({__name__=~".*(queue_length|queue_size|queue_depth|pool_(active|idle|size|usage|used|pending)|connections_(active|open|in_use|idle)|threads_(active|busy|current)|inflight|in_flight|consumergroup_lag|consumer_lag).*"})
+- id: ingress_controller_requests
+  why: Ingress controller request metrics (ingress-nginx, Traefik). Per-ingress latency, traffic and errors without app metrics. EKS ALB goes through CloudWatch instead
+  query: >
+    count by (exported_namespace, ingress, namespace, service) ({__name__=~"nginx_ingress_controller_requests|traefik_service_requests_total|traefik_entrypoint_requests_total"})
+- id: alertmanager_notifications_failed_1d
+  why: Notifications Alertmanager failed to deliver to receivers (24h). Anything above 0 means alerts are being lost
+  query: sum by (integration) (increase(alertmanager_notifications_failed_total[1d])) > 0
+- id: alertmanager_alerts_by_state
+  why: Alerts held by Alertmanager (active, suppressed). A large suppressed count means silences/inhibitions are swallowing a lot
+  query: sum by (state) (alertmanager_alerts)
+- id: prometheus_storage_bytes
+  why: TSDB disk usage plus WAL. Compare with the PVC size
+  query: prometheus_tsdb_storage_blocks_bytes + prometheus_tsdb_wal_storage_size_bytes
+- id: prometheus_remote_write_failed_1h
+  why: Failed remote-write samples (when configured). The path to long-term storage is broken
+  query: sum by (url) (increase(prometheus_remote_storage_samples_failed_total[1h])) > 0
+- id: scrape_targets_down_by_job
+  why: Targets with up==0 per job. A ServiceMonitor exists but the scrape fails
+  query: count by (job) (up == 0)
+- id: alerts_firing_stale_days
+  why: Alerts continuously active (pending or firing) for more than 3 days, and for how many days. Nobody is acting on them
+  query: (time() - ALERTS_FOR_STATE{alertname!="Watchdog"}) / 86400 > 3
+
+# ---- Prometheus and Alertmanager self health (read by lib/stackhealth.py)
+- id: prom_head_series
+  why: Active series in memory. Above 1M, memory and rule evaluation both slow down (a small cluster is typically 100-200k)
+  query: max(prometheus_tsdb_head_series)
+- id: prom_rss_vs_limit
+  why: Prometheus container RSS ÷ memory limit. Above 0.85 the next compaction or large query gets OOMKilled
+  query: >
+    max by (pod) (container_memory_working_set_bytes{container="prometheus"}) / on (pod) group_left() max by (pod) (kube_pod_container_resource_limits{container="prometheus",resource="memory"})
+- id: prom_oomkilled
+  why: Whether the Prometheus container's last termination reason was OOMKilled (kube-state-metrics)
+  query: kube_pod_container_status_last_terminated_reason{container="prometheus",reason="OOMKilled"}
+- id: prom_pvc_used_ratio
+  why: Prometheus data PVC usage ratio (kubelet volume stats — not available for local volumes such as local-path)
+  query: max by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{persistentvolumeclaim=~".*prometheus.*"} / kubelet_volume_stats_capacity_bytes)
+- id: prom_retention_days
+  why: Configured retention (seconds → days). With retention.size at 0 only time is enforced, so the disk can fill first
+  query: max(prometheus_tsdb_retention_limit_seconds) / 86400
+- id: prom_oldest_sample_days
+  why: Age in days of the oldest sample actually left in the TSDB. Much shorter than retention means data was cut by disk shortage or a reinstall
+  query: (time() - max(prometheus_tsdb_lowest_timestamp_seconds)) / 86400
+- id: prom_scrape_slow_jobs
+  why: Max scrape duration per job (seconds). Above half the scrape interval (usually 30s) the target is slow or its response too large
+  query: topk(10, max by (job) (scrape_duration_seconds))
+- id: prom_scrape_interval_s
+  why: Most common scrape interval (seconds). The denominator for the slow-scrape judgement
+  query: max(prometheus_target_interval_length_seconds{quantile="0.5"})
+- id: prom_sample_limit_exceeded_1h
+  why: Scrapes dropped entirely for exceeding sampleLimit (per job, 1h). That target has no metrics at all
+  query: sum by (job) (increase(prometheus_target_scrapes_exceeded_sample_limit_total[1h])) > 0
+- id: prom_notifications_dropped_1d
+  why: Alerts dropped from the Prometheus → Alertmanager queue overflow (24h). Anything above 0 means alerts were lost
+  query: sum(increase(prometheus_notifications_dropped_total[1d]))
+- id: prom_notifications_errors_1d
+  why: Alerts that failed to send to Alertmanager (24h, per Alertmanager address)
+  query: sum by (alertmanager) (increase(prometheus_notifications_errors_total[1d])) > 0
+- id: prom_rule_eval_ratio_top
+  why: Top rule groups by evaluation duration ÷ interval. Near 1, evaluations fall behind and alerts are late or skipped
+  query: topk(5, prometheus_rule_group_last_duration_seconds / prometheus_rule_group_interval_seconds)
+- id: prom_rule_iterations_missed_1d
+  why: Rule evaluations skipped for overrunning the interval (24h)
+  query: sum(increase(prometheus_rule_group_iterations_missed_total[1d]))
+- id: prom_compactions_failed_7d
+  why: TSDB compaction failures (7d). The first sign of disk shortage or corruption
+  query: sum(increase(prometheus_tsdb_compactions_failed_total[7d]))
+- id: prom_wal_corruptions
+  why: Cumulative WAL corruptions
+  query: max(prometheus_tsdb_wal_corruptions_total)
+- id: prom_reload_ok
+  why: Whether the last config reload succeeded (0 means new rules/scrape config were not applied and the old config is still running)
+  query: min(prometheus_config_last_reload_successful)
+- id: prom_replicas
+  why: Number of Prometheus instances (by up)
+  query: count(up{job=~".*prometheus$"} == 1)
+- id: am_reload_ok
+  why: Whether the last Alertmanager config reload succeeded
+  query: min(alertmanager_config_last_reload_successful)
+- id: am_cluster_members
+  why: Alertmanager cluster member count (absent when not HA)
+  query: max(alertmanager_cluster_members)
+- id: am_invalid_alerts_1d
+  why: Invalid alerts rejected by Alertmanager (24h)
+  query: sum(increase(alertmanager_alerts_invalid_total[1d]))
+- id: am_notifications_1d
+  why: Notifications sent per receiver integration (slack, email, ...) in 24h. Non-zero ones are the channels actually in use
+  query: sum by (integration) (increase(alertmanager_notifications_total[1d])) > 0
+- id: am_received_1d
+  why: Alerts Alertmanager received in 24h (firing, resolved). Many firing and no resolved means alerts that never stop
+  query: sum by (status) (increase(alertmanager_alerts_received_total[1d]))
+- id: monitoring_restarts_7d
+  why: Restarts per pod in the monitoring namespace over 7d (instability of the stack itself)
+  query: sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace="monitoring"}[7d])) > 0.5
+- id: monitoring_oomkilled
+  why: Containers in the monitoring namespace whose last termination reason was OOMKilled
+  query: kube_pod_container_status_last_terminated_reason{namespace="monitoring",reason="OOMKilled"}

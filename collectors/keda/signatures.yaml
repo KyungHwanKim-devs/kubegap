@@ -1,0 +1,13 @@
+# KEDA log signatures (moved here from signatures/catalog.yaml). Field descriptions are in the catalog.yaml header.
+- id: keda.scaler-error
+  name: KEDA scaler failed to fetch metrics
+  component: keda
+  area: scaling
+  severity: medium
+  sources: ["logs/pods/keda/*.log"]
+  pattern: 'error getting (scaler|metric)|scaler.*error|Failed to get metrics|Error getting scale decision|unauthorized|TriggerAuthentication'
+  meaning: A ScaledObject cannot read its external metric (queue length, Prometheus), so scaling stops. Without a fallback it is pinned at the current replica count.
+  cause: Expired trigger authentication, external system down, query error.
+  verify: "kubectl get scaledobjects -A | grep -v True"
+  warn_at: 5
+  fail_at: 200

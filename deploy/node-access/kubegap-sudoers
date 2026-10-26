@@ -1,0 +1,16 @@
+# kubegap read-only node commands. Replace <USER> with the SSH username and install as /etc/sudoers.d/kubegap, chmod 440.
+# Every command is read-only. du uses `-d 1` to report per-directory totals only (file contents are not read). If paths differ (k3s not in /usr/local/bin), adjust them with `which k3s crictl dmesg`.
+Cmnd_Alias KUBEGAP_READ = /usr/bin/dmesg, /usr/bin/dmesg -T, \
+    /usr/local/bin/k3s secrets-encrypt status, /usr/local/bin/k3s etcd-snapshot ls, \
+    /usr/local/bin/k3s crictl ps -a, /usr/local/bin/k3s crictl images, /usr/local/bin/k3s crictl imagefsinfo, /usr/local/bin/k3s crictl info, \
+    /usr/bin/du -sh /var/lib/rancher/k3s/server/db, /usr/bin/du -sh /var/lib/rancher/k3s/server/db/*, /usr/bin/ls -la /var/lib/rancher/k3s/server/db, \
+    /usr/local/bin/k3s crictl version, /usr/local/bin/k3s certificate check, \
+    /usr/local/bin/k3s crictl stats -a, /usr/bin/du -sm /var/lib/docker, \
+    /usr/bin/du -sm /var/lib/rancher/k3s/storage, /usr/bin/du -m -d 1 /var/lib/rancher/k3s/storage, \
+    /usr/bin/tail -n 2000 /var/lib/rancher/k3s/agent/containerd/containerd.log, \
+    /usr/bin/du -m -d 1 /var/log/pods, /usr/bin/du -m -d 3 /var/lib/kubelet/pods, /usr/bin/ss -ltnp, \
+    /usr/bin/du -sm /var/lib/rancher/k3s/agent/containerd, /usr/bin/du -sm /var/lib/rancher/k3s/server/db, \
+    /usr/bin/du -sh /var/log/pods/*, /usr/bin/du -sh /var/lib/rancher/k3s/agent/containerd, \
+    /usr/bin/cat /etc/rancher/k3s/config.yaml, /usr/bin/cat /var/lib/rancher/k3s/agent/etc/containerd/config.toml, /usr/bin/cat /etc/rancher/k3s/registries.yaml, \
+    /usr/sbin/sysctl -a, /usr/sbin/smartctl -H *, /usr/sbin/smartctl -A *
+<USER> ALL=(root) NOPASSWD: KUBEGAP_READ

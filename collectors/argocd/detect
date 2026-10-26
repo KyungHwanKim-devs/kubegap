@@ -1,0 +1,2 @@
+# Argo CD collector. Enabled when the detected component argocd (argocd-application-controller or the Application CRD) is present. EKS and k3s.
+component: argocd

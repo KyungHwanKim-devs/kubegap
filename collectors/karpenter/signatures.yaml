@@ -1,0 +1,69 @@
+# Karpenter log signatures (moved here from signatures/catalog.yaml). Field descriptions are in the catalog.yaml header.
+- id: karpenter.insufficient-capacity
+  name: Karpenter insufficient instance capacity
+  component: karpenter
+  area: scaling
+  severity: medium
+  sources: ["logs/pods/karpenter/*.log"]
+  pattern: 'InsufficientInstanceCapacity|insufficient capacity|no instance type satisfied|could not schedule pod|incompatible with nodepool'
+  meaning: EC2 has no capacity for the requested instance type/AZ, or no NodePool satisfies the pod's requirements. Pods stay Pending.
+  cause: Allowed instance types too narrow, spot capacity exhausted, node selector/taint mismatch.
+  verify: "kubectl logs -n karpenter -l app.kubernetes.io/name=karpenter --since=24h | grep -iE 'insufficient|no instance type'"
+- id: karpenter.version-unsupported
+  name: Karpenter does not support the cluster Kubernetes version
+  component: karpenter
+  area: platform
+  severity: high
+  sources: ["logs/pods/karpenter/*.log"]
+  pattern: 'failed validating kubernetes version|unsupported kubernetes version|kubernetes version .* is not supported'
+  meaning: The Karpenter controller considers the EKS Kubernetes version outside its supported range. The nodeclass.status controller stops resolving AMIs, so new nodes do not launch or launch only with old AMIs.
+  cause: EKS was upgraded without upgrading the Karpenter chart (or vice versa), or 1.x version validation is on and the patch version is outside the support table.
+  verify: "kubectl logs -n karpenter -l app.kubernetes.io/name=karpenter --since=24h | grep -c 'failed validating kubernetes version'; helm list -n karpenter"
+  warn_at: 1
+  fail_at: 10
+- id: karpenter.launch-failed
+  name: Karpenter node launch failed
+  component: karpenter
+  area: scaling
+  severity: high
+  sources: ["logs/pods/karpenter/*.log"]
+  pattern: 'failed launching nodeclaim|creating instance.*(error|failed)|launching.*error|VcpuLimitExceeded|UnauthorizedOperation|AccessDenied|InvalidParameter'
+  meaning: A NodeClaim was created but the EC2 instance did not launch, so scale-out is stuck.
+  cause: Account vCPU limit, IAM permissions (Karpenter controller role, instance profile), AMI/subnet/security-group selectors matching nothing.
+  verify: "kubectl get nodeclaims; kubectl logs -n karpenter -l app.kubernetes.io/name=karpenter --since=24h | grep -i 'launch'"
+- id: karpenter.disruption-blocked
+  name: Karpenter disruption (consolidation, expiry, drift) blocked
+  component: karpenter
+  area: cost
+  severity: low
+  sources: ["logs/pods/karpenter/*.log"]
+  pattern: 'DisruptionBlocked|disruption budget|cannot disrupt|pdb prevents|do-not-disrupt'
+  meaning: Nodes should be replaced or consolidated but budgets, PDBs or do-not-disrupt annotations block it. Old AMIs and expensive nodes linger.
+  cause: A 10% budget rounding to 0 on a small node count, a PDB with maxUnavailable 0, single-replica workloads.
+  verify: "kubectl get events -A --field-selector reason=DisruptionBlocked | tail; kubectl get nodepool -o jsonpath='{.items[*].spec.disruption.budgets}'"
+  warn_at: 10
+  fail_at: 1000
+- id: karpenter.drain-failed
+  name: Karpenter node drain failed
+  component: karpenter
+  area: resilience
+  severity: medium
+  sources: ["logs/pods/karpenter/*.log"]
+  pattern: 'failed to drain|cannot evict pod|eviction.*(failed|blocked)|Cannot evict pod as it would violate the pod.s disruption budget'
+  meaning: The node is being drained but pods will not leave. Node replacement drags on and pods get force-killed on spot reclaim.
+  cause: PDB too strict, long pod terminationGracePeriod, pods stuck in Terminating.
+  verify: "kubectl get pdb -A; kubectl get pods -A | grep Terminating"
+  warn_at: 5
+  fail_at: 100
+- id: karpenter.spot-interruption
+  name: Spot instance interruption notice
+  component: karpenter
+  area: resilience
+  severity: low
+  sources: ["logs/pods/karpenter/*.log"]
+  pattern: 'spot interruption|interruption (warning|notice)|rebalance recommendation|instance terminating'
+  meaning: EC2 announced it will reclaim a spot node in 2 minutes. Its pods get rescheduled. If frequent, widen the spot pool selection.
+  cause: Spot market fluctuation. The narrower the instance types, the more frequent.
+  verify: "kubectl get events -A | grep -i interrupt"
+  warn_at: 3
+  fail_at: 50

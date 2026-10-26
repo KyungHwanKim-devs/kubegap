@@ -1,0 +1,3327 @@
+# Prometheus self-health checks. summary.stackhealth.prometheus — lib/stackhealth.py. Observability coverage (rules, alerts, targets) is handled by core observability.*. The baseline checks stay in core (evaluated as absence even without Prometheus).
+- id: prometheus.memory-pressure
+  name: Prometheus memory is close to its limit or has an OOMKilled history
+  area: observability
+  type: summary
+  each: stackhealth.prometheus
+  cluster_level: true
+  rule:
+    expr: "item['present'] and ((item['rss_vs_limit'] or 0) >= 0.9)"
+    warn_expr: "item['present'] and ((item['rss_vs_limit'] or 0) >= 0.75 or item['oomkilled_last'] or len(item['monitoring_oomkilled'] or []) > 0)"
+  target: "item['target']"
+  evidence: "f\"working set / limit {item['rss_vs_limit']} (limit {item['memory_limit']}), active series {item['head_series']}, Prometheus container last terminated OOMKilled {item['oomkilled_last']} ({item['oomkilled_at']}), restarts {item['restarts']}, OOMKilled containers in the monitoring namespace {item['monitoring_oomkilled']}, restarts over 7 days {item['monitoring_restarts_7d']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    Prometheus keeps every active (head) series in memory and briefly uses more during the 2-hour compaction. Near the limit it gets OOMKilled during compaction or a large query (a 30-day Grafana panel) — alert evaluation stops at that moment, and after the restart there is a metrics gap for several minutes while the WAL replays. If Prometheus is unhealthy, every other check runs on wrong data.
+    Measured on a real EKS cluster: working set 0.57 of a 1.5GiB limit (RSS 1.34GiB), last termination reason OOMKilled with one restart; Loki was also OOMKilled because of a 24-hour query from this skill (since fixed to a 1-hour window). A 2-node k3s k3s: 0.59, no OOM.
+  suggest: "Raise the limit (head series × about 8KB + compaction headroom) or reduce cardinality (prometheus.cardinality). Precompute long-range Grafana panels with recording rules."
+  verify:
+    - "kubectl -n monitoring top pod -l app.kubernetes.io/name=prometheus --containers"
+    - "kubectl -n monitoring get pod -l app.kubernetes.io/name=prometheus -o jsonpath='{.items[*].status.containerStatuses[?(@.name==\"prometheus\")].lastState}'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.93
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.8
+          memory_limit: "1536Mi"
+          oomkilled_last: false
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled: []
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.57
+          memory_limit: "1536Mi"
+          oomkilled_last: false
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled: []
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+- id: prometheus.storage-risk
+  name: Prometheus storage risk (PVC saturation, emptyDir, failed compactions, WAL corruption)
+  area: observability
+  type: summary
+  each: stackhealth.prometheus
+  cluster_level: true
+  rule:
+    expr: "item['present'] and ((item['pvc_used_ratio'] or 0) >= 0.85 or (item['compactions_failed_7d'] or 0) > 0 or (item['wal_corruptions'] or 0) > 0)"
+    warn_expr: "item['present'] and ((item['pvc_used_ratio'] or 0) >= 0.7 or item['retention_shortfall'] or item['storage'] == 'emptyDir' or (item['corruption_count'] or 0) > 0)"
+  target: "item['target']"
+  evidence: "f\"storage {item['storage']} (PVC {item['pvc_size']}), PVC usage {item['pvc_used_ratio']}, TSDB {round((item['tsdb_bytes'] or 0)/1024**3, 1)}GiB, retention {item['retention_time']} (size cap {item['retention_size']}), actual oldest sample {item['oldest_sample_days']} days, failed compactions over 7 days {item['compactions_failed_7d']}, WAL corruptions {item['wal_corruptions']}, corruptions at startup {item['corruption_count']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    With retention.size at 0B Prometheus only trims by time, so as series grow the disk fills first — once the disk is full, compaction fails and eventually writes stop. With emptyDir, the moment the pod moves to another node or the node is replaced, the whole retention window of metrics is gone (measured on a k3s: 30 days, 23.7GiB on emptyDir). If the actual oldest sample is much younger than the retention period, data has already been cut.
+    Measured on a real EKS cluster: a 20GiB PVC at 43% (8.3GiB, 15-day retention, no size cap) → pass; the small k3s cluster on emptyDir → warn (the same fact as core observability.stack-storage-emptydir).
+  suggest: "Set retention.size to 80-85% of the PVC (--storage.tsdb.retention.size=16GB). Replace emptyDir with a PVC (StorageClass). For failed compactions and WAL corruption, read the compaction failed / wal corruption lines in the Prometheus log."
+  verify:
+    - "kubectl -n monitoring exec prometheus-kube-prometheus-stack-prometheus-0 -c prometheus -- df -h /prometheus"
+    - "kubectl -n monitoring get pvc"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.9
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 2
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: null
+          pvc_size: null
+          storage: "emptyDir"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 4.0
+          retention_shortfall: true
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+- id: prometheus.cardinality
+  name: Many active series, or one metric dominates cardinality
+  area: observability
+  type: summary
+  each: stackhealth.prometheus
+  cluster_level: true
+  rule:
+    expr: "item['present'] and (item['head_series'] or 0) >= 2000000"
+    warn_expr: "item['present'] and ((item['head_series'] or 0) >= 1000000 or (item['top_metric_share'] or 0) >= 0.25)"
+  target: "item['target']"
+  evidence: "f\"active series {item['head_series']} (label pairs {item['label_pairs']}), top metrics {[(x['name'], x['series']) for x in (item['top_metrics'] or [])[:5]]}, share of the top metric {item['top_metric_share']}, histogram bucket series among the top 10 {item['top10_bucket_series']}, labels with many values {item['top_labels_by_values']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    The series count determines memory, compaction time and query latency. Past 1 million a single Prometheus struggles (8GiB+ memory), and when one metric holds 1/4 of the series, dropping that one metric (usually apiserver/etcd histogram buckets, or an app metric with IDs or paths in labels) alone cuts it substantially.
+    Measured on a real EKS cluster: 157k series; a k3s: 140k. In both, all top 10 were apiserver/etcd histogram buckets (61k = 39% on EKS) — control-plane metrics scraped by the kube-prometheus-stack defaults, so dropping the buckets with metricRelabelings removes about 1/3.
+  suggest: "Drop unused _bucket series with metricRelabelings on the ServiceMonitors (kube-apiserver, kube-etcd). If an app metric is at the top, remove IDs and URLs from its labels. Check the top metrics each time via /api/v1/status/tsdb."
+  verify:
+    - "kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090 & curl -s localhost:9090/api/v1/status/tsdb | jq '.data.seriesCountByMetricName[:10]'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 2500000
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 1200000
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.3
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+- id: prometheus.scrape-slow-or-limited
+  name: Scrapes are slow, or whole scrapes are dropped for exceeding sampleLimit
+  area: observability
+  type: summary
+  each: stackhealth.prometheus
+  cluster_level: true
+  rule:
+    expr: "item['present'] and len(item['sample_limit_exceeded_1h'] or {}) > 0"
+    warn_expr: "item['present'] and len(item['slow_scrape_jobs'] or []) > 0"
+  target: "item['target']"
+  evidence: "f\"scrape interval {round(item['scrape_interval_s'] or 0)}s, jobs exceeding half the interval {item['slow_scrape_jobs']}, slowest {item['scrape_top']}, jobs exceeding sampleLimit in the last hour {item['sample_limit_exceeded_1h']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    A scrape that exceeds sampleLimit drops all metrics of that target (not a partial store) — alerts for that job go silent. A scrape that takes more than half the interval means the target is overloaded or the response is too large, and it will soon hit the timeout (10s by default).
+    Measured on a real EKS cluster: slowest jobs kafka-metrics 0.5s and apiserver 0.43s (30s interval) → pass; a k3s: apiserver 1.6s, kubelet 1.4s → pass. No sampleLimit exceeded.
+  suggest: "For slow targets, check the response size (curl -w %{size_download}) and trim with metricRelabelings or raise scrapeTimeout. For sampleLimit exceeded, raise sampleLimit on that ServiceMonitor or reduce the metrics."
+  verify:
+    - "curl -s localhost:9090/api/v1/query --data-urlencode 'query=topk(10, scrape_duration_seconds)'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h:
+            app: 120
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs:
+            - job: "kubelet"
+              seconds: 16.2
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+- id: prometheus.rule-evaluation-lag
+  name: Rule evaluation exceeds its interval or skips iterations (alerts are late or missing)
+  area: observability
+  type: summary
+  each: stackhealth.prometheus
+  cluster_level: true
+  rule:
+    expr: "item['present'] and ((item['rule_iterations_missed_1d'] or 0) > 0 or (item['rule_eval_ratio_max'] or 0) >= 0.8)"
+    warn_expr: "item['present'] and (item['rule_eval_ratio_max'] or 0) >= 0.5"
+  target: "item['target']"
+  evidence: "f\"top evaluation duration / interval {item['rule_eval_ratio_top']}, skipped evaluations over 24 hours {item['rule_iterations_missed_1d']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    Rule groups are evaluated in order every interval (usually 30s). When one group approaches the interval, the next evaluation is delayed; when it exceeds it, an evaluation is skipped (iterations_missed) — an alert with for: 5m has its pending state reset when an evaluation is missed and may never fire. The heavy group is usually the apiserver burnrate (histogram sums).
+    Measured on a real EKS cluster: max 0.13; a 2-node k3s: kube-apiserver-burnrate 0.33 (CPU is tight with two nodes). Skipped: 0.
+  suggest: "For heavy groups, raise the interval (1m) or split the query into recording rules. If the CPU limit is tight (500m), raise it."
+  verify:
+    - "curl -s localhost:9090/api/v1/rules | jq '[.data.groups[] | {name, interval, lastEvaluation, evaluationTime}] | sort_by(-.evaluationTime)[:5]'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 3
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.85
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.6
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+- id: prometheus.alert-delivery-errors
+  name: Prometheus → Alertmanager notification failures, or config reload failure
+  area: observability
+  type: summary
+  each: stackhealth.prometheus
+  cluster_level: true
+  rule:
+    expr: "item['present'] and ((item['notifications_dropped_1d'] or 0) > 0 or item['reload_success'] is False)"
+    warn_expr: "item['present'] and len(item['notifications_errors_1d'] or {}) > 0"
+  target: "item['target']"
+  evidence: "f\"notifications dropped over 24 hours {item['notifications_dropped_1d']}, send errors per Alertmanager address {item['notifications_errors_1d']}, last config reload successful {item['reload_success']} (config time {item['last_config_time']})\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    If a firing rule cannot reach Alertmanager, nobody finds out. dropped means the send queue overflowed (Alertmanager was down for a long time); errors means failures to a specific Alertmanager address (an Alertmanager restart, the network, or one of the configured addresses is dead). A reload failure means a new PrometheusRule has a syntax error and the old rules keep running.
+    Measured on a real EKS cluster and a k3s: both 0, reload successful.
+  suggest: "Check the Alertmanager pod status and the 'Error sending alert' lines in the Prometheus log. For reload failures, check the rule validation errors in the prometheus-operator log."
+  verify:
+    - "curl -s localhost:9090/api/v1/alertmanagers | jq '.data'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 40
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: false
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d:
+            http://198.51.100.104:9093/api/v2/alerts: 12
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+- id: prometheus.single-replica
+  name: Single Prometheus replica (single point of failure, gaps during upgrades)
+  area: observability
+  type: summary
+  each: stackhealth.prometheus
+  cluster_level: true
+  rule:
+    warn_expr: "item['present'] and (item['replicas'] or 0) <= 1"
+  target: "item['target']"
+  evidence: "f\"Prometheus StatefulSet replicas {item['replicas']} (ready {item['ready']}), restarts {item['restarts']}, started {item['start_time']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    While a single Prometheus restarts (OOM, node replacement, upgrade), scraping and alert evaluation stop for several minutes. With replicas 2, kube-prometheus-stack has both instances scrape the same targets and Alertmanager deduplicates (availability without Thanos). This matters more on EKS clusters with frequent node replacement (Karpenter consolidation).
+    Measured on a real EKS cluster and a k3s: both 1. On a 2-node small k3s cluster it matters little — low.
+  suggest: "prometheus.prometheusSpec.replicas: 2 + podAntiAffinity. For long-term retention, a Thanos sidecar."
+  verify:
+    - "kubectl -n monitoring get prometheus -o jsonpath='{.items[*].spec.replicas}'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 2
+          ready: 2
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+- id: prometheus.version-old
+  name: Prometheus version is old (non-LTS 2.x)
+  area: observability
+  type: summary
+  each: stackhealth.prometheus
+  cluster_level: true
+  rule:
+    warn_expr: "item['present'] and item['version'] is not None and (item['major'] or 0) < 3 and int(str(item['version']).split('.')[1]) < 53"
+  target: "item['target']"
+  evidence: "f\"Prometheus {item['version']} — 2.53 is the last 2.x LTS (2024-07), 3.0 was released 2024-11\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Prometheus only patches the LTS (2.53) and the latest 3.x. Intermediate versions such as 2.49 (2024-01) get no security or bug fixes. 3.x makes UTF-8 metric names, OTLP ingestion and native histograms the default (the upgrade notes list a few flag changes).
+    Measured on a real EKS cluster: 2.49.1 → warn; a k3s: 3.7.3 → pass.
+  suggest: "Upgrade the kube-prometheus-stack chart (Prometheus 3.x needs chart 66+). If staying on 2.x, at least 2.53 LTS."
+  verify:
+    - "curl -s localhost:9090/api/v1/status/buildinfo | jq .data.version"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.49.1"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.53.4"
+          major: 2
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "pass"
+        item:
+          present: true
+          version: "3.7.3"
+          major: 3
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+      - expect: "pass"
+        item:
+          present: true
+          version: null
+          major: null
+          start_time: "2026-10-06T12:32:07.180790214Z"
+          reload_success: true
+          last_config_time: "2026-10-23T04:45:17Z"
+          corruption_count: 0
+          retention_time: "15d"
+          retention_size: "0B"
+          retention_days: 15.0
+          oldest_sample_days: 15.5
+          retention_shortfall: false
+          head_series: 156746
+          label_pairs: 8775
+          chunks: 313012
+          top_metrics:
+            - name: "etcd_request_duration_seconds_bucket"
+              series: 17808
+            - name: "apiserver_request_sli_duration_seconds_bucket"
+              series: 13156
+            - name: "apiserver_request_duration_seconds_bucket"
+              series: 9744
+            - name: "apiserver_request_body_size_bytes_bucket"
+              series: 6752
+            - name: "apiserver_response_sizes_bucket"
+              series: 3664
+            - name: "kubernetes_feature_enabled"
+              series: 2875
+            - name: "apiserver_watch_cache_read_wait_seconds_bucket"
+              series: 2688
+            - name: "prober_probe_duration_seconds_bucket"
+              series: 2640
+            - name: "apiserver_storage_list_duration_seconds_bucket"
+              series: 2352
+            - name: "storage_operation_duration_seconds_bucket"
+              series: 1862
+          top_metric_share: 0.114
+          top10_bucket_series: 60666
+          top_labels_by_values:
+            - label: "__name__"
+              values: 1574
+            - label: "name"
+              values: 622
+            - label: "id"
+              values: 442
+            - label: "replicaset"
+              values: 416
+            - label: "le"
+              values: 339
+          rss_vs_limit: 0.573
+          memory_limit: "1536Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-06T12:32:06Z"
+          restarts: 1
+          pvc_used_ratio: 0.431
+          pvc_size: "20Gi"
+          storage: "pvc-template:prometheus-kube-prometheus-stack-prometheus-db:20Gi"
+          tsdb_bytes: 8961052778.0
+          scrape_interval_s: 30.000004557
+          slow_scrape_jobs: []
+          scrape_top:
+            - job: "kafka-metrics"
+              seconds: 0.5
+            - job: "apiserver"
+              seconds: 0.34
+            - job: "kubelet"
+              seconds: 0.12
+            - job: "node-exporter"
+              seconds: 0.05
+            - job: "kube-state-metrics"
+              seconds: 0.05
+          sample_limit_exceeded_1h: {}
+          notifications_dropped_1d: 0
+          notifications_errors_1d: {}
+          rule_eval_ratio_top:
+            - group: "kube-apiserver-burnrate.rules"
+              ratio: 0.128
+            - group: "kube-apiserver-availability.rules"
+              ratio: 0.005
+            - group: "kube-apiserver-histogram.rules"
+              ratio: 0.004
+            - group: "node-exporter.rules"
+              ratio: 0.002
+            - group: "kubernetes-storage"
+              ratio: 0.001
+          rule_eval_ratio_max: 0.128
+          rule_iterations_missed_1d: 0
+          compactions_failed_7d: 0
+          wal_corruptions: 0
+          replicas_up: 2.0
+          monitoring_restarts_7d:
+            loki-stack-0: 1
+          monitoring_oomkilled:
+            - "loki-stack-0/loki"
+            - "prometheus-kube-prometheus-stack-prometheus-0/prometheus"
+          admin_api: "false"
+          lifecycle_api: "true"
+          query_timeout: "2m"
+          metrics_available: true
+          tsdb_status_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"

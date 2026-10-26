@@ -1,0 +1,1318 @@
+# KEDA checks. summary.kedactl.summary — lib/kedactl.py. ScaledObject Ready/Fallback and metrics API availability are covered by core scaling.keda-* and metrics-api-unavailable.
+- id: keda.unused
+  name: KEDA is installed but there is no ScaledObject or ScaledJob at all
+  area: hygiene
+  type: summary
+  each: kedactl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['unused']"
+  target: "'cluster'"
+  evidence: "f\"KEDA v{item['version']} operator {item['operator_ready']}/{item['operator_replicas']}, metrics-apiserver {item['metrics_apiserver_ready']}/{item['metrics_apiserver_replicas']}, webhooks {item['webhooks_ready']}/{item['webhooks_replicas']} — ScaledObject {item['scaledobjects']}, ScaledJob {item['scaledjobs']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    KEDA takes up three pods and one external.metrics.k8s.io APIService, and places a webhook and 7 CRDs in the cluster. With no ScaledObject in use, only the resources and the attack surface remain. Measured on a real k3s k3s: 2.19.0 installed, 0 ScaledObjects → warn.
+  suggest: "If there is no plan to use it, helm uninstall keda (including CRDs). If there is, move HPAs to ScaledObjects."
+  verify:
+    - "kubectl get scaledobjects,scaledjobs -A"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 0
+          scaledjobs: 0
+          unused: true
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+- id: keda.components-single-replica
+  name: KEDA operator and metrics-apiserver run a single replica (if it dies, external-metric HPAs stop)
+  area: scaling
+  type: summary
+  each: kedactl.summary
+  cluster_level: true
+  rule:
+    expr: "not item['unused'] and ((item['metrics_apiserver_ready'] or 0) < (item['metrics_apiserver_replicas'] or 1) or (item['operator_ready'] or 0) < (item['operator_replicas'] or 1) or not item['apiservice_available'])"
+    warn_expr: "not item['unused'] and item['scaledobjects_prod'] > 0 and ((item['metrics_apiserver_replicas'] or 1) < 2 or not item['has_pdb'])"
+  target: "'cluster'"
+  evidence: "f\"operator {item['operator_ready']}/{item['operator_replicas']}, metrics-apiserver {item['metrics_apiserver_ready']}/{item['metrics_apiserver_replicas']}, APIService v1beta1.external.metrics Available {item['apiservice_available']}, PDB {item['has_pdb']}, prod ScaledObject {item['scaledobjects_prod']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    The path an HPA uses to read external metrics (kafka lag, queue length) is kube-apiserver → external.metrics APIService → keda-operator-metrics-apiserver → keda-operator (gRPC). If any of them dies, the HPA stops scaling with "unable to get external metric" (keeping the current replicas), does not grow on a spike and does not shrink after a surge. The default install has both at 1 replica with no PDB.
+    Measured on a real EKS cluster: all 1/1, no PDB, 3 prod ScaledObjects → warn.
+  suggest: "metrics-apiserver replicas 2 (active-active is possible) + PDB; the operator uses leader election, so 2 gives a standby replica. With few nodes, at least a PDB."
+  verify:
+    - "kubectl get deploy -n keda ; kubectl get apiservice v1beta1.external.metrics.k8s.io"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 0
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: false
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 2
+          operator_ready: 2
+          metrics_apiserver_replicas: 2
+          metrics_apiserver_ready: 2
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: true
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 0
+          scaledjobs: 0
+          unused: true
+          scaledobjects_prod: 0
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+- id: keda.prod-external-trigger-no-fallback
+  name: prod ScaledObject with an external trigger (kafka, metrics-api) has no fallback
+  area: scaling
+  type: summary
+  each: kedactl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['prod_external_without_fallback']) > 0"
+  target: "'cluster'"
+  evidence: "f\"prod external-trigger ScaledObjects without fallback {item['prod_external_without_fallback']}, trigger types {item['trigger_types']}, minimum pollingInterval {item['polling_interval_min_s']}s\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    The kafka and metrics-api triggers read an external system (broker, app endpoint). When that system dies the scaler errors and the HPA freezes at its last value — consumers do not grow at the very moment the queue piles up. spec.fallback{failureThreshold, replicas} moves to a fixed replica count after N consecutive errors.
+    Measured on a real EKS cluster: all 3 prod ScaledObjects had no fallback (one kafka lag, two metrics-api).
+  suggest: "Add fallback: {failureThreshold: 3, replicas: <usual peak count>} to the ScaledObject. For metrics-api triggers, consumers then stay up even when the app endpoint dies."
+  verify:
+    - "kubectl get scaledobject -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name} {.spec.fallback}{\"\\n\"}{end}'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback: []
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+- id: keda.scaledobject-never-active
+  name: ScaledObject has not been Active for more than 14 days (trigger threshold wrong or useless)
+  area: scaling
+  type: summary
+  each: kedactl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['never_active_14d']) > 0"
+  target: "'cluster'"
+  evidence: "f\"inactive for more than 14 days {item['never_active_14d']}, not Ready {item['not_ready']}, fallback active {item['fallback_active']}, scale-to-zero targets {item['scale_to_zero']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Active means "the trigger crossed its threshold and there is a reason to scale", and lastActiveTime is the last time that happened. If it was never crossed for weeks, the threshold (kafka lagThreshold 1 should be crossed almost always) or the metric path is wrong, or the workload is unused. This is the KEDA counterpart of scaling.hpa-never-scaled.
+    Measured on a real EKS cluster: one worker inactive for 30.8 days (min 0, so it sat at 0 pods — possibly intended).
+  suggest: "Query the trigger metric directly (the URL for metrics-api, the consumer group lag for kafka) and see whether values arrive. If the worker is unused, delete the ScaledObject and the Deployment."
+  verify:
+    - "kubectl get scaledobject -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ACTIVE:.status.conditions[1].status,LAST:.status.lastActiveTime"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d: []
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+- id: keda.auth-or-secret-missing
+  name: ScaledObject's TriggerAuthentication or its Secret is missing
+  area: scaling
+  type: summary
+  each: kedactl.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['auth_missing']) > 0 or len(item['secret_missing']) > 0"
+  target: "'cluster'"
+  evidence: "f\"TriggerAuthentication referenced by authenticationRef missing {item['auth_missing']}, Secret referenced by TriggerAuthentication missing {item['secret_missing']} (Secrets checked by name only via kube_secret_info, {item['triggerauths']} total)\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    With a broken authentication reference the scaler cannot reach the broker, repeats "error getting metrics" and the HPA freezes. A common cause of the log signature keda.scaler-error. Measured on a real EKS cluster: both had their Secret — pass.
+  suggest: "Compare kubectl get triggerauthentication -n <ns> with the referenced Secret names. If an ExternalSecret has not synced yet, see security.externalsecret-not-ready."
+  verify:
+    - "kubectl get scaledobject -A -o jsonpath='{range .items[*]}{.metadata.namespace} {.spec.triggers[*].authenticationRef.name}{\"\\n\"}{end}'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing:
+            - "prod-a/scaledobject/x"
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing:
+            - "prod-a/kafka-auth: ['kafka-secret']"
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+- id: keda.external-metrics-api-errors
+  name: External metrics API request errors (times the HPA failed to get a metric)
+  area: scaling
+  type: summary
+  each: kedactl.summary
+  cluster_level: true
+  rule:
+    expr: "item['api_metrics_available'] and ((item['api_grpc_non_ok'] or 0) >= 1000 or (item['api_requests_non_2xx'] or 0) >= 1000 or (item['api_requests_non_2xx'] or 0) / max(sum((item.get('api_requests_by_code') or {}).values()), 1) >= 0.01)"
+    warn_expr: "item['api_metrics_available'] and ((item['api_requests_non_2xx'] or 0) >= 100 or (item['api_grpc_non_ok'] or 0) >= 100 or (item['api_requests_non_2xx'] or 0) / max(sum((item.get('api_requests_by_code') or {}).values()), 1) >= 0.001)"  # 18 of 1.1M (0.002%) is noise — from 100 requests or 0.1%
+  target: "'cluster'"
+  evidence: "f\"request codes since metrics-apiserver start {item['api_requests_by_code']}, non-2xx/3xx responses {item['api_requests_non_2xx']}, operator gRPC GetMetrics failures {item['api_grpc_non_ok']}, scaler errors in logs (24h) {item['scaler_errors_24h_logs']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    For every external metric request from the HPA controller, metrics-apiserver fetches the value from the operator over gRPC and answers. A 500 or gRPC Unknown means the HPA got no value at that moment. The counters are cumulative since process start, so they are judged as a ratio (measured on a real EKS cluster: 18 failures out of 390,734 = 0.005%).
+  suggest: "Match the times failures cluster with scaler errors in the operator log (logs/pods/keda/). Availability of the trigger target (broker, app URL) is the cause in most cases."
+  verify:
+    - "apiserver_request_total{component=\"external-metrics\"} from the pod /metrics (metrics/pod/keda-metrics-apiserver/)"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 2500
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 150
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 0
+          api_grpc_non_ok: 0
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: false
+          api_requests_non_2xx: 0
+          api_grpc_non_ok: 0
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+- id: keda.operator-metrics-disabled
+  name: KEDA operator Prometheus metrics are off (scaler errors, latency and values not visible)
+  area: observability
+  type: summary
+  each: kedactl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "not item['unused'] and (item['operator_prometheus_metrics'] is False or not item['operator_metrics_present'])"
+  target: "'cluster'"
+  evidence: "f\"--enable-prometheus-metrics {item['operator_prometheus_metrics']}, operator keda_* metrics exposed {item['operator_metrics_present']}, scaler errors in logs (24h) {item['scaler_errors_24h_logs']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    When enabled the operator exposes keda_scaler_errors_total, keda_scaler_metrics_value (the value the trigger read), keda_scaler_metrics_latency and keda_internal_scale_loop_latency. When off, neither kubegap nor Grafana can see "what is the kafka lag right now" and errors are counted only from log signatures. Measured on real clusters: false on both.
+  suggest: "Helm values prometheus.operator.enabled true (+ serviceMonitor). Trigger value trends and scale loop latency then accumulate in Prometheus."
+  verify:
+    - "kubectl get deploy -n keda keda-operator -o jsonpath='{.spec.template.spec.containers[0].args}'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: true
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: true
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: true
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+- id: keda.webhook-fail-policy
+  name: KEDA admission webhook uses the Fail policy (if the webhook pod dies, ScaledObjects cannot be changed)
+  area: resilience
+  type: summary
+  each: kedactl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['webhook_fail_policy']) > 0 and (item['webhooks_replicas'] or 1) < 2"
+  target: "'cluster'"
+  evidence: "f\"Fail-policy webhooks {item['webhook_fail_policy']}, webhooks replicas {item['webhooks_replicas']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    The KEDA webhook validates only ScaledObject and TriggerAuthentication (unrelated to pod creation). The default is Ignore, so the impact is small, but in an install switched to Fail with a single webhook pod, ScaledObjects cannot be fixed while that pod is down. Measured on real clusters: Ignore on both — pass.
+  suggest: "If you keep Fail, set webhooks replicas 2."
+  verify:
+    - "kubectl get validatingwebhookconfiguration keda-admission -o jsonpath='{.webhooks[*].failurePolicy}'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy:
+            - "vscaledobject.kb.io"
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 1
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy: []
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.17.2"
+          operator_replicas: 1
+          operator_ready: 1
+          metrics_apiserver_replicas: 1
+          metrics_apiserver_ready: 1
+          webhooks_replicas: 2
+          webhooks_ready: 1
+          has_pdb: false
+          operator_prometheus_metrics: false
+          apiservice_available: true
+          apiservice_keda_owned: true
+          webhook_fail_policy:
+            - "vscaledobject.kb.io"
+          scaledobjects: 4
+          scaledjobs: 0
+          unused: false
+          scaledobjects_prod: 3
+          trigger_types:
+            kafka: 4
+            metrics-api: 2
+          scale_to_zero:
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          never_active_14d:
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          not_ready: []
+          fallback_active: []
+          prod_external_without_fallback:
+            - "prod-app-d/scaledobject/app-d-ai-kafka-lag"
+            - "prod-app-a-backend/scaledobject/app-a-file-worker"
+            - "prod-app-a-backend/scaledobject/app-a-graph-worker"
+          auth_missing: []
+          secret_missing: []
+          secrets_known: true
+          triggerauths: 2
+          polling_interval_min_s: 15
+          api_metrics_available: true
+          api_requests_non_2xx: 18
+          api_grpc_non_ok: 18
+          api_requests_by_code:
+            200: 1027247
+            304: 58774
+            500: 18
+          operator_metrics_present: false
+          scaler_errors_total: 0
+          scaler_errors_24h_logs: 0

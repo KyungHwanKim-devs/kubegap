@@ -1,0 +1,7 @@
+# EBS CSI collection. Read-only throughout.
+# Attach limits, VolumeAttachments, EBS volumes (gp2, unattached, unencrypted) and snapshots are already covered by the core storage section (core + the eks-platform aws step). This collector looks at the driver itself: controller, sidecars, IRSA, CSIDriver settings, kubelet CSI call success rate/latency, and whether controller metrics exist.
+# The controller's aws_ebs_csi_* metrics are off by default in the add-on (0 series observed): collected when present, otherwise the check reports "disabled". kubelet's csi_operations_seconds and storage_operation_duration_seconds are scraped by kube-prometheus-stack by default.
+- id: metrics
+  type: promql
+  file: metrics.yaml
+  timeout: 30

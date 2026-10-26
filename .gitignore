@@ -1,0 +1,16 @@
+# kubegap. A comment after a pattern becomes part of the pattern, so comments go on their own line.
+
+# Tool binaries and virtualenvs downloaded by setup (hundreds of MB, per machine)
+.tools/
+
+# Personal configuration (context, suppression reasons). Only config.example.yaml is committed
+config.yaml
+
+__pycache__/
+*.pyc
+.DS_Store
+
+# Linter, type-checker and test-runner caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/

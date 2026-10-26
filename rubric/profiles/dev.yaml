@@ -1,0 +1,8 @@
+# dev profile. Development and staging clusters, or applied to selected namespaces via config.yaml namespace_profiles. Turns off single-replica, backup and cost checks; drift and deprecated-API checks stay on.
+name: dev
+base: prod
+description: Development and staging. Availability, backup and cost checks are off.
+disabled_checks: [resilience.single-replica-in-prod, resilience.no-pdb, resilience.replicas-same-node, resilience.n-plus-one, resilience.prod-concentration, resilience.no-backup, resilience.prod-db-without-backup-cronjob, resilience.backup-same-node, eks.no-backup-policy, scaling.no-hpa-serving-prod, cost.idle-compute-high, cost.request-waste, cost.idle-node, cost.idle-load-balancer, observability.no-slo, observability.no-event-retention, tenancy.prod-boundary-missing, tenancy.prod-without-quota]
+thresholds: {}
+expected_families: [metrics-store, kube-state-metrics, node-exporter]
+exclude: {}

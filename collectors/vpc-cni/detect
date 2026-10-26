@@ -1,0 +1,2 @@
+# VPC CNI (aws-node) collector. Enabled when the detected component vpc-cni (kube-system/aws-node DaemonSet) is present.
+component: vpc-cni

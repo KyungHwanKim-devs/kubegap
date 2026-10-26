@@ -1,0 +1,8 @@
+# small-prod profile. 3-20 nodes, one or two AZs, including non-AWS (GKE, AKS, kubeadm). A check whose profiles list lacks small-prod is applied on the base (prod) terms.
+name: small-prod
+base: prod
+description: Small production. EKS-only checks drop out naturally because their collectors are off. Service-quota and chargeback checks are off; PDB, probe, HPA and alert-coverage checks are the same as eks.
+disabled_checks: [eks.service-quota-near-limit, cost.idle-compute-high, cost.request-waste, cost.idle-load-balancer, cost.idle-node, tenancy.ci-no-dedicated-pool]
+thresholds: {}
+expected_families: [metrics-store, logs-store, alert-router, backup, kube-state-metrics, node-exporter, certificates]
+exclude: {}

@@ -1,0 +1,496 @@
+#!/usr/bin/env python3
+"""kubegap: command entry point of the Kubernetes operations gap audit skill.
+
+People type `/kubegap` in Claude Code. This file provides the subcommands that the SKILL.md procedure calls via Bash;
+it can also be run by hand when debugging. Only the Python standard library is used.
+
+Subcommands:
+  setup      install dependency tools, check context, Prometheus/Loki and AWS permissions
+  collect    discover + run collectors -> new snapshot folder
+  summarize  snapshot -> summary.json
+  evaluate   first-pass evaluation with checks.yaml -> findings-draft.json
+  diff       object and first-pass status changes between two snapshots
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+from lib import (  # noqa: E402  lib is importable only after the skill folder is on sys.path
+    __version__,
+    kube,
+    paths,
+)
+from lib import rubric as _rubric  # noqa: E402
+from lib import yamlite as _yamlite  # noqa: E402
+
+EXIT_OK = 0
+EXIT_ERROR = 1
+EXIT_USAGE = 2
+
+
+
+def _resolve_context(args) -> str | None:
+    ctx = getattr(args, "context", None) or kube.current_context(getattr(args, "kubeconfig", None))
+    if not ctx:
+        print("kubegap: cannot determine the kube context. `kubectl config current-context` is empty or kubectl is missing. Pass `--context <name>` or run `kubegap setup` first.", file=sys.stderr)
+    return ctx
+
+
+def cmd_setup(args) -> int:
+    from lib import setup as _setup
+    from lib.config import load_config
+
+    cfg = load_config(args.config)
+    for w in cfg.warnings:
+        print(f"kubegap: warning: {w}", file=sys.stderr)
+    ctx = getattr(args, "context", None) or cfg.get("context") or kube.current_context(getattr(args, "kubeconfig", None))
+    if not ctx:
+        print("kubegap setup: cannot determine the kube context (kubectl missing or current-context empty). Proceeding with tool installation only.", file=sys.stderr)
+    # install policy: arguments win; otherwise config install_tools (always = install, ask/never = check only)
+    if args.install_only:
+        install: bool | list[str] = [n.strip() for n in args.install_only.split(",") if n.strip()]
+    elif args.install:
+        install = True
+    elif args.no_install:
+        install = False
+    else:
+        install = cfg.install_policy == "always"
+    code, _ = _setup.run_setup(ctx, cfg, kubeconfig=args.kubeconfig, install=install, snapshots_root=_root(args), verbose=args.verbose)
+    return code
+
+
+def cmd_contexts(args) -> int:
+    """List kube contexts, mark the current one, and say which cluster each points to (EKS or k3s, best guess). For guidance only."""
+    from lib import shell
+
+    cmd = ["kubectl", "config", "get-contexts", "-o", "name"]
+    if args.kubeconfig:
+        cmd += ["--kubeconfig", args.kubeconfig]
+    r = shell.run(cmd, timeout=10)
+    if not r.ok:
+        print(f"kubegap contexts: kubectl failed: {r.error or r.stderr.strip()}", file=sys.stderr)
+        return EXIT_ERROR
+    names = [n for n in r.stdout.split() if n]
+    current = kube.current_context(args.kubeconfig)
+    if not names:
+        print("kubeconfig has no contexts.")
+        return EXIT_OK
+    print(f"{'':2} {'CONTEXT':<28} {'KIND':<8} CLUSTER")
+    for n in names:
+        info = kube.context_info(n, args.kubeconfig)
+        if info.get("is_eks"):
+            e = info.get("eks") or {}
+            kind, desc = "EKS", f"{e.get('name')} ({e.get('region')}, AWS profile {e.get('profile') or '-'})"
+        else:
+            server = info.get("server") or "?"
+            kind, desc = "other", f"{info.get('cluster_name')} @ {server}"
+        mark = "*" if n == current else " "
+        print(f"{mark:2} {n:<28} {kind:<8} {desc}")
+    print("\n* = current context. To audit another one: `/kubegap --context <name>`.")
+    return EXIT_OK
+
+
+def _root(args):
+    """Snapshot root: --snapshots-root > $KUBEGAP_SNAPSHOTS > config snapshots_root > ~/.kubegap/snapshots (legacy location)."""
+    from lib.config import load_config as _lc
+
+    cfg_val = None
+    try:
+        cfg_val = _lc(getattr(args, "config", None)).get("snapshots_root")
+    except Exception:
+        cfg_val = None
+    return paths.snapshots_root(getattr(args, "snapshots_root", None), cfg_val)
+
+
+def _new_snapshot(args, ctx: str):
+    root = _root(args)
+    snap = paths.new_snapshot_dir(ctx, root)
+    return snap
+
+
+def cmd_discover(args) -> int:
+    """Run discovery only and write inventory.json and objects/ into a new snapshot folder (for debugging; collect does the same as its first step)."""
+    from lib import discover as _discover
+    from lib.config import load_config
+    from lib.runlog import RunLog
+
+    cfg = load_config(args.config)
+    ctx = _resolve_context(args)
+    if not ctx:
+        return EXIT_ERROR
+    snap = _new_snapshot(args, ctx)
+    log = RunLog(snap / "run.log", echo=args.verbose)
+    log.meta(kubegap=__version__, context=ctx, command="discover")
+    print(f"context {ctx} -> {snap}")
+    inv = _discover.discover(ctx, cfg, snap, kubeconfig=args.kubeconfig, log=log, profile_override=args.profile)
+    c = inv["cluster"]
+    print(f"\nplatform {c['platform']} ({'; '.join(c['platform_reasons'])}), server {c['server_version']}")
+    print(f"profile {inv['profile']['name']} [{inv['profile']['source']}] / node access {inv['node_access']['method']}")
+    n = inv["nodes"]
+    print(f"nodes {n['count']} (Ready {n['ready']}), namespaces {inv['namespaces']['count']}, pods {inv['pods']['count']}, CRDs {inv['crds']['count']}")
+    print(f"components present {len(inv['components_present'])}: {', '.join(inv['components_present'])}")
+    print(f"expected but missing families: {', '.join(inv['missing_families']) or 'none'}")
+    for k, v in inv["stores"].items():
+        print(f"  {k:<12} {'connected v' + str(v.get('version')) + ' retention ' + str(v.get('retention') or '-') if v.get('ok') else 'missing'}")
+    if inv["node_access"]["method"] == "ssm":
+        print(f"SSM registered {len(inv['node_access']['ssm_registered'])} / unregistered {len(inv['node_access']['ssm_unregistered'])}: {', '.join(x['node'] for x in inv['node_access']['ssm_unregistered']) or '-'}")
+    print(f"collectors to run: {', '.join(inv['collectors_enabled'])}")
+    print(f"saved: {snap / 'inventory.json'}")
+    return EXIT_OK
+
+
+def cmd_collect(args) -> int:
+    """Discover then collect. One new snapshot folder receives inventory.json, objects/, events.json, metrics/, aws/ and run.log."""
+    import time as _time
+
+    from lib import collect as _collect
+    from lib import discover as _discover
+    from lib.config import load_config
+    from lib.runlog import RunLog
+
+    cfg = load_config(args.config)
+    ctx = _resolve_context(args)
+    if not ctx:
+        return EXIT_ERROR
+    t0 = _time.monotonic()
+    # Refuse if a collection is already in progress for the same context (two collects started 44 s apart once overlapped and one died during discovery). In progress = INCOMPLETE present and run.log updated within 10 minutes
+    from lib import paths as _paths
+
+    for other in _paths.list_snapshots(ctx, _root(args)):
+        rl = other / "run.log"
+        if (other / "INCOMPLETE").is_file() and rl.is_file() and _time.time() - rl.stat().st_mtime < 600 and not getattr(args, "force", False):
+            print(f"error: a collection is already in progress for this context: {other} (run.log updated {int(_time.time() - rl.stat().st_mtime)} s ago). Wait for it to finish or override with --force.")
+            return EXIT_ERROR
+    snap = _new_snapshot(args, ctx)
+    (snap / "INCOMPLETE").write_text("Discovery/collection in progress. If this file remains, the snapshot was interrupted (an interrupted folder was once picked up as the diff baseline).\n", encoding="utf-8")
+    log = RunLog(snap / "run.log", echo=args.verbose)
+    log.meta(kubegap=__version__, context=ctx, command="collect", args=vars(args))
+    print(f"context {ctx} -> {snap}\n== discover")
+    inv = _discover.discover(ctx, cfg, snap, kubeconfig=args.kubeconfig, log=log, profile_override=args.profile)
+    print(f"  platform {inv['cluster']['platform']}, profile {inv['profile']['name']}, components {len(inv['components_present'])}, collectors to run {len(inv['collectors_enabled'])}")
+    print("== collect")
+    only = [n.strip() for n in args.only.split(",")] if args.only else None
+    mode = _mode(args, cfg)
+    print(f"mode {mode}" + (" (daily skips slow tools, per-node scripts, CloudWatch and cost data; `--mode full` collects everything)" if mode == "daily" else ""))
+    results = _collect.collect(ctx, cfg, inv, snap, log, kubeconfig=args.kubeconfig, only=only, mode=mode)
+    ran = [n for n, r in results.items() if not r.get("skipped")]
+    unimpl = [n for n, r in results.items() if r.get("skipped")]
+    print(f"\ncollectors run {len(ran)} ({', '.join(ran)}), unimplemented skipped {len(unimpl)}")
+    print(f"elapsed {_time.monotonic() - t0:.0f}s, saved: {snap}")
+    return EXIT_OK
+
+
+def _resolve_snapshot_arg(args, spec: str):
+    ctx = getattr(args, "context", None) or kube.current_context(getattr(args, "kubeconfig", None))
+    root = _root(args)
+    return paths.resolve_snapshot(spec, ctx, root, mode=getattr(args, "mode", None))
+
+
+def _mode(args, cfg) -> str:
+    """Collection mode: --mode, else `mode:` in config.yaml, else daily."""
+    m = getattr(args, "mode", None) or cfg.get("mode") or paths.DEFAULT_MODE
+    if m not in paths.MODES:
+        raise SystemExit(f"kubegap: unknown mode {m!r} (expected {' | '.join(paths.MODES)})")
+    return m
+
+
+def cmd_summarize(args) -> int:
+    from lib import summarize as _summarize
+
+    snap = _resolve_snapshot_arg(args, args.snapshot)
+    print(f"snapshot {snap}")
+    if paths.is_incomplete(snap):
+        print("warning: collect did not finish on this snapshot (INCOMPLETE). Summarize and evaluate still work, but inputs are missing; note it in report section 7-1.")
+    _summarize.summarize(snap)
+    return EXIT_OK
+
+
+def cmd_evaluate(args) -> int:
+    import json as _json
+
+    from lib import evaluate as _evaluate
+    from lib.config import load_config
+
+    cfg = load_config(args.config)
+    snap = _resolve_snapshot_arg(args, args.snapshot)
+    print(f"snapshot {snap}")
+    tools_present = None
+    sj = snap.parent / "setup.json"
+    if sj.is_file():
+        try:
+            tools_present = {t["name"] for t in _json.loads(sj.read_text(encoding="utf-8")).get("tools", []) if t.get("present")}
+        except (ValueError, KeyError):
+            tools_present = None
+    _evaluate.evaluate(snap, cfg, profile_override=args.profile, tools_present=tools_present)
+    return EXIT_OK
+
+
+def cmd_diff(args) -> int:
+    """Compare two snapshots. B defaults to latest; A defaults to the snapshot just before B. Writes diff.json into B's folder and appends one row for B to history.csv."""
+    from lib import diff as _diff
+
+    b = _resolve_snapshot_arg(args, args.snapshot_b)
+    if args.snapshot_a:
+        a = _resolve_snapshot_arg(args, args.snapshot_a)
+    else:
+        a = paths.previous_snapshot(b)
+        if a is None:
+            print(f"kubegap diff: no earlier {paths.snapshot_mode(b)} snapshot to compare {b.name} with (daily compares with daily, full with full). Only history.csv is updated.", file=sys.stderr)
+            hp = _diff.append_history(b)
+            print(f"history: {hp}" if hp else "history: not recorded (findings-draft.json or inventory.json missing)")
+            return EXIT_OK
+    if a == b:
+        print("kubegap diff: A and B are the same snapshot.", file=sys.stderr)
+        return EXIT_USAGE
+    d = _diff.diff(a, b)
+    _diff.print_summary(d)
+    hp = _diff.append_history(b)
+    print(f"saved: {b / 'diff.json'}" + (f", history: {hp}" if hp else ", history: not recorded (findings-draft.json missing)"))
+    return EXIT_OK
+
+
+def cmd_render_details(args) -> int:
+    """Assemble report-details.md from the snapshot files and the LLM fragments in <snapshot>/llm/ (see lib/render.py)."""
+    from lib import render as _render
+
+    snap = _resolve_snapshot_arg(args, args.snapshot)
+    p = _render.render_details(snap, language=args.language)
+    missing = [n for n in _render.FRAGMENTS if not (snap / "llm" / f"{n}.md").is_file()]
+    print(f"saved: {p}" + (f" (fragments not written: {', '.join(missing)})" if missing else " (all fragments present)"))
+    return EXIT_OK
+
+
+def cmd_checks(args) -> int:
+    """List every check in the rubric, grouped by area, as Markdown (docs/CHECKS.md is generated from this) or as plain text."""
+    from lib import rubric as _rubric
+
+    checks, errors = _rubric.load_checks([p.name for p in sorted(paths.COLLECTORS_DIR.iterdir()) if (p / "checks.yaml").is_file()])
+    if errors:
+        print("load errors: " + "; ".join(errors), file=sys.stderr)
+    by_area: dict[str, list[dict]] = {}
+    for c in checks:
+        by_area.setdefault(c["area"], []).append(c)
+    order = ["resources", "scaling", "observability", "traffic", "resilience", "hygiene", "storage", "security", "cost", "tenancy", "node", "platform"]
+    areas = [a for a in order if a in by_area] + sorted(a for a in by_area if a not in order)
+    if args.markdown:
+        print(f"# kubegap checks\n\nGenerated by `scripts/kubegap checks --markdown` from `collectors/*/checks.yaml`, rubric {paths.rubric_version()}. {len(checks)} checks in {len(areas)} areas. Severity is the default before the agent adjusts it; profiles say where the check applies (derived profiles inherit from their base).\n")
+        print("| Area | Checks |\n|---|---|")
+        for a in areas:
+            print(f"| [{a}](#{a}) | {len(by_area[a])} |")
+        for a in areas:
+            print(f"\n## {a}\n\n| id | What it checks | Default severity | Profiles | Collector |\n|---|---|---|---|---|")
+            for c in sorted(by_area[a], key=lambda c: c["id"]):
+                print(f"| `{c['id']}` | {c['name']} | {c['severity_default']} | {', '.join(c.get('profiles') or [])} | {c['collector']} |")
+        return EXIT_OK
+    for a in areas:
+        print(f"{a} ({len(by_area[a])})")
+        for c in sorted(by_area[a], key=lambda c: c["id"]):
+            print(f"  {c['id']:<60} {c['severity_default']:<9} {c['name']}")
+    return EXIT_OK
+
+
+def cmd_mask(args) -> int:
+    """Mask report files. If inventory.json exists in the same folder, AWS account ids are masked too. SKILL.md calls this right before saving."""
+    import json as _json
+
+    from lib import mask as _mask
+
+    accounts = list(args.account or [])
+    for f in args.files:
+        inv = Path(f).resolve().parent / "inventory.json"
+        if inv.is_file():
+            try:
+                eks = (_json.loads(inv.read_text(encoding="utf-8")).get("cluster") or {}).get("eks") or {}
+                if eks.get("account"):
+                    accounts.append(str(eks["account"]))
+            except ValueError:
+                pass
+        r = _mask.mask_file(f, accounts, ips=args.ips, write=not args.check)
+        detail = ", ".join(f"{k} {v}" for k, v in sorted(r.counts.items())) or "nothing to mask"
+        print(f"{f}: {r.total} {'(check only)' if args.check else 'masked'}: {detail}")
+    return EXIT_OK
+
+
+def cmd_nodes(args) -> int:
+    """Verify node command backend (SSM/SSH) access. Sends `echo; uname -r; hostname` to every node listed in the latest snapshot's inventory.json."""
+    import json as _json
+
+    from lib.config import load_config
+    from lib.node import NodeAccess
+
+    cfg = load_config(args.config)
+    snap = _resolve_snapshot_arg(args, args.snapshot)
+    inv = _json.loads((snap / "inventory.json").read_text(encoding="utf-8"))
+    na = NodeAccess(inv, cfg)
+    print(f"snapshot {snap.name}, backend {na.method}" + (" (overridden by config.yaml)" if cfg.get("node_access") else ""))
+    if args.cmd:
+        results = na.run_on_all(args.cmd, timeout=args.timeout)
+    else:
+        results = na.probe()
+    ok = 0
+    for n, r in results.items():
+        if r.ok:
+            ok += 1
+            out = " / ".join(ln for ln in r.stdout.strip().splitlines()[:6])
+            print(f"  OK   {n:<48} [{r.backend} {r.seconds:.1f}s] {out[:160]}")
+        else:
+            tail = (" | output: " + " / ".join(r.stdout.strip().splitlines()[:4])[:160]) if r.stdout.strip() else ""
+            print(f"  failed {n:<48} [{r.backend}] {r.error}{tail}")
+    print(f"reachable {ok}/{len(results)}")
+    if not args.cmd and ok and na.method == "ssh":
+        import json as _json2
+
+        caps = na.capabilities()
+        keys = ["k3s-role", "cgroup", "journal", "kernlog", "dmesg", "k3s-db", "k3s-config", "crictl", "sudo-any"]
+        print("node privileges (yes=allowed, sudo=allowed via sudoers, no=not allowed -> those checks are marked 'node privilege missing'). Setup: deploy/node-access/README.md")
+        print("  " + f"{'NODE':<12}" + "".join(f"{k:<12}" for k in keys))
+        for n, c in caps.items():
+            print("  " + f"{n:<12}" + "".join(f"{(c['caps'].get(k) or '-'):<12}" for k in keys))
+        (snap.parent / "node-access.json").write_text(_json2.dumps({"snapshot": snap.name, "method": na.method, "nodes": caps}, ensure_ascii=False, indent=1), encoding="utf-8")
+        print(f"saved: {snap.parent / 'node-access.json'}")
+    return EXIT_OK if ok == len(results) else EXIT_ERROR
+
+
+def cmd_selftest(args) -> int:
+    from pathlib import Path as _P
+
+    from lib import selftest as _st
+
+    r = _st.run(check_ids=args.check or None, snapshots=[_P(x) for x in (args.snapshot or [])])
+    return 1 if r["failed"] or r["load_errors"] or r["audit_failed"] else 0
+
+
+def cmd_snapshots(args) -> int:
+    """List snapshot folders. Auxiliary debugging command."""
+    ctx = _resolve_context(args)
+    if not ctx:
+        return EXIT_ERROR
+    root = _root(args)
+    snaps = paths.list_snapshots(ctx, root)
+    print(f"context: {ctx}\nroot:    {paths.context_root(ctx, root)}")
+    if not snaps:
+        print("(no snapshots)")
+        return EXIT_OK
+    for s in snaps:
+        marks = [paths.snapshot_mode(s)] + [n for n in ("inventory.json", "summary.json", "findings-draft.json", "report.md") if (s / n).exists()]
+        if paths.is_incomplete(s):
+            marks.insert(0, "INCOMPLETE (collection interrupted)")
+        print(f"  {s.name}  [{', '.join(marks) or 'empty'}]")
+    return EXIT_OK
+
+
+def build_parser() -> argparse.ArgumentParser:
+    p = argparse.ArgumentParser(prog="kubegap", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--version", action="version", version=f"kubegap {__version__} (rubric {paths.rubric_version()}, signatures {paths.signatures_version()})")
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--context", help="kube context. Default: `kubectl config current-context`")
+    common.add_argument("--kubeconfig", help="kubeconfig path. Default: kubectl default")
+    common.add_argument("--config", default=str(paths.DEFAULT_CONFIG), help="config.yaml path (optional; works without it)")
+    common.add_argument("--snapshots-root", help=f"snapshot root. Default {paths.DEFAULT_SNAPSHOTS_ROOT}, or $KUBEGAP_SNAPSHOTS, or snapshots_root in config")
+    common.add_argument("-v", "--verbose", action="store_true", help="also print run.log entries to stderr")
+
+    sub = p.add_subparsers(dest="command", metavar="<command>")
+    sub.required = True
+
+    s = sub.add_parser("setup", parents=[common], help="check dependency tools (check only by default) and access to the context, Prometheus, Loki, Alertmanager, Grafana and AWS")
+    g = s.add_mutually_exclusive_group()
+    g.add_argument("--install", action="store_true", help="install every missing tool (brew, then GitHub release, then dedicated venv)")
+    g.add_argument("--install-only", metavar="NAME,NAME", help="install only the named tools")
+    g.add_argument("--no-install", action="store_true", help="check only, even if install_tools is always in config.yaml")
+    s.set_defaults(func=cmd_setup)
+
+    s = sub.add_parser("contexts", parents=[common], help="list kube contexts, mark the current one, and say whether each is EKS")
+    s.set_defaults(func=cmd_contexts)
+
+    s = sub.add_parser("discover", parents=[common], help="run discovery only and write inventory.json (debugging)")
+    s.add_argument("--profile", help="override the detected profile (prod | lab | small-prod | multi-az-prod | dev)")
+    s.set_defaults(func=cmd_discover)
+
+    s = sub.add_parser("collect", parents=[common], help="run discovery and collection into a new snapshot folder")
+    s.add_argument("--profile", help="override the detected profile (prod | lab | small-prod | multi-az-prod | dev)")
+    s.add_argument("--mode", choices=list(paths.MODES), help="daily (default; skips steps marked `modes: [full]` in collect.yaml) or full. Config key `mode` sets the default")
+    s.add_argument("--only", help="run only these comma-separated collectors (e.g. core,eks-platform)")
+    s.add_argument("--force", action="store_true", help="proceed even if a collection is in progress for the same context")
+    s.set_defaults(func=cmd_collect)
+
+    s = sub.add_parser("summarize", parents=[common], help="read a snapshot and write summary.json")
+    s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
+    s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
+    s.set_defaults(func=cmd_summarize)
+
+    s = sub.add_parser("evaluate", parents=[common], help="first-pass evaluation with checks.yaml, writing findings-draft.json")
+    s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
+    s.add_argument("--profile", help="override the profile (prod | lab | small-prod | multi-az-prod | dev)")
+    s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
+    s.set_defaults(func=cmd_evaluate)
+
+    s = sub.add_parser("diff", parents=[common], help="object additions, deletions and changes plus first-pass status changes between two snapshots")
+    s.add_argument("snapshot_a", metavar="A", nargs="?", help="earlier snapshot (path, name or date prefix). Defaults to the snapshot just before B")
+    s.add_argument("snapshot_b", metavar="B", nargs="?", default="latest", help="later snapshot. Default latest")
+    s.add_argument("--mode", choices=list(paths.MODES), help="with B = latest: the latest snapshot of this mode. A defaults to the previous snapshot of the same mode")
+    s.set_defaults(func=cmd_diff)
+
+    s = sub.add_parser("render-details", parents=[common], help="assemble report-details.md from the snapshot plus the LLM fragments in <snapshot>/llm/ (SKILL.md calls this before mask)")
+    s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
+    s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
+    s.add_argument("--language", choices=["en", "ko"], default="en", help="language of the headings and fixed phrases; data inside tables stays English")
+    s.set_defaults(func=cmd_render_details)
+
+    s = sub.add_parser("checks", help="list every check by area; --markdown writes the catalog that docs/CHECKS.md is generated from")
+    s.add_argument("--markdown", action="store_true", help="Markdown tables instead of plain text")
+    s.set_defaults(func=cmd_checks)
+
+    s = sub.add_parser("mask", help="mask tokens, passwords, keys and AWS account ids in report files (SKILL.md calls this right before saving)")
+    s.add_argument("files", nargs="+", help="files to mask (edited in place)")
+    s.add_argument("--ips", action="store_true", help="also mask private IPv4 addresses as <ip>")
+    s.add_argument("--account", action="append", help="additional AWS account id (12 digits) to mask. Repeatable")
+    s.add_argument("--check", action="store_true", help="print counts only, without modifying")
+    s.set_defaults(func=cmd_mask)
+
+    s = sub.add_parser("nodes", parents=[common], help="verify node command backend (SSM/SSH) access. Default command: echo, uname, hostname")
+    s.add_argument("--snapshot", default="latest", help="snapshot whose inventory.json to read. Default latest")
+    s.add_argument("--cmd", help="read-only command to run instead (e.g. 'df -h /')")
+    s.add_argument("--timeout", type=float, default=60)
+    s.set_defaults(func=cmd_nodes)
+
+    s = sub.add_parser("snapshots", parents=[common], help="list snapshot folders for this context (debugging)")
+    s.set_defaults(func=cmd_snapshots)
+    s = sub.add_parser("selftest", help="run each check's fail/warn/pass paths with the fake inputs from its test section in checks.yaml to catch expression errors (no cluster needed)")
+    s.add_argument("--check", action="append", help="only this check id (repeatable)")
+    s.add_argument("--snapshot", action="append", help="real snapshot folder (repeatable). Verifies that keys referenced by summary-type check expressions exist in that summary.json")
+    s.set_defaults(func=cmd_selftest)
+    return p
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    from lib import tools as _tools
+
+    ok, why = _tools.supported_host()
+    if not ok:
+        print(f"kubegap: {why}", file=sys.stderr)
+        return EXIT_ERROR
+    try:
+        return args.func(args)
+    except KeyboardInterrupt:
+        print("kubegap: interrupted", file=sys.stderr)
+        return 130
+    except FileNotFoundError as e:
+        print(f"kubegap: {e}", file=sys.stderr)
+        return EXIT_ERROR
+    except (_yamlite.YamlError, _rubric.RubricError, json.JSONDecodeError) as e:
+        # malformed config.yaml, checks.yaml or snapshot file: one line, no traceback
+        print(f"kubegap: {type(e).__name__}: {e}", file=sys.stderr)
+        return EXIT_ERROR
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -1,0 +1,35 @@
+# VPC CNI (aws-node) log signatures (moved here from signatures/catalog.yaml; loaded only when the collector is enabled). Field descriptions are in the catalog.yaml header.
+- id: vpc-cni.ip-assign-failed
+  name: Pod IP assignment failed (subnet or ENI exhausted)
+  component: vpc-cni
+  area: traffic
+  severity: high
+  sources: ["logs/pods/vpc-cni/*.log"]
+  pattern: 'Failed to (assign|allocate) (an )?IP|InsufficientFreeAddressesInSubnet|datastore has no available IP|no available IP addresses|failed to assign an IP address to container'
+  meaning: New pods cannot get an IP and stay in ContainerCreating. The subnet's free IPs or the instance ENI/IP limit are used up.
+  cause: Small subnet, ENI limit of the node type, WARM_IP_TARGET setting, prefix delegation not used.
+  verify: "aws ec2 describe-subnets --query 'Subnets[].{id:SubnetId,free:AvailableIpAddressCount}'; kubectl get events -A | grep -i 'failed to assign'"
+- id: vpc-cni.ec2-throttled
+  name: aws-node throttled by the EC2 API
+  component: vpc-cni
+  area: platform
+  severity: medium
+  sources: ["logs/pods/vpc-cni/*.log"]
+  pattern: 'RequestLimitExceeded|Throttling|Rate exceeded'
+  meaning: ENI/IP allocation API calls slow down, delaying pod startup.
+  cause: Many nodes launching at once (scale-out, deployment), API quota shared with other controllers.
+  verify: "kubectl logs -n kube-system -l k8s-app=aws-node --since=24h | grep -c RequestLimitExceeded"
+  warn_at: 5
+  fail_at: 100
+- id: vpc-cni.ipamd-error
+  name: ipamd errors
+  component: vpc-cni
+  area: traffic
+  severity: medium
+  sources: ["logs/pods/vpc-cni/*.log"]
+  pattern: 'level=error|Failed to (create|attach|delete) ENI|ipamd.*(error|failed)'
+  meaning: The aws-node IP management daemon logged errors. Check the samples to tell ENI-related from API-related.
+  cause: IAM permissions (AmazonEKS_CNI_Policy on the node role), security groups, subnet configuration.
+  verify: "kubectl logs -n kube-system -l k8s-app=aws-node --since=24h | grep level=error | head"
+  warn_at: 10
+  fail_at: 200

@@ -1,0 +1,2 @@
+# k3s platform collector. Enabled only when the detected platform is k3s. Requires SSH node access and the deploy/node-access setup; items that cannot run are reported as "no node access".
+platform: k3s

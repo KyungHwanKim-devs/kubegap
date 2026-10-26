@@ -1,0 +1,35 @@
+# Argo CD log signatures. The first edition lived in signatures/catalog.yaml and was moved into this collector. Field descriptions are in the header of catalog.yaml.
+- id: argocd.sync-failed
+  name: Argo CD sync failed
+  component: argocd
+  area: hygiene
+  severity: medium
+  sources: ["logs/pods/argocd/*.log"]
+  pattern: 'sync failed|ComparisonError|Failed to load live state|error synchronizing|failed to sync|one or more objects failed to apply|level=error.*(sync|apply)'
+  meaning: Git and the cluster differ and Argo CD cannot reconcile them. Deployments have stopped or manual changes are not being reverted.
+  cause: Manifest errors (missing CRD, field mismatch), RBAC, resource hook failures, repository unreachable.
+  verify: "kubectl get applications -A -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status | grep -v Synced"
+  warn_at: 1
+  fail_at: 50
+- id: argocd.repo-access
+  name: Argo CD repository access failed
+  component: argocd
+  area: hygiene
+  severity: medium
+  sources: ["logs/pods/argocd/*.log"]
+  pattern: 'repository not accessible|authentication required|failed to get git client|Unable to resolve.*revision|rpc error: code = Unknown desc = .*(git|helm)'
+  meaning: The Git or Helm repository cannot be read, so new commits are not deployed.
+  cause: Expired token or SSH key, changed repository URL, rate limit.
+  verify: "argocd repo list; kubectl logs -n argocd deploy/argocd-repo-server --since=1h | grep -i auth"
+- id: argocd.rate-limit
+  name: Argo CD hit the Git hosting rate limit
+  component: argocd
+  area: hygiene
+  severity: low
+  sources: ["logs/pods/argocd/*.log"]
+  pattern: 'too many requests|rate limit|secondary rate limit|status(=| )429'
+  meaning: Polling is too frequent and GitHub refuses requests. Syncs are delayed.
+  cause: Many apps with a short polling interval (default 3 minutes), no webhook configured.
+  verify: "kubectl get cm -n argocd argocd-cm -o jsonpath='{.data.timeout\\.reconciliation}'"
+  warn_at: 5
+  fail_at: 200

@@ -1,0 +1,2 @@
+# ECR collector. Enabled when a pod image uses a .dkr.ecr. registry (components.ecr). Being an aws step, it only actually runs in an EKS context (AWS profile).
+component: ecr

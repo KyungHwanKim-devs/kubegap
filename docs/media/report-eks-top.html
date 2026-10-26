@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset='utf-8'><style>
+body{margin:0;background:#f6f8fa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#1f2328}
+.wrap{max-width:900px;margin:32px auto;background:#fff;border:1px solid #d0d7de;border-radius:8px;padding:40px 48px;font-size:16px;line-height:1.6}
+h1{font-size:30px;border-bottom:1px solid #d8dee4;padding-bottom:8px;margin-top:0}
+h2{font-size:23px;border-bottom:1px solid #d8dee4;padding-bottom:6px;margin-top:36px}
+h3{font-size:19px;margin-top:28px}
+code{background:#f6f8fa;padding:2px 6px;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:85%}
+pre{background:#f6f8fa;padding:14px;border-radius:6px;overflow:hidden;font-size:85%}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14px}
+th,td{border:1px solid #d0d7de;padding:6px 12px;text-align:left;vertical-align:top}
+th{background:#f6f8fa}
+ul{padding-left:24px}
+strong{font-weight:600}
+</style></head><body><div class='wrap'><h1>my-cluster — full audit, 2026-10-26 16:27 KST</h1>
+<p>This is the EKS cluster <code>my-cluster</code> (kube context <code>my-cluster</code>, Kubernetes 1.32.13, region us-east-1, profile prod), 8 nodes, 25 namespaces, 157 pods, running 8 production services (app-r, app-q, app-m, app-o, app-l, app-p, app-n, app-s) in 8 prod namespaces and 4 dev namespaces. Nothing is on fire at the moment of collection, and the 95 minutes since the 14:52 full run were quiet: no spot reclaim, no node change, no deployment. That also means the five problems below are the same five as in the 14:52 and 05:14 reports, and none of their actions has been started, so the next spot reclaim will take the same six workloads down again. The one thing that moved is the CPU throttling of the app-m frontend, which crossed the 25% line. This collection started 9 minutes after the 16:18 daily collection, so the apiserver numbers include kubegap's own load and are not counted.</p>
+<h2>The 5 problems to work on</h2>
+<h3>1. 28 of 42 prod pods still sit on one expired spot node that AWS can take back with two minutes' notice, and the last four reclaims each stopped a production service</h3>
+<p><strong>Problem.</strong> Application pods can only run on nodes labelled <code>workload-type=app</code>, which today is two spot nodes in one availability zone: <code>ip-10-0-1-139</code> (r8gd.xlarge, 28 of 42 prod pods from 22 workloads) and <code>ip-10-0-1-62</code> (r8gd.large, 5 prod pods, created at 14:17 KST today when its predecessor was reclaimed). AWS has reclaimed the second app node four times in 26 hours. Each time the six pods on it were evicted and waited about 80 seconds for Karpenter to launch a new node, because the big node has no CPU request room left, and <code>prod-app-p/app-p-backend</code> with one replica and strategy Recreate was unreachable for the whole wait. Five 2-replica prod Deployments have both replicas on the big node, so when that node goes, app-r, app-o-ai, app-o-backend, app-l-backend and app-l-frontend go with it, and the cluster cannot absorb its loss on memory. The big node is 54 hours past its Karpenter expiry and is held in place by one <code>karpenter.sh/do-not-disrupt</code> annotation on <code>prod-app-m/app-m-admin</code>.</p>
+<p><strong>Evidence.</strong> 28 of 42 prod pods are on <code>ip-10-0-1-139</code>, 5 on <code>ip-10-0-1-62</code>, both in us-east-1. Source: summary.json resilience.placement. CPU requests on <code>ip-10-0-1-139</code> are 99.5% of allocatable while the 7-day p95 usage is 5.6%. Source: metrics/node_cpu_request_ratio.json and metrics/node_cpu_usage_ratio_p95_7d.json. Without that node the cluster has 46.0 GB of allocatable memory against 47.5 GB requested. Source: summary.json resilience.n_plus_one. The control-plane log holds 113 "no fit" scheduler lines in 24 hours, 23 each for app-m-backend, app-p-backend and app-l-embedding-server and 19 for app-m-api. Source: summary.json controlplane.scheduler. Karpenter logged "initiating delete from interruption message" at 2026-10-25T20:09:52Z, 2026-10-26T03:33:23Z and 05:17:28Z. Source: logs/pods/karpenter/karpenter_karpenter.log. The do-not-disrupt pod has blocked disruption of this node 14,163 times since 2026-10-06. Source: events.json. app-p-backend still has replicas 1 and strategy Recreate at generation 5. Source: objects/deployments.json.</p>
+<p><strong>Cause.</strong> Prod runs on two spot nodes in the Karpenter <code>default</code> pool with no spread rule, so pods pack onto whichever node has room. Requests 18 times above real use make the scheduler see the big node as full, so every evicted pod waits for a new node instead of rescheduling in seconds. Karpenter sizes the replacement for the six waiting pods only, so the new node is small and is reclaimed again as cheap spot capacity. The <code>app-amd64-fallback</code> pool that could hold on-demand capacity has 0 nodes and a 10% budget that has blocked 83,933 times. Likely: the do-not-disrupt annotation on app-m-admin was added once to protect a session and never removed.</p>
+<p><strong>Action.</strong> ① Lower CPU requests to the 7-day p95 in the shared prod chart: app-l-backend 500 m → 150 m, app-l-embedding-server 500 m → 160 m, app-p-backend 500 m → 150 m, app-l-neo4j 500 m → 50 m, and neo4j memory 4 Gi → 1 Gi. Effect: <code>ip-10-0-1-139</code> drops to roughly 60% requested, evicted pods reschedule in seconds, and the N+1 memory gap closes. Takes 1 hour. ② app-p-backend: replicas 2, RollingUpdate with maxSurge 1 and maxUnavailable 0, a 5-second preStop. Takes 20 minutes. ③ Add topologySpreadConstraints on hostname and on zone to the shared prod chart, plus a PDB with minAvailable 1 for app-o-ai and app-o-backend. Takes 2 to 3 hours including the Argo CD sync. ④ Remove <code>karpenter.sh/do-not-disrupt</code> from the app-m-admin template. Takes 10 minutes. Karpenter then replaces the expired node, which also clears problem 2. Do ① to ③ before ④, otherwise the pods regroup on whichever node replaces it. ⑤ Give the <code>app-amd64-fallback</code> pool a usable budget and an on-demand capacity-type requirement, and add a spread on <code>karpenter.sh/capacity-type</code> so prod is never spot-only. Takes half a day.</p>
+<pre><code class="language-yaml"># shared prod chart values -&gt; Deployment template.spec
+replicas: 2
+strategy: { type: RollingUpdate, rollingUpdate: { maxSurge: 1, maxUnavailable: 0 } }
+topologySpreadConstraints:
+
+- maxSkew: 1
+  topologyKey: kubernetes.io/hostname
+  whenUnsatisfiable: DoNotSchedule
+  labelSelector: { matchLabels: { app.kubernetes.io/name: &quot;{{ .name }}&quot; } }
+
+- maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+  labelSelector: { matchLabels: { app.kubernetes.io/name: &quot;{{ .name }}&quot; } }
+containers:
+
+- resources: { requests: { cpu: 150m } }
+  lifecycle: { preStop: { exec: { command: [&quot;sleep&quot;, &quot;5&quot;] } } }
+</code></pre>
+<p><strong>Why this happens.</strong></p>
+<ul>
+<li>Principle: A spot interruption gives two minutes' notice. Karpenter drains the node at once and provisions a replacement sized for the pending pods, so the gap users see equals node launch time plus pod start time unless the remaining nodes have request headroom. The scheduler places by requests, not usage, so requests far above real use turn an idle node into a full one, and without a spread constraint the scheduler and Karpenter consolidation pack replicas onto the same node.</li>
+<li>Cases: No public case recorded for this check. The check definition records its own measurement: on its first real run a single spot reclaim stopped a production service for 2 minutes 7 seconds while that node held 27 production pods.</li>
+<li>Read next: "Kubernetes docs: Pod Topology Spread Constraints", "Karpenter docs: Disruption (expiration, consolidation, interruption)", "AWS docs: EC2 Spot Instance interruption notices".</li>
+</ul>
+<p>Evidence checks: <code>resilience.prod-concentration.node-1-139</code>, <code>resilience.n-plus-one.cluster</code>, <code>resilience.replicas-same-node.prod-app-r/deployment/app-r</code>, <code>resilience.replicas-same-node.prod-app-o/deployment/app-o-ai</code>, <code>resilience.replicas-same-node.prod-app-o/deployment/app-o-backend</code>, <code>resilience.replicas-same-node.prod-app-l-backend/deployment/app-l-backend</code>, <code>resilience.replicas-same-node.prod-app-l-backend/deployment/app-l-frontend</code>, <code>resilience.replicas-same-zone.*</code> ×9, <code>resilience.single-replica-in-prod.prod-app-p/app-p-backend</code>, <code>resilience.recreate-strategy-serving.prod-app-p/deployment/app-p-backend</code>, <code>resilience.no-pdb.prod-app-o/app-o-ai</code>, <code>resilience.no-pdb.prod-app-o/app-o-backend</code>, <code>controlplane.scheduler-unschedulable.prod-app-m/app-m-api</code>, <code>controlplane.scheduler-unschedulable.prod-app-m/app-m-backend</code>, <code>controlplane.scheduler-unschedulable.prod-app-l-backend/app-l-embedding-server</code>, <code>controlplane.scheduler-unschedulable.prod-app-p/app-p-backend</code>, <code>resources.node-request-usage-gap.node-1-139</code>, <code>resources.cpu-request-overprovisioned.*</code> (39), <code>resources.krr-recommendation.*</code> (31), <code>scaling.karpenter-expired-not-replaced.default-n44bh</code>, <code>karpenter.spot-to-spot-consolidation-off.cluster</code>, <code>resilience.priority-inversion.cluster</code>, <code>observability.failure-mode-uncovered.Scheduling failure</code></p></div></body></html>

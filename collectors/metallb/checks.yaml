@@ -1,0 +1,969 @@
+# MetalLB checks. summary.metallb — lib/metallbctl.py (pool and L2 leader data reuse k3s.cluster.metallb built by lib/k3s.py). The first two were moved from k3s-platform with their ids unchanged.
+- id: traffic.metallb-pool-near-full
+  name: MetalLB IP pool running out of free addresses
+  area: traffic
+  type: summary
+  each: metallb.pools
+  cluster_level: true
+  profiles: [lab]
+  rule:
+    expr: "item.get('present') and ((item.get('free') or 0) <= 1 or len(item.get('pending') or []) > 0)"
+    warn_expr: "item.get('present') and (item.get('free') or 0) <= 3"
+  target: "'cluster'"
+  evidence: "f\"pools {[(p['name'], p['addresses'], p['size']) for p in item.get('pools') or []]}, used {item.get('used')}/{item.get('total_ips')}, free {item.get('free')}, Pending Services {[(s['namespace'], s['name']) for s in item.get('pending') or []]}\""
+  severity_default: medium
+  symptom_linked: true
+  why: When the pool is empty, new LoadBalancer Services stay at EXTERNAL-IP Pending. The EKS equivalent is subnet free IPs and the ELB quota.
+  suggest: Widen the IPAddressPool range or let Services share an IP (`metallb.universe.tf/allow-shared-ip`). Consolidating behind one ingress is usually the answer.
+  verify:
+    - "kubectl get ipaddresspools -A -o yaml; kubectl get svc -A --field-selector spec.type=LoadBalancer"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          pools:
+            - name: "p"
+              addresses:
+                - "192.0.2.200-192.0.2.209"
+              size: 10
+          total_ips: 10
+          used: 9
+          free: 1
+          pending: []
+      - expect: "fail"
+        item:
+          present: true
+          pools:
+            - name: "p"
+              addresses:
+                - "192.0.2.200-192.0.2.209"
+              size: 10
+          total_ips: 10
+          used: 1
+          free: 9
+          pending:
+            - namespace: "a"
+              name: "b"
+      - expect: "warn"
+        item:
+          present: true
+          pools:
+            - name: "p"
+              addresses:
+                - "192.0.2.200-192.0.2.209"
+              size: 10
+          total_ips: 10
+          used: 7
+          free: 3
+          pending: []
+      - expect: "pass"
+        item:
+          present: true
+          pools:
+            - name: "p"
+              addresses:
+                - "192.0.2.200-192.0.2.209"
+              size: 10
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+      - expect: "pass"
+        item:
+          present: false
+- id: traffic.metallb-l2-leader-concentration
+  name: MetalLB L2 — service IP announcements (leader) concentrated on one node
+  area: traffic
+  type: summary
+  each: metallb.l2
+  cluster_level: true
+  profiles: [lab]
+  rule:
+    expr: "item['available'] and item['nodes_total'] >= 2 and item['announced_total'] >= 2 and (item['leader_share'] or 0) >= 1.0 and not item['pinned_by_selector']"
+    warn_expr: "(item['available'] and item['nodes_total'] >= 2 and item['announced_total'] >= 2 and (item['leader_share'] or 0) >= 0.8 and not item['pinned_by_selector']) or (not item['available'] and item['lb_services'] > 0)"
+  target: "'cluster'"
+  evidence: "f\"read from {item['speakers']} speakers (available {item['available']}): {item['announced_total']} IPs announced (LoadBalancer services {item['lb_services']}), by node {item['by_node']}, leader {item['leader_node']} ({item['leader_share']}), pinned by nodeSelectors {item['pinned_by_selector']}, {item['nodes_total']} nodes\" + ('' if item['available'] else ' — could not read speaker /metrics (pod proxy failed or no speaker)')"
+  severity_default: low
+  symptom_linked: false
+  why: >
+    In MetalLB L2 mode one node announces each service IP via ARP (the leader). If one node announces every IP, all external traffic passes through that node's NIC, and when it dies everything is down for the roughly 10 seconds it takes another node to take over.
+    With a single IP, concentration is expected (fail requires 2 or more IPs). If pinned with L2Advertisement nodeSelectors it is a deliberate design and is excluded. Prometheus usually does not scrape the speaker, so /metrics is read directly through the pod proxy (read-only GET).
+  suggest: "With several service IPs, MetalLB spreads announcements across nodes by default — if they all sit on one node, either the speaker runs on only one node (DaemonSet nodeSelector or taints) or the other nodes' NICs are missing from L2Advertisement interfaces. BGP mode spreads traffic with ECMP."
+  verify:
+    - "kubectl get --raw /api/v1/namespaces/metallb-system/pods/<speaker-pod>:7472/proxy/metrics | grep metallb_speaker_announced"
+    - "kubectl get l2advertisements -n metallb-system -o yaml"
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          available: true
+          source: null
+          speakers: 2
+          announced: []
+          announced_total: 3
+          lb_services: 1
+          by_node:
+            node-b: 3
+          leader_node: "node-b"
+          leader_share: 1.0
+          nodes_total: 2
+          advertisements:
+            - name: "default-advertisement"
+              pools:
+                - "primary-pool"
+              node_selectors: null
+              interfaces: null
+          pinned_by_selector: false
+          note: "L2 mode advertises each service IP from one node. If one node advertises all IPs, its NIC carries all external traffic and everything drops during failover (about 10 s) if that node dies."
+      - expect: "warn"
+        item:
+          available: true
+          source: null
+          speakers: 2
+          announced: []
+          announced_total: 5
+          lb_services: 1
+          by_node:
+            node-b: 4
+            node-a: 1
+          leader_node: "node-b"
+          leader_share: 0.8
+          nodes_total: 2
+          advertisements:
+            - name: "default-advertisement"
+              pools:
+                - "primary-pool"
+              node_selectors: null
+              interfaces: null
+          pinned_by_selector: false
+          note: "L2 mode advertises each service IP from one node. If one node advertises all IPs, its NIC carries all external traffic and everything drops during failover (about 10 s) if that node dies."
+      - expect: "warn"
+        item:
+          available: false
+          source: null
+          speakers: 0
+          announced: []
+          announced_total: 0
+          lb_services: 1
+          by_node: {}
+          leader_node: null
+          leader_share: null
+          nodes_total: 2
+          advertisements:
+            - name: "default-advertisement"
+              pools:
+                - "primary-pool"
+              node_selectors: null
+              interfaces: null
+          pinned_by_selector: false
+          note: "L2 mode advertises each service IP from one node. If one node advertises all IPs, its NIC carries all external traffic and everything drops during failover (about 10 s) if that node dies."
+      - expect: "pass"
+        item:
+          available: true
+          source: null
+          speakers: 2
+          announced: []
+          announced_total: 1
+          lb_services: 1
+          by_node:
+            node-b: 1
+          leader_node: "node-b"
+          leader_share: 1.0
+          nodes_total: 2
+          advertisements:
+            - name: "default-advertisement"
+              pools:
+                - "primary-pool"
+              node_selectors: null
+              interfaces: null
+          pinned_by_selector: false
+          note: "L2 mode advertises each service IP from one node. If one node advertises all IPs, its NIC carries all external traffic and everything drops during failover (about 10 s) if that node dies."
+      - expect: "pass"
+        item:
+          available: true
+          source: null
+          speakers: 2
+          announced: []
+          announced_total: 3
+          lb_services: 1
+          by_node:
+            node-b: 3
+          leader_node: "node-b"
+          leader_share: 1.0
+          nodes_total: 2
+          advertisements:
+            - name: "default-advertisement"
+              pools:
+                - "primary-pool"
+              node_selectors: null
+              interfaces: null
+          pinned_by_selector: true
+          note: "L2 mode advertises each service IP from one node. If one node advertises all IPs, its NIC carries all external traffic and everything drops during failover (about 10 s) if that node dies."
+      - expect: "pass"
+        item:
+          available: false
+          source: null
+          speakers: 0
+          announced: []
+          announced_total: 0
+          lb_services: 0
+          by_node: {}
+          leader_node: null
+          leader_share: null
+          nodes_total: 2
+          advertisements:
+            - name: "default-advertisement"
+              pools:
+                - "primary-pool"
+              node_selectors: null
+              interfaces: null
+          pinned_by_selector: false
+          note: "L2 mode advertises each service IP from one node. If one node advertises all IPs, its NIC carries all external traffic and everything drops during failover (about 10 s) if that node dies."
+- id: traffic.metallb-speaker-not-ready
+  name: MetalLB speaker is not running on every node or its metrics cannot be read
+  area: traffic
+  type: summary
+  each: metallb.summary
+  cluster_level: true
+  rule:
+    expr: "(item['speaker_ready'] or 0) < (item['speaker_desired'] or 0) or (item['controller_ready'] or 0) < (item['controller_replicas'] or 0)"
+    warn_expr: "item['speaker_all_nodes'] is False or len(item['speakers_unreadable']) > 0 or (item['metrics_available'] is False and (item['lb_services'] or 0) > 0)"
+  target: "'cluster'"
+  evidence: "f\"speaker ready {item['speaker_ready']}/{item['speaker_desired']} ({item['nodes_total']} nodes, all nodes {item['speaker_all_nodes']}), controller {item['controller_ready']}/{item['controller_replicas']}, speakers with metrics read {item['speakers_read']}, unreadable {item['speakers_unreadable']}, version {item['version']}, mode {item['mode']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    In L2 mode a node without a speaker cannot announce any service IP — when the leader node dies, failover to that node does not happen, and an externalTrafficPolicy Local service that lives only on that node is never reachable. If the controller is down, new LoadBalancer services get no IP and stay Pending (existing IPs keep being announced by the speakers).
+    Measured on a 2-node k3s k3s: speaker 2/2 (2 nodes), controller 1/1, metrics 2/2 -> pass.
+  suggest: "kubectl -n metallb-system get ds speaker; check node taints (the speaker needs tolerations) and nodeSelector."
+  verify:
+    - "kubectl -n metallb-system get pods -o wide"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 1
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "fail"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 0
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "warn"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 1
+          speaker_ready: 1
+          speaker_all_nodes: false
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "warn"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable:
+            - pod: "speaker-x"
+              node: "node-a"
+              error: "timeout"
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+- id: traffic.metallb-config-stale
+  name: Speaker MetalLB config is stale or failed to load, or k8s update errors
+  area: traffic
+  type: summary
+  each: metallb.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and len(item['config_stale_pods']) > 0"
+    warn_expr: "item['metrics_available'] and (item['update_errors_total'] or 0) > 0"
+  target: "'cluster'"
+  evidence: "f\"speakers with stale/unloaded config {item['config_stale_pods']}, k8s client update errors {item['update_errors_total']}, ARP requests/responses {item['arp_requests_total']}/{item['arp_responses_total']}, gratuitous ARP {item['gratuitous_total']}, BGP sessions up {item['bgp_sessions_up']}/{item['bgp_sessions']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    metallb_k8s_client_config_stale_bool=1 means the speaker rejected a new IPAddressPool or L2Advertisement (validation failed) and keeps running on the old config — you widened the pool but it never applied, and "no free IPs" still fires. config_loaded 0 means the config was never read. update_errors counts failures of the speaker writing Service status.
+    Measured on a 2-node k3s k3s: both speakers loaded 1, stale 0, errors 0; the leader speaker had 5,020 gratuitous ARPs (failover and periodic re-announcement) -> pass.
+  suggest: "kubectl -n metallb-system logs ds/speaker | grep -i 'config\\|error'. Rejected CRs have the validation reason in the controller log."
+  verify:
+    - "kubectl get --raw /api/v1/namespaces/metallb-system/pods/<speaker-pod>:7472/proxy/metrics | grep metallb_k8s_client"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods:
+            - "speaker-lqmcg"
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "warn"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 4
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: false
+- id: traffic.metallb-single-lb-service
+  name: LoadBalancer services concentrated on a single ingress controller (L2 mode, one node carries all external traffic)
+  area: traffic
+  type: summary
+  each: metallb.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['mode'] == 'layer2' and (item['lb_services'] or 0) >= 1 and (item['nodes_total'] or 0) >= 2 and (item['leader_share'] or 0) >= 1.0 and not item['pinned_by_selector'] and (item['l2_available'] is True)"
+  target: "'cluster'"
+  evidence: "f\"mode {item['mode']}, {item['lb_services']} LoadBalancer services, pool used {item['used']}/{item['total_ips']}, leader {item['leader_node']} ({item['leader_share']}), pinned by nodeSelectors {item['pinned_by_selector']}, {item['nodes_total']} nodes\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    L2 mode is failover, not load balancing — a service IP enters through one node's NIC only. If a single ingress controller is the only LoadBalancer, all external traffic passes through the leader node's NIC and then rides vxlan again to pods on other nodes (a share of the small k3s cluster's overlay traffic). When the leader dies, traffic is down for about 10 seconds of ARP relearning. On a 2-node small k3s cluster this is a known trade-off, hence low — traffic.metallb-l2-leader-concentration looks at the same fact as a leader share.
+    Measured on a 2-node k3s k3s: 1 LoadBalancer (ingress-nginx) with the leader on one node.
+  suggest: "BGP mode (if the router supports it), or externalTrafficPolicy Local plus one service IP per node. For a small k3s cluster, record 'leader node = X, about 10 s outage if it dies' in the report."
+  verify:
+    - "kubectl get svc -A --field-selector spec.type=LoadBalancer; kubectl -n metallb-system get servicel2statuses.metallb.io -o wide"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: true
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          mode: "bgp"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 1
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+- id: traffic.metallb-version-old
+  name: MetalLB version is old
+  area: traffic
+  type: summary
+  each: metallb.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['version'] is not None and (int(str(item['version']).split('.')[0]) == 0 and int(str(item['version']).split('.')[1]) < 14)"
+  target: "'cluster'"
+  evidence: "f\"MetalLB {item['version']} (mode {item['mode']}, webhooks Fail {len(item['webhooks_fail'])})\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    0.13 moved configuration from a ConfigMap to CRDs (IPAddressPool, L2Advertisement), and 0.14 added FRR-K8s and L2 interface selection among others. 0.13 and below receive no patches.
+    Measured on a k3s k3s: 0.14.5 -> pass.
+  suggest: "Upgrade the metallb Helm chart. CRD changes are in the release notes."
+  verify:
+    - "kubectl -n metallb-system get ds speaker -o jsonpath='{.spec.template.spec.containers[0].image}'"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.13.12"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          mode: "layer2"
+          version: null
+          namespace: "metallb-system"
+          speaker_desired: 2
+          speaker_ready: 2
+          speaker_all_nodes: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true

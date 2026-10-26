@@ -1,0 +1,796 @@
+# Log signature catalog. The version is in signatures/version.
+# Fields: id (<component>.<name>), name, component, area (one of the 12 areas), severity (critical|high|medium|low), sources (glob list relative to the snapshot),
+#        pattern (regex, case sensitive; use (?i) to ignore case), meaning (what it means), cause (usual causes), verify (command to confirm), warn_at (default 1), fail_at (default 10).
+# The summary (lib/logs.py) scans the files in sources once and writes count, first/last timestamp and 5 sample lines per signature to summary.logs.signatures;
+# the evaluation (type: signature checks) emits a finding: fail when count >= fail_at, warn when >= warn_at. Finding id = logs.signatures.<signature id>.
+# Error lines matching no signature are normalized and the top 30 patterns go to summary.logs.unclassified_errors (candidates for new signatures).
+# Source layout: logs/pods/<component>/<ns>_<workload>.log (kubectl logs, 24h, 1500 lines per pod, --prefix --timestamps),
+#            logs/node/<node>/kubelet-24h.log and containerd-24h.log (EKS SSM journalctl), logs/node/<node>/k3s-errors-24h.log (the single k3s process: kubelet, apiserver, flannel included).
+
+# ---------------- kubelet ----------------
+- id: kubelet.pleg-not-healthy
+  name: kubelet PLEG not healthy
+  component: kubelet
+  area: node
+  severity: high
+  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'PLEG is not healthy'
+  meaning: The kubelet could not get pod status from the container runtime within 3 minutes, so the node goes NotReady.
+  cause: Node CPU or disk I/O overload, containerd latency, too many pods or containers.
+  verify: "journalctl -u kubelet --since -24h | grep PLEG; crictl ps -a | wc -l"
+- id: kubelet.eviction
+  name: kubelet evicted pods under node pressure
+  component: kubelet
+  area: node
+  severity: medium
+  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'eviction manager: (must evict|attempting to reclaim|pods ranked for eviction)|Evicted pod|evicting pod'
+  meaning: Memory, disk or inodes fell below evictionHard and the kubelet killed pods. Those pods remain in Evicted state.
+  cause: emptyDir or logs filling the node disk, memory of pods without limits, sluggish image GC.
+  verify: "kubectl get pods -A --field-selector status.phase=Failed | grep Evicted; df -h /var/lib/kubelet"
+- id: kubelet.image-gc-failed
+  name: Image garbage collection failed
+  component: kubelet
+  area: node
+  severity: medium
+  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'Image garbage collection failed|failed to garbage collect required amount of images|ImageGCFailed'
+  meaning: imagefs is above the threshold (85% by default) but there are not enough removable images. Disk-pressure eviction is imminent.
+  cause: Only in-use images remain, or images are too large. Exited containers are holding on to images.
+  verify: "crictl imagefsinfo; crictl images | wc -l"
+- id: kubelet.system-oom
+  name: kubelet detected SystemOOM
+  component: kubelet
+  area: node
+  severity: high
+  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'SystemOOM|System OOM encountered'
+  meaning: The whole node ran out of memory and the kernel OOM killer fired (different from a container OOMKilled).
+  cause: No kubeReserved/systemReserved, pods without limits, no evictionHard memory.available.
+  verify: "journalctl -k --since -24h | grep -E 'Out of memory|oom-kill'"
+- id: kubelet.runtime-network-not-ready
+  name: Container runtime network not ready (CNI)
+  component: kubelet
+  area: traffic
+  severity: high
+  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'Container runtime network not ready|NetworkPluginNotReady|cni plugin not initialized'
+  meaning: No CNI config, so new pods are stuck in ContainerCreating. The node is NotReady.
+  cause: The aws-node or flannel pod is not running on that node, /etc/cni/net.d is empty.
+  verify: "crictl info | jq .status; ls /etc/cni/net.d"
+- id: kubelet.volume-mount-failed
+  name: Volume attach/mount failed
+  component: kubelet
+  area: storage
+  severity: medium
+  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'Unable to attach or mount volumes|MountVolume\.(SetUp|MountDevice|WaitForAttach) failed|FailedMount'
+  meaning: The pod cannot attach its volume and stays in ContainerCreating.
+  cause: EBS attach limit, volume still attached to another node (Multi-Attach), PVC Pending, missing ConfigMap/Secret.
+  verify: "kubectl describe pod -n <ns> <pod> | grep -A5 Events"
+- id: kubelet.orphaned-pod
+  name: Orphaned pod directories
+  component: kubelet
+  area: hygiene
+  severity: low
+  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'orphaned pod .* found, but'
+  meaning: Directories of pods unknown to the apiserver remain under /var/lib/kubelet/pods and the kubelet cannot remove them. They eat disk and fill the log.
+  cause: Volume unmount failure (subPath, CSI), deletion during a kubelet restart.
+  verify: "ls /var/lib/kubelet/pods | wc -l"
+  warn_at: 20
+  fail_at: 500
+- id: kubelet.probe-failed
+  name: Repeated readiness/liveness probe failures
+  component: kubelet
+  area: resilience
+  severity: low
+  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: '(Readiness|Liveness|Startup) probe failed|prober.go.*failed'
+  meaning: Many probe failures mean frequent restarts and endpoint removals. Check the samples for which pods.
+  cause: Slow app startup with a short initialDelay, a dependency down, CPU throttling.
+  verify: "kubectl get events -A --field-selector reason=Unhealthy"
+  warn_at: 50
+  fail_at: 500
+- id: kubelet.pod-sync-error
+  name: Repeated pod sync errors
+  component: kubelet
+  area: resilience
+  severity: low
+  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'Error syncing pod|failed to "StartContainer"|CreateContainerConfigError|CreateContainerError'
+  meaning: The kubelet cannot bring the pod to its desired state. The samples name the pod and reason.
+  cause: CrashLoopBackOff back-off, missing image, missing ConfigMap/Secret key, runtime errors.
+  verify: "kubectl get pods -A | grep -vE 'Running|Completed'"
+  warn_at: 50
+  fail_at: 1000
+
+# ---------------- containerd ----------------
+- id: containerd.no-space
+  name: containerd out of disk space
+  component: containerd
+  area: node
+  severity: high
+  sources: ["logs/node/*/containerd-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'no space left on device'
+  meaning: Image pulls and container creation fail. The node is effectively unusable.
+  cause: Images, logs or emptyDir filling the node disk.
+  verify: "df -h /var/lib/containerd /var/lib/rancher; crictl imagefsinfo"
+- id: containerd.image-pull-failed
+  name: Image pull failed
+  component: containerd
+  area: resilience
+  severity: medium
+  sources: ["logs/node/*/containerd-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'failed to pull (and unpack )?image|PullImage .* failed|failed to resolve reference|unexpected status (from HEAD request|code).*(401|403|404|429)'
+  meaning: The image cannot be pulled from the registry and the pod stays in ImagePullBackOff.
+  cause: Missing tag, expired registry credentials (ECR token, imagePullSecret), rate limiting (Docker Hub 429), network.
+  verify: "kubectl get events -A --field-selector reason=Failed | grep -i pull"
+- id: containerd.sandbox-failed
+  name: Pod sandbox creation failed
+  component: containerd
+  area: resilience
+  severity: medium
+  sources: ["logs/node/*/containerd-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'RunPodSandbox .* failed|failed to (setup network for|create containerd task|reserve sandbox name|start sandbox)|FailedCreatePodSandBox'
+  meaning: The pod network namespace or pause container cannot be created. Most often the CNI cannot hand out an IP.
+  cause: aws-node IP exhaustion, CNI plugin errors, runtime resource shortage.
+  verify: "kubectl get events -A --field-selector reason=FailedCreatePodSandBox"
+- id: containerd.shim-error
+  name: containerd shim crashed
+  component: containerd
+  area: node
+  severity: medium
+  sources: ["logs/node/*/containerd-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'shim disconnected|shim reaped|failed to delete task|ttrpc: closed.*shim'
+  meaning: The shim wrapping the container process died. The container state may be left as Unknown.
+  cause: OOM (including the shim), runtime bugs, node reboot.
+  verify: "crictl ps -a | grep -i unknown"
+  warn_at: 5
+  fail_at: 50
+
+# ---------------- external-dns ----------------
+- id: external-dns.change-failed
+  name: external-dns record change failed
+  component: external-dns
+  area: traffic
+  severity: medium
+  sources: ["logs/pods/external-dns/*.log"]
+  pattern: 'Failure in zone|failed to submit all changes|InvalidChangeBatch|AccessDenied|Throttling|level=error'
+  meaning: DNS records for Ingresses and Services are not created or updated.
+  cause: Route53 permissions, record conflict with another owner (txt owner id), record count limit.
+  verify: "kubectl logs -n <ns> deploy/external-dns --since=1h | grep level=error"
+  warn_at: 1
+  fail_at: 50
+
+# ---------------- metrics-server ----------------
+- id: metrics-server.scrape-failed
+  name: metrics-server cannot scrape node kubelets
+  component: metrics-server
+  area: scaling
+  severity: medium
+  sources: ["logs/pods/metrics-server/*.log"]
+  pattern: 'unable to fully scrape metrics|Failed to scrape node|no metrics known for|x509|certificate'
+  meaning: The CPU/memory metrics HPAs use are missing or stale. HPAs stall at "unknown".
+  cause: kubelet serving certificate verification failure (environments needing --kubelet-insecure-tls), network policy, node NotReady.
+  verify: "kubectl top nodes; kubectl get apiservice v1beta1.metrics.k8s.io"
+  warn_at: 5
+  fail_at: 100
+
+# ---------------- Prometheus ----------------
+- id: prometheus.rule-eval-failed
+  name: Prometheus rule evaluation failed
+  component: prometheus
+  area: observability
+  severity: medium
+  sources: ["logs/pods/prometheus/*.log"]
+  pattern: 'Evaluating rule failed|rule evaluation failed|Error evaluating rule'
+  meaning: That alert rule will never fire. It creates the illusion that an alert exists.
+  cause: PromQL errors, functions over a missing metric, label mismatch.
+  verify: "kubectl logs -n monitoring prometheus-<name>-0 -c prometheus --since=24h | grep -i 'Evaluating rule failed' | head"
+- id: prometheus.wal-corrupt
+  name: Prometheus WAL/block corruption
+  component: prometheus
+  area: observability
+  severity: critical
+  sources: ["logs/pods/prometheus/*.log"]
+  pattern: 'WAL.*corrupt|corruption|invalid (block|chunk)|repair'
+  meaning: Storage is corrupted; some data is lost or startup keeps failing.
+  cause: Disk full, abnormal termination (OOM), emptyDir or an unreliable disk.
+  verify: "kubectl logs -n monitoring prometheus-<name>-0 -c prometheus --previous | grep -i corrupt"
+- id: prometheus.low-disk
+  name: Prometheus out of disk
+  component: prometheus
+  area: observability
+  severity: critical
+  sources: ["logs/pods/prometheus/*.log"]
+  pattern: 'no space left on device|low disk space|out of disk'
+  meaning: New samples cannot be written. All metrics and alerts stop.
+  cause: PVC size < retention × ingest volume, retention.size not set.
+  verify: "kubectl exec -n monitoring prometheus-<name>-0 -c prometheus -- df -h /prometheus"
+- id: prometheus.scrape-error
+  name: Prometheus scrape errors
+  component: prometheus
+  area: observability
+  severity: low
+  sources: ["logs/pods/prometheus/*.log"]
+  pattern: 'err="(context deadline exceeded|connection refused|server returned HTTP status 5\d\d)"|scrape.*error'
+  meaning: Some targets could not be scraped. Those workloads have holes in their metrics.
+  cause: Target down, short scrape_timeout, network policy.
+  verify: "curl -s localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.health!=\"up\") | .labels.job'"
+  warn_at: 50
+  fail_at: 1000
+- id: prometheus.out-of-order
+  name: Prometheus out-of-order samples
+  component: prometheus
+  area: observability
+  severity: low
+  sources: ["logs/pods/prometheus/*.log"]
+  pattern: 'out of order sample|out of bounds|duplicate sample for timestamp'
+  meaning: Samples arrived out of time order for the same series and were dropped. It can also mean two or more targets with identical labels are being scraped.
+  cause: Duplicate ServiceMonitors, two Prometheus instances writing to the same remote write, clock skew.
+  verify: "kubectl get servicemonitors -A | wc -l"
+  warn_at: 50
+  fail_at: 5000
+
+# ---------------- Alertmanager ----------------
+- id: alertmanager.notify-failed
+  name: Alertmanager notification failed
+  component: alertmanager
+  area: observability
+  severity: high
+  sources: ["logs/pods/alertmanager/*.log"]
+  pattern: 'Notify for alerts failed|Error on notify|notify retry canceled|failed to send'
+  meaning: The alert fired but never reached Slack, Discord or PagerDuty. Nobody knows.
+  cause: Expired or changed webhook URL, network egress policy, rate limiting on the receiver side.
+  verify: "kubectl logs -n monitoring alertmanager-<name>-0 --since=24h | grep -i 'notify' | tail"
+- id: alertmanager.cluster-error
+  name: Alertmanager cluster (gossip) errors
+  component: alertmanager
+  area: observability
+  severity: medium
+  sources: ["logs/pods/alertmanager/*.log"]
+  pattern: 'failed to join cluster|gossip.*(error|failed)|cluster.*unreachable'
+  meaning: Deduplication and silence sync between replicas is broken, so alerts are duplicated or silences apply on one side only.
+  cause: Headless Service or port 9094 policy, replica restart order.
+  verify: "kubectl logs -n monitoring alertmanager-<name>-0 --since=1h | grep -i gossip"
+  warn_at: 5
+  fail_at: 100
+
+# ---------------- Grafana ----------------
+- id: grafana.db-locked
+  name: Grafana SQLite locked
+  component: grafana
+  area: observability
+  severity: medium
+  sources: ["logs/pods/grafana/*.log"]
+  pattern: 'database is locked|database table is locked'
+  meaning: Dashboard saves and logins fail intermittently. Happens when two or more replicas share one SQLite database.
+  cause: SQLite with replicas>1, a slow PV.
+  verify: "kubectl get deploy -n monitoring -l app.kubernetes.io/name=grafana -o jsonpath='{.items[*].spec.replicas}'"
+  warn_at: 1
+  fail_at: 20
+- id: grafana.provisioning-error
+  name: Grafana provisioning (dashboards, datasources) errors
+  component: grafana
+  area: observability
+  severity: medium
+  sources: ["logs/pods/grafana/*.log"]
+  pattern: 'logger=provisioning.*level=(error|warn)|failed to (load|save|sync) dashboard|Failed to provision'  # level=error.*(datasource|dashboard) was removed: it matched infra.usagestats "Failed to read all Amazon Prometheus data sources" (false positive)
+  meaning: Some dashboards or datasources provisioned via ConfigMap do not show up.
+  cause: JSON syntax, duplicate uid, datasource name mismatch.
+  verify: "kubectl logs -n monitoring deploy/<grafana> --since=24h | grep -i provisioning | head"
+  warn_at: 1
+  fail_at: 50
+- id: grafana.auth-failed
+  name: Repeated Grafana login failures
+  component: grafana
+  area: security
+  severity: low
+  sources: ["logs/pods/grafana/*.log"]
+  pattern: 'Invalid username or password|Failed to authenticate|invalid API key|Invalid credentials'
+  meaning: Many wrong passwords may mean a publicly exposed Grafana is being brute-forced.
+  cause: Internet exposure plus default accounts, automation using an expired API key.
+  verify: "kubectl get ingress -A | grep -i grafana"
+  warn_at: 20
+  fail_at: 500
+
+# ---------------- Loki ----------------
+- id: loki.rate-limited
+  name: Loki ingestion rate limited
+  component: loki
+  area: observability
+  severity: medium
+  sources: ["logs/pods/loki/*.log", "logs/pods/promtail/*.log"]
+  pattern: 'Ingestion rate limit exceeded|Per stream rate limit exceeded|rate limit|too many outstanding requests|429 Too Many Requests|server returned HTTP status 429'
+  meaning: Some logs are being dropped. During an incident the most verbose logs are dropped first.
+  cause: Small limits_config.ingestion_rate_mb (default 4MB/s), a pod flooding logs.
+  verify: "kubectl logs -n monitoring -l app=promtail --since=1h | grep -c 429"
+- id: loki.stream-limit
+  name: Loki active stream limit exceeded
+  component: loki
+  area: observability
+  severity: medium
+  sources: ["logs/pods/loki/*.log", "logs/pods/promtail/*.log"]
+  pattern: 'Maximum active stream limit exceeded|per-user streams limit|streams limit exceeded'
+  meaning: Too many label combinations (streams), so new streams are rejected. High-cardinality labels (pod name, request id) are the cause.
+  cause: promtail attaching dynamic labels, the max_streams_per_user default (10000).
+  verify: "curl -s localhost:3100/metrics | grep loki_ingester_memory_streams"
+- id: loki.out-of-order
+  name: Loki out-of-order or too-old entries
+  component: loki
+  area: observability
+  severity: low
+  sources: ["logs/pods/loki/*.log", "logs/pods/promtail/*.log"]
+  pattern: 'entry (too far behind|out of order)|timestamp too old|too far in the future|entry with timestamp.*ignored'
+  meaning: Logs with skewed timestamps are dropped. Node clocks or delayed resends.
+  cause: Node NTP, resends after a backed-up promtail queue, the reject_old_samples setting.
+  verify: "timedatectl status; kubectl logs -n monitoring -l app=promtail --since=1h | grep -c 'too far behind'"
+  warn_at: 10
+  fail_at: 1000
+- id: loki.flush-failed
+  name: Loki chunk flush failed
+  component: loki
+  area: observability
+  severity: high
+  sources: ["logs/pods/loki/*.log"]
+  pattern: 'failed to flush|flush failed|error flushing|no space left on device'
+  meaning: Logs buffered in memory cannot be written to storage. A restart loses them.
+  cause: Disk or S3 permissions/capacity, emptyDir storage.
+  verify: "kubectl logs -n monitoring loki-0 --since=24h | grep -i flush | tail"
+- id: loki.panic
+  name: Loki panic
+  component: loki
+  area: observability
+  severity: critical
+  sources: ["logs/pods/loki/*.log"]
+  pattern: 'panic:|runtime error:|fatal error:'
+  meaning: The Loki process died. Logs between restarts are lost.
+  cause: OOM from a large query, bugs, a corrupted index.
+  verify: "kubectl get pods -n monitoring -l app=loki -o jsonpath='{.items[*].status.containerStatuses[*].lastState}'"
+
+# ---------------- promtail ----------------
+- id: promtail.send-failed
+  name: promtail push failed
+  component: promtail
+  area: observability
+  severity: medium
+  sources: ["logs/pods/promtail/*.log"]
+  pattern: 'error sending batch|server returned HTTP status 5\d\d|final error sending batch|connection refused|context deadline exceeded'
+  meaning: Logs are not reaching Loki. Once dropped after retries, that window is a permanent gap.
+  cause: Loki down or OOM, network policy, a changed Loki address.
+  verify: "kubectl logs -n monitoring -l app=promtail --since=1h | grep -c 'error sending batch'"
+  warn_at: 5
+  fail_at: 200
+- id: promtail.too-many-open-files
+  name: promtail too many open files
+  component: promtail
+  area: observability
+  severity: high
+  sources: ["logs/pods/promtail/*.log"]
+  pattern: 'too many open files'
+  meaning: The node inotify limit was hit, so log files of new pods cannot be opened. Logs of new pods on that node are not collected.
+  cause: fs.inotify.max_user_instances default 128 (node.sysctl-tuning), a node with many pods.
+  verify: "sysctl fs.inotify.max_user_instances; kubectl logs -n monitoring -l app=promtail --since=24h | grep -c 'too many open files'"
+- id: promtail.tail-failed
+  name: promtail failed to tail a log file
+  component: promtail
+  area: observability
+  severity: low
+  sources: ["logs/pods/promtail/*.log"]
+  pattern: 'failed to tail file|no such file or directory|error reading|permission denied'
+  meaning: A specific pod log file cannot be read. Usually a transient message right after a pod disappears, but repeated permission denied means a collection gap.
+  cause: Pod termination race, hostPath mount permissions, a changed log path.
+  verify: "kubectl logs -n monitoring -l app=promtail --since=1h | grep -i 'permission denied' | head"
+  warn_at: 20
+  fail_at: 500
+
+# ---------------- fluent-bit ----------------
+- id: fluent-bit.flush-failed
+  name: fluent-bit chunk flush failed
+  component: fluent-bit
+  area: observability
+  severity: medium
+  sources: ["logs/pods/fluent-bit/*.log"]
+  pattern: 'failed to flush chunk|flush chunk .* (failed|retry)|could not flush|HTTP status=(4|5)\d\d'
+  meaning: Logs are not being written to the output (Elasticsearch, Loki, CloudWatch) and are retrying. Past the retry limit they are dropped.
+  cause: Output target down or rejecting (ES disk watermark, mapping conflict), authentication, network.
+  verify: "kubectl logs -n <ns> -l app.kubernetes.io/name=fluent-bit --since=1h | grep -c 'failed to flush'"
+  warn_at: 10
+  fail_at: 500
+- id: fluent-bit.upstream-down
+  name: fluent-bit cannot connect to its output
+  component: fluent-bit
+  area: observability
+  severity: medium
+  sources: ["logs/pods/fluent-bit/*.log"]
+  pattern: 'no upstream connections available|upstream connection initialization error|connection refused|connection timed out|could not connect|broken connection'
+  meaning: The connection to the output target itself fails. Logs pile up in the memory/file buffer and are eventually dropped.
+  cause: Elasticsearch or Loki down, changed Service name/port, network policy.
+  verify: "kubectl get svc -A | grep -iE 'elastic|opensearch|loki'"
+  warn_at: 5
+  fail_at: 200
+- id: fluent-bit.backpressure
+  name: fluent-bit buffer full (backpressure)
+  component: fluent-bit
+  area: observability
+  severity: high
+  sources: ["logs/pods/fluent-bit/*.log"]
+  pattern: 'storage\.backlog|input chunk.*full|paused|backpressure|exceeds Mem_Buf_Limit|mem buf overlimit'
+  meaning: Input is paused. Logs from that window are not collected.
+  cause: Buffer filled because the output is slow or dead, small Mem_Buf_Limit, storage.type filesystem not set.
+  verify: "kubectl logs -n <ns> -l app.kubernetes.io/name=fluent-bit --since=1h | grep -iE 'paused|backlog'"
+- id: fluent-bit.too-many-open-files
+  name: fluent-bit too many open files
+  component: fluent-bit
+  area: observability
+  severity: high
+  sources: ["logs/pods/fluent-bit/*.log"]
+  pattern: 'too many open files|inotify_add_watch|cannot (open|watch)'
+  meaning: The inotify limit prevents opening new pod log files.
+  cause: fs.inotify.max_user_instances / max_user_watches defaults (node.sysctl-tuning).
+  verify: "sysctl fs.inotify"
+
+# ---------------- Elasticsearch / OpenSearch ----------------
+- id: elasticsearch.read-only-flood
+  name: Elasticsearch indices read-only (disk flood stage)
+  component: elasticsearch-opensearch
+  area: observability
+  severity: critical
+  sources: ["logs/pods/elasticsearch-opensearch/*.log"]
+  pattern: 'flood stage disk watermark|cluster_block_exception|FORBIDDEN/12/index read-only|TOO_MANY_REQUESTS/12/disk usage exceeded'
+  meaning: Disk went past 95% and all indices became read-only. No more logs come in. Even after freeing disk the block must be lifted by hand (automatic on 7.4+).
+  cause: No retention (ILM), a small PV.
+  verify: "curl -s <es>/_cluster/allocation/explain; curl -s <es>/_cat/allocation?v"
+- id: elasticsearch.disk-watermark
+  name: Elasticsearch disk watermark warning
+  component: elasticsearch-opensearch
+  area: observability
+  severity: high
+  sources: ["logs/pods/elasticsearch-opensearch/*.log"]
+  pattern: '(high|low) disk watermark \[\d+%\] exceeded'
+  meaning: Disk passed 85% (low) or 90% (high), so shard allocation stops or shards are relocated. The stage before flood stage.
+  cause: No retention policy, growing index size.
+  verify: "curl -s <es>/_cat/allocation?v"
+  warn_at: 1
+  fail_at: 20
+- id: elasticsearch.circuit-breaker
+  name: Elasticsearch circuit breaker
+  component: elasticsearch-opensearch
+  area: observability
+  severity: high
+  sources: ["logs/pods/elasticsearch-opensearch/*.log"]
+  pattern: 'circuit_breaking_exception|CircuitBreakingException|Data too large'
+  meaning: Requests were rejected for lack of heap. Searches and indexing fail.
+  cause: Heap (default 1GB) too small for the data and shard count, large aggregation queries.
+  verify: "curl -s <es>/_nodes/stats/breaker | jq '.nodes[].breakers.parent'"
+- id: elasticsearch.oom
+  name: Elasticsearch OutOfMemoryError
+  component: elasticsearch-opensearch
+  area: observability
+  severity: critical
+  sources: ["logs/pods/elasticsearch-opensearch/*.log"]
+  pattern: 'OutOfMemoryError|java\.lang\.OutOfMemory'
+  meaning: The JVM heap blew up and the node died.
+  cause: Heap settings not matching the container limit (ES_JAVA_OPTS), too many shards.
+  verify: "kubectl get pods -n <ns> -l app=elasticsearch -o jsonpath='{.items[*].status.containerStatuses[*].lastState}'"
+- id: elasticsearch.master-not-discovered
+  name: Elasticsearch master not discovered
+  component: elasticsearch-opensearch
+  area: observability
+  severity: critical
+  sources: ["logs/pods/elasticsearch-opensearch/*.log"]
+  pattern: 'master not discovered|not enough master nodes|MasterNotDiscoveredException'
+  meaning: The cluster has not formed, so every request fails.
+  cause: Discovery settings (seed_hosts, initial_master_nodes), fewer nodes than quorum, network.
+  verify: "curl -s <es>/_cluster/health"
+- id: elasticsearch.bulk-rejected
+  name: Elasticsearch bulk rejections
+  component: elasticsearch-opensearch
+  area: observability
+  severity: medium
+  sources: ["logs/pods/elasticsearch-opensearch/*.log"]
+  pattern: 'rejected execution|es_rejected_execution_exception|failed to execute bulk'
+  meaning: The write thread pool queue overflowed and some logs are rejected. fluent-bit retries and then drops them.
+  cause: Many shards or an indexing flood, slow disk I/O.
+  verify: "curl -s '<es>/_cat/thread_pool/write?v&h=node_name,active,queue,rejected'"
+  warn_at: 5
+  fail_at: 200
+
+# ---------------- ingress-nginx ----------------
+- id: ingress-nginx.emerg
+  name: nginx [emerg] configuration error
+  component: ingress-nginx
+  area: traffic
+  severity: critical
+  sources: ["logs/pods/ingress-nginx/*.log"]
+  pattern: 'nginx: \[emerg\]|\[emerg\]'
+  meaning: The config reload failed and the old config keeps running. New Ingresses are not applied.
+  cause: Annotation snippet errors, duplicate server_name, certificate files.
+  verify: "kubectl exec -n ingress-nginx deploy/<controller> -- nginx -t"
+- id: ingress-nginx.no-live-upstreams
+  name: nginx no live upstreams
+  component: ingress-nginx
+  area: traffic
+  severity: high
+  sources: ["logs/pods/ingress-nginx/*.log"]
+  pattern: 'no live upstreams'
+  meaning: Every endpoint of that Service is down, producing 502s.
+  cause: All pods NotReady, a wrong selector, zero replicas during a rollout.
+  verify: "kubectl get endpoints -n <ns> <service>"
+  warn_at: 1
+  fail_at: 20
+- id: ingress-nginx.upstream-errors
+  name: Repeated nginx upstream connection failures
+  component: ingress-nginx
+  area: traffic
+  severity: medium
+  sources: ["logs/pods/ingress-nginx/*.log"]
+  pattern: 'upstream prematurely closed connection|connect\(\) failed .* while connecting to upstream|upstream timed out'
+  meaning: The backend closed the connection or did not respond, producing 502/504.
+  cause: App timeout shorter than nginx's, keep-alive mismatch, no preStop on pod termination.
+  verify: "kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --since=1h | grep -c 'upstream prematurely'"
+  warn_at: 50
+  fail_at: 2000
+- id: ingress-nginx.worker-connections
+  name: nginx worker_connections exhausted
+  component: ingress-nginx
+  area: traffic
+  severity: high
+  sources: ["logs/pods/ingress-nginx/*.log"]
+  pattern: 'worker_connections are not enough|too many open files'
+  meaning: The concurrent connection limit was hit and requests are refused.
+  cause: The max-worker-connections default (16384) or ulimit, traffic growth.
+  verify: "kubectl get cm -n ingress-nginx <controller> -o yaml | grep -i worker"
+- id: ingress-nginx.invalid-ingress
+  name: Ingress ignored after validation failure
+  component: ingress-nginx
+  area: traffic
+  severity: medium
+  sources: ["logs/pods/ingress-nginx/*.log"]
+  pattern: 'ignoring ingress because of error while validating|Error obtaining Endpoints|error obtaining service|Error getting SSL certificate'
+  meaning: That Ingress was not added to routing.
+  cause: References to a missing Service or Secret, annotation errors.
+  verify: "kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --since=24h | grep -i 'ignoring ingress' | head"
+  warn_at: 1
+  fail_at: 50
+
+# ---------------- Traefik (k3s default) ----------------
+- id: traefik.acme-failed
+  name: Traefik ACME certificate issuance failed
+  component: traefik
+  area: security
+  severity: high
+  sources: ["logs/pods/traefik/*.log"]
+  pattern: 'Unable to obtain ACME certificate|acme.*error|Error renewing certificate'
+  meaning: Automatic HTTPS certificate issuance/renewal is not working.
+  cause: Port 80 not exposed, DNS, rate limits.
+  verify: "kubectl logs -n kube-system deploy/traefik --since=24h | grep -i acme | head"
+- id: traefik.config-error
+  name: Traefik configuration error
+  component: traefik
+  area: traffic
+  severity: medium
+  sources: ["logs/pods/traefik/*.log"]
+  pattern: 'level=error|Skipping service|unable to (parse|create|find)|invalid configuration'
+  meaning: Some routes or middlewares were not applied.
+  cause: IngressRoute reference errors (missing Service, Middleware or TLS Secret).
+  verify: "kubectl logs -n kube-system deploy/traefik --since=24h | grep level=error | head"
+  warn_at: 1
+  fail_at: 50
+
+# ---------------- MetalLB ----------------
+- id: metallb.pool-exhausted
+  name: MetalLB IP pool exhausted
+  component: metallb
+  area: traffic
+  severity: high
+  sources: ["logs/pods/metallb/*.log"]
+  pattern: 'no available IPs|IP pool exhausted|assignment failed|address pool is full|AllocationFailed|no matching pool'
+  meaning: LoadBalancer Services stay at EXTERNAL-IP Pending.
+  cause: Small IPAddressPool range, one IP per Service (sharing annotation not used).
+  verify: "kubectl get svc -A | grep -i pending; kubectl get ipaddresspools -A -o yaml"
+- id: metallb.speaker-error
+  name: MetalLB speaker errors
+  component: metallb
+  area: traffic
+  severity: medium
+  sources: ["logs/pods/metallb/*.log"]
+  pattern: '"level":"error"|level=error|failed to (announce|send|bind)|arp.*(error|failed)'
+  meaning: ARP/BGP announcement of the external IP failed, so it is unreachable from outside.
+  cause: Interface selection, L2Advertisement settings, node network.
+  verify: "kubectl logs -n metallb-system -l component=speaker --since=1h | grep -i error | head"
+  warn_at: 5
+  fail_at: 200
+
+# ---------------- flannel (including the k3s built-in) ----------------
+- id: flannel.lease-failed
+  name: flannel subnet lease failed
+  component: flannel
+  area: traffic
+  severity: high
+  sources: ["logs/pods/flannel/*.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'failed to acquire lease|Error registering network|Failed to create SubnetManager|failed to retrieve lease|lease expired'
+  meaning: The node did not get a pod CIDR, so pod networking on that node does not work.
+  cause: No podCIDR assigned to the node, apiserver access, cluster CIDR exhausted.
+  verify: "kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'"
+- id: flannel.vxlan-error
+  name: flannel vxlan/iptables errors
+  component: flannel
+  area: traffic
+  severity: medium
+  sources: ["logs/pods/flannel/*.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'vxlan.*(error|failed)|failed to set up IPMasq|iptables.*(failed|error)|Failed to (add|remove) route'
+  meaning: The inter-node pod traffic tunnel or NAT rules are broken.
+  cause: Kernel modules, interface selection (--flannel-iface), another firewall wiping the rules.
+  verify: "ip -d link show flannel.1; journalctl -u k3s --since -1h | grep -i flannel"
+  warn_at: 5
+  fail_at: 200
+
+# ---------------- k3s only ----------------
+- id: k3s.slow-sql
+  name: k3s kine slow SQL
+  component: k3s
+  area: platform
+  severity: medium
+  sources: ["logs/node/*/k3s-errors-24h.log"]
+  pattern: 'slow sql|Slow SQL'
+  meaning: The SQLite datastore is slow and apiserver writes lag. A signal to move to embedded etcd or change the disk.
+  cause: Non-SSD disk, a bloated state.db, shared disk.
+  verify: "journalctl -u k3s --since -24h | grep -c 'slow sql'"
+  warn_at: 5
+  fail_at: 100
+- id: k3s.agent-tunnel
+  name: k3s agent-server tunnel lost
+  component: k3s
+  area: platform
+  severity: medium
+  sources: ["logs/node/*/k3s-errors-24h.log"]
+  pattern: 'Failed to connect to proxy|websocket: bad handshake|Remotedialer proxy error|failed to dial'
+  meaning: The agent lost its tunnel to the server; kubectl logs/exec fail on that node and it goes briefly NotReady.
+  cause: Server restart, network outage, token mismatch.
+  verify: "journalctl -u k3s-agent --since -24h | grep -i 'proxy' | tail"
+  warn_at: 5
+  fail_at: 200
+- id: k3s.cert-expired
+  name: k3s certificate expired
+  component: k3s
+  area: security
+  severity: critical
+  sources: ["logs/node/*/k3s-errors-24h.log"]
+  pattern: 'certificate has expired|x509: certificate.*expired|failed to get CA certs'
+  meaning: Authentication between components breaks and the cluster stops. k3s renews certificates expiring within 90 days at startup, so this happens after more than a year without a restart.
+  cause: Certificates older than a year, clock skew.
+  verify: "sudo k3s certificate check"
+
+# ---------------- Common to all components ----------------
+- id: common.panic
+  name: Process panic/fatal
+  component: any
+  area: resilience
+  severity: critical
+  sources: ["logs/pods/*/*.log"]
+  pattern: '^(\S+ )?(\[[^\]]+\] )?\S* ?(panic: |fatal error: |runtime error: |goroutine \d+ \[running\]|SIGSEGV|segmentation fault)'
+  meaning: The container process terminated abnormally. Read together with the restart count.
+  cause: Bugs, nil dereference, memory corruption.
+  verify: "kubectl get pods -A --sort-by=.status.containerStatuses[0].restartCount | tail"
+  warn_at: 1
+  fail_at: 5
+- id: common.too-many-open-files
+  name: too many open files
+  component: any
+  area: node
+  severity: high
+  sources: ["logs/pods/*/*.log"]
+  pattern: 'too many open files'
+  meaning: A file descriptor or inotify limit was hit. Whatever the component, it behaves erratically afterwards.
+  cause: ulimit, fs.inotify.max_user_instances (default 128), fd leaks.
+  verify: "sysctl fs.inotify.max_user_instances fs.file-nr"
+- id: common.no-space
+  name: no space left on device
+  component: any
+  area: node
+  severity: high
+  sources: ["logs/pods/*/*.log"]
+  pattern: 'no space left on device'
+  meaning: The volume (or node disk) used by that container is full.
+  cause: PVC size, emptyDir, no log rotation.
+  verify: "kubectl exec -n <ns> <pod> -- df -h"
+- id: common.cert-expired
+  name: Certificate expired (x509)
+  component: any
+  area: security
+  severity: critical
+  sources: ["logs/pods/*/*.log"]
+  pattern: 'x509: certificate has expired|certificate has expired or is not yet valid'
+  meaning: Some TLS connection fails because of an expired certificate. Webhooks, metrics or API calls break.
+  cause: cert-manager renewal failure, a neglected manually issued certificate, clock skew.
+  verify: "kubectl get certificates -A; kubectl get secrets -A --field-selector type=kubernetes.io/tls -o json | jq -r '.items[] | .metadata.namespace+\"/\"+.metadata.name'"
+- id: common.connection-refused
+  name: Repeated connection refused
+  component: any
+  area: traffic
+  severity: low
+  sources: ["logs/pods/*/*.log"]
+  pattern: 'connection refused'
+  meaning: Some dependency is not listening on its port. The samples show which component tried to connect where.
+  cause: Target pod down or restarting, Service port mismatch, network policy.
+  verify: "kubectl logs -n <ns> <pod> --since=1h | grep 'connection refused' | head"
+  warn_at: 50
+  fail_at: 2000
+- id: common.context-deadline
+  name: Repeated context deadline exceeded
+  component: any
+  area: traffic
+  severity: low
+  sources: ["logs/pods/*/*.log"]
+  pattern: 'context deadline exceeded|i/o timeout'
+  meaning: Some call timed out. A high frequency means a dependency or the apiserver is slow.
+  cause: apiserver latency (controlplane.*), external API latency, DNS.
+  verify: "kubectl logs -n <ns> <pod> --since=1h | grep -c 'context deadline exceeded'"
+  warn_at: 100
+  fail_at: 5000
+
+# ---------------- Promoted from unclassified errors seen on a small k3s cluster ----------------
+- id: k3s.etcd-request-stats
+  name: k3s embedded etcd slow request stats (aggregated by controlplane.etcd-slow)
+  component: k3s
+  area: platform
+  severity: low
+  sources: ["logs/node/*/k3s-errors-24h.log"]
+  pattern: '"msg":"request stats"|apply request took too long|slow fdatasync'
+  meaning: etcd logged a warning for requests taking over 100ms. Aggregation and judgement are done by the controlplane.etcd-slow check; this signature counts them only to keep them out of unclassified errors.
+  cause: Disk fsync latency (disk shared with PVs and logs), large objects, CPU contention.
+  verify: "journalctl -u k3s --since -24h | grep -c 'request stats'"
+  warn_at: 100000
+  fail_at: 1000000
+- id: k3s.proxy-websocket-closed
+  name: k3s tunnel websocket closed abnormally (kubectl exec/logs/port-forward dropped)
+  component: k3s
+  area: platform
+  severity: low
+  sources: ["logs/node/*/k3s-errors-24h.log"]
+  pattern: 'Error proxying data from (client to backend|backend to client): websocket'
+  meaning: Records of exec/logs/port-forward connections over the apiserver-kubelet tunnel being dropped. Many are normal closes by the user. Hundreds or more mean an unstable network or a flaky port-forward client.
+  cause: Client closed first (normal), unstable agent-server network, long port-forward sessions.
+  verify: "journalctl -u k3s --since -24h | grep -c 'Error proxying data'"
+  warn_at: 500
+  fail_at: 10000
+- id: kubelet.cadvisor-partial
+  name: kubelet cAdvisor partial container stats failure
+  component: kubelet
+  area: node
+  severity: low
+  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'Partial failure issuing cadvisor.ContainerInfoV2|Failed to get cgroup stats'
+  meaning: The cgroup of a just-terminated container vanished before its stats could be read. Occasional is normal; many means container churn is very high.
+  cause: CrashLoop pods, a flood of short Jobs.
+  verify: "journalctl -u kubelet --since -1h | grep -c cadvisor"
+  warn_at: 100
+  fail_at: 5000
+
+# ---------------- Promoted from top unclassified errors seen on EKS and k3s clusters ----------------
+- id: ebs-csi.snapshot-crd-missing
+  name: EBS CSI cannot find the VolumeSnapshot CRD (snapshot controller not installed)
+  component: ebs-csi
+  area: storage
+  severity: medium
+  sources: ["logs/pods/ebs-csi/*.log"]
+  pattern: 'failed to list \*v1\.VolumeSnapshot(Class|Content)?: the server could not find the requested resource'
+  meaning: external-snapshotter (CRD + snapshot-controller) is missing, so VolumeSnapshots cannot be created. Velero/CSI snapshot backups are impossible and the csi-snapshotter sidecar logs an error every minute.
+  cause: Only the EBS CSI add-on was installed, without the snapshot-controller (separate add-on or kubernetes-csi/external-snapshotter).
+  verify: "kubectl get crd volumesnapshotclasses.snapshot.storage.k8s.io; kubectl get deploy -n kube-system snapshot-controller"
+  warn_at: 1
+  fail_at: 100
+- id: cert-manager.orphan-tls-secret
+  name: TLS Secret without an owning Certificate (not managed by cert-manager)
+  component: cert-manager
+  area: hygiene
+  severity: low
+  sources: ["logs/pods/cert-manager/*.log"]
+  pattern: 'unable to fetch certificate that owns the secret'
+  meaning: A TLS Secret carries cert-manager annotations but its Certificate resource is gone. An Ingress may be serving a certificate that will never renew (discovered at expiry).
+  cause: Certificate deleted but Secret left behind, a namespace move, a hand-made Secret.
+  verify: "kubectl get secrets -A --field-selector type=kubernetes.io/tls -o json | jq -r '.items[] | select(.metadata.annotations[\"cert-manager.io/certificate-name\"]) | .metadata.namespace+\"/\"+.metadata.name' ; kubectl get certificates -A"
+  warn_at: 1
+  fail_at: 1000

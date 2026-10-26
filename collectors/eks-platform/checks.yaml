@@ -1,0 +1,1025 @@
+# EKS platform checks. Reads cluster.eks in inventory.json and the aws/ folder.
+- id: eks.audit-log-off
+  name: Control plane audit log disabled
+  area: platform
+  type: inventory
+  cluster_level: true
+  rule:
+    expr: "'audit' in (inv['cluster']['eks'].get('control_plane_logging_off') or [])"
+  evidence: "f\"enabled logs {inv['cluster']['eks'].get('control_plane_logging')}, disabled logs {inv['cluster']['eks'].get('control_plane_logging_off')}\""
+  severity_default: info
+  symptom_linked: false
+  why: Without the audit log, "who changed what" cannot be answered after the fact. It is often turned off because of cost (CloudWatch ingestion), hence info. But it is the first thing missed during an incident investigation.
+  suggest: Enable audit and keep the CloudWatch log group retention short (7-30 days) to cap the cost.
+  verify:
+    - "aws eks describe-cluster --name {cluster} --query cluster.logging"
+  profiles: [prod]
+  test:
+    profile: "eks"
+    cases:
+      - expect: "fail"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+      - expect: "pass"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+                - "audit"
+              control_plane_logging_off: []
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+
+- id: eks.public-endpoint-open
+  name: Cluster public endpoint open to the whole world
+  area: security
+  type: inventory
+  cluster_level: true
+  rule:
+    expr: "inv['cluster']['eks'].get('endpoint_public') and '0.0.0.0/0' in (inv['cluster']['eks'].get('public_access_cidrs') or [])"
+    warn_expr: "bool(inv['cluster']['eks'].get('endpoint_public'))"
+  evidence: "f\"public {inv['cluster']['eks'].get('endpoint_public')}, private {inv['cluster']['eks'].get('endpoint_private')}, allowed CIDRs {inv['cluster']['eks'].get('public_access_cidrs')}\""
+  severity_default: high
+  symptom_linked: false
+  why: The apiserver is exposed to the internet. Authentication is IAM, but a single leaked token or vulnerability is enough, and indiscriminate requests become apiserver load.
+  suggest: Restrict publicAccessCidrs to office/VPN CIDRs, or switch to private-only and access through a VPN or bastion.
+  verify:
+    - "aws eks describe-cluster --name {cluster} --query cluster.resourcesVpcConfig"
+  profiles: [prod]
+  test:
+    profile: "eks"
+    cases:
+      - expect: "fail"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+      - expect: "warn"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "1.2.3.4/32"
+              support_type: "STANDARD"
+              addons: {}
+      - expect: "pass"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: false
+              endpoint_private: true
+              public_access_cidrs: []
+              support_type: "STANDARD"
+              addons: {}
+
+- id: eks.addon-outdated
+  name: Managed add-on is not the latest version
+  area: platform
+  modes: [full]   # needs inputs the daily run does not collect
+  type: inventory
+  each: cluster.eks.addons
+  rule:
+    expr: "addon_latest(key) is not None and item.get('version') != addon_latest(key) and addon_minor_gap(item.get('version'), addon_latest(key)) >= 2"
+    warn_expr: "addon_latest(key) is not None and item.get('version') != addon_latest(key)"
+  target: "key"
+  evidence: "f\"installed {item.get('version')}, latest available {addon_latest(key)}, default {addon_default(key)}\""
+  severity_default: medium
+  symptom_linked: false
+  why: vpc-cni, coredns, kube-proxy and ebs-csi each have versions compatible with the cluster version, and old versions keep known bugs (IP allocation failures, DNS latency, attach limits).
+  suggest: "aws eks update-addon --addon-name <name> --addon-version <version>, one step at a time. Read the changelog first."
+  verify:
+    - "aws eks describe-addon-versions --addon-name <name> --kubernetes-version {k8s_version} --query 'addons[].addonVersions[0].addonVersion'"
+  profiles: [prod]
+  test:
+    profile: "eks"
+    cases:
+      - expect: "fail"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons:
+                vpc-cni:
+                  version: "v1.19.0-eksbuild.1"
+                  status: "ACTIVE"
+        aws:
+          describe-addon-versions-vpc-cni.json:
+            addons:
+              - addonVersions:
+                  - addonVersion: "v1.23.2-eksbuild.1"
+                    compatibilities:
+                      - defaultVersion: false
+                  - addonVersion: "v1.22.4-eksbuild.1"
+                    compatibilities:
+                      - defaultVersion: true
+      - expect: "warn"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons:
+                coredns:
+                  version: "v1.11.3-eksbuild.1"
+                  status: "ACTIVE"
+        aws:
+          describe-addon-versions-coredns.json:
+            addons:
+              - addonVersions:
+                  - addonVersion: "v1.11.4-eksbuild.88"
+                    compatibilities:
+                      - defaultVersion: true
+      - expect: "pass"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons:
+                coredns:
+                  version: "v1.11.4-eksbuild.88"
+                  status: "ACTIVE"
+        aws:
+          describe-addon-versions-coredns.json:
+            addons:
+              - addonVersions:
+                  - addonVersion: "v1.11.4-eksbuild.88"
+                    compatibilities:
+                      - defaultVersion: true
+
+- id: eks.node-os-skew
+  name: Node OS, kernel and container runtime skew
+  area: platform
+  type: inventory
+  cluster_level: true
+  rule:
+    expr: "len(inv['nodes'].get('os_images', [])) > 1 and len(inv['nodes'].get('runtimes', [])) > 1"
+    warn_expr: "len(inv['nodes'].get('kernels', [])) > 1 or len(inv['nodes'].get('os_images', [])) > 1"
+  evidence: "f\"OS {inv['nodes'].get('os_images')}, kernels {inv['nodes'].get('kernels')}, runtimes {inv['nodes'].get('runtimes')}, cgroup: AL2 may be v1, AL2023 is v2\""
+  severity_default: medium
+  symptom_linked: false
+  why: Mixing AL2 and AL2023 means cgroup v1/v2 and containerd 1.7/2.1 coexist. The same manifest behaves differently depending on the node, and AL2 is close to EKS end of support (Upgrade Insights ERROR).
+  suggest: Unify amiFamily in the Karpenter EC2NodeClass to AL2023 and replace nodes through drift.
+  verify:
+    - "kubectl get nodes -o custom-columns=NAME:.metadata.name,OS:.status.nodeInfo.osImage,KERNEL:.status.nodeInfo.kernelVersion,RUNTIME:.status.nodeInfo.containerRuntimeVersion"
+    - "kubectl get ec2nodeclass -o jsonpath='{.items[*].spec.amiFamily}'"
+  profiles: [prod]
+  test:
+    profile: "eks"
+    cases:
+      - expect: "fail"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+          nodes:
+            count: 2
+            nodes: []
+            os_images:
+              - "AL2"
+              - "AL2023"
+            kernels:
+              - "5.10"
+              - "6.1"
+            runtimes:
+              - "containerd://1.7"
+              - "containerd://2.1"
+      - expect: "warn"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+          nodes:
+            count: 2
+            nodes: []
+            os_images:
+              - "AL2023"
+            kernels:
+              - "6.1.1"
+              - "6.1.2"
+            runtimes:
+              - "containerd://2.1"
+      - expect: "pass"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+          nodes:
+            count: 2
+            nodes: []
+            os_images:
+              - "AL2023"
+            kernels:
+              - "6.1.1"
+            runtimes:
+              - "containerd://2.1"
+
+- id: eks.ssm-unregistered
+  name: Node not registered with SSM
+  area: platform
+  type: inventory
+  each: node_access.ssm_unregistered
+  rule:
+    expr: "True"
+  target: "item['node']"
+  evidence: "f\"instance {item.get('instance_id')} is missing from ssm describe-instance-information or not Online\""
+  severity_default: medium
+  symptom_linked: false
+  why: Node OS checks (kernel log, sysctl, containerd) cannot run. Either the node IAM role lacks AmazonSSMManagedInstanceCore or the agent is dead.
+  suggest: Add AmazonSSMManagedInstanceCore to the node role (Karpenter EC2NodeClass role). Kernel log checks for nodes failing this check are marked as skipped.
+  verify:
+    - "aws ssm describe-instance-information --query 'InstanceInformationList[].{id:InstanceId,ping:PingStatus}'"
+  profiles: [prod]
+  test:
+    profile: "eks"
+    cases:
+      - expect: "fail"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+          node_access:
+            method: "ssm"
+            ssm_registered: []
+            ssm_unregistered:
+              - node: "ip-10-0-1-117"
+                instance_id: "i-abc"
+      - expect: "none"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+          node_access:
+            method: "ssm"
+            ssm_registered: []
+            ssm_unregistered: []
+
+- id: eks.extended-support
+  name: Extended support billing in effect
+  area: cost
+  modes: [full]   # needs inputs the daily run does not collect
+  type: inventory
+  cluster_level: true
+  rule:
+    expr: "(inv['cluster']['eks'].get('support_type') == 'EXTENDED') and eks_version_status() == 'EXTENDED_SUPPORT'"
+    warn_expr: "inv['cluster']['eks'].get('support_type') == 'EXTENDED'"
+  evidence: "f\"version {inv['cluster']['eks'].get('version')}, supportType {inv['cluster']['eks'].get('support_type')}, status {eks_version_status()}, end of standard support {eks_version_dates().get('endOfStandardSupportDate')}, end of extended support {eks_version_dates().get('endOfExtendedSupportDate')}\""
+  severity_default: medium
+  symptom_linked: false
+  why: A version past standard support moves to extended support and the hourly cluster price rises about 6×. Security patches continue, but you pay for them.
+  suggest: Plan the upgrade to the next minor (check removed APIs with Pluto/kubent → add-ons → control plane → nodes). If it cannot happen now, record that keeping upgradePolicy at EXTENDED is a deliberate decision.
+  verify:
+    - "aws eks describe-cluster-versions --cluster-versions {k8s_version}"
+  profiles: [prod]
+  test:
+    profile: "eks"
+    cases:
+      - expect: "fail"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "EXTENDED"
+              addons: {}
+        aws:
+          describe-cluster-versions.json:
+            clusterVersions:
+              - clusterVersion: "1.32"
+                status: "EXTENDED_SUPPORT"
+                endOfStandardSupportDate: "2026-03-23"
+                endOfExtendedSupportDate: "2027-03-23"
+      - expect: "warn"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "EXTENDED"
+              addons: {}
+        aws:
+          describe-cluster-versions.json:
+            clusterVersions:
+              - clusterVersion: "1.32"
+                status: "STANDARD_SUPPORT"
+                endOfStandardSupportDate: "2027-03-23"
+                endOfExtendedSupportDate: "2028-03-23"
+      - expect: "pass"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+        aws:
+          describe-cluster-versions.json:
+            clusterVersions:
+              - clusterVersion: "1.32"
+                status: "STANDARD_SUPPORT"
+                endOfStandardSupportDate: "2027-03-23"
+                endOfExtendedSupportDate: "2028-03-23"
+
+- id: eks.no-backup-policy
+  name: No EBS snapshot policy (DLM) or AWS Backup plan
+  area: resilience
+  modes: [full]   # needs inputs the daily run does not collect
+  type: inventory
+  rule:
+    expr: "not (aws_file('dlm-lifecycle-policies.json') or {}).get('Policies') and not (aws_file('backup-plans.json') or {}).get('BackupPlansList') and aws_file('dlm-lifecycle-policies.json') is not None"
+  evidence: "f\"dlm get-lifecycle-policies Policies {len((aws_file('dlm-lifecycle-policies.json') or {}).get('Policies') or [])}, backup list-backup-plans {len((aws_file('backup-plans.json') or {}).get('BackupPlansList') or [])}. In-cluster backup tools: {backup_signals()}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    EBS PVs live on volumes, not nodes, so they survive a node death, but against accidental deletion (PVC deleted → reclaimPolicy Delete), ransomware or corruption a snapshot is the only recovery.
+    DLM (Data Lifecycle Manager) is a free feature that takes and retains EBS snapshots automatically by tag; AWS Backup is the higher-level service that includes it. With neither, there is no PV backup (the same question resilience.no-backup asks, on the AWS side).
+  suggest: "One DLM policy (tag kubernetes.io/created-for/pvc/name exists → daily snapshot, 7-day retention) or Velero + EBS CSI snapshots. Also StorageClass reclaimPolicy Retain."
+  verify:
+    - "aws dlm get-lifecycle-policies"
+    - "aws backup list-backup-plans"
+  profiles: [prod]
+  test:
+    profile: "eks"
+    cases:
+      - expect: "fail"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+        aws:
+          dlm-lifecycle-policies.json:
+            Policies: []
+          backup-plans.json:
+            BackupPlansList: []
+        objects:
+          cronjobs.batch: []
+          etcdsnapshotfiles.k3s.cattle.io: []
+          volumesnapshots.snapshot.storage.k8s.io: []
+      - expect: "pass"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+        aws:
+          dlm-lifecycle-policies.json:
+            Policies:
+              - PolicyId: "p"
+          backup-plans.json:
+            BackupPlansList: []
+        objects:
+          cronjobs.batch: []
+      - expect: "pass"
+        inventory:
+          cluster:
+            platform: "eks"
+            server_version: "v1.32.13-eks"
+            eks:
+              name: "c"
+              version: "1.32"
+              control_plane_logging:
+                - "api"
+              control_plane_logging_off:
+                - "audit"
+              endpoint_public: true
+              endpoint_private: true
+              public_access_cidrs:
+                - "0.0.0.0/0"
+              support_type: "STANDARD"
+              addons: {}
+        objects:
+          cronjobs.batch: []
+
+- id: platform.karpenter-version-compat
+  name: Karpenter version does not support the cluster Kubernetes version (compatibility table)
+  area: platform
+  type: summary
+  each: scaling.karpenter
+  cluster_level: true
+  profiles: [prod]
+  rule:
+    expr: "item.get('present') and item.get('k8s_supported') is False"
+    warn_expr: "item.get('present') and item.get('k8s_supported') is None"
+  target: "'cluster'"
+  evidence: "f\"Karpenter {item.get('version')} supports Kubernetes up to {item.get('k8s_max_supported')}, the cluster runs {item.get('k8s_minor')}. {item.get('version_note') or ''}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    Karpenter 1.x compares the cluster version against its own support table at startup and in the nodeclass.status controller; outside the table it stops resolving AMIs, so new nodes fail to launch or launch only with old AMIs. The log signature (karpenter.version-unsupported) is one line a day and stays at warn, so this check compares the versions directly.
+    Measured on a real EKS cluster: Karpenter 0.37.0 (max 1.30) on a 1.32 cluster.
+  suggest: "Upgrade Karpenter in step with EKS (0.37 → 1.0 → 1.1 → ... one minor at a time, including CRD migrations). The compatibility table is rubric/karpenter-compat.yaml."
+  verify:
+    - "helm list -n karpenter ; kubectl version --short"
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_minor: "1.32"
+          k8s_max_supported: "1.30"
+          k8s_supported: false
+          version_note: null
+      - expect: "warn"
+        item:
+          present: true
+          version: "9.9.0"
+          k8s_minor: "1.32"
+          k8s_max_supported: null
+          k8s_supported: null
+          version_note: "9.9 not in the compatibility table (rubric/karpenter-compat.yaml)"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.2.1"
+          k8s_minor: "1.32"
+          k8s_max_supported: "1.32"
+          k8s_supported: true
+          version_note: null
+      - expect: "pass"
+        item:
+          present: false
+
+- id: eks.acm-certificate-expiring
+  name: ACM certificate in use is expiring soon, expired, or cannot auto-renew
+  area: security
+  type: summary
+  each: eksplatform.acm
+  cluster_level: true
+  rule:
+    expr: "item.get('available') and (len(item.get('expired_in_use') or []) + len(item.get('expiring_14d_in_use') or []) > 0)"
+    warn_expr: "item.get('available') and (len(item.get('expiring_30d_in_use') or []) + len(item.get('not_renewable_in_use') or []) + len(item.get('imported_in_use') or []) > 0)"
+  target: "'acm'"
+  evidence: "f\"ACM certificates {item.get('certificates')}, in use {item.get('in_use')}, expiring within 30 days {item.get('expiring_30d_in_use')}, within 14 days {item.get('expiring_14d_in_use')}, expired but in use {item.get('expired_in_use')}, not auto-renewable (validation failed) {item.get('not_renewable_in_use')}, IMPORTED (no auto-renewal) {item.get('imported_in_use')}, nearest expiry {item.get('min_days_in_use')} days, unused expired certificates {item.get('expired_unused')}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    On EKS, ingress TLS is usually an ACM certificate attached to the ALB rather than cert-manager. ACM renews automatically as long as DNS validation holds, but with RenewalEligibility INELIGIBLE (CNAME deleted, domain moved) it expires silently, and IMPORTED certificates never renew — on the expiry date every host behind it breaks with browser warnings. Pairs with the "certificate expiry" alert gap in observability.failure-mode-uncovered.
+    Measured on a real EKS cluster: 7 of 12 in use, nearest expiry 71 days (an earlier-expiring one was unused), 1 expired unused certificate → pass.
+  suggest: "If RenewalEligibility is INELIGIBLE, restore the validation CNAME in Route53. Re-import IMPORTED certificates 30 days before expiry or replace them with ACM-issued ones. Delete expired unused certificates."
+  verify:
+    - "aws acm list-certificates --query 'CertificateSummaryList[?InUse==`true`].[DomainName,NotAfter,RenewalEligibility,Status]' --output table"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          available: true
+          certificates: 12
+          in_use: 7
+          expiring_30d_in_use:
+            - "app-c.example.com"
+          expiring_14d_in_use:
+            - "app-c.example.com"
+          expired_in_use: []
+          not_renewable_in_use: []
+          imported_in_use: []
+          expired_unused:
+            - "app-b-xl.com"
+          min_days_in_use: 71.0
+      - expect: "fail"
+        item:
+          available: true
+          certificates: 12
+          in_use: 7
+          expiring_30d_in_use: []
+          expiring_14d_in_use: []
+          expired_in_use:
+            - "old.example.com"
+          not_renewable_in_use: []
+          imported_in_use: []
+          expired_unused:
+            - "app-b-xl.com"
+          min_days_in_use: 71.0
+      - expect: "warn"
+        item:
+          available: true
+          certificates: 12
+          in_use: 7
+          expiring_30d_in_use: []
+          expiring_14d_in_use: []
+          expired_in_use: []
+          not_renewable_in_use:
+            - "example.com"
+          imported_in_use: []
+          expired_unused:
+            - "app-b-xl.com"
+          min_days_in_use: 71.0
+      - expect: "warn"
+        item:
+          available: true
+          certificates: 12
+          in_use: 7
+          expiring_30d_in_use: []
+          expiring_14d_in_use: []
+          expired_in_use: []
+          not_renewable_in_use: []
+          imported_in_use:
+            - "legacy.example.com"
+          expired_unused:
+            - "app-b-xl.com"
+          min_days_in_use: 71.0
+      - expect: "pass"
+        item:
+          available: true
+          certificates: 12
+          in_use: 7
+          expiring_30d_in_use: []
+          expiring_14d_in_use: []
+          expired_in_use: []
+          not_renewable_in_use: []
+          imported_in_use: []
+          expired_unused:
+            - "app-b-xl.com"
+          min_days_in_use: 71.0
+      - expect: "pass"
+        item:
+          available: false
+          certificates: 12
+          in_use: 7
+          expiring_30d_in_use: []
+          expiring_14d_in_use: []
+          expired_in_use: []
+          not_renewable_in_use: []
+          imported_in_use: []
+          expired_unused:
+            - "app-b-xl.com"
+          min_days_in_use: 71.0
+- id: eks.service-quota-near-limit
+  name: AWS service quota usage near the limit (at the limit, node, LB and IP creation fail silently)
+  area: platform
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: eksplatform.quotas
+  cluster_level: true
+  rule:
+    expr: "item.get('available') and len(item.get('near_limit') or []) > 0"
+    warn_expr: "item.get('available') and len(item.get('over_60') or []) > 0"
+  target: "'aws-account'"
+  evidence: "f\"quotas with a usage metric {item.get('with_usage')}/{item.get('quotas')}, at 80% or more {item.get('near_limit')}, at 60% or more {item.get('over_60')}, top operational quotas {item.get('watched_top')[:6]}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    When the vCPU, ENI, EIP, ALB, target group or listener rule limit is reached, Karpenter node creation, ALB Controller ingress reconciliation and NodePort allocation fail with "InsufficientCapacity/LimitExceeded", which inside Kubernetes shows only as pending and events. Quota increases take a day or more, so request them at 60%. Usage is the 1-hour maximum from CloudWatch AWS/Usage (only quotas with a usage metric; services ec2, vpc, elasticloadbalancing, ebs).
+    Measured on a real EKS cluster: 20 of 65 quotas had usage, VPCs 3/5 (60%) → warn; listener rules per ALB 47/100 (a shared ALB — same root as traffic.shared-alb-group), target groups per ALB 40/100.
+  suggest: "aws service-quotas request-service-quota-increase --service-code <svc> --quota-code <L-...> --desired-value <n>. For listener rules per ALB, split the ingresses into two ALB groups."
+  verify:
+    - "aws service-quotas list-service-quotas --service-code ec2 --query 'Quotas[?UsageMetric!=null].[QuotaName,Value]' --output table"
+    - "aws cloudwatch get-metric-statistics --namespace AWS/Usage --metric-name ResourceCount --dimensions Name=Service,Value=EC2 Name=Type,Value=Resource Name=Resource,Value=vCPU Name=Class,Value=Standard/OnDemand --statistics Maximum --period 3600 --start-time <1h ago> --end-time <now>"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          available: true
+          quotas: 65
+          with_usage: 20
+          near_limit:
+            - "ALB listener rules per load balancer 85/100"
+          over_60:
+            - "ALB listener rules per load balancer 0.85"
+          watched_top:
+            - "['VPC count', 3.0, 5.0, 0.6]"
+          max_ratio: 0.6
+          max_ratio_name: "VPC count"
+      - expect: "warn"
+        item:
+          available: true
+          quotas: 65
+          with_usage: 20
+          near_limit: []
+          over_60:
+            - "VPC count 0.6"
+          watched_top:
+            - "['VPC count', 3.0, 5.0, 0.6]"
+          max_ratio: 0.6
+          max_ratio_name: "VPC count"
+      - expect: "pass"
+        item:
+          available: true
+          quotas: 65
+          with_usage: 20
+          near_limit: []
+          over_60: []
+          watched_top:
+            - "['VPC count', 3.0, 5.0, 0.6]"
+          max_ratio: 0.6
+          max_ratio_name: "VPC count"
+      - expect: "pass"
+        item:
+          available: false
+          quotas: 65
+          with_usage: 20
+          near_limit: []
+          over_60: []
+          watched_top:
+            - "['VPC count', 3.0, 5.0, 0.6]"
+          max_ratio: 0.6
+          max_ratio_name: "VPC count"
+- id: storage.ebs-volume-io-saturated
+  name: EBS volume I/O saturation (queue length, IOPS limit, burst balance) — root volumes included
+  area: storage
+  type: summary
+  each: eksplatform.ebs
+  cluster_level: true
+  rule:
+    expr: "item.get('available') and (len(item.get('queue_high') or []) > 0 or len(item.get('burst_low') or []) > 0 or (item.get('max_iops_ratio') or 0) >= 0.9)"
+    warn_expr: "item.get('available') and ((item.get('max_queue') or 0) >= 0.5 or (item.get('max_iops_ratio') or 0) >= 0.7 or len(item.get('iops_near_limit') or []) > 0)"
+  target: "'cluster'"
+  evidence: "f\"EBS volumes {item.get('volumes')} (root {item.get('root_volumes')}): max hourly average queue length {item.get('max_queue')}, queue ≥1 {item.get('queue_high')}, busiest-hour IOPS/provisioned max {item.get('max_iops_ratio')}, IOPS at 70% or more {item.get('iops_near_limit')}, burst balance under 20% {item.get('burst_low')}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    gp3 defaults to 3,000 IOPS and 125MB/s. A node root volume takes container images, write layers, logs (read by promtail/fluent-bit) and emptyDirs, so it saturates first on nodes with many log collectors, and then kubelet and containerd slow down, causing PLEG delays and slow pod starts. A sustained queue length of 1 or more means the disk cannot keep up. gp2 drops to baseline IOPS when its burst balance (BurstBalance) runs out.
+    Measured on a real EKS cluster: 24 volumes (7 root, 17 PVC), max average queue 0.26 (a root volume, momentary peak 2.06), busiest-hour IOPS ratio max 5% → pass.
+  suggest: "For root volumes with a high queue, raise iops/throughput in the EC2NodeClass blockDeviceMappings (gp3 can be tuned independently of volume size) or reduce logs and emptyDir use. For PVCs, the StorageClass parameters iops/throughput."
+  verify:
+    - "aws cloudwatch get-metric-statistics --namespace AWS/EBS --metric-name VolumeQueueLength --dimensions Name=VolumeId,Value=<vol> --statistics Average --period 300 --start-time <24h ago> --end-time <now>"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          available: true
+          volumes: 24
+          root_volumes: 7
+          queue_high:
+            - "vol-1(root ip-10-0-1-1) q=1.4"
+          iops_near_limit: []
+          burst_low: []
+          max_queue: 1.4
+          max_iops_ratio: 0.05
+      - expect: "fail"
+        item:
+          available: true
+          volumes: 24
+          root_volumes: 7
+          queue_high: []
+          iops_near_limit: []
+          burst_low:
+            - "vol-2 12%"
+          max_queue: 0.26
+          max_iops_ratio: 0.05
+      - expect: "warn"
+        item:
+          available: true
+          volumes: 24
+          root_volumes: 7
+          queue_high: []
+          iops_near_limit: []
+          burst_low: []
+          max_queue: 0.6
+          max_iops_ratio: 0.05
+      - expect: "warn"
+        item:
+          available: true
+          volumes: 24
+          root_volumes: 7
+          queue_high: []
+          iops_near_limit:
+            - "vol-3(db/data) 0.75"
+          burst_low: []
+          max_queue: 0.26
+          max_iops_ratio: 0.75
+      - expect: "pass"
+        item:
+          available: true
+          volumes: 24
+          root_volumes: 7
+          queue_high: []
+          iops_near_limit: []
+          burst_low: []
+          max_queue: 0.26
+          max_iops_ratio: 0.05
+- id: eks.security-group-open-to-world
+  name: Cluster security group inbound open to 0.0.0.0/0 (other than 443)
+  area: security
+  type: summary
+  each: eksplatform.security_groups
+  cluster_level: true
+  rule:
+    expr: "item.get('available') and len(item.get('open_all_ports') or []) > 0"
+    warn_expr: "item.get('available') and len(item.get('open_non_https') or []) > 0"
+  target: "'cluster-security-groups'"
+  evidence: "f\"cluster security groups {item.get('groups')}, world-open (0.0.0.0/0, ::/0) inbound rules {item.get('open_to_world_count')}, of which non-443 {item.get('open_non_https')}, all ports {item.get('open_all_ports')}; endpoint public {item.get('public_endpoint')} CIDRs {item.get('public_cidrs')}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    The EKS cluster security group is attached to the control plane ENIs and the nodes. If 0.0.0.0/0 inbound is open on ports other than 443 (or on all ports), the nodes' kubelet 10250, NodePorts 30000-32767 and SSH 22 are exposed to the internet. Thresholds (defaults, user-adjustable): only 443 open to the world is pass, other ports warn, all ports fail. The endpoint public CIDRs are covered by eks.public-endpoint-open.
+    Measured on a real EKS cluster: 2 security groups, 0 world-open inbound rules → pass.
+  suggest: "Keep only cluster SG and ALB SG references as node security group inbound and delete CIDR rules. Replace SSH with SSM."
+  verify:
+    - "aws ec2 describe-security-groups --group-ids <sg> --query 'SecurityGroups[].IpPermissions[?contains(IpRanges[].CidrIp, `0.0.0.0/0`)]'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          available: true
+          groups: 2
+          open_to_world_count: 1
+          open_non_https:
+            - "eks-node-sg: -1 None-None"
+          open_all_ports:
+            - "eks-node-sg"
+          public_endpoint: true
+          public_cidrs:
+            - "0.0.0.0/0"
+      - expect: "warn"
+        item:
+          available: true
+          groups: 2
+          open_to_world_count: 1
+          open_non_https:
+            - "eks-node-sg: tcp 22-22"
+          open_all_ports: []
+          public_endpoint: true
+          public_cidrs:
+            - "0.0.0.0/0"
+      - expect: "pass"
+        item:
+          available: true
+          groups: 2
+          open_to_world_count: 0
+          open_non_https: []
+          open_all_ports: []
+          public_endpoint: true
+          public_cidrs:
+            - "0.0.0.0/0"
+      - expect: "pass"
+        item:
+          available: true
+          groups: 2
+          open_to_world_count: 1
+          open_non_https: []
+          open_all_ports: []
+          public_endpoint: true
+          public_cidrs:
+            - "0.0.0.0/0"
+- id: eks.nodegroup-ami-old
+  name: Managed node group AMI is old (kernel and containerd patches not applied)
+  area: platform
+  type: summary
+  each: eksplatform.nodegroups
+  cluster_level: true
+  rule:
+    expr: "item.get('available') and len(item.get('ami_old_180d') or []) > 0"
+    warn_expr: "item.get('available') and (len(item.get('ami_old_90d') or []) > 0 or len(item.get('unhealthy') or []) > 0)"
+  target: "'nodegroups'"
+  evidence: "f\"node groups {item.get('nodegroups')}, max AMI age {item.get('max_ami_age_days')} days, over 90 days {item.get('ami_old_90d')}, over 180 days {item.get('ami_old_180d')}, health issues {item.get('unhealthy')}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    A managed node group's AMI (the date at the end of releaseVersion) only changes when a node group update is run. EKS-optimized AMIs ship roughly every 2-4 weeks with kernel, containerd and runc security patches. Thresholds (defaults, user-adjustable): 90 days warn, 180 days fail. Karpenter nodes are covered by the EC2NodeClass AMI selection (karpenter.ec2nodeclass-al2, hardening).
+    Measured on a real EKS cluster: a managed node group AMI about 320 days old → fail.
+  suggest: "aws eks update-nodegroup-version --cluster-name <c> --nodegroup-name <ng> (rolling replacement). Automate with the node group's 'auto update' or a periodic pipeline."
+  verify:
+    - "aws eks describe-nodegroup --cluster-name <c> --nodegroup-name <ng> --query 'nodegroup.{ami:releaseVersion,status:status,health:health}'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          available: true
+          nodegroups: 1
+          ami_old_90d:
+            - "system_core 320d"
+          ami_old_180d:
+            - "system_core"
+          max_ami_age_days: 320
+          unhealthy: []
+      - expect: "warn"
+        item:
+          available: true
+          nodegroups: 1
+          ami_old_90d:
+            - "system_core 120d"
+          ami_old_180d: []
+          max_ami_age_days: 120
+          unhealthy: []
+      - expect: "warn"
+        item:
+          available: true
+          nodegroups: 1
+          ami_old_90d: []
+          ami_old_180d: []
+          max_ami_age_days: 45
+          unhealthy:
+            - "system_core"
+      - expect: "pass"
+        item:
+          available: true
+          nodegroups: 1
+          ami_old_90d: []
+          ami_old_180d: []
+          max_ami_age_days: 45
+          unhealthy: []

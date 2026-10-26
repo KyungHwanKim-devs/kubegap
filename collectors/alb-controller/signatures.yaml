@@ -1,0 +1,45 @@
+# AWS Load Balancer Controller log signatures. The first edition lived in signatures/catalog.yaml and was moved into this collector. Field descriptions are in the header of catalog.yaml.
+- id: alb-controller.reconcile-error
+  name: ALB Controller reconcile error
+  component: alb-controller
+  area: traffic
+  severity: medium
+  sources: ["logs/pods/alb-controller/*.log"]
+  pattern: 'Reconciler error|failed to reconcile|"level":"error"'
+  meaning: The ALB/NLB configuration of an Ingress or Service was not applied to AWS. New routing and certificates do not take effect.
+  cause: IAM permissions, missing subnet tags (kubernetes.io/role/elb), security group limits, wrong certificate ARN.
+  verify: "kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --since=24h | grep -i error | head"
+  warn_at: 1
+  fail_at: 50
+- id: alb-controller.access-denied
+  name: ALB Controller IAM permission denied
+  component: alb-controller
+  area: security
+  severity: high
+  sources: ["logs/pods/alb-controller/*.log"]
+  pattern: 'AccessDenied|UnauthorizedOperation|is not authorized to perform'
+  meaning: The controller lacks permission to call the ELB, EC2 or WAF APIs. All load balancer creation and updates stop.
+  cause: IRSA role policy written for an older controller version, missing policy.
+  verify: "kubectl describe sa -n kube-system aws-load-balancer-controller | grep role-arn"
+- id: alb-controller.certificate
+  name: ALB certificate resolution failed
+  component: alb-controller
+  area: traffic
+  severity: high
+  sources: ["logs/pods/alb-controller/*.log"]
+  pattern: 'no certificate found|unable to resolve.*certificate|certificate.*not found|CertificateNotFound'
+  meaning: The ACM certificate for the HTTPS listener cannot be found, so the Ingress does not work.
+  cause: No ACM certificate matching the hostname (wrong region), typo in the annotation ARN.
+  verify: "aws acm list-certificates --query 'CertificateSummaryList[].DomainName'"
+- id: alb-controller.throttled
+  name: ALB Controller API throttling
+  component: alb-controller
+  area: platform
+  severity: medium
+  sources: ["logs/pods/alb-controller/*.log"]
+  pattern: 'Throttling|Rate exceeded|RequestLimitExceeded'
+  meaning: The ELB API limit is being hit and reconciliation is delayed.
+  cause: Many Ingresses and TargetGroupBindings with a short reconcile interval.
+  verify: "kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --since=1h | grep -c Throttling"
+  warn_at: 5
+  fail_at: 200

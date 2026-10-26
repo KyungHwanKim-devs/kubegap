@@ -1,0 +1,6 @@
+# flannel collection (the k3s counterpart of VPC CNI). In-node data (flannel.1 mtu, vxlan, RX/TX statistics, underlay NIC mtu, sysctl) is read over SSH by the `flannel` section of the k3s-platform k3s-node.sh script
+# and saved to logs/node/<node>/k3s-platform.txt (not read again here to avoid a second SSH round trip). Here only the interface counters node-exporter holds are fetched via PromQL.
+- id: metrics.flannel
+  type: promql
+  file: metrics.yaml
+  timeout: 30

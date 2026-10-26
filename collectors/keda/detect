@@ -1,0 +1,2 @@
+# KEDA collector. Enabled when the detected component keda (keda-operator Deployment or ScaledObject CRD) is present. EKS and k3s.
+component: keda

@@ -1,0 +1,7 @@
+# local-path-provisioner collection (small k3s cluster counterpart of EBS CSI).
+# Volumes are node directories (/var/lib/rancher/k3s/storage/<pv>_<ns>_<pvc>). Actual usage per directory (du) is read over SSH by the `local-path` section of k3s-platform/k3s-node.sh into logs/node/<node>/k3s-platform.txt (no second SSH round trip).
+# Objects (StorageClass, PV, PVC, ConfigMap local-path-config, Deployment) come from core. Here we read node root filesystem free space via PromQL to answer "are volume directories filling the OS disk?".
+- id: metrics.local-path
+  type: promql
+  file: metrics.yaml
+  timeout: 30

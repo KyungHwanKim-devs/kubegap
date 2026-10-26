@@ -1,0 +1,15 @@
+# prod profile: a production cluster with HA expectations (the reference set of expectations; EKS with 3+ nodes and an autoscaler is the model). All core checks are on; platform checks follow the detected platform.
+name: prod
+description: Production expectations. All core checks on; platform-specific checks follow the detected platform.
+disabled_checks: []
+# Per-check threshold overrides. Same meaning as rule.threshold.<profile> in checks.yaml; values here take precedence.
+thresholds: {}
+# Component families that must be present (same as EXPECTED_FAMILIES in lib/components.py; this list takes precedence)
+expected_families: [metrics-store, logs-store, alert-router, backup, event-retention, secrets-manager, slo, certificates, node-autoscaler, kube-state-metrics, node-exporter, progressive-delivery]
+# Per-check exclusion patterns. On EKS the control plane is not visible, so these kube-prometheus-stack Services are expected to have no endpoints.
+exclude:
+  traffic.endpoint-zero:
+    - kube-system/kube-prometheus-stack-kube-controller-manager
+    - kube-system/kube-prometheus-stack-kube-scheduler
+    - kube-system/kube-prometheus-stack-kube-etcd
+    - kube-system/kube-prometheus-stack-kube-proxy

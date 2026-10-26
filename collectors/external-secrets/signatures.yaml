@@ -1,0 +1,23 @@
+# External Secrets Operator log signatures. The first edition lived in signatures/catalog.yaml and was moved into this collector. Field descriptions are in the header of catalog.yaml.
+- id: external-secrets.provider-error
+  name: External Secrets cannot fetch a value from the secret store
+  component: external-secrets
+  area: security
+  severity: high
+  sources: ["logs/pods/external-secrets/*.log"]
+  pattern: 'could not get secret data from provider|could not fetch|SecretSyncedError|AccessDenied|ExpiredToken|Unable to assume role|unable to (create|get) session|ResourceNotFoundException|AccessDeniedException'
+  meaning: The ExternalSecret has SecretSynced=False. New pods use the old Secret, or there is no Secret at all and they fail to start.
+  cause: IRSA role permissions, secret renamed or deleted, region mismatch, expired token.
+  verify: "kubectl get externalsecrets -A | grep -v SecretSynced"
+- id: external-secrets.update-failed
+  name: External Secrets cannot update the Secret
+  component: external-secrets
+  area: security
+  severity: medium
+  sources: ["logs/pods/external-secrets/*.log"]
+  pattern: 'could not update Secret|error patching|could not create Secret|Operation cannot be fulfilled'
+  meaning: The value was fetched but cannot be written to the cluster Secret.
+  cause: Another controller manages the same Secret (ownership conflict), RBAC.
+  verify: "kubectl describe externalsecret -n <ns> <name>"
+  warn_at: 1
+  fail_at: 50

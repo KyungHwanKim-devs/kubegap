@@ -1,0 +1,74 @@
+# k3s platform collection. node items run read-only commands inside the node via lib/node.py.
+# node item: cmd, nodes(all|server|agent), out(logs/node/{node}/<name>), requires (entry of the permission table: journal|kernlog|dmesg|k3s-db|crictl|sudo-any). If requires is not satisfied the node is skipped as "no node access".
+# Control-plane logs (journal steps) and k3s-node.sh (config, ports, flannel, journald, datastore, certificates, registries, containerd, local-path, disk, temperature) plus the containerd log.
+- id: k3s-journal-errors
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: all
+  requires: journal
+  cmd: >
+    journalctl -u k3s -u k3s-agent --since -24h --no-pager -q -o short-iso 2>/dev/null
+    | sed -E 's/^[^ ]+ [^ ]+ k3s(-agent)?\[[0-9]+\]: //'
+    | grep -E '^[EW][0-9]{4}|"level":"(warn|error|fatal)"|level=(warning|error|fatal)' | tail -n 3000
+  out: logs/node/{node}/k3s-errors-24h.log
+  timeout: 60
+- id: k3s-journal-stats
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: all
+  requires: journal
+  cmd: >
+    journalctl -u k3s -u k3s-agent --since -24h --no-pager -q 2>/dev/null
+    | sed -E 's/^[A-Z][a-z]{2} [0-9 ]+[0-9:]+ [a-z0-9]+ k3s(-agent)?\[[0-9]+\]: //'
+    | sed -E 's/^([EIWF])[0-9]{4} [0-9:.]+ +[0-9]+ ([a-zA-Z_]+\.go):[0-9]+\].*/klog \1 \2/; s/^\{"level":"([a-z]+)".*/etcd-json \1/; s/^time="[^"]+" level=([a-z]+).*/logrus \1/'
+    | cut -c1-60 | sort | uniq -c | sort -rn | head -40
+  out: logs/node/{node}/k3s-stats-24h.txt
+  timeout: 60
+- id: k3s-scheduler-unschedulable
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: server
+  requires: journal
+  cmd: journalctl -u k3s --since -24h --no-pager -q 2>/dev/null | grep -E 'Unschedulable|FailedScheduling|Insufficient' | tail -n 200
+  out: logs/node/{node}/k3s-scheduler-unschedulable-24h.log
+  timeout: 60
+- id: k3s-webhook-failures
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: server
+  requires: journal
+  cmd: journalctl -u k3s --since -24h --no-pager -q 2>/dev/null | grep -E 'failed calling webhook|webhook.*context deadline' | tail -n 200
+  out: logs/node/{node}/k3s-webhook-failures-24h.log
+  timeout: 60
+- id: k3s-etcd-slow
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: server
+  requires: journal
+  # Keep at most 15 lines per hour (max 360 lines over 24h) — a plain tail 200 only kept the last hour before collection, so "was it quiet in other hours?" could not be answered. A full 15 lines for an hour means there were more
+  cmd: journalctl -u k3s --since -24h --no-pager -q 2>/dev/null | grep -E '"level":"warn".*(apply request took too long|slow fdatasync|leader changed|request stats|took too long)' | awk '{h=substr($0,1,9)} c[h]++<15'
+  out: logs/node/{node}/k3s-etcd-slow-24h.log
+  timeout: 60
+- id: kubelet-pleg
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: all
+  requires: journal
+  cmd: journalctl -u k3s -u k3s-agent --since -24h --no-pager -q 2>/dev/null | grep -iE 'PLEG|not healthy|eviction|image garbage|imageGC|OOMKilling|SystemOOM' | tail -n 200
+  out: logs/node/{node}/kubelet-pleg-eviction-24h.log
+  timeout: 60
+# ---- k3s platform node inspection. script ships the file from this folder to the node. Tokens are redacted inside the script. ----
+- id: k3s-node
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: all
+  script: k3s-node.sh
+  out: logs/node/{node}/k3s-platform.txt
+  timeout: 90
+- id: containerd-log
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: all
+  cmd: sudo -n /usr/bin/tail -n 2000 /var/lib/rancher/k3s/agent/containerd/containerd.log 2>/dev/null | grep -E 'level=(warn|error|fatal)' | tail -n 1500
+  out: logs/node/{node}/containerd-24h.log
+  timeout: 60

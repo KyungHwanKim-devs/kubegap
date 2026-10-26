@@ -1,0 +1,196 @@
+# EKS platform collection. Read-only calls throughout. Results go to the aws/ folder.
+# Already fetched and saved by detection (discover): aws/describe-cluster.json, aws/list-addons.json, aws/describe-addon-<name>.json,
+# aws/list-nodegroups.json. The rest is collected here.
+# Placeholders available in aws item args: {cluster} {region} {account}, plus {item} when for_each is set.
+# for_each values: eks.nodegroups | eks.addons | eks.subnet_ids (read from cluster.eks in inventory.json)
+# A plural placeholder such as `{subnet_ids}` expands the whole list into multiple arguments.
+- id: nodegroup
+  type: aws
+  for_each: eks.nodegroups
+  args: [eks, describe-nodegroup, --cluster-name, "{cluster}", --nodegroup-name, "{item}"]
+  out: aws/describe-nodegroup-{item}.json
+  timeout: 60
+- id: addon-versions
+  modes: [full]   # skipped by the daily run
+  type: aws
+  for_each: eks.addons
+  args: [eks, describe-addon-versions, --addon-name, "{item}", --kubernetes-version, "{k8s_version}", --max-results, "5"]
+  out: aws/describe-addon-versions-{item}.json
+  timeout: 60
+- id: cluster-versions
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [eks, describe-cluster-versions, --cluster-versions, "{k8s_version}"]
+  out: aws/describe-cluster-versions.json
+  timeout: 60
+- id: insights
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [eks, list-insights, --cluster-name, "{cluster}"]
+  out: aws/list-insights.json
+  timeout: 60
+- id: subnets
+  type: aws
+  args: [ec2, describe-subnets, --subnet-ids, "{subnet_ids}"]
+  out: aws/describe-subnets.json
+  timeout: 60
+- id: ssm-instances
+  type: aws
+  args: [ssm, describe-instance-information, --max-results, "50"]
+  out: aws/ssm-instance-information.json
+  timeout: 60
+- id: cluster-security-groups
+  type: aws
+  args: [ec2, describe-security-groups, --group-ids, "{security_groups}"]
+  out: aws/describe-security-groups.json
+  timeout: 60
+- id: controlplane-logs
+  modes: [full]   # skipped by the daily run
+  type: cwlogs
+  file: cwlogs.yaml
+  hours: 24
+  timeout: 120
+# ---- Node kubelet/containerd journals (signature input). SSM runs as root, so no requires. klog writes everything at journald priority info, so filter by klog level (E, W) and logrus level rather than -p. 3000 lines per node max ----
+- id: kubelet-journal
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: all
+  cmd: journalctl -u kubelet --since -24h -o short-iso --no-pager -q 2>/dev/null | grep -E ' [EW][0-9]{4} [0-9:.]+ ' | tail -n 3000
+  out: logs/node/{node}/kubelet-24h.log
+  timeout: 60
+- id: containerd-journal
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: all
+  cmd: journalctl -u containerd --since -24h -o short-iso --no-pager -q 2>/dev/null | grep -E 'level=(warn|error|fatal)' | tail -n 2000
+  out: logs/node/{node}/containerd-24h.log
+  timeout: 60
+# ---- Backup policies (DLM, AWS Backup presence). Both read-only calls ----
+- id: dlm-policies
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [dlm, get-lifecycle-policies]
+  out: aws/dlm-lifecycle-policies.json
+  timeout: 60
+- id: backup-plans
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [backup, list-backup-plans]
+  out: aws/backup-plans.json
+  timeout: 60
+# ---- ALB/NLB and target groups. describe-* and CloudWatch get-metric-data (24 hours, 1-hour period), all read-only. lib/albmetrics.py ----
+# Observed on a real cluster: 1 ALB (40 target groups) and 2 NLBs, about 90 calls (attributes and health per target group), ~300 queries in batches of 100. lib/traffic.py joins them to Services and Ingresses through TargetGroupBindings.
+- id: alb-metrics
+  type: alb-metrics
+  out: aws/alb-metrics.json
+  hours: 24
+  timeout: 300
+# ---- EBS volumes and snapshots. Read-only calls. Observed on a real cluster: 28 cluster-tagged volumes (25 gp3, 3 gp2), 0 available, 12 snapshots in 30 days ----
+- id: ec2-volumes
+  type: aws
+  args: [ec2, describe-volumes, --filters, "Name=tag:KubernetesCluster,Values={cluster}", --query, "Volumes[].{id:VolumeId,size:Size,type:VolumeType,state:State,iops:Iops,throughput:Throughput,created:CreateTime,az:AvailabilityZone,encrypted:Encrypted,attachments:Attachments[].{instance:InstanceId,state:State},tags:Tags}"]
+  out: aws/ec2-volumes.json
+  timeout: 60
+- id: ec2-volumes-available
+  type: aws
+  args: [ec2, describe-volumes, --filters, "Name=status,Values=available", --query, "Volumes[].{id:VolumeId,size:Size,type:VolumeType,created:CreateTime,az:AvailabilityZone,tags:Tags}"]
+  out: aws/ec2-volumes-available.json
+  timeout: 60
+- id: ec2-snapshots-30d
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [ec2, describe-snapshots, --owner-ids, self, --query, "Snapshots[?StartTime>='{date_30d_ago}'].{id:SnapshotId,volume:VolumeId,size:VolumeSize,start:StartTime,state:State,description:Description,tags:Tags}"]
+  out: aws/ec2-snapshots-30d.json
+  timeout: 120
+# ---- Security. IMDS settings (can a pod steal the node role?) and Pod Identity. Read-only calls ----
+- id: ec2-instances-imds
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [ec2, describe-instances, --filters, "Name=tag:kubernetes.io/cluster/{cluster},Values=owned", "Name=instance-state-name,Values=running", --query, "Reservations[].Instances[].{id:InstanceId,type:InstanceType,hop_limit:MetadataOptions.HttpPutResponseHopLimit,tokens:MetadataOptions.HttpTokens,endpoint:MetadataOptions.HttpEndpoint,profile:IamInstanceProfile.Arn,name:Tags[?Key==`Name`].Value|[0]}"]
+  out: aws/ec2-instances-imds.json
+  timeout: 60
+- id: pod-identity-associations
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [eks, list-pod-identity-associations, --cluster-name, "{cluster}"]
+  out: aws/pod-identity-associations.json
+  timeout: 60
+# ---- Cost. All read-only. Cost Explorer bills 0.01 USD per request (called once); the Pricing API exists only in us-east-1, so the region is fixed ----
+- id: ec2-addresses
+  type: aws
+  args: [ec2, describe-addresses, --query, "Addresses[].{ip:PublicIp,association:AssociationId,instance:InstanceId,eni:NetworkInterfaceId,tags:Tags}"]
+  out: aws/ec2-addresses.json
+  timeout: 60
+- id: ec2-nat-gateways
+  type: aws
+  args: [ec2, describe-nat-gateways, --filter, "Name=state,Values=available", --query, "NatGateways[].{id:NatGatewayId,subnet:SubnetId,vpc:VpcId,created:CreateTime,tags:Tags}"]
+  out: aws/ec2-nat-gateways.json
+  timeout: 60
+- id: ec2-spot-prices
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [ec2, describe-spot-price-history, --instance-types, "{instance_types}", --product-descriptions, "Linux/UNIX", --start-time, "{date_today}T00:00:00Z", --query, "SpotPriceHistory[].{type:InstanceType,az:AvailabilityZone,price:SpotPrice,ts:Timestamp}"]
+  out: aws/ec2-spot-prices.json
+  timeout: 60
+- id: pricing-ondemand
+  modes: [full]   # skipped by the daily run
+  type: aws
+  region: us-east-1
+  for_each: instance_types
+  args: [pricing, get-products, --service-code, AmazonEC2, --filters, "Type=TERM_MATCH,Field=instanceType,Value={item}", "Type=TERM_MATCH,Field=regionCode,Value={region}", "Type=TERM_MATCH,Field=operatingSystem,Value=Linux", "Type=TERM_MATCH,Field=tenancy,Value=Shared", "Type=TERM_MATCH,Field=preInstalledSw,Value=NA", "Type=TERM_MATCH,Field=capacitystatus,Value=Used", --max-results, "1"]
+  out: aws/pricing-{item}.json
+  timeout: 60
+- id: ce-cost-30d
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [ce, get-cost-and-usage, --time-period, "Start={date_30d_ago},End={date_tomorrow}", --granularity, MONTHLY, --metrics, UnblendedCost, --group-by, "Type=DIMENSION,Key=SERVICE"]
+  out: aws/ce-cost-30d.json
+  timeout: 60
+# ---- ACM certificate expiry, service quota usage (CloudWatch AWS/Usage), EBS volume queue and IOPS (CloudWatch AWS/EBS). All read-only calls ----
+- id: acm-certificates
+  type: aws
+  args: [acm, list-certificates, --includes, "keyTypes=RSA_1024,RSA_2048,RSA_3072,RSA_4096,EC_prime256v1,EC_secp384r1,EC_secp521r1"]
+  out: aws/acm-certificates.json
+  timeout: 60
+- id: service-quotas
+  modes: [full]   # skipped by the daily run
+  type: aws
+  for_each: service_codes
+  args: [service-quotas, list-service-quotas, --service-code, "{item}", --query, "Quotas[?UsageMetric!=null].{QuotaCode:QuotaCode,QuotaName:QuotaName,Value:Value,Unit:Unit,Adjustable:Adjustable,GlobalQuota:GlobalQuota,ServiceCode:ServiceCode,UsageMetric:UsageMetric}"]
+  out: aws/service-quotas-{item}.json
+  timeout: 120
+- id: quota-usage
+  modes: [full]   # skipped by the daily run
+  type: cw-metrics
+  mode: quotas
+  from_files: [aws/service-quotas-ec2.json, aws/service-quotas-vpc.json, aws/service-quotas-elasticloadbalancing.json, aws/service-quotas-ebs.json]
+  out: aws/cw-quota-usage.json
+  hours: 1
+  period: 3600
+  timeout: 300
+- id: ec2-root-volumes
+  modes: [full]   # skipped by the daily run
+  # Node root volumes (unlike PVC volumes they carry no KubernetesCluster tag). Instance ids come from the node providerID
+  type: aws
+  args: [ec2, describe-volumes, --filters, "Name=attachment.instance-id,Values={instance_ids}", --query, "Volumes[?Attachments[0].Device==`/dev/xvda` || Attachments[0].Device==`/dev/sda1` || Attachments[0].Device==`/dev/nvme0n1`].{id:VolumeId,size:Size,type:VolumeType,state:State,iops:Iops,throughput:Throughput,az:AvailabilityZone,encrypted:Encrypted,attachments:Attachments[].{instance:InstanceId,state:State,device:Device},root:`true`}"]
+  out: aws/ec2-root-volumes.json
+  timeout: 60
+- id: ebs-volume-metrics
+  modes: [full]   # skipped by the daily run
+  type: cw-metrics
+  namespace: AWS/EBS
+  dimension: VolumeId
+  from_file: {path: aws/ec2-volumes.json, items: "", key: id}
+  from_files: [aws/ec2-root-volumes.json]
+  metrics:
+    - {name: VolumeQueueLength, stat: Average}
+    - {name: VolumeQueueLength, stat: Maximum}
+    - {name: VolumeReadOps, stat: Sum}
+    - {name: VolumeWriteOps, stat: Sum}
+    - {name: BurstBalance, stat: Minimum}
+    - {name: VolumeTotalReadTime, stat: Sum}
+    - {name: VolumeTotalWriteTime, stat: Sum}
+  out: aws/cw-ebs-volumes.json
+  hours: 24
+  period: 3600
+  timeout: 300

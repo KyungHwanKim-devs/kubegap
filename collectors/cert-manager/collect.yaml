@@ -1,0 +1,11 @@
+# cert-manager collection. Objects (Certificate, CertificateRequest, Issuer, ClusterIssuer, Order, Challenge, Ingress, Deployment, webhooks) come from core. Secrets (certificates and keys) are never collected.
+# The controller metrics (:9402) are not scraped by Prometheus (0 certmanager_* series observed on a small k3s cluster, no ServiceMonitor) → pod-metrics (proxy → curl from a node).
+- id: controller-metrics
+  type: pod-metrics
+  namespace: cert-manager
+  selector: app.kubernetes.io/component=controller,app.kubernetes.io/instance=cert-manager
+  port: 9402
+  path: /metrics
+  out: metrics/pod/cert-manager
+  keep: '^(certmanager_(certificate_(expiration_timestamp_seconds|renewal_timestamp_seconds|ready_status)|http_acme_client_request_count|controller_sync_(error_count|call_count)|clock_time_seconds)|process_(start_time|resident_memory_bytes))'
+  timeout: 30

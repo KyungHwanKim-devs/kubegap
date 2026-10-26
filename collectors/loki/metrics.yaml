@@ -1,0 +1,16 @@
+# Loki and promtail metrics (when Prometheus scrapes them). Output metrics/<id>.json. Read by summary.logs.agents.
+- id: promtail_dropped_1h
+  why: Log lines promtail dropped in 1h (retries exhausted, rate limited). Anything above 0 is a permanent gap in the logs
+  query: sum(increase(promtail_dropped_entries_total[1h]))
+- id: promtail_targets_active
+  why: Files being tailed per promtail instance (node). A node at 0 is not shipping its logs
+  query: sum by (instance) (promtail_targets_active_total)
+- id: promtail_request_errors_1h
+  why: Non-2xx responses (429, 5xx) from promtail → Loki pushes
+  query: sum by (status_code) (increase(promtail_request_duration_seconds_count{status_code!~"2.."}[1h]))
+- id: loki_discarded_1h
+  why: Samples Loki rejected in 1h by reason (rate_limited, per_stream_rate_limit, line_too_long, too_far_behind, stream_limit)
+  query: sum by (reason) (increase(loki_discarded_samples_total[1h])) > 0
+- id: loki_5xx_1h
+  why: 5xx Loki requests. Query or ingest failures
+  query: sum by (route) (increase(loki_request_duration_seconds_count{status_code=~"5.."}[1h])) > 0

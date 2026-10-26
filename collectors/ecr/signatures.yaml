@@ -1,0 +1,2 @@
+# ECR log signatures. ECR has no logs of its own (CloudTrail is out of scope). ErrImagePull on the pod side is covered by the core event summary.
+[]

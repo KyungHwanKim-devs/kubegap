@@ -1,0 +1,13 @@
+# Karpenter collection. All read-only.
+# NodePool/NodeClaim status, provisioning latency, expired-but-not-replaced nodes, DisruptionBlocked and budgets are covered by the scaling section (summary.scaling.karpenter) from objects, events and logs. Here: the controller itself and its metrics:
+# EC2NodeClass settings (AMI family, IMDS, root volume), controller replicas/IRSA/feature gates, and from :8000/metrics pool usage vs limits, NodeClaim create/terminate/disruption reasons, spot interruption messages, cloud API errors, cluster state sync, pod startup time.
+# Prometheus usually does not scrape these metrics. pod-metrics reads them via the API proxy first, then curl from inside the node. instance_type_offering_* is ~6,000 series, so keep filters it out.
+- id: controller-metrics
+  type: pod-metrics
+  namespace: karpenter
+  selector: app.kubernetes.io/name=karpenter
+  port: 8000
+  path: /metrics
+  out: metrics/pod/karpenter
+  keep: '^(karpenter_(nodepool_|nodeclaims_|nodes_(created|terminated|termination_time_seconds_(sum|count))|interruption_|cloudprovider_(errors_total|duration_seconds_(sum|count))|cluster_state_synced|consistency_errors|pods_startup_time_seconds_(sum|count)|disruption_(eligible_nodes|budgets_allowed_disruptions|nodes_disrupted_total|pods_disrupted_total|actions_performed_total|queue_depth)|provisioner_scheduling_(queue_depth|duration_seconds_(sum|count))|nodes_eviction_queue_depth)|controller_runtime_reconcile_errors_total|leader_election|process_(start_time|resident_memory_bytes))'
+  timeout: 30

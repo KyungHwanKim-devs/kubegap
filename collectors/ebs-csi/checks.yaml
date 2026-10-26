@@ -1,0 +1,1526 @@
+# EBS CSI checks. summary.ebscsi.summary — lib/ebscsi.py. Attach limits, EBS volumes and snapshots are covered by the core storage section (storage.*).
+- id: ebscsi.controller-availability
+  name: EBS CSI controller has 1 replica or all replicas on one node (single point where volume attach and provisioning stop)
+  area: storage
+  type: summary
+  each: ebscsi.summary
+  cluster_level: true
+  rule:
+    expr: "item['controller_present'] and ((item['controller_ready'] or 0) < (item['controller_replicas'] or 0) or (item['controller_replicas'] or 0) < 2)"
+    warn_expr: "item['controller_present'] and item['controller_all_same_node']"
+  target: "'cluster'"
+  evidence: "f\"ebs-csi-controller replicas {item['controller_replicas']} / ready {item['controller_ready']}, all on one node {item['controller_all_same_node']}, node plugin {item['node_ready']}/{item['node_desired']}, version {item['version']} (add-on {item['addon_version']}, latest {item['addon_latest']})\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    Without the controller, new PVC provisioning, attach after node replacement, snapshots and expansion all stop — when a node dies and a StatefulSet moves, the PV cannot attach to the new node and the pod stays Pending. The default is 2 replicas with leader election; if both are on the same node, both disappear when that node fails.
+    Measured on a real EKS cluster: 2/2 on different nodes (both system nodes without SSM registration).
+  suggest: "Keep replicas 2 and confirm podAntiAffinity (present in the defaults). Also check that the node plugin (ebs-csi-node) is Ready on every node."
+  verify:
+    - "kubectl get deploy -n kube-system ebs-csi-controller -o wide ; kubectl get ds -n kube-system ebs-csi-node"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 1
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 1
+          controller_ready: 1
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: true
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+- id: ebscsi.no-dedicated-role
+  name: EBS CSI controller has no dedicated IAM role (IRSA or Pod Identity) (shares the node role permissions)
+  area: security
+  type: summary
+  each: ebscsi.summary
+  cluster_level: true
+  rule:
+    expr: "item['controller_present'] and not item['has_dedicated_role']"
+  target: "'cluster'"
+  evidence: "f\"ServiceAccount ebs-csi-controller-sa: IRSA role {item['irsa_role']}, Pod Identity {item['pod_identity']}, add-on serviceAccountRoleArn present {item['has_dedicated_role']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    Without a dedicated role the controller uses the node instance role's EC2 volume permissions (CreateVolume, AttachVolume, DeleteVolume, CreateSnapshot). Those permissions then have to live on the node role, and on nodes with IMDS hop limit 2 (security.imds-hop-limit) every pod can create and delete volumes.
+    Measured on a real EKS cluster: a dedicated IRSA role for the EBS CSI driver was present — pass.
+  suggest: "Set a role with AmazonEBSCSIDriverPolicy as the add-on serviceAccountRoleArn and remove EBS permissions from the node role."
+  verify:
+    - "kubectl get sa -n kube-system ebs-csi-controller-sa -o jsonpath='{.metadata.annotations}' ; aws eks describe-addon --addon-name aws-ebs-csi-driver --query addon.serviceAccountRoleArn"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: false
+          irsa_role: null
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+- id: ebscsi.volumeattachment-stuck
+  name: VolumeAttachment stuck unattached for a long time or carrying an attach/detach error
+  area: storage
+  type: summary
+  each: ebscsi.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['va_stuck']) > 0"
+    warn_expr: "len(item['va_orphan']) > 0"
+  target: "'cluster'"
+  evidence: "f\"VolumeAttachments {item['volume_attachments']}, incomplete or errored {item['va_stuck']} ({[(d['pv'], d['node'], d['age_min'], d['error']) for d in item['va_stuck_detail']][:3]}), orphans whose PV or node is gone {item['va_orphan']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    A VolumeAttachment is the request object for "attach this PV to this node". If it stays attached false for more than 10 minutes, that pod is sitting in ContainerCreating with "Multi-Attach error" or "timed out waiting for volume". The attachError message is the direct cause (limit exceeded, attached to another node, IAM). One left behind after its node disappeared is an orphan whose detach never finished.
+  suggest: "Follow the attachError message: AttachmentLimitExceeded → the node attach limit (storage.node-attach-limit); 'already attached' → force detach from the old node (aws ec2 detach-volume --force risks data — first confirm the pod is not running on another node)."
+  verify:
+    - "kubectl get volumeattachments -o custom-columns=NAME:.metadata.name,PV:.spec.source.persistentVolumeName,NODE:.spec.nodeName,ATTACHED:.status.attached,ERR:.status.attachError.message"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck:
+            - "csi-abc"
+          va_stuck_detail:
+            - name: "csi-abc"
+              node: "n1"
+              pv: "pvc-1"
+              attached: false
+              age_min: 45.0
+              error: "AttachmentLimitExceeded"
+              pv_missing: false
+              node_missing: false
+              deleting: false
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan:
+            - "csi-old"
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+- id: ebscsi.storageclass-unencrypted
+  name: EBS StorageClass without encrypted (new volumes are not encrypted)
+  area: security
+  type: summary
+  each: ebscsi.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['classes_unencrypted']) > 0 and item['default_class'] in item['classes_unencrypted']"
+    warn_expr: "len(item['classes_unencrypted']) > 0"
+  target: "'cluster'"
+  evidence: "f\"ebs.csi.aws.com StorageClasses {item['classes']}, without encrypted {item['classes_unencrypted']} (default class {item['default_class']}), in-tree leftovers {item['classes_intree']}, without allowVolumeExpansion {item['classes_no_expansion']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    storage.ebs-unencrypted reports the result — existing volumes that are not encrypted. This check reports the cause: without encrypted: "true" in the StorageClass parameters, future volumes will be the same. Enabling account-level "EBS encryption by default" removes the need to fix the class, but clusters have been observed with neither.
+  suggest: "Set parameters.encrypted \"true\" on the gp3 class (+ optional kmsKeyId). Or aws ec2 enable-ebs-encryption-by-default (per region). Existing volumes only change via snapshot → encrypted copy."
+  verify:
+    - "kubectl get sc -o custom-columns=NAME:.metadata.name,PROV:.provisioner,ENC:.parameters.encrypted,EXP:.allowVolumeExpansion ; aws ec2 get-ebs-encryption-by-default"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3-2a"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted: []
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+- id: ebscsi.node-ops-errors
+  name: kubelet → EBS CSI node plugin calls failing (mount or attach confirmation failed)
+  area: storage
+  type: summary
+  each: ebscsi.summary
+  cluster_level: true
+  rule:
+    expr: "item['kubelet_metrics_available'] and ((item['node_ops_errors_24h'] or 0) >= 10 or (item['storage_ops_failures_24h'] or 0) >= 10)"
+    warn_expr: "item['kubelet_metrics_available'] and ((item['node_ops_errors_24h'] or 0) > 0 or (item['storage_ops_failures_24h'] or 0) > 0 or (item['events_failures_24h'] or 0) > 0)"
+  target: "'cluster'"
+  evidence: "f\"CSI gRPC failures in 24h {item['node_ops_errors_24h']} ({item['node_ops_errors_detail']}), kubelet volume operation failures {item['storage_ops_failures_24h']}, volume-related Warning events {item['events_24h']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    kubelet sends NodeStageVolume (mount the device on the node) and NodePublishVolume (bind into the pod path) to the CSI node plugin; on failure the pod stays in ContainerCreating with FailedMount events. The non-OK codes of csi_operations_seconds and the fail-unknown of storage_operation_duration_seconds are those counts.
+    Measured on a real EKS cluster: 0 failures and 0 events in 24h.
+  suggest: "Read the FailedMount event message and the ebs-csi-node logs (logs/pods/ebs-csi/). Device name conflicts, filesystem corruption and incomplete attach are common."
+  verify:
+    - "sum by (method_name, grpc_status_code) (increase(csi_operations_seconds_count{driver_name=\"ebs.csi.aws.com\"}[24h]))"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 14
+          node_ops_errors_detail:
+            NodeStageVolume:
+              Internal: 14
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h:
+            FailedMount: 3
+          events_failures_24h: 3
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: false
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+- id: ebscsi.stage-latency
+  name: Volume attach→mount (NodeStageVolume) p99 is slow (StatefulSet recovery time)
+  area: storage
+  type: summary
+  each: ebscsi.summary
+  cluster_level: true
+  rule:
+    expr: "(item['stage_p99_s'] or 0) >= 120"
+    warn_expr: "(item['stage_p99_s'] or 0) >= 30 or (item['publish_p99_s'] or 0) >= 30"
+  target: "'cluster'"
+  evidence: "f\"24h p99: NodeStageVolume {item['stage_p99_s']}s, NodePublishVolume {item['publish_p99_s']}s (no value means no attach happened in that window)\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    After node replacement or a spot reclaim, the time for a StatefulSet pod to come up on a new node is "EBS detach + attach + Stage (mount)". A Stage p99 above 30 seconds delays DB recovery by tens of seconds per node; above 2 minutes the attach itself is being retried.
+    Measured on a real EKS cluster: no Stage calls within 24h, so no value (the pods moved by that day's spot reclaim did not use EBS).
+  suggest: "If slow, check the controller --batching (enabled) and EC2 API throttling (visible only when ebscsi.controller-metrics is enabled). With many nodes, raise attacher --worker-threads."
+  verify:
+    - "histogram_quantile(0.99, sum by (method_name, le) (rate(csi_operations_seconds_bucket{driver_name=\"ebs.csi.aws.com\"}[24h])))"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: 180.0
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: 45.0
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: 5.0
+          publish_p99_s: 40.0
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: 8.0
+          publish_p99_s: 1.0
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+- id: ebscsi.controller-metrics-disabled
+  name: EBS CSI controller metrics disabled (EC2 API errors and throttling not visible)
+  area: observability
+  type: summary
+  each: ebscsi.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['controller_present'] and not item['controller_metrics_enabled']"
+  target: "'cluster'"
+  evidence: "f\"aws_ebs_csi_* series {0 if not item['controller_metrics_enabled'] else 'present'}, add-on {item['addon_version']}. When enabled, shows EC2 API errors {item['api_errors_24h']} / throttles {item['api_throttles_24h']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    The controller can emit latency, error and throttle counters for every EC2 API call (aws_ebs_csi_api_request_*), but the EKS add-on default is off. When off, "is attach slow because of EC2 throttling" can only be guessed from the log signature (ebs-csi.throttled).
+  suggest: "Add-on configurationValues: controller.enableMetrics true (+ kube-prometheus-stack picks up the ServiceMonitor by label)."
+  verify:
+    - "count({__name__=~\"aws_ebs_csi_.*\"})"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-provisioner: "60s"
+            csi-attacher: "60s"
+            csi-snapshotter: null
+            csi-resizer: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: true
+          api_errors_24h: {}
+          api_throttles_24h: 0
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+- id: ebscsi.sidecar-timeout-default
+  name: CSI sidecar (attacher, provisioner, resizer) timeout at the default 60s or unset
+  area: storage
+  type: summary
+  each: ebscsi.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['controller_present'] and item['sidecar_timeouts'] is not None and any((v in (None, '15s', '60s')) for v in item['sidecar_timeouts'].values()) and (item['stage_p99_s'] or 0) >= 30"
+  target: "'cluster'"
+  evidence: "f\"sidecar --timeout {item['sidecar_timeouts']}, batching {item['batching']}, Stage p99 {item['stage_p99_s']}s\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    The attacher and provisioner --timeout is the wait limit for a single EC2 call. With large volumes or throttling, exceeding 60 seconds makes the sidecars retry repeatedly and delays attach further. It only matters when latency is actually present (Stage p99 of 30s or more), so it warns only then.
+  suggest: "In the add-on values, sidecars.attacher.additionalArgs --timeout=300s and similar. batching is already enabled."
+  verify:
+    - "kubectl get deploy -n kube-system ebs-csi-controller -o jsonpath='{.spec.template.spec.containers[*].args}' | tr ' ' '\\n' | grep timeout"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-attacher: "60s"
+            csi-provisioner: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: 45.0
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-attacher: "60s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: null
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.37.0"
+          addon_version: "v1.37.0-eksbuild.1"
+          addon_latest: "v1.67.2-eksbuild.1"
+          addon_managed: true
+          controller_replicas: 2
+          controller_ready: 2
+          controller_all_same_node: false
+          controller_present: true
+          node_desired: 7
+          node_ready: 7
+          windows_daemonset_desired: 0
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/my-cluster-eks-ebs-csi-role"
+          pod_identity: false
+          batching: true
+          sidecar_timeouts:
+            csi-attacher: "300s"
+            csi-provisioner: "300s"
+            csi-resizer: "300s"
+            csi-snapshotter: "300s"
+          volume_attachments: 17
+          va_stuck: []
+          va_stuck_detail: []
+          va_orphan: []
+          classes: 4
+          classes_unencrypted:
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_no_expansion:
+            - "gp2"
+            - "gp3"
+            - "gp3-2a"
+            - "gp3-2c"
+          classes_intree:
+            - "gp2"
+          default_class: "gp3"
+          kubelet_metrics_available: true
+          node_ops_errors_24h: 0
+          node_ops_errors_detail: {}
+          stage_p99_s: 45.0
+          publish_p99_s: null
+          storage_ops_failures_24h: 0
+          controller_metrics_enabled: false
+          api_errors_24h: {}
+          api_throttles_24h: null
+          events_24h: {}
+          events_failures_24h: 0
+          fs_group_policy: "ReadWriteOnceWithFSType"

@@ -1,0 +1,720 @@
+# Grafana self-health checks. summary.stackhealth.grafana — lib/stackhealth.py. :3000/metrics is readable without authentication. Datasource and dashboard lists only when grafana_api_token is set. observability.grafana-unused-dashboard is disabled for the open-source edition.
+- id: grafana.datasource-errors
+  name: Grafana → datasource queries fail with 429/5xx (panels break)
+  area: observability
+  type: summary
+  each: stackhealth.grafana
+  cluster_level: true
+  rule:
+    expr: "item['present'] and item['metrics_available'] and (item['datasource_error_max_ratio'] or 0) >= 0.1 and len(item['datasources_with_errors'] or []) > 0"
+    warn_expr: "item['present'] and item['metrics_available'] and (len(item['datasources_with_errors'] or []) > 0 or (item['api_5xx'] or 0) > 0)"
+  target: "item['target']"
+  evidence: "f\"responses per datasource (cumulative since start) {[(d['datasource'], d['requests'], d['by_code']) for d in (item['datasources'] or [])]}, error rate 1% or more {item['datasources_with_errors']} (max {item['datasource_error_max_ratio']}), Grafana API 5xx {item['api_5xx']}/{item['api_requests']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    A datasource 429 means the store rate-limited Grafana's queries (Loki's per-tenant query limit, Prometheus query.max-concurrency) — dashboard panels go empty with "too many outstanding requests" and people read it as "there are no logs". 5xx means the store died while processing the query (Loki OOM, Prometheus timeout).
+    Measured on a real EKS cluster: Loki datasource 302 of 2,515 requests were 429 (12%) → fail. Prometheus and a second metrics store 0. API 500 9 times. Small k3s cluster: no datasource queries since start (active_users 0).
+  suggest: "Raise Loki limits_config max_outstanding_per_tenant (default 100 → 2048) and querier.max-concurrent, and narrow the range of log panels in Grafana dashboards. For Prometheus: query.max-concurrency and query.timeout."
+  verify:
+    - "kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80 & curl -s localhost:3000/metrics | grep grafana_datasource_request_total"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "10.2.3"
+          major: 10
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors:
+            - "Loki(loki)"
+          datasource_error_max_ratio: 0.1201
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+      - expect: "warn"
+        item:
+          present: true
+          version: "10.2.3"
+          major: 10
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors:
+            - "Loki(loki)"
+          datasource_error_max_ratio: 0.02
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+      - expect: "warn"
+        item:
+          present: true
+          version: "10.2.3"
+          major: 10
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors: []
+          datasource_error_max_ratio: 0.0
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+      - expect: "pass"
+        item:
+          present: true
+          version: "10.2.3"
+          major: 10
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors: []
+          datasource_error_max_ratio: 0.0
+          api_requests: 6638689
+          api_5xx: 0
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+      - expect: "pass"
+        item:
+          present: true
+          version: "10.2.3"
+          major: 10
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors:
+            - "Loki(loki)"
+          datasource_error_max_ratio: 0.1201
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: false
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+- id: grafana.version-old
+  name: Grafana major version is end of support (10.x or lower)
+  area: observability
+  type: summary
+  each: stackhealth.grafana
+  cluster_level: true
+  rule:
+    warn_expr: "item['present'] and item['major'] is not None and item['major'] < 11"
+  target: "item['target']"
+  evidence: "f\"Grafana {item['version']} (database {item['database']}), ingress {item['ingress_hosts']}, dashboards {(item['stats'] or {}).get('totals_dashboard')}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Grafana patches only the latest and the previous major. After 12 (2025-05) came out, 10.x stopped receiving security patches — for a UI exposed to the internet, authentication bypass and XSS CVEs remain as they are.
+    Measured on real clusters: EKS 10.2.3 → warn, small k3s cluster 12.2.1 → pass.
+  suggest: "Bump the grafana subchart version in the kube-prometheus-stack chart (10 → 11 → 12; check the impact of Angular panel removal)."
+  verify:
+    - "curl -s https://<grafana>/api/health"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "10.2.3"
+          major: 10
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors:
+            - "Loki(loki)"
+          datasource_error_max_ratio: 0.1201
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+      - expect: "pass"
+        item:
+          present: true
+          version: "12.2.1"
+          major: 12
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors:
+            - "Loki(loki)"
+          datasource_error_max_ratio: 0.1201
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+      - expect: "pass"
+        item:
+          present: true
+          version: null
+          major: null
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors:
+            - "Loki(loki)"
+          datasource_error_max_ratio: 0.1201
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+- id: grafana.alerting-failures
+  name: Grafana built-in alerting evaluation or delivery failures
+  area: observability
+  type: summary
+  each: stackhealth.grafana
+  cluster_level: true
+  rule:
+    warn_expr: "item['present'] and item['metrics_available'] and ((item['alert_rule_eval_failures'] or 0) > 0 or (item['alert_notification_failures'] or 0) > 0)"
+  target: "item['target']"
+  evidence: "f\"Grafana alert rules {(item['stats'] or {}).get('totals_alert_rules')}, evaluation failures {item['alert_rule_eval_failures']}, notification failures {item['alert_notification_failures']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    If Grafana alerting (a system separate from Prometheus rules) is in use, evaluation failures (datasource errors) and notification failures (contact point configuration) accumulate here. With 0 rules Grafana alerting is not in use and Alertmanager is the only path.
+    Measured on real clusters: 0 Grafana alert rules and 0 failures on both EKS and small k3s cluster.
+  suggest: "Look at Error/NoData in Grafana Alerting → rule state. Not splitting into two systems alongside Prometheus rules is easier to manage."
+  verify:
+    - "curl -s localhost:3000/metrics | grep grafana_alerting_rule_evaluation_failures_total"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "10.2.3"
+          major: 10
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors:
+            - "Loki(loki)"
+          datasource_error_max_ratio: 0.1201
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 3
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+      - expect: "warn"
+        item:
+          present: true
+          version: "10.2.3"
+          major: 10
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors:
+            - "Loki(loki)"
+          datasource_error_max_ratio: 0.1201
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 1
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+      - expect: "pass"
+        item:
+          present: true
+          version: "10.2.3"
+          major: 10
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors:
+            - "Loki(loki)"
+          datasource_error_max_ratio: 0.1201
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+- id: grafana.metrics-unreadable
+  name: Grafana's own metrics could not be read
+  area: observability
+  type: summary
+  each: stackhealth.grafana
+  cluster_level: true
+  rule:
+    warn_expr: "item['present'] and not item['metrics_available']"
+  target: "item['target']"
+  evidence: "f\"metrics/pod/grafana/ missing — pod proxy and node access both failed. /api/health says {item['database']}, version {item['version']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Without :3000/metrics, datasource 429/5xx and alerting failures cannot be seen. Datasource and dashboard lists need grafana_api_token (config.yaml).
+  suggest: "Node access (SSM, SSH) or a ServiceMonitor (grafana.serviceMonitor.enabled). For the datasource list, put a Viewer service account token in config.yaml grafana_api_token."
+  verify:
+    - "kubectl get --raw /api/v1/namespaces/monitoring/pods/<grafana-pod>:3000/proxy/metrics | head"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "10.2.3"
+          major: 10
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors:
+            - "Loki(loki)"
+          datasource_error_max_ratio: 0.1201
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: false
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"
+      - expect: "pass"
+        item:
+          present: true
+          version: "10.2.3"
+          major: 10
+          database: "ok"
+          datasources:
+            - datasource: "Loki(loki)"
+              requests: 2515
+              errors_5xx_429: 302
+              error_ratio: 0.1201
+              by_code:
+                101: 4
+                200: 2203
+                400: 6
+                429: 302
+            - datasource: "Prometheus(prometheus)"
+              requests: 1523
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 1349
+                301: 174
+            - datasource: "VictoriaMetrics_onprem(prometheus)"
+              requests: 130
+              errors_5xx_429: 0
+              error_ratio: 0.0
+              by_code:
+                200: 130
+          datasources_with_errors:
+            - "Loki(loki)"
+          datasource_error_max_ratio: 0.1201
+          api_requests: 6638689
+          api_5xx: 9
+          alert_rule_eval_failures: 0
+          alert_notification_failures: 0
+          stats:
+            totals_dashboard: 28
+            active_users: 1
+            totals_alert_rules: 0
+          rss_mib: 105
+          ingress_hosts:
+            - "monitor.example.com"
+          storage: "pvc:kube-prometheus-stack-grafana"
+          datasources_api: "no auth"
+          metrics_available: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/deployment/kube-prometheus-stack-grafana"

@@ -1,0 +1,457 @@
+# Loki self-health checks. Input: summary.stackhealth.loki (lib/stackhealth.py; loki/metrics.txt is the raw Loki /metrics output). Unlimited retention, not-ready, OOMKilled, rejections and promtail drops are covered by core observability.loki-* and promtail-*.
+- id: loki.memory-pressure
+  name: Loki memory near its limit or OOMKilled history
+  area: observability
+  type: summary
+  each: stackhealth.loki
+  cluster_level: true
+  rule:
+    expr: "item['present'] and (item['rss_vs_limit'] or 0) >= 0.9"
+    warn_expr: "item['present'] and ((item['rss_vs_limit'] or 0) >= 0.75 or item['oomkilled_last'])"
+  target: "item['target']"
+  evidence: "f\"RSS {item['rss_mib']}MiB / limit {item['memory_limit']} = {item['rss_vs_limit']}, in-memory streams {item['memory_streams']}, last termination OOMKilled {item['oomkilled_last']}({item['oomkilled_at']}), restarts {item['restarts']}, storage {item['storage']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    In single-binary Loki the ingester (in-memory chunks) and the querier (chunk loading) share one process, so a single large range query can cause an OOMKill. At that moment ingestion stops too (promtail retries -> 429/5xx), and with emptyDir any chunks not recovered from the WAL after the restart are lost. core observability.loki-oomkilled reports the event itself; this check looks at current usage against the limit and at restarts.
+    Measured on a real EKS cluster: limit 512MiB, RSS 222MiB (0.43), last termination OOMKilled caused by a 24-hour count_over_time query (later reduced to a 1-hour window) -> warn.
+  suggest: "Raise the limit to 1GiB or more, lower querier.max_concurrent, and set limits_config.max_query_series and max_entries_limit. Narrow query ranges and move long ranges to recording rules (ruler)."
+  verify:
+    - "kubectl -n monitoring top pod loki-stack-0 --containers"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.6.1"
+          major: 2
+          metrics_available: true
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-25T00:15:41Z"
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 1
+          requests_5xx_by_route:
+            loki_api_v1_series: 1
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 0
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.95
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.6.1"
+          major: 2
+          metrics_available: true
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-25T00:15:41Z"
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 1
+          requests_5xx_by_route:
+            loki_api_v1_series: 1
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 0
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.434
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.6.1"
+          major: 2
+          metrics_available: true
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: false
+          oomkilled_at: null
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 1
+          requests_5xx_by_route:
+            loki_api_v1_series: 1
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 0
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.4
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"
+- id: loki.request-errors
+  name: Loki request 5xx, panics or WAL disk full
+  area: observability
+  type: summary
+  each: stackhealth.loki
+  cluster_level: true
+  rule:
+    expr: "item['present'] and item['metrics_available'] and ((item['requests_5xx'] or 0) >= 100 or (item['panics'] or 0) > 0 or (item['wal_disk_full_failures'] or 0) > 0)"
+    warn_expr: "item['present'] and item['metrics_available'] and ((item['requests_5xx'] or 0) >= 10 or (item['requests_5xx'] or 0) / max(item.get('requests_total') or 1, 1) >= 0.001 or (item['log_error_messages'] or 0) >= 100)"  # 1 in 380k requests is noise; start at 10 requests or 0.1%
+  target: "item['target']"
+  evidence: "f\"{item['requests_5xx']} 5xx out of {item['requests_total']} requests since start (by route {item['requests_5xx_by_route']}, excluding /ready 503 during startup), panics {item['panics']}, WAL disk full {item['wal_disk_full_failures']}, error log lines {item['log_error_messages']}, rejected {item['discarded_by_reason']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    5xx means a query (series, query_range) died from memory pressure or a timeout, a panic means a bug or corruption, and WAL disk full means ingestion has stopped. Read together with Grafana 429s (grafana.datasource-errors) it separates "too many queries" from "Loki is too small".
+    Measured on a real EKS cluster: 1 5xx out of 273,468 requests (/loki/api/v1/series 500, triggered by this tool's own collection) -> warn (low). panics 0, WAL 0.
+  suggest: "Break loki_request_duration_seconds_count{status_code=~\"5..\"} down by route. 5xx on series/query_range points to memory (loki.memory-pressure) and limits_config."
+  verify:
+    - "kubectl -n monitoring port-forward svc/loki-stack 3100 & curl -s localhost:3100/metrics | grep -E 'loki_request_duration_seconds_count.*status_code=\"5|loki_panic_total'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.6.1"
+          major: 2
+          metrics_available: true
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-25T00:15:41Z"
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 150
+          requests_5xx_by_route:
+            loki_api_v1_series: 1
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 0
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.434
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.6.1"
+          major: 2
+          metrics_available: true
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-25T00:15:41Z"
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 1
+          requests_5xx_by_route:
+            loki_api_v1_series: 1
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 1
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.434
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.6.1"
+          major: 2
+          metrics_available: true
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-25T00:15:41Z"
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 25
+          requests_5xx_by_route:
+            loki_api_v1_series: 1
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 0
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.434
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.6.1"
+          major: 2
+          metrics_available: true
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-25T00:15:41Z"
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 0
+          requests_5xx_by_route: {}
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 0
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.434
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.6.1"
+          major: 2
+          metrics_available: false
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-25T00:15:41Z"
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 1
+          requests_5xx_by_route:
+            loki_api_v1_series: 1
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 0
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.434
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"
+- id: loki.version-old
+  name: Loki major version is end of life (2.x)
+  area: observability
+  type: summary
+  each: stackhealth.loki
+  cluster_level: true
+  rule:
+    warn_expr: "item['present'] and item['major'] is not None and item['major'] < 3"
+  target: "item['target']"
+  evidence: "f\"Loki {item['version']}, storage {item['storage']}, retention applied {item['retention_applied']}(compactor {item['compactor_running']})\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Since Loki 3.0 (2024-04) the 2.x line receives no patches. 2.6 (2022-07) uses the boltdb-shipper index and single-binary defaults, so it lacks the 3.x TSDB index, structured metadata and bloom filters, and the loki-stack chart itself is no longer maintained (moved to the grafana/loki chart).
+    Measured on a real EKS cluster: 2.6.1 (loki-stack chart) -> warn. The small k3s cluster has no Loki.
+  suggest: "Migrate to the grafana/loki chart (SingleBinary mode) and set up 3.x, the tsdb index and retention in one go. Keep the existing boltdb-shipper data as a separate period in schema_config."
+  verify:
+    - "curl -s localhost:3100/loki/api/v1/status/buildinfo"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.6.1"
+          major: 2
+          metrics_available: true
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-25T00:15:41Z"
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 1
+          requests_5xx_by_route:
+            loki_api_v1_series: 1
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 0
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.434
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"
+      - expect: "pass"
+        item:
+          present: true
+          version: "3.3.2"
+          major: 3
+          metrics_available: true
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-25T00:15:41Z"
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 1
+          requests_5xx_by_route:
+            loki_api_v1_series: 1
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 0
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.434
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"
+- id: loki.metrics-unreadable
+  name: Loki self metrics (/metrics) could not be read
+  area: observability
+  type: summary
+  each: stackhealth.loki
+  cluster_level: true
+  rule:
+    warn_expr: "item['present'] and not item['metrics_available']"
+  target: "item['target']"
+  evidence: "f\"loki/metrics.txt missing - Loki {item['version']}, ready {item['ready_endpoint']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Without Loki /metrics we cannot see 5xx, rejections, WAL or memory. Usually the port-forward failed (pod not ready).
+  suggest: "Check the loki pod status and collect again. Enable a ServiceMonitor so Prometheus scrapes Loki."
+  verify:
+    - "kubectl -n monitoring port-forward svc/loki-stack 3100 & curl -s localhost:3100/metrics | head"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.6.1"
+          major: 2
+          metrics_available: false
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-25T00:15:41Z"
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 1
+          requests_5xx_by_route:
+            loki_api_v1_series: 1
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 0
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.434
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.6.1"
+          major: 2
+          metrics_available: true
+          storage: "emptyDir"
+          memory_limit: "512Mi"
+          oomkilled_last: true
+          oomkilled_at: "2026-10-25T00:15:41Z"
+          restarts: 1
+          requests_total: 273468
+          requests_5xx: 1
+          requests_5xx_by_route:
+            loki_api_v1_series: 1
+          discarded_by_reason: {}
+          discarded_total: 0
+          wal_disk_full_failures: 0
+          panics: 0
+          log_error_messages: 11
+          rss_mib: 222
+          rss_vs_limit: 0.434
+          memory_streams: 52
+          retention_applied: false
+          compactor_running: 1.0
+          lines_received: 10511098
+          bytes_received: 865278447
+          ready_endpoint: true
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/loki-stack"

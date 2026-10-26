@@ -1,0 +1,2 @@
+# Additional Loki-specific signatures. The base set lives in signatures/catalog.yaml as loki.* and promtail.*.
+[]

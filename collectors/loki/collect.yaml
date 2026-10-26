@@ -1,0 +1,72 @@
+# Loki collection (application logs and Loki self health). All read-only GET. Output in the loki/ folder.
+# The window is 1 hour. A 24-hour count_over_time OOMKilled a single-binary Loki with a small memory limit. Only label value lookups and 1-hour aggregates are used.
+# Placeholders for params values: {now_s} {now_ns} {ago_1h_s} {ago_1h_ns} (the Loki API uses nanoseconds).
+- id: ready
+  type: http
+  store: loki
+  path: /ready
+  accept: text
+  out: loki/ready.txt
+  timeout: 15
+- id: buildinfo
+  type: http
+  store: loki
+  path: /loki/api/v1/status/buildinfo
+  out: loki/buildinfo.json
+  timeout: 15
+- id: label_namespace_1h
+  type: http
+  store: loki
+  path: /loki/api/v1/label/namespace/values
+  params:
+    start: "{ago_1h_ns}"
+    end: "{now_ns}"
+  out: loki/label_namespace_1h.json
+  timeout: 30
+- id: label_pod_1h
+  type: http
+  store: loki
+  path: /loki/api/v1/label/pod/values
+  params:
+    start: "{ago_1h_ns}"
+    end: "{now_ns}"
+  out: loki/label_pod_1h.json
+  timeout: 30
+- id: volume_1h
+  type: http
+  store: loki
+  path: /loki/api/v1/query
+  params:
+    query: "sum by (namespace) (count_over_time({namespace=~\".+\"}[1h]))"
+    time: "{now_s}"
+  out: loki/volume_1h.json
+  timeout: 90
+- id: errors_1h
+  type: http
+  store: loki
+  path: /loki/api/v1/query
+  params:
+    query: "sum by (namespace) (count_over_time({namespace=~\".+\"} |~ \"(?i)(error|exception|fatal)\" [1h]))"
+    time: "{now_s}"
+  out: loki/errors_1h.json
+  timeout: 90
+- id: json_1h
+  type: http
+  store: loki
+  path: /loki/api/v1/query
+  params:
+    query: "sum by (namespace) (count_over_time({namespace=~\".+\"} | json | __error__=\"\" [1h]))"
+    time: "{now_s}"
+  out: loki/json_1h.json
+  timeout: 90
+- id: metrics
+  type: http
+  store: loki
+  path: /metrics
+  accept: text
+  out: loki/metrics.txt
+  timeout: 30
+- id: metrics.loki
+  type: promql
+  file: metrics.yaml
+  timeout: 30

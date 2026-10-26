@@ -1,0 +1,41 @@
+# Grafana HTTP API. /api/health works without authentication, but the datasource and dashboard lists require it (401 otherwise).
+# If config.yaml has grafana_api_token (a Viewer service-account token) it is sent as the Authorization header. Without it those items are skipped as "no auth".
+- id: health
+  type: http
+  store: grafana
+  path: /api/health
+  out: grafana/health.json
+  timeout: 30
+- id: datasources
+  type: http
+  store: grafana
+  path: /api/datasources
+  out: grafana/datasources.json
+  auth: grafana_api_token
+  timeout: 30
+- id: dashboards
+  type: http
+  store: grafana
+  path: /api/search?type=dash-db&limit=500
+  out: grafana/dashboards.json
+  auth: grafana_api_token
+  timeout: 30
+- id: dashboards-json
+  # Panel JSON per dashboard (which metrics it plots) — input for "metric exists but no panel shows it". Needs the dashboards (list) step first and only runs with a token
+  type: http
+  store: grafana
+  path: /api/dashboards/uid/{item.uid}
+  for_each_file: {path: grafana/dashboards.json, key: uid, limit: 300}
+  out: grafana/dashboards/{item_safe}.json
+  auth: grafana_api_token
+  timeout: 30
+# Grafana self metrics. :3000/metrics is open without authentication. Per-datasource response codes (429, 5xx), API 5xx, alert evaluation failures, build version. Prometheus usually does not scrape Grafana (no up{job=~grafana}) → pod-metrics.
+- id: self-metrics
+  type: pod-metrics
+  namespace: monitoring
+  selector: app.kubernetes.io/name=grafana
+  port: 3000
+  path: /metrics
+  out: metrics/pod/grafana
+  keep: '^(grafana_(build_info|datasource_request_total|api_response_status_total|alerting_(active_alerts|rule_evaluation_failures_total|notification_failed_total|active_configurations)|stat_totals_(dashboard|datasource|users|active_users|alert_rules)|stat_active_users|db_datasource_query_by_id_total|plugin_build_info)|process_(start_time|resident_memory_bytes))'
+  timeout: 30

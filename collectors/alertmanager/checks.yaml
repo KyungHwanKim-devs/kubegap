@@ -1,0 +1,443 @@
+# Alertmanager self-health checks. summary.stackhealth.alertmanager — lib/stackhealth.py. Routing (null default receiver, silences, delivery failures) is covered by core observability.alertmanager-*.
+- id: alertmanager.single-instance
+  name: Single Alertmanager with cluster mode disabled (single point of failure for alert routing)
+  area: observability
+  type: summary
+  each: stackhealth.alertmanager
+  cluster_level: true
+  rule:
+    warn_expr: "item['present'] and (item['replicas'] or 0) <= 1 and item['cluster_status'] != 'ready'"
+  target: "item['target']"
+  evidence: "f\"replicas {item['replicas']} (ready {item['ready']}), cluster {item['cluster_status']} (peers {item['cluster_peers']}), data storage {item['storage']} (silence/notification state preserved {item['data_retention']})\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    If the only Alertmanager dies, Prometheus accumulates send errors and no notifications go out. With emptyDir data, silences and alert group state are lost on restart, so alerts that were silenced fire again. The official recommendation is a 3-member gossip cluster. On a 2-node small k3s cluster this matters less.
+    Measured on real clusters: both the EKS cluster and the small k3s cluster ran 1 replica, cluster disabled, emptyDir, 120h retention.
+  suggest: "alertmanager.alertmanagerSpec.replicas: 3 (the operator configures cluster peers automatically) + storage.volumeClaimTemplate."
+  verify:
+    - "kubectl -n monitoring get alertmanager -o jsonpath='{.items[*].spec.replicas}'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d:
+            slack: 9.0
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 9.0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "ready"
+          cluster_peers: 2
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d:
+            slack: 9.0
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 9.0
+          replicas: 3
+          ready: 3
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+- id: alertmanager.config-reload-or-invalid
+  name: Alertmanager config reload failed or invalid alerts received
+  area: observability
+  type: summary
+  each: stackhealth.alertmanager
+  cluster_level: true
+  rule:
+    expr: "item['present'] and item['reload_success'] is False"
+    warn_expr: "item['present'] and (item['invalid_alerts_1d'] or 0) > 0"
+  target: "item['target']"
+  evidence: "f\"last config reload succeeded {item['reload_success']}, invalid alerts rejected in 24h {item['invalid_alerts_1d']}, version {item['version']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    If the configuration in an AlertmanagerConfig CR or the secret is invalid, Alertmanager keeps running on the old config — you believe the new receivers and routes are active but they are not. Invalid alerts are alerts with bad labels (rule label template errors) that get dropped.
+    Measured on real clusters: reload succeeded and invalid 0 on both the EKS cluster and the small k3s cluster.
+  suggest: "kubectl -n monitoring logs alertmanager-... -c alertmanager | grep -i 'error loading config'. Check the AlertmanagerConfig CR status and the operator logs."
+  verify:
+    - "curl -s localhost:9093/api/v2/status | jq '.config.original' | head"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: false
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d:
+            slack: 9.0
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 9.0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 5
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d:
+            slack: 9.0
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 9.0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d:
+            slack: 9.0
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 9.0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+- id: alertmanager.receivers-unused-or-no-inhibit
+  name: Receivers not referenced by any route, or no inhibit rules
+  area: observability
+  type: summary
+  each: stackhealth.alertmanager
+  cluster_level: true
+  rule:
+    warn_expr: "item['present'] and (len(item['receivers_unused'] or []) > 0 or (item['inhibit_rules'] or 0) == 0)"
+  target: "item['target']"
+  evidence: "f\"receivers {item['receivers']}, receivers unused by routes {item['receivers_unused']}, inhibit rules {item['inhibit_rules']}, time_intervals (business hours, maintenance windows) {item['time_intervals']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    A receiver that is declared but not referenced by any route is the channel "we thought alerts went to" (a previous owner removed the route, or a matcher is wrong). Without inhibit rules, when a critical fires the warning/info alerts for the same cause fire with it and cause fatigue (kube-prometheus-stack ships 3 severity-hierarchy inhibits by default).
+    Measured on real clusters: EKS used all receivers (null plus two Slack channels), 4 inhibits → pass. Small k3s cluster used null and discord, 4 inhibits → pass.
+  suggest: "Delete unused receivers or attach a route. Start inhibits with the severity hierarchy (critical → warning|info, same namespace and alertname)."
+  verify:
+    - "curl -s localhost:9093/api/v2/status | jq -r '.config.original' | grep -A2 'receiver:'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused:
+            - "pagerduty-old"
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d:
+            slack: 9.0
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 9.0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 0
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d:
+            slack: 9.0
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 9.0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d:
+            slack: 9.0
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 9.0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+- id: alertmanager.notifications-silent
+  name: Alerts keep arriving but nothing was sent to any receiver in 24 hours
+  area: observability
+  type: summary
+  each: stackhealth.alertmanager
+  cluster_level: true
+  rule:
+    expr: "item['present'] and item['metrics_available'] and (item['notifications_1d_total'] or 0) == 0 and ((item['received_1d'] or {}).get('firing') or 0) > 100"
+  target: "item['target']"
+  evidence: "f\"alerts received in 24h {item['received_1d']}, notifications per integration {item['notifications_1d']} (total {item['notifications_1d_total']}), active silences {item['silences_active']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    If thousands of firing alerts arrive per day and 0 went out through any integration (slack, email, webhook), then everything goes to the null receiver (null default receiver — core alertmanager-default-null), everything is swallowed by silences/inhibits, or the receiver configuration is broken. Either way nobody sees the alerts.
+    Measured on real clusters: EKS received firing 17,625 / resolved 1,915 and sent slack 9 → pass (repeated alerts such as Watchdog are grouped, so few go out). Small k3s cluster slack 27 → pass.
+  suggest: "Review the route tree and the default receiver (core observability.alertmanager-default-null). Use amtool config routes test --config.file=... to check where sample labels end up."
+  verify:
+    - "curl -s localhost:9093/api/v2/alerts | jq '[.[] | .receivers[].name] | group_by(.) | map({(.[0]): length}) | add'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d: {}
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d:
+            slack: 9.0
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 9.0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d: {}
+          received_1d:
+            firing: 20
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d: {}
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: false
+          notifications_1d_total: 0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"

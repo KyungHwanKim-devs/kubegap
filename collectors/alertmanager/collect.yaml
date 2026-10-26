@@ -1,0 +1,25 @@
+# Alertmanager HTTP API (alert routing). config.original in status is the whole route tree and receiver list. Webhook URLs and tokens inside receiver settings are not copied into the report (masked).
+- id: status
+  type: http
+  store: alertmanager
+  path: /api/v2/status
+  out: alertmanager/status.json
+  timeout: 30
+- id: silences
+  type: http
+  store: alertmanager
+  path: /api/v2/silences
+  out: alertmanager/silences.json
+  timeout: 30
+- id: alerts
+  type: http
+  store: alertmanager
+  path: /api/v2/alerts?active=true&silenced=true&inhibited=true
+  out: alertmanager/alerts.json
+  timeout: 30
+- id: receivers
+  type: http
+  store: alertmanager
+  path: /api/v2/receivers
+  out: alertmanager/receivers.json
+  timeout: 30

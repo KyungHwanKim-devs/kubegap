@@ -1,0 +1,23 @@
+# cert-manager log signatures. The first edition lived in signatures/catalog.yaml and was moved here.
+- id: cert-manager.issue-failed
+  name: Certificate issuance failed
+  component: cert-manager
+  area: security
+  severity: high
+  sources: ["logs/pods/cert-manager/*.log"]
+  pattern: 'error issuing certificate|failed to (issue|finalize|request)|urn:ietf:params:acme:error|acme.*(level=error|rateLimited|status 429)|Error getting certificate'
+  meaning: The Certificate does not become Ready. HTTPS breaks when the expiry approaches.
+  cause: ACME challenge failure (DNS, HTTP01 path not exposed), Let's Encrypt rate limit (50 per week), issuer configuration.
+  verify: "kubectl get certificates -A | grep -v True; kubectl get challenges -A"
+- id: cert-manager.challenge-failed
+  name: ACME challenge validation failed
+  component: cert-manager
+  area: security
+  severity: medium
+  sources: ["logs/pods/cert-manager/*.log"]
+  pattern: 'challenge.*(failed|error)|propagation check failed|Waiting for (HTTP-01|DNS-01) challenge'
+  meaning: Proof of domain ownership is not passing. Issuance is delayed.
+  cause: DNS record propagation delay, ingress not serving the .well-known path, firewall.
+  verify: "kubectl describe challenges -A | grep -A3 Reason"
+  warn_at: 5
+  fail_at: 100

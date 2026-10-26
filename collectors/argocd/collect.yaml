@@ -1,0 +1,33 @@
+# Argo CD collection. Read-only throughout. Git credentials and Secret values are never read.
+# Application Sync/Health and auto-sync status are listed by the core hygiene.templating step. Here the operator view: how long apps have been out of Sync/Health, auto-sync/prune/selfHeal policy, project boundaries (default project, wildcards),
+# server settings (admin, SSO, exec, insecure, RBAC default policy), whether notifications are configured, and controller metrics (sync results, k8s API errors, cluster cache age, git request failures, redis errors, gRPC errors).
+# Prometheus does not scrape the metrics (0 series observed, no ServiceMonitor). pod-metrics reads them via the proxy, falling back to curl from inside a node.
+- id: application-controller-metrics
+  type: pod-metrics
+  namespace: argocd
+  selector: app.kubernetes.io/name=argocd-application-controller
+  port: 8082
+  path: /metrics
+  out: metrics/pod/argocd-application-controller
+  # Lines are filtered because of the SSM output limit (24,000 characters). argocd_app_info is replaced by the Application objects, and for k8s request counts only the error-code (4xx, 5xx) lines are kept.
+  keep: '^(argocd_app_(sync_total|reconcile_(sum|count))|argocd_app_k8s_request_total\{.*response_code="[45][0-9][0-9]"|argocd_cluster_(cache_age_seconds|api_resource_objects|api_resources|connection_status|events_total|info)|argocd_redis_request_total|argocd_kubectl_exec_(total|pending)|process_(start_time|resident_memory_bytes))'
+  timeout: 30
+- id: repo-server-metrics
+  type: pod-metrics
+  namespace: argocd
+  selector: app.kubernetes.io/name=argocd-repo-server
+  port: 8084
+  path: /metrics
+  out: metrics/pod/argocd-repo-server
+  keep: '^(argocd_git_(request_total|lsremote_fail_total|fetch_fail_total|request_duration_seconds_(sum|count))|argocd_repo_pending_request_total|argocd_redis_request_total|process_(start_time|resident_memory_bytes))'
+  timeout: 30
+- id: server-metrics
+  type: pod-metrics
+  namespace: argocd
+  selector: app.kubernetes.io/name=argocd-server
+  port: 8083
+  path: /metrics
+  out: metrics/pod/argocd-server
+  # gRPC has more than 170 code×method combinations, so only non-zero lines are kept.
+  keep: '^(grpc_server_handled_total\{.*\} [1-9]|argocd_redis_request_total|argocd_info|process_(start_time|resident_memory_bytes))'
+  timeout: 30

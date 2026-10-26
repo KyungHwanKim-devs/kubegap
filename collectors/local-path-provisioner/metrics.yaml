@@ -1,0 +1,10 @@
+# Free space of the filesystem that holds local-path volumes (/ or /var by default). node-exporter. Read by lib/localpath.py.
+- id: localpath_fs_avail_ratio
+  why: Free ratio of the node root filesystem. local-path volumes have no capacity enforcement (capacity is nominal), so when this fills up kubelet eviction and k3s SQLite write failures come together
+  query: min by (instance) (node_filesystem_avail_bytes{mountpoint=~"/|/var|/var/lib"} / node_filesystem_size_bytes{mountpoint=~"/|/var|/var/lib"})
+- id: localpath_fs_size_bytes
+  why: Node root filesystem size (bytes)
+  query: max by (instance) (node_filesystem_size_bytes{mountpoint="/"})
+- id: localpath_fs_growth_bytes_per_day
+  why: 7-day trend of root filesystem usage (bytes/day, deriv). If positive, the days until full can be computed
+  query: max by (instance) (deriv((node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_avail_bytes{mountpoint="/"})[7d:1h]) * 86400)

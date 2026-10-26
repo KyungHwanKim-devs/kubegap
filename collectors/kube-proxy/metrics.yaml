@@ -1,0 +1,37 @@
+# kube-proxy PromQL. On EKS the series come from job=kube-proxy; on k3s they are mixed into the kubelet/apiserver scrapes. No job filter.
+- id: kubeproxy_sync_p99_1h
+  why: p99 seconds of a rule sync (one iptables-restore). Above 1s Service/Endpoint changes reach nodes slowly; above 5s the iptables rule count is at its limit
+  query: histogram_quantile(0.99, sum by (le) (rate(kubeproxy_sync_proxy_rules_duration_seconds_bucket[1h])))
+- id: kubeproxy_sync_p99_by_instance_1h
+  why: Sync p99 per node. If only one node is slow it is that node's rule count or CPU
+  query: histogram_quantile(0.99, sum by (instance, le) (rate(kubeproxy_sync_proxy_rules_duration_seconds_bucket[1h])))
+- id: kubeproxy_syncs_1h
+  why: Sync count per node over 1h. Runs on every change and every syncPeriod
+  query: sum by (instance) (increase(kubeproxy_sync_proxy_rules_duration_seconds_count[1h]))
+- id: kubeproxy_rules_pending_s
+  why: Last queued change time minus last sync time (seconds). Positive and above 60s means a change has not reached the node yet (stale rules)
+  query: max by (instance) (kubeproxy_sync_proxy_rules_last_queued_timestamp_seconds - kubeproxy_sync_proxy_rules_last_timestamp_seconds)
+- id: kubeproxy_last_sync_age_s
+  why: Seconds since the last sync. On 1.29+ syncs only run on change, so this can grow; informational
+  query: time() - max by (instance) (kubeproxy_sync_proxy_rules_last_timestamp_seconds)
+- id: kubeproxy_iptables_rules
+  why: iptables rule count per node and table. Above 10k nat rules syncs slow down; grounds for moving to ipvs/nftables
+  query: max by (instance, table) (kubeproxy_sync_proxy_rules_iptables_total)
+- id: kubeproxy_programming_p99_1h
+  why: p99 seconds from a Service/Endpoint change reaching the apiserver until it is programmed into node rules (NaN when there were no changes)
+  query: histogram_quantile(0.99, sum by (le) (rate(kubeproxy_network_programming_duration_seconds_bucket[1h])))
+- id: kubeproxy_restore_failures_24h
+  why: iptables-restore failures (full and partial) over 24h. Must be 0. On failure that node keeps stale Service routing
+  query: sum by (instance) (increase(kubeproxy_sync_proxy_rules_iptables_restore_failures_total[24h])) + sum by (instance) (increase(kubeproxy_sync_proxy_rules_iptables_partial_restore_failures_total[24h]))
+- id: kubeproxy_no_local_endpoints_1h
+  why: Traffic dropped because externalTrafficPolicy is Local and the node has no pod for it (1h)
+  query: sum by (instance) (increase(kubeproxy_sync_proxy_rules_no_local_endpoints_total[1h]))
+- id: kubeproxy_ct_invalid_dropped_1h
+  why: Packets dropped in conntrack INVALID state (1h). A sign of asymmetric routing or conntrack table trouble
+  query: sum by (instance) (increase(kubeproxy_iptables_ct_state_invalid_dropped_packets_total[1h]))
+- id: kubeproxy_targets
+  why: Scrape target status for job=kube-proxy (EKS). Empty on k3s, which has no such job
+  query: up{job=~".*kube-proxy.*"}
+- id: kubeproxy_rest_client_errors_1h
+  why: Non-2xx responses from kube-proxy → apiserver calls (1h, EKS job)
+  query: sum by (code) (increase(rest_client_requests_total{job=~".*kube-proxy.*",code!~"2.."}[1h])) > 0

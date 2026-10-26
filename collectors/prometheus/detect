@@ -1,0 +1,2 @@
+# Prometheus collector. Enabled when detection finds components.prometheus (automatic, same name).
+component: prometheus

@@ -1,0 +1,11 @@
+# multi-az-prod profile. Multi-AZ, managed, several teams. No checks disabled; topology spread, tenancy, cost, quota and upgrade thresholds are stricter than eks.
+name: multi-az-prod
+base: prod
+description: Multi-AZ production. Same check set as eks with stricter thresholds.
+disabled_checks: []
+thresholds:
+  resilience.prod-concentration: { fail: 0.4, warn: 0.3 }
+  tenancy.shared-node-limit-overcommit: { fail: 1.5, warn: 1.2 }
+  scaling.hpa-flapping: { fail: 40, warn: 20 }
+expected_families: [metrics-store, logs-store, alert-router, backup, event-retention, secrets-manager, slo, certificates, node-autoscaler, kube-state-metrics, node-exporter, progressive-delivery]
+exclude: {}

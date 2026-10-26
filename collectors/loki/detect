@@ -1,0 +1,2 @@
+# Loki collector. Enabled when detection finds components.loki (automatic, same name). Reads the HTTP API at the stores.loki address (port-forward or config.yaml loki_url).
+component: loki

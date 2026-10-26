@@ -1,0 +1,2 @@
+# MetalLB log signatures. None in signatures/catalog.yaml. "failed to announce" and "address pool exhausted" in the speaker/controller logs also surface as events (AllocationFailed), which the core event summary covers.
+[]

@@ -1,0 +1,48 @@
+<!doctype html><html><head><meta charset='utf-8'><style>
+body{margin:0;background:#f6f8fa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#1f2328}
+.wrap{max-width:900px;margin:32px auto;background:#fff;border:1px solid #d0d7de;border-radius:8px;padding:40px 48px;font-size:16px;line-height:1.6}
+h1{font-size:30px;border-bottom:1px solid #d8dee4;padding-bottom:8px;margin-top:0}
+h2{font-size:23px;border-bottom:1px solid #d8dee4;padding-bottom:6px;margin-top:36px}
+h3{font-size:19px;margin-top:28px}
+code{background:#f6f8fa;padding:2px 6px;border-radius:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:85%}
+pre{background:#f6f8fa;padding:14px;border-radius:6px;overflow:hidden;font-size:85%}
+pre code{background:none;padding:0}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:14px}
+th,td{border:1px solid #d0d7de;padding:6px 12px;text-align:left;vertical-align:top}
+th{background:#f6f8fa}
+ul{padding-left:24px}
+strong{font-weight:600}
+</style></head><body><div class='wrap'><h1>my-cluster — full 점검, 2026-10-26 16:47 KST</h1>
+<p>이 클러스터는 EKS <code>my-cluster</code> 예요. kube 컨텍스트 <code>my-cluster</code>, Kubernetes 1.32.13, 리전 us-east-1, 프로필 prod, 노드 8대, 네임스페이스 25개, 파드 157개, prod 네임스페이스 8개에 app-r, app-q, app-m, app-o, app-l, app-p, app-n, app-s 여덟 서비스가 돌고 dev 네임스페이스는 4개예요. 수집 시점에 급한 장애는 없습니다. 16:27 full 점검 뒤 19분 동안 스팟 회수도, 노드 변경도, 배포도 없었고, 그래서 아래 다섯 문제는 14:52, 16:27 리포트와 같은 다섯이고 조치는 아직 하나도 시작되지 않았어요. 새로 보인 건 <code>prod-app-p</code> 의 PostgreSQL 이 수집 시각에 CPU 제한으로 42% 멈춰 있던 것 하나인데, 7일 사용은 제한의 1% 도 안 돼 짧은 몰아 쓰기로 봤어요. 이번 수집은 직전 수집 19분 뒤에 시작돼 apiserver 숫자에는 kubegap 자신의 부하가 섞여 있고 세지 않았어요.</p>
+<h2>지금 손봐야 할 문제 5개</h2>
+<h3>1. prod 파드 42개 중 28개가 여전히 만료된 스팟 노드 한 대에 있고, AWS 는 2분 예고로 그 노드를 가져갈 수 있으며, 지난 네 번의 회수마다 prod 서비스 하나가 멈췄습니다</h3>
+<p><strong>문제.</strong> 애플리케이션 파드는 <code>workload-type=app</code> 레이블이 있는 노드에만 올라갈 수 있고, 지금 그 노드는 한 가용 영역의 스팟 노드 두 대예요. <code>ip-10-0-1-139</code> r8gd.xlarge 가 prod 파드 42개 중 28개, 워크로드 22개를 들고 있고, <code>ip-10-0-1-62</code> r8gd.large 는 prod 파드 5개를 들어요. 두 번째 노드는 오늘 14:17 KST 에 앞 노드가 회수되면서 생겼어요. AWS 는 26시간 동안 두 번째 앱 노드를 네 번 회수했어요. 그때마다 그 노드의 파드 여섯 개가 쫓겨나 Karpenter 가 새 노드를 띄울 때까지 80초쯤 기다렸는데, 큰 노드에 CPU request 여유가 없어서였어요. 레플리카 1개에 Recreate 전략인 <code>prod-app-p/app-p-backend</code> 는 그 시간 내내 접속이 안 됐어요. 레플리카 2개짜리 prod Deployment 다섯 개는 두 레플리카가 모두 큰 노드에 있어서, 그 노드가 가면 app-r, app-o-ai, app-o-backend, app-l-backend, app-l-frontend 가 같이 가고 클러스터는 메모리 때문에 그 손실을 받아내지 못해요. 큰 노드는 Karpenter 만료에서 55시간 지났고 <code>prod-app-m/app-m-admin</code> 의 <code>karpenter.sh/do-not-disrupt</code> 애노테이션 하나가 붙잡고 있어요.</p>
+<p><strong>근거.</strong> prod 파드 28개가 <code>ip-10-0-1-139</code> 에, 5개가 <code>ip-10-0-1-62</code> 에 있고 둘 다 us-east-1 예요. 출처는 summary.json resilience.placement 예요. <code>ip-10-0-1-139</code> 의 CPU requests 는 allocatable 의 99.5% 인데 7일 p95 사용은 5.6% 예요. 출처는 metrics/node_cpu_request_ratio.json 과 metrics/node_cpu_usage_ratio_p95_7d.json 이에요. 그 노드를 빼면 allocatable 메모리 46.0 GB 에 requests 47.5 GB 예요. 출처는 summary.json resilience.n_plus_one 이에요. 컨트롤 플레인 로그에 24시간 동안 "no fit" 스케줄러 줄이 113개 있고 app-m-backend, app-p-backend, app-l-embedding-server 가 각 23개, app-m-api 가 19개예요. 출처는 summary.json controlplane.scheduler 예요. Karpenter 는 2026-10-25T20:09:52Z, 2026-10-26T03:33:23Z, 05:17:28Z 에 "initiating delete from interruption message" 를 남겼어요. 출처는 logs/pods/karpenter/karpenter_karpenter.log 예요. do-not-disrupt 파드가 2026-10-06 이후 이 노드의 교체를 14,171번 막았어요. 출처는 events.json 이에요. app-p-backend 는 아직 replicas 1, Recreate, generation 5 예요. 출처는 objects/deployments.json 이에요.</p>
+<p><strong>원인.</strong> prod 가 Karpenter <code>default</code> 풀의 스팟 노드 두 대에서 분산 규칙 없이 돌아서, 파드는 자리가 있는 쪽 노드에 몰려요. 실제 사용의 18배인 requests 때문에 스케줄러는 큰 노드를 꽉 찬 것으로 보고, 쫓겨난 파드는 몇 초 안에 재배치되지 못하고 새 노드를 기다려요. Karpenter 는 기다리는 파드 여섯 개 크기로만 대체 노드를 만들어서 새 노드는 작고 값싼 스팟이라 또 회수돼요. 온디맨드를 받을 수 있는 <code>app-amd64-fallback</code> 풀은 노드 0대에 10% 예산이 83,953번 막혔어요. 추정입니다. app-m-admin 의 do-not-disrupt 애노테이션은 한 번 세션을 지키려 붙였다가 떼지 않은 것으로 보여요.</p>
+<p><strong>조치.</strong> ① 공유 prod 차트에서 CPU requests 를 7일 p95 로 내려요. app-l-backend 500 m → 150 m, app-l-embedding-server 500 m → 160 m, app-p-backend 500 m → 150 m, app-l-neo4j 500 m → 50 m, neo4j 메모리 4 Gi → 1 Gi. 이렇게 하면 <code>ip-10-0-1-139</code> 의 요청률이 60% 쯤으로 내려가고 쫓겨난 파드가 몇 초 안에 재배치되며 N+1 메모리 부족이 사라져요. 1시간 걸려요. ② app-p-backend 를 replicas 2, RollingUpdate maxSurge 1 maxUnavailable 0, preStop 5초로 바꿔요. 20분 걸려요. ③ 공유 prod 차트에 hostname 과 zone 기준 topologySpreadConstraints 를 넣고 app-o-ai 와 app-o-backend 에 minAvailable 1 PDB 를 만들어요. Argo CD 동기화까지 2~3시간 걸려요. ④ app-m-admin 템플릿에서 <code>karpenter.sh/do-not-disrupt</code> 를 떼요. 10분 걸려요. 그러면 Karpenter 가 만료 노드를 교체하고 문제 2 도 같이 풀려요. ①~③ 을 ④ 보다 먼저 해야 해요. 안 그러면 파드가 대체 노드에 다시 몰려요. ⑤ <code>app-amd64-fallback</code> 풀에 쓸 수 있는 예산과 온디맨드 capacity-type 요구를 주고 <code>karpenter.sh/capacity-type</code> 기준 분산을 넣어 prod 가 스팟에만 있지 않게 해요. 반나절 걸려요.</p>
+<pre><code class="language-yaml"># 공유 prod 차트 values -&gt; Deployment template.spec
+replicas: 2
+strategy: { type: RollingUpdate, rollingUpdate: { maxSurge: 1, maxUnavailable: 0 } }
+topologySpreadConstraints:
+
+- maxSkew: 1
+  topologyKey: kubernetes.io/hostname
+  whenUnsatisfiable: DoNotSchedule
+  labelSelector: { matchLabels: { app.kubernetes.io/name: &quot;{{ .name }}&quot; } }
+
+- maxSkew: 1
+  topologyKey: topology.kubernetes.io/zone
+  whenUnsatisfiable: ScheduleAnyway
+  labelSelector: { matchLabels: { app.kubernetes.io/name: &quot;{{ .name }}&quot; } }
+containers:
+
+- resources: { requests: { cpu: 150m } }
+  lifecycle: { preStop: { exec: { command: [&quot;sleep&quot;, &quot;5&quot;] } } }
+</code></pre>
+<p><strong>왜 이런 일이 생기나.</strong></p>
+<ul>
+<li>원리: 스팟 중단은 2분 예고로 와요. Karpenter 는 바로 노드를 비우고 대기 중인 파드 크기에 맞춰 대체 노드를 만들기 때문에, 남은 노드에 request 여유가 없으면 사용자가 보는 공백은 노드 기동 시간과 파드 시작 시간을 더한 만큼이에요. 스케줄러는 사용량이 아니라 requests 로 자리를 정하니 실제보다 훨씬 큰 requests 는 놀고 있는 노드를 꽉 찬 노드로 만들고, 분산 제약이 없으면 스케줄러와 Karpenter 통합이 레플리카를 같은 노드에 모아요.</li>
+<li>사례: 이 체크에 기록된 공개 사례는 없어요. 체크 정의에 자체 측정이 적혀 있어요. 첫 실제 실행에서 스팟 회수 한 번이 prod 파드 27개를 든 노드를 가져가 prod 서비스 하나가 2분 7초 멈췄어요.</li>
+<li>더 알아보기: "Kubernetes docs: Pod Topology Spread Constraints", "Karpenter docs: Disruption (expiration, consolidation, interruption)", "AWS docs: EC2 Spot Instance interruption notices".</li>
+</ul>
+<p>근거 체크: <code>resilience.prod-concentration.node-1-139</code>, <code>resilience.n-plus-one.cluster</code>, <code>resilience.replicas-same-node.prod-app-r/deployment/app-r</code>, <code>resilience.replicas-same-node.prod-app-o/deployment/app-o-ai</code>, <code>resilience.replicas-same-node.prod-app-o/deployment/app-o-backend</code>, <code>resilience.replicas-same-node.prod-app-l-backend/deployment/app-l-backend</code>, <code>resilience.replicas-same-node.prod-app-l-backend/deployment/app-l-frontend</code>, <code>resilience.replicas-same-zone.*</code> ×4, <code>resilience.single-replica-in-prod.prod-app-p/app-p-backend</code>, <code>resilience.recreate-strategy-serving.prod-app-p/deployment/app-p-backend</code>, <code>resilience.no-pdb.prod-app-o/app-o-ai</code>, <code>resilience.no-pdb.prod-app-o/app-o-backend</code>, <code>controlplane.scheduler-unschedulable.prod-app-m/app-m-api</code>, <code>controlplane.scheduler-unschedulable.prod-app-m/app-m-backend</code>, <code>controlplane.scheduler-unschedulable.prod-app-l-backend/app-l-embedding-server</code>, <code>controlplane.scheduler-unschedulable.prod-app-p/app-p-backend</code>, <code>resources.node-request-usage-gap.node-1-139</code>, <code>resources.cpu-request-overprovisioned.*</code> (39), <code>resources.krr-recommendation.*</code> (31), <code>scaling.karpenter-expired-not-replaced.default-n44bh</code>, <code>karpenter.spot-to-spot-consolidation-off.cluster</code>, <code>resilience.priority-inversion.cluster</code>, <code>observability.failure-mode-uncovered.Scheduling failure</code></p></div></body></html>

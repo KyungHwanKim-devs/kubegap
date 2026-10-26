@@ -1,0 +1,57 @@
+# EKS control plane logs — CloudWatch Logs Insights queries. Log group /aws/eks/<cluster>/cluster.
+# Streams: kube-apiserver-*, kube-controller-manager-*, kube-scheduler-*, authenticator-*, cloud-controller-manager-*, and kube-apiserver-audit-* when enabled.
+# Each item: id, why, query, hours (default 24), limit (optional). Results go to logs/cloudwatch/<id>.json. One query scans about 40MB per 24 hours (cost: scanned bytes).
+- id: volume_by_stream
+  why: Log lines per stream (component) in 24 hours. A spike signals a reconcile loop or an error storm
+  query: stats count() as lines by @logStream | sort lines desc
+- id: apiserver_webhook_failures
+  why: Lines where the apiserver failed calling an admission webhook. If the webhook pod is dead or timing out, create and update requests are rejected (Jetstack)
+  query: >
+    fields @timestamp, @message | filter @logStream like /kube-apiserver-/ and (@message like /failed calling webhook/ or @message like /webhook.*context deadline exceeded/)
+    | parse @message /webhook "(?<webhook>[^"]+)"/ | stats count() as c by webhook | sort c desc | limit 20
+- id: apiserver_errors_by_source
+  why: apiserver E (error) and W (warning) lines aggregated by source file. Shows which subsystem is noisy
+  query: >
+    fields @message | filter @logStream like /kube-apiserver-/ and @message like /^[EW][0-9]{4}/
+    | parse @message /^(?<lvl>[EW])[0-9]{4} \S+\s+\d+ (?<src>[a-zA-Z_]+\.go):\d+\]/ | stats count() as c by lvl, src | sort c desc | limit 25
+- id: apiserver_slow_traces
+  why: Trace lines the apiserver writes for slow requests (over 500ms by default). A signal of etcd latency or large LISTs
+  query: >
+    fields @timestamp, @message | filter @logStream like /kube-apiserver-/ and @message like /Trace\[/
+    | parse @message /Trace\[\d+\]: "(?<op>[^"]+)"/ | stats count() as c by op | sort c desc | limit 20
+- id: apiserver_etcd_errors
+  why: Errors from the apiserver talking to etcd (timeout, leader changed, too many requests). Managed, so not fixable, but the impact is real
+  query: >
+    fields @timestamp, @message | filter @logStream like /kube-apiserver-/ and (@message like /etcdserver/ or @message like /etcd.*timed out/ or @message like /leader changed/)
+    | stats count() as c by bin(1h) | sort @timestamp desc
+- id: controller_manager_errors_by_source
+  why: controller-manager E and W lines by source file. Thousands from the same source mean a reconcile is failing repeatedly
+  query: >
+    fields @message | filter @logStream like /kube-controller-manager-/ and @message like /^[EW][0-9]{4}/
+    | parse @message /^(?<lvl>[EW])[0-9]{4} \S+\s+\d+ (?<src>[a-zA-Z_]+\.go):\d+\]/ | stats count() as c by lvl, src | sort c desc | limit 25
+- id: controller_manager_error_samples
+  why: Sample of controller-manager error lines (most recent 30). Aggregates alone do not reveal the meaning
+  query: >
+    fields @timestamp, @message | filter @logStream like /kube-controller-manager-/ and @message like /^E[0-9]{4}/ | sort @timestamp desc | limit 30
+- id: scheduler_unschedulable
+  why: Lines where the scheduler could not place a pod, with reasons (Insufficient cpu/memory, taint, affinity, volume). FailedScheduling events vanish after 1 hour, but this log remains
+  query: >
+    fields @timestamp, @message | filter @logStream like /kube-scheduler-/ and (@message like /Unschedulable/ or @message like /FailedScheduling/ or @message like /Insufficient/)
+    | parse @message /pod="(?<pod>[^"]+)"/ | stats count() as c by pod | sort c desc | limit 30
+- id: scheduler_unschedulable_samples
+  why: Raw samples of the unschedulable reasons
+  query: >
+    fields @timestamp, @message | filter @logStream like /kube-scheduler-/ and (@message like /Unschedulable/ or @message like /Insufficient/) | sort @timestamp desc | limit 15
+- id: authenticator_failures
+  why: aws-iam-authenticator authentication failures (access denied, unable to authenticate). Expired tokens, wrong role mappings, brute-force attempts
+  query: >
+    fields @timestamp, @message | filter @logStream like /authenticator-/ and (@message like /access denied/ or @message like /Unable to authenticate/ or @message like /invalid/ or @message like /error/)
+    | parse @message /msg="(?<msg>[^"]{0,80})/ | stats count() as c by msg | sort c desc | limit 15
+- id: cloud_controller_errors
+  why: cloud-controller-manager (AWS integration: node registration, LoadBalancer, routes) errors
+  query: >
+    fields @timestamp, @message | filter @logStream like /cloud-controller-manager-/ and @message like /^[EW][0-9]{4}/
+    | parse @message /^(?<lvl>[EW])[0-9]{4} \S+\s+\d+ (?<src>[a-zA-Z_]+\.go):\d+\]/ | stats count() as c by lvl, src | sort c desc | limit 15
+- id: audit_stream_present
+  why: Whether an audit stream exists (kube-apiserver-audit-* when enabled). Without it, "who changed what" cannot be answered after the fact (cross-check with the eks.audit-log-off check)
+  query: fields @logStream | filter @logStream like /audit/ | stats count() as lines

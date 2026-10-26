@@ -1,0 +1,2434 @@
+# Karpenter controller checks. summary.karpenterctl.summary — lib/karpenterctl.py. NodePool/NodeClaim status, latency, budgets and version compatibility are covered by core scaling.karpenter-* and eks-platform platform.karpenter-version-compat.
+- id: karpenter.controller-availability
+  name: Karpenter controller replicas, spread, PDB and own node (if the controller dies, scale-out and spot interruption handling stop)
+  area: scaling
+  type: summary
+  each: karpenterctl.summary
+  cluster_level: true
+  rule:
+    expr: "(item['ready'] or 0) < (item['replicas'] or 0) or (item['replicas'] or 0) < 2 or item['all_same_node'] or len(item['on_karpenter_node']) > 0"
+    warn_expr: "not item['has_pdb']"
+  target: "'cluster'"
+  evidence: "f\"karpenter v{item['version']}: replicas {item['replicas']} / ready {item['ready']}, all on one node {item['all_same_node']}, running on a Karpenter-made node {item['on_karpenter_node']}, PDB {item['has_pdb']}, leader identified {item['leader_found']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    Without the controller, no nodes come up for Pending pods and nobody handles the 2-minute spot interruption warning (interruption queue), so pods are cut off without a drain. If the controller runs on a node it created, consolidating that node removes its own footing — the Karpenter docs say to put it on a managed node group or Fargate.
+    Measured on a real EKS cluster: 2/2 on two managed node group nodes with a PDB — pass.
+  suggest: "Keep replicas 2 + PDB and pin it to a managed node group with a nodeSelector."
+  verify:
+    - "kubectl get pods -n karpenter -o wide ; kubectl get pdb -n karpenter"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 1
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node:
+            - "n1"
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: false
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+- id: karpenter.ec2nodeclass-al2
+  name: EC2NodeClass uses the AL2 AMI family (end of support — no AMI from 1.33 on)
+  area: platform
+  type: summary
+  each: karpenterctl.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['classes_al2']) > 0"
+  target: "'cluster'"
+  evidence: "f\"EC2NodeClass {item['ec2nodeclasses']} total, amiFamily AL2 {item['classes_al2']}, AMI families {item['ami_families']}, AMI not pinned (auto-tracks latest) {item['classes_ami_unpinned']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    End of support for the Amazon Linux 2 EKS AMI was announced in 2024-11 and no AL2 AMI is published from Kubernetes 1.33 on. After an EKS upgrade Karpenter cannot find an AMI for new nodes and scale-out stops (eks.node-os-skew looks at the OS of current nodes; this check looks at the configuration of nodes yet to come).
+    If the AMI is not pinned (no amiSelectorTerms, or @latest), every new AMI release replaces nodes through drift — fine if intended, but business-hours replacement must be blocked with budgets.
+    Measured on a real EKS cluster: the default class was AL2 with no selector → fail.
+  suggest: "Switch amiFamily to AL2023 and set amiSelectorTerms alias al2023@v2026… (pinned version). Drift is on (Drift=true), so nodes are replaced in sequence — set budgets first. Karpenter 0.37 should be upgraded to 1.x first (platform.karpenter-version-compat)."
+  verify:
+    - "kubectl get ec2nodeclass -o jsonpath='{.items[*].spec.amiFamily}' ; kubectl get ec2nodeclass -o jsonpath='{.items[*].spec.amiSelectorTerms}'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2023"
+          classes_al2: []
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+- id: karpenter.ec2nodeclass-hardening
+  name: EC2NodeClass IMDS hop limit, tokens and root volume encryption
+  area: security
+  type: summary
+  each: karpenterctl.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['classes_imds_tokens_optional']) > 0"  # only allowing IMDSv1 fails; hop 2 is warn (same criterion as security.imds-hop-limit)
+    warn_expr: "len(item['classes_imds_hop_gt1']) > 0 or len(item['classes_root_unencrypted']) > 0"
+  target: "'cluster'"
+  evidence: "f\"IMDS hop limit 2 or more {item['classes_imds_hop_gt1']}, tokens optional {item['classes_imds_tokens_optional']}, root volume encrypted not set {item['classes_root_unencrypted']} (size {item['root_volume_gb']}GB)\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    security.imds-hop-limit looks at the value on instances running now. This check looks at the **cause** — EC2NodeClass metadataOptions.httpPutResponseHopLimit is 2, so every new node also comes up with hop 2. With hop 1, pods (one hop behind the bridge) cannot obtain the node role credentials. httpTokens required enforces IMDSv2. Without root volume encrypted, the node disk (container images, logs, emptyDir) is plaintext.
+    Measured on a real EKS cluster: hop 2 (fail), tokens required, 50Gi gp3 root volume without encryption (warn).
+  suggest: "EC2NodeClass metadataOptions.httpPutResponseHopLimit 1 (pods using IRSA or Pod Identity are unaffected), blockDeviceMappings.ebs.encrypted true. Nodes are replaced through drift."
+  verify:
+    - "kubectl get ec2nodeclass default -o jsonpath='{.spec.metadataOptions}{\"\\n\"}{.spec.blockDeviceMappings}'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional:
+            - "default"
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1: []
+          classes_imds_tokens_optional:
+            - "default"
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1: []
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1: []
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted: []
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+- id: karpenter.no-dedicated-role
+  name: Karpenter controller ServiceAccount has no IRSA or Pod Identity role
+  area: security
+  type: summary
+  each: karpenterctl.summary
+  cluster_level: true
+  rule:
+    expr: "not item['has_dedicated_role']"
+  target: "'cluster'"
+  evidence: "f\"ServiceAccount karpenter: IRSA role {item['irsa_role']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    Karpenter needs EC2 RunInstances, TerminateInstances, CreateFleet and IAM PassRole permissions. Without a dedicated role those permissions end up in the node role, and every pod on the node can create and delete instances. Measured on a real EKS cluster: a dedicated controller role was present — pass.
+  suggest: "A dedicated role with KarpenterControllerPolicy via IRSA or Pod Identity."
+  verify:
+    - "kubectl get sa -n karpenter karpenter -o jsonpath='{.metadata.annotations}'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: false
+          irsa_role: null
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+- id: karpenter.interruption-handling
+  name: Spot interruption and rebalance message handling (interruption queue and actual handling counts)
+  area: resilience
+  type: summary
+  each: karpenterctl.summary
+  cluster_level: true
+  rule:
+    expr: "not item['interruption_queue']"
+    warn_expr: "item['metrics_available'] and (((item['interruption_messages_by_type'] or {}).get('SpotInterruptionKind', 0) / max(item.get('leader_uptime_days') or 1, 1)) >= 10 or (item['cloudprovider_errors_total'] or 0) >= 100)"  # cumulative since the leader started, so judged as a daily average — 252 over 58 days (4/day) is normal
+  target: "'cluster'"
+  evidence: "f\"INTERRUPTION_QUEUE {item['interruption_queue']}, messages received since leader start ({item.get('leader_uptime_days')} days ago) {item['interruption_messages_by_type']}, actions {item['interruption_actions']}, cloud API errors {item['cloudprovider_errors']}, NodeClaim termination reasons {item['nodeclaims_terminated_by_reason']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    Without an interruption queue (SQS + EventBridge) the 2-minute spot reclaim warning is never received and pods are cut off without a drain (same premise as scaling.karpenter-no-interruption-queue — this check adds "how many were received and actually handled"). SpotInterruptionKind in the hundreds means a pool with frequent spot reclaims, so prod must not sit on a single spot type (resilience.prod-concentration).
+    Measured on a real EKS cluster: queue present; since leader start 252 spot interruptions, 313 rebalance recommendations, 1,005 CordonAndDrain actions, 251 NodeClaims terminated for interruption — warn. 33 cloud API errors (NodeClaimNotFound — re-reading an already deleted node, harmless).
+  suggest: "Mix on-demand into the prod NodePool (capacity-type spot,on-demand + weights) or widen the instance types to lower the reclaim probability. If CordonAndDrain is low compared to interruption messages, check the queue permissions."
+  verify:
+    - "karpenter_interruption_received_messages from the pod /metrics (metrics/pod/karpenter/)"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: null
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            SpotInterruptionKind: 252
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            SpotInterruptionKind: 5
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 150
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            SpotInterruptionKind: 5
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 0
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+- id: karpenter.nodepool-usage-near-limit
+  name: NodePool usage is close to its limits (at the limit no nodes come up for Pending pods)
+  area: scaling
+  type: summary
+  each: karpenterctl.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and (item['nodepool_usage_max'] or 0) >= 0.9"
+    warn_expr: "item['metrics_available'] and (item['nodepool_usage_max'] or 0) >= 0.75"
+  target: "'cluster'"
+  evidence: "f\"usage/limit per pool and resource {item['nodepool_usage_ratio']}, pools without limits {item['nodepools_without_limits']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    NodePool spec.limits is a ceiling against runaway growth, but once the limit is reached that pool cannot grow and pods stay Pending (Karpenter log "exceeds limit"). The metrics karpenter_nodepool_usage/limit give the current ratio. Measured on a real EKS cluster: at most 4.6% — plenty of headroom.
+  suggest: "Raise the limits (see the cost section for a cost ceiling) or split the pool."
+  verify:
+    - "kubectl get nodepools -o custom-columns=NAME:.metadata.name,LIMITS:.spec.limits,USAGE:.status.resources"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.95
+          nodepool_usage_max: 0.95
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.8
+          nodepool_usage_max: 0.8
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+- id: karpenter.consistency-errors
+  name: Karpenter consistency errors and cluster state not synced
+  area: scaling
+  type: summary
+  each: karpenterctl.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and item['cluster_state_synced'] is False"
+    warn_expr: "item['metrics_available'] and ((item['consistency_errors'] or 0) > 0 or (item['reconcile_errors_total'] or 0) > 0)"
+  target: "'cluster'"
+  evidence: "f\"cluster state synced {item['cluster_state_synced']}, consistency errors {item['consistency_errors']}, reconcile errors {item['reconcile_errors']}, pod startup average {item['pods_startup_avg_s']}s ({item['pods_startup_count']} pods), node termination average {item['node_termination_avg_s']}s\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    With cluster_state_synced 0 Karpenter has not read the full node and pod state and stops making scheduling decisions (normal briefly after startup). Consistency errors (check=Termination etc.) mean a NodeClaim and the real instance disagree — a node whose termination never finished may be left behind.
+    Measured on a real EKS cluster: synced, 3 consistency errors (Termination), 0 reconcile errors — warn.
+  suggest: "Compare non-Ready entries in kubectl get nodeclaims with instances shutting down in the EC2 console."
+  verify:
+    - "kubectl get nodeclaims ; karpenter_consistency_errors from the pod /metrics"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: false
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 0
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+- id: karpenter.spot-to-spot-consolidation-off
+  name: SpotToSpotConsolidation is off, so spot nodes are not replaced by cheaper spot
+  area: cost
+  type: summary
+  each: karpenterctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['spot_to_spot_consolidation'] is False and (item['nodeclaims_terminated_by_reason'] or {}).get('interruption', 0) > 0"
+  target: "'cluster'"
+  evidence: "f\"FEATURE_GATES {item['feature_gates']}, NodeClaims terminated by spot interruption {(item['nodeclaims_terminated_by_reason'] or {}).get('interruption', 0)}, drift {item['drift_enabled']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    By default spot-to-spot consolidation is off (to avoid churn), so while a spot node is running it is not replaced even when a cheaper or safer spot type appears. When enabled it only acts with 15 or more candidate instance types, and the Unconsolidatable events disappear. Measured on a real EKS cluster: off, 42 Unconsolidatable events.
+  suggest: "FEATURE_GATES=SpotToSpotConsolidation=true plus a wide instance type list in the NodePool. Turn it off again if churn appears."
+  verify:
+    - "kubectl get deploy -n karpenter karpenter -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 FEATURE"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            interruption: 251
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: true
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            consolidation: 10
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+- id: karpenter.metrics-unreadable
+  name: Karpenter controller metrics (:8000/metrics) could not be read
+  area: observability
+  type: summary
+  each: karpenterctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "not item['metrics_available'] or not item['leader_found']"
+  target: "'cluster'"
+  evidence: "f\"controller metrics read {item['metrics_available']}, leader identified {item['leader_found']}. Prometheus does not scrape Karpenter (no ServiceMonitor)\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Karpenter exposes pool usage, interruption messages, cloud API errors and pod startup time on :8000. kube-prometheus-stack does not scrape it by default, so kubegap reads it via pod proxy → curl inside the node. If neither works, every metrics check in this collector looks like a pass.
+  suggest: "Helm values serviceMonitor.enabled true. Then it accumulates in Prometheus and trends become visible."
+  verify:
+    - "kubectl get servicemonitor -A | grep -i karpenter"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: false
+          leader_found: false
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []

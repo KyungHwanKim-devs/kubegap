@@ -1,0 +1,36 @@
+# kubegap development tooling. No runtime dependencies (standard library only, Python 3.11+ for datetime.fromisoformat 'Z' handling and zoneinfo).
+[project]
+name = "kubegap"
+version = "0.1.0"
+description = "Kubernetes operational gap audit (Claude Code Agent Skill)"
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 240          # summary modules keep one dict per line by convention; readability at a glance beats line length
+extend-exclude = ["snapshots", "deploy", ".tools"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "C4", "SIM", "PIE", "RUF", "FURB", "PLR0124", "PLW1510", "PLR1730"]
+ignore = [
+  "E501",    # line length is handled by line-length
+  "BLE001",  # summary modules turn exceptions into {"error": ...} and surface them in the report's tool-notes section (one module's defect must not stop the whole summary) -- intentional blind except
+  "B023",    # small closures defined in a loop are used in the same iteration (lambda g(k) style); never stored, so no late-binding issue
+  "RUF001", "RUF002", "RUF003",  # full-width characters in comments and strings are intentional
+  "SIM108",  # forcing ternaries often hurts readability
+  "UP017",   # do not force the datetime.UTC alias (keep 3.11 compatibility)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["lib", "tests"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+# Summary modules handle kubectl JSON (dict[str, Any]) as is. Gradual adoption: type new modules first, then enable the two options below one at a time.
+check_untyped_defs = false
+warn_unused_ignores = true

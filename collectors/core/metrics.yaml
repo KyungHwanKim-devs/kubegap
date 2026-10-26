@@ -1,0 +1,354 @@
+# core PromQL list (the basic queries plus supporting ones). Output metrics/<id>.json.
+# Each item: id, query, why (for humans), limit (topk cap, optional). Queries are instant queries.
+# Metric names were verified on real clusters running kube-prometheus-stack, kube-state-metrics 2.x and node-exporter.
+- id: cpu_throttle_ratio_5m
+  why: CFS throttling ratio: the share of 100ms periods in which a container with a limit was stalled. Above 0.25 latency spikes (Buffer and Omio postmortems). The usual formula aggregates by (namespace, pod); here it is split down to container, because telling sidecars from app containers is what says which limit to fix. The first-pass evaluation judges this per container as is
+  query: >
+    topk(200, sum by (namespace, pod, container) (rate(container_cpu_cfs_throttled_periods_total{container!=""}[5m]))
+      / sum by (namespace, pod, container) (rate(container_cpu_cfs_periods_total{container!=""}[5m])) > 0.01)
+- id: oomkilled_last_terminated
+  why: Containers whose last termination reason was OOMKilled. Memory limit too small or a leak
+  query: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+- id: oom_events_7d
+  why: How many times a container was OOM-killed in 7 days (increase of cAdvisor container_oom_events_total). "Last termination reason" shows only one event; this is the frequency
+  # For runtimes where the cAdvisor counter is empty (cgroup v1 etc.), also count 7-day restarts of containers whose last termination reason is OOMKilled
+  query: >
+    (sum by (namespace, pod, container) (increase(container_oom_events_total{container!="", container!="POD"}[7d])) > 0)
+      or (sum by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total[7d])) and on (namespace, pod, container) (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1))
+- id: restarts_24h
+  why: Top restart counts over 24h. A combined signal of CrashLoop, OOM and probe failures
+  query: topk(50, sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total[24h])) > 0)
+- id: restarts_7d
+  why: Top restart counts over 7d. Intermittent restarts do not show in a 24h window
+  query: topk(50, sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total[7d])) > 0)
+- id: qos_class_counts
+  why: Pod count per QoS class. BestEffort pods in production die first under node pressure
+  query: sum by (qos_class) (kube_pod_status_qos_class == 1)
+- id: besteffort_pods
+  why: List of BestEffort pods (neither request nor limit). Those in production namespaces are evaluated in the first pass
+  query: kube_pod_status_qos_class{qos_class="BestEffort"} == 1
+- id: node_cpu_request_ratio
+  why: Sum of CPU requests / allocatable per node. Near 1 nothing more can be scheduled; a large gap from actual usage means over-requesting
+  query: >
+    sum by (node) (kube_pod_container_resource_requests{resource="cpu"} * on (namespace, pod) group_left() max by (namespace, pod) (kube_pod_status_phase{phase="Running"}))
+      / sum by (node) (kube_node_status_allocatable{resource="cpu"})
+- id: node_memory_request_ratio
+  why: Sum of memory requests / allocatable per node
+  query: >
+    sum by (node) (kube_pod_container_resource_requests{resource="memory"} * on (namespace, pod) group_left() max by (namespace, pod) (kube_pod_status_phase{phase="Running"}))
+      / sum by (node) (kube_node_status_allocatable{resource="memory"})
+- id: node_cpu_usage_ratio_5m
+  why: Actual CPU usage / allocatable per node. Next to the request ratio it shows over- and under-requesting
+  query: >
+    sum by (node) (rate(container_cpu_usage_seconds_total{container!="",id!="/"}[5m]) * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
+      / sum by (node) (kube_node_status_allocatable{resource="cpu"})
+- id: node_memory_usage_ratio
+  why: Actual memory working set / allocatable per node
+  query: >
+    sum by (node) (container_memory_working_set_bytes{container!="",id!="/"} * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
+      / sum by (node) (kube_node_status_allocatable{resource="memory"})
+- id: conntrack_ratio
+  why: Node conntrack table usage. Above 0.8 new connections are silently dropped
+  query: node_nf_conntrack_entries / node_nf_conntrack_entries_limit
+- id: disk_usage_ratio
+  why: Node filesystem usage (root, container data). From 0.85 the kubelet starts image GC and eviction
+  query: >
+    max by (instance, mountpoint) (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660", mountpoint!~"/boot.*|/run.*|/snap.*"}
+      / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660", mountpoint!~"/boot.*|/run.*|/snap.*"})
+- id: inode_usage_ratio
+  why: inode usage. Disk space left but no files can be created. A sign of log file explosion
+  query: >
+    max by (instance, mountpoint) (1 - node_filesystem_files_free{fstype!~"tmpfs|overlay|squashfs|iso9660", mountpoint!~"/boot.*|/run.*|/snap.*"}
+      / node_filesystem_files{fstype!~"tmpfs|overlay|squashfs|iso9660", mountpoint!~"/boot.*|/run.*|/snap.*"})
+- id: ntp_offset_seconds
+  why: Clock offset (seconds). Above 0.1 TLS, tokens and distributed log timestamps drift
+  query: abs(node_timex_offset_seconds)
+- id: ntp_sync_status
+  why: Clock sync status (1 = synced). At 0 check chrony or systemd-timesyncd
+  query: node_timex_sync_status
+- id: targets_down
+  why: Failed scrape targets (up==0). What Prometheus cannot see, no metric check can see
+  query: up == 0
+- id: hpa_at_max
+  why: HPAs whose current replicas sit at maxReplicas. They cannot grow further, so scaling is effectively off
+  query: >
+    kube_horizontalpodautoscaler_status_current_replicas >= on (namespace, horizontalpodautoscaler) kube_horizontalpodautoscaler_spec_max_replicas
+- id: hpa_min_max
+  why: min/max/current per HPA. min==max makes the HPA meaningless; a too-small max blocks at traffic peaks
+  query: >
+    label_replace(kube_horizontalpodautoscaler_spec_min_replicas, "kind", "min", "", "")
+      or label_replace(kube_horizontalpodautoscaler_spec_max_replicas, "kind", "max", "", "")
+      or label_replace(kube_horizontalpodautoscaler_status_current_replicas, "kind", "current", "", "")
+- id: endpoint_ready_addresses
+  why: Ready endpoint count per Service. The first pass finds Services with a selector that are missing here (= 0 endpoints)
+  query: count by (namespace, endpoint) (kube_endpoint_address{ready="true"})
+- id: pods_waiting_reason
+  why: Waiting reasons such as CrashLoopBackOff, ImagePullBackOff, CreateContainerConfigError
+  query: kube_pod_container_status_waiting_reason{reason!="ContainerCreating"} == 1
+- id: pods_pending
+  why: Pending pods. A sign of unschedulability (resources, taints, affinity, PVC)
+  query: kube_pod_status_phase{phase="Pending"} == 1
+- id: secrets_meta
+  why: Secret count per namespace (kube_secret_info). Secret values are never fetched; only metadata via metrics
+  query: count by (namespace) (kube_secret_info)
+- id: kubelet_running_pods
+  why: Pods run by the kubelet per node vs the node pod limit (allocatable pods)
+  query: kubelet_running_pods / on (node) group_left() label_replace(kube_node_status_allocatable{resource="pods"}, "node", "$1", "node", "(.*)")
+- id: pdb_disruptions_allowed
+  why: Allowed disruptions per PDB. At 0 drains and upgrades are blocked by that PDB
+  query: kube_poddisruptionbudget_status_pod_disruptions_allowed
+- id: node_boot_time
+  why: Node boot time. Tracks recent reboots and node replacements
+  query: node_boot_time_seconds
+- id: prometheus_tsdb_head_series
+  why: Active series count. The first indicator of a cardinality explosion
+  query: prometheus_tsdb_head_series
+- id: prometheus_scrape_samples_top
+  why: Top targets by samples per scrape. Finding the cardinality culprit
+  query: topk(20, scrape_samples_scraped)
+# --- Additional queries ---
+- id: hpa_at_max_ratio_15d
+  why: Share of the last 15 days the current replicas sat at max. Near 1 the HPA has been capped
+  query: >
+    avg_over_time((kube_horizontalpodautoscaler_status_current_replicas == bool on (namespace, horizontalpodautoscaler) kube_horizontalpodautoscaler_spec_max_replicas)[15d:5m])
+- id: cardinality_top_metrics
+  why: Top 20 metric names by series count. Hundreds of thousands means a Prometheus memory blow-up
+  query: topk(20, count by (__name__) ({__name__=~".+"}))
+- id: node_memory_available_ratio
+  why: Node MemAvailable / MemTotal. The real headroom including usage outside containers (kernel, cache, host processes)
+  query: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+- id: node_swap_total_bytes
+  why: Swap size. If not 0, check the kubelet settings (failSwapOn, swapBehavior)
+  query: node_memory_SwapTotal_bytes
+- id: zombie_processes
+  why: Zombie process count. No series when the node-exporter processes collector is off (that itself is recorded)
+  query: node_processes_state{state="Z"}
+- id: node_network_errors_1d
+  why: RX/TX errors on physical NICs over 24h (per node and device, virtual interfaces excluded). Non-zero means NIC, driver, cable or ENA trouble
+  query: >
+    topk(20, sum by (instance, device) (increase(node_network_receive_errs_total{device!~"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|tailscale.*|br-.*|kube-.*"}[1d])
+      + increase(node_network_transmit_errs_total{device!~"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|tailscale.*|br-.*|kube-.*"}[1d])) > 0)
+- id: node_tcp_timewait
+  why: TIME_WAIT socket count per node. The early signal before SNAT source ports (about 28,000 by default) are exhausted by a flood of short connections (Prezi case)
+  query: node_sockstat_TCP_tw
+- id: kubelet_pleg_p99_1h
+  why: kubelet PLEG (pod lifecycle relist) p99 latency per node (1h). Above 3s the node goes NotReady with "PLEG is not healthy"
+  query: histogram_quantile(0.99, sum by (le, node) (rate(kubelet_pleg_relist_duration_seconds_bucket[1h])))
+- id: node_network_errors_5m
+  why: NIC receive errors and transmit drops. Non-zero means driver, MTU or overlay trouble
+  query: >
+    (sum by (instance, device) (rate(node_network_receive_errs_total{device!~"lo|veth.*|cali.*|flannel.*|cni.*|docker.*"}[5m]))
+      + sum by (instance, device) (rate(node_network_transmit_drop_total{device!~"lo|veth.*|cali.*|flannel.*|cni.*|docker.*"}[5m]))) > 0
+# --- apiserver metrics. EKS exposes apiserver /metrics too. On k3s the apiserver lives inside the k3s process and kube-prometheus-stack scrapes it
+- id: apiserver_429_rate
+  why: Requests per second the apiserver rejected with 429 (Too Many Requests). Client QPS floods or Priority and Fairness (APF) limits
+  query: sum by (code) (rate(apiserver_request_total{code="429"}[5m]))
+- id: apiserver_5xx_rate
+  why: apiserver 5xx per second. etcd trouble, webhook timeouts, overload
+  query: sum by (code) (rate(apiserver_request_total{code=~"5.."}[5m]))
+- id: apiserver_p99_latency_by_verb
+  why: Request p99 latency per verb (excluding WATCH and CONNECT). Above 1s kubectl and controllers slow down
+  query: histogram_quantile(0.99, sum by (le, verb) (rate(apiserver_request_duration_seconds_bucket{verb!~"WATCH|CONNECT"}[5m])))
+- id: apiserver_watch_count
+  why: Open WATCH count. Proportional to the number of controllers and agents. A spike is an informer restart storm
+  query: sum(apiserver_longrunning_requests{verb="WATCH"})
+- id: apiserver_watch_per_node
+  why: Open WATCHes per node. Scaling with node count is normal (a few each for kubelet, kube-proxy, CNI). Hundreds means a controller or agent is spawning informers freely
+  query: sum(apiserver_longrunning_requests{verb="WATCH"}) / count(kube_node_info)
+- id: apiserver_401_rate_1h
+  why: 1h average 401s (authentication failures) per second. A client retrying with an expired token or a wrong kubeconfig
+  query: sum(rate(apiserver_request_total{code="401"}[1h]))
+- id: apiserver_storage_size_bytes
+  why: etcd database size (reported by the apiserver). EKS hides etcd but exposes this metric — the limit is 8GiB
+  query: max(apiserver_storage_size_bytes)
+- id: apiserver_storage_objects_top
+  why: Top object counts per resource type. Piled-up completed Jobs, events and runner pods slow LISTs down
+  query: topk(15, apiserver_storage_objects)
+- id: apiserver_webhook_p99_by_name
+  why: p99 latency per admission webhook. A slow webhook slows every create and update
+  query: histogram_quantile(0.99, sum by (le, name) (rate(apiserver_admission_webhook_admission_duration_seconds_bucket[5m])))
+- id: apiserver_top_requests
+  why: Top requests per second by (resource, verb). apiserver_request_total has no client label, so "who" needs the audit log; "what" is seen here. Traces of a runaway controller or CI
+  query: topk(10, sum by (resource, verb) (rate(apiserver_request_total[5m])))
+- id: apiserver_inflight
+  why: In-flight requests (mutating, readOnly). At the limit 429s appear
+  query: sum by (request_kind) (apiserver_current_inflight_requests)
+# ---- Log agent fluent-bit. For clusters shipping to a non-Loki store (Elasticsearch, CloudWatch). No series when absent ----
+- id: fluentbit_output_errors_1h
+  why: Errors from fluent-bit outputs (ES, Loki, CloudWatch) in 1h. Logs are not being written to the store
+  query: sum by (name) (increase(fluentbit_output_errors_total[1h])) > 0
+- id: fluentbit_retries_failed_1h
+  why: Chunks dropped after retries also failed. Those logs are a permanent gap
+  query: sum by (name) (increase(fluentbit_output_retries_failed_total[1h])) > 0
+- id: fluentbit_input_records_1h
+  why: Log records read in 1h. 0 means the agent has stopped
+  query: sum(increase(fluentbit_input_records_total[1h]))
+- id: fluentbit_dropped_records_1h
+  why: Records dropped at the output stage
+  query: sum by (name) (increase(fluentbit_output_dropped_records_total[1h])) > 0
+
+# ---------- 7-day p95 vs request/limit (measuring the gap between requests and actual usage) ----------
+# The subquery [7d:15m] samples 7 days at 15-minute steps (672 points). Takes roughly 2-12 seconds on clusters with ~150k series. Pods younger than a day (kube_pod_created) are excluded.
+- id: cpu_request_p95_ratio_7d
+  why: Container 7-day CPU p95 usage / request. Below 0.3 is over-allocation (node cost); only requests >= 100m and pods older than 1 day
+  query: >
+    topk(300, quantile_over_time(0.95, (sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
+      / on (namespace, pod, container) (kube_pod_container_resource_requests{resource="cpu"} >= 0.1)
+      and on (namespace, pod) (time() - kube_pod_created > 86400))
+- id: cpu_limit_p95_ratio_7d
+  why: Container 7-day CPU p95 usage / limit. Above 0.9 it hits the limit and throttling becomes routine (a leading indicator for cpu-throttling)
+  query: >
+    topk(300, quantile_over_time(0.95, (sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
+      / on (namespace, pod, container) (kube_pod_container_resource_limits{resource="cpu"} > 0)
+      and on (namespace, pod) (time() - kube_pod_created > 86400))
+- id: memory_request_p95_ratio_7d
+  why: Container 7-day memory working set p95 / request. Below 0.3 is over-allocation; only requests >= 256Mi and pods older than 1 day
+  query: >
+    topk(300, quantile_over_time(0.95, (max by (namespace, pod, container) (container_memory_working_set_bytes{container!="",container!="POD"}))[7d:15m])
+      / on (namespace, pod, container) (kube_pod_container_resource_requests{resource="memory"} >= 268435456)
+      and on (namespace, pod) (time() - kube_pod_created > 86400))
+- id: memory_limit_p95_ratio_7d
+  why: Container 7-day memory p95 / limit. Above 0.9 is on the verge of OOMKilled
+  query: >
+    topk(300, quantile_over_time(0.95, (max by (namespace, pod, container) (container_memory_working_set_bytes{container!="",container!="POD"}))[7d:15m])
+      / on (namespace, pod, container) (kube_pod_container_resource_limits{resource="memory"} > 0)
+      and on (namespace, pod) (time() - kube_pod_created > 86400))
+- id: cpu_p95_7d_cores
+  why: Container 7-day CPU p95 absolute value (cores). Evidence number for the ratio checks
+  query: >
+    topk(300, quantile_over_time(0.95, (sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
+      and on (namespace, pod, container) (kube_pod_container_resource_requests{resource="cpu"} > 0))
+- id: memory_p95_7d_bytes
+  why: Container 7-day memory working set p95 absolute value (bytes). Evidence number for the ratio checks
+  query: >
+    topk(300, quantile_over_time(0.95, (max by (namespace, pod, container) (container_memory_working_set_bytes{container!="",container!="POD"}))[7d:15m])
+      and on (namespace, pod, container) (kube_pod_container_resource_requests{resource="memory"} > 0))
+- id: container_cpu_request_cores
+  why: Current container CPU request (cores). Evidence for the ratio checks
+  query: max by (namespace, pod, container) (kube_pod_container_resource_requests{resource="cpu"})
+- id: container_memory_request_bytes
+  why: Current container memory request (bytes). Evidence for the ratio checks
+  query: max by (namespace, pod, container) (kube_pod_container_resource_requests{resource="memory"})
+- id: node_cpu_usage_ratio_p95_7d
+  why: Node 7-day CPU usage p95 / allocatable. Used instead of the 5-minute instant value to judge the request gap (current nodes only)
+  query: >
+    quantile_over_time(0.95, (sum by (node) (rate(container_cpu_usage_seconds_total{container!="",id!="/"}[5m]) * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
+      / sum by (node) (kube_node_status_allocatable{resource="cpu"}))[7d:15m]) and on (node) max by (node) (kube_node_info)
+- id: node_memory_usage_ratio_p95_7d
+  why: Node 7-day memory working set p95 / allocatable (current nodes only)
+  query: >
+    quantile_over_time(0.95, (sum by (node) (container_memory_working_set_bytes{container!="",id!="/"} * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
+      / sum by (node) (kube_node_status_allocatable{resource="memory"}))[7d:15m]) and on (node) max by (node) (kube_node_info)
+- id: large_request_containers
+  why: Containers whose CPU or memory request exceeds half the median node allocatable. Workloads that defeat bin packing and make Karpenter launch big nodes. The median rather than the smallest node is used because a 1-core smallest node would flag every 0.5-core request
+  query: >
+    (max by (namespace, pod, container) (kube_pod_container_resource_requests{resource="cpu"}) / scalar(quantile(0.5, kube_node_status_allocatable{resource="cpu"})) > 0.5)
+      or (max by (namespace, pod, container) (kube_pod_container_resource_requests{resource="memory"}) / scalar(quantile(0.5, kube_node_status_allocatable{resource="memory"})) > 0.5)
+
+# ---------- Scaling ----------
+- id: hpa_at_min_ratio_15d
+  why: Share of the last 15 days the current replicas sat at min. Above 0.99 with max > min the HPA never moved (wrong target or over-requesting)
+  query: >
+    avg_over_time((kube_horizontalpodautoscaler_status_current_replicas == bool on (namespace, horizontalpodautoscaler) kube_horizontalpodautoscaler_spec_min_replicas)[15d:5m])
+- id: hpa_desired_changes_7d
+  why: How often desired replicas changed in 7 days. Dozens means flapping (up and down in short cycles). Happens without behavior stabilization
+  query: changes(kube_horizontalpodautoscaler_status_desired_replicas[7d])
+- id: pod_pending_seconds
+  why: Seconds since creation for pods Pending right now. Only above 60s. A sign that the node autoscaler is not making room
+  query: >
+    (time() - kube_pod_created) * on (namespace, pod) group_left() (kube_pod_status_phase{phase="Pending"} == 1) > 60
+- id: keda_scaler_errors_24h
+  why: KEDA scaler (trigger) failures reading external metrics (24h). No series when KEDA is not scraped by Prometheus
+  query: sum by (namespace, scaledObject) (increase(keda_scaler_errors_total[24h]) > 0)
+
+# ---------- Traffic ----------
+- id: pod_network_rx_bytes_1h
+  why: 1h average received bytes/s per pod (above 1KB/s). Large variance between pods of one workload means keep-alive or gRPC pinning traffic to one pod. lib/traffic.py groups by workload
+  query: sum by (namespace, pod) (rate(container_network_receive_bytes_total{pod!=""}[1h])) > 1000
+- id: pod_ready_ratio_24h
+  why: Share of the last 24h a currently Running pod was Ready (below 0.99 only). Time it was out of the endpoints due to readiness failures. Pairs with Unhealthy events
+  query: >
+    avg_over_time(kube_pod_status_ready{condition="true"}[24h]) * on (namespace, pod) group_left() max by (namespace, pod) (kube_pod_status_phase{phase="Running"} == 1) < 0.99
+- id: ingress_nginx_rps_1h
+  why: 1h average RPS per ingress-nginx Ingress. No series when controller metrics are off (observability.golden-signals-missing)
+  query: sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests[1h])) > 0
+- id: ingress_nginx_5xx_ratio_1h
+  why: 1h 5xx ratio per ingress-nginx Ingress
+  query: >
+    sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests{status=~"5.."}[1h]))
+      / sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests[1h]))
+- id: ingress_nginx_p95_1h
+  why: 1h p95 response time per ingress-nginx Ingress (seconds)
+  query: histogram_quantile(0.95, sum by (le, exported_namespace, ingress) (rate(nginx_ingress_controller_request_duration_seconds_bucket[1h])))
+- id: coredns_servfail_ratio_1h
+  why: CoreDNS SERVFAIL ratio (1h). Upstream or plugin trouble. Above 0.01 applications see DNS delays and failures
+  query: sum(rate(coredns_dns_responses_total{rcode="SERVFAIL"}[1h])) / sum(rate(coredns_dns_responses_total[1h]))
+- id: coredns_p99_1h
+  why: CoreDNS request p99 (seconds, 1h). Near 5s is the UDP conntrack race; above 0.1s is CoreDNS overload or upstream latency
+  query: histogram_quantile(0.99, sum by (le) (rate(coredns_dns_request_duration_seconds_bucket[1h])))
+- id: endpoint_not_ready_addresses
+  why: Endpoints with not-ready addresses behind a Service (pods failing readiness are out of traffic)
+  query: sum by (namespace, endpoint) (kube_endpoint_address_not_ready) > 0
+
+# ---------- Structure and hygiene ----------
+- id: apiserver_requested_deprecated_apis
+  why: Deprecated APIs still being called (group, version, resource, removal release). Pluto looks at stored objects; this metric looks at calls
+  query: sum by (group, version, resource, removed_release) (apiserver_requested_deprecated_apis)
+- id: secrets_by_name
+  why: Secret names and namespaces (kube_secret_info, no values). For finding Secrets nobody references (orphans)
+  query: kube_secret_info
+- id: secret_types
+  why: Secret type (kube_secret_type). service-account-token and helm release Secrets are excluded from the orphan check
+  query: kube_secret_type
+
+# ---------- Storage. The kubelet only reports mounted PVCs (local-path volumes only partially) ----------
+- id: pvc_usage_ratio
+  why: PVC usage (kubelet_volume_stats). Above 0.85 a database is about to fail writes
+  query: kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes
+- id: pvc_inode_ratio
+  why: PVC inode usage. Volumes with many small files (cache, logs) run out of inodes before space
+  query: kubelet_volume_stats_inodes_used / kubelet_volume_stats_inodes
+- id: pvc_capacity_bytes
+  why: PVC capacity (bytes). Evidence number for the usage check
+  query: kubelet_volume_stats_capacity_bytes
+- id: pvc_available_bytes
+  why: PVC bytes remaining. Together with the growth rate, for the "full in N days" estimate
+  query: kubelet_volume_stats_available_bytes
+- id: pvc_growth_bytes_per_day_7d
+  why: Daily growth in bytes from a 7-day linear regression (deriv). Negative means shrinking
+  query: deriv(kubelet_volume_stats_used_bytes[7d]) * 86400
+- id: node_pvc_pods_count
+  why: Pods using a PVC per node (≈ attached volumes). Compared with the CSINode attach limit
+  query: count by (node) (kube_pod_spec_volumes_persistentvolumeclaims_info * on (namespace, pod) group_left(node) kube_pod_info)
+# --- Multi-tenancy. Namespace = tenant unit ---
+- id: namespace_cpu_p95_7d
+  why: Namespace (tenant) 7-day CPU p95 (cores). Baseline for comparing tenant usage and noisy-neighbour candidates
+  query: >
+    quantile_over_time(0.95, (sum by (namespace) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
+- id: namespace_cpu_max_7d
+  why: Namespace 7-day CPU max (15-minute samples). A large multiple of p95 means a bursty tenant (CI runners, batch)
+  query: >
+    max_over_time((sum by (namespace) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
+- id: namespace_cpu_median_7d
+  why: Namespace 7-day CPU median. The denominator of the burst multiple (max/median)
+  query: >
+    quantile_over_time(0.5, (sum by (namespace) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
+- id: namespace_memory_p95_7d_bytes
+  why: Namespace 7-day memory working set p95 (bytes). How much a tenant without a quota actually uses
+  query: >
+    quantile_over_time(0.95, (sum by (namespace) (container_memory_working_set_bytes{container!="",container!="POD"}))[7d:15m])
+- id: namespace_node_cpu_share_p95_7d
+  why: Per node, what share of allocatable CPU each namespace uses (7-day p95). When one tenant dominates a node, the other tenants on it get squeezed
+  query: >
+    quantile_over_time(0.95, (sum by (namespace, node) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m]) * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
+      / on (node) group_left() sum by (node) (kube_node_status_allocatable{resource="cpu"}))[7d:15m])
+- id: node_cpu_saturated_minutes_7d
+  why: Minutes the node CPU usage exceeded 90% of allocatable (7d, 5-minute samples). At 0 a noisy neighbour had no room to do real harm
+  query: >
+    sum_over_time(((sum by (node) (rate(container_cpu_usage_seconds_total{container!="",id!="/"}[5m]) * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
+      / sum by (node) (kube_node_status_allocatable{resource="cpu"})) > bool 0.9)[7d:5m]) * 5
+- id: namespace_cpu_throttled_ratio_7d
+  why: 7-day CPU throttled-period ratio per namespace. A production tenant throttled on a shared node has either a low limit or a neighbour eating CPU
+  query: >
+    sum by (namespace) (increase(container_cpu_cfs_throttled_periods_total{container!="",container!="POD"}[7d]))
+      / sum by (namespace) (increase(container_cpu_cfs_periods_total{container!="",container!="POD"}[7d])) > 0

@@ -1,0 +1,1483 @@
+# kube-proxy checks. summary.kubeproxy.summary — lib/kubeproxy.py. conntrack table saturation is handled by core node.conntrack-*.
+- id: kubeproxy.metrics-not-scraped
+  name: kube-proxy metrics missing from Prometheus or targets down (rule sync state cannot be observed)
+  area: observability
+  type: summary
+  each: kubeproxy.summary
+  cluster_level: true
+  rule:
+    warn_expr: "(not item['metrics_available']) or item['targets_down'] > 0 or item['metrics_loopback_only']"
+  target: "'cluster'"
+  evidence: "f\"metrics {item['metrics_available']} (source {item['metrics_source']}), targets up {item['targets_up']}/down {item['targets_down']} {item['targets_down_nodes']}, metricsBindAddress {item['metrics_bind_address']} (loopback only {item['metrics_loopback_only']}), nodes {item['nodes_total']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    The default kube-proxy metricsBindAddress is 127.0.0.1:10249, so Prometheus cannot scrape it from outside the node — all kube-proxy targets down in kube-prometheus-stack is the most common "red target". The EKS add-on changes it to 0.0.0.0 (measured: 7/7 up on a 7-node EKS cluster); on k3s the kube-proxy metrics are mixed into the kubelet scrape and are visible without a job.
+  suggest: "EKS: set metricsBindAddress 0.0.0.0:10249 via the add-on configurationValues or the kube-proxy-config ConfigMap. kubeadm: edit the kube-proxy ConfigMap and restart."
+  verify:
+    - "up{job=~\".*kube-proxy.*\"} ; kubectl get cm -n kube-system kube-proxy-config -o yaml | grep metricsBindAddress"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: false
+          metrics_source: null
+          targets_up: 0
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "warn"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 5
+          targets_down: 2
+          targets_down_nodes:
+            - "n1"
+            - "n2"
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "warn"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "127.0.0.1:10249"
+          metrics_loopback_only: true
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "pass"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+- id: kubeproxy.sync-slow
+  name: iptables rule sync is slow (p99)
+  area: traffic
+  type: summary
+  each: kubeproxy.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and (item['sync_p99_max_s'] or 0) >= 5"
+    warn_expr: "item['metrics_available'] and (item['sync_p99_max_s'] or 0) >= 1"
+  target: "'cluster'"
+  evidence: "f\"sync p99 cluster-wide {item['sync_p99_s']}s, slowest node {item['sync_p99_max_node']} {item['sync_p99_max_s']}s, nat rules max {item['nat_rules_max']}, Services {item['services']}, endpoints {item['endpoints']}, mode {item['mode']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    One sync = rewriting the whole (or part of the) rule set via iptables-restore. When it is slow, a new pod is Ready but node routing only reflects it seconds later, causing 5xx and connection refused during rolling deployments. It scales with the rule count (services × endpoints) and node CPU.
+    Measured on a real EKS cluster: p99 0.13s (two m5.large nodes); a small k3s cluster node: 0.51s.
+  suggest: "Above 1s in iptables mode, move to ipvs or nftables mode (GA in 1.31+). As a stopgap, set minSyncPeriod to 1-2s to batch bursts."
+  verify:
+    - "histogram_quantile(0.99, sum by (instance, le) (rate(kubeproxy_sync_proxy_rules_duration_seconds_bucket[1h])))"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 3.1
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 6.2
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "warn"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.9
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 1.4
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "pass"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+- id: kubeproxy.rules-pending
+  name: Service/endpoint changes not yet applied to node rules
+  area: traffic
+  type: summary
+  each: kubeproxy.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and (item['rules_pending_max_s'] or 0) >= 300"
+    warn_expr: "item['metrics_available'] and (item['rules_pending_max_s'] or 0) >= 60"
+  target: "'cluster'"
+  evidence: "f\"queue time − last sync time max {item['rules_pending_max_s']}s, nodes over 60s {item['rules_pending_nodes']}, change → applied p99 {item['programming_p99_s']}s\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    kube-proxy runs a sync when a change enters the queue. If the queue time is more than a minute ahead of the sync time, that node is sending traffic with stale rules (connections to dead pod IPs → timeouts). Causes: iptables-restore failures, a stuck kube-proxy, or a broken apiserver watch.
+  suggest: "Check that node's kube-proxy log (logs/pods/kube-proxy/, the journal on k3s) for iptables-restore and sync errors and restart the pod. If it recurs, look at it together with kubeproxy.restore-failures."
+  verify:
+    - "max by (instance) (kubeproxy_sync_proxy_rules_last_queued_timestamp_seconds - kubeproxy_sync_proxy_rules_last_timestamp_seconds)"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 900.0
+          rules_pending_nodes:
+            - "n1"
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "warn"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 120.0
+          rules_pending_nodes:
+            - "n1"
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "pass"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+- id: kubeproxy.restore-failures
+  name: iptables-restore failures (service routing on that node is stale)
+  area: traffic
+  type: summary
+  each: kubeproxy.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and (item['restore_failures_24h'] or 0) > 0"
+  target: "'cluster'"
+  evidence: "f\"iptables-restore failures over 24 hours (full+partial) {item['restore_failures_24h']}, nodes {item['restore_failure_nodes']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    When iptables-restore fails, that sync's rules are not applied. Causes: another process (docker, CNI, firewall) holding the iptables lock, rule syntax conflicts, or a missing kernel module. This is the same event as the log signature kube-proxy.iptables-restore-failed.
+  suggest: "Read the iptables-restore error lines in the kube-proxy log and check other daemons using iptables on the same node (docker — node.docker-and-containerd, ufw/firewalld)."
+  verify:
+    - "sum by (instance) (increase(kubeproxy_sync_proxy_rules_iptables_restore_failures_total[24h]))"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 3
+          restore_failure_nodes:
+            - "n1"
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "pass"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+- id: kubeproxy.iptables-scale
+  name: iptables mode with many rules and services (grounds for moving to ipvs/nftables)
+  area: traffic
+  type: summary
+  each: kubeproxy.summary
+  cluster_level: true
+  rule:
+    warn_expr: "(item['mode'] or 'iptables').startswith('iptables') and ((item['nat_rules_max'] or 0) >= 10000 or item['services'] >= 1000 or item['endpoints'] >= 5000)"
+  target: "'cluster'"
+  evidence: "f\"mode {item['mode']}, nat rules max {item['nat_rules_max']} (per node {item['nat_rules_by_node']}), Services {item['services']}, endpoints {item['endpoints']}, sync p99 {item['sync_p99_s']}s\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    iptables mode evaluates rules linearly and rewrites all of them on every sync. With thousands of services and tens of thousands of endpoints, sync slows to seconds and per-packet latency grows. ipvs (hashing) or nftables (GA in 1.31, recommended from 1.33) is the fix. Small clusters (measured: 105 services on an EKS cluster, 80 on a small k3s cluster) are not affected.
+  suggest: "kube-proxy mode nftables (recommended on 1.33+) or ipvs. On EKS, mode in the add-on configurationValues."
+  verify:
+    - "max by (instance, table) (kubeproxy_sync_proxy_rules_iptables_total) ; kubectl get svc -A | wc -l"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 1500
+          endpoints: 6000
+          external_traffic_local: 0
+          nat_rules_max: 12000
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "pass"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "pass"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "ipvs"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 1500
+          endpoints: 6000
+          external_traffic_local: 0
+          nat_rules_max: 12000
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+- id: kubeproxy.daemonset-not-ready
+  name: kube-proxy pods are not Ready on every node
+  area: traffic
+  type: summary
+  each: kubeproxy.summary
+  cluster_level: true
+  rule:
+    expr: "not item['embedded'] and item['daemonset_desired'] is not None and (item['daemonset_ready'] or 0) < item['daemonset_desired']"
+    warn_expr: "len(item['healthz_failing_nodes']) > 0 or item['mode_mismatch']"
+  target: "'cluster'"
+  evidence: "f\"DaemonSet ready {item['daemonset_ready']}/{item['daemonset_desired']}, nodes failing healthz {item['healthz_failing_nodes']}, modes per node {item['modes_seen']} (mismatch {item['mode_mismatch']}), version {item['version']} (add-on {item['addon_version']})\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    A node without kube-proxy cannot send any traffic to Service ClusterIPs — only the pods on that node see "connection failed to every service". healthz other than 200 means sync has stopped; different modes across nodes means a rollout in progress or diverged configuration.
+  suggest: "Find the node with kubectl get pods -n kube-system -l k8s-app=kube-proxy -o wide and read its log."
+  verify:
+    - "kubectl get ds -n kube-system kube-proxy ; on the node: curl -s localhost:10256/healthz"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 6
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "warn"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes:
+            - "n1"
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "warn"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen:
+            - "iptables"
+            - "ipvs"
+          mode_mismatch: true
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "pass"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+- id: kubeproxy.conntrack-invalid-drops
+  name: Many packets dropped in conntrack INVALID state (asymmetric routing, tangled NAT)
+  area: traffic
+  type: summary
+  each: kubeproxy.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and (item['ct_invalid_dropped_1h'] or 0) >= 10000"
+    warn_expr: "item['metrics_available'] and (item['ct_invalid_dropped_1h'] or 0) >= 500"
+  target: "'cluster'"
+  evidence: "f\"conntrack INVALID drops over 1 hour {item['ct_invalid_dropped_1h']} packets (sum over nodes), services with externalTrafficPolicy Local {item['external_traffic_local']}, no-local-endpoints drops {item['no_local_endpoints_1h']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    kube-proxy drops packets that conntrack judges INVALID (default since 1.29). A high count points to asymmetric routing (the reply leaves via another node), conntrack expiry of long-lived connections (tcpEstablishedTimeout), or NAT overlapping with the CNI. Apps see it as intermittent connection resets.
+    Measured on a real EKS cluster: 1,038 packets in one hour on a single node.
+  suggest: "On that node, use conntrack -L to see the peers of the INVALID flows; for long-lived connections, set the app keep-alive interval shorter than the conntrack timeout. Also check NLB/ALB preserve-client-ip and asymmetric paths."
+  verify:
+    - "sum by (instance) (increase(kubeproxy_iptables_ct_state_invalid_dropped_packets_total[1h]))"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 25000
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "warn"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "pass"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 12
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+- id: kubeproxy.node-cmd-unavailable
+  name: kube-proxy mode and healthz could not be checked from inside the nodes
+  area: platform
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: kubeproxy.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['node_cmd_unavailable']) == item['nodes_total'] and item['nodes_total'] > 0"
+  target: "'cluster'"
+  evidence: "f\"{len(item['node_cmd_unavailable'])} of {item['nodes_total']} nodes could not read /proxyMode or /healthz. Mode from the config file: {item['mode']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    The mode (iptables, ipvs, nftables) and healthz can only be read inside the node at 127.0.0.1:10249 and 10256. If none could be read, node access (SSM, SSH) was unavailable, so the mode in the kube-proxy section is the ConfigMap value (EKS) or unknown (k3s).
+  suggest: "Set up node access (eks.ssm-unregistered, deploy/node-access/README.md)."
+  verify:
+    - "on the node: curl -s localhost:10249/proxyMode"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 2
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "n1"
+            - "n2"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "pass"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "n1"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "pass"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "iptables"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoints_1h: 0
+          ct_invalid_dropped_1h: 1066
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable: []
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0

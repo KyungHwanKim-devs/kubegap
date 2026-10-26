@@ -1,0 +1,2024 @@
+# CoreDNS checks. summary.coredns.summary — lib/coredns.py. SERVFAIL ratio and p99 are covered by core traffic.coredns-servfail and coredns-latency.
+- id: coredns.nxdomain-ratio-high
+  name: More than half of DNS responses are NXDOMAIN (ndots:5 search path noise)
+  area: traffic
+  type: summary
+  each: coredns.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and (item['qps_total'] or 0) >= 5 and (item['nxdomain_ratio'] or 0) >= 0.6"
+    warn_expr: "item['metrics_available'] and (item['qps_total'] or 0) >= 5 and (item['nxdomain_ratio'] or 0) >= 0.4"
+  target: "'cluster'"
+  evidence: "f\"NXDOMAIN share of responses in 1h {item['nxdomain_ratio']}, queries per second {item['qps_total']}, NXDOMAIN share of queries forwarded upstream {item['forward_nxdomain_ratio']} (upstreams {item['upstreams']}), pods with default ndots (5) {item['pods_default_ndots']}, autopath {item['autopath']}, cache hit ratio {item['cache_hit_ratio']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    Pod resolv.conf has ndots:5. A name with fewer than 5 dots (api.example.com) is first queried with the search domains appended (<ns>.svc.cluster.local → svc.cluster.local → cluster.local → VPC domain), so one real name drags 3-4 NXDOMAINs along. CoreDNS answers the cluster.local suffixes directly, but the VPC domain suffix goes all the way upstream — on a real small k3s cluster 83% of upstream queries were NXDOMAIN.
+    The query count becomes a multiple of the real name count, and upstream calls (Route 53 Resolver, external resolvers) grow, causing latency, cost and throttling. Measured on real clusters: EKS NXDOMAIN 50% (60 queries per second), small k3s cluster 70%.
+  suggest: "(1) Write external names in apps as FQDNs (trailing dot) or set dnsConfig options ndots:2. (2) Enable the autopath plugin in CoreDNS (+ kubernetes plugin pods verified) so the search path is handled server-side in one step. (3) Put a cache on each node with NodeLocal DNSCache."
+  verify:
+    - "sum by (rcode) (increase(coredns_dns_responses_total[1h]))"
+    - "kubectl exec -n <ns> <pod> -- cat /etc/resolv.conf  (the user checks ndots and search)"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.12.3"
+          replicas: 1
+          nodes_total: 2
+          nodes_with_pods: 1
+          all_same_node: false
+          single_replica: true
+          has_pdb: false
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 31.2
+          nxdomain_ratio: 0.697
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.487
+          cache_hit_ratio: 0.8528
+          p50_s: 0.0001
+          p99_s: 0.0855
+          forward_nxdomain_ratio: 0.832
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "1.1.1.1:53"
+            - "8.8.8.8:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: null
+          qps_by_pod:
+            coredns-59d4d457d-qjng8: 31.21
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 149
+          restarts_total: 1
+          memory_limit: "170Mi"
+          pods_by_node:
+            node-b: 1
+          pdb: []
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.1
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 1.0
+          nxdomain_ratio: 0.9
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: false
+          qps_total: null
+          nxdomain_ratio: null
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+- id: coredns.availability
+  name: CoreDNS has 1 replica or all replicas on one node (one node down = cluster-wide DNS outage)
+  area: traffic
+  type: summary
+  each: coredns.summary
+  cluster_level: true
+  rule:
+    expr: "item['nodes_total'] >= 2 and (item['single_replica'] or item['all_same_node'])"
+    warn_expr: "item['nodes_total'] >= 2 and (not item['has_pdb'] or not item['spread_declared'])"
+  target: "'cluster'"
+  evidence: "f\"replicas {item['replicas']}, nodes with pods {item['nodes_with_pods']} of {item['nodes_total']} ({item['pods_by_node']}), PDB {item['pdb']}, spread declared (antiAffinity/topologySpread) {item['spread_declared']}, restarts total {item['restarts_total']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    When CoreDNS stops, service names stop resolving and every app fails at once — the user symptom is "everything is slow, everything errors". With 1 replica, DNS is gone for seconds to tens of seconds whenever that pod's node dies or the pod restarts or redeploys. Two replicas on the same node give no protection.
+    Measured on real clusters: the small k3s cluster had 1 replica and no PDB — had the other node been the one powered off, DNS would have been down cluster-wide. EKS had 2 replicas on different nodes with a PDB.
+  suggest: "replicas 2 or more + podAntiAffinity (hostname) or topologySpread + PDB (minAvailable 1). On k3s, override the coredns Deployment with HelmChartConfig/kustomize."
+  verify:
+    - "kubectl get pods -n kube-system -l k8s-app=kube-dns -o wide ; kubectl get pdb -n kube-system"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.12.3"
+          replicas: 1
+          nodes_total: 2
+          nodes_with_pods: 1
+          all_same_node: false
+          single_replica: true
+          has_pdb: false
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 31.22
+          nxdomain_ratio: 0.697
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.487
+          cache_hit_ratio: 0.8528
+          p50_s: 0.0001
+          p99_s: 0.0855
+          forward_nxdomain_ratio: 0.832
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "1.1.1.1:53"
+            - "8.8.8.8:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: null
+          qps_by_pod:
+            coredns-59d4d457d-qjng8: 31.21
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 149
+          restarts_total: 1
+          memory_limit: "170Mi"
+          pods_by_node:
+            node-b: 1
+          pdb: []
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 1
+          all_same_node: true
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            n1: 2
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: false
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.12.3"
+          replicas: 1
+          nodes_total: 1
+          nodes_with_pods: 1
+          all_same_node: false
+          single_replica: true
+          has_pdb: false
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 31.22
+          nxdomain_ratio: 0.697
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.487
+          cache_hit_ratio: 0.8528
+          p50_s: 0.0001
+          p99_s: 0.0855
+          forward_nxdomain_ratio: 0.832
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "1.1.1.1:53"
+            - "8.8.8.8:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: null
+          qps_by_pod:
+            coredns-59d4d457d-qjng8: 31.21
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 149
+          restarts_total: 1
+          memory_limit: "170Mi"
+          pods_by_node:
+            node-b: 1
+          pdb: []
+          forward_to:
+            - "/etc/resolv.conf"
+- id: coredns.no-autoscaler
+  name: Many nodes but a fixed CoreDNS replica count (no cluster-proportional-autoscaler)
+  area: scaling
+  type: summary
+  each: coredns.summary
+  cluster_level: true
+  rule:
+    expr: "item['nodes_total'] >= 16 and not item['autoscaler']"
+    warn_expr: "item['nodes_total'] >= 8 and not item['autoscaler'] and (item['replicas'] or 0) < item['nodes_total'] / 8"
+  target: "'cluster'"
+  evidence: "f\"nodes {item['nodes_total']}, CoreDNS replicas {item['replicas']}, autoscaler {item['autoscaler']}, queries per second {item['qps_total']}, p99 {item['p99_s']}s\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    The default 2 replicas become a bottleneck as nodes grow. The convention is cluster-proportional-autoscaler (proportional to node or core count, e.g. "1 per 16 nodes or 1 per 256 cores") or an HPA. The EKS add-on has an autoScaling option.
+    Under 8 nodes, 2 replicas are enough and this is not evaluated. Measured on real clusters: EKS 7 nodes / 2 replicas, small k3s cluster 2 nodes / 1 replica (the availability check's job).
+  suggest: "EKS: autoScaling in the coredns add-on configurationValues (enabled true, minReplicas 2, maxReplicas 10). Elsewhere: deploy cluster-proportional-autoscaler."
+  verify:
+    - "kubectl get deploy -n kube-system | grep -i dns ; aws eks describe-addon --addon-name coredns --query addon.configurationValues"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 20
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 1
+          nodes_total: 10
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 3
+          nodes_total: 20
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: "cluster-proportional"
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+- id: coredns.cache-hit-low
+  name: CoreDNS cache hit ratio is low
+  area: traffic
+  type: summary
+  each: coredns.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and (item['qps_total'] or 0) >= 5 and (item['cache_hit_ratio'] or 1) < 0.3"
+    warn_expr: "item['metrics_available'] and (item['qps_total'] or 0) >= 5 and (item['cache_hit_ratio'] or 1) < 0.5"
+  target: "'cluster'"
+  evidence: "f\"cache hit ratio {item['cache_hit_ratio']} (1h), cache TTL {item['cache_ttl']}s, queries per second {item['qps_total']}, NXDOMAIN share of queries forwarded upstream {item['forward_nxdomain_ratio']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    A low hit ratio means every query hits the kubernetes plugin or the upstream. Common causes are a short cache TTL (default cap 30s) or names that differ every time (search path noise also lands in the cache as NXDOMAIN). Measured on real clusters: EKS 0.90, small k3s cluster 0.85 — both normal.
+  suggest: "Raise the success and denial TTLs in the Corefile cache block (e.g. cache 300 { success 9984 300 / denial 9984 60 }) and reduce ndots noise (coredns.nxdomain-ratio-high)."
+  verify:
+    - "sum(rate(coredns_cache_hits_total[1h])) / (sum(rate(coredns_cache_hits_total[1h])) + sum(rate(coredns_cache_misses_total[1h])))"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.2
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.45
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+- id: coredns.aaaa-noise
+  name: AAAA queries equal A queries in a cluster without IPv6
+  area: traffic
+  type: summary
+  each: coredns.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['metrics_available'] and not item['cluster_ipv6'] and (item['qps_total'] or 0) >= 5 and (item['aaaa_ratio'] or 0) >= 0.4"
+  target: "'cluster'"
+  evidence: "f\"AAAA share of request types {item['aaaa_ratio']}, cluster IPv6 {item['cluster_ipv6']}, queries per second {item['qps_total']}. The glibc resolver always asks A and AAAA as a pair\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    The glibc resolver asks A and AAAA at the same time in getaddrinfo. In a cluster without IPv6 every AAAA query has an empty answer, so half of all DNS queries are wasted. Multiplied with search path noise (ndots), the query count reaches 8× the real name count. Measured on real clusters: AAAA 50% on both EKS and the small k3s cluster.
+    Not a risk, only a cost and latency factor, so it never goes beyond warn.
+  suggest: "Answer AAAA immediately with an empty NOERROR via the CoreDNS template plugin (template IN AAAA . { rcode NOERROR }), or do IPv4-only lookups on the app side (single-request-reopen option). NodeLocal DNSCache also mitigates it."
+  verify:
+    - "sum by (type) (increase(coredns_dns_requests_total[1h]))"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: true
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.1
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+- id: coredns.forward-upstream-errors
+  name: Upstream resolver errors (SERVFAIL, health check failures, concurrency rejections)
+  area: traffic
+  type: summary
+  each: coredns.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and ((item['forward_servfail_ratio'] or 0) >= 0.2 or (item['max_concurrent_rejects_1h'] or 0) > 0)"
+    warn_expr: "item['metrics_available'] and ((item['forward_servfail_ratio'] or 0) >= 0.05 or (item['forward_healthcheck_failures_1h'] or 0) > 0 or (item['forward_servfail_1h'] or 0) > 0)"
+  target: "'cluster'"
+  evidence: "f\"upstreams {item['upstreams']}: SERVFAIL in 1h {item['forward_servfail_1h']} ({item['forward_servfail_ratio']}), health check failures {item['forward_healthcheck_failures_1h']}, max_concurrent rejections {item['max_concurrent_rejects_1h']}, overall SERVFAIL ratio {item['servfail_ratio']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    If the forward target (the VPC resolver on EKS, public resolvers such as 1.1.1.1 or 8.8.8.8 on a small k3s cluster) fails, external name resolution returns SERVFAIL and apps see "connection failed". Health check failures are intermittent disconnects; max_concurrent rejections are CoreDNS itself being overloaded. Core traffic.coredns-servfail looks at the overall ratio; this check isolates the upstream side.
+  suggest: "Use two or more upstreams (policy sequential/random). With the VPC resolver, check the Route 53 Resolver query limit (1,024 per second per ENI). With external resolvers, pick trustworthy ones."
+  verify:
+    - "sum by (to, rcode) (increase(coredns_proxy_request_duration_seconds_count{proxy_name=\"forward\"}[1h]))"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 600
+          forward_servfail_ratio: 0.3
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 12.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 20
+          forward_servfail_ratio: 0.01
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 3.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+- id: coredns.panic-or-reload-failed
+  name: CoreDNS plugin panic or Corefile reload failure
+  area: traffic
+  type: summary
+  each: coredns.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and ((item['panics_1h'] or 0) > 0 or (item['reload_failed_1h'] or 0) > 0)"
+  target: "'cluster'"
+  evidence: "f\"panics in 1h {item['panics_1h']}, reload failures {item['reload_failed_1h']}, restarts total {item['restarts_total']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    A panic is a plugin defect that failed a request; a reload failure means the ConfigMap was edited incorrectly and CoreDNS keeps running on the old Corefile (you think it is fixed, but it is not applied). Read together with the log signature coredns.reload-failed.
+  suggest: "Find the cause line with kubectl logs -n kube-system -l k8s-app=kube-dns | grep -iE 'panic|reload' and fix the Corefile syntax."
+  verify:
+    - "sum(increase(coredns_panics_total[1h])) ; sum(increase(coredns_reload_failed_total[1h]))"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 1.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 2.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+- id: coredns.pod-imbalance
+  name: Large query skew between CoreDNS pods
+  area: traffic
+  type: summary
+  each: coredns.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['metrics_available'] and (item['qps_skew'] or 1) >= 3 and (item['qps_total'] or 0) >= 10"
+  target: "'cluster'"
+  evidence: "f\"queries per second by pod {item['qps_by_pod']}, max/min {item['qps_skew']}×\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    The kube-dns Service is UDP, so conntrack pins the client → pod mapping for a long time. If the queries of a few large nodes land on one pod, only that pod saturates and p99 spikes. Measured on a real EKS cluster: 1.01 — even.
+  suggest: "NodeLocal DNSCache (node-local cache, TCP upstream) is the real fix. As a stopgap, restarting the CoreDNS pods reshuffles the mapping."
+  verify:
+    - "sum by (pod) (rate(coredns_dns_requests_total[5m]))"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 4.2
+          qps_by_pod:
+            a: 50.0
+            b: 11.9
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.12.3"
+          replicas: 1
+          nodes_total: 2
+          nodes_with_pods: 1
+          all_same_node: false
+          single_replica: true
+          has_pdb: false
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 31.2
+          nxdomain_ratio: 0.697
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.487
+          cache_hit_ratio: 0.8528
+          p50_s: 0.0001
+          p99_s: 0.0855
+          forward_nxdomain_ratio: 0.832
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "1.1.1.1:53"
+            - "8.8.8.8:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: null
+          qps_by_pod:
+            coredns-59d4d457d-qjng8: 31.21
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 149
+          restarts_total: 1
+          memory_limit: "170Mi"
+          pods_by_node:
+            node-b: 1
+          pdb: []
+          forward_to:
+            - "/etc/resolv.conf"
+- id: coredns.node-local-dns-absent
+  name: No NodeLocal DNSCache (with many nodes or high DNS p99)
+  area: traffic
+  type: summary
+  each: coredns.summary
+  cluster_level: true
+  rule:
+    warn_expr: "not item['node_local_dns'] and item['nodes_total'] >= 5 and ((item['p99_s'] or 0) >= 0.05 or (item['qps_total'] or 0) >= 200)"
+  target: "'cluster'"
+  evidence: "f\"no NodeLocal DNSCache, nodes {item['nodes_total']}, queries per second {item['qps_total']}, p99 {item['p99_s']}s, p50 {item['p50_s']}s\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    NodeLocal DNSCache runs a cache daemon on every node and talks to the upstream (CoreDNS) over TCP, removing the UDP conntrack race (5-second delay) and CoreDNS hotspots. With few nodes and a low p99 it is unnecessary. Measured on real clusters: EKS p99 1.1ms (not needed), small k3s cluster p99 86ms with 2 nodes (below the node threshold).
+  suggest: "With 5 or more nodes and p99 over 50ms or more than 200 queries per second, deploy the node-local-dns DaemonSet (point kubelet --cluster-dns at the link-local IP)."
+  verify:
+    - "kubectl get ds -n kube-system node-local-dns"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0855
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 300.0
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.001
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.12.3"
+          replicas: 1
+          nodes_total: 2
+          nodes_with_pods: 1
+          all_same_node: false
+          single_replica: true
+          has_pdb: false
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 31.2
+          nxdomain_ratio: 0.697
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.487
+          cache_hit_ratio: 0.8528
+          p50_s: 0.0001
+          p99_s: 0.0855
+          forward_nxdomain_ratio: 0.832
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "1.1.1.1:53"
+            - "8.8.8.8:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: null
+          qps_by_pod:
+            coredns-59d4d457d-qjng8: 31.21
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 149
+          restarts_total: 1
+          memory_limit: "170Mi"
+          pods_by_node:
+            node-b: 1
+          pdb: []
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: true
+          metrics_available: true
+          qps_total: 500.0
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.5
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+- id: coredns.metrics-unavailable
+  name: CoreDNS metrics missing from Prometheus (queries, cache and latency not visible)
+  area: observability
+  type: summary
+  each: coredns.summary
+  cluster_level: true
+  rule:
+    warn_expr: "not item['metrics_available']"
+  target: "'cluster'"
+  evidence: "f\"no coredns_* series. replicas {item['replicas']}, version {item['version']}. Even with the prometheus plugin in the Corefile, nothing is scraped without a ServiceMonitor\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    CoreDNS exposes metrics on :9153, but if Prometheus does not scrape them the NXDOMAIN ratio, cache, latency and upstream errors are all invisible. kube-prometheus-stack creates a coredns ServiceMonitor by default (present on both clusters observed).
+  suggest: "Set coreDns.enabled true in the kube-prometheus-stack values, or attach a ServiceMonitor to the kube-dns Service in kube-system (port metrics 9153)."
+  verify:
+    - "count({__name__=~\"coredns_.*\"})"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: false
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.11.3"
+          replicas: 2
+          nodes_total: 7
+          nodes_with_pods: 2
+          all_same_node: false
+          single_replica: false
+          has_pdb: true
+          spread_declared: true
+          autoscaler: null
+          node_local_dns: false
+          metrics_available: true
+          qps_total: 60.1
+          nxdomain_ratio: 0.503
+          servfail_ratio: 0.0
+          aaaa_ratio: 0.5
+          cache_hit_ratio: 0.8975
+          p50_s: 0.0001
+          p99_s: 0.0011
+          forward_nxdomain_ratio: 0.435
+          forward_servfail_1h: 0
+          forward_servfail_ratio: 0.0
+          forward_healthcheck_failures_1h: 0.0
+          max_concurrent_rejects_1h: 0.0
+          upstreams:
+            - "10.0.0.2:53"
+          panics_1h: 0.0
+          reload_failed_1h: 0.0
+          rest_client_errors_total_1h: 0
+          qps_skew: 1.01
+          qps_by_pod:
+            coredns-c7dbf4744-cb76h: 29.85
+            coredns-c7dbf4744-lz5fs: 30.29
+          cache_ttl: 30
+          autopath: false
+          cluster_ipv6: false
+          pods_default_ndots: 152
+          restarts_total: 0
+          memory_limit: "170Mi"
+          pods_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 1
+            ip-10-0-2-60.us-east-1.compute.internal: 1
+          pdb:
+            - "coredns"
+          forward_to:
+            - "/etc/resolv.conf"

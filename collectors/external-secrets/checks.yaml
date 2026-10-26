@@ -1,0 +1,1138 @@
+# External Secrets Operator checks. summary.esoctl.summary — lib/esoctl.py. The ExternalSecret Ready False list is covered by core security.externalsecret-not-ready. Secret values are never read anywhere.
+- id: eso.provider-api-errors
+  name: Secret store (provider) API call failures accumulating (an ExternalSecret fails every cycle)
+  area: security
+  type: summary
+  each: esoctl.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and (item['api_error_ratio'] or 0) >= 0.05 and (item['api_errors'] or 0) >= 100"
+    warn_expr: "item['metrics_available'] and (item['api_errors'] or 0) > 0"
+  target: "'cluster'"
+  evidence: "f\"provider API calls since controller start: success {item['api_success']} / errors {item['api_errors']} (ratio {item['api_error_ratio']}), sync failures {item['sync_calls_error']}/{item['sync_calls_total']}, reconcile errors {item['reconcile_errors_total']}, ExternalSecrets not Ready {item['not_ready']} (oldest refresh {item['not_ready_oldest_refresh_h']} hours ago)\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    If the secret an ExternalSecret points to was deleted from the store or its permissions changed, the controller fails again every refreshInterval (default 1 hour) — API call cost and log/event noise accumulate, and that Secret is frozen at the last successful value.
+    Measured on a real EKS cluster: 1,566 failures / 18,078 successes (7.97%), all from a single ExternalSecret in a database namespace that had failed every hour for 10 months (the same incident as 1,552 UpdateFailed events in an earlier report).
+  suggest: "Follow the message of the ExternalSecret that is not Ready (ResourceNotFound, AccessDenied): restore the secret in the store, or delete the ExternalSecret if it is unused. Group with security.externalsecret-not-ready as one item."
+  verify:
+    - "kubectl get externalsecret -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[0].status,REASON:.status.conditions[0].reason"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 12
+          api_success: 18078
+          api_error_ratio: 0.0007
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 0
+          api_success: 18078
+          api_error_ratio: 0.0
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: false
+          api_errors: 0
+          api_success: 0
+          api_error_ratio: null
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+- id: eso.store-static-credentials
+  name: SecretStore authenticates with static cloud credentials (an access key in a Secret)
+  area: security
+  type: summary
+  each: esoctl.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['stores_static_key']) > 0 and item['externalsecrets_prod'] > 0"
+    warn_expr: "len(item['stores_static_key']) > 0"
+  target: "'cluster'"
+  evidence: "f\"stores with static key auth {item['stores_static_key']} (all auth methods {item['stores_auth']}), providers {item['providers']}, ExternalSecrets {item['externalsecrets']} (prod {item['externalsecrets_prod']})\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    auth.secretRef on a (Cluster)SecretStore keeps a long-lived access key in a cluster Secret. If the key leaks, every secret in the store is exposed, and rotation is manual. EKS uses short-lived credentials via IRSA/Pod Identity (jwt) — on a real EKS cluster the ClusterSecretStore used jwt auth (pass). A small k3s cluster outside AWS may have no alternative to a static key, but then narrow that key's IAM policy to secretsmanager:GetSecretValue + specific ARNs and set a rotation schedule.
+    Measured on a real k3s: the ClusterSecretStore authenticated with an access key from a Secret, 33 prod ExternalSecrets → fail.
+  suggest: "EKS: IRSA/Pod Identity. Outside the cluster (small k3s cluster): minimize the IAM user policy to GetSecretValue + a resource ARN prefix with 90-day rotation, or consider OIDC federation (IAM Roles Anywhere, GitHub-style OIDC)."
+  verify:
+    - "kubectl get clustersecretstore -o jsonpath='{.items[*].spec.provider.aws.auth}'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key:
+            - "ClusterSecretStore/aws-secret-store"
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 33
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key:
+            - "SecretStore/dev/x"
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 0
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+- id: eso.controller-single-replica
+  name: External Secrets controller and webhook at 1 replica with a webhook Fail policy
+  area: resilience
+  type: summary
+  each: esoctl.summary
+  cluster_level: true
+  rule:
+    expr: "(item['controller_ready'] or 0) < (item['controller_replicas'] or 1) or (item['webhook_ready'] or 0) < (item['webhook_replicas'] or 1)"
+    warn_expr: "len(item['webhook_fail_policy']) > 0 and (item['webhook_replicas'] or 1) < 2"
+  target: "'cluster'"
+  evidence: "f\"controller {item['controller_ready']}/{item['controller_replicas']}, webhook {item['webhook_ready']}/{item['webhook_replicas']} (Fail policy {item['webhook_fail_policy']}), cert-controller {item['cert_controller_ready']}/{item['cert_controller_replicas']}, --concurrent {item['concurrent']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    If the controller dies, Secrets already created remain (no app impact). But with a webhook at Fail policy and 1 replica, no ExternalSecret or SecretStore can be created or changed while the webhook pod is down — Argo CD syncs stall on those resources. cert-controller renews the webhook TLS, so if it is dead the whole webhook fails after the certificate expires.
+    Measured on real clusters: 1 replica everywhere on both clusters, webhook Fail policy → warn.
+  suggest: "webhook.replicaCount 2 or failurePolicy Ignore. One controller is enough (leader election)."
+  verify:
+    - "kubectl get deploy -n external-secrets ; kubectl get validatingwebhookconfiguration externalsecret-validate -o jsonpath='{.webhooks[*].failurePolicy}'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 0
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 2
+          webhook_ready: 2
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy: []
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+- id: eso.externalsecret-stale
+  name: ExternalSecret Ready but not refreshed for more than 3× its refreshInterval
+  area: security
+  type: summary
+  each: esoctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['stale']) > 0"
+  target: "'cluster'"
+  evidence: "f\"refresh delays {item['stale_detail']}, refreshInterval distribution {item['refresh_intervals']}, --concurrent {item['concurrent']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    If refreshTime is several intervals old while Ready, the controller is not getting to that item (too few workers with --concurrent=1, provider limits, leader change). Rotated secrets reach the cluster late. Measured on real clusters: 0 on both.
+  suggest: "Raise --concurrent (default 1), and with many items lengthen refreshInterval to reduce calls."
+  verify:
+    - "kubectl get externalsecret -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,INTERVAL:.spec.refreshInterval,REFRESH:.status.refreshTime"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale:
+            - "prod-a/externalsecret/x"
+          stale_detail:
+            - target: "prod-a/externalsecret/x"
+              refresh_interval: "1h"
+              refresh_age_h: 9.5
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+- id: eso.deletion-policy-delete
+  name: ExternalSecret deletionPolicy Delete (deleted from the store = cluster Secret disappears)
+  area: resilience
+  type: summary
+  each: esoctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['deletion_policy_delete']) > 0"
+  target: "'cluster'"
+  evidence: "f\"deletionPolicy Delete {item['deletion_policy_delete']}, creationPolicy Orphan {item['orphan_creation']}\""
+  severity_default: low
+  symptom_linked: true
+  why: >
+    The default Retain keeps the cluster Secret even when the store's secret disappears (the app keeps running on the last value). Delete removes the Secret the moment it is deleted from the store, so the next pod restart fails to start. It may be an intentional security policy, so warn at most. Measured on real clusters: 0 on both.
+  suggest: "Retain (default) for prod. Delete only where secret revocation must take effect immediately."
+  verify:
+    - "kubectl get externalsecret -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name} {.spec.target.deletionPolicy}{\"\\n\"}{end}' | grep Delete"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete:
+            - "prod-a/externalsecret/x"
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+- id: eso.store-not-ready
+  name: (Cluster)SecretStore not Ready (no ExternalSecret of that store can refresh)
+  area: security
+  type: summary
+  each: esoctl.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['stores_not_ready']) > 0"
+  target: "'cluster'"
+  evidence: "f\"stores not Ready {item['stores_not_ready']} / total {item['stores']}, providers {item['providers']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    If a store is not Ready (auth failure, region typo, network), every ExternalSecret using it stops with SecretStoreNotReady. Secret rotation is not applied at all. Measured on real clusters: Ready on both.
+  suggest: "Follow the conditions message of kubectl describe clustersecretstore <name> (auth, permissions, region)."
+  verify:
+    - "kubectl get clustersecretstore,secretstore -A"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready:
+            - "ClusterSecretStore/aws"
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+- id: eso.version-old
+  name: External Secrets Operator is an old version (below 1.0)
+  area: hygiene
+  type: summary
+  each: esoctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['version'] is not None and int(str(item['version']).split('.')[0]) < 1"
+  target: "'cluster'"
+  evidence: "f\"external-secrets {item['version']} (ExternalSecrets {item['externalsecrets']}, PushSecrets {item['pushsecrets']})\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    ESO 1.0 (2025) brought API stabilization and security fixes, and the 0.9 line is no longer supported. Measured on real clusters: EKS 0.9.13, small k3s cluster 2.1.0. The version comparison looks at the major only (no latest-version lookup).
+  suggest: "Upgrade the Helm chart (CRDs included). For 0.9 → 1.x follow the v1beta1 → v1 API migration guide."
+  verify:
+    - "helm list -n external-secrets"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.1.0"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "pass"
+        item:
+          present: true
+          version: null
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+- id: eso.metrics-unreadable
+  name: External Secrets controller metrics (:8080/metrics) could not be read
+  area: observability
+  type: summary
+  each: esoctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "not item['metrics_available']"
+  target: "'cluster'"
+  evidence: "f\"controller metrics read {item['metrics_available']}. Prometheus does not scrape this controller (no ServiceMonitor, 0 series observed)\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    The controller exposes provider API call success/failure, sync errors and reconcile latency on :8080. Without it, "are secret store calls failing" is visible only through ExternalSecret conditions and logs.
+  suggest: "Helm values serviceMonitor.enabled true. Otherwise prepare node access (SSM or SSH)."
+  verify:
+    - "kubectl get --raw /api/v1/namespaces/external-secrets/pods/<pod>:8080/proxy/metrics | head"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: false
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4
+      - expect: "pass"
+        item:
+          present: true
+          version: "0.9.13"
+          controller_replicas: 1
+          controller_ready: 1
+          webhook_replicas: 1
+          webhook_ready: 1
+          cert_controller_ready: 1
+          cert_controller_replicas: 1
+          concurrent: "1"
+          irsa_role: "arn:aws:iam::<account>:role/ExternalSecretsRole-my-cluster-eks"
+          stores: 1
+          stores_not_ready: []
+          stores_static_key: []
+          stores_auth:
+            ClusterSecretStore/aws-secrets-manager: "irsa/jwt(ServiceAccount)"
+          providers:
+            - "aws"
+          externalsecrets: 47
+          externalsecrets_prod: 27
+          not_ready:
+            - "database/externalsecret/mysql-app-c-secret"
+          not_ready_prod: []
+          stale: []
+          stale_detail: []
+          refresh_intervals:
+            1h: 47
+          deletion_policy_delete: []
+          orphan_creation: []
+          pushsecrets: 0
+          webhook_fail_policy:
+            - "validate.externalsecret.external-secrets.io"
+            - "validate.secretstore.external-secrets.io"
+            - "validate.clustersecretstore.external-secrets.io"
+          webhooks: 3
+          metrics_available: true
+          api_errors: 1566
+          api_success: 18078
+          api_error_ratio: 0.0797
+          reconcile_errors_total: 1566
+          sync_calls_error: 1566
+          sync_calls_total: 41311
+          not_ready_oldest_refresh_h: 7495.4

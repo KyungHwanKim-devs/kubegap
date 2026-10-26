@@ -1,0 +1,35 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "KubegapReadOnly",
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity",
+        "eks:Describe*", "eks:List*",
+        "ec2:Describe*",
+        "elasticloadbalancing:Describe*",
+        "cloudwatch:GetMetricData",
+        "logs:DescribeLogGroups", "logs:StartQuery", "logs:GetQueryResults", "logs:StopQuery",
+        "ssm:DescribeInstanceInformation", "ssm:GetCommandInvocation",
+        "acm:ListCertificates", "acm:DescribeCertificate",
+        "servicequotas:ListServiceQuotas", "servicequotas:GetServiceQuota",
+        "dlm:GetLifecyclePolicies",
+        "backup:ListBackupPlans",
+        "ecr:DescribeRepositories", "ecr:DescribeImages", "ecr:DescribeRegistry", "ecr:DescribePullThroughCacheRules", "ecr:GetLifecyclePolicy", "ecr:GetRegistryScanningConfiguration",
+        "ce:GetCostAndUsage",
+        "pricing:GetProducts"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "KubegapNodeShellReadOnlyViaSSM",
+      "Effect": "Allow",
+      "Action": ["ssm:SendCommand"],
+      "Resource": [
+        "arn:aws:ssm:*:*:document/AWS-RunShellScript",
+        "arn:aws:ec2:*:*:instance/*"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# kube-proxy collector. Enabled when the detected component kube-proxy is present: on EKS the kube-system/kube-proxy DaemonSet, on k3s it is built into the binary (detected by the +k3s node version). Disabled on Cilium kube-proxy-replacement clusters, which have no DaemonSet.
+component: kube-proxy

@@ -1,0 +1,2361 @@
+# k3s platform checks. Input: summary.k3s (lib/k3s.py). All small k3s cluster profile; on EKS the collector itself is disabled.
+- id: platform.k3s-secrets-encryption-off
+  name: k3s Secret encryption at rest is off (--secrets-encryption)
+  area: platform
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: k3s.nodes
+  profiles: [lab]
+  rule:
+    expr: "item.get('role') == 'server' and str(((item.get('server') or {}).get('secrets_encryption') or '')).startswith('Disabled')"
+  target: "item['node']"
+  evidence: "f\"k3s secrets-encrypt status: {(item.get('server') or {}).get('secrets_encryption')}. Datastore {(item.get('server') or {}).get('db_kind')} {(item.get('server') or {}).get('db_mb')}MB\""
+  severity_default: medium
+  symptom_linked: false
+  why: Secrets sit in plaintext in etcd (or SQLite). Anyone who can read the datastore files or snapshots (`db/snapshots/`) can read every Secret. `--secrets-encryption` is the k3s counterpart of EKS KMS envelope encryption.
+  suggest: "Add `--secrets-encryption` to the server arguments, restart, then run `k3s secrets-encrypt reencrypt` (re-encrypts existing Secrets). Check snapshot file permissions as well."
+  verify:
+    - "sudo k3s secrets-encrypt status"
+  notes: k3s secrets encryption
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Disabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "agent"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server: null
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+
+- id: platform.k3s-server-url-stale
+  name: k3s server --server points to an address that is not in the cluster
+  area: platform
+  type: summary
+  each: k3s.cluster.server_url_stale
+  profiles: [lab]
+  rule:
+    expr: "True"
+  target: "item['node']"
+  evidence: "f\"host {item['host']} of --server {item['server_url']} is not among current node IPs or names\""
+  severity_default: low
+  symptom_linked: false
+  why: The address of another server used when first joining the cluster is still in the systemd unit. It currently comes up with its own etcd, but on reinstall or rejoin it will try the missing address and fail, and readers misunderstand the topology.
+  suggest: "Remove `--server` from the unit (single server: keep only `--cluster-init`) and run `systemctl daemon-reload && systemctl restart k3s` in a maintenance window."
+  verify:
+    - "systemctl cat k3s | grep -A1 -- --server"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          node: "node-b"
+          server_url: "https://192.0.2.160:6443"
+          host: "192.0.2.160"
+      - expect: "none"
+
+- id: platform.k3s-version-skew
+  name: k3s version mismatch between nodes
+  area: platform
+  type: summary
+  each: k3s.cluster
+  cluster_level: true
+  profiles: [lab]
+  rule:
+    expr: "item.get('version_skew') is True"
+  target: "'cluster'"
+  evidence: "f\"kubelet version per node {item.get('versions')}\""
+  severity_default: medium
+  symptom_linked: false
+  why: k3s ships server and agent in one binary, so differing versions can break API and CNI behaviour. Unless an upgrade is in progress, one node has simply been left behind.
+  suggest: Upgrade k3s on the lagging node to the same version (can be automated with system-upgrade-controller).
+  verify:
+    - "kubectl get nodes -o wide"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          servers:
+            - "node-b"
+          agents:
+            - "node-a"
+          versions:
+            v1.33.5+k3s1: 1
+            v1.32.0+k3s1: 1
+          version_skew: true
+          embedded_etcd: true
+          apiserver:
+            bind_all_nodes: []
+            tls_san: []
+            external_ips: []
+          server_url_stale: []
+          disabled_builtins: []
+          disabled_without_replacement: []
+          builtin_images: {}
+          podcidr: []
+          metallb:
+            present: true
+            pools:
+              - name: "p"
+                addresses:
+                  - "192.0.2.200-192.0.2.209"
+                size: 10
+            total_ips: 10
+            used: 1
+            free: 9
+            pending: []
+          local_path:
+            pv_count: 0
+            by_node: {}
+            pinned: []
+            over_capacity: []
+            node_total_mb: 0
+          journald_total_mb: 100
+          check_config_missing: []
+          gaps: {}
+      - expect: "pass"
+        item:
+          servers:
+            - "node-b"
+          agents:
+            - "node-a"
+          versions:
+            v1.33.5+k3s1: 2
+          version_skew: false
+          embedded_etcd: true
+          apiserver:
+            bind_all_nodes: []
+            tls_san: []
+            external_ips: []
+          server_url_stale: []
+          disabled_builtins: []
+          disabled_without_replacement: []
+          builtin_images: {}
+          podcidr: []
+          metallb:
+            present: true
+            pools:
+              - name: "p"
+                addresses:
+                  - "192.0.2.200-192.0.2.209"
+                size: 10
+            total_ips: 10
+            used: 1
+            free: 9
+            pending: []
+          local_path:
+            pv_count: 0
+            by_node: {}
+            pinned: []
+            over_capacity: []
+            node_total_mb: 0
+          journald_total_mb: 100
+          check_config_missing: []
+          gaps: {}
+
+- id: platform.k3s-check-config-missing
+  name: k3s check-config reports missing kernel settings
+  area: platform
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: k3s.cluster
+  cluster_level: true
+  profiles: [lab]
+  rule:
+    warn_expr: "len(item.get('check_config_missing') or []) > 0"
+  target: "'cluster'"
+  evidence: "f\"missing: {item.get('check_config_missing')}\""
+  severity_default: low
+  symptom_linked: false
+  why: "Most missing items from `k3s check-config` are optional features (realtime scheduling groups and similar), so with STATUS pass nothing is broken. Still, knowing what the stock Ubuntu kernel lacks saves time when investigating cgroup or network problems."
+  suggest: "Leave it as is unless you use the feature the item enables (for example RT scheduling)."
+  verify:
+    - "k3s check-config"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "warn"
+        item:
+          servers:
+            - "node-b"
+          agents:
+            - "node-a"
+          versions:
+            v1.33.5+k3s1: 2
+          version_skew: false
+          embedded_etcd: true
+          apiserver:
+            bind_all_nodes: []
+            tls_san: []
+            external_ips: []
+          server_url_stale: []
+          disabled_builtins: []
+          disabled_without_replacement: []
+          builtin_images: {}
+          podcidr: []
+          metallb:
+            present: true
+            pools:
+              - name: "p"
+                addresses:
+                  - "192.0.2.200-192.0.2.209"
+                size: 10
+            total_ips: 10
+            used: 1
+            free: 9
+            pending: []
+          local_path:
+            pv_count: 0
+            by_node: {}
+            pinned: []
+            over_capacity: []
+            node_total_mb: 0
+          journald_total_mb: 100
+          check_config_missing:
+            - "CONFIG_RT_GROUP_SCHED"
+          gaps: {}
+      - expect: "pass"
+        item:
+          servers:
+            - "node-b"
+          agents:
+            - "node-a"
+          versions:
+            v1.33.5+k3s1: 2
+          version_skew: false
+          embedded_etcd: true
+          apiserver:
+            bind_all_nodes: []
+            tls_san: []
+            external_ips: []
+          server_url_stale: []
+          disabled_builtins: []
+          disabled_without_replacement: []
+          builtin_images: {}
+          podcidr: []
+          metallb:
+            present: true
+            pools:
+              - name: "p"
+                addresses:
+                  - "192.0.2.200-192.0.2.209"
+                size: 10
+            total_ips: 10
+            used: 1
+            free: 9
+            pending: []
+          local_path:
+            pv_count: 0
+            by_node: {}
+            pinned: []
+            over_capacity: []
+            node_total_mb: 0
+          journald_total_mb: 100
+          check_config_missing: []
+          gaps: {}
+
+- id: platform.k3s-etcd-snapshot-stale
+  name: Embedded etcd snapshots missing or stale
+  area: resilience
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: k3s.nodes
+  profiles: [lab]
+  rule:
+    expr: "item.get('role') == 'server' and (item.get('server') or {}).get('db_kind') == 'etcd' and ((item.get('server') or {}).get('etcd_snapshots') is not None) and (not (item.get('server') or {}).get('etcd_snapshots') or ((item.get('server') or {}).get('snapshot_latest_age_h') or 0) > 26) and 'k3s etcd-snapshot ls (no sudoers entry or no snapshots)' not in item.get('gaps', [])"
+    warn_expr: "item.get('role') == 'server' and (item.get('server') or {}).get('db_kind') == 'etcd' and ((item.get('server') or {}).get('snapshot_interval_h') or 0) > 13"
+  target: "item['node']"
+  evidence: "f\"{len((item.get('server') or {}).get('etcd_snapshots') or [])} snapshots, latest {(item.get('server') or {}).get('snapshot_latest_age_h')}h ago, interval {(item.get('server') or {}).get('snapshot_interval_h')}h, latest size {((item.get('server') or {}).get('etcd_snapshots') or [{}])[-1].get('size_mb')}MB\""
+  severity_default: high
+  symptom_linked: false
+  why: `k3s etcd-snapshot` (default every 12 hours, 5 kept) is the only backup of the embedded etcd. If snapshots stop, a disk failure loses the whole cluster state (every object).
+  suggest: "Check `--etcd-snapshot-schedule-cron` and `--etcd-snapshot-retention`, and look in the journal for failing `k3s etcd-snapshot save`."
+  verify:
+    - "sudo k3s etcd-snapshot ls"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s"
+                size_mb: 30
+                created: "x"
+                age_h: 40.0
+                offsite: false
+            snapshot_latest_age_h: 40.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "fail"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots: []
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "warn"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 24.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots: []
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps:
+            - "k3s etcd-snapshot ls (no sudoers entry or no snapshots)"
+
+- id: platform.k3s-etcd-snapshot-local-only
+  name: etcd snapshots exist only on the server node disk (no off-site copy)
+  area: resilience
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: k3s.nodes
+  profiles: [lab]
+  rule:
+    expr: "item.get('role') == 'server' and bool((item.get('server') or {}).get('etcd_snapshots')) and not (item.get('server') or {}).get('snapshots_offsite')"
+  target: "item['node']"
+  evidence: "f\"all {len((item.get('server') or {}).get('etcd_snapshots') or [])} snapshots at file:///var/lib/rancher/k3s/server/db/snapshots (same node, same disk). No S3 config (--etcd-s3)\""
+  severity_default: medium
+  symptom_linked: false
+  why: The snapshots live on the same disk as the etcd data. The day that disk dies, data and backup disappear together. This is the most common small k3s cluster form of "we thought we had a backup".
+  suggest: "Enable off-site transfer with `--etcd-s3 --etcd-s3-bucket ...` (MinIO works too), or add a cron that rsyncs to another machine."
+  verify:
+    - "sudo k3s etcd-snapshot ls; sudo ls -la /var/lib/rancher/k3s/server/db/snapshots"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: false
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+
+- id: platform.k3s-certificate-expiring
+  name: k3s internal certificates expiring soon
+  area: security
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: k3s.nodes
+  profiles: [lab]
+  rule:
+    expr: "item.get('role') == 'server' and ((item.get('server') or {}).get('certificates_min_days_left') is not None) and (item.get('server') or {}).get('certificates_min_days_left') < 30"
+    warn_expr: "item.get('role') == 'server' and ((item.get('server') or {}).get('certificates_min_days_left') is not None) and (item.get('server') or {}).get('certificates_min_days_left') < 90"
+  target: "item['node']"
+  evidence: "f\"earliest expiry in {(item.get('server') or {}).get('certificates_min_days_left')} days. Expiring within 90 days: {[(c['file'], c['name'], c['days_left']) for c in (item.get('server') or {}).get('certificates_expiring_90d') or []][:6]}\""
+  severity_default: high
+  symptom_linked: false
+  why: k3s renews certificates that expire within 90 days at startup. So if it runs a year without a restart, the certificates simply expire and the cluster stops (a classic failure in small k3s clusters where k3s has been up for over a year).
+  suggest: "Within 90 days of expiry run `systemctl restart k3s` (auto renewal) or `k3s certificate rotate`."
+  verify:
+    - "sudo k3s certificate check"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 10
+            certificates_expiring_90d:
+              - file: "a.crt"
+                name: "x"
+                days_left: 10
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "warn"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 60
+            certificates_expiring_90d:
+              - file: "a.crt"
+                name: "x"
+                days_left: 60
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+
+- id: platform.k3s-journald-unbounded
+  name: No journald size cap (k3s logs fill the disk)
+  area: node
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: k3s.nodes
+  profiles: [lab]
+  rule:
+    warn_expr: "item.get('journald') is not None and not item['journald'].get('bounded') and (item['journald'].get('disk_mb') or 0) >= 500"
+  target: "item['node']"
+  evidence: "f\"journald usage {item['journald'].get('disk_mb')}MB, no journald.conf setting (default: 10% of the filesystem, max 4GB), k3s log lines in 24h {item['journald'].get('k3s_lines_24h')}\""
+  severity_default: low
+  symptom_linked: false
+  why: k3s writes every component's logs into a single journald (measured at tens of thousands of lines a day). Without a cap it grows to the default (10% of the filesystem, max 4GB), which is noticeable on a small root disk. Retention is also undefined, so during an investigation you do not know how much history is left.
+  suggest: "Put `SystemMaxUse=1G` and `MaxRetentionSec=14day` in /etc/systemd/journald.conf.d/kubegap.conf and run `systemctl restart systemd-journald`."
+  verify:
+    - "journalctl --disk-usage; cat /etc/systemd/journald.conf"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "warn"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 608
+            conf: ""
+            bounded: false
+            k3s_lines_24h: 25000
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald: null
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+
+- id: platform.k3s-builtin-disabled-unreplaced
+  name: k3s built-in components disabled with no replacement
+  area: platform
+  type: summary
+  each: k3s.cluster
+  cluster_level: true
+  profiles: [lab]
+  rule:
+    expr: "len(item.get('disabled_without_replacement') or []) > 0"
+  target: "'cluster'"
+  evidence: "f\"--disable {item.get('disabled_builtins')}, without replacement {item.get('disabled_without_replacement')}. Detected ingress/LB: inventory.components_present\""
+  severity_default: medium
+  symptom_linked: true
+  why: With traefik disabled and no other ingress controller, Ingress resources attach to nothing; with servicelb disabled and no MetalLB, LoadBalancer Services stay Pending.
+  suggest: Install a replacement or drop the --disable flag.
+  verify:
+    - "kubectl get svc -A | grep -i pending; kubectl get ingressclass"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          servers:
+            - "node-b"
+          agents:
+            - "node-a"
+          versions:
+            v1.33.5+k3s1: 2
+          version_skew: false
+          embedded_etcd: true
+          apiserver:
+            bind_all_nodes: []
+            tls_san: []
+            external_ips: []
+          server_url_stale: []
+          disabled_builtins:
+            - "traefik"
+          disabled_without_replacement:
+            - "traefik"
+          builtin_images: {}
+          podcidr: []
+          metallb:
+            present: true
+            pools:
+              - name: "p"
+                addresses:
+                  - "192.0.2.200-192.0.2.209"
+                size: 10
+            total_ips: 10
+            used: 1
+            free: 9
+            pending: []
+          local_path:
+            pv_count: 0
+            by_node: {}
+            pinned: []
+            over_capacity: []
+            node_total_mb: 0
+          journald_total_mb: 100
+          check_config_missing: []
+          gaps: {}
+      - expect: "pass"
+        item:
+          servers:
+            - "node-b"
+          agents:
+            - "node-a"
+          versions:
+            v1.33.5+k3s1: 2
+          version_skew: false
+          embedded_etcd: true
+          apiserver:
+            bind_all_nodes: []
+            tls_san: []
+            external_ips: []
+          server_url_stale: []
+          disabled_builtins:
+            - "traefik"
+          disabled_without_replacement: []
+          builtin_images: {}
+          podcidr: []
+          metallb:
+            present: true
+            pools:
+              - name: "p"
+                addresses:
+                  - "192.0.2.200-192.0.2.209"
+                size: 10
+            total_ips: 10
+            used: 1
+            free: 9
+            pending: []
+          local_path:
+            pv_count: 0
+            by_node: {}
+            pinned: []
+            over_capacity: []
+            node_total_mb: 0
+          journald_total_mb: 100
+          check_config_missing: []
+          gaps: {}
+
+- id: platform.k3s-apiserver-bind-all
+  name: apiserver 6443 is open on all interfaces
+  area: security
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: k3s.cluster
+  cluster_level: true
+  profiles: [lab]
+  rule:
+    warn_expr: "len((item.get('apiserver') or {}).get('bind_all_nodes') or []) > 0"
+  target: "'cluster'"
+  evidence: "f\"servers binding 6443 to *: {item['apiserver'].get('bind_all_nodes')}, --tls-san {item['apiserver'].get('tls_san')}, node-external-ip {item['apiserver'].get('external_ips')}\""
+  severity_default: low
+  symptom_linked: false
+  why: k3s binds the apiserver to 0.0.0.0:6443 by default (there is no bind-address option). It is reachable from the LAN and from any overlay network such as Tailscale, and with router port forwarding or a public IP it is exposed to the internet. This is the k3s counterpart of the EKS public endpoint CIDR question.
+  suggest: "Make sure the router does not forward 6443; for remote use, only use the overlay (Tailscale) address and block 6443 from outside the LAN with a firewall (ufw). The kubeconfig server address must be in tls-san."
+  verify:
+    - "sudo ss -ltnp | grep 6443; curl -sk https://<public-ip>:6443/version"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "warn"
+        item:
+          servers:
+            - "node-b"
+          agents:
+            - "node-a"
+          versions:
+            v1.33.5+k3s1: 2
+          version_skew: false
+          embedded_etcd: true
+          apiserver:
+            bind_all_nodes:
+              - "node-b"
+            tls_san:
+              - "192.0.2.102"
+            external_ips: []
+          server_url_stale: []
+          disabled_builtins: []
+          disabled_without_replacement: []
+          builtin_images: {}
+          podcidr: []
+          metallb:
+            present: true
+            pools:
+              - name: "p"
+                addresses:
+                  - "192.0.2.200-192.0.2.209"
+                size: 10
+            total_ips: 10
+            used: 1
+            free: 9
+            pending: []
+          local_path:
+            pv_count: 0
+            by_node: {}
+            pinned: []
+            over_capacity: []
+            node_total_mb: 0
+          journald_total_mb: 100
+          check_config_missing: []
+          gaps: {}
+      - expect: "pass"
+        item:
+          servers:
+            - "node-b"
+          agents:
+            - "node-a"
+          versions:
+            v1.33.5+k3s1: 2
+          version_skew: false
+          embedded_etcd: true
+          apiserver:
+            bind_all_nodes: []
+            tls_san: []
+            external_ips: []
+          server_url_stale: []
+          disabled_builtins: []
+          disabled_without_replacement: []
+          builtin_images: {}
+          podcidr: []
+          metallb:
+            present: true
+            pools:
+              - name: "p"
+                addresses:
+                  - "192.0.2.200-192.0.2.209"
+                size: 10
+            total_ips: 10
+            used: 1
+            free: 9
+            pending: []
+          local_path:
+            pv_count: 0
+            by_node: {}
+            pinned: []
+            over_capacity: []
+            node_total_mb: 0
+          journald_total_mb: 100
+          check_config_missing: []
+          gaps: {}
+
+- id: node.smartmontools-missing
+  name: smartmontools missing (disk SMART status not visible)
+  area: node
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: k3s.nodes
+  profiles: [lab]
+  rule:
+    warn_expr: "item.get('collected') and item.get('smartctl') is False"
+  target: "item['node']"
+  evidence: "f\"smartctl missing. Disks {(item.get('disks') or {}).get('devices')}\""
+  severity_default: low
+  symptom_linked: false
+  why: For small k3s cluster disks (consumer SSDs), SMART is the only early view of wear and errors. Without it the first signal is kernel I/O errors (node.kernel-io-fs-errors), and by then it is too late.
+  suggest: "After `apt install smartmontools`, kubegap reads `smartctl -H` and `-A` (Percentage Used, Media errors); the sudoers template already allows it. Exporting via the node-exporter smartmon textfile collector also enables alerting."
+  verify:
+    - "sudo smartctl -H /dev/sda"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "warn"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: false
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: false
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: false
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+
+- id: node.thermal-high
+  name: Node temperature high
+  area: node
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: k3s.nodes
+  profiles: [lab]
+  rule:
+    expr: "(item.get('thermal_max_c') or 0) >= 85"
+    warn_expr: "(item.get('thermal_max_c') or 0) >= 75"
+  target: "item['node']"
+  evidence: "f\"thermal zone {item.get('thermal_c')} ℃\""
+  severity_default: medium
+  symptom_linked: true
+  why: On PC-class nodes thermal throttling looks like CPU throttling. High temperature makes performance erratic and shortens disk life.
+  suggest: Check fans, dust and placement. Add an alert on node_hwmon_temp_celsius.
+  verify:
+    - "cat /sys/class/thermal/thermal_zone*/temp; sensors"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 90.0
+          thermal_max_c: 90.0
+          gaps: []
+      - expect: "warn"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 78.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+
+# --- small k3s cluster variant: MetalLB L2 leader ---
+- id: platform.k3s-datastore-slow
+  name: k3s datastore (etcd/kine) requests are slow (apply latency, fdatasync, leader changes)
+  area: platform
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: k3s.cluster.datastore
+  cluster_level: true
+  rule:
+    expr: "item['kind'] is not None and ((item['leader_changes'] or 0) > 0 or (item['fdatasync_slow'] or 0) > 0 or (item['apply_over_1s'] or 0) >= 10 or ((item['capped'] or False) and (item['apply_slow'] or 0) >= 100))"
+    warn_expr: "item['kind'] is not None and (item['lines_24h'] or 0) > 0"
+  target: "'cluster'"
+  evidence: "f\"datastore {item['kind']} (servers {item['servers']}), warn lines in 24h {item['lines_24h']}{' (hit the 200-line cap - there were more)' if item['capped'] else ''}: slow apply {item['apply_slow']} (max {item['max_apply_ms']}ms, over 1s {item['apply_over_1s']}), slow fdatasync {item['fdatasync_slow']}, leader changes {item['leader_changes']}, request stats {item['request_stats']}, DB {item['db_mb']}MB\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    etcd logs "apply request took too long" when an apply exceeds 100ms. When disk fsync is slow (a SATA SSD competing with other I/O such as Elasticsearch, databases or backups), leader heartbeats are delayed, the apiserver times out, and in bad cases the leader changes (on a single server etcd pauses briefly) or nodes flap to NotReady. It is the first thing to make noise when one small k3s cluster server node carries the datastore, the workloads and the log store all at once.
+    Measured on a 2-node k3s k3s: the server node (embedded etcd, DB 578MB) had 200 warn lines in 24h (capped; the real count was higher, about one hour's worth), 95 slow applies (max 1,447ms, 7 over 1s), 2 slow fdatasync -> fail. The same node hosted Elasticsearch (102GiB), a registry and databases.
+  suggest: "Move etcd to a different disk (NVMe) via --data-dir, or reduce disk I/O on the same node (move Elasticsearch and backups to another node). If etcd_disk_wal_fsync_duration_seconds p99 exceeds 10ms it is a disk problem. For kine (SQLite): journalctl -u k3s | grep 'slow sql'."
+  verify:
+    - "ssh <server> sudo journalctl -u k3s --since -1h | grep -cE 'took too long|slow fdatasync|leader changed'"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          kind: "etcd"
+          servers:
+            - "node-b"
+          db_mb: 578
+          quota_mb: 2048
+          db_ratio: 0.282
+          slow_by_node:
+            node-b:
+              lines_24h: 200
+              capped: true
+              apply_slow: 95
+              max_apply_ms: 1447.6
+              apply_over_1s: 7
+              fdatasync_slow: 2
+              leader_changes: 0
+              request_stats: 97
+              first: "Oct 25 12:27:30"
+              last: "Oct 25 13:37:33"
+          slow_log_nodes:
+            - "node-b"
+          capped: true
+          max_apply_ms: 1447.6
+          lines_24h: 200
+          apply_slow: 95
+          apply_over_1s: 7
+          fdatasync_slow: 2
+          leader_changes: 1
+          request_stats: 97
+          note: "Slow-request logs are the last 200 warn lines of journalctl -u k3s over 24 h (capped means there were more). etcd expects apply within 100 ms. DB size is the data directory under /var/lib/rancher/k3s/server/db."
+      - expect: "fail"
+        item:
+          kind: "etcd"
+          servers:
+            - "node-b"
+          db_mb: 578
+          quota_mb: 2048
+          db_ratio: 0.282
+          slow_by_node:
+            node-b:
+              lines_24h: 200
+              capped: true
+              apply_slow: 95
+              max_apply_ms: 1447.6
+              apply_over_1s: 7
+              fdatasync_slow: 2
+              leader_changes: 0
+              request_stats: 97
+              first: "Oct 25 12:27:30"
+              last: "Oct 25 13:37:33"
+          slow_log_nodes:
+            - "node-b"
+          capped: true
+          max_apply_ms: 1447.6
+          lines_24h: 200
+          apply_slow: 95
+          apply_over_1s: 12
+          fdatasync_slow: 2
+          leader_changes: 0
+          request_stats: 97
+          note: "Slow-request logs are the last 200 warn lines of journalctl -u k3s over 24 h (capped means there were more). etcd expects apply within 100 ms. DB size is the data directory under /var/lib/rancher/k3s/server/db."
+      - expect: "fail"
+        item:
+          kind: "etcd"
+          servers:
+            - "node-b"
+          db_mb: 578
+          quota_mb: 2048
+          db_ratio: 0.282
+          slow_by_node:
+            node-b:
+              lines_24h: 200
+              capped: true
+              apply_slow: 95
+              max_apply_ms: 1447.6
+              apply_over_1s: 7
+              fdatasync_slow: 2
+              leader_changes: 0
+              request_stats: 97
+              first: "Oct 25 12:27:30"
+              last: "Oct 25 13:37:33"
+          slow_log_nodes:
+            - "node-b"
+          capped: true
+          max_apply_ms: 1447.6
+          lines_24h: 200
+          apply_slow: 95
+          apply_over_1s: 7
+          fdatasync_slow: 2
+          leader_changes: 0
+          request_stats: 97
+          note: "Slow-request logs are the last 200 warn lines of journalctl -u k3s over 24 h (capped means there were more). etcd expects apply within 100 ms. DB size is the data directory under /var/lib/rancher/k3s/server/db."
+      - expect: "warn"
+        item:
+          kind: "etcd"
+          servers:
+            - "node-b"
+          db_mb: 578
+          quota_mb: 2048
+          db_ratio: 0.282
+          slow_by_node:
+            node-b:
+              lines_24h: 200
+              capped: true
+              apply_slow: 95
+              max_apply_ms: 1447.6
+              apply_over_1s: 7
+              fdatasync_slow: 2
+              leader_changes: 0
+              request_stats: 97
+              first: "Oct 25 12:27:30"
+              last: "Oct 25 13:37:33"
+          slow_log_nodes:
+            - "node-b"
+          capped: false
+          max_apply_ms: 1447.6
+          lines_24h: 80
+          apply_slow: 40
+          apply_over_1s: 0
+          fdatasync_slow: 0
+          leader_changes: 0
+          request_stats: 97
+          note: "Slow-request logs are the last 200 warn lines of journalctl -u k3s over 24 h (capped means there were more). etcd expects apply within 100 ms. DB size is the data directory under /var/lib/rancher/k3s/server/db."
+      - expect: "pass"
+        item:
+          kind: "etcd"
+          servers:
+            - "node-b"
+          db_mb: 578
+          quota_mb: 2048
+          db_ratio: 0.282
+          slow_by_node:
+            node-b:
+              lines_24h: 200
+              capped: true
+              apply_slow: 95
+              max_apply_ms: 1447.6
+              apply_over_1s: 7
+              fdatasync_slow: 2
+              leader_changes: 0
+              request_stats: 97
+              first: "Oct 25 12:27:30"
+              last: "Oct 25 13:37:33"
+          slow_log_nodes:
+            - "node-b"
+          capped: false
+          max_apply_ms: null
+          lines_24h: 0
+          apply_slow: 0
+          apply_over_1s: 0
+          fdatasync_slow: 0
+          leader_changes: 0
+          request_stats: 97
+          note: "Slow-request logs are the last 200 warn lines of journalctl -u k3s over 24 h (capped means there were more). etcd expects apply within 100 ms. DB size is the data directory under /var/lib/rancher/k3s/server/db."
+      - expect: "pass"
+        item:
+          kind: null
+          servers:
+            - "node-b"
+          db_mb: 578
+          quota_mb: 2048
+          db_ratio: 0.282
+          slow_by_node:
+            node-b:
+              lines_24h: 200
+              capped: true
+              apply_slow: 95
+              max_apply_ms: 1447.6
+              apply_over_1s: 7
+              fdatasync_slow: 2
+              leader_changes: 0
+              request_stats: 97
+              first: "Oct 25 12:27:30"
+              last: "Oct 25 13:37:33"
+          slow_log_nodes:
+            - "node-b"
+          capped: true
+          max_apply_ms: 1447.6
+          lines_24h: 0
+          apply_slow: 95
+          apply_over_1s: 7
+          fdatasync_slow: 2
+          leader_changes: 0
+          request_stats: 97
+          note: "Slow-request logs are the last 200 warn lines of journalctl -u k3s over 24 h (capped means there were more). etcd expects apply within 100 ms. DB size is the data directory under /var/lib/rancher/k3s/server/db."
+- id: platform.k3s-datastore-large
+  name: k3s datastore DB is large (near the 2GiB etcd quota)
+  area: platform
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: k3s.cluster.datastore
+  cluster_level: true
+  rule:
+    expr: "item['kind'] == 'etcd' and (item['db_ratio'] or 0) >= 0.85"
+    warn_expr: "(item['db_mb'] or 0) >= 1024"
+  target: "'cluster'"
+  evidence: "f\"datastore {item['kind']} DB {item['db_mb']}MB (quota {item['quota_mb']}MB, ratio {item['db_ratio']}), servers {item['servers']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    Once etcd exceeds its default 2GiB quota it rejects writes (NOSPACE alarm) and the cluster becomes read-only; compaction and defragmentation are needed before that. k3s compacts automatically every 5 minutes but never defragments, so the du size (file) stays larger than the logical size. Clusters that write many events and CR statuses (Argo CD Applications, cert-manager Orders) grow fast. kine (SQLite) has no quota but slows down past 1GB.
+    Measured on a 2-node k3s k3s: 578MB (28%) -> pass.
+  suggest: "After k3s etcd-snapshot, run ETCDCTL_API=3 etcdctl --endpoints 127.0.0.1:2379 defrag (certificates in /var/lib/rancher/k3s/server/tls/etcd/). Find large key ranges with etcdctl get --prefix --keys-only /registry/events | wc -l."
+  verify:
+    - "ssh <server> sudo du -sm /var/lib/rancher/k3s/server/db"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          kind: "etcd"
+          servers:
+            - "node-b"
+          db_mb: 1800
+          quota_mb: 2048
+          db_ratio: 0.879
+          slow_by_node:
+            node-b:
+              lines_24h: 200
+              capped: true
+              apply_slow: 95
+              max_apply_ms: 1447.6
+              apply_over_1s: 7
+              fdatasync_slow: 2
+              leader_changes: 0
+              request_stats: 97
+              first: "Oct 25 12:27:30"
+              last: "Oct 25 13:37:33"
+          slow_log_nodes:
+            - "node-b"
+          capped: true
+          max_apply_ms: 1447.6
+          lines_24h: 200
+          apply_slow: 95
+          apply_over_1s: 7
+          fdatasync_slow: 2
+          leader_changes: 0
+          request_stats: 97
+          note: "Slow-request logs are the last 200 warn lines of journalctl -u k3s over 24 h (capped means there were more). etcd expects apply within 100 ms. DB size is the data directory under /var/lib/rancher/k3s/server/db."
+      - expect: "warn"
+        item:
+          kind: "etcd"
+          servers:
+            - "node-b"
+          db_mb: 1200
+          quota_mb: 2048
+          db_ratio: 0.586
+          slow_by_node:
+            node-b:
+              lines_24h: 200
+              capped: true
+              apply_slow: 95
+              max_apply_ms: 1447.6
+              apply_over_1s: 7
+              fdatasync_slow: 2
+              leader_changes: 0
+              request_stats: 97
+              first: "Oct 25 12:27:30"
+              last: "Oct 25 13:37:33"
+          slow_log_nodes:
+            - "node-b"
+          capped: true
+          max_apply_ms: 1447.6
+          lines_24h: 200
+          apply_slow: 95
+          apply_over_1s: 7
+          fdatasync_slow: 2
+          leader_changes: 0
+          request_stats: 97
+          note: "Slow-request logs are the last 200 warn lines of journalctl -u k3s over 24 h (capped means there were more). etcd expects apply within 100 ms. DB size is the data directory under /var/lib/rancher/k3s/server/db."
+      - expect: "pass"
+        item:
+          kind: "etcd"
+          servers:
+            - "node-b"
+          db_mb: 578
+          quota_mb: 2048
+          db_ratio: 0.282
+          slow_by_node:
+            node-b:
+              lines_24h: 200
+              capped: true
+              apply_slow: 95
+              max_apply_ms: 1447.6
+              apply_over_1s: 7
+              fdatasync_slow: 2
+              leader_changes: 0
+              request_stats: 97
+              first: "Oct 25 12:27:30"
+              last: "Oct 25 13:37:33"
+          slow_log_nodes:
+            - "node-b"
+          capped: true
+          max_apply_ms: 1447.6
+          lines_24h: 200
+          apply_slow: 95
+          apply_over_1s: 7
+          fdatasync_slow: 2
+          leader_changes: 0
+          request_stats: 97
+          note: "Slow-request logs are the last 200 warn lines of journalctl -u k3s over 24 h (capped means there were more). etcd expects apply within 100 ms. DB size is the data directory under /var/lib/rancher/k3s/server/db."

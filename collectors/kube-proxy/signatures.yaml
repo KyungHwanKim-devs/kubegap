@@ -1,0 +1,11 @@
+# kube-proxy log signatures (moved here from signatures/catalog.yaml). On k3s the kube-proxy log is mixed into the k3s journal (logs/node/<node>/k3s-errors-24h.log), so it is listed in sources too.
+- id: kube-proxy.iptables-restore-failed
+  name: kube-proxy iptables-restore failed
+  component: kube-proxy
+  area: traffic
+  severity: high
+  sources: ["logs/pods/kube-proxy/*.log", "logs/node/*/k3s-errors-24h.log"]
+  pattern: 'Failed to execute iptables-restore|iptables-restore.*(failed|error)|Failed to (sync|list) IPVS'
+  meaning: Service rules are not being updated, so traffic does not reach new pods or new Services.
+  cause: iptables lock contention (another CNI or security agent), rule count explosion, kernel modules.
+  verify: "kubectl logs -n kube-system -l k8s-app=kube-proxy --since=1h | grep -i iptables-restore"

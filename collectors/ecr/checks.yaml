@@ -1,0 +1,4864 @@
+# ECR checks. summary.ecr.summary — lib/ecr.py. All EKS only (aws step), except pull-failures, which is event-based and also runs on a small k3s cluster. Repository and registry policies are never read.
+- id: ecr.scan-disabled
+  name: ECR image vulnerability scanning disabled (no scanOnPush, no registry scan rules)
+  area: security
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: ecr.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['repos_scan_off_prod']) > 0 and not item['registry_scan_on_push']"
+    warn_expr: "len(item['repos_scan_off']) > 0 and not item['registry_scan_on_push']"
+  target: "'ecr/registry/' + str(item['account'])"
+  evidence: "f\"registry scanning {item['scan_type']} (rules {item['scan_rules']}), repositories with scanOnPush off {len(item['repos_scan_off'])}/{item['repositories']} (used by prod {len(item['repos_scan_off_prod'])}: {item['repos_scan_off_prod'][:6]}…), scanned images {item['images_scanned']}/{item['images']}, CRITICAL+HIGH {item['critical_high_findings']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    Without scanning, nobody knows how many known CVEs the images running in prod carry. ECR basic scanning (BASIC, Clair-based) is free and needs a single scanOnPush line, but if it is off on every repository and there is no registry-level rule, the number of scanned images is 0. Enhanced scanning (Inspector) keeps rescanning OS and language packages (paid).
+    Measured on a real cluster: 39 of 43 repositories had scanOnPush off (including 25 used by prod), scanned images 0/783.
+  suggest: "aws ecr put-registry-scanning-configuration --scan-type ENHANCED --rules '[{\"scanFrequency\":\"SCAN_ON_PUSH\",\"repositoryFilters\":[{\"filter\":\"*\",\"filterType\":\"WILDCARD\"}]}]' or --image-scanning-configuration scanOnPush=true per repository. Results via describe-image-scan-findings."
+  verify:
+    - "aws ecr get-registry-scanning-configuration"
+    - "aws ecr describe-repositories --query 'repositories[?imageScanningConfiguration.scanOnPush==`false`].repositoryName'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "warn"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod: []
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "pass"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: true
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "pass"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off: []
+          repos_scan_off_prod: []
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+- id: ecr.tag-mutable-prod
+  name: ECR repositories used by prod have mutable tags (a different image can be pushed under the same tag)
+  area: security
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: ecr.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['repos_mutable_prod']) > 0"
+  target: "'ecr/registry/' + str(item['account'])"
+  evidence: "f\"MUTABLE repositories {len(item['repos_mutable'])}/{item['repositories']}, used by prod {len(item['repos_mutable_prod'])}: {item['repos_mutable_prod'][:8]}…, digest-pinned containers {item['digest_pinned']}/{item['images_in_use']}, repositories with a latest tag {item['repos_with_latest_tag']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    With IMMUTABLE, a tag once pushed cannot be overwritten with a different image — the "v1.2.3 is different from yesterday" incident (accidental re-push, CI rerun, supply chain attack) is prevented and no node ends up running a different binary. When Argo CD deploys by tag, tag immutability is the precondition for rollback. Digest pinning is stronger but more cumbersome to operate.
+    Measured on a real cluster: 42/43 MUTABLE (a single immutable repository), digest-pinned 2/205, no repositories with a latest tag.
+  suggest: "aws ecr put-image-tag-mutability --repository-name <r> --image-tag-mutability IMMUTABLE (CI re-pushing the same tag will fail, so put the git sha in the tag). In Terraform, image_tag_mutability."
+  verify:
+    - "aws ecr describe-repositories --query 'repositories[?imageTagMutability==`MUTABLE`].repositoryName'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "pass"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod: []
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+- id: ecr.no-lifecycle-policy
+  name: ECR repositories without a lifecycle policy (images accumulate forever)
+  area: cost
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: ecr.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['repos_no_lifecycle']) > 0 and (item['repos_no_lifecycle_gib'] or 0) >= 20"
+    warn_expr: "len(item['repos_no_lifecycle']) > 0"
+  target: "'ecr/registry/' + str(item['account'])"
+  evidence: "f\"repositories without a lifecycle policy {item['repos_no_lifecycle']} (total {item['repos_no_lifecycle_gib']}GiB), overall {item['repositories']} repositories, {item['images']} images, {item['total_gib']}GiB ≈ {item['monthly_usd']} USD/month, untagged images {item['untagged']} (excluding {item['attestations']} attestations)\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    ECR keeps everything forever unless deleted and bills per GB-month. A repository without a lifecycle policy ("delete untagged after 1 day, keep only the latest 30 tagged") grows with every CI run. A single repository above 100GiB alone costs 10 USD a month.
+    Measured on a real cluster: 39/43 had a policy (untagged 1 day, tagged 30). The 4 without: one abandoned app repository (8.8GiB, no push or pull for over a year), two mirrored base images and one database image. Total 398.5GiB ≈ 42.8 USD/month.
+  suggest: "Attach the same policy to those repositories (aws ecr put-lifecycle-policy). With a Terraform module, make lifecycle_policy the default."
+  verify:
+    - "for r in $(aws ecr describe-repositories --query 'repositories[].repositoryName' --output text); do aws ecr get-lifecycle-policy --repository-name $r >/dev/null 2>&1 || echo no-policy $r; done"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 25.0
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "warn"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "pass"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle: []
+          repos_no_lifecycle_gib: 0.0
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+- id: ecr.stale-storage
+  name: Images accumulating in repositories not pulled for more than 90 days (storage that only costs money)
+  area: cost
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: ecr.summary
+  cluster_level: true
+  rule:
+    expr: "(item['stale_pull_gib'] or 0) >= 100"
+    warn_expr: "(item['stale_pull_gib'] or 0) >= 10 or (item['unused_gib'] or 0) >= 10"
+  target: "'ecr/registry/' + str(item['account'])"
+  evidence: "f\"repositories with no pull for more than {item['stale_pull_days']} days {item['repos_stale_pull'][:8]} (name, GiB, days since last pull) (total {item['stale_pull_gib']}GiB), repositories not used by the cluster {item['repos_unused_by_cluster']} (total {item['unused_gib']}GiB), empty repositories {item['repos_empty']}, largest repository {item['largest']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    If lastRecordedPullTime is 90 days ago, no node pulled any image from that repository for three months — space that nothing would miss if deleted. Repositories the cluster does not use (absent from pod images) are the same. But other clusters or CI may pull them, so the report should say "confirm, then delete".
+    Measured on a real cluster: an abandoned app repository of 8.8GiB (885 days), a prod repository of 29.8GiB with no push for months. The largest repositories were two ML image repositories of 96.6GiB and 75.3GiB (lifecycle keeping 30 × large ML images).
+  suggest: "Confirm with the owner and delete repositories with no pull history, or cut their lifecycle to 'latest 5 only'. For large repositories such as ML images, reduce the retained count from 30 to 10."
+  verify:
+    - "aws ecr describe-images --repository-name <r> --query 'max_by(imageDetails, &lastRecordedPullTime).lastRecordedPullTime'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 120.0
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "warn"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 12.0
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 0.0
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "warn"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 0.0
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 15.0
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "pass"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 1.0
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 2.0
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+- id: ecr.dockerhub-dependency
+  name: Cluster pulls Docker Hub images directly with no pull-through cache (rate limits, outage propagation)
+  area: resilience
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: ecr.summary
+  cluster_level: true
+  rule:
+    warn_expr: "(item['dockerhub_images'] or 0) >= 5 and len(item['pull_through_cache_rules']) == 0"
+  target: "'ecr/registry/' + str(item['account'])"
+  evidence: "f\"registry distribution of container images {item['images_by_registry']}, docker.io images {item['dockerhub_images']} (e.g. {item['dockerhub_sample'][:4]}), pull-through cache rules {item['pull_through_cache_rules']}, replication rules {item['replication_rules']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    Docker Hub limits anonymous pulls to 100 per IP per hour (stricter since 2024-12). When nodes are replaced (Karpenter) or many pods start on one node, the pulls pouring through the same NAT IP get 429 and pods land in ImagePullBackOff — the Docker Hub outages (2020, 2023) caused restart failures of this shape (Datadog 2019). An ECR pull-through cache rule caches docker.io, quay.io and ghcr.io in ECR so pulls stay inside the VPC.
+    Measured on a real EKS cluster: docker.io 31, quay.io 23, ghcr.io 9 containers, 0 pull-through rules.
+  suggest: "aws ecr create-pull-through-cache-rule --ecr-repository-prefix docker-hub --upstream-registry-url registry-1.docker.io --credential-arn <Docker Hub credentials in Secrets Manager>, then point image references at <acct>.dkr.ecr.<region>.amazonaws.com/docker-hub/<img>. Or use global.imageRegistry in Helm values."
+  verify:
+    - "aws ecr describe-pull-through-cache-rules"
+    - "kubectl get pods -A -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{\"\\n\"}{end}{end}' | grep -vE '^[0-9]+\\.dkr\\.ecr|^public\\.ecr|^registry\\.k8s|^quay|^ghcr' | sort -u"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "pass"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules:
+            - "docker-hub"
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "pass"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 2
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+- id: ecr.pull-failures
+  name: Image pull failure events (ErrImagePull, BackOff)
+  area: resilience
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: ecr.summary
+  cluster_level: true
+  rule:
+    expr: "(item['pull_failure_events'] or 0) >= 20"
+    warn_expr: "(item['pull_failure_events'] or 0) > 0"
+  target: "'cluster'"
+  evidence: "f\"image pull failure events within the event retention window {item['pull_failure_events']}, targets {item['pull_failure_targets']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    A pull failure is one of four things: registry authentication (ECR token expiring after 12 hours, IRSA permissions), missing tag (CI has not pushed yet), rate limit (Docker Hub) or network (NAT, no VPC endpoint). kubelet's PullImage metrics are dropped by the default kube-prometheus-stack configuration, so only events (1-hour retention) are used — 0 does not mean "none happened".
+    Measured on real clusters: 0 on both EKS and the small k3s cluster.
+  suggest: "Classify by the message in the Events of kubectl describe pod <pod> (401 Unauthorized, manifest unknown, toomanyrequests, i/o timeout)."
+  verify:
+    - "kubectl get events -A --field-selector reason=Failed | grep -i pull"
+  profiles: [prod]  # ECR is an EKS-only collector (the selftest caught this during clone validation)
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 30
+          pull_failure_targets:
+            - "dev-x/app-abc"
+      - expect: "warn"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 2
+          pull_failure_targets:
+            - "dev-x/app-abc"
+      - expect: "pass"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+- id: ecr.no-replication
+  name: No ECR replication rules (a region outage takes the images with it)
+  area: resilience
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: ecr.summary
+  cluster_level: true
+  rule:
+    warn_expr: "(item['replication_rules'] or 0) == 0 and len(item['repos_mutable_prod']) + len(item['repos_scan_off_prod']) > 0"
+  target: "'ecr/registry/' + str(item['account'])"
+  evidence: "f\"replication rules {item['replication_rules']}, repositories used by prod {len(set(item['repos_mutable_prod']) | set(item['repos_scan_off_prod']))}, total {item['total_gib']}GiB\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    ECR is a regional service. If ECR in the cluster's region is down, every node replacement and restart fails to pull (a fresh node with no image cache cannot start anything), and in a regional recovery (DR) the manifests alone deploy nothing without the images. Cross-region replication is automatic with one rule and only doubles storage cost. For a single-region, single-cluster organization, "we know" is enough — low.
+    Measured on a real cluster: 0 replication rules.
+  suggest: "If a DR region is defined, replicate only the prod repositories with aws ecr put-replication-configuration (repositoryFilters). Otherwise write 'single-region dependency' in the report."
+  verify:
+    - "aws ecr describe-registry"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "pass"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 1
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "pass"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod: []
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod: []
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+- id: ecr.untagged-images
+  name: Untagged images accumulating (no lifecycle untagged rule, or too loose)
+  area: cost
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: ecr.summary
+  cluster_level: true
+  rule:
+    warn_expr: "(item['untagged'] or 0) >= 100"
+  target: "'ecr/registry/' + str(item['account'])"
+  evidence: "f\"untagged images {item['untagged']}/{item['images']} (excluding {item['attestations']} BuildKit attestation manifests), repositories {item['repositories']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Re-pushing the same tag leaves the previous image behind without a tag (untagged) — nobody can pull it, but it uses space. The provenance/SBOM attestation manifests BuildKit uploads alongside (1-2KB) also appear untagged but have no size, so they are excluded here. Even with a lifecycle "delete untagged after 1 day", the child manifests referenced by a multi-architecture index are not deleted, so a count may remain.
+    Measured on a real cluster: 226/783 untagged (mostly per-platform child manifests of multi-arch indexes), 150 attestations.
+  suggest: "Confirm the lifecycle untagged rule, and note in the report that multi-arch child manifests are normal. Judge actual space by GiB per repository."
+  verify:
+    - "aws ecr list-images --repository-name <r> --filter tagStatus=UNTAGGED --query 'length(imageIds)'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 226
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []
+      - expect: "pass"
+        item:
+          present: true
+          account: "<account>"
+          repositories: 43
+          images: 783
+          attestations: 150
+          untagged: 12
+          total_gib: 398.5
+          monthly_usd: 42.8
+          largest:
+            - "('ecr-app-a-embedding-eks-prod', 96.59)"
+            - "('ecr-app-a-backend-eks-prod', 75.34)"
+            - "('ecr-app-h-frontend-eks-prod', 31.03)"
+            - "('ecr-app-d-ai-prod', 29.75)"
+            - "('ecr-app-d-ai-dev', 28.88)"
+          scan_type: "BASIC"
+          scan_rules: 0
+          registry_scan_on_push: false
+          repos_scan_off:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_scan_off_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "bitnami/mysql"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          images_scanned: 0
+          critical_high_findings: 0
+          repos_with_critical_high: []
+          repos_mutable:
+            - "app-c"
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-d-admin-dev"
+            - "ecr-app-f-eks-prod"
+            - "bitnami/kafka"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-frontend-prod"
+            - "app-c-admin-frontend"
+            - "ecr-app-b-frontend-dev"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "app-c-backend"
+            - "app-c-frontend"
+            - "ecr-app-b-admin-dev"
+            - "ecr-app-b-backend-dev"
+            - "ecr-app-b-api-dev"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-d-backend-dev"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "vxt-chatbot-backend"
+            - "vxt-chatbot-frontend"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-frontend-dev"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-d-ai-dev"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_mutable_prod:
+            - "ecr-app-h-frontend-eks-prod"
+            - "ecr-app-f-eks-prod"
+            - "ecr-app-e-backend-eks-prod"
+            - "ecr-app-e-web-eks-prod"
+            - "ecr-app-g-postgresql-prod"
+            - "ecr-app-b-admin-eks-prod"
+            - "ecr-app-h-postgresql-pgvector"
+            - "ecr-app-e-postgresql-prod"
+            - "ecr-app-b-backend-eks-prod"
+            - "ecr-app-b-api-eks-prod"
+            - "ecr-app-d-frontend-eks-prod"
+            - "ecr-app-h-backend-eks-prod"
+            - "ecr-app-d-ai-prod"
+            - "ecr-app-d-admin-eks-prod"
+            - "ecr-app-a-embedding-eks-prod"
+            - "app-c-admin-frontend-prod"
+            - "app-c-frontend-prod"
+            - "app-c-backend-prod"
+            - "ecr-app-b-frontend-eks-prod"
+            - "ecr-app-d-backend-eks-prod"
+            - "ecr-app-a-backend-eks-prod"
+            - "ecr-app-a-frontend-eks-prod"
+            - "ecr-app-e-ai-eks-prod"
+            - "ecr-app-e-studio-eks-prod"
+            - "ecr-app-g-web-eks-prod"
+            - "ecr-app-g-backend-eks-prod"
+          repos_no_lifecycle:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-h-postgresql-pgvector"
+            - "bitnami/mysql"
+          repos_no_lifecycle_gib: 10.9
+          repos_stale_pull:
+            - "('app-c', 8.82, 885)"
+            - "('bitnami/mysql', 0.61, 107)"
+          stale_pull_gib: 9.4
+          stale_pull_days: 90
+          repos_unused_by_cluster:
+            - "app-c"
+            - "bitnami/kafka"
+            - "ecr-app-b-frontend-prod"
+          unused_gib: 9.8
+          repos_empty:
+            - "ecr-app-b-frontend-prod"
+          repos_with_latest_tag: []
+          encryption:
+            KMS: 1
+            AES256: 42
+          replication_rules: 0
+          pull_through_cache_rules: []
+          images_in_use: 99
+          images_by_registry:
+            <account>.dkr.ecr.us-east-1.amazonaws.com: 67
+            602401143452.dkr.ecr.us-east-1.amazonaws.com: 63
+            docker.io: 32
+            quay.io: 23
+            ghcr.io: 9
+            public.ecr.aws: 8
+            registry.k8s.io: 3
+          dockerhub_images: 19
+          dockerhub_sample:
+            - "alpine/socat:1.8.0.0"
+            - "bitnami/kubectl:latest"
+            - "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4"
+            - "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3"
+            - "docker.io/bitnamilegacy/kubectl:1.32.4"
+            - "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+          digest_pinned: 2
+          pull_failure_events: 0
+          pull_failure_targets: []

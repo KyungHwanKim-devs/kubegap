@@ -1,0 +1,2 @@
+# AWS Load Balancer Controller collector. Enabled when the detected component alb-controller (kube-system/aws-load-balancer-controller Deployment) is present. EKS only.
+component: alb-controller

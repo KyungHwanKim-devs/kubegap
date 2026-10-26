@@ -1,0 +1,25 @@
+# lab profile: a small cluster of 1-3 nodes with no HA expectation (typically k3s on bare metal or VMs).
+name: lab
+description: Small cluster, 1-3 nodes, no HA expectation. Multi-AZ, PDB, anti-affinity, spot, service-quota and EKS platform checks are off; disk, backup and single-node-dependency checks are tightened.
+# Disabled checks: meaningless on 2 nodes (drains are rare, no availability zones) or cloud-only. eks.* checks do not list lab in their profiles, so they never run here.
+disabled_checks:
+  - resilience.no-pdb              # 2 nodes: drains are rare. Whether 2 replicas land one per node is covered by the spread check
+  - resilience.multi-az-spread     # no availability-zone concept
+  - resilience.anti-affinity       # only the node spread of 2 replicas matters
+  - cost.spot-usage                # no spot instances
+  - platform.service-quotas        # no service quotas
+# Component families that must be present. Differs from EKS: secrets-manager and node-autoscaler are not required (fixed node count; sealed-secrets or nothing is acceptable for secrets).
+# logs-store is required (Elasticsearch or fluent-bit counts as "present", not only Loki).
+expected_families: [metrics-store, logs-store, alert-router, backup, event-retention, slo, certificates, kube-state-metrics, node-exporter]
+# Tightened thresholds. One disk receives every PV (local-path), so warn earlier.
+thresholds:
+  node.disk-usage: { warn: 0.70, fail: 0.80 }
+  node.inode-usage: { warn: 0.70, fail: 0.80 }
+# Per-check exclusion patterns
+exclude:
+  traffic.endpoint-zero:
+    - kube-system/kube-prometheus-stack-kube-etcd            # the k3s default datastore is kine (SQLite); an empty etcd metrics Service is expected
+    - kube-system/kube-prometheus-stack-kube-controller-manager   # k3s runs as one process, so per-component Services may be empty
+    - kube-system/kube-prometheus-stack-kube-scheduler
+    - kube-system/kube-prometheus-stack-kube-proxy
+# The tightened small k3s cluster checks (SMART, temperature, power, single-node dependency, workloads that cannot come back if one node dies) live in the k3s-platform collector (SSH) and the resilience collector.

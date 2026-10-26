@@ -1,0 +1,121 @@
+# Commands run by the core collector.
+# Item types (type):
+#   kubectl-dump-all : dump every kind listable via `kubectl api-resources --verbs=list` into objects/<kind>.json per kind.
+#                      Kinds in exclude are not fetched. Secrets are never fetched. Kinds already fetched by detection are skipped.
+#   kubectl          : run args as given and save to out
+#   promql           : send the query list in file to Prometheus as instant queries and save to metrics/<id>.json
+#   aws              : aws CLI (used by the eks-platform collector)
+# Common: timeout (seconds), on_fail (skip|abort, default skip)
+- id: objects.dump-all
+  type: kubectl-dump-all
+  timeout: 120
+  exclude:
+    - secrets                        # never fetched, values would come along. Metadata via the kube_secret_info metric
+    - events                         # fetched separately by the events item below
+    - events.events.k8s.io
+    - componentstatuses              # deprecated, always errors
+    - bindings
+    - localsubjectaccessreviews.authorization.k8s.io
+    - selfsubjectaccessreviews.authorization.k8s.io
+    - selfsubjectrulesreviews.authorization.k8s.io
+    - subjectaccessreviews.authorization.k8s.io
+    - tokenreviews.authentication.k8s.io
+    - selfsubjectreviews.authentication.k8s.io
+    - pods.metrics.k8s.io            # metrics-server instant values. Fetched separately via top below
+    - nodes.metrics.k8s.io
+    - packagerevisions.*             # very large
+- id: events
+  type: kubectl
+  args: [get, events, -A, -o, json]
+  out: events.json
+  timeout: 120
+- id: top.nodes
+  type: kubectl
+  args: [top, nodes, --no-headers]
+  out: metrics/top-nodes.txt
+  timeout: 30
+- id: top.pods
+  type: kubectl
+  args: [top, pods, -A, --no-headers, --containers]
+  out: metrics/top-pods.txt
+  timeout: 60
+- id: metrics.core
+  type: promql
+  file: metrics.yaml
+  timeout: 30
+# ---- Node OS ----
+# node item: script ships a file from collectors/core/ to the node and runs it (EKS = SSM as root, SSH = login user plus kubegap-sudoers read-only commands).
+# No requires: the script leaves sections it has no permission for empty and the parser (lib/nodeos.py) records them as "no permission". Output logs/node/<node>/os.txt.
+- id: node-os
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: all
+  script: node-os.sh
+  out: logs/node/{node}/os.txt
+  timeout: 120
+# Effective kubelet config (eviction thresholds, reserved resources, log rotation, maxPods). Read through the apiserver node proxy without node access (all platforms).
+- id: kubelet-configz
+  modes: [full]   # skipped by the daily run
+  type: kubectl
+  for_each: nodes
+  args: [get, --raw, "/api/v1/nodes/{item}/proxy/configz"]
+  out: logs/node/{item}/kubelet-configz.json
+  timeout: 30
+# ---- Component pod logs (for signatures) ----
+# component-logs: kubectl logs (--all-containers --prefix --timestamps) for each workload of a detected component (components_present). User application logs are not fetched (that is Loki's job).
+# Output logs/pods/<component>/<ns>_<workload>.log. Signatures (signatures/catalog.yaml) read these files. No file is written for an empty log.
+- id: component-logs
+  type: component-logs
+  since: 24h
+  tail: 1500
+  tail_daemonset: 600
+  exclude: [kube-state-metrics, node-exporter, victoria-metrics, eks-managed-addons, k3s]
+  timeout: 120
+# KRR (Robusta): per-container request/limit recommendations from 7 days of Prometheus history. Read-only (kube API list + PromQL). Output tools/krr.json → summary.resources.krr.
+# Skipped when the tool is missing (report section "tool missing"); the check resources.krr-recommendation becomes tool-missing. Takes about 3 minutes on a small 2-node cluster. Reuses the Prometheus port-forward opened by Stores.
+- id: krr
+  modes: [full]   # skipped by the daily run
+  type: tool
+  tool: krr
+  cmd: [krr, simple, -c, "{context}", -p, "{prometheus_url}", -f, json, -q, --logtostderr, --fileoutput, "{out}", --max-workers, "4"]
+  writes_out: true
+  out: tools/krr.json
+  timeout: 900
+# ---- Structure and hygiene tools. All read-only, they read the cluster directly (Polaris cannot read List objects from snapshot files). Typical runtime on a 7-node EKS cluster: polaris ~4s, pluto ~7s, kubent ~10s, helm <1s ----
+- id: polaris
+  modes: [full]   # skipped by the daily run
+  type: tool
+  tool: polaris
+  cmd: [polaris, audit, --context, "{context}", --format, json, --only-show-failed-tests]
+  out: tools/polaris.json
+  timeout: 300
+- id: pluto
+  modes: [full]   # skipped by the daily run
+  type: tool
+  tool: pluto
+  cmd: [pluto, detect-all-in-cluster, --kube-context, "{context}", -o, json, --target-versions, "k8s={k8s_next_minor}"]
+  out: tools/pluto.json
+  timeout: 300
+- id: kubent
+  modes: [full]   # skipped by the daily run
+  type: tool
+  tool: kubent
+  cmd: [kubent, --context, "{context}", -o, json, -t, "{k8s_next_minor_short}"]
+  out: tools/kubent.json
+  timeout: 300
+- id: helm-list
+  modes: [full]   # skipped by the daily run
+  type: tool
+  tool: helm
+  cmd: [helm, list, -A, -o, json, --kube-context, "{context}", --deployed, --failed, --pending, --uninstalling, --uninstalled]
+  out: tools/helm-list.json
+  timeout: 120
+- id: helm-values
+  modes: [full]   # skipped by the daily run
+  # User-supplied values per release (the diff from chart defaults = what the operator changed). Empty means pure chart defaults — input for "Helm release drift (deployed values vs chart defaults)". Needs helm-list first
+  type: tool
+  tool: helm
+  for_each_file: {path: tools/helm-list.json, key: [namespace, name], limit: 100}
+  cmd: [helm, get, values, "{item.name}", -n, "{item.namespace}", -o, json, --kube-context, "{context}"]
+  out: tools/helm-values/{item_safe}.json
+  timeout: 120

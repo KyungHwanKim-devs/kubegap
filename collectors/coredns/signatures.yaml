@@ -1,0 +1,47 @@
+# CoreDNS log signatures. The first edition lived in signatures/catalog.yaml and was moved into this collector. Field descriptions are in the header of catalog.yaml.
+- id: coredns.servfail
+  name: CoreDNS SERVFAIL responses
+  component: coredns
+  area: traffic
+  severity: medium
+  sources: ["logs/pods/coredns/*.log"]
+  pattern: ' SERVFAIL '
+  meaning: DNS queries are failing. Apps see "no such host" or timeouts.
+  cause: Upstream (VPC resolver, external DNS) not responding, forward configuration, conntrack drops.
+  verify: "kubectl logs -n kube-system -l k8s-app=kube-dns --since=1h | grep -c SERVFAIL"
+  warn_at: 20
+  fail_at: 500
+- id: coredns.upstream-timeout
+  name: CoreDNS upstream i/o timeout
+  component: coredns
+  area: traffic
+  severity: medium
+  sources: ["logs/pods/coredns/*.log"]
+  pattern: 'i/o timeout|read udp .* timeout|plugin/errors.*(timeout|unreachable)'
+  meaning: CoreDNS received no answer from the upstream DNS. External domain resolution slows down or fails.
+  cause: Node conntrack drops, VPC resolver limit (1024 pps per ENI), network policy.
+  verify: "kubectl logs -n kube-system -l k8s-app=kube-dns --since=1h | grep -c 'i/o timeout'"
+  warn_at: 10
+  fail_at: 200
+- id: coredns.loop
+  name: CoreDNS forwarding loop
+  component: coredns
+  area: traffic
+  severity: critical
+  sources: ["logs/pods/coredns/*.log"]
+  pattern: 'plugin/loop: Loop'
+  meaning: CoreDNS sends queries to itself. The pod CrashLoops and cluster DNS stops.
+  cause: Node /etc/resolv.conf points at 127.0.0.53 (systemd-resolved). Common with k3s on Ubuntu.
+  verify: "kubectl logs -n kube-system -l k8s-app=kube-dns | grep -i loop"
+- id: coredns.reload-failed
+  name: CoreDNS Corefile reload failed
+  component: coredns
+  area: traffic
+  severity: medium
+  sources: ["logs/pods/coredns/*.log"]
+  pattern: 'Corefile changed|reload.*(failed|error)|Error during parsing'
+  meaning: The ConfigMap change was not applied and CoreDNS runs on the old configuration.
+  cause: Corefile syntax error.
+  verify: "kubectl get cm -n kube-system coredns -o yaml"
+  warn_at: 1
+  fail_at: 1

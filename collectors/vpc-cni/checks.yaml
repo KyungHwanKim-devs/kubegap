@@ -1,0 +1,764 @@
+# VPC CNI (aws-node) checks. summary.vpccni — lib/vpccni.py. Network policy enforcement and add-on versions are covered by the core security and eks-platform checks.
+- id: vpccni.node-ip-exhaustion
+  name: Node pod IPs near the limit or "no available IP" has already occurred
+  area: traffic
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: vpccni.nodes
+  rule:
+    expr: "item['metrics_available'] and ((item['no_available_ip_events'] or 0) > 0 or (item['ip_usage_ratio'] or 0) >= 0.9)"
+    warn_expr: "(item['ip_usage_ratio'] or 0) >= 0.75 or (item['ip_headroom'] is not None and item['ip_headroom'] <= 4)"
+  target: "item['node']"
+  evidence: "f\"node {item['node']} ({item['instance_type']}, pool {item['pool']}): pod IPs {item['ip_used']}/{item['ip_max']} ({item['ip_usage_ratio']}), ENI {item['metrics'].get('eni_allocated')}/{item['metrics'].get('eni_max')} (at limit {item['eni_at_max']}), 'no available IP' events {item['no_available_ip_events']}, max-pods {item['max_pods']}, prod pods {item['prod_pods']}. prefix delegation {item['prefix_delegation']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    VPC CNI gives each pod a VPC IP as a secondary IP on an ENI. The instance type decides how many IPs a node can hold (ENIs x (IPv4 per ENI - 1)). Once they are used up, new pods stall in ContainerCreating with "failed to assign an IP address" — the most common EKS trap.
+    `no_available_ip_events` is how many times ipamd answered "no IP to give" (cumulative since the process started), so any non-zero value means it has already happened at least once. ENIs attached up to the limit (eni_at_max) is normal with WARM_ENI_TARGET=1, so it is not a judgement axis — 4 or fewer remaining IPs (ip_headroom) or 75% usage is warn. max-pods exceeding the IP limit by 2 is normal: that is the hostNetwork pods' share.
+    Measured on a 7-node EKS cluster: an r8gd.xlarge node at ENI 4/4 and IP 42/56 had 4 'no available IP' events. Its max-pods was 58 while IPs stop at 56, so kubelet sees room and the CNI refuses.
+  suggest: "(1) prefix delegation (ENABLE_PREFIX_DELEGATION=true, /28 prefixes give 16x the IPs) — works immediately on nitro instances. (2) Or spread pods across nodes (topologySpread) and tune the Karpenter consolidation that packs them onto one large node. (3) Set max-pods below the IP limit."
+  verify:
+    - "on the node: curl -s localhost:61678/metrics | grep -E 'awscni_(assigned_ip_addresses|total_ip_addresses|eni_max|no_available_ip_addresses)'"
+    - "kubectl get events -A --field-selector reason=FailedCreatePodSandBox | grep -i 'assign'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: null
+          ipv4_per_eni: null
+          ip_capacity_calc: null
+          max_pods: 58
+          pods_with_ip: 42
+          prod_pods: 27
+          metrics:
+            available: true
+            assigned: 42
+            total: 56
+            eni_allocated: 4
+            eni_max: 4
+            ip_max: 56
+            prefixes: 0
+            no_available_ip_events: 4
+            force_removed_enis: 0
+            force_removed_ips: 0
+            ec2_api_errors: 0
+            ec2_api_errors_by_api: {}
+            per_eni:
+              eni-a: 14
+          ip_max: 56
+          ip_used: 42
+          ip_usage_ratio: 0.75
+          eni_at_max: true
+          max_pods_exceeds_ip_capacity: false
+          max_pods_over_ip: 2
+          ip_headroom: null
+          no_available_ip_events: 4
+          ec2_api_errors: 0
+          metrics_available: true
+          prefix_delegation: false
+          hypervisor: null
+      - expect: "fail"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: null
+          ipv4_per_eni: null
+          ip_capacity_calc: null
+          max_pods: 58
+          pods_with_ip: 42
+          prod_pods: 27
+          metrics:
+            available: true
+            assigned: 52
+            total: 56
+            eni_allocated: 4
+            eni_max: 4
+            ip_max: 56
+            prefixes: 0
+            no_available_ip_events: 0
+            force_removed_enis: 0
+            force_removed_ips: 0
+            ec2_api_errors: 0
+            ec2_api_errors_by_api: {}
+            per_eni:
+              eni-a: 14
+          ip_max: 56
+          ip_used: 52
+          ip_usage_ratio: 0.929
+          eni_at_max: true
+          max_pods_exceeds_ip_capacity: false
+          max_pods_over_ip: 2
+          ip_headroom: null
+          no_available_ip_events: 0
+          ec2_api_errors: 0
+          metrics_available: true
+          prefix_delegation: false
+          hypervisor: null
+      - expect: "warn"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: null
+          ipv4_per_eni: null
+          ip_capacity_calc: null
+          max_pods: 58
+          pods_with_ip: 42
+          prod_pods: 27
+          metrics:
+            available: true
+            assigned: 42
+            total: 56
+            eni_allocated: 4
+            eni_max: 4
+            ip_max: 56
+            prefixes: 0
+            no_available_ip_events: 0
+            force_removed_enis: 0
+            force_removed_ips: 0
+            ec2_api_errors: 0
+            ec2_api_errors_by_api: {}
+            per_eni:
+              eni-a: 14
+          ip_max: 56
+          ip_used: 43
+          ip_usage_ratio: 0.768
+          eni_at_max: true
+          max_pods_exceeds_ip_capacity: false
+          max_pods_over_ip: 2
+          ip_headroom: null
+          no_available_ip_events: 0
+          ec2_api_errors: 0
+          metrics_available: true
+          prefix_delegation: false
+          hypervisor: null
+      - expect: "warn"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: null
+          ipv4_per_eni: null
+          ip_capacity_calc: null
+          max_pods: 58
+          pods_with_ip: 42
+          prod_pods: 27
+          metrics:
+            available: false
+          ip_max: 27
+          ip_used: 22
+          ip_usage_ratio: 0.815
+          eni_at_max: false
+          max_pods_exceeds_ip_capacity: false
+          max_pods_over_ip: 2
+          ip_headroom: null
+          no_available_ip_events: null
+          ec2_api_errors: null
+          metrics_available: false
+          prefix_delegation: false
+          hypervisor: null
+      - expect: "pass"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: null
+          ipv4_per_eni: null
+          ip_capacity_calc: null
+          max_pods: 58
+          pods_with_ip: 42
+          prod_pods: 27
+          metrics:
+            available: true
+            assigned: 10
+            total: 56
+            eni_allocated: 2
+            eni_max: 4
+            ip_max: 56
+            prefixes: 0
+            no_available_ip_events: 0
+            force_removed_enis: 0
+            force_removed_ips: 0
+            ec2_api_errors: 0
+            ec2_api_errors_by_api: {}
+            per_eni:
+              eni-a: 14
+          ip_max: 56
+          ip_used: 10
+          ip_usage_ratio: 0.179
+          eni_at_max: false
+          max_pods_exceeds_ip_capacity: false
+          max_pods_over_ip: 2
+          ip_headroom: null
+          no_available_ip_events: 0
+          ec2_api_errors: 0
+          metrics_available: true
+          prefix_delegation: false
+          hypervisor: null
+- id: vpccni.max-pods-exceeds-ip-capacity
+  name: Node max-pods is larger than the number of IPs the CNI can hand out
+  area: traffic
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: vpccni.nodes
+  rule:
+    expr: "item['max_pods_exceeds_ip_capacity'] and item['pods_with_ip'] >= (item['ip_max'] or 0) * 0.5"
+    warn_expr: "item['max_pods_exceeds_ip_capacity']"
+  target: "item['node']"
+  evidence: "f\"node {item['node']} ({item['instance_type']}): max-pods {item['max_pods']} > IP limit {item['ip_max']}+2 (ENI {item['max_eni']} x ({item['ipv4_per_eni']} per ENI - 1), over by {item['max_pods_over_ip']}). pods using an IP now {item['pods_with_ip']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    kubelet's max-pods is the number of slots the scheduler sees; the CNI's IP limit is what can actually be handed out. If the former is larger, the scheduler sends pods, the CNI refuses, and pods stall in ContainerCreating (a difference equal to the hostNetwork pods that use no IP is fine).
+    The EKS-optimized AMI formula for max-pods is ENI x (IP - 1) + 2. The +2 is for aws-node and kube-proxy, which are hostNetwork and use no IP, and is normal (measured: every node was exactly +2); anything larger means Karpenter set `maxPods` separately, or prefix delegation was turned on and then off.
+  suggest: "Set kubelet.maxPods in the Karpenter EC2NodeClass to the IP limit (x16 with prefix delegation), or enable prefix delegation to raise the IP limit."
+  verify:
+    - "kubectl get node <node> -o jsonpath='{.status.allocatable.pods}' ; aws ec2 describe-instance-types --instance-types <type> --query 'InstanceTypes[].NetworkInfo.[MaximumNetworkInterfaces,Ipv4AddressesPerInterface]'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: 4
+          ipv4_per_eni: 15
+          ip_capacity_calc: null
+          max_pods: 58
+          pods_with_ip: 42
+          prod_pods: 27
+          metrics:
+            available: false
+          ip_max: 56
+          ip_used: 42
+          ip_usage_ratio: null
+          eni_at_max: false
+          max_pods_exceeds_ip_capacity: true
+          max_pods_over_ip: 6
+          ip_headroom: null
+          no_available_ip_events: null
+          ec2_api_errors: null
+          metrics_available: false
+          prefix_delegation: false
+          hypervisor: null
+      - expect: "warn"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: 4
+          ipv4_per_eni: 15
+          ip_capacity_calc: null
+          max_pods: 58
+          pods_with_ip: 10
+          prod_pods: 27
+          metrics:
+            available: false
+          ip_max: 56
+          ip_used: 42
+          ip_usage_ratio: null
+          eni_at_max: false
+          max_pods_exceeds_ip_capacity: true
+          max_pods_over_ip: 6
+          ip_headroom: null
+          no_available_ip_events: null
+          ec2_api_errors: null
+          metrics_available: false
+          prefix_delegation: false
+          hypervisor: null
+      - expect: "pass"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: 3
+          ipv4_per_eni: 10
+          ip_capacity_calc: null
+          max_pods: 29
+          pods_with_ip: 15
+          prod_pods: 27
+          metrics:
+            available: false
+          ip_max: 27
+          ip_used: 42
+          ip_usage_ratio: null
+          eni_at_max: false
+          max_pods_exceeds_ip_capacity: false
+          max_pods_over_ip: 2
+          ip_headroom: null
+          no_available_ip_events: null
+          ec2_api_errors: null
+          metrics_available: false
+          prefix_delegation: false
+          hypervisor: null
+- id: vpccni.prefix-delegation-off
+  name: nitro nodes but prefix delegation is off (IP limit is 16x smaller)
+  area: platform
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: vpccni.warm.summary
+  cluster_level: true
+  rule:
+    expr: "not item['prefix_delegation'] and item['nitro_nodes'] > 0 and len(item['nodes_no_available_ip']) > 0"
+    warn_expr: "not item['prefix_delegation'] and item['nitro_nodes'] > 0 and len(item['nodes_near_ip_limit']) > 0"
+  target: "'cluster'"
+  evidence: "f\"ENABLE_PREFIX_DELEGATION false, nitro nodes {item['nitro_nodes']}/{item['nodes']}. nodes above 50% IP usage {item['nodes_near_ip_limit']}, nodes that saw 'no available IP' {item['nodes_no_available_ip']}. warm policy {item['policy']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    Prefix delegation attaches a /28 prefix (16 IPs) to one ENI secondary IP slot, raising pod IPs per node 16x. On nitro instances (all recent generations) it is a single setting, and the subnet needs contiguous /28 space.
+    If node IPs are more than half used or 'no available IP' has occurred, this setting is the cheapest fix. Note that it reserves the subnet in /28 units per node, so small subnets (/24) run out faster — read together with subnet free IPs (vpccni.subnet-ips-low).
+  suggest: "Set ENABLE_PREFIX_DELEGATION=true and WARM_PREFIX_TARGET=1 on aws-node (via add-on configurationValues). It applies to new nodes only, so it takes effect as Karpenter replaces nodes. Raise max-pods as well."
+  verify:
+    - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 PREFIX"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          policy: "whole_eni"
+          warm_eni_target: 1
+          warm_ip_target: null
+          idle_ips_total: 0
+          subnets_low: []
+          min_subnet_available: 148
+          nodes: 7
+          prefix_delegation: false
+          nitro_nodes: 7
+          nodes_near_ip_limit:
+            - "n1"
+          nodes_no_available_ip:
+            - "n1"
+          metrics_unavailable_nodes:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+      - expect: "warn"
+        item:
+          policy: "whole_eni"
+          warm_eni_target: 1
+          warm_ip_target: null
+          idle_ips_total: 0
+          subnets_low: []
+          min_subnet_available: 148
+          nodes: 7
+          prefix_delegation: false
+          nitro_nodes: 7
+          nodes_near_ip_limit:
+            - "n1"
+          nodes_no_available_ip: []
+          metrics_unavailable_nodes:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+      - expect: "pass"
+        item:
+          policy: "whole_eni"
+          warm_eni_target: 1
+          warm_ip_target: null
+          idle_ips_total: 0
+          subnets_low: []
+          min_subnet_available: 148
+          nodes: 7
+          prefix_delegation: false
+          nitro_nodes: 7
+          nodes_near_ip_limit: []
+          nodes_no_available_ip: []
+          metrics_unavailable_nodes:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+      - expect: "pass"
+        item:
+          policy: "whole_eni"
+          warm_eni_target: 1
+          warm_ip_target: null
+          idle_ips_total: 0
+          subnets_low: []
+          min_subnet_available: 148
+          nodes: 7
+          prefix_delegation: true
+          nitro_nodes: 7
+          nodes_near_ip_limit:
+            - "n1"
+          nodes_no_available_ip:
+            - "n1"
+          metrics_unavailable_nodes:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+- id: vpccni.subnet-ips-low
+  name: Node subnet has few free IPs
+  area: traffic
+  type: summary
+  each: vpccni.subnets
+  rule:
+    expr: "(item['available'] or 0) < 32 or (item['available_ratio'] or 1) < 0.1"
+    warn_expr: "(item['available_ratio'] or 1) < 0.25"
+  target: "item['subnet_id']"
+  evidence: "f\"subnet {item['subnet_id']} ({item['name']}, {item['az']}, {item['cidr']}): free IPs {item['available']}/{item['usable']} (used {item['used_ratio']}), {item['nodes']} nodes in this AZ\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    Nodes, pods, ENIs and LBs all draw from the same subnet IPs. When the subnet is empty, new nodes cannot start (Karpenter InsufficientFreeAddressesInSubnet) and existing nodes cannot refill their warm pool. A /24 has 251 usable addresses, which a few nodes exhaust.
+    Measured on a 7-node EKS cluster: two /24 subnets with 148 and 151 free (40% used) — still fine.
+  suggest: "A subnet cannot be widened; instead attach a secondary CIDR to the VPC and use custom networking (ENIConfig) to place only pods there. Or tidy per-node reservations with prefix delegation."
+  verify:
+    - "aws ec2 describe-subnets --subnet-ids <id> --query 'Subnets[].AvailableIpAddressCount'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          subnet_id: "subnet-01e43688f4ab26b0e"
+          name: "acme-vpc-eks-private-us-east-1a"
+          az: "us-east-1a"
+          cidr: "10.0.1.0/24"
+          usable: 251
+          available: 20
+          used_ratio: 0.92
+          available_ratio: 0.08
+          nodes: 3
+      - expect: "warn"
+        item:
+          subnet_id: "subnet-01e43688f4ab26b0e"
+          name: "acme-vpc-eks-private-us-east-1a"
+          az: "us-east-1a"
+          cidr: "10.0.1.0/24"
+          usable: 251
+          available: 50
+          used_ratio: 0.8
+          available_ratio: 0.199
+          nodes: 3
+      - expect: "pass"
+        item:
+          subnet_id: "subnet-01e43688f4ab26b0e"
+          name: "acme-vpc-eks-private-us-east-1a"
+          az: "us-east-1a"
+          cidr: "10.0.1.0/24"
+          usable: 251
+          available: 148
+          used_ratio: 0.41
+          available_ratio: 0.59
+          nodes: 3
+- id: vpccni.warm-pool-whole-eni
+  name: ENI-sized warm pool without WARM_IP_TARGET (each node keeps one ENI's worth of IPs idle)
+  area: platform
+  type: summary
+  each: vpccni.warm.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['policy'] == 'whole_eni' and (len(item['subnets_low']) > 0 or (item['min_subnet_available'] or 10**9) < 64)"
+  target: "'cluster'"
+  evidence: "f\"warm policy {item['policy']} (WARM_ENI_TARGET {item['warm_eni_target']}, WARM_IP_TARGET {item['warm_ip_target']}), idle reserved IPs total {item['idle_ips_total']}, min subnet free {item['min_subnet_available']}, subnets below 25% free {item['subnets_low']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    The default (WARM_ENI_TARGET=1) pre-allocates one ENI's worth of IPs per node (e.g. 9 on m5.large, 14 on r8gd.xlarge). Pod startup is fast, but the subnet loses nodes x ENI-size IPs to reservations. Fine if the subnet is roomy; if not, reduce reservations with WARM_IP_TARGET and MINIMUM_IP_TARGET.
+    Measured on a 7-node EKS cluster: 148 and 151 free in the subnets, so no warning.
+  suggest: "Only when the subnet is tight: WARM_IP_TARGET=5, MINIMUM_IP_TARGET=10 or so. With prefix delegation, WARM_PREFIX_TARGET=1 is the default and these settings are ignored."
+  verify:
+    - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 -E 'WARM|MINIMUM'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          policy: "whole_eni"
+          warm_eni_target: 1
+          warm_ip_target: null
+          idle_ips_total: 0
+          subnets_low:
+            - "subnet-a"
+          min_subnet_available: 40
+          nodes: 7
+          prefix_delegation: false
+          nitro_nodes: 0
+          nodes_near_ip_limit: []
+          nodes_no_available_ip: []
+          metrics_unavailable_nodes:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+      - expect: "pass"
+        item:
+          policy: "whole_eni"
+          warm_eni_target: 1
+          warm_ip_target: null
+          idle_ips_total: 0
+          subnets_low: []
+          min_subnet_available: 148
+          nodes: 7
+          prefix_delegation: false
+          nitro_nodes: 0
+          nodes_near_ip_limit: []
+          nodes_no_available_ip: []
+          metrics_unavailable_nodes:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+      - expect: "pass"
+        item:
+          policy: "ip_target"
+          warm_eni_target: 1
+          warm_ip_target: 5
+          idle_ips_total: 0
+          subnets_low:
+            - "subnet-a"
+          min_subnet_available: 40
+          nodes: 7
+          prefix_delegation: false
+          nitro_nodes: 0
+          nodes_near_ip_limit: []
+          nodes_no_available_ip: []
+          metrics_unavailable_nodes:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+- id: vpccni.ec2-api-errors
+  name: aws-node accumulating EC2 API call failures (IAM, throttling, subnet)
+  area: platform
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: vpccni.nodes
+  rule:
+    expr: "item['metrics_available'] and (item['ec2_api_errors'] or 0) >= 50"
+    warn_expr: "item['metrics_available'] and (item['ec2_api_errors'] or 0) > 0"
+  target: "item['node']"
+  evidence: "f\"node {item['node']}: EC2 API failures {item['ec2_api_errors']} (by API {item['metrics'].get('ec2_api_errors_by_api')}), force-removed ENIs {item['metrics'].get('force_removed_enis')} / IPs {item['metrics'].get('force_removed_ips')} (cumulative since ipamd start, IMDS 404 excluded)\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    ipamd creates and attaches ENIs and allocates IPs through the EC2 API. As failures pile up, the warm pool cannot be refilled, so pods start slowly or get no IP. Causes are a missing AmazonEKS_CNI_Policy on the node role, API throttling (RequestLimitExceeded), and subnet or security group configuration. Read together with the log signatures vpc-cni.ec2-throttled and ipamd-error.
+  suggest: "Find the failing API name in the aws-node logs (logs/pods/vpc-cni/); for IAM fix the node role policy, for throttling reduce the concurrent scale-out burst."
+  verify:
+    - "kubectl logs -n kube-system -l k8s-app=aws-node --since=24h | grep -iE 'error|throttl' | head"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: null
+          ipv4_per_eni: null
+          ip_capacity_calc: null
+          max_pods: 58
+          pods_with_ip: 42
+          prod_pods: 27
+          metrics:
+            available: true
+            assigned: 42
+            total: 56
+            eni_allocated: 4
+            eni_max: 4
+            ip_max: 56
+            prefixes: 0
+            no_available_ip_events: 4
+            force_removed_enis: 0
+            force_removed_ips: 0
+            ec2_api_errors: 120
+            ec2_api_errors_by_api:
+              CreateNetworkInterface: 120
+            per_eni:
+              eni-a: 14
+          ip_max: null
+          ip_used: 42
+          ip_usage_ratio: null
+          eni_at_max: false
+          max_pods_exceeds_ip_capacity: false
+          max_pods_over_ip: 2
+          ip_headroom: null
+          no_available_ip_events: null
+          ec2_api_errors: 120
+          metrics_available: true
+          prefix_delegation: false
+          hypervisor: null
+      - expect: "warn"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: null
+          ipv4_per_eni: null
+          ip_capacity_calc: null
+          max_pods: 58
+          pods_with_ip: 42
+          prod_pods: 27
+          metrics:
+            available: true
+            assigned: 42
+            total: 56
+            eni_allocated: 4
+            eni_max: 4
+            ip_max: 56
+            prefixes: 0
+            no_available_ip_events: 4
+            force_removed_enis: 0
+            force_removed_ips: 0
+            ec2_api_errors: 3
+            ec2_api_errors_by_api:
+              AttachNetworkInterface: 3
+            per_eni:
+              eni-a: 14
+          ip_max: null
+          ip_used: 42
+          ip_usage_ratio: null
+          eni_at_max: false
+          max_pods_exceeds_ip_capacity: false
+          max_pods_over_ip: 2
+          ip_headroom: null
+          no_available_ip_events: null
+          ec2_api_errors: 3
+          metrics_available: true
+          prefix_delegation: false
+          hypervisor: null
+      - expect: "pass"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: null
+          ipv4_per_eni: null
+          ip_capacity_calc: null
+          max_pods: 58
+          pods_with_ip: 42
+          prod_pods: 27
+          metrics:
+            available: true
+            assigned: 42
+            total: 56
+            eni_allocated: 4
+            eni_max: 4
+            ip_max: 56
+            prefixes: 0
+            no_available_ip_events: 4
+            force_removed_enis: 0
+            force_removed_ips: 0
+            ec2_api_errors: 0
+            ec2_api_errors_by_api: {}
+            per_eni:
+              eni-a: 14
+          ip_max: null
+          ip_used: 42
+          ip_usage_ratio: null
+          eni_at_max: false
+          max_pods_exceeds_ip_capacity: false
+          max_pods_over_ip: 2
+          ip_headroom: null
+          no_available_ip_events: null
+          ec2_api_errors: 0
+          metrics_available: true
+          prefix_delegation: false
+          hypervisor: null
+      - expect: "pass"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_eni: null
+          ipv4_per_eni: null
+          ip_capacity_calc: null
+          max_pods: 58
+          pods_with_ip: 42
+          prod_pods: 27
+          metrics:
+            available: false
+          ip_max: null
+          ip_used: 42
+          ip_usage_ratio: null
+          eni_at_max: false
+          max_pods_exceeds_ip_capacity: false
+          max_pods_over_ip: 2
+          ip_headroom: null
+          no_available_ip_events: null
+          ec2_api_errors: null
+          metrics_available: false
+          prefix_delegation: false
+          hypervisor: null
+- id: vpccni.metrics-unreadable
+  name: Nodes whose ipamd metrics could not be read (IP usage is an estimate only)
+  area: platform
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: vpccni.warm.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['metrics_unavailable_nodes']) > 0"
+  target: "'cluster'"
+  evidence: "f\"{len(item['metrics_unavailable_nodes'])} of {item['nodes']} nodes without readable ipamd metrics (localhost:61678): {item['metrics_unavailable_nodes'][:6]}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    aws-node exposes metrics on 61678 via hostNetwork, but the apiserver pod proxy is blocked by the node security group (measured: timeout). So it is read with curl from inside the node — nodes not registered in SSM or without SSH cannot be read, and their IP usage is the estimate "pods using an IP / computed limit".
+  suggest: "Register with SSM (eks.ssm-unregistered) or install cni-metrics-helper (awscni_* to CloudWatch or Prometheus)."
+  verify:
+    - "kubectl get pods -n kube-system -l k8s-app=aws-node -o wide"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          policy: "whole_eni"
+          warm_eni_target: 1
+          warm_ip_target: null
+          idle_ips_total: 0
+          subnets_low: []
+          min_subnet_available: 148
+          nodes: 7
+          prefix_delegation: false
+          nitro_nodes: 0
+          nodes_near_ip_limit: []
+          nodes_no_available_ip: []
+          metrics_unavailable_nodes:
+            - "ip-10-0-1-117"
+            - "ip-10-0-2-60"
+      - expect: "pass"
+        item:
+          policy: "whole_eni"
+          warm_eni_target: 1
+          warm_ip_target: null
+          idle_ips_total: 0
+          subnets_low: []
+          min_subnet_available: 148
+          nodes: 7
+          prefix_delegation: false
+          nitro_nodes: 0
+          nodes_near_ip_limit: []
+          nodes_no_available_ip: []
+          metrics_unavailable_nodes: []

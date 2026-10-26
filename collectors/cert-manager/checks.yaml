@@ -1,0 +1,2207 @@
+# cert-manager checks (on EKS this is enabled when cert-manager is used instead of ACM). summary.certmanager.summary — lib/certmanager.py. Secret values are never read. Ingress exposure and authentication are covered by core traffic and security.
+- id: certmanager.certificate-not-ready
+  name: Certificate not Ready (issuance or renewal is stuck)
+  area: security
+  type: summary
+  each: certmanager.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['not_ready_prod']) > 0 or len(item['expired']) > 0"
+    warn_expr: "len(item['not_ready']) > 0 or len(item['issuing_stuck']) > 0"
+  target: "'cluster'"
+  evidence: "f\"Certificates {item['certificates']} (prod {item['certificates_prod']}), not Ready {item['not_ready']} (prod {item['not_ready_prod']}), expired {item['expired']}, stuck in Issuing {item['issuing_stuck']}, failed CertificateRequests {item['certificaterequests_failed']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    A Certificate with Ready False either has no Secret (first issuance failed → the ingress answers with its default certificate, browser warning) or is frozen on an old certificate (renewal failed → the service breaks on the expiry date). The reason is in the Issuing condition message and in the CertificateRequest, Order and Challenge.
+    Measured on a real k3s: all 31 Ready, 114 CertificateRequests and 110 Orders all valid → pass.
+  suggest: "Walk down from the Conditions/Events of kubectl describe certificate <name> → certificaterequest → order → challenge (cmctl status certificate <name>)."
+  verify:
+    - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[?(@.type==\"Ready\")].status,NOTAFTER:.status.notAfter"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready:
+            - "p/certificate/x(Failed)"
+          not_ready_prod:
+            - "p/certificate/x"
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired:
+            - "p/certificate/x"
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready:
+            - "dev/certificate/x(Pending)"
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck:
+            - "dev/certificate/x(Pending: waiting)"
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+- id: certmanager.certificate-expiring
+  name: Certificate expiring soon, or renewal time passed without renewal
+  area: security
+  type: summary
+  each: certmanager.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['expiring_14d']) > 0 or len(item['renewal_overdue']) > 0"
+    warn_expr: "len(item['expiring_30d']) > 0"
+  target: "'cluster'"
+  evidence: "f\"expiring within 30 days {item['expiring_30d']}, within 14 days {item['expiring_14d']}, renewalTime passed by more than 24h without renewal {item['renewal_overdue']}, nearest expiry {item['min_days_to_expiry']} days (metric {item['min_days_to_expiry_metric']})\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    Let's Encrypt certificates last 90 days and cert-manager renews them 30 days before expiry (renewBefore defaults to 1/3 of duration). So "expiring within 30 days" is the tail of a normal cycle, and "renewalTime passed but not renewed" is the real signal — caused by ACME challenge failures (HTTP-01 breaks when the ingress path or DNS changes), rate limits (50 per week) or account key problems.
+    Measured on a real k3s: nearest expiry 31 days (two certificates due for renewal the next day) → pass. Whether those two were renewed is the thing to confirm on the next run.
+  suggest: "Try a manual renewal with cmctl renew <name> and watch the Challenge state. For HTTP-01, check that http://<host>/.well-known/acme-challenge/ is reachable from outside."
+  verify:
+    - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,RENEW:.status.renewalTime,NOTAFTER:.status.notAfter | sort -k3"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d:
+            - "['p/certificate/x', 9.0]"
+          expiring_14d:
+            - "p/certificate/x"
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue:
+            - "['p/certificate/x', 70.0]"
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d:
+            - "['p/certificate/x', 25.0]"
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+- id: certmanager.acme-challenge-failing
+  name: ACME Order or Challenge failed or pending for more than 1 hour
+  area: security
+  type: summary
+  each: certmanager.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['orders_bad']) > 0 or any(c['state'] in ('invalid', 'errored') for c in item['challenges_bad'])"
+    warn_expr: "len(item['challenges_bad']) > 0 or len(item['orders_pending_old']) > 0 or len(item['certificaterequests_denied']) > 0"
+  target: "'cluster'"
+  evidence: "f\"Orders {item['orders']} by state {item['orders_by_state']}, failed {item['orders_bad']}, pending over 1 hour {item['orders_pending_old']}, Challenges {item['challenges']} with problems {item['challenges_bad']}, denied CertificateRequests {item['certificaterequests_denied']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    A Challenge that stays pending means Let's Encrypt cannot validate the domain — HTTP-01 needs the solver pod and temporary ingress to be reachable from outside (ingress controller LoadBalancer IP, port 80, firewall), DNS-01 needs correct DNS provider credentials. invalid is a validation failure (the Let's Encrypt response is in reason — 403 unauthorized, connection refused), errored is an error on the cert-manager side. Accumulating failed Orders hits the rate limit (5 failures per account and hostname per week) and blocks issuance for a week.
+    Measured on a real k3s: 110 Orders all valid, 0 Challenges → pass.
+  suggest: "Read the Reason in kubectl describe challenge -A. For HTTP-01, run curl -v http://<host>/.well-known/acme-challenge/x from outside."
+  verify:
+    - "kubectl get orders,challenges -A"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad:
+            - "p/x-1(errored: 429 rateLimited)"
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad:
+            - challenge: "p/x"
+              type: "HTTP-01"
+              dns: "a.example.com"
+              state: "invalid"
+              reason: "403 unauthorized"
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad:
+            - challenge: "p/x"
+              type: "HTTP-01"
+              dns: "a.example.com"
+              state: "pending"
+              reason: ""
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old:
+            - "p/x-2"
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+- id: certmanager.issuer-not-ready
+  name: Issuer/ClusterIssuer not Ready
+  area: security
+  type: summary
+  each: certmanager.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['issuers_not_ready']) > 0"
+  target: "'cluster'"
+  evidence: "f\"issuers {item['issuers']} ({item['issuer_types']}, solvers {item['solvers']}), not Ready {item['issuers_not_ready']}, issuers with no certificates {item['issuers_unused']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    If an ACME issuer is not Ready (account registration failed, account key Secret missing, server URL typo), renewal stops for every certificate that references it — and stays quiet until expiry.
+    Measured on a real k3s: ClusterIssuers letsencrypt-production and staging and an Issuer selfsigned were all Ready. staging had 0 certificates (kept for testing).
+  suggest: "Check Status in kubectl describe clusterissuer <name>. Confirm the ACME account key Secret (privateKeySecretRef) exists."
+  verify:
+    - "kubectl get clusterissuers,issuers -A -o wide"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready:
+            - "ClusterIssuer/letsencrypt-production(ErrRegisterACMEAccount)"
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+- id: certmanager.staging-issuer-in-prod
+  name: prod certificate issued by the Let's Encrypt staging issuer (browsers do not trust it)
+  area: security
+  type: summary
+  each: certmanager.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['staging_certs_prod']) > 0"
+    warn_expr: "len(item['staging_certs']) > 0"
+  target: "'cluster'"
+  evidence: "f\"certificates from a staging issuer {item['staging_certs']} (prod {item['staging_certs_prod']})\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    Certificates from the staging ACME server chain to the "(STAGING) Let's Encrypt" root, so every browser warns. A common incident is an ingress whose issuerRef was never switched to production after testing. cert-manager may not reissue the Secret after the change, so the Secret may need deleting.
+    Measured on a real k3s: 0 → pass.
+  suggest: "Change the Certificate's issuerRef to production and trigger reissuance with kubectl delete secret <tls>."
+  verify:
+    - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ISSUER:.spec.issuerRef.name | grep -i staging"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs:
+            - "p/certificate/x"
+          staging_certs_prod:
+            - "p/certificate/x"
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs:
+            - "dev/certificate/x"
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+- id: certmanager.ingress-tls-unmanaged
+  name: Ingress TLS Secret not managed by cert-manager (nobody watches expiry), or Ingress without TLS
+  area: security
+  type: summary
+  each: certmanager.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['ingress_tls_unmanaged_prod']) > 0"
+    warn_expr: "len(item['ingress_tls_unmanaged']) > 0 or len(item['ingress_no_tls']) > 0"
+  target: "'cluster'"
+  evidence: "f\"Ingress TLS entries {item['ingress_tls']}, Secrets not managed by cert-manager {item['ingress_tls_unmanaged']} (prod {item['ingress_tls_unmanaged_prod']}), Ingresses without TLS {item['ingress_no_tls']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    Hand-placed TLS Secrets (a copied wildcard certificate, an external CA) have no expiry tracking — they break in the middle of the night a year later. When cert-manager manages them there is a Certificate object and a metric (expiration_timestamp). An Ingress without TLS is plain HTTP (ALB is the exception, since it does TLS through the certificate-arn annotation).
+    Measured on a real k3s: all 34 TLS entries managed by cert-manager, 0 Ingresses without TLS → pass.
+  suggest: "Add the cert-manager.io/cluster-issuer annotation to the Ingress so ingress-shim creates the Certificate. For external CA certificates that are not a Certificate, at least monitor expiry (blackbox exporter probe_ssl_earliest_cert_expiry)."
+  verify:
+    - "kubectl get ingress -A -o json | jq -r '.items[] | .metadata.namespace+\"/\"+.metadata.name+\" \"+((.spec.tls//[])|map(.secretName)|join(\",\"))'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged:
+            - "['p/web', 'manual-tls']"
+          ingress_tls_unmanaged_prod:
+            - "p/web"
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls:
+            - "dev/web"
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+- id: certmanager.controller-errors
+  name: cert-manager controller sync errors and ACME client errors accumulating
+  area: security
+  type: summary
+  each: certmanager.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and ((item['acme_error_ratio'] or 0) >= 0.2 and (item['acme_errors'] or 0) >= 20)"
+    warn_expr: "item['metrics_available'] and ((item['sync_errors'] or 0) >= 100 or (item['acme_errors'] or 0) > 0)"
+  target: "'cluster'"
+  evidence: "f\"sync calls since controller start {item['sync_calls']} / errors {item['sync_errors']}, ACME requests {item['acme_requests']} by status {item['acme_by_status']} (4xx/5xx {item['acme_errors']}, ratio {item['acme_error_ratio']}), Ready False metric {item['not_ready_metric']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Sync errors count how often the controller failed while reconciling some object (permissions, webhook, transient errors included), so a high number is not an outage by itself, but a steady climb means some Certificate is not progressing. ACME 4xx is rate limiting (429), bad requests (400) or account problems (403); 5xx is on the Let's Encrypt side.
+    Measured on a real k3s: 216 errors out of 1,574 syncs (13.7%), one 400 out of 49 ACME requests → warn (low). Every Certificate was Ready, so the errors were most likely past transient failures — confirm in the logs.
+  suggest: "kubectl -n cert-manager logs deploy/cert-manager --since=24h | grep -iE 'error|failed' | sort | uniq -c | sort -rn | head"
+  verify:
+    - "kubectl get --raw /api/v1/namespaces/cert-manager/pods/<controller-pod>:9402/proxy/metrics | grep -E 'certmanager_controller_sync_error_count|certmanager_http_acme_client_request_count'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 100
+          acme_errors: 30
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.3
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 0
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0
+          sync_errors: 5
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: false
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+- id: certmanager.version-old
+  name: cert-manager version is end of life
+  area: security
+  type: summary
+  each: certmanager.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['version'] is not None and (int(str(item['version']).split('.')[0]) < 1 or int(str(item['version']).split('.')[1]) < 16)"
+  target: "'cluster'"
+  evidence: "f\"cert-manager {item['version']} (components {item['components']}), webhooks with Fail {len(item['webhooks_fail'])} / webhook replicas {item['webhook_replicas']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    cert-manager supports only the two latest minors (at 1.17/1.18, 1.14 is out of support). Old versions cannot follow ACME protocol changes (Let's Encrypt ending OCSP, ARI renewal info, short-lived certificates). If the webhook has failurePolicy Fail with 1 replica, Certificate and Ingress creation is rejected while the webhook pod restarts (same structure as ESO).
+    Measured on a real k3s: 1.14.4 (2024-03) → warn.
+  suggest: "Upgrade the cert-manager Helm chart one minor at a time (including the CRD upgrade: --set crds.enabled=true or kubectl apply cert-manager.crds.yaml)."
+  verify:
+    - "kubectl -n cert-manager get deploy -o jsonpath='{range .items[*]}{.metadata.name}{\" \"}{.spec.template.spec.containers[0].image}{\"\\n\"}{end}'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.17.2"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "pass"
+        item:
+          present: true
+          version: null
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+- id: certmanager.metrics-unreadable
+  name: cert-manager controller metrics could not be read
+  area: observability
+  type: summary
+  each: certmanager.summary
+  cluster_level: true
+  rule:
+    warn_expr: "not item['metrics_available']"
+  target: "'cluster'"
+  evidence: "f\"no metrics/pod/cert-manager/ — Prometheus does not scrape certmanager_* (no ServiceMonitor) and neither the proxy nor node access could read them. {item['certificates']} Certificates were read as objects\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Without the controller's :9402, ACME response codes and sync errors are invisible. Expiry and Ready are read from objects, so those checks still work. If Prometheus scrapes it, Alertmanager rules (CertManagerCertExpirySoon) become possible too.
+  suggest: "Helm values prometheus.servicemonitor.enabled true. Otherwise node access (SSM or SSH)."
+  verify:
+    - "kubectl get --raw /api/v1/namespaces/cert-manager/pods/<controller-pod>:9402/proxy/metrics | head"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: false
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0
+      - expect: "pass"
+        item:
+          present: true
+          version: "1.14.4"
+          components:
+            controller: "1/1"
+            cainjector: "1/1"
+            webhook: "1/1"
+          components_not_ready: []
+          components_single_replica:
+            - "controller"
+            - "cainjector"
+            - "webhook"
+          certificates: 31
+          certificates_prod: 22
+          not_ready: []
+          not_ready_prod: []
+          expiring_30d: []
+          expiring_14d: []
+          expired: []
+          min_days_to_expiry: 31.0
+          renewal_overdue: []
+          issuing_stuck: []
+          staging_certs: []
+          staging_certs_prod: []
+          issuers: 3
+          issuers_not_ready: []
+          issuers_unused:
+            - "ClusterIssuer/letsencrypt-staging"
+          issuer_types:
+            acme: 2
+            selfSigned: 1
+          solvers:
+            - "http01"
+          certificaterequests: 114
+          certificaterequests_failed: []
+          certificaterequests_denied: []
+          orders: 110
+          orders_by_state:
+            valid: 110
+          orders_bad: []
+          orders_pending_old: []
+          challenges: 0
+          challenges_bad: []
+          ingress_tls: 34
+          ingress_tls_unmanaged: []
+          ingress_tls_unmanaged_prod: []
+          ingress_no_tls: []
+          webhooks_fail:
+            - "webhook.cert-manager.io"
+            - "webhook.cert-manager.io"
+          webhook_replicas: 1
+          metrics_available: true
+          acme_requests: 49
+          acme_errors: 1
+          acme_by_status:
+            200: 46
+            201: 2
+            400: 1
+          acme_error_ratio: 0.0204
+          sync_errors: 216
+          sync_calls: 1574
+          not_ready_metric: 0
+          min_days_to_expiry_metric: 31.0

@@ -1,0 +1,43 @@
+# Prometheus itself and its alerting rules (observability coverage and the observability stack)
+# http item: GET against the address of store (prometheus|alertmanager|loki|grafana). Uses the configured URL if present, otherwise a port-forward. headers come from the token in config.yaml.
+- id: rules
+  type: http
+  store: prometheus
+  path: /api/v1/rules
+  out: prometheus/rules.json
+  timeout: 60
+- id: targets
+  type: http
+  store: prometheus
+  path: /api/v1/targets?state=any
+  out: prometheus/targets.json
+  timeout: 60
+- id: runtime
+  type: http
+  store: prometheus
+  path: /api/v1/status/runtimeinfo
+  out: prometheus/runtimeinfo.json
+  timeout: 30
+# Prometheus self health. All read-only GET. config (/api/v1/status/config) is not read because scrape configs may hold credentials.
+- id: tsdb-status
+  type: http
+  store: prometheus
+  path: /api/v1/status/tsdb
+  out: prometheus/tsdb.json
+  timeout: 30
+- id: flags
+  type: http
+  store: prometheus
+  path: /api/v1/status/flags
+  out: prometheus/flags.json
+  timeout: 30
+- id: buildinfo
+  type: http
+  store: prometheus
+  path: /api/v1/status/buildinfo
+  out: prometheus/buildinfo.json
+  timeout: 30
+- id: metrics.observability
+  type: promql
+  file: metrics.yaml
+  timeout: 60

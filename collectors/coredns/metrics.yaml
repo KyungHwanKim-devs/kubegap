@@ -1,0 +1,43 @@
+# CoreDNS PromQL. Window is 1 hour. On both clusters observed, 43-44 coredns_* series were in Prometheus.
+- id: coredns_responses_by_rcode_1h
+  why: Responses in 1h by rcode. A high NXDOMAIN ratio is the noise of external names being queried first with the cluster.local suffixes because of the ndots:5 search path
+  query: sum by (rcode) (increase(coredns_dns_responses_total[1h]))
+- id: coredns_requests_by_type_1h
+  why: Requests in 1h by record type. In a cluster without IPv6, AAAA equal to A means half of the queries are wasted
+  query: sum by (type) (increase(coredns_dns_requests_total[1h]))
+- id: coredns_qps_by_pod
+  why: Queries per second per pod (5m). Concentration on one pod means UDP conntrack pinning or client cache bias
+  query: sum by (pod) (rate(coredns_dns_requests_total[5m]))
+- id: coredns_cache_hit_ratio_1h
+  why: Cache hit ratio (1h). When low, upstream round trips grow and spread into latency and SERVFAIL. Input for tuning cache TTL and autopath
+  query: sum(increase(coredns_cache_hits_total[1h])) / (sum(increase(coredns_cache_hits_total[1h])) + sum(increase(coredns_cache_misses_total[1h])))
+- id: coredns_cache_entries
+  why: Cache entries (by pod and type). Read together with the default memory limit of 170Mi
+  query: sum by (pod, type) (coredns_cache_entries)
+- id: coredns_p50_1h
+  why: Request p50 (seconds). p99 is in core. A p50 above 10ms means CoreDNS itself is slow
+  query: histogram_quantile(0.5, sum by (le) (rate(coredns_dns_request_duration_seconds_bucket[1h])))
+- id: coredns_forward_by_upstream_rcode_1h
+  why: Forwarded queries per upstream (forward target) and rcode (1h). Many NXDOMAINs sent upstream mean ndots noise leaking out; SERVFAIL means an upstream failure
+  query: sum by (to, rcode) (increase(coredns_proxy_request_duration_seconds_count{proxy_name="forward"}[1h]))
+- id: coredns_forward_p99_1h
+  why: Upstream response p99 (seconds). Tells whether a high overall CoreDNS p99 is caused by the upstream
+  query: histogram_quantile(0.99, sum by (le) (rate(coredns_proxy_request_duration_seconds_bucket{proxy_name="forward"}[1h])))
+- id: coredns_forward_healthcheck_failures_1h
+  why: Upstream health check failures (1h). Non-zero means the upstream resolver dies intermittently
+  query: sum(increase(coredns_proxy_healthcheck_failures_total[1h])) + sum(increase(coredns_forward_healthcheck_broken_total[1h]))
+- id: coredns_max_concurrent_rejects_1h
+  why: Queries rejected by the forward max_concurrent limit (1h). Non-zero means CoreDNS is overloaded
+  query: sum(increase(coredns_forward_max_concurrent_rejects_total[1h]))
+- id: coredns_panics_1h
+  why: Plugin panics (1h). Must be 0
+  query: sum(increase(coredns_panics_total[1h]))
+- id: coredns_reload_failed_1h
+  why: Corefile reload failures (1h). A bad ConfigMap edit leaves CoreDNS running on the old configuration
+  query: sum(increase(coredns_reload_failed_total[1h]))
+- id: coredns_rest_client_errors_1h
+  why: Non-2xx responses from CoreDNS → apiserver calls (1h). If the Service/EndpointSlice watch breaks, new service names stop resolving
+  query: sum by (code) (increase(coredns_kubernetes_rest_client_requests_total{code!~"2.."}[1h]))
+- id: coredns_up
+  why: Number of CoreDNS pods being scraped
+  query: count(up{job=~".*coredns.*"} == 1)

@@ -1,0 +1,2 @@
+# MetalLB collector (k3s counterpart of the ALB Controller on EKS). Enabled when the CRD ipaddresspools.metallb.io or the speaker DaemonSet is present.
+component: metallb

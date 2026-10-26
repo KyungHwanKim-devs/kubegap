@@ -1,0 +1,2 @@
+# cert-manager collector (the counterpart of ACM on EKS). Enabled when the CRD certificates.cert-manager.io exists. EKS and k3s (not installed on the EKS cluster observed → ACM is covered by eks-platform).
+component: cert-manager

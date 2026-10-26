@@ -1,0 +1,7 @@
+# CoreDNS collection. Read-only throughout.
+# Metrics are the coredns (:9153) series that kube-prometheus-stack scrapes by default (43-44 series observed on two clusters). Corefile, Deployment, pods and PDB come from the core object dump; logs from core component-logs (logs/pods/coredns/).
+# p99 and the SERVFAIL ratio are already in core metrics.yaml (traffic.coredns-latency, coredns-servfail), so only the rest is collected here.
+- id: metrics
+  type: promql
+  file: metrics.yaml
+  timeout: 30

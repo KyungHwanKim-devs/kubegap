@@ -1,0 +1,14 @@
+# Severity rules. Code only assigns severity_default as a first-pass status; the LLM decides the final severity using these rules.
+# evaluate embeds this file verbatim in findings-draft.json so the LLM reads it.
+levels: [critical, high, medium, low, info]
+rules:
+  - id: symptom-linked
+    text: Raise one level when the item is directly linked to a user-facing symptom (error rate, latency, availability). Example - missing graceful shutdown on a service that is actually returning 5xx goes high -> critical.
+  - id: recurrence
+    text: If something marked "resolved" in the previous report appears again, raise one level and mark it "recurrence". Same namespace, same check and a similar name suggests a resource rename; do not treat that as a recurrence.
+  - id: critical-absences
+    text: These four absences are critical regardless of profile - no SLO defined, no symptom alerts, no backup tool, N+1 not met.
+  - id: profile-context
+    text: Fit the profile context. "No multi-AZ spread" on a 2-node cluster is info at most.
+  - id: explain-override
+    text: When the LLM overturns the first-pass status (changes severity by two or more levels, or turns a fail into a pass), it writes the reason next to that item in the report.

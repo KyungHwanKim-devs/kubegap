@@ -1,0 +1,2 @@
+# External Secrets Operator collector. Enabled when the detected component external-secrets (external-secrets Deployment or the ExternalSecret CRD) is present. EKS and k3s.
+component: external-secrets

@@ -1,0 +1,2 @@
+# EKS platform collector. Enabled only when the detected platform is eks. Disabled on k3s.
+platform: eks

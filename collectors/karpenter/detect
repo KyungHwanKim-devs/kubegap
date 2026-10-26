@@ -1,0 +1,2 @@
+# Karpenter collector. Enabled when the detected component karpenter (NodePool/NodeClaim CRD or karpenter Deployment) is present. EKS only (disabled on Cluster Autoscaler clusters).
+component: karpenter

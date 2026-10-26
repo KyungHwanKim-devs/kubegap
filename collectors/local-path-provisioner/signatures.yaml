@@ -1,0 +1,2 @@
+# local-path-provisioner log signatures. "failed to provision" and "helper pod" in the provisioner log (kube-system/local-path-provisioner) are covered by the core event summary (ProvisioningFailed).
+[]

@@ -1,0 +1,911 @@
+# flannel checks. summary.flannel — lib/flannelctl.py (node data from the flannel section of the k3s-platform node script, counters from node-exporter). The first three were moved from k3s-platform with their ids unchanged (history.csv continuity).
+- id: traffic.flannel-mtu-mismatch
+  name: flannel vxlan MTU is not the underlay interface MTU − 50
+  area: traffic
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: flannel.nodes
+  profiles: [lab]
+  rule:
+    expr: "item.get('flannel') is not None and item['flannel'].get('mtu_ok') is False"
+  target: "item['node']"
+  evidence: "f\"flannel.1 mtu {item['flannel'].get('mtu')}, underlay {item['flannel'].get('underlay_dev')} mtu {item['flannel'].get('underlay_mtu')}\""
+  severity_default: medium
+  symptom_linked: true
+  why: Without subtracting the 50-byte vxlan header, large packets are fragmented or dropped, so small requests work while only large responses stall.
+  suggest: Check the underlay interface MTU and align the flannel configuration (--flannel-iface).
+  verify:
+    - "ip -d link show flannel.1 | grep mtu; ping -M do -s 1400 <pod IP on another node>"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1500
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: false
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel: null
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+- id: traffic.flannel-errors
+  name: flannel.1 interface errors and drops
+  area: traffic
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: flannel.nodes
+  profiles: [lab]
+  rule:
+    expr: "item.get('flannel') is not None and ((item['flannel'].get('rx_errors') or 0) + (item['flannel'].get('tx_errors') or 0)) > 0"
+    warn_expr: "item.get('flannel') is not None and ((item['flannel'].get('rx_dropped') or 0) + (item['flannel'].get('tx_dropped') or 0)) > 1000"
+  target: "item['node']"
+  evidence: "f\"flannel.1 rx errors {item['flannel'].get('rx_errors')} dropped {item['flannel'].get('rx_dropped')}, tx errors {item['flannel'].get('tx_errors')} dropped {item['flannel'].get('tx_dropped')} (cumulative since boot)\""
+  severity_default: medium
+  symptom_linked: true
+  why: Errors on the overlay interface signal that pod-to-pod traffic between nodes is silently breaking. A few drops are normal (right after boot); thousands point at the underlay network or MTU.
+  suggest: Compare with the errors on the underlay interface (br0, eth0) and check MTU, switch and cabling.
+  verify:
+    - "ip -s link show flannel.1"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 3
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "warn"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 5000
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+      - expect: "pass"
+        item:
+          node: "node-b"
+          role: "server"
+          collected: true
+          version: "v1.33.5+k3s1"
+          args: []
+          disable: []
+          tls_san: []
+          node_ip: "192.0.2.102"
+          server_url: null
+          pod_cidr: "10.42.0.0/24"
+          unit:
+            restarts: 0
+            since: "x"
+          check_config:
+            missing: []
+            status: "pass"
+          ports: []
+          apiserver_bind: []
+          etcd_bind: []
+          flannel:
+            mtu: 1450
+            underlay_mtu: 1500
+            underlay_dev: "eth0"
+            mtu_ok: true
+            rx_errors: 0
+            tx_errors: 0
+            rx_dropped: 0
+            tx_dropped: 0
+          journald:
+            disk_mb: 100
+            conf: ""
+            bounded: true
+            k3s_lines_24h: 100
+          server:
+            secrets_encryption: "Enabled"
+            db_kind: "etcd"
+            db_mb: 500
+            etcd_snapshots:
+              - name: "s1"
+                size_mb: 30
+                created: "x"
+                age_h: 4.0
+                offsite: false
+            snapshot_latest_age_h: 4.0
+            snapshot_interval_h: 12.0
+            snapshots_offsite: true
+            certificates: []
+            certificates_min_days_left: 300
+            certificates_expiring_90d: []
+          registries:
+            mirrors: []
+            auth_configs: []
+          containerd: {}
+          local_path:
+            total_mb: 0
+            volumes: []
+          disks:
+            devices:
+              - "sda 500G"
+            smart: []
+          smartctl: true
+          thermal_c:
+            x86_pkg_temp: 45.0
+          thermal_max_c: 45.0
+          gaps: []
+- id: traffic.podcidr-near-full
+  name: Node pod CIDR nearly full
+  area: traffic
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: flannel.podcidr
+  profiles: [lab]
+  rule:
+    expr: "(item.get('ratio') or 0) >= 0.8"
+    warn_expr: "(item.get('ratio') or 0) >= 0.6"
+  target: "item['node']"
+  evidence: "f\"podCIDR {item['cidr']}: {item['pods']} pods of {item['usable']} usable ({item['ratio']})\""
+  severity_default: medium
+  symptom_linked: true
+  why: flannel gives every node a /24 (254 addresses). That is more than kubelet maxPods 110, so it normally does not fill up, but if maxPods was raised or the CIDR was made narrow, IPs run out first and pods stall in ContainerCreating. The EKS equivalent is remaining subnet IPs.
+  suggest: "Widening --cluster-cidr is a reinstall. Reduce the pod count or add nodes."
+  verify:
+    - "kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'; kubectl get pods -A -o wide --field-selector spec.nodeName=<node> | wc -l"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          node: "node-b"
+          cidr: "10.42.0.0/24"
+          usable: 253
+          pods: 210
+          ratio: 0.83
+      - expect: "warn"
+        item:
+          node: "node-b"
+          cidr: "10.42.0.0/24"
+          usable: 253
+          pods: 160
+          ratio: 0.63
+      - expect: "pass"
+        item:
+          node: "node-b"
+          cidr: "10.42.0.0/24"
+          usable: 253
+          pods: 40
+          ratio: 0.16
+- id: traffic.flannel-sysctl-off
+  name: ip_forward or bridge-nf-call-iptables disabled on a flannel node (same-node Service traffic breaks)
+  area: traffic
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: flannel.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['sysctl_off']) > 0"
+  target: "'cluster'"
+  evidence: "f\"nodes where the sysctl is not 1 {item['sysctl_off']} (nodes with data {item['nodes_with_data']}), backend {item['backend']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    flannel connects pods across nodes with vxlan (flannel.1) and within a node with a Linux bridge (cni0). With net.ipv4.ip_forward=0 all pod traffic leaving the node stops; with net.bridge.bridge-nf-call-iptables=0 traffic between two pods on the same node bypasses iptables (kube-proxy Service rules, NetworkPolicy), producing the intermittent failure "works to a pod on another node, fails on the same node". It happens when sysctl.d is lost after a reboot.
+    Measured on a real k3s: 1 on both nodes → pass.
+  suggest: "sysctl -w net.ipv4.ip_forward=1 net.bridge.bridge-nf-call-iptables=1 and persist in /etc/sysctl.d/99-kubernetes.conf (br_netfilter module in /etc/modules-load.d). k3s sets these at startup, but other tools can revert them."
+  verify:
+    - "sysctl net.ipv4.ip_forward net.bridge.bridge-nf-call-iptables"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          backend: "vxlan"
+          nodes: 2
+          nodes_with_data:
+            - "node-a"
+            - "node-b"
+          nodes_missing_data: []
+          mtu_mismatch: []
+          mtu:
+            node-a: 1450
+            node-b: 1450
+          sysctl_off:
+            - "node-b"
+          if_down:
+            - "node-a"
+            - "node-b"
+          errors_1d_total: 0
+          drops_1d_total: 0
+          drops_1d_by_node: {}
+          errors_boot_total: 0
+          drops_boot_total: 12
+          node_subnets:
+            - "192.0.2.0/24"
+          cross_subnet: false
+          overlay_gib_1d:
+            node-a: 80.08
+            node-b: 80.42
+          podcidr_max_ratio: 0.193
+          podcidr_nodes: 2
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          backend: "vxlan"
+          nodes: 2
+          nodes_with_data:
+            - "node-a"
+            - "node-b"
+          nodes_missing_data: []
+          mtu_mismatch: []
+          mtu:
+            node-a: 1450
+            node-b: 1450
+          sysctl_off: []
+          if_down:
+            - "node-a"
+            - "node-b"
+          errors_1d_total: 0
+          drops_1d_total: 0
+          drops_1d_by_node: {}
+          errors_boot_total: 0
+          drops_boot_total: 12
+          node_subnets:
+            - "192.0.2.0/24"
+          cross_subnet: false
+          overlay_gib_1d:
+            node-a: 80.08
+            node-b: 80.42
+          podcidr_max_ratio: 0.193
+          podcidr_nodes: 2
+          metrics_available: true
+- id: traffic.flannel-vxlan-cross-subnet
+  name: Nodes in different subnets connected over flannel vxlan (unencrypted)
+  area: security
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: flannel.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['backend'] == 'vxlan' and item['cross_subnet']"
+  target: "'cluster'"
+  evidence: "f\"node underlay IP subnets {item['node_subnets']}, backend {item['backend']}, overlay traffic in 24h (GiB) {item['overlay_gib_1d']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    vxlan only encapsulates; it does not encrypt. When the nodes share one L2 switch (the same /24) the LAN trust model is enough, but across subnets, a VPN (Tailscale) or a public network, pod-to-pod traffic (DB passwords and tokens included) travels in plain text. k3s turns on node-to-node encryption with a single `--flannel-backend=wireguard-native`.
+    Measured on a real k3s: both nodes in one private /24 subnet → pass (Tailscale was for node access, not the flannel underlay).
+  suggest: "If nodes span subnets, use the k3s server argument --flannel-backend=wireguard-native (all nodes must restart) or run the flannel underlay over a node-to-node VPN."
+  verify:
+    - "kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{\" \"}{.metadata.annotations.flannel\\.alpha\\.coreos\\.com/backend-type}{\" \"}{.metadata.annotations.flannel\\.alpha\\.coreos\\.com/public-ip}{\"\\n\"}{end}'"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          backend: "vxlan"
+          nodes: 2
+          nodes_with_data:
+            - "node-a"
+            - "node-b"
+          nodes_missing_data: []
+          mtu_mismatch: []
+          mtu:
+            node-a: 1450
+            node-b: 1450
+          sysctl_off: []
+          if_down:
+            - "node-a"
+            - "node-b"
+          errors_1d_total: 0
+          drops_1d_total: 0
+          drops_1d_by_node: {}
+          errors_boot_total: 0
+          drops_boot_total: 12
+          node_subnets:
+            - "192.0.2.0/24"
+            - "10.0.0.0/24"
+          cross_subnet: true
+          overlay_gib_1d:
+            node-a: 80.08
+            node-b: 80.42
+          podcidr_max_ratio: 0.193
+          podcidr_nodes: 2
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          backend: "vxlan"
+          nodes: 2
+          nodes_with_data:
+            - "node-a"
+            - "node-b"
+          nodes_missing_data: []
+          mtu_mismatch: []
+          mtu:
+            node-a: 1450
+            node-b: 1450
+          sysctl_off: []
+          if_down:
+            - "node-a"
+            - "node-b"
+          errors_1d_total: 0
+          drops_1d_total: 0
+          drops_1d_by_node: {}
+          errors_boot_total: 0
+          drops_boot_total: 12
+          node_subnets:
+            - "192.0.2.0/24"
+          cross_subnet: false
+          overlay_gib_1d:
+            node-a: 80.08
+            node-b: 80.42
+          podcidr_max_ratio: 0.193
+          podcidr_nodes: 2
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          backend: "wireguard-native"
+          nodes: 2
+          nodes_with_data:
+            - "node-a"
+            - "node-b"
+          nodes_missing_data: []
+          mtu_mismatch: []
+          mtu:
+            node-a: 1450
+            node-b: 1450
+          sysctl_off: []
+          if_down:
+            - "node-a"
+            - "node-b"
+          errors_1d_total: 0
+          drops_1d_total: 0
+          drops_1d_by_node: {}
+          errors_boot_total: 0
+          drops_boot_total: 12
+          node_subnets:
+            - "192.0.2.0/24"
+          cross_subnet: true
+          overlay_gib_1d:
+            node-a: 80.08
+            node-b: 80.42
+          podcidr_max_ratio: 0.193
+          podcidr_nodes: 2
+          metrics_available: true
+- id: traffic.flannel-drops-growing
+  name: Errors and drops on flannel.1/cni0 increasing over 24 hours
+  area: traffic
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: flannel.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and (item['errors_1d_total'] or 0) > 0"
+    warn_expr: "item['metrics_available'] and (item['drops_1d_total'] or 0) >= 100"
+  target: "'cluster'"
+  evidence: "f\"errors in 24h {item['errors_1d_total']} / drops {item['drops_1d_total']} (by node and device {item['drops_1d_by_node']}), cumulative since boot errors {item['errors_boot_total']} / drops {item['drops_boot_total']}, overlay traffic (GiB/day) {item['overlay_gib_1d']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    The node script counters are cumulative since boot, so they cannot separate "old" from "now" (traffic.flannel-errors). If node-exporter's 24-hour increase is non-zero, overlay packets are being corrupted or dropped right now — causes are MTU mismatch (only large packets fail), the underlay NIC driver or conntrack saturation, and the symptoms are intermittent timeouts and slow DB queries. vxlan devices report operstate UNKNOWN, so node_network_up reads 0 and is not used.
+    Measured on a real k3s: 0 errors and 0 drops in 24h (12 cumulative drops), overlay traffic about 80GiB/day per node — the volume of pods crossing nodes to reach Elasticsearch and databases.
+  suggest: "Run ip -s link show flannel.1 twice 10 minutes apart to see which direction, and check MTU with ping -M do -s 1400 <pod IP on another node>. Together with ethtool -S errors on the underlay NIC."
+  verify:
+    - "curl -s localhost:9090/api/v1/query --data-urlencode 'query=increase(node_network_transmit_drop_total{device=\"flannel.1\"}[1d])'"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          backend: "vxlan"
+          nodes: 2
+          nodes_with_data:
+            - "node-a"
+            - "node-b"
+          nodes_missing_data: []
+          mtu_mismatch: []
+          mtu:
+            node-a: 1450
+            node-b: 1450
+          sysctl_off: []
+          if_down:
+            - "node-a"
+            - "node-b"
+          errors_1d_total: 3
+          drops_1d_total: 0
+          drops_1d_by_node: {}
+          errors_boot_total: 0
+          drops_boot_total: 12
+          node_subnets:
+            - "192.0.2.0/24"
+          cross_subnet: false
+          overlay_gib_1d:
+            node-a: 80.08
+            node-b: 80.42
+          podcidr_max_ratio: 0.193
+          podcidr_nodes: 2
+          metrics_available: true
+      - expect: "warn"
+        item:
+          present: true
+          backend: "vxlan"
+          nodes: 2
+          nodes_with_data:
+            - "node-a"
+            - "node-b"
+          nodes_missing_data: []
+          mtu_mismatch: []
+          mtu:
+            node-a: 1450
+            node-b: 1450
+          sysctl_off: []
+          if_down:
+            - "node-a"
+            - "node-b"
+          errors_1d_total: 0
+          drops_1d_total: 250
+          drops_1d_by_node:
+            node-a:
+              flannel.1: 250
+          errors_boot_total: 0
+          drops_boot_total: 12
+          node_subnets:
+            - "192.0.2.0/24"
+          cross_subnet: false
+          overlay_gib_1d:
+            node-a: 80.08
+            node-b: 80.42
+          podcidr_max_ratio: 0.193
+          podcidr_nodes: 2
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          backend: "vxlan"
+          nodes: 2
+          nodes_with_data:
+            - "node-a"
+            - "node-b"
+          nodes_missing_data: []
+          mtu_mismatch: []
+          mtu:
+            node-a: 1450
+            node-b: 1450
+          sysctl_off: []
+          if_down:
+            - "node-a"
+            - "node-b"
+          errors_1d_total: 0
+          drops_1d_total: 0
+          drops_1d_by_node: {}
+          errors_boot_total: 0
+          drops_boot_total: 12
+          node_subnets:
+            - "192.0.2.0/24"
+          cross_subnet: false
+          overlay_gib_1d:
+            node-a: 80.08
+            node-b: 80.42
+          podcidr_max_ratio: 0.193
+          podcidr_nodes: 2
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          backend: "vxlan"
+          nodes: 2
+          nodes_with_data:
+            - "node-a"
+            - "node-b"
+          nodes_missing_data: []
+          mtu_mismatch: []
+          mtu:
+            node-a: 1450
+            node-b: 1450
+          sysctl_off: []
+          if_down:
+            - "node-a"
+            - "node-b"
+          errors_1d_total: 0
+          drops_1d_total: 0
+          drops_1d_by_node: {}
+          errors_boot_total: 0
+          drops_boot_total: 12
+          node_subnets:
+            - "192.0.2.0/24"
+          cross_subnet: false
+          overlay_gib_1d:
+            node-a: 80.08
+            node-b: 80.42
+          podcidr_max_ratio: 0.193
+          podcidr_nodes: 2
+          metrics_available: false
+- id: traffic.flannel-node-data-missing
+  name: Some nodes' flannel data could not be read
+  area: traffic
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: flannel.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['nodes_missing_data']) > 0 or (item['nodes'] or 0) > len(item['nodes_with_data'])"
+  target: "'cluster'"
+  evidence: "f\"nodes {item['nodes']}, nodes with the flannel section read {item['nodes_with_data']}, nodes not read {item['nodes_missing_data']}, node-exporter metrics {item['metrics_available']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Nodes without node access (SSH) or without a flannel.1 device cannot report MTU, errors or sysctl. The missing device itself (k3s running another backend, or flannel dead) can be a finding.
+  suggest: "ssh <node> ip -d link show flannel.1. If absent, journalctl -u k3s | grep -i flannel."
+  verify:
+    - "ssh <node> ip -d link show flannel.1"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          backend: "vxlan"
+          nodes: 2
+          nodes_with_data:
+            - "node-a"
+          nodes_missing_data:
+            - "node-b"
+          mtu_mismatch: []
+          mtu:
+            node-a: 1450
+            node-b: 1450
+          sysctl_off: []
+          if_down:
+            - "node-a"
+            - "node-b"
+          errors_1d_total: 0
+          drops_1d_total: 0
+          drops_1d_by_node: {}
+          errors_boot_total: 0
+          drops_boot_total: 12
+          node_subnets:
+            - "192.0.2.0/24"
+          cross_subnet: false
+          overlay_gib_1d:
+            node-a: 80.08
+            node-b: 80.42
+          podcidr_max_ratio: 0.193
+          podcidr_nodes: 2
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          backend: "vxlan"
+          nodes: 2
+          nodes_with_data:
+            - "node-a"
+            - "node-b"
+          nodes_missing_data: []
+          mtu_mismatch: []
+          mtu:
+            node-a: 1450
+            node-b: 1450
+          sysctl_off: []
+          if_down:
+            - "node-a"
+            - "node-b"
+          errors_1d_total: 0
+          drops_1d_total: 0
+          drops_1d_by_node: {}
+          errors_boot_total: 0
+          drops_boot_total: 12
+          node_subnets:
+            - "192.0.2.0/24"
+          cross_subnet: false
+          overlay_gib_1d:
+            node-a: 80.08
+            node-b: 80.42
+          podcidr_max_ratio: 0.193
+          podcidr_nodes: 2
+          metrics_available: true

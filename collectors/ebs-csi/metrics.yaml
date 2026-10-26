@@ -1,0 +1,22 @@
+# EBS CSI PromQL. Window is 24 hours — attach and stage only happen on node replacement and deploys, so 1 hour is usually empty.
+- id: ebscsi_controller_metrics_series
+  why: Number of controller (ebs-plugin) metric series. 0 means the add-on controller.enableMetrics is off and EC2 API errors, throttling and latency are invisible
+  query: count({__name__=~"aws_ebs_csi_.*"})
+- id: ebscsi_api_errors_24h
+  why: Errors of EC2 API calls made by the controller (24h, when metrics are enabled)
+  query: sum by (request) (increase(aws_ebs_csi_api_request_errors_total[24h]))
+- id: ebscsi_api_throttles_24h
+  why: EC2 API throttles (24h, when metrics are enabled)
+  query: sum(increase(aws_ebs_csi_api_request_throttles_total[24h]))
+- id: ebscsi_node_ops_by_status_24h
+  why: gRPC calls kubelet sent to the EBS CSI node plugin (Stage, Publish, Unstage, VolumeStats...) by method and result code (24h). Any non-OK code means a mount or attach failure
+  query: sum by (method_name, grpc_status_code) (increase(csi_operations_seconds_count{driver_name="ebs.csi.aws.com"}[24h]))
+- id: ebscsi_node_ops_p99_24h
+  why: p99 seconds per method (24h). NodeStageVolume above 30s means attach→mount is slow and StatefulSet recovery is delayed
+  query: histogram_quantile(0.99, sum by (method_name, le) (rate(csi_operations_seconds_bucket{driver_name="ebs.csi.aws.com"}[24h])))
+- id: ebscsi_storage_ops_by_status_24h
+  why: kubelet volume operations (mount, unmount, attach confirmation) by status (24h, CSI plugin). fail-unknown means a pod was stuck in ContainerCreating
+  query: sum by (operation_name, status) (increase(storage_operation_duration_seconds_count{volume_plugin=~"kubernetes.io/csi.*"}[24h]))
+- id: ebscsi_storage_ops_p99_24h
+  why: kubelet volume operation p99 seconds (24h)
+  query: histogram_quantile(0.99, sum by (operation_name, le) (rate(storage_operation_duration_seconds_bucket{volume_plugin=~"kubernetes.io/csi.*"}[24h])))

@@ -1,0 +1,4250 @@
+# Argo CD checks. summary.argocdctl.summary — lib/argocdctl.py. The Application Sync/Health list is also in the core hygiene section (argocd_apps). Git credentials and Secret values are never read.
+- id: argocd.app-out-of-sync-or-unhealthy
+  name: Application is OutOfSync or not Healthy (Git and the cluster differ)
+  area: hygiene
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['out_of_sync_prod']) + len(item['unhealthy_prod']) > 0 or len(item['degraded']) > 0"
+    warn_expr: "len(item['out_of_sync']) + len(item['unhealthy']) + len(item['apps_with_conditions']) > 0"
+  target: "'cluster'"
+  evidence: "f\"Applications {item['applications']} (prod {item['applications_prod']}), OutOfSync {item['out_of_sync']} (prod {item['out_of_sync_prod']}), Degraded/Missing/Unknown {item['unhealthy']} (prod {item['unhealthy_prod']}), Progressing (rolling out, not abnormal) {item['progressing']}, apps with conditions {item['conditions']}: {item['apps_with_conditions']}, last operation failed {item['last_op_failed']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    In GitOps, OutOfSync means "Git is not the truth" — someone changed things with kubectl (drift), auto-sync is off, or the sync failed. Degraded means the deployed workload is not ready, and conditions (ComparisonError, SyncError, ExcludedResourceWarning) signal that the comparison itself failed or some resources were left out.
+    Sync/Health is also in the argocd_apps list of the core hygiene section. This check separates prod from non-prod and bundles conditions and the last operation result. Progressing (rollout in progress) and Suspended are not counted as abnormal.
+    Measured on real clusters: EKS had all 12 Synced/Healthy; the small k3s cluster had the root App-of-Apps OutOfSync, one app Progressing and one with ExcludedResourceWarning (a resource matched by resource.exclusions present in the manifests) → warn.
+  suggest: "Use argocd app diff <app> to see the difference, then fix Git (or add ignoreDifferences if the drift is intended) and sync. For Degraded, read that workload's events and logs. For conditions, follow the CONDITIONS message in argocd app get <app>."
+  verify:
+    - "kubectl get applications.argoproj.io -A -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,COND:.status.conditions[*].type"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync:
+            - "argocd/application/x-prod"
+          out_of_sync_prod:
+            - "argocd/application/x-prod"
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy:
+            - "argocd/application/y(Degraded)"
+          unhealthy_prod: []
+          progressing: []
+          degraded:
+            - "argocd/application/y"
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync:
+            - "argocd/application/root"
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing:
+            - "argocd/application/dam"
+          degraded: []
+          last_op_failed: []
+          conditions:
+            - "ExcludedResourceWarning"
+          apps_with_conditions:
+            - "argocd/application/app-p"
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing:
+            - "argocd/application/dam"
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.sync-failures
+  name: Sync failures accumulating (sync Failed/Error)
+  area: hygiene
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and (item['sync_failure_ratio'] or 0) >= 0.05 and (item['sync_failed'] or 0) >= 20"
+    warn_expr: "(item['metrics_available'] and ((item['sync_failed'] or 0) >= 20 or (item['sync_failure_ratio'] or 0) >= 0.01)) or len(item['last_op_failed']) > 0"  # 10 of 1,304 (0.8%) is noise — warn from 20 failures or 1%
+  target: "'cluster'"
+  evidence: "f\"syncs since controller start {item['sync_total']}, failed {item['sync_failed']} (ratio {item['sync_failure_ratio']}), apps whose last operation failed {item['last_op_failed']}, k8s API 4xx {item['k8s_api_4xx']} / 5xx+429 {item['k8s_api_errors']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    An app with auto-sync retries after a failure — if the same manifest error (validating webhook rejection, missing CRD, immutable field) fails every few minutes, that app's deployments have effectively stopped and only argocd_app_sync_total{phase="Failed"} keeps climbing.
+    Prometheus does not scrape these metrics (no ServiceMonitor), so the controller's :8082 is read from inside a node. Measured on a real EKS cluster: Failed 9 and Error 1 out of 1,304 (0.77%).
+  suggest: "Use argocd app history <app> and operationState.message to find the failure cause. For repeated failures, fix the manifest or review syncOptions (Replace=true, ServerSideApply=true)."
+  verify:
+    - "kubectl get applications.argoproj.io -A -o json | jq -r '.items[] | select(.status.operationState.phase!=\"Succeeded\") | .metadata.name+\" \"+.status.operationState.phase+\" \"+(.status.operationState.message//\"\")'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 80
+          sync_total: 1000
+          sync_failure_ratio: 0.08
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 25
+          sync_total: 1304
+          sync_failure_ratio: 0.019
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed:
+            - "argocd/application/x(Failed)"
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: false
+          sync_failed: 0
+          sync_total: 0
+          sync_failure_ratio: null
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 0
+          sync_total: 1304
+          sync_failure_ratio: 0.0
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.prod-sync-policy
+  name: prod Application has auto-sync or selfHeal disabled
+  area: hygiene
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['prod_not_automated']) + len(item['prod_no_self_heal']) > 0"
+  target: "'cluster'"
+  evidence: "f\"prod apps {item['applications_prod']}, auto-sync disabled {item['prod_not_automated']}, automated but selfHeal disabled {item['prod_no_self_heal']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    A prod app without auto-sync is deployed only when a human clicks Sync even after merging to Git — this may be an intentional approval step, but it is why OutOfSync lingers. With selfHeal off, Argo CD does not revert direct changes to the cluster (drift) and only shows OutOfSync.
+    Neither is "wrong"; both mean "confirm the policy". Measured on real clusters: all prod apps on both EKS and the small k3s cluster had automated+prune+selfHeal.
+  suggest: "If manual approval is intended, leave it and note it in the report. Otherwise set syncPolicy.automated: {prune: true, selfHeal: true}."
+  verify:
+    - "kubectl get applications.argoproj.io -A -o custom-columns=NAME:.metadata.name,NS:.spec.destination.namespace,AUTO:.spec.syncPolicy.automated.selfHeal,PRUNE:.spec.syncPolicy.automated.prune"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated:
+            - "argocd/application/x-prod"
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal:
+            - "argocd/application/x-prod"
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.prune-manages-namespace-or-crd
+  name: Application with prune enabled manages a Namespace or CRD (removed from Git = deleted wholesale)
+  area: resilience
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['prune_with_namespace_or_crd']) > 0 and item['applications_prod'] > 0"
+    warn_expr: "len(item['prune_with_namespace_or_crd']) > 0"
+  target: "'cluster'"
+  evidence: "f\"apps with prune enabled that manage a Namespace or CRD as a resource {item['prune_with_namespace_or_crd']} (namespaces created by the CreateNamespace option are not managed resources and are not counted here)\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    prune: true means "resources that disappear from Git are deleted from the cluster too". If a Namespace is among the managed resources, the moment its manifest leaves Git (directory move, rename, ApplicationSet generator change) Argo CD deletes the Namespace and everything inside it, PVCs included. The same applies to CRDs — deleting a CRD deletes all of its CRs.
+    The Skyscanner 2021 incident had this shape (ApplicationSet generator change → apps removed → prune deleted everything). Measured on a real k3s: 7 apps managed a Namespace as a resource. The EKS cluster used CreateNamespace=true and did not manage Namespaces.
+  suggest: "Annotate Namespaces with argocd.argoproj.io/sync-options: Prune=false, or create namespaces via syncOptions CreateNamespace=true and remove them from the manifests. Move CRDs into a separate Application with prune off. Also review the Application finalizer in Argo CD 2.6+ and preservedResourcesOnDeletion on ApplicationSets."
+  verify:
+    - "kubectl get applications.argoproj.io -A -o json | jq -r '.items[] | select(.spec.syncPolicy.automated.prune==true) | .metadata.name as $n | .status.resources[]? | select(.kind==\"Namespace\" or .kind==\"CustomResourceDefinition\") | $n+\" \"+.kind+\"/\"+.name'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 10
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd:
+            - "argocd/application/app-m-prod"
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 0
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd:
+            - "argocd/application/dev-x"
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.default-project-wildcard
+  name: Application bound to the unbounded default AppProject (any repository, any destination)
+  area: security
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    expr: "'default' in item['wildcard_projects'] and item['default_project_apps'] > 0 and item['applications_prod'] > 0 and item['projects'] == 1"
+    warn_expr: "len(item['wildcard_projects']) > 0 and item['default_project_apps'] > 0"
+  target: "'cluster'"
+  evidence: "f\"AppProjects {item['projects']}, projects whose sourceRepos and destinations are all * {item['wildcard_projects']}, apps bound to the default project {item['default_project_apps']}/{item['applications']} (prod {item['applications_prod']})\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    An AppProject is the boundary of "which repositories this app may deploy from, into which namespaces and clusters". The default project is all *, so anyone who can edit an Application manifest (or has write access to the repository) can deploy any manifest from any repository anywhere, kube-system included — the Argo CD controller is cluster-admin.
+    With a single project there is also no team or environment (prod/dev) boundary. Measured on real clusters: EKS had all 12 apps in the single default project; the small k3s cluster had default plus one team project (4 apps in default).
+  suggest: "Create an AppProject per environment and team, narrow sourceRepos (organization repositories only), destinations (that environment's namespaces only) and clusterResourceWhitelist, then move the apps. Leave the default project empty."
+  verify:
+    - "kubectl get appprojects.argoproj.io -n argocd -o custom-columns=NAME:.metadata.name,REPOS:.spec.sourceRepos,DEST:.spec.destinations"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 2
+          default_project_apps: 4
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 0
+          wildcard_projects: []
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 3
+          default_project_apps: 0
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.admin-account-no-sso
+  name: Only the built-in admin account is used; no SSO or RBAC policy
+  area: security
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    expr: "item['anonymous_enabled'] or ('role:admin' in str(item['rbac_policy_default']))"
+    warn_expr: "(item['admin_enabled'] and not item['sso_configured']) or item['exec_enabled']"
+  target: "'cluster'"
+  evidence: "f\"admin.enabled {item['admin_enabled']}, SSO (dex/oidc) {item['sso_configured']}, anonymous {item['anonymous_enabled']}, RBAC policy.default '{item['rbac_policy_default']}' / policy.csv {item['rbac_policy_csv_lines']} lines, exec.enabled {item['exec_enabled']}, URL {item['url']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    The Argo CD admin is a cluster-admin-grade account that handles every project, app and cluster credential, shared through a single password — the audit log does not say who did what, and it cannot be revoked when someone leaves. The official recommendation is to attach SSO and disable admin. If policy.default is role:admin or anonymous access is on, anyone who logs in (or does not) has full power.
+    exec.enabled opens pod shells from the web UI, so when it is on Argo CD is effectively a shell gateway. Measured on real clusters: both EKS and the small k3s cluster had admin only, no SSO, no policy.csv, exec off. The EKS server gRPC had 945 PermissionDenied responses accumulated (RBAC rejections — someone keeps making calls without permission).
+  suggest: "Attach SSO (Google Workspace, GitHub, Okta) via dex or oidc.config, split roles with policy.csv, then set admin.enabled: 'false' in argocd-cm. Leave policy.default empty or role:readonly."
+  verify:
+    - "kubectl -n argocd get cm argocd-cm -o jsonpath='{.data.admin\\.enabled}{\"\\n\"}{.data.dex\\.config}{.data.oidc\\.config}'"
+    - "kubectl -n argocd get cm argocd-rbac-cm -o yaml"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: true
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: "role:admin"
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: false
+          sso_configured: true
+          exec_enabled: true
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: false
+          sso_configured: true
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.ingress-no-tls
+  name: Argo CD server exposed without TLS (no ingress TLS, or server.insecure)
+  area: security
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    expr: "item['ingress_tls'] is False"
+    warn_expr: "item['server_insecure'] and item['ingress_tls'] is None"
+  target: "'cluster'"
+  evidence: "f\"ingress hosts {item['ingress_hosts']}, ingress TLS {item['ingress_tls']}, server.insecure {item['server_insecure']}, url {item['url']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    If the Argo CD login (admin password, SSO token) and API tokens travel in plain text, interception means full cluster control immediately. server.insecure by itself is a common setup where TLS terminates at the ingress, so it is fine when the ingress has TLS; without an ingress (port-forward, NodePort) it needs checking.
+    Measured on real clusters: EKS used an ALB on 443 (certificate ARN), the small k3s cluster used Ingress TLS. Both pass.
+  suggest: "Add Ingress spec.tls or ALB certificate-arn + listen-ports 443 and redirect 80→443. Keep server.insecure only when the ingress has TLS."
+  verify:
+    - "kubectl -n argocd get ingress -o yaml | grep -A3 'tls:\\|certificate-arn\\|listen-ports'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: false
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: true
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts: []
+          ingress_tls: null
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: null
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.components-not-ha
+  name: Argo CD component not ready or running a single replica
+  area: resilience
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['components_not_ready']) > 0"
+    warn_expr: "len(item['components_single_replica']) > 0 and item['applications_prod'] >= 5"
+  target: "'cluster'"
+  evidence: "f\"components (ready/replicas) {item['components']}, not ready {item['components_not_ready']}, single replica (server, repo-server) {item['components_single_replica']}, version {item['version']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    If application-controller dies, deployments stop (and so does drift recovery); if repo-server dies, manifests cannot be rendered and every app becomes Unknown; if server dies, the UI, CLI and webhooks are cut off. On a single-node small k3s cluster more replicas are pointless, so this warns only with 5 or more prod apps.
+    The official Argo CD HA manifests use server 2, repo-server 2 and redis-ha 3 (the controller is sharded). Measured on real clusters: every component ran 1 replica on both EKS and the small k3s cluster.
+  suggest: "Use the HA manifests (install/ha) or Helm values server.replicas 2, repoServer.replicas 2, redis-ha.enabled true, and add PDBs. On a small k3s cluster leave it and note it in the report."
+  verify:
+    - "kubectl -n argocd get deploy,sts -o custom-columns=NAME:.metadata.name,READY:.status.readyReplicas,REPLICAS:.spec.replicas"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready:
+            - "repo-server"
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica: []
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 2
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.prod-tracks-moving-ref
+  name: prod Application tracks a branch (main/HEAD) (every push deploys immediately)
+  area: hygiene
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['prod_tracking_moving_ref']) > 0 and len(item['prod_tracking_moving_ref']) >= item['applications_prod']"
+  target: "'cluster'"
+  evidence: "f\"prod apps {item['applications_prod']}, apps whose targetRevision is a branch or HEAD {len(item['prod_tracking_moving_ref'])} {item['prod_tracking_moving_ref'][:8]}, apps using ignoreDifferences {item['ignore_differences_apps']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    targetRevision: main means "merged to main → in prod within 3 minutes". It is the most common GitOps setup and not a defect by itself, but without repository protection rules (required review, passing CI) write access to the repository is prod deploy access. Tags or pinned commits make promotion (dev→prod) explicit.
+    This check warns only when every prod app tracks a branch, and the severity is low — the report should read "confirm the repository has branch protection". Measured on real clusters: all 8 EKS prod apps tracked main, all 10 small k3s cluster prod apps tracked HEAD/main.
+  suggest: "Confirm branch protection on the repository (1 reviewer, required CI). To make promotion explicit, have prod track a tag or an environment branch (release)."
+  verify:
+    - "kubectl get applications.argoproj.io -A -o custom-columns=NAME:.metadata.name,REV:.spec.source.targetRevision,REPO:.spec.source.repoURL"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref: []
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.notifications-not-configured
+  name: No notifications configured for sync failures or Degraded (argocd-notifications)
+  area: observability
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "not item['notifications_configured'] and item['applications_prod'] > 0"
+  target: "'cluster'"
+  evidence: "f\"service.* in argocd-notifications-cm {item['notifications_configured']} (triggers {item['notifications_triggers']}), prod apps {item['applications_prod']}, and no Argo CD metrics flow to Alertmanager either (no ServiceMonitor)\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Prod apps with auto-sync deploy without a human in the loop, so without a channel reporting failures and Degraded, users find out first. notifications-controller runs (default install) but sends nothing unless argocd-notifications-cm has a service (Slack, email) and a trigger. The alternative is Prometheus scraping argocd_app_info{sync_status,health_status} with Alertmanager rules; this check looks for neither being present.
+    Measured on real clusters: the notifications cm was empty and there was no ServiceMonitor on both EKS and the small k3s cluster.
+  suggest: "Add service.slack (or webhook) and trigger.on-sync-failed / on-health-degraded to argocd-notifications-cm, then the notifications.argoproj.io/subscribe annotation on Applications (or defaultTriggers). Or enable the ServiceMonitor and use the official Argo CD Prometheus rules."
+  verify:
+    - "kubectl -n argocd get cm argocd-notifications-cm -o yaml"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: true
+          notifications_triggers: 2
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 0
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.backend-errors
+  name: Argo CD backend errors (cluster connection, Git, Redis, k8s API 5xx)
+  area: hygiene
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and (item['cluster_connection_ok'] is False or (item['k8s_api_errors'] or 0) >= 100 or (item['git_failure_ratio'] or 0) >= 0.1)"
+    warn_expr: "item['metrics_available'] and ((item['k8s_api_errors'] or 0) > 0 or (item['git_failure_ratio'] or 0) >= 0.01 or (item['redis_failure_ratio'] or 0) >= 0.01 or (item['grpc_errors'] or 0) > 0 or (item['repo_pending_requests'] or 0) > 10)"
+  target: "'cluster'"
+  evidence: "f\"cluster connection {item['cluster_connection_ok']}, cache age {item['cluster_cache_age_s']}s, k8s API 5xx/429 {item['k8s_api_errors']}, git requests {item['git_requests']} / failures {item['git_failures']} ({item['git_failure_ratio']}), redis failures {item['redis_failed']}/{item['redis_total']}, repo-server pending {item['repo_pending_requests']}, gRPC errors {item['grpc_errors']} (PermissionDenied {item['grpc_permission_denied']} and Unauthenticated {item['grpc_unauthenticated']} counted separately)\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    When Argo CD is slow or apps flicker to Unknown, the cause is usually behind it — cluster cache resync failing (connection_status 0), k8s API 429 (the controller lists and watches too much), Git access failures (expired token, rate limit — argocd_git_lsremote_fail_total), Redis cache failures (manifests re-rendered every time), or a repo-server queue. Each pairs with a log signature (argocd.repo-access, argocd.rate-limit).
+    Measured on a real EKS cluster: 25 failures out of 7,958 git requests (0.3%), 32 redis failures (ratio 0), k8s API 5xx/429 0 — pass.
+  suggest: "If argocd_git_lsremote_fail_total rises, check the repo credentials (expiry) and the GitHub rate limit. For k8s API 429, lower controller.status.processors or reduce watched resources with resource.exclusions. For redis failures, check redis pod restarts and memory."
+  verify:
+    - "kubectl -n argocd logs deploy/argocd-repo-server --since=1h | grep -i 'rate limit\\|authentication\\|failed to' | tail"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: false
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 250
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 400
+          git_failure_ratio: 0.05
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 9000
+          redis_total: 100000
+          redis_failure_ratio: 0.09
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: false
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: null
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.version-eol
+  name: Argo CD version is end of life (2.x)
+  area: hygiene
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['version_major'] is not None and item['version_major'] < 3"
+  target: "'cluster'"
+  evidence: "f\"Argo CD {item['version']} (components {item['components']}) — 3.0 was released 2025-05, only the three latest minors are supported (N-2)\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Argo CD patches only the three latest minors. Since 3.0 (2025-05), 3.1 and 3.2 shipped, 2.x no longer receives security patches — Argo CD runs as cluster-admin and its UI is often open to the internet, so a server vulnerability (several UI XSS, SSRF and RBAC-bypass CVEs in 2024-2025) is full cluster control right away.
+    Measured on real clusters: EKS ran 2.13.0 (2024-11), the small k3s cluster 3.2.0.
+  suggest: "Upgrade 2.14 → 3.0 → 3.x following the upgrade notes (RBAC default policy change, log format, fine-grained RBAC). With Helm, use the argo-cd chart 8.x."
+  verify:
+    - "kubectl -n argocd get deploy argocd-server -o jsonpath='{.spec.template.spec.containers[0].image}'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "3.2.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 3
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: null
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: null
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+- id: argocd.metrics-unreadable
+  name: Argo CD metrics could not be read (not scraped by Prometheus, no node access)
+  area: observability
+  type: summary
+  each: argocdctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['present'] and not item['metrics_available']"
+  target: "'cluster'"
+  evidence: "f\"no metrics under metrics/pod/argocd-*/ — Prometheus does not scrape argocd_* (no ServiceMonitor) and neither the pod proxy nor node access could read them. {item['applications']} Applications were read as objects\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    Without the controller (:8082), repo-server (:8084) and server (:8083) metrics, sync failure accumulation, Git failures, k8s API errors and Redis failures are visible only through log signatures. Application state (Sync/Health/policy) is read from objects, so those checks still work.
+  suggest: "Helm values controller.metrics.serviceMonitor.enabled, repoServer.metrics.serviceMonitor.enabled and server.metrics.serviceMonitor.enabled true. Otherwise node access (SSM or SSH)."
+  verify:
+    - "kubectl get --raw /api/v1/namespaces/argocd/pods/argocd-application-controller-0:8082/proxy/metrics | head"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: false
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false

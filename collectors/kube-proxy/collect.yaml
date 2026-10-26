@@ -1,0 +1,15 @@
+# kube-proxy collection. All read-only.
+# 1) PromQL: kubeproxy_* comes from job=kube-proxy (:10249) on EKS; on k3s it is mixed into the kubelet/apiserver metrics of the k3s binary (instance :10250/:6443, same process so same values). So queries select by name without a job filter and split nodes by the instance IP.
+# 2) Inside the node: /proxyMode (iptables|ipvs|nftables) and /healthz. On EKS the mode is also in the ConfigMap, but k3s has no config file so asking the node is the only way. Output logs/node/<node>/kube-proxy.txt
+# 3) Config (ConfigMap kube-proxy-config), DaemonSet and Service/EndpointSlice counts come from the core object dump; logs from core component-logs (logs/pods/kube-proxy/) and the k3s journal.
+- id: metrics
+  type: promql
+  file: metrics.yaml
+  timeout: 30
+- id: proxy-mode
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: all
+  cmd: echo "mode=$(curl -s -m 3 http://127.0.0.1:10249/proxyMode)"; echo "healthz=$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:10256/healthz)"; echo "metrics_local=$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:10249/metrics)"
+  out: logs/node/{node}/kube-proxy.txt
+  timeout: 20

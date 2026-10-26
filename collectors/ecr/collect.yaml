@@ -1,0 +1,36 @@
+# ECR collection. Read-only calls throughout (describe/get). The repository list was saved by detection to aws/ecr-repositories.json (eks.ecr_repositories).
+# Only image metadata (size, push/pull times, tags, scan summary) is collected; layer and manifest contents are not. Repository policies (get-repository-policy) contain principal ARNs and are not collected.
+# kubelet's PullImage metrics (kubelet_runtime_operations_*) are dropped by the default kube-prometheus-stack configuration and were absent on both clusters observed — pull failures are read from events (ErrImagePull, BackOff).
+- id: registry
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [ecr, describe-registry]
+  out: aws/ecr-registry.json
+  timeout: 60
+- id: scanning-configuration
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [ecr, get-registry-scanning-configuration]
+  out: aws/ecr-scanning-configuration.json
+  timeout: 60
+- id: pull-through-cache
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [ecr, describe-pull-through-cache-rules]
+  out: aws/ecr-pull-through-cache-rules.json
+  timeout: 60
+- id: images
+  modes: [full]   # skipped by the daily run
+  type: aws
+  for_each: eks.ecr_repositories
+  args: [ecr, describe-images, --repository-name, "{item}", --max-items, "1000"]
+  out: aws/ecr-images/{item_safe}.json
+  timeout: 120
+- id: lifecycle-policy
+  modes: [full]   # skipped by the daily run
+  type: aws
+  for_each: eks.ecr_repositories
+  tolerate_errors: true
+  args: [ecr, get-lifecycle-policy, --repository-name, "{item}"]
+  out: aws/ecr-lifecycle/{item_safe}.json
+  timeout: 60

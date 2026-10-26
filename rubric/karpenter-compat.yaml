@@ -1,0 +1,12 @@
+# Highest Kubernetes minor supported by each Karpenter minor (used by check platform.karpenter-version-compat).
+# Source: karpenter.sh/docs/upgrading/compatibility (as of 2026-10-25). On 1.x, a version outside the table makes the nodeclass.status controller report 'failed validating kubernetes version'.
+# A Karpenter version missing from this table makes the check report "cannot verify (warn)" -- add one line when a new version ships.
+- { karpenter: "0.37", max_k8s: "1.30" }
+- { karpenter: "1.0", max_k8s: "1.30" }
+- { karpenter: "1.1", max_k8s: "1.31" }
+- { karpenter: "1.2", max_k8s: "1.32" }
+- { karpenter: "1.3", max_k8s: "1.32" }
+- { karpenter: "1.4", max_k8s: "1.33" }
+- { karpenter: "1.5", max_k8s: "1.33" }
+- { karpenter: "1.6", max_k8s: "1.34" }
+- { karpenter: "1.7", max_k8s: "1.34" }

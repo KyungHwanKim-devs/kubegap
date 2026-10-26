@@ -1,0 +1,13 @@
+# External Secrets Operator collection. Read-only throughout. Secret values are never read anywhere — only the status and references of ExternalSecret/SecretStore objects and the controller metrics.
+# ExternalSecret Ready False is covered by the core security section (security.externalsecret-not-ready). Here the operator itself: controller/webhook/cert-controller replicas and version, store auth method (IRSA vs static key), refresh delay (refreshTime vs refreshInterval),
+# provider API call success/failure (externalsecret_provider_api_calls_count), reconcile errors, webhook failurePolicy.
+# The controller metrics (:8080) are not scraped by Prometheus (0 series observed). pod-metrics reads them via the proxy, falling back to curl from inside a node. externalsecret_status_condition is 2 lines per ExternalSecret and is left out of keep (the objects carry the same information).
+- id: controller-metrics
+  type: pod-metrics
+  namespace: external-secrets
+  selector: app.kubernetes.io/name=external-secrets
+  port: 8080
+  path: /metrics
+  out: metrics/pod/external-secrets
+  keep: '^(externalsecret_(sync_calls_total|sync_calls_error|provider_api_calls_count)|clustersecretstore_status_condition|secretstore_status_condition|controller_runtime_reconcile_(errors_total|total)|controller_runtime_reconcile_time_seconds_(sum|count)|process_(start_time|resident_memory_bytes))'
+  timeout: 30

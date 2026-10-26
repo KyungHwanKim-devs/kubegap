@@ -1,0 +1,1816 @@
+# local-path-provisioner checks. summary.local_path — lib/localpath.py (directory usage comes from the local-path section of the k3s-platform node script). The first two were moved from k3s-platform with their ids unchanged.
+- id: storage.local-path-over-capacity
+  name: local-path volume usage exceeds the PVC capacity (capacity is not enforced)
+  area: storage
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: local_path.over_capacity
+  profiles: [lab]
+  rule:
+    expr: "True"
+  target: "item['namespace'] + '/' + item['pvc']"
+  evidence: "f\"node {item['node']} uses {item['used_mb']}MB / capacity {item['capacity_mb']}MB ({item['used_ratio']}x). workloads {item['workloads']}\""
+  severity_default: high
+  symptom_linked: false
+  why: local-path-provisioner only creates a directory; it does not enforce capacity. A PVC that says 5Gi can write until the node disk is full. Every plan built on the stated capacity (backup retention, disk sizing) is wrong, and when the node disk fills up every pod on that node is evicted.
+  suggest: Reduce the data or raise the PVC capacity to match reality (the capacity is documentation only). Read together with node disk usage (node.disk-usage).
+  verify:
+    - "sudo du -sm /var/lib/rancher/k3s/storage/*"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "fail"
+        item:
+          namespace: "logging"
+          pvc: "es-data"
+          node: "node-b"
+          capacity_mb: 20480
+          used_mb: 105000
+          used_ratio: 5.1
+          workloads:
+            - "statefulset/elasticsearch"
+      - expect: "none"
+- id: storage.local-path-node-pinned
+  name: Workloads pinned to a node by a local-path PV (cannot start if that node dies)
+  area: storage
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: local_path.summary
+  cluster_level: true
+  profiles: [lab]
+  rule:
+    warn_expr: "(item.get('pv_count') or 0) > 0"
+  target: "'cluster'"
+  evidence: "f\"{item.get('pv_count')} local-path PVs, by node {item.get('by_node')}, node disk used {item.get('node_total_mb')}MB. top: {[(p['namespace'], p['pvc'], p['node'], p['used_mb'], p['workloads'][:1]) for p in (item.get('pinned') or [])[:8]]}\""
+  severity_default: low
+  symptom_linked: false
+  why: A local-path volume is a node directory and cannot move. If that node dies, the StatefulSet or DB using it cannot start on another node. This is the small k3s cluster's "N+1" list. The longer the list, the larger the blast radius of a single node.
+  suggest: Move important DBs to external or replicated storage (Longhorn, NFS, external Postgres), spread backup PVCs across other nodes, and record this list in the recovery runbook.
+  verify:
+    - "kubectl get pv -o custom-columns=NAME:.metadata.name,CLAIM:.spec.claimRef.name,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
+  test:
+    profile: "k3s"
+    cases:
+      - expect: "warn"
+        item:
+          pv_count: 26
+          by_node:
+            node-b: 19
+            node-a: 7
+          node_total_mb: 150000
+          pinned:
+            - namespace: "a"
+              pvc: "b"
+              node: "node-b"
+              used_mb: 10
+              workloads:
+                - "x"
+          over_capacity: []
+      - expect: "pass"
+        item:
+          pv_count: 0
+          by_node: {}
+          node_total_mb: 0
+          pinned: []
+          over_capacity: []
+- id: storage.local-path-fs-near-full
+  name: Node filesystem hosting local-path volumes has little free space (volumes have no capacity limit)
+  area: storage
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: local_path.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and ((item['fs_min_avail_ratio'] if item['fs_min_avail_ratio'] is not None else 1) < 0.1 or (item['fs_min_days_to_full'] is not None and item['fs_min_days_to_full'] < 14))"
+    warn_expr: "item['metrics_available'] and ((item['fs_min_avail_ratio'] if item['fs_min_avail_ratio'] is not None else 1) < 0.25 or (item['fs_min_days_to_full'] is not None and item['fs_min_days_to_full'] < 60) or item['over_capacity_count'] > 0)"
+  target: "'cluster'"
+  evidence: "f\"root filesystem per node {item['fs']} (avail_ratio = free ratio, volumes_gib = sum of local-path directories, days_to_full = day it fills at the 7-day trend), over-capacity PVCs {item['over_capacity_count']}, PVs {item['pv_count']} by node {item['by_node']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    A local-path volume is a node directory, so the PVC capacity is a label only and the kernel does not enforce it — Elasticsearch writing 100GiB into a 20GiB PVC (measured on a small k3s cluster node) raises no error; instead the node root filesystem fills up. When root is full, kubelet evicts pods for DiskPressure and k3s SQLite (state.db) writes fail, stopping the whole cluster — what would be a single full volume on EBS becomes a node failure.
+    Measured on a 2-node k3s k3s: node A 21.9% free (not trending down), node B 50.1% free (+0.34GiB/day -> 670 days). Two over-capacity PVCs (Elasticsearch 5.0x, a backup PVC 1.3x) -> warn.
+  suggest: "On the tight node, clean up the largest directories first (du -sm /var/lib/rancher/k3s/storage/*) or shorten backup PVC retention. To actually enforce capacity, use Longhorn or NFS instead of local-path, or mount a separate disk via nodePathMap to keep volumes off the OS disk."
+  verify:
+    - "ssh <node> df -h / && sudo du -sm /var/lib/rancher/k3s/storage/* | sort -rn | head"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 2
+          released: []
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.08
+          fs_min_days_to_full: 670
+          fs_nodes_low: []
+          metrics_available: true
+      - expect: "fail"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 2
+          released: []
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.219
+          fs_min_days_to_full: 10
+          fs_nodes_low: []
+          metrics_available: true
+      - expect: "warn"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 2
+          released: []
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.219
+          fs_min_days_to_full: 670
+          fs_nodes_low: []
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 0
+          released: []
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.4
+          fs_min_days_to_full: null
+          fs_nodes_low: []
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 0
+          released: []
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.219
+          fs_min_days_to_full: 670
+          fs_nodes_low: []
+          metrics_available: false
+- id: storage.local-path-orphan-dirs
+  name: local-path directories without a PV remain (leftover data from deleted PVCs)
+  area: storage
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: local_path.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['orphan_dirs']) > 0 or len(item['released']) > 0"
+  target: "'cluster'"
+  evidence: "f\"directories without a PV {[(o['node'], o['dir'], o['mb']) for o in item['orphan_dirs']][:8]} (total {item['orphan_mb']}MB), Released/Failed PVs {item['released']}, directories per node {item['node_dirs']} vs PVs {item['by_node']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    When a PVC is deleted, the provisioner's helper pod (teardown) removes the directory. If the helper pod failed (node down, image pull failure) or reclaimPolicy is Retain, the directory stays, consumes space, and keeps old DB data in plaintext. A Released PV, whose claim is gone while the PV remains, has the same root cause.
+    Measured on a 2-node k3s k3s: 26 node directories = 26 PVs, 0 orphans, 0 Released -> pass (du reads only the top 30 entries, so with more than 30 directories some are not visible).
+  suggest: "Confirm from the directory name (pvc-<uid>_<ns>_<pvc>) that the PVC really is gone, then delete it. Released PVs: kubectl delete pv."
+  verify:
+    - "ssh <node> sudo ls /var/lib/rancher/k3s/storage | sed 's/_.*//' | sort > /tmp/dirs; kubectl get pv -o name | sed 's#.*/##' | sort > /tmp/pvs; comm -23 /tmp/dirs /tmp/pvs"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 2
+          released: []
+          orphan_dirs:
+            - node: "node-b"
+              dir: "pvc-abc_old-ns_data"
+              namespace: "old-ns"
+              pvc: "data"
+              mb: 1200
+          orphan_mb: 1200
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.219
+          fs_min_days_to_full: 670
+          fs_nodes_low: []
+          metrics_available: true
+      - expect: "warn"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 2
+          released:
+            - "pvc-abc(old/data)"
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.219
+          fs_min_days_to_full: 670
+          fs_nodes_low: []
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 2
+          released: []
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.219
+          fs_min_days_to_full: 670
+          fs_nodes_low: []
+          metrics_available: true
+- id: storage.local-path-prod-delete-reclaim
+  name: prod local-path PVs have reclaimPolicy Delete (deleting the PVC deletes the data immediately, no snapshot)
+  area: resilience
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: local_path.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['prod_pvs_delete_reclaim']) > 0"
+  target: "'cluster'"
+  evidence: "f\"{len(item['prod_pvs_delete_reclaim'])} of {item['prod_pvs']} prod PVs are Delete {item['prod_pvs_delete_reclaim'][:10]}, StorageClass reclaim {item['reclaim_policies']}, default class {item['default_class']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    EBS with Delete still has snapshots (DLM) and asynchronous volume deletion, which leaves room to recover; local-path Delete is an rm of the directory — the moment a StatefulSet is deleted by mistake or Argo CD prune removes the PVC, the DB data is gone (the same failure path as the Argo CD check argocd.prune-manages-namespace-or-crd). Read together with the resilience backup check (backup_locality) as "is the backup on another node or outside the cluster?".
+    Measured on a 2-node k3s k3s: all 19 prod PVs were Delete (both StorageClasses default to Delete). The backup PVCs were local-path on the same node as well.
+  suggest: "For DB and backup PVCs, create a second StorageClass with reclaimPolicy Retain (local-path-retain), or patch existing PVs with kubectl patch pv <pv> -p '{\"spec\":{\"persistentVolumeReclaimPolicy\":\"Retain\"}}'. Keep backups on another node or outside the cluster (S3, NAS)."
+  verify:
+    - "kubectl get pv -o custom-columns=PV:.metadata.name,NS:.spec.claimRef.namespace,PVC:.spec.claimRef.name,RECLAIM:.spec.persistentVolumeReclaimPolicy,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 2
+          released: []
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.219
+          fs_min_days_to_full: 670
+          fs_nodes_low: []
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 2
+          released: []
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim: []
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.219
+          fs_min_days_to_full: 670
+          fs_nodes_low: []
+          metrics_available: true
+- id: storage.local-path-provisioner-unhealthy
+  name: local-path-provisioner is not ready or its configuration is empty
+  area: storage
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: local_path.summary
+  cluster_level: true
+  rule:
+    expr: "(item['provisioner_ready'] or 0) < 1 and (item['provisioner_replicas'] or 0) >= 1"
+    warn_expr: "not item['node_path_map'] or item['default_class'] is None"
+  target: "'cluster'"
+  evidence: "f\"provisioner ready {item['provisioner_ready']}/{item['provisioner_replicas']} (version {item['provisioner_version']}), nodePathMap {item['node_path_map']}, StorageClasses {item['storage_classes']} (default {item['default_class']})\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    If the provisioner is down, new PVCs stay Pending (existing volumes are directories and keep working); if there is no default StorageClass, PVCs without storageClassName stay Pending forever. An empty nodePathMap falls back to the DEFAULT path (/opt/local-path-provisioner; on k3s /var/lib/rancher/k3s/storage).
+    Measured on a k3s k3s: 1/1 ready, v0.0.31, default class local-path -> pass.
+  suggest: "kubectl -n kube-system logs deploy/local-path-provisioner. The default class is set by the storageclass.kubernetes.io/is-default-class annotation."
+  verify:
+    - "kubectl -n kube-system get deploy local-path-provisioner; kubectl get sc"
+  profiles: [lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          provisioner_ready: 0
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 2
+          released: []
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.219
+          fs_min_days_to_full: 670
+          fs_nodes_low: []
+          metrics_available: true
+      - expect: "warn"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: null
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 2
+          released: []
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.219
+          fs_min_days_to_full: 670
+          fs_nodes_low: []
+          metrics_available: true
+      - expect: "pass"
+        item:
+          present: true
+          provisioner_ready: 1
+          provisioner_replicas: 1
+          provisioner_version: "0.0.31"
+          node_path_map:
+            DEFAULT_PATH_FOR_NON_LISTED_NODES:
+              - "/var/lib/rancher/k3s/storage"
+          storage_classes:
+            - "local-path"
+            - "local-path-node-b"
+          default_class: "local-path"
+          reclaim_policies:
+            local-path: "Delete"
+            local-path-node-b: "Delete"
+          pv_count: 26
+          by_node:
+            node-a: 7
+            node-b: 19
+          node_total_mb:
+            node-a: 7163
+            node-b: 139342
+          pinned:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92"
+              namespace: "registry"
+              pvc: "registry-data-registry-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 51200
+              used_mb: 32732
+              used_ratio: 0.64
+              workloads:
+                - "registry/registry-0"
+                - "registry/registry-gc"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity:
+            - pv: "pvc-db50eb33-8393-45cd-93b3-042e019e1186"
+              namespace: "logging"
+              pvc: "data-elasticsearch-0"
+              node: "node-b"
+              storage_class: "local-path-node-b"
+              capacity_mb: 20480
+              used_mb: 102588
+              used_ratio: 5.01
+              workloads:
+                - "logging/elasticsearch-0"
+              phase: "Bound"
+            - pv: "pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda"
+              namespace: "app-m-prod"
+              pvc: "app-m-postgres-backup-pvc"
+              node: "node-a"
+              storage_class: "local-path"
+              capacity_mb: 5120
+              used_mb: 6838
+              used_ratio: 1.34
+              workloads:
+                - "app-m-prod/app-m-postgres-backup"
+              phase: "Bound"
+          over_capacity_count: 2
+          released: []
+          orphan_dirs: []
+          orphan_mb: 0
+          node_dirs:
+            node-a: 7
+            node-b: 19
+          prod_pvs_delete_reclaim:
+            - "app-j-prod/app-j-postgres-data"
+            - "app-n-prod/app-n-postgres-mx-backup-pvc"
+            - "app-k-prod/app-k-postgres-backup-pvc"
+            - "app-n-prod/app-n-postgres-vn-data-app-n-postgres-vn-0"
+            - "app-l-prod/app-l-artifacts"
+            - "app-m-prod/data-app-m-redis-0"
+            - "app-n-prod/app-n-postgres-vn-backup-pvc"
+            - "app-o-prod/app-o-qdrant-data-app-o-qdrant-0"
+            - "app-k-prod/app-k-postgres-data-app-k-postgres-0"
+            - "app-n-prod/app-n-redis-data-app-n-redis-0"
+            - "app-o-prod/mysql-backup-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-mx-data-app-n-postgres-mx-0"
+            - "app-j-prod/app-j-artifacts"
+            - "app-o-prod/mysql-data-app-o-mysql-0"
+            - "app-n-prod/app-n-postgres-data-app-n-postgres-0"
+            - "app-m-prod/data-app-m-postgres-0"
+            - "app-n-prod/app-n-postgres-backup-pvc"
+            - "app-i-prod/postgres-data-app-i-postgres-0"
+            - "app-m-prod/app-m-postgres-backup-pvc"
+          prod_pvs: 19
+          fs:
+            node-a:
+              avail_ratio: 0.219
+              size_gib: 106.7
+              growth_gib_per_day: -0.08
+              avail_gib: 23.4
+              days_to_full: null
+              volumes_gib: 7.0
+            node-b:
+              avail_ratio: 0.501
+              size_gib: 454.9
+              growth_gib_per_day: 0.34
+              avail_gib: 227.9
+              days_to_full: 670
+              volumes_gib: 136.1
+          fs_min_avail_ratio: 0.219
+          fs_min_days_to_full: 670
+          fs_nodes_low: []
+          metrics_available: true

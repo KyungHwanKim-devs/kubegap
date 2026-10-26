@@ -1,0 +1,18 @@
+# VPC CNI (aws-node) collection. All read-only.
+# 1) ipamd metrics: aws-node exposes /metrics on hostNetwork port 61678, but the apiserver pod proxy is typically blocked by the node security group and times out.
+#    So it is read with curl from inside the node (SSM root or SSH). per_cidr series are one line per IP and are dropped. Output logs/node/<node>/awscni.prom (not scanned as a log — .prom).
+# 2) ENI/IP limits per instance type (describe-instance-types): max IPs a node can hold = ENIs × (IPv4 per ENI − 1). Compared with max-pods.
+# 3) Remaining subnet IPs come from eks-platform aws/describe-subnets.json; aws-node logs from core component-logs (logs/pods/vpc-cni/).
+- id: ipamd-metrics
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: all
+  cmd: curl -s -m 5 http://127.0.0.1:61678/metrics | grep -E '^awscni_' | grep -vE 'per_cidr|_bucket'
+  out: logs/node/{node}/awscni.prom
+  timeout: 30
+- id: instance-type-network
+  type: aws
+  for_each: instance_types
+  args: [ec2, describe-instance-types, --instance-types, "{item}", --query, "InstanceTypes[].{InstanceType:InstanceType,MaximumNetworkInterfaces:NetworkInfo.MaximumNetworkInterfaces,Ipv4AddressesPerInterface:NetworkInfo.Ipv4AddressesPerInterface,Hypervisor:Hypervisor,EfaSupported:NetworkInfo.EfaSupported}"]
+  out: aws/instance-type-{item}.json
+  timeout: 60

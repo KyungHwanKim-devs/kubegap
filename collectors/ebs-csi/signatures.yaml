@@ -1,0 +1,23 @@
+# EBS CSI log signatures. The first edition lived in signatures/catalog.yaml and was moved into this collector. Field descriptions are in the header of catalog.yaml.
+- id: ebs-csi.attach-failed
+  name: EBS volume attach failed
+  component: ebs-csi
+  area: storage
+  severity: high
+  sources: ["logs/pods/ebs-csi/*.log"]
+  pattern: 'AttachVolume\.Attach failed|rpc error.*(attach|Attach)|VolumeInUse|Multi-Attach error|timed out waiting for volume|AttachmentLimitExceeded'
+  meaning: A pod using a PVC is moving to another node but the volume does not follow, so it is stuck in ContainerCreating.
+  cause: Detach from the old node did not happen (node terminated abnormally), instance volume attach limit (28 on Nitro), AZ mismatch.
+  verify: "kubectl get volumeattachments; aws ec2 describe-volumes --filters Name=status,Values=in-use --query 'Volumes[].Attachments[].{id:VolumeId,inst:InstanceId,state:State}'"
+- id: ebs-csi.throttled
+  name: EBS CSI EC2 API throttling
+  component: ebs-csi
+  area: storage
+  severity: medium
+  sources: ["logs/pods/ebs-csi/*.log"]
+  pattern: 'RequestLimitExceeded|Throttling|Rate exceeded'
+  meaning: Volume creation and attach slow down. StatefulSet rollouts take longer.
+  cause: Many volumes and frequent polling.
+  verify: "kubectl logs -n kube-system -l app.kubernetes.io/name=aws-ebs-csi-driver --since=1h | grep -c RequestLimitExceeded"
+  warn_at: 5
+  fail_at: 200

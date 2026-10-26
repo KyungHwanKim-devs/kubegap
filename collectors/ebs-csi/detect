@@ -1,0 +1,2 @@
+# EBS CSI driver collector. Enabled when the detected component ebs-csi (kube-system/ebs-csi-node DaemonSet or a StorageClass with provisioner ebs.csi.aws.com) is present. EKS only.
+component: ebs-csi

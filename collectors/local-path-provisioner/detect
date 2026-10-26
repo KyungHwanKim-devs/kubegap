@@ -1,0 +1,2 @@
+# local-path-provisioner collector (k3s counterpart of EBS CSI on EKS). Enabled when the kube-system/local-path-provisioner Deployment or a StorageClass with provisioner rancher.io/local-path is present.
+component: local-path-provisioner

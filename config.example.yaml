@@ -1,0 +1,53 @@
+# kubegap configuration example. Everything in here is optional.
+# Copy this file to ~/.kubegap/config.yaml (a config.yaml inside the skill folder is also read, but personal settings end up next to the repository, so it is not recommended). kubegap works without it: the context is kubectl's current context, and Prometheus and Loki are discovered and port-forwarded by the skill.
+# Three kinds of settings live here: (1) prompts and install policy, (2) connection overrides, (3) suppressions and threshold overrides.
+
+# ---- (1) Prompts and install policy ----
+confirm_context: true        # ask once at start whether this is the right context. false = do not ask
+install_tools: ask           # policy for missing tools. ask = show the list and reasons, ask once (default) / always = install without asking / never = skip without asking
+# language: en               # language of the briefing and the report (en | ko). If unset, the skill asks once at the start of a run
+# mode: daily                # default collection mode. daily (default) skips node OS scripts, CloudWatch logs, cost and ECR data and the slow tools; full collects everything. /kubegap full overrides it
+
+# snapshots_root: ~/.kubegap/snapshots   # where snapshots (collected data and reports) are stored. Default is ~/.kubegap/snapshots. --snapshots-root and $KUBEGAP_SNAPSHOTS take precedence
+
+# ---- (2) Connection information (leave empty for auto-discovery) ----
+# context: my-cluster        # kube context to audit by default. /kubegap --context takes precedence
+# profile: prod              # override the detected set of expectations (prod | lab | small-prod | multi-az-prod | dev). Detected from platform and node count: EKS -> prod, 1-3 nodes -> lab, otherwise small-prod. --profile takes precedence
+# namespace_profiles:        # a different profile per namespace (glob -> profile). Checks listed in that profile's disabled_checks produce no findings in those namespaces
+#   "dev-*": dev
+#   "staging": dev
+# aws_profile: my-aws        # AWS CLI profile for EKS. If empty, the AWS_PROFILE from the kubeconfig exec env is used, then the AWS CLI default
+# aws_region: us-east-1
+# prometheus_url: http://localhost:9090      # if set, this address is used instead of a port-forward. Same for Alertmanager, Loki and Grafana
+# alertmanager_url: http://localhost:9093
+# loki_url: http://localhost:3100
+# grafana_url: http://localhost:3000
+# grafana_api_token: glsa_...     # service-account token with the Viewer role, used to list Grafana datasources and dashboards (optional). Without it that part is skipped as "no credentials"
+# node_access: ssm           # override the node command backend (ssm | ssh | daemonset | none). If empty: EKS = ssm, k3s = ssh, DaemonSet when the kubegap-node-reader pod is running
+# ssh:                       # when node_access is ssh (small k3s cluster). If empty, nodes are reached at their InternalIP with the user and key from ~/.ssh/config
+#   user: ubuntu
+#   key: ~/.ssh/id_ed25519
+#   port: 22
+#   hosts:                   # node name -> address reachable from this machine. For when the node InternalIP (a private LAN address) is on another network and not reachable (Tailscale and similar)
+#     node-a: 100.64.0.11
+#     node-b: admin@100.64.0.12    # use user@address when the username differs per node
+#   prefer_hostname: false   # true = nodes not listed in hosts are reached by node name instead of InternalIP (when DNS resolves them)
+
+# ---- (3) Suppressions and threshold overrides ----
+# Suppressed findings appear in the report's suppression section as "N suppressed" with the reason and expiry. After the expiry date the suppression lifts automatically and is marked "suppression expired".
+suppress:
+  - id: security.no-certificate-manager
+    reason: The ALB uses ACM certificates; cert-manager is not needed. ACM expiry is covered by the eks-platform collector
+    until: 2027-01-01
+  - id: resilience.single-replica-in-prod
+    namespaces: [ci-runners]           # suppress only in these namespaces. Empty = everywhere
+    reason: CI runners are ephemeral pods; replicas do not apply
+    until: 2027-01-01
+
+# Per-check threshold overrides. Key = check id, value = threshold (fail) and warn_threshold (warn). Takes precedence over the profile files (rubric/profiles/*.yaml).
+overrides:
+  resources.cpu-throttling:
+    threshold: 0.35
+    warn_threshold: 0.15
+  node.disk-usage:
+    threshold: 0.90

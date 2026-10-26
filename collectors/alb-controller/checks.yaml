@@ -1,0 +1,2372 @@
+# AWS Load Balancer Controller checks. summary.albctl.summary — lib/albctl.py. ALB and target group CloudWatch metrics are covered by the core traffic section (traffic.alb-*).
+- id: albctl.controller-availability
+  name: AWS Load Balancer Controller replicas, spread and PDB (if the controller dies, Ingress and TargetGroup changes stop)
+  area: traffic
+  type: summary
+  each: albctl.summary
+  cluster_level: true
+  rule:
+    expr: "(item['ready'] or 0) < (item['replicas'] or 0) or (item['replicas'] or 0) < 2 or item['all_same_node']"
+    warn_expr: "not item['has_pdb'] or not item['anti_affinity']"
+  target: "'cluster'"
+  evidence: "f\"aws-load-balancer-controller v{item['version']}: replicas {item['replicas']} / ready {item['ready']}, all on one node {item['all_same_node']}, PDB {item['has_pdb']}, podAntiAffinity {item['anti_affinity']}, leader pod found {item['leader_found']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    Even when the controller stops, the ALBs and target groups it already created keep serving traffic. But targets are no longer registered or deregistered as pods change (RegisterTargets/DeregisterTargets), so after a rolling deploy traffic goes to dead pod IPs or new pods never receive traffic, and new Ingress or certificate changes are not applied.
+    Measured on a real EKS cluster: 2/2 replicas on different nodes with PDB and antiAffinity — pass.
+  suggest: "Keep replicas 2 + podAntiAffinity + PDB (minAvailable 1). Check that both replicas do not land on the same node during node replacement (Karpenter)."
+  verify:
+    - "kubectl get deploy -n kube-system aws-load-balancer-controller -o wide ; kubectl get pdb -n kube-system"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 1
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 1
+          ready: 1
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: true
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: false
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+- id: albctl.no-dedicated-role
+  name: Controller ServiceAccount has no IRSA or Pod Identity role (ELB and EC2 are manipulated through the node role)
+  area: security
+  type: summary
+  each: albctl.summary
+  cluster_level: true
+  rule:
+    expr: "not item['has_dedicated_role']"
+  target: "'cluster'"
+  evidence: "f\"ServiceAccount aws-load-balancer-controller: IRSA role {item['irsa_role']}, Pod Identity {item['pod_identity']}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    The controller needs permission to create and delete ELBs, change security group rules and look up ACM certificates. Without a dedicated role those permissions must live on the node instance role, and on nodes with IMDS hop limit 2 every pod can delete load balancers and open security groups.
+    Measured on a real EKS cluster: a dedicated load balancer controller role was present — pass.
+  suggest: "Attach a dedicated role with AWSLoadBalancerControllerIAMPolicy via IRSA or Pod Identity and remove ELB permissions from the node role."
+  verify:
+    - "kubectl get sa -n kube-system aws-load-balancer-controller -o jsonpath='{.metadata.annotations}'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: false
+          irsa_role: null
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+- id: albctl.webhook-fail-policy-pods
+  name: Controller webhook intercepts every pod creation with a Fail policy (controller down = no pod can be created)
+  area: resilience
+  type: summary
+  each: albctl.summary
+  cluster_level: true
+  rule:
+    expr: "item['webhook_pod_scope_fail'] or len(item['webhook_no_endpoints']) > 0"
+    warn_expr: "(item['webhook_5xx'] or 0) > 0"
+  target: "'cluster'"
+  evidence: "f\"webhooks {item['webhooks']} (Fail policy {item['webhooks_fail_policy']}), pod creation intercepted with Fail and no selector {item['webhook_pod_scope_fail']}, webhooks without endpoints {item['webhook_no_endpoints']}, webhook 5xx responses {item['webhook_5xx']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    mpod.elbv2.k8s.aws is a mutating webhook that injects readiness gates at pod creation. With failurePolicy Fail and no namespaceSelector/objectSelector, the moment all controller pods are gone **every pod creation in the cluster is rejected** (the controller itself cannot start — a deadlock, same conclusion as operators.webhook-self-lock). The default chart scopes it with the `elbv2.k8s.aws/pod-readiness-gate-inject: enabled` namespace selector.
+    Measured on a real EKS cluster: the mpod webhook had a namespaceSelector and objectSelector, 2 endpoints, 0 5xx — pass.
+  suggest: "Keep the namespaceSelector on the mpod webhook and use a controller PDB so both replicas do not go down at once. Keep a runbook step for switching failurePolicy to Ignore in an emergency."
+  verify:
+    - "kubectl get mutatingwebhookconfiguration aws-load-balancer-webhook -o jsonpath='{.webhooks[*].namespaceSelector}'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: true
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints:
+            - "mpod.elbv2.k8s.aws"
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 4
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+- id: albctl.reconcile-errors
+  name: Controller reconcile errors and requeues accumulating (an Ingress is not applied or is retried repeatedly)
+  area: traffic
+  type: summary
+  each: albctl.summary
+  cluster_level: true
+  rule:
+    expr: "item['metrics_available'] and item['leader_found'] and (item['reconcile_errors_total'] or 0) >= 100"
+    warn_expr: "item['metrics_available'] and item['leader_found'] and (item['reconcile_errors_total'] or 0) > 0"
+  target: "'cluster'"
+  evidence: "f\"reconcile errors since leader start {item['reconcile_errors_total']}, apiserver 429/503 responses {item['rest_client_429_503']}, max workqueue depth {item['workqueue_depth_max']}, Ingresses without an LB address {item['ingresses_without_lb']}, stale TargetGroupBindings {item['tgb_stale']}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    A reconcile error means the controller failed to make one Ingress, Service or TargetGroupBinding match AWS (permissions, bad annotation, missing certificate, limits). The counter accumulates since the leader process started, so a small number may be a past event — read it together with the log signature alb-controller.reconcile-error (24 hours).
+    Measured on a real EKS cluster: 41 errors (ingress controller), 34,713 requeues — close to the pattern of one Ingress with a bad annotation being retried forever (0 errors in the 24-hour logs, so a past event).
+  suggest: "Run kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller | grep -i 'reconciler error' to find which Ingress it is, then fix the annotation, certificate or security group."
+  verify:
+    - "kubectl describe ingress -A | grep -A3 Events | grep -i fail"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 250
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 0
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: false
+          leader_found: false
+          reconcile_errors_total: null
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+- id: albctl.aws-api-churn
+  name: Controller makes many AWS API calls (repeated target register/deregister, Describe storms → throttling risk)
+  area: traffic
+  type: summary
+  each: albctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "item['metrics_available'] and ((item['aws_api_retries_avg'] or 0) >= 0.1 or (item['rest_client_429_503'] or 0) >= 100)"
+  target: "'cluster'"
+  evidence: "f\"AWS API calls since leader start {item['aws_api_calls_total']}, top {item['aws_api_top_ops'][:5] if item['aws_api_top_ops'] else None}, average retries per call {item['aws_api_retries_avg']}, slowest by average latency {item['aws_api_slow_ops_avg_s'][:3] if item['aws_api_slow_ops_avg_s'] else None}, apiserver 429/503 {item['rest_client_429_503']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    The controller runs DescribeTargetHealth for every target group and calls Register/DeregisterTargets every time a pod changes. Rising retries per call mean the ELB API limit is being hit; apiserver 429s mean the controller's LIST/WATCH hit the apiserver priority limits.
+    Measured on a real EKS cluster: 232,463 calls since leader start (DescribeTargetHealth 73,740, DescribeTargetGroupAttributes 40,600, DescribeInstances 36,913, Register/Deregister about 11k each), average retries 0, apiserver 429/503 total 123 — warn.
+  suggest: "Reduce the number of target groups (ALB group sharing may already be in place) or the pod churn rate (HPA flapping, CronJob pods). If retries rise, tune the --aws-api-throttle argument and look for Throttling in the controller logs."
+  verify:
+    - "aws_api_call_duration_seconds_count and aws_api_call_retries_sum from the pod /metrics (metrics/pod/alb-controller/)"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.25
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 10
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 5
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+- id: albctl.tgb-stale-or-orphan
+  name: TargetGroupBinding not applied or its target Service is missing
+  area: traffic
+  type: summary
+  each: albctl.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['tgb_stale']) > 0 or len(item['tgb_service_missing']) > 0"
+    warn_expr: "item['traffic_target_groups_without_tgb'] > 0"
+  target: "'cluster'"
+  evidence: "f\"TargetGroupBindings {item['tgb_count']} (targetType {item['tgb_by_target_type']}), generation lagging {item['tgb_stale']}, Service missing {item['tgb_service_missing']}, hand-made TGBs {len(item['tgb_manual'])}, target groups without a binding (traffic section) {item['traffic_target_groups_without_tgb']}\""
+  severity_default: medium
+  symptom_linked: true
+  why: >
+    A TargetGroupBinding says "register this Service's pods into this target group". If observedGeneration lags behind generation the controller could not process that binding, and if the Service is missing the target group is empty and returns 503. Hand-made TGBs (the pattern of exposing a DB through an NLB) leave the target group behind when deleted, unlike an Ingress.
+    Measured on a real EKS cluster: all 51 applied, 10 hand-made TGBs (DB NLBs — the same targets as traffic.db-exposed).
+  suggest: "If stale, look for that TGB's reconcile error in the controller logs. Delete TGBs whose Service is missing and clean up the target group on the AWS side too."
+  verify:
+    - "kubectl get targetgroupbindings -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,SVC:.spec.serviceRef.name,GEN:.metadata.generation,OBS:.status.observedGeneration"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale:
+            - "prod-a/k8s-x"
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing:
+            - "prod-a/old-tgb"
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 2
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 0
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+- id: albctl.ingress-without-lb
+  name: Ingress of class ALB has no load balancer address (provisioning failed)
+  area: traffic
+  type: summary
+  each: albctl.summary
+  cluster_level: true
+  rule:
+    expr: "len(item['ingresses_without_lb']) > 0"
+  target: "'cluster'"
+  evidence: "f\"ALB Ingresses {item['alb_ingresses']}, with empty status.loadBalancer {item['ingresses_without_lb']}. IngressClass {item['ingress_classes']} (default class {item['ingress_class_default']}), most used annotations {item['ingress_annotations_top']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    If an Ingress was created but no ALB appeared, that service is not reachable from outside at all. Causes are missing subnet tags (kubernetes.io/role/elb), a typo in the certificate ARN, security group limits or permissions, and they show up as reconcile errors in the controller logs.
+  suggest: "Read the Events in kubectl describe ingress and the controller logs. Subnet tags, ACM certificates and group name conflicts are the common causes."
+  verify:
+    - "kubectl get ingress -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ADDR:.status.loadBalancer.ingress[0].hostname"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb:
+            - "prod-a/web"
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+- id: albctl.lb-service-intree
+  name: LoadBalancer Service created through the in-tree (legacy) path instead of the controller
+  area: traffic
+  type: summary
+  each: albctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "len(item['lb_services_intree']) > 0"
+  target: "'cluster'"
+  evidence: "f\"LoadBalancer Services {item['lb_services']}, created via the in-tree path without aws-load-balancer-type external or loadBalancerClass {item['lb_services_intree']}\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    A LoadBalancer Service without annotations gets a Classic LB from the in-tree AWS provider in kube-controller-manager. It is legacy: no NLB features (IP targets, TLS termination, PROXY protocol) and on the removal path from 1.27+. With the controller present, switch to `service.beta.kubernetes.io/aws-load-balancer-type: external` or `loadBalancerClass: service.k8s.aws/nlb`.
+    Measured on a real EKS cluster: the single LB Service (an external kafka listener) was controller-owned — pass.
+  suggest: "Set loadBalancerClass service.k8s.aws/nlb on the Service (a new LB is created and the DNS name changes, so plan the cutover)."
+  verify:
+    - "kubectl get svc -A -o json | jq -r '.items[] | select(.spec.type==\"LoadBalancer\") | \"\\(.metadata.namespace)/\\(.metadata.name) \\(.spec.loadBalancerClass) \\(.metadata.annotations[\"service.beta.kubernetes.io/aws-load-balancer-type\"])\"'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 2
+          lb_services_intree:
+            - "default/legacy-lb"
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+- id: albctl.metrics-unreadable
+  name: Controller metrics (:8080/metrics) could not be read (reconcile and AWS API state not visible)
+  area: observability
+  type: summary
+  each: albctl.summary
+  cluster_level: true
+  rule:
+    warn_expr: "not item['metrics_available'] or not item['leader_found']"
+  target: "'cluster'"
+  evidence: "f\"controller metrics read {item['metrics_available']}, leader pod identified {item['leader_found']}. Prometheus does not scrape this controller (no ServiceMonitor), so it is read through the pod proxy or curl from inside a node\""
+  severity_default: low
+  symptom_linked: false
+  why: >
+    The controller exposes the standard controller-runtime metrics (reconcile, webhook, workqueue) plus AWS API call latency and retries on :8080. kube-prometheus-stack does not scrape it by default. If the pod proxy is blocked by a security group (seen on a real EKS cluster) it is read from inside a node via the pod IP, which also fails when neither SSM nor SSH works.
+  suggest: "Enable the ServiceMonitor (serviceMonitor.enabled true) so Prometheus scrapes it and kubegap uses that. Otherwise prepare node access (SSM registration)."
+  verify:
+    - "kubectl get --raw /api/v1/namespaces/kube-system/pods/<pod>:8080/proxy/metrics | head"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: false
+          leader_found: false
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: false
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"
+      - expect: "pass"
+        item:
+          present: true
+          version: "2.7.2"
+          replicas: 2
+          ready: 2
+          all_same_node: false
+          has_pdb: true
+          anti_affinity: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
+          pod_identity: false
+          nodes_total: 7
+          webhooks: 6
+          webhooks_fail_policy: 6
+          webhook_pod_scope_fail: false
+          webhook_no_endpoints: []
+          webhook_5xx: 0
+          ingress_classes:
+            - "alb"
+          ingress_class_default: false
+          ingress_class_params: 1
+          alb_ingresses: 40
+          ingresses_without_lb: []
+          ingress_annotations_top:
+            group.name: 40
+            listen-ports: 40
+            scheme: 40
+            target-type: 40
+            healthcheck-path: 21
+            healthy-threshold-count: 12
+            success-codes: 12
+            unhealthy-threshold-count: 12
+          tgb_count: 51
+          tgb_by_target_type:
+            ip: 51
+          tgb_stale: []
+          tgb_service_missing: []
+          tgb_manual:
+            - "dev-app-b/app-b-dev-mysql-tgb"
+            - "dev-app-d/app-d-dev-mysql-tgb"
+            - "dev-app-c/app-c-dev-mysql-tgb"
+            - "prod-app-e/app-e-prod-postgresql-tgb"
+            - "prod-app-b/app-b-prod-mysql-tgb"
+            - "prod-app-d/app-d-prod-mysql-tgb"
+            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
+            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
+            - "prod-app-c/app-c-prod-mysql-tgb"
+          lb_services: 1
+          lb_services_intree: []
+          metrics_available: true
+          leader_found: true
+          reconcile_errors_total: 41
+          aws_api_calls_total: 232463
+          aws_api_retries_avg: 0.0
+          aws_api_slow_ops_avg_s:
+            - "('Shield/GetSubscriptionState', 0.76)"
+            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
+            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
+            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
+          aws_api_top_ops:
+            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
+            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
+            - "('EC2/DescribeInstances', 36913)"
+            - "('EC2/DescribeSecurityGroups', 24255)"
+            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
+            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
+            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
+            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
+          rest_client_429_503: 123
+          workqueue_depth_max: 0.0
+          traffic_target_groups_without_tgb: 1
+          traffic_unhealthy_target_groups: 6
+          cluster_name_arg: "my-cluster-eks"

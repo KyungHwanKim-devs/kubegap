@@ -1,0 +1,16 @@
+# flannel overlay interface (flannel.1) and bridge (cni0) counters. Uses node-exporter's node_network_* (flannel has no metrics of its own — k3s built-in flannel is not a pod). Read by lib/flannelctl.py.
+- id: flannel_if_errors_1d
+  why: RX/TX errors that increased on flannel.1 and cni0 over 24 hours (by node and device). Non-zero means overlay packets are being corrupted (MTU, underlay NIC)
+  query: sum by (instance, device) (increase(node_network_receive_errs_total{device=~"flannel.*|cni0"}[1d]) + increase(node_network_transmit_errs_total{device=~"flannel.*|cni0"}[1d]))
+- id: flannel_if_drops_1d
+  why: RX/TX drops that increased over 24 hours. Unlike the cumulative-since-boot node script, this shows "is it still increasing now"
+  query: sum by (instance, device) (increase(node_network_receive_drop_total{device=~"flannel.*|cni0"}[1d]) + increase(node_network_transmit_drop_total{device=~"flannel.*|cni0"}[1d]))
+- id: flannel_if_up
+  why: Whether the flannel.1 interface is up (by node). 0 means that node's pods cannot talk to other nodes
+  query: node_network_up{device=~"flannel.*"}
+- id: flannel_if_mtu
+  why: flannel.1 MTU as seen by node-exporter (cross-check with the node script)
+  query: node_network_mtu_bytes{device=~"flannel.*"}
+- id: flannel_overlay_bytes_1d
+  why: Overlay bytes sent and received in 24 hours (by node). Scale of inter-node traffic — a large value means pods are crossing nodes to reach databases and caches
+  query: sum by (instance) (increase(node_network_receive_bytes_total{device=~"flannel.*"}[1d]) + increase(node_network_transmit_bytes_total{device=~"flannel.*"}[1d]))

@@ -1,0 +1,2 @@
+# The core collector is always enabled. This file exists to keep the collector layout uniform.
+always: true

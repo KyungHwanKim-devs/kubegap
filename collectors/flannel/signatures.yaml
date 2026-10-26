@@ -1,0 +1,2 @@
+# flannel log signatures. k3s built-in flannel logs to the k3s journal with a "flannel" prefix — covered by the k3s-platform signatures (k3s.*).
+[]

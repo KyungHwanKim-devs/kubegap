@@ -1,0 +1,2 @@
+# flannel collector (the counterpart of EKS VPC CNI). Enabled when a node annotation flannel.alpha.coreos.com/* or a kube-flannel DaemonSet exists. In k3s flannel is built into the binary, so there are no pods.
+component: flannel

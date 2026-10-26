@@ -1,0 +1,2 @@
+# CoreDNS collector. Enabled when the detected component coredns (kube-system/coredns Deployment) is present. k3s coredns has the same name, so it is enabled on a homelab too.
+component: coredns
