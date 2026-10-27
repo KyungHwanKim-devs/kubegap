@@ -11,7 +11,7 @@
         "elasticloadbalancing:Describe*",
         "cloudwatch:GetMetricData",
         "logs:DescribeLogGroups", "logs:StartQuery", "logs:GetQueryResults", "logs:StopQuery",
-        "ssm:DescribeInstanceInformation", "ssm:GetCommandInvocation",
+        "ssm:DescribeInstanceInformation", "ssm:GetCommandInvocation", "ssm:DescribeDocument",
         "acm:ListCertificates", "acm:DescribeCertificate",
         "servicequotas:ListServiceQuotas", "servicequotas:GetServiceQuota",
         "dlm:GetLifecyclePolicies",
@@ -23,13 +23,21 @@
       "Resource": "*"
     },
     {
-      "Sid": "KubegapNodeShellReadOnlyViaSSM",
+      "Sid": "KubegapNodeReadDocumentOnly",
       "Effect": "Allow",
       "Action": ["ssm:SendCommand"],
-      "Resource": [
-        "arn:aws:ssm:*:*:document/AWS-RunShellScript",
-        "arn:aws:ec2:*:*:instance/*"
-      ]
+      "Resource": "arn:aws:ssm:*:*:document/kubegap-node-read"
+    },
+    {
+      "Sid": "KubegapNodeReadThisClusterOnly",
+      "Effect": "Allow",
+      "Action": ["ssm:SendCommand"],
+      "Resource": "arn:aws:ec2:*:*:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "ssm:resourceTag/kubernetes.io/cluster/<CLUSTER_NAME>": "owned"
+        }
+      }
     }
   ]
 }
