@@ -80,7 +80,7 @@ Supported platforms: macOS on Apple Silicon and Intel, Linux on amd64 and arm64,
 
 Set `mode: full` in `~/.kubegap/config.yaml` to make full the default. Daily and full snapshots live side by side under the same context folder and are never compared with each other.
 
-A full snapshot is about 40 MB. `scripts/kubegap prune --keep-daily 14 --keep-full 4` removes older ones (add `--dry-run` to see the list first; `retention` in the config sets the defaults); the latest daily and the latest full always stay.
+A full snapshot is about 40 MB. `scripts/kubegap prune --keep-daily 14 --keep-full 4` removes older ones, and `retention` in the config sets the defaults. It deletes without asking, so with `retention` set a bare `scripts/kubegap prune` already removes folders. Add `--dry-run` to see the list first. The latest daily and the latest full always stay.
 
 ## What it checks
 

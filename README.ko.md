@@ -80,7 +80,7 @@ $kubegap
 
 `~/.kubegap/config.yaml` 에 `mode: full` 을 두면 full 이 기본값이 됩니다. daily 와 full 스냅샷은 같은 컨텍스트 폴더에 나란히 쌓이고 서로 비교하지 않습니다.
 
-full 스냅샷 하나는 40 MB 안팎입니다. `scripts/kubegap prune --keep-daily 14 --keep-full 4` 로 오래된 스냅샷을 지웁니다 (`--dry-run` 을 붙이면 목록만 보여 줍니다. 설정의 `retention` 이 기본값이 됩니다). 직전 daily 와 직전 full 은 항상 남습니다.
+full 스냅샷 하나는 40 MB 안팎입니다. `scripts/kubegap prune --keep-daily 14 --keep-full 4` 로 오래된 스냅샷을 지웁니다. 설정의 `retention` 이 기본값이 됩니다. 확인 없이 바로 지우므로, 설정에 `retention` 이 있으면 `scripts/kubegap prune` 만 쳐도 지워집니다. `--dry-run` 을 붙이면 지울 목록만 보여 줍니다. 직전 daily 와 직전 full 은 항상 남습니다.
 
 ## 점검하는 영역
 
