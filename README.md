@@ -8,9 +8,9 @@
 
 Auditing a cluster is toil. Google's *Site Reliability Engineering* book calls work toil when it is manual, repetitive, automatable and grows with the service, and says reducing it is the point of SRE. kubegap takes that toil off your hands so your time goes to engineering.
 
-kubegap comes out of running three clusters alone on three platforms: a small k3s cluster, EKS at work, and a client's Kubernetes on Azure. Alerts and dashboards catch only what someone already defined. Everything else shows up only when you go digging through the cluster by hand, and three clusters do not leave time for that every day. kubegap does the digging: it reads the cluster, judges it against 403 written checks, and writes a report a person can read.
+kubegap comes out of running three clusters alone on three platforms: a small k3s cluster, EKS at work, and a client's Kubernetes on Azure. Alerts and dashboards catch only what someone already defined. Everything else shows up only when you go digging through the cluster by hand, and three clusters do not leave time for that every day. kubegap does the digging: it reads the cluster, judges it against 402 written checks, and writes a report a person can read.
 
-kubegap is a skill in the [Agent Skills](https://agentskills.io) standard, the open format that coding agents such as Claude Code and Codex read, so any of them can run it with one command. It reads your cluster, read-only, and never touches a Secret value. It grades the cluster against 403 checks in 12 areas. Then it writes you a report: what is wrong, what the evidence is, why it happened, what to do, and, when the check definition records one, a public case that looked the same.
+kubegap is a skill in the [Agent Skills](https://agentskills.io) standard, the open format that coding agents such as Claude Code and Codex read, so any of them can run it with one command. It reads your cluster, read-only, and never touches a Secret value. It grades the cluster against 402 checks in 12 areas. Then it writes you a report: what is wrong, what the evidence is, why it happened, what to do, and, when the check definition records one, a public case that looked the same.
 
 ![A kubegap daily run on an 8-node EKS cluster: collection, first-pass evaluation, two report files](docs/media/kubegap-run.gif)
 
@@ -32,7 +32,7 @@ The full sample reports, daily and full, for an EKS cluster and a small k3s clus
 Three things to know:
 
 1. **One command, every morning.** `/kubegap` is the daily run: a one-page report with the 3 problems to work on, compared with yesterday's daily run. `/kubegap full` is the deep one: everything collected, the 5 problems, every table.
-2. **It only reads and never changes anything.** The only Kubernetes verbs it uses are `get`, `list` and `watch`, and it never reads a Secret value or stores a ConfigMap value. The exact ClusterRole and IAM policy are in [`deploy/permissions/`](deploy/permissions/). The numbers come from deterministic scripts and are the same on every run. The judgment and the writing come from the agent, and every change it makes to a first-pass verdict is written in an adjustment table with the reason.
+2. **It only reads and never changes anything.** The only Kubernetes verbs it uses are `get`, `list` and `watch`, and it never reads a Secret value or stores a ConfigMap value, with one exception: `helm list` reads Helm's own release records, which Helm stores in Secrets, and only their metadata is kept. The exact ClusterRole and IAM policy are in [`deploy/permissions/`](deploy/permissions/). The numbers come from deterministic scripts and are the same on every run. The judgment and the writing come from the agent, and every change it makes to a first-pass verdict is written in an adjustment table with the reason.
 3. **It doesn't just find problems; it explains them.** Every problem ends with the principle behind it, a public case when the check definition has one, and what to read next. Sources are never invented: that section cites only what the check definition or a primary document says.
 
 The daily run is for whoever is on the hook for a cluster this morning: a solo operator, the on-call engineer, a platform team that wants one page before standup. The full run is for the moments that deserve an afternoon: taking over a cluster, preparing an upgrade, a quarterly review, a post-incident look at what else is fragile. kubegap is not a monitoring or alerting system, and it does not fix anything. It audits the monitoring you already have, and it only reads.
@@ -74,7 +74,7 @@ Supported platforms: macOS on Apple Silicon and Intel, Linux on amd64 and arm64,
 | | `daily` (default) | `full` |
 |---|---|---|
 | Collects | Kubernetes objects, events, Prometheus metrics, component logs, AWS inventory | the same plus node OS scripts (SSM/SSH), CloudWatch control-plane logs and metrics, cost and pricing, ECR, service quotas, krr/polaris/pluto/kubent/helm |
-| Checks | 403 minus the ones that need full-only inputs; those are reported as "not collected", not as findings | all 403 |
+| Checks | 402 minus the ones that need full-only inputs; those are reported as "not collected", not as findings | all 402 |
 | Report | `report.md`: the 3 problems, each with evidence, cause, action and cases; what changed since the previous daily run; what the run could not see. `report-details.md`: every table | `report.md`: the same shape with 5 problems. `report-details.md`: the 12-area detail and the full first-pass list as well |
 | Compared with | the previous daily snapshot | the previous full snapshot |
 
@@ -84,7 +84,7 @@ A full snapshot is about 40 MB. `scripts/kubegap prune --keep-daily 14 --keep-fu
 
 ## What it checks
 
-Twelve areas, 403 checks. Each row gives the count and a few examples; the full list is [`docs/CHECKS.md`](docs/CHECKS.md).
+Twelve areas, 402 checks. Each row gives the count and a few examples; the full list is [`docs/CHECKS.md`](docs/CHECKS.md).
 
 | Area | Checks | Examples |
 |---|---|---|
@@ -93,7 +93,7 @@ Twelve areas, 403 checks. Each row gives the count and a few examples; the full 
 | Observability | 64 | no symptom-based alerts, alerts firing for 7 days straight, observability stack on emptyDir, ingress controller metrics not scraped |
 | Traffic | 53 | database ports open to the internet, unhealthy ALB targets, deregistration delay longer than termination grace |
 | Resilience | 43 | all replicas on one node, no PDB, backup dumps on the same disk as the source, workloads that can only land on one node |
-| Hygiene | 35 | `latest` tags, deprecated APIs, Helm releases on pure chart defaults, dependence on custom node labels |
+| Hygiene | 34 | `latest` tags, deprecated APIs, Helm releases left in a pending or failed state, dependence on custom node labels |
 | Storage | 25 | unencrypted EBS, StorageClasses without expansion, local-path volumes over capacity |
 | Security | 46 | NetworkPolicies not enforced, IMDSv1 allowed, plaintext secret env vars (names only), wildcard RBAC |
 | Cost | 13 | idle compute ratio, monthly cost of request waste, ECR repos without lifecycle |
@@ -154,7 +154,7 @@ kubegap does not have its own credential store. It reuses what is already on you
 
 ## Required permissions
 
-kubegap **never changes the cluster.** It makes read calls only. Secret values are never read or recorded; only their names and types are. ConfigMap values are not recorded either: the snapshot keeps each key's length and shape, and the real value only for the configuration keys kubegap parses, listed in `KEEP_VALUES` in [`lib/scrub.py`](lib/scrub.py) (CoreDNS Corefile, kube-proxy config, local-path-provisioner paths, a few Argo CD flags). Component pod logs are aggregated into the summary and then deleted from the snapshot.
+kubegap **never changes the cluster.** It makes read calls only. Secret values are never read or recorded; only their names and types are. The one exception is Helm: Helm stores each release record in a Secret, so `helm list` reads those Secrets; kubegap keeps only the release name, status, versions and date from it and never collects the release values. ConfigMap values are not recorded either: the snapshot keeps each key's length and shape, and the real value only for the configuration keys kubegap parses, listed in `KEEP_VALUES` in [`lib/scrub.py`](lib/scrub.py) (CoreDNS Corefile, kube-proxy config, local-path-provisioner paths, a few Argo CD flags). Component pod logs are aggregated into the summary and then deleted from the snapshot.
 
 - Cluster: [`deploy/permissions/clusterrole.yaml`](deploy/permissions/clusterrole.yaml) — get/list/watch on everything plus `nodes/proxy` and `nodes/metrics`, Secrets excluded.
 - AWS (EKS): [`deploy/permissions/iam-policy.json`](deploy/permissions/iam-policy.json) — Describe/List/Get actions, CloudWatch `GetMetricData`, and SSM `SendCommand` limited in two ways: only the document `kubegap-node-read` ([`deploy/permissions/ssm-document.yaml`](deploy/permissions/ssm-document.yaml)), which embeds the read commands and takes no free command text, and only instances tagged `kubernetes.io/cluster/<CLUSTER_NAME>=owned`, the tag managed node groups and Karpenter already put on every node. Replace `<ACCOUNT_ID>` and `<CLUSTER_NAME>` in the policy before attaching it; the account id keeps a same-named document shared from another account from matching. A key with this policy can run those commands on that cluster's nodes and nothing else.
@@ -164,7 +164,7 @@ kubegap **never changes the cluster.** It makes read calls only. Secret values a
 
 ## What leaves your machine
 
-kubegap itself sends nothing anywhere. Everything it collects is written to `~/.kubegap/snapshots/` on your machine. The agent that runs the skill then reads those files to write the report, and what it reads goes to that agent's model API: Anthropic's for Claude Code, OpenAI's for Codex. In practice that is the summary, the first-pass findings, and the raw files the agent opens to check a number: object specs, events and metrics. Secret values are never collected, so they cannot leave. ConfigMap values are not written to the snapshot, apart from the configuration keys listed in `lib/scrub.py`. Component pod logs are read by code, counted into the summary with masked sample lines, and deleted before the agent starts; set `keep_component_logs: true` in the config only if you accept that raw log lines may then be read by the agent. Still stored as collected, and so readable by the agent: node journals under `logs/node/` (kubelet, containerd, k3s), CloudWatch control-plane log queries under `logs/cloudwatch/`, Grafana dashboards, and in full mode the user values of Helm releases under `tools/helm-values/`, which is [issue #3](https://github.com/KyungHwanKim-devs/kubegap/issues/3). Tokens, account ids and private IPs are masked in the report, not in the snapshot. There is no mode that keeps the data local, because the report is written by the model. If that is not acceptable for a cluster, do not run kubegap against it.
+kubegap itself sends nothing anywhere. Everything it collects is written to `~/.kubegap/snapshots/` on your machine. The agent that runs the skill then reads those files to write the report, and what it reads goes to that agent's model API: Anthropic's for Claude Code, OpenAI's for Codex. In practice that is the summary, the first-pass findings, and the raw files the agent opens to check a number: object specs, events and metrics. Secret values are never collected, so they cannot leave. ConfigMap values are not written to the snapshot, apart from the configuration keys listed in `lib/scrub.py`. Component pod logs are read by code, counted into the summary with masked sample lines, and deleted before the agent starts; set `keep_component_logs: true` in the config only if you accept that raw log lines may then be read by the agent. Still stored as collected, and so readable by the agent: node journals under `logs/node/` (kubelet, containerd, k3s), CloudWatch control-plane log queries under `logs/cloudwatch/`, and Grafana dashboards. Tokens, account ids and private IPs are masked in the report, not in the snapshot. There is no mode that keeps the data local, because the report is written by the model. If that is not acceptable for a cluster, do not run kubegap against it.
 
 ## Configuration (optional)
 

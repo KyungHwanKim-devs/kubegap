@@ -8,9 +8,9 @@ English: [README.md](README.md)
 
 클러스터 점검은 toil 입니다. Google 이 낸 『Site Reliability Engineering』 은 손으로 반복하고, 자동화할 수 있고, 서비스가 커질수록 같이 늘어나는 일을 toil 이라고 부르고, 그런 일을 줄이는 것이 SRE 의 본업이라고 말합니다. kubegap 은 점검이라는 toil 을 대신 맡습니다. 그렇게 아낀 시간은 엔지니어링에 쓰시면 됩니다.
 
-kubegap 은 플랫폼이 다른 클러스터 세 개를 혼자 운영하면서 만들었습니다. 규모가 작은 k3s, 회사의 EKS, 그리고 고객사에서 맡고 있는 Azure 위의 Kubernetes 입니다. 알림과 대시보드는 미리 정해 둔 것만 잡아 줍니다. 그 바깥의 문제는 클러스터를 직접 뒤져야 보이는데, 세 곳을 매일 그렇게 들여다볼 시간은 없습니다. 그 일을 kubegap 이 대신합니다. 클러스터 상태를 읽어 와서 403개 기준으로 따져 보고, 사람이 읽을 리포트로 정리합니다.
+kubegap 은 플랫폼이 다른 클러스터 세 개를 혼자 운영하면서 만들었습니다. 규모가 작은 k3s, 회사의 EKS, 그리고 고객사에서 맡고 있는 Azure 위의 Kubernetes 입니다. 알림과 대시보드는 미리 정해 둔 것만 잡아 줍니다. 그 바깥의 문제는 클러스터를 직접 뒤져야 보이는데, 세 곳을 매일 그렇게 들여다볼 시간은 없습니다. 그 일을 kubegap 이 대신합니다. 클러스터 상태를 읽어 와서 402개 기준으로 따져 보고, 사람이 읽을 리포트로 정리합니다.
 
-kubegap 은 [Agent Skills](https://agentskills.io) 스킬입니다. Claude Code, Codex 같은 코딩 에이전트가 읽는 공개 규격이라, 그런 에이전트라면 어디서든 명령 하나로 돌릴 수 있습니다. 명령을 치면 클러스터를 읽기만 하면서 살펴보고, 12개 영역 403개 점검 항목으로 따져 본 뒤 리포트를 씁니다. Secret 값은 절대 읽지 않습니다. 리포트에는 무엇이 문제인지, 근거가 무엇인지, 왜 생겼는지, 무엇을 하면 되는지, 그리고 점검 항목에 기록된 공개 사례가 있으면 그것까지 씁니다.
+kubegap 은 [Agent Skills](https://agentskills.io) 스킬입니다. Claude Code, Codex 같은 코딩 에이전트가 읽는 공개 규격이라, 그런 에이전트라면 어디서든 명령 하나로 돌릴 수 있습니다. 명령을 치면 클러스터를 읽기만 하면서 살펴보고, 12개 영역 402개 점검 항목으로 따져 본 뒤 리포트를 씁니다. Secret 값은 절대 읽지 않습니다. 리포트에는 무엇이 문제인지, 근거가 무엇인지, 왜 생겼는지, 무엇을 하면 되는지, 그리고 점검 항목에 기록된 공개 사례가 있으면 그것까지 씁니다.
 
 ![8노드 EKS 클러스터에서 kubegap daily 점검을 돌리는 모습](docs/media/kubegap-run.gif)
 
@@ -32,7 +32,7 @@ kubegap 은 [Agent Skills](https://agentskills.io) 스킬입니다. Claude Code,
 꼭 알아 둘 세 가지입니다.
 
 1. **매일 아침 명령 하나.** `/kubegap` 이 daily 점검입니다. 오늘 손댈 문제 3개가 적힌 한 장짜리 리포트가 나오고, 어제 daily 점검과 비교해 무엇이 바뀌었는지 알려 줍니다. `/kubegap full` 은 깊은 점검입니다. 모을 수 있는 건 다 모으고, 문제 5개와 세부 표 전부를 리포트에 담습니다.
-2. **클러스터를 읽기만 하고 아무것도 바꾸지 않습니다.** 쓰는 Kubernetes API 는 get, list, watch 셋뿐이고 Secret 값은 읽지 않으며 ConfigMap 값은 저장하지 않습니다. 정확한 ClusterRole 과 IAM 정책은 [`deploy/permissions/`](deploy/permissions/) 에 있습니다. 숫자는 결정론적인 스크립트가 만들어서 다시 돌려도 똑같이 나옵니다. 판단과 글은 에이전트가 쓰고, 1차 판정을 바꾼 곳은 조정표에 이유와 함께 남깁니다.
+2. **클러스터를 읽기만 하고 아무것도 바꾸지 않습니다.** 쓰는 Kubernetes API 는 get, list, watch 셋뿐이고 Secret 값은 읽지 않으며 ConfigMap 값은 저장하지 않습니다. 예외는 `helm list` 하나로, Helm 이 Secret 에 두는 자기 릴리스 기록을 읽되 메타데이터만 남깁니다. 정확한 ClusterRole 과 IAM 정책은 [`deploy/permissions/`](deploy/permissions/) 에 있습니다. 숫자는 결정론적인 스크립트가 만들어서 다시 돌려도 똑같이 나옵니다. 판단과 글은 에이전트가 쓰고, 1차 판정을 바꾼 곳은 조정표에 이유와 함께 남깁니다.
 3. **찾아 주는 데서 끝나지 않습니다.** 문제마다 왜 그런 일이 생기는지, 같은 일을 겪은 공개 사례가 있는지, 더 파고들려면 무엇을 찾아볼지를 함께 씁니다. 출처를 지어내지 않습니다. 항목 정의나 공식 문서에 있는 것만 인용합니다.
 
 daily 점검은 오늘 아침 클러스터를 책임지는 사람을 위한 것입니다. 혼자 운영하는 사람, 이번 주 on-call 담당, 스탠드업 전에 한 장만 보고 싶은 플랫폼 팀. full 점검은 오후를 들일 만한 순간을 위한 것입니다. 클러스터를 넘겨받을 때, 업그레이드를 앞두고 있을 때, 분기 리뷰, 장애 뒤에 또 무엇이 약한지 볼 때. kubegap 은 모니터링이나 알림 도구가 아니라 이미 깔린 모니터링이 제대로 돌고 있는지 점검하는 도구이고, 고쳐 주지 않고 읽기만 합니다.
@@ -74,7 +74,7 @@ $kubegap
 | | `daily`, 기본값 | `full` |
 |---|---|---|
 | 수집 | Kubernetes 오브젝트, 이벤트, Prometheus 메트릭, 컴포넌트 로그, AWS 인벤토리 | 왼쪽 전부에 더해 SSM 이나 SSH 로 도는 노드 OS 스크립트, CloudWatch 컨트롤플레인 로그와 메트릭, 비용과 가격, ECR, 서비스 쿼터, krr·polaris·pluto·kubent·helm |
-| 점검 항목 | 403개 중 full 전용 입력이 필요한 것은 뺍니다. 뺀 것은 "미수집" 으로 적고 문제로 세지 않습니다 | 403개 전부 |
+| 점검 항목 | 402개 중 full 전용 입력이 필요한 것은 뺍니다. 뺀 것은 "미수집" 으로 적고 문제로 세지 않습니다 | 402개 전부 |
 | 리포트 | `report.md`: 문제 3개, 각각 근거·원인·조치·사례. 지난 daily 점검 이후 바뀐 것. 이번에 확인 못 한 것. `report-details.md`: 모든 표 | `report.md`: 같은 모양으로 문제 5개. `report-details.md`: 12개 영역 세부와 1차 결과 전체까지 |
 | 비교 대상 | 지난 daily 스냅샷 | 지난 full 스냅샷 |
 
@@ -84,7 +84,7 @@ full 스냅샷 하나는 40 MB 안팎입니다. `scripts/kubegap prune --keep-da
 
 ## 점검하는 영역
 
-영역 12개, 항목 403개입니다. 영역마다 항목 수와 예시를 적었습니다. 전체 목록은 [`docs/CHECKS.md`](docs/CHECKS.md) 에 있습니다.
+영역 12개, 항목 402개입니다. 영역마다 항목 수와 예시를 적었습니다. 전체 목록은 [`docs/CHECKS.md`](docs/CHECKS.md) 에 있습니다.
 
 | 영역 | 항목 수 | 예시 |
 |---|---|---|
@@ -93,7 +93,7 @@ full 스냅샷 하나는 40 MB 안팎입니다. `scripts/kubegap prune --keep-da
 | 관측성 | 64 | 증상 기반 알림이 없음, 7일 내내 울리는 알림, emptyDir 위의 관측 스택, 수집되지 않는 인그레스 컨트롤러 메트릭 |
 | 트래픽 | 53 | 인터넷에 열린 DB 포트, 비정상 ALB 타깃, 종료 유예보다 긴 deregistration delay |
 | 복원력 | 43 | 한 노드에 몰린 레플리카, PDB 없음, 원본과 같은 디스크에 있는 백업 덤프, 노드 하나에만 갈 수 있는 워크로드 |
-| 위생 | 35 | `latest` 태그, 지원이 끝난 API, 차트 기본값 그대로인 Helm 릴리스, 사용자 노드 레이블 의존 |
+| 위생 | 34 | `latest` 태그, 지원이 끝난 API, pending 이나 failed 상태로 남은 Helm 릴리스, 사용자 노드 레이블 의존 |
 | 스토리지 | 25 | 암호화되지 않은 EBS, 확장이 꺼진 StorageClass, 용량을 넘긴 local-path 볼륨 |
 | 보안 | 46 | 적용되지 않는 NetworkPolicy, 허용된 IMDSv1, 평문 비밀 환경 변수, 와일드카드 RBAC |
 | 비용 | 13 | 유휴 컴퓨트 비율, requests 과잉이 만드는 월 비용, 수명주기 정책 없는 ECR 저장소 |
@@ -154,7 +154,7 @@ kubegap 에는 자체 자격 증명 저장소가 없습니다. 지금 쓰는 PC 
 
 ## 필요한 권한
 
-kubegap 은 클러스터를 읽기만 하고 **아무것도 바꾸지 않습니다.** Secret 값은 읽지도 기록하지도 않습니다. 이름과 종류만 봅니다. ConfigMap 값도 기록하지 않습니다. 스냅샷에는 키마다 길이와 모양만 남고, 실제 값은 kubegap 이 파싱하는 설정 키만 남습니다. 그 목록은 [`lib/scrub.py`](lib/scrub.py) 의 `KEEP_VALUES` 이고, CoreDNS 의 Corefile, kube-proxy 설정, local-path-provisioner 경로, Argo CD 플래그 몇 개입니다. 컴포넌트 파드 로그는 요약에 집계된 뒤 스냅샷에서 지워집니다.
+kubegap 은 클러스터를 읽기만 하고 **아무것도 바꾸지 않습니다.** Secret 값은 읽지도 기록하지도 않습니다. 이름과 종류만 봅니다. 예외는 Helm 하나입니다. Helm 은 릴리스 기록을 Secret 에 두기 때문에 `helm list` 가 그 Secret 을 읽습니다. kubegap 은 거기서 릴리스 이름, 상태, 버전, 날짜만 저장하고 릴리스 values 는 수집하지 않습니다. ConfigMap 값도 기록하지 않습니다. 스냅샷에는 키마다 길이와 모양만 남고, 실제 값은 kubegap 이 파싱하는 설정 키만 남습니다. 그 목록은 [`lib/scrub.py`](lib/scrub.py) 의 `KEEP_VALUES` 이고, CoreDNS 의 Corefile, kube-proxy 설정, local-path-provisioner 경로, Argo CD 플래그 몇 개입니다. 컴포넌트 파드 로그는 요약에 집계된 뒤 스냅샷에서 지워집니다.
 
 - 클러스터: [`deploy/permissions/clusterrole.yaml`](deploy/permissions/clusterrole.yaml). 모든 리소스에 get, list, watch 와 `nodes/proxy`, `nodes/metrics`. Secret 은 제외.
 - AWS, EKS: [`deploy/permissions/iam-policy.json`](deploy/permissions/iam-policy.json). Describe, List, Get 동작과 CloudWatch `GetMetricData`, 그리고 노드 안을 읽기 위한 SSM `SendCommand`. SendCommand 는 두 겹으로 제한됩니다. 문서는 `kubegap-node-read` ([`deploy/permissions/ssm-document.yaml`](deploy/permissions/ssm-document.yaml)) 하나만 허용하는데, 이 문서에는 읽기 명령이 고정으로 박혀 있고 바깥에서 명령을 넣을 자리가 없습니다. 대상은 `kubernetes.io/cluster/<CLUSTER_NAME>=owned` 태그가 붙은 인스턴스만 허용하는데, 이 태그는 관리형 노드 그룹과 Karpenter 가 노드마다 이미 붙여 둔 것입니다. 정책을 붙이기 전에 `<ACCOUNT_ID>` 와 `<CLUSTER_NAME>` 을 바꿔 넣습니다. 계정 번호를 박아 두는 건 다른 계정이 같은 이름으로 공유한 문서가 정책에 걸리지 않게 하기 위해서입니다. 이 정책을 가진 키로 할 수 있는 일은 그 클러스터 노드에서 그 명령을 돌리는 것뿐입니다.
@@ -164,7 +164,7 @@ kubegap 은 클러스터를 읽기만 하고 **아무것도 바꾸지 않습니�
 
 ## 내 컴퓨터 밖으로 나가는 것
 
-kubegap 자체는 어디로도 데이터를 보내지 않습니다. 수집한 것은 전부 내 컴퓨터의 `~/.kubegap/snapshots/` 에 씁니다. 그다음 스킬을 돌리는 에이전트가 그 파일을 읽어 리포트를 쓰는데, 에이전트가 읽은 내용은 그 에이전트의 모델 API 로 전송됩니다. Claude Code 면 Anthropic, Codex 면 OpenAI 입니다. 실제로 읽는 것은 요약, 1차 판정 결과, 그리고 숫자를 확인하려고 여는 원본 파일입니다. 오브젝트 스펙, 이벤트, 메트릭이 여기에 들어갑니다. Secret 값은 수집 자체를 하지 않으므로 나갈 수 없습니다. ConfigMap 값은 `lib/scrub.py` 에 적힌 설정 키를 빼고 스냅샷에 쓰지 않습니다. 컴포넌트 파드 로그는 코드가 읽어 횟수와 가린 샘플 줄만 요약에 남기고, 에이전트가 시작하기 전에 지웁니다. 설정에 `keep_component_logs: true` 를 두면 지우지 않는데, 그러면 로그 원본이 에이전트에게 읽혀 모델로 갈 수 있습니다. 받은 그대로 남아서 에이전트가 읽을 수 있는 것도 있습니다. `logs/node/` 의 노드 저널인 kubelet, containerd, k3s 로그, `logs/cloudwatch/` 의 컨트롤플레인 로그 조회 결과, Grafana 대시보드, 그리고 full 모드에서 `tools/helm-values/` 에 저장되는 Helm 릴리스의 사용자 values 입니다. Helm values 는 [이슈 #3](https://github.com/KyungHwanKim-devs/kubegap/issues/3) 에서 다룹니다. 토큰, 계정 ID, 사설 IP 는 리포트에서 가리고 스냅샷에서는 가리지 않습니다. 리포트를 모델이 쓰기 때문에 데이터를 내 컴퓨터에만 두는 모드는 없습니다. 이 조건을 받아들일 수 없는 클러스터라면 kubegap 을 돌리지 마세요.
+kubegap 자체는 어디로도 데이터를 보내지 않습니다. 수집한 것은 전부 내 컴퓨터의 `~/.kubegap/snapshots/` 에 씁니다. 그다음 스킬을 돌리는 에이전트가 그 파일을 읽어 리포트를 쓰는데, 에이전트가 읽은 내용은 그 에이전트의 모델 API 로 전송됩니다. Claude Code 면 Anthropic, Codex 면 OpenAI 입니다. 실제로 읽는 것은 요약, 1차 판정 결과, 그리고 숫자를 확인하려고 여는 원본 파일입니다. 오브젝트 스펙, 이벤트, 메트릭이 여기에 들어갑니다. Secret 값은 수집 자체를 하지 않으므로 나갈 수 없습니다. ConfigMap 값은 `lib/scrub.py` 에 적힌 설정 키를 빼고 스냅샷에 쓰지 않습니다. 컴포넌트 파드 로그는 코드가 읽어 횟수와 가린 샘플 줄만 요약에 남기고, 에이전트가 시작하기 전에 지웁니다. 설정에 `keep_component_logs: true` 를 두면 지우지 않는데, 그러면 로그 원본이 에이전트에게 읽혀 모델로 갈 수 있습니다. 받은 그대로 남아서 에이전트가 읽을 수 있는 것도 있습니다. `logs/node/` 의 노드 저널인 kubelet, containerd, k3s 로그, `logs/cloudwatch/` 의 컨트롤플레인 로그 조회 결과, Grafana 대시보드입니다. 토큰, 계정 ID, 사설 IP 는 리포트에서 가리고 스냅샷에서는 가리지 않습니다. 리포트를 모델이 쓰기 때문에 데이터를 내 컴퓨터에만 두는 모드는 없습니다. 이 조건을 받아들일 수 없는 클러스터라면 kubegap 을 돌리지 마세요.
 
 ## 선택 설정
 

@@ -30,7 +30,7 @@ uvx --from skills-ref agentskills validate "$PWD"      # run from the parent dir
 ## Rules
 
 - kubegap is read-only. Do not add commands that change the cluster (apply, delete, scale, patch, exec).
-- Secret values are never read or recorded anywhere. Names, types and key names only. ConfigMap values are not recorded either, apart from the keys in `KEEP_VALUES`, and raw component logs are deleted once `summarize` has aggregated them (`lib/scrub.py`, `lib/summarize.py`).
+- Secret values are never read or recorded anywhere. Names, types and key names only. The one exception is `helm list`, which reads Helm's own release records stored in Secrets; only release metadata is kept, and `helm get values` is never run. ConfigMap values are not recorded either, apart from the keys in `KEEP_VALUES`, and raw component logs are deleted once `summarize` has aggregated them (`lib/scrub.py`, `lib/summarize.py`).
 - Raw cluster data (snapshots), personal configuration (`config.yaml`) and tool binaries (`.tools/`) are not committed (`.gitignore`).
 - README.md and README.ko.md do not use parentheses for asides. Write a second sentence instead. The same rule applies to the reports (`references/report-writing.md`).
 - Commit messages: at least one line in English saying what changed and why.

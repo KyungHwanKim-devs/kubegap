@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Removed
+
+- The `helm-values` collection step and the check `hygiene.helm-release-pure-defaults`. `helm get values` reads Helm's release Secrets and the values often hold credentials; they were stored raw in the snapshot. `helm list` stays, and the READMEs now say that it reads Helm's release records, which Helm keeps in Secrets, and that only their metadata is stored. When `helm list` fails for lack of secrets permission, the summary says so instead of "helm not installed". Rubric 0.1.52, 402 checks. ([#3](https://github.com/KyungHwanKim-devs/kubegap/issues/3))
+
 ### Changed
 
 - EKS node commands run through a custom SSM document, `kubegap-node-read` (`deploy/permissions/ssm-document.yaml`), instead of `AWS-RunShellScript`. The document embeds every read command and takes no free command text; kubegap compares its sha256 with the account copy before sending and `kubegap setup` uploads it with consent (`--install-ssm-document`, config `ssm_document`). The IAM policy allows `ssm:SendCommand` only on that document and only on instances tagged `kubernetes.io/cluster/<CLUSTER_NAME>=owned`. ([#1](https://github.com/KyungHwanKim-devs/kubegap/issues/1))

@@ -1,6 +1,6 @@
 # kubegap read-only ClusterRole.
 # get, list and watch on every resource. Secrets are excluded: list returns the values, so kubegap never reads Secrets through kubectl
-# and only sees names and types via kube-state-metrics kube_secret_info. nodes/proxy is for kubelet configz and metrics, nodes/metrics for node metrics.
+# and only sees names and types via kube-state-metrics kube_secret_info. Helm stores release records in Secrets, so with this role `helm list` fails and the two Helm checks are skipped; grant secrets read if you want them. nodes/proxy is for kubelet configz and metrics, nodes/metrics for node metrics.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
