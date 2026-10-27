@@ -2,15 +2,19 @@
 
 The node OS layer (kernel log, sysctl, containerd state, disk paths) is invisible to kubectl. This module wraps two backends
 behind one interface, `run_on_node(node, cmd)`:
-- ssm : EKS. `aws ssm send-command` (document AWS-RunShellScript) → `get-command-invocation` polling. Works only for nodes whose IAM role has
-                SSM permissions and whose agent is registered. Unregistered nodes come back as "not registered with SSM" (their kernel log checks are marked skipped).
+- ssm : EKS. `aws ssm send-command` with the kubegap-node-read document (deploy/permissions/ssm-document.yaml) → `get-command-invocation` polling.
+                The document embeds every node command; the caller names a `step` and the document runs that fixed command. The IAM policy allows SendCommand on
+                that document only, so the key cannot run anything else. Before the first send, the sha256 of the local document file is compared with the one in
+                the account; when it is missing or different every node step fails with one message telling the user to run `kubegap setup --install-ssm-document`.
+                Works only for nodes whose IAM role has SSM permissions and whose agent is registered. Unregistered nodes come back as "not registered with SSM".
 - ssh : small k3s cluster / bare metal. `ssh -o BatchMode=yes` (no password prompt). The host is chosen from config.yaml `ssh.hosts.<node>` → node Hostname →
                 InternalIP, in that order. User, key and port come from config.yaml `ssh.user/key/port`; when empty, ~/.ssh/config applies.
 - none: platforms without a backend in 1.0 (GKE, AKS). Only node-exporter metrics are used.
 The detection result (inventory.node_access.method) picks the backend; config.yaml `node_access` overrides it. A privileged DaemonSet backend is planned.
 
-Read-only principle: the only commands sent here are the read commands defined by collectors (node entries in collect.yaml). This module does not
-inspect commands, so the collector definitions are responsible.
+Read-only principle: the only commands sent here are the read commands defined by collectors (node entries in collect.yaml) and the two probes in
+lib/nodecommands.py. deploy/node-access/COMMANDS.md lists all of them. On SSM the document enforces the list; on SSH the node's sudoers file limits the
+root commands; on the DaemonSet nothing but this list applies.
 """
 
 from __future__ import annotations
@@ -24,11 +28,11 @@ from pathlib import Path
 
 from . import aws as _aws
 from . import kube as _kube
-from . import shell
+from . import nodecommands, shell
 from .config import Config
 from .runlog import RunLog
 
-SSM_DOCUMENT = "AWS-RunShellScript"
+SSM_DOCUMENT = nodecommands.DOCUMENT_NAME
 
 
 @dataclass
@@ -57,11 +61,12 @@ class NodeAccess:
         self.ssh = cfg.get("ssh") or {}
 
     # ---------- public interface ----------
-    def run_on_node(self, node: str, cmd: str, timeout: float = 60, id: str | None = None, collector: str | None = None) -> NodeResult:
+    def run_on_node(self, node: str, cmd: str, timeout: float = 60, id: str | None = None, collector: str | None = None, *, step: str | None = None, params: dict | None = None) -> NodeResult:
+        """`cmd` is the shell text (SSH and DaemonSet send it as is). `step` is the same command's name in the SSM document (`<collector>/<step id>`, `probe`, `capabilities`); the SSM backend sends only that name plus `params` (podIp), never the text."""
         if node not in self.nodes:
             return NodeResult(node, self.method, False, error=f"node {node} not in inventory")
         if self.method == "ssm":
-            r = self._ssm(node, cmd, timeout)
+            r = self._ssm(node, step, params or {}, timeout)
         elif self.method == "ssh":
             r = self._ssh(node, cmd, timeout)
         elif self.method == "daemonset":
@@ -72,25 +77,16 @@ class NodeAccess:
             self.log.command(id=f"{id}.{node}", cmd=[f"node:{r.backend}", node, cmd], code=0 if r.ok else 1, seconds=r.seconds, error=r.error, collector=collector)
         return r
 
-    def run_on_all(self, cmd: str, timeout: float = 60, id: str | None = None, collector: str | None = None) -> dict[str, NodeResult]:
-        return {n: self.run_on_node(n, cmd, timeout, id, collector) for n in self.nodes}
+    def run_on_all(self, cmd: str, timeout: float = 60, id: str | None = None, collector: str | None = None, *, step: str | None = None) -> dict[str, NodeResult]:
+        return {n: self.run_on_node(n, cmd, timeout, id, collector, step=step) for n in self.nodes}
 
-    CAPABILITY_SCRIPT = (
-        "echo cap:journal=$( journalctl -n1 -q -u k3s -u k3s-agent -u kubelet -u containerd >/dev/null 2>&1 && echo yes || echo no );"
-        "echo cap:kernlog=$( [ -r /var/log/kern.log ] && echo yes || echo no );"
-        "echo cap:dmesg=$( dmesg -T >/dev/null 2>&1 && echo yes || ( sudo -n dmesg -T >/dev/null 2>&1 && echo sudo || echo no ) );"
-        "echo cap:k3s-db=$( ls /var/lib/rancher/k3s/server/db >/dev/null 2>&1 && echo yes || ( sudo -n ls -la /var/lib/rancher/k3s/server/db >/dev/null 2>&1 && echo sudo || echo no ) );"
-        "echo cap:k3s-config=$( cat /etc/rancher/k3s/config.yaml >/dev/null 2>&1 && echo yes || ( sudo -n cat /etc/rancher/k3s/config.yaml >/dev/null 2>&1 && echo sudo || ( [ -e /etc/rancher/k3s/config.yaml ] && echo no || echo absent ) ) );"
-        "echo cap:crictl=$( (command -v crictl >/dev/null && crictl info >/dev/null 2>&1) && echo yes || ( sudo -n /usr/local/bin/k3s crictl info >/dev/null 2>&1 && echo sudo || echo no ) );"
-        "echo cap:sudo-any=$( sudo -n true >/dev/null 2>&1 && echo yes || echo no );"
-        "echo cap:k3s-role=$( systemctl is-active k3s >/dev/null 2>&1 && echo server || ( systemctl is-active k3s-agent >/dev/null 2>&1 && echo agent || echo none ) );"
-        "echo cap:cgroup=$( stat -fc %T /sys/fs/cgroup/ 2>/dev/null )"
-    )
+    CAPABILITY_SCRIPT = nodecommands.CAPABILITY_SCRIPT
+    PROBE_CMD = nodecommands.PROBE_CMD
 
     def capabilities(self) -> dict[str, dict]:
         """Which read permissions each node has (readiness of stages 1 and 2 in deploy/node-access/README.md). yes=works as-is, sudo=works via sudoers, no=no permission."""
         out = {}
-        for n, r in self.run_on_all(self.CAPABILITY_SCRIPT, timeout=30, id="node.capabilities").items():
+        for n, r in self.run_on_all(self.CAPABILITY_SCRIPT, timeout=30, id="node.capabilities", step="capabilities").items():
             caps = {}
             for line in r.stdout.splitlines():
                 if line.startswith("cap:") and "=" in line:
@@ -101,7 +97,7 @@ class NodeAccess:
 
     def probe(self) -> dict[str, NodeResult]:
         """Send `echo ok; uname -r` to every node to confirm access. setup and discover record the result."""
-        return self.run_on_all("echo kubegap-ok; uname -r; hostname", timeout=30, id="node.probe")
+        return self.run_on_all(self.PROBE_CMD, timeout=30, id="node.probe", step="probe")
 
     # ---------- DaemonSet (kubectl exec → chroot /host) ----------
     DS_NAMESPACE, DS_LABEL = "kubegap", "app.kubernetes.io/name=kubegap-node-reader"
@@ -132,23 +128,42 @@ class NodeAccess:
         m = re.search(r"(i-[0-9a-f]+)$", (self.nodes[node].get("provider_id") or ""))
         return m.group(1) if m else None
 
-    def _ssm(self, node: str, cmd: str, timeout: float) -> NodeResult:
+    @cached_property
+    def ssm_document(self) -> dict:
+        """The kubegap-node-read document in the account compared with the local file, read once per NodeAccess (see lib/nodecommands.document_status)."""
+        return nodecommands.document_status(self.aws_profile, self.aws_region, log=self.log)
+
+    def _ssm(self, node: str, step: str | None, params: dict, timeout: float) -> NodeResult:
         t0 = time.monotonic()
         if node in self.ssm_unregistered:
             return NodeResult(node, "ssm", False, error="node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore")
+        if not step:
+            return NodeResult(node, "ssm", False, error=f"the SSM backend runs only the steps of the {SSM_DOCUMENT} document (deploy/node-access/COMMANDS.md); a free command cannot be sent")
+        if not self.ssm_document.get("current"):
+            return NodeResult(node, "ssm", False, error=nodecommands.missing_document_message(self.ssm_document, self.aws_profile, self.aws_region))
         iid = self._instance_id(node)
         if not iid:
             return NodeResult(node, "ssm", False, error="could not find an instance id in providerID")
-        # AWS-RunShellScript joins the elements of commands with newlines and runs them as one script. Multi-line scripts are passed line by line.
-        # Standard output is truncated at 24,000 characters (---Output truncated---). This is why the script limits line counts per section.
-        lines = cmd.split("\n") if "\n" in cmd else [cmd]
-        params = json.dumps({"commands": lines, "executionTimeout": [str(int(max(timeout, 30)))]})
+        # Standard output is truncated at 24,000 characters (---Output truncated---). This is why the scripts limit line counts per section.
+        p = {"step": [step], "executionTimeout": [str(int(max(timeout, 30)))]}
+        if params.get("podIp"):
+            p["podIp"] = [str(params["podIp"])]
         d, r = _aws.aws_json(
-            ["ssm", "send-command", "--instance-ids", iid, "--document-name", SSM_DOCUMENT, "--parameters", params, "--timeout-seconds", str(int(max(timeout, 30))), "--comment", "kubegap read-only"],
+            ["ssm", "send-command", "--instance-ids", iid, "--document-name", SSM_DOCUMENT, "--parameters", json.dumps(p), "--timeout-seconds", str(int(max(timeout, 30))), "--comment", f"kubegap read-only {step}"],
             profile=self.aws_profile,
             region=self.aws_region,
             timeout=30,
         )
+        if d is None:
+            err = (r.error or "") + " " + (r.stderr or "")
+            if "AccessDenied" in err or "not authorized" in err:
+                return NodeResult(
+                    node,
+                    "ssm",
+                    False,
+                    error=f"send-command denied for {iid}. The IAM policy allows SendCommand only on instances tagged kubernetes.io/cluster/<cluster name>=owned (deploy/permissions/iam-policy.json); check the tag on this node and the document name {SSM_DOCUMENT}: {r.stderr.strip()[-200:]}",
+                    seconds=time.monotonic() - t0,
+                )
         if d is None:
             return NodeResult(node, "ssm", False, error=f"send-command failed: {r.error or r.stderr.strip()[-300:]}", seconds=time.monotonic() - t0)
         cid = (d.get("Command") or {}).get("CommandId")

@@ -1,4 +1,4 @@
-"""AWS CLI wrapper and permission checks. Used only with the EKS profile. No write calls."""
+"""AWS CLI wrapper and permission checks. Used only with the EKS profile. No write calls here; the only write kubegap ever makes to an account is uploading the kubegap-node-read SSM document in lib/nodecommands.install_document, after the user agreed."""
 
 from __future__ import annotations
 

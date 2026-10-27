@@ -62,7 +62,9 @@ def cmd_setup(args) -> int:
         install = False
     else:
         install = cfg.install_policy == "always"
-    code, _ = _setup.run_setup(ctx, cfg, kubeconfig=args.kubeconfig, install=install, snapshots_root=_root(args), verbose=args.verbose)
+    # SSM document policy (EKS only): the flag wins; otherwise config ssm_document (always = upload, ask/never = report only). SKILL.md asks the user when setup reports it missing
+    install_doc = bool(args.install_ssm_document) or cfg.ssm_document_policy == "always"
+    code, _ = _setup.run_setup(ctx, cfg, kubeconfig=args.kubeconfig, install=install, install_ssm_document=install_doc, snapshots_root=_root(args), verbose=args.verbose)
     return code
 
 
@@ -349,7 +351,26 @@ def cmd_nodes(args) -> int:
     inv = _json.loads((snap / "inventory.json").read_text(encoding="utf-8"))
     na = NodeAccess(inv, cfg)
     print(f"snapshot {snap.name}, backend {na.method}" + (" (overridden by config.yaml)" if cfg.get("node_access") else ""))
-    if args.cmd:
+    if na.method == "ssm":
+        from lib import nodecommands as _nc
+
+        st = na.ssm_document
+        if st.get("current"):
+            print(f"SSM document {_nc.DOCUMENT_NAME}: present and current (version {st.get('version')})")
+        else:
+            print(f"SSM document: {_nc.missing_document_message(st, na.aws_profile, na.aws_region)}")
+        if args.cmd:
+            print("--cmd is not available on the SSM backend: only the steps of the document can run (deploy/node-access/COMMANDS.md). Use --step <name>", file=sys.stderr)
+            return EXIT_ERROR
+    if args.step:
+        from lib import nodecommands as _nc
+
+        match = [c for c in _nc.node_commands() if c["step"] == args.step]
+        if not match:
+            print(f"unknown step {args.step}. `kubegap node-commands` lists them", file=sys.stderr)
+            return EXIT_ERROR
+        results = na.run_on_all(match[0]["text"], timeout=args.timeout, step=args.step)
+    elif args.cmd:
         results = na.run_on_all(args.cmd, timeout=args.timeout)
     else:
         results = na.probe()
@@ -363,7 +384,7 @@ def cmd_nodes(args) -> int:
             tail = (" | output: " + " / ".join(r.stdout.strip().splitlines()[:4])[:160]) if r.stdout.strip() else ""
             print(f"  failed {n:<48} [{r.backend}] {r.error}{tail}")
     print(f"reachable {ok}/{len(results)}")
-    if not args.cmd and ok and na.method == "ssh":
+    if not args.cmd and not args.step and ok and na.method == "ssh":
         import json as _json2
 
         caps = na.capabilities()
@@ -423,6 +444,7 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--install", action="store_true", help="install every missing tool (brew, then GitHub release, then dedicated venv)")
     g.add_argument("--install-only", metavar="NAME,NAME", help="install only the named tools")
     g.add_argument("--no-install", action="store_true", help="check only, even if install_tools is always in config.yaml")
+    s.add_argument("--install-ssm-document", action="store_true", help="EKS: upload or update the kubegap-node-read SSM document in the account (needs ssm:CreateDocument and UpdateDocument on the current credentials; not part of the read-only policy)")
     s.set_defaults(func=cmd_setup)
 
     s = sub.add_parser("contexts", parents=[common], help="list kube contexts, mark the current one, and say whether each is EKS")
@@ -481,7 +503,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("nodes", parents=[common], help="verify node command backend (SSM/SSH) access. Default command: echo, uname, hostname")
     s.add_argument("--snapshot", default="latest", help="snapshot whose inventory.json to read. Default latest")
-    s.add_argument("--cmd", help="read-only command to run instead (e.g. 'df -h /')")
+    s.add_argument("--cmd", help="read-only command to run instead (e.g. 'df -h /'). SSH and DaemonSet backends only; SSM runs document steps, see --step")
+    s.add_argument("--step", help="run one named step from deploy/node-access/COMMANDS.md (e.g. core/node-os) instead of the probe")
     s.add_argument("--timeout", type=float, default=60)
     s.set_defaults(func=cmd_nodes)
 
