@@ -24,7 +24,7 @@ Rules for this file:
 <!-- Title is a plain sentence about the thing, e.g. "15 prod apps can only run on one node, and that node rebooted yesterday" -->
 **Problem.** {{problem_1_what}} <!-- what is wrong, how, and the impact on users or operations right now. Two or three sentences. -->
 
-**Evidence.** {{problem_1_evidence}} <!-- the three to six numbers that carry the problem, each in its own short sentence with its source file named after the number, not in parentheses. Everything else is in report-details.md; do not pile every value in here. Measured during collection? say so. -->
+**Evidence.** {{problem_1_evidence}} <!-- the three to six numbers that carry the problem, each in its own short sentence with its source file named after the number, not in parentheses. Everything else is in report-details.md; do not pile every value in here. Measured during collection? say so. A number here that differs from the first-pass aggregate for that check (its note, value or item count in findings-draft.json) must have a row in the Recounted aggregates table of llm/adjustments.md with the reason. -->
 
 **Cause.** {{problem_1_cause}} <!-- why it came to this. When not certain, start with "Most likely," -->
 

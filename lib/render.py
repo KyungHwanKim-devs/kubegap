@@ -6,7 +6,7 @@ dig: every table that can be produced mechanically is produced here (counts, cri
 checks evaluated, signature matches, the full first-pass table), and the parts that need judgment come from small Markdown fragments the
 LLM drops into `<snapshot>/llm/` before calling `scripts/kubegap render-details`:
 
-  llm/adjustments.md   final severity/status changes against the first pass, with reasons (one table)
+  llm/adjustments.md   final severity/status changes and recounted aggregates against the first pass, with reasons (two tables: Severities, Recounted aggregates)
   llm/changes.md       why things changed since the previous run of the same mode (narrative)
   llm/areas.md         per-area detail (full mode)
   llm/files-read.md    raw files the LLM opened directly
