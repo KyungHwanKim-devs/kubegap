@@ -2,7 +2,7 @@
 
 For every collector folder listed in `collectors_enabled` of `inventory.json`, read its `collect.yaml` and run the commands.
 Each command has a timeout and failure handling; on failure it is logged to run.log and we move on. The LLM is not involved in this stage.
-Secrets are never fetched by any path. If Secrets are mixed into fetched objects, data and stringData are stripped (defensive).
+Secrets are never fetched through kubectl. If Secrets are mixed into fetched objects, data and stringData are stripped (defensive). The one tool that touches Secrets is `helm list` (Helm keeps release records there); only its metadata output is stored.
 """
 
 from __future__ import annotations

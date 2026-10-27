@@ -1,6 +1,6 @@
 """Structure and hygiene summary.
 
-Inputs: tools/polaris.json (Polaris audit, failures only), tools/pluto.json and tools/kubent.json (deprecated APIs), tools/helm-list.json, aws/list-insights.json (EKS Upgrade Insights),
+Inputs: tools/polaris.json (Polaris audit, failures only), tools/pluto.json and tools/kubent.json (deprecated APIs), tools/helm-list.json (release metadata only; user values are never collected), aws/list-insights.json (EKS Upgrade Insights),
 metrics/apiserver_requested_deprecated_apis·secrets_by_name·secret_types, objects/(deployments·statefulsets·daemonsets·cronjobs·jobs·pods·configmaps·replicasets·persistentvolumeclaims·persistentvolumes·
 services·ingresses·serviceaccounts·customresourcedefinitions·namespaces·externalsecrets·applications.argoproj.io), summary.webhooks.
 
@@ -289,10 +289,25 @@ def _deprecated(cx: _Ctx) -> dict:
 # ---------- Helm ----------
 
 
+def _helm_missing_note(snap: Path) -> str:
+    """Why tools/helm-list.json is absent. Helm reads release records from Secrets, so the shipped ClusterRole (no secrets) makes `helm list` fail; tell that apart from helm not being installed."""
+    step = (((load_json(snap / "collect-result.json") or {}).get("core") or {}).get("steps") or {}).get("helm-list") or {}
+    err = str(step.get("error") or "")
+    if step.get("tool_missing"):
+        return "helm is not installed; the Helm checks are skipped (kubegap setup --install-only helm)"
+    if step.get("mode_skipped"):
+        return "helm list is not collected in daily mode; the Helm checks run in a full run"
+    if "forbidden" in err.lower() and "secret" in err.lower():
+        return "helm list failed: Helm stores release records in Secrets and the credentials used have no secrets read permission (the shipped kubegap ClusterRole leaves it out on purpose). The Helm checks are skipped"
+    if err:
+        return f"helm list failed: {err[:200]}"
+    return "tools/helm-list.json missing (helm not installed or not collected yet)"
+
+
 def _helm(cx: _Ctx, now: _dt.datetime) -> dict:
     d = load_json(cx.snap / "tools" / "helm-list.json")
     if d is None:
-        return {"present": False, "note": "tools/helm-list.json missing (helm not installed or not collected yet)"}
+        return {"present": False, "note": _helm_missing_note(cx.snap)}
     rows = []
     for r in d if isinstance(d, list) else []:
         upd = _ts(r.get("updated"))
@@ -314,26 +329,10 @@ def _helm(cx: _Ctx, now: _dt.datetime) -> dict:
                 "prod": (r.get("namespace") in cx.prod),
             }
         )
-    # Per release, the user values (tools/helm-values/<ns>__<name>.json, `helm get values -o json`: null when there are none) — a release running on pure chart defaults is not drift but "never tuned"
-    vdir = cx.snap / "tools" / "helm-values"
-    values_read = 0
-    for r in rows:
-        f = vdir / f"{r['namespace']}__{r['name']}.json"
-        r["user_values_keys"] = None
-        r["pure_defaults"] = None
-        if not f.is_file():
-            continue
-        values_read += 1
-        v = load_json(f)
-        r["user_values_keys"] = sorted(v.keys())[:40] if isinstance(v, dict) else []
-        r["user_values_count"] = len(v) if isinstance(v, dict) else 0
-        r["pure_defaults"] = not v
+    # User values (`helm get values`) are deliberately not collected: they often carry credentials (issue #3). Only the list metadata above is known.
     return {
         "present": True,
         "count": len(rows),
-        "values_read": values_read,
-        "pure_defaults": [r["target"] for r in rows if r.get("pure_defaults")],
-        "pure_defaults_prod": [r["target"] for r in rows if r.get("pure_defaults") and r["prod"]],
         "releases": rows,
         "not_deployed": [r for r in rows if r["status"] != "deployed"],
         "by_status": dict(Counter(r["status"] for r in rows)),

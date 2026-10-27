@@ -22,7 +22,7 @@ The report never gives the cluster a number out of 100. It gives counts by sever
 
 ## 4. Read-only, and Secret values are never read
 
-kubegap runs no command that changes a cluster. Secret objects are collected with their `data` and `stringData` fields removed before anything is written to disk. The ClusterRole in `deploy/permissions/` excludes `secrets` entirely; Secret metadata comes from kube-state-metrics instead.
+kubegap runs no command that changes a cluster. Secret objects are collected with their `data` and `stringData` fields removed before anything is written to disk. The ClusterRole in `deploy/permissions/` excludes `secrets` entirely; Secret metadata comes from kube-state-metrics instead. The one exception is Helm: Helm stores release records in Secrets, so `helm list` reads them. kubegap keeps only release metadata from it and does not run `helm get values`, whose output often holds credentials; with the shipped ClusterRole the Helm checks are simply skipped.
 
 A tool that one person points at production without a review board must be safe to run by construction, not by convention.
 
