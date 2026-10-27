@@ -77,7 +77,7 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         "helm",
-        "Release status and values drift",
+        "Helm release status and age (reads release records, which Helm stores in Secrets)",
         brew="helm",
         download={"url": "https://get.helm.sh/helm-{tag}-{os}-{arch}.tar.gz", "version_repo": "helm/helm", "bin": "helm"},
         version_args=["version", "--short"],

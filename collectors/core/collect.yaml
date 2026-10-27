@@ -103,19 +103,11 @@
   cmd: [kubent, --context, "{context}", -o, json, -t, "{k8s_next_minor_short}"]
   out: tools/kubent.json
   timeout: 300
+# Helm keeps each release record in a Secret (sh.helm.release.v1.<name>.v<n>), so `helm list` reads Secrets. kubegap stores only what list prints: name, namespace, status, revision, chart and app version, updated. User values (`helm get values`) are not collected: they often hold credentials. The shipped ClusterRole has no secrets permission, so with it this step fails and the Helm checks are skipped (lib/hygiene.py says why).
 - id: helm-list
   modes: [full]   # skipped by the daily run
   type: tool
   tool: helm
   cmd: [helm, list, -A, -o, json, --kube-context, "{context}", --deployed, --failed, --pending, --uninstalling, --uninstalled]
   out: tools/helm-list.json
-  timeout: 120
-- id: helm-values
-  modes: [full]   # skipped by the daily run
-  # User-supplied values per release (the diff from chart defaults = what the operator changed). Empty means pure chart defaults — input for "Helm release drift (deployed values vs chart defaults)". Needs helm-list first
-  type: tool
-  tool: helm
-  for_each_file: {path: tools/helm-list.json, key: [namespace, name], limit: 100}
-  cmd: [helm, get, values, "{item.name}", -n, "{item.namespace}", -o, json, --kube-context, "{context}"]
-  out: tools/helm-values/{item_safe}.json
   timeout: 120
