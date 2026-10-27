@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import __version__, paths
 from .runlog import read_runlog
-from .snapshot import items, load_json
+from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, items, load_json
 
 WAITING_REASONS = ("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "CreateContainerConfigError", "CreateContainerError", "InvalidImageName", "RunContainerError")
 LABEL_KEEP = ("__name__", "namespace", "pod", "container", "node", "instance", "mountpoint", "qos_class", "reason", "job", "horizontalpodautoscaler", "endpoint", "kind", "phase", "poddisruptionbudget", "service", "deployment")
@@ -473,7 +473,44 @@ def _component_enabled(key: str, enabled_by: tuple[str, ...], snap: Path, collec
     return key == "ecr" and (snap / "aws" / "ecr-repositories.json").exists()
 
 
-def summarize(snap: Path, echo=print) -> dict:
+COMPONENT_LOGS_MARKER_TEXT = (
+    "Component pod logs were collected here, aggregated into summary.json (logs section: signature counts, masked sample lines, unclassified error patterns; "
+    "scaling section: Karpenter timings) and then deleted, so that raw log lines cannot be read by the agent and sent to its model API. "
+    "AGGREGATED.json next to this file holds what was computed from them; a rerun of summarize reads it. "
+    "To keep the raw logs, set keep_component_logs: true in ~/.kubegap/config.yaml.\n"
+)
+
+
+def remove_component_logs(snap: Path, summary: dict | None = None) -> int:
+    """Delete logs/pods/*.log after the summary is written. Leaves the marker and AGGREGATED.json (the log-derived parts of `summary`, so a rerun does not need the raw files). Returns the number of files removed."""
+    import shutil
+
+    d = snap / COMPONENT_LOGS_DIR
+    if not d.is_dir():
+        return 0
+    files = [p for p in d.rglob("*") if p.is_file() and p.name not in (COMPONENT_LOGS_MARKER, COMPONENT_LOGS_AGGREGATE)]
+    if not files:
+        return 0
+    from .logs import LOG_SCAN_KEYS
+    from .scaling import KARPENTER_LOG_KEYS
+
+    logs_sec = (summary or {}).get("logs") if isinstance((summary or {}).get("logs"), dict) else {}
+    karp = ((summary or {}).get("scaling") or {}).get("karpenter") if isinstance((summary or {}).get("scaling"), dict) else {}
+    agg = {
+        "removed_at": _dt.datetime.now().astimezone().isoformat(timespec="seconds"),
+        "files_removed": sorted(str(p.relative_to(snap)) for p in files),
+        "log_scan": {k: logs_sec.get(k) for k in LOG_SCAN_KEYS if k in logs_sec},
+        "karpenter_logs": {k: karp.get(k) for k in KARPENTER_LOG_KEYS if isinstance(karp, dict) and k in karp},
+    }
+    shutil.rmtree(d)
+    d.mkdir(parents=True, exist_ok=True)
+    (d / COMPONENT_LOGS_AGGREGATE).write_text(json.dumps(agg, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+    (d / COMPONENT_LOGS_MARKER).write_text(COMPONENT_LOGS_MARKER_TEXT, encoding="utf-8")
+    return len(files)
+
+
+def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> dict:
+    """Build summary.json. Unless keep_component_logs is true the component pod logs are deleted afterwards, with their log-derived aggregates saved to logs/pods/AGGREGATED.json; lib/logs.py and lib/scaling.py read that file on a rerun, so the result does not change."""
     inv = load_json(snap / "inventory.json")
     s = {
         "kubegap": __version__,
@@ -530,8 +567,19 @@ def summarize(snap: Path, echo=print) -> dict:
             "eks": ({k: inv["cluster"]["eks"].get(k) for k in ("version", "support_type", "control_plane_logging_off", "public_access_cidrs", "secrets_encryption", "addons")} if inv["cluster"].get("eks") else None),
             "ssm_unregistered": [x["node"] for x in inv["node_access"].get("ssm_unregistered", [])],
         }
+    removed = 0 if keep_component_logs else remove_component_logs(snap, s)
+    if isinstance(s.get("logs"), dict):
+        s["logs"]["component_logs_removed"] = component_logs_removed(snap)  # from the marker, so a later keep_component_logs: true does not claim the logs are there
     (snap / "summary.json").write_text(json.dumps(s, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
     if echo:
+        if removed:
+            echo(f"component logs: {removed} files aggregated into {COMPONENT_LOGS_DIR}/{COMPONENT_LOGS_AGGREGATE} and deleted ({COMPONENT_LOGS_MARKER} left in place)")
+        elif component_logs_removed(snap):
+            echo(f"component logs: deleted by an earlier summarize; log results read from {COMPONENT_LOGS_DIR}/{COMPONENT_LOGS_AGGREGATE}" + (" (keep_component_logs: true has no effect on this snapshot)" if keep_component_logs else ""))
+        elif keep_component_logs and (snap / COMPONENT_LOGS_DIR).is_dir():
+            echo("component logs: kept (keep_component_logs: true). Raw log lines can be read by the agent")
+        if isinstance(s.get("logs"), dict) and s["logs"].get("scan_incomplete"):
+            echo("warning: component logs are gone and no AGGREGATED.json was found; log signature results cover node logs only")
         e, o, m, r = s["events"], s["objects"], s["metrics"], s["run"]
         if e.get("missing"):
             echo(f"events: {e['missing']}")

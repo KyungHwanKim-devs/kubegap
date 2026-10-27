@@ -1,7 +1,7 @@
 """Read config.yaml. The file is optional; without it we run with an empty config.
 
 Known keys: context, profile, confirm_context (bool, default true), install_tools (ask|always|never, default ask), aws_profile, aws_region, prometheus_url, loki_url, alertmanager_url, grafana_url,
-node_access(ssm|ssh|daemonset|none), ssh(user, key, port), ssm_document (ask|always|never, default ask), suppress[], overrides{}.
+node_access(ssm|ssh|daemonset|none), ssh(user, key, port), ssm_document (ask|always|never, default ask), keep_component_logs (bool, default false), suppress[], overrides{}.
 """
 
 from __future__ import annotations
@@ -32,6 +32,7 @@ KNOWN_KEYS = {
     "grafana_api_token",
     "snapshots_root",
     "ssm_document",
+    "keep_component_logs",
 }
 INSTALL_POLICIES = ("ask", "always", "never")
 
@@ -53,6 +54,11 @@ class Config(dict):
         """Whether `kubegap setup` may upload the kubegap-node-read SSM document to the account: ask (default; the agent asks once), always, never."""
         v = str(self.get("ssm_document", "ask")).lower()
         return v if v in INSTALL_POLICIES else "ask"
+
+    @property
+    def keep_component_logs(self) -> bool:
+        """false (default): summarize deletes logs/pods/ after the logs section is built, so the agent cannot read raw component logs. true keeps them (they may then reach the model API)."""
+        return bool(self.get("keep_component_logs", False))
 
     @property
     def confirm_context(self) -> bool:

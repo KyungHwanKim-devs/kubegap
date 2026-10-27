@@ -205,12 +205,14 @@ def _mode(args, cfg) -> str:
 
 def cmd_summarize(args) -> int:
     from lib import summarize as _summarize
+    from lib.config import load_config
 
+    cfg = load_config(args.config)
     snap = _resolve_snapshot_arg(args, args.snapshot)
     print(f"snapshot {snap}")
     if paths.is_incomplete(snap):
         print("warning: collect did not finish on this snapshot (INCOMPLETE). Summarize and evaluate still work, but inputs are missing; note it in report section 7-1.")
-    _summarize.summarize(snap)
+    _summarize.summarize(snap, keep_component_logs=cfg.keep_component_logs)
     return EXIT_OK
 
 

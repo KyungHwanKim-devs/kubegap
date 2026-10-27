@@ -15,7 +15,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .snapshot import load_json, objects
+from .snapshot import component_logs_aggregate, component_logs_removed, load_json, objects
 
 ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?")
 
@@ -458,8 +458,17 @@ def _pending(snap: Path) -> dict:
     return {"available": m is not None, "count": len(rows), "rows": rows[:30]}
 
 
+# Karpenter keys computed from logs/pods/karpenter/*.log. summarize saves them to logs/pods/AGGREGATED.json before deleting the logs; analyze() restores them on a rerun.
+KARPENTER_LOG_KEYS = ("latency_24h", "nodeclaims_launched_24h", "disruptions_24h", "disrupted_24h", "launch_failures_24h")
+
+
 def analyze(snap: Path, inv: dict | None) -> dict:
     now = _dt.datetime.now(_dt.UTC)
     keda = _keda(snap)
     hpa = _hpa(snap, inv, now)
-    return {"hpa": hpa, "keda": keda, "metrics_api": _metrics_api(snap, keda["present"]), "karpenter": _karpenter(snap, inv, now), "pending": _pending(snap)}
+    karpenter = _karpenter(snap, inv, now)
+    agg = component_logs_aggregate(snap) if component_logs_removed(snap) else None
+    if karpenter.get("present") and agg and isinstance(agg.get("karpenter_logs"), dict):
+        karpenter.update({k: agg["karpenter_logs"].get(k) for k in KARPENTER_LOG_KEYS if k in agg["karpenter_logs"]})
+        karpenter["logs_note"] = "24h latency, launches, disruptions and launch failures read from logs/pods/AGGREGATED.json (raw logs deleted after the first summarize)"
+    return {"hpa": hpa, "keda": keda, "metrics_api": _metrics_api(snap, keda["present"]), "karpenter": karpenter, "pending": _pending(snap)}
