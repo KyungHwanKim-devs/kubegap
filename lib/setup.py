@@ -12,7 +12,7 @@ import json
 import platform
 from pathlib import Path
 
-from . import __version__, aws, kube, monitoring, paths, tools
+from . import __version__, aws, kube, monitoring, nodecommands, paths, tools
 from . import discover as _discover
 from .config import Config
 from .runlog import RunLog
@@ -22,8 +22,8 @@ def _p(msg: str = "") -> None:
     print(msg, flush=True)
 
 
-def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None, install: bool | list[str] = False, snapshots_root: Path | None = None, verbose: bool = False) -> tuple[int, dict]:
-    """install=False: check only (default). True: install everything missing. List of names: install only those. The install policy is decided by the caller (scripts/kubegap) from config and arguments."""
+def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None, install: bool | list[str] = False, install_ssm_document: bool = False, snapshots_root: Path | None = None, verbose: bool = False) -> tuple[int, dict]:
+    """install=False: check only (default). True: install everything missing. List of names: install only those. install_ssm_document=True uploads the kubegap-node-read SSM document when it is missing or outdated (EKS). Both policies are decided by the caller (scripts/kubegap) from config and arguments."""
     started = _dt.datetime.now().astimezone()
     result: dict = {
         "kubegap": __version__,
@@ -158,6 +158,26 @@ def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None
             for name, c in a["checks"].items():
                 detail = {k: v for k, v in c.items() if k not in ("ok", "why") and v not in (None, [], "")}
                 _p(f"  {name:<34} {'OK ' if c['ok'] else 'FAIL'} {c['why'] or ''} {json.dumps(detail, ensure_ascii=False) if detail else ''}")
+            # The SSM document that pins the node commands (deploy/permissions/ssm-document.yaml). Node OS steps run only when the account copy matches the local file.
+            if a["checks"]["sts:GetCallerIdentity"]["ok"]:
+                st = nodecommands.document_status(prof, region, log=log)
+                if st.get("present") is None:
+                    _p(f"  {'ssm document ' + nodecommands.DOCUMENT_NAME:<34} FAIL {st.get('error')}")
+                    _p(f"    -> {nodecommands.missing_document_message(st, prof, region)}")
+                    a["ssm_document"] = st
+                elif not st.get("current") and install_ssm_document:
+                    _p(f"  uploading SSM document {nodecommands.DOCUMENT_NAME} ({'create' if st.get('present') is False else 'update'}) ...")
+                    res = nodecommands.install_document(prof, region, log=log)
+                    st = nodecommands.document_status(prof, region, log=log)
+                    st["install"] = res
+                    _p(f"    {'done, version ' + str(res.get('version')) if res['ok'] else 'failed: ' + str(res.get('error'))}")
+                if st.get("present") is not None:
+                    a["ssm_document"] = st
+                    if st.get("current"):
+                        _p(f"  {'ssm document ' + nodecommands.DOCUMENT_NAME:<34} OK  version {st.get('version')}")
+                    else:
+                        _p(f"  {'ssm document ' + nodecommands.DOCUMENT_NAME:<34} {'MISSING' if st.get('present') is False else 'OUTDATED'}")
+                        _p(f"    -> {nodecommands.missing_document_message(st, prof, region)}")
     else:
         result["aws"] = None
         _p("  not EKS; skipped")

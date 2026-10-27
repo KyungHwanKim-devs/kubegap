@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import aws as _aws
-from . import kube, paths, yamlite
+from . import kube, nodecommands, paths, yamlite
 from .config import Config
 from .portfwd import PortForward
 from .prom import Prometheus
@@ -458,7 +458,7 @@ def _run_node_step(st: dict, sid: str, name: str, inv: dict, cfg: Config, snap: 
             rec = {"ok": False, "skipped": f"node permission missing ({req}={cap.get(req, '?')}). See deploy/node-access/README.md"}
             log.skip(id=f"{name}.{sid}.{node}", reason=rec["skipped"], collector=name)
             return node, rec, f"    {node}: skipped — {rec['skipped']}"
-        r = runner.na.run_on_node(node, cmd, timeout=timeout, id=f"{name}.{sid}", collector=name)
+        r = runner.na.run_on_node(node, cmd, timeout=timeout, id=f"{name}.{sid}", collector=name, step=f"{name}/{sid}")
         if "---Output truncated---" in r.stdout:
             r.stdout += "\n### truncated\n"
         out = snap / str(st["out"]).format(node=node)
@@ -689,8 +689,10 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
                     if pip is None:
                         break
                     # Because of the SSM 24,000-character output cap, histogram buckets (_bucket) and comments are filtered on the node (the ALB controller leader was truncated with buckets included). _sum and _count remain
-                    keep = f" | grep -E '{st['keep']}'" if st.get("keep") else ""  # if the step gives a keep regex, only those names are kept (for chatty controllers)
-                    nr = node_access.na.run_on_node(nd, f"curl -s -m 8 http://{pip}:{st['port']}{st.get('path', '/metrics')} | grep -vE '^#|_bucket\\{{'" + keep, timeout=30, id=f"{name}.{sid}.{pname}.node", collector=name)
+                    # The curl text comes from lib/nodecommands (same source as COMMANDS.md and the SSM document); on SSM only the step name and podIp are sent. `keep` narrows chatty controllers to the metric names the checks need.
+                    nr = node_access.na.run_on_node(
+                        nd, nodecommands.pod_metrics_cmd(pip, st["port"], st.get("path", "/metrics"), st.get("keep")), timeout=30, id=f"{name}.{sid}.{pname}.node", collector=name, step=f"{name}/{sid}", params={"podIp": pip}
+                    )
                     if nr.ok and nr.stdout.strip():
                         out.write_text(nr.stdout, encoding="utf-8")
                         rr = nr

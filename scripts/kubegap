@@ -62,7 +62,9 @@ def cmd_setup(args) -> int:
         install = False
     else:
         install = cfg.install_policy == "always"
-    code, _ = _setup.run_setup(ctx, cfg, kubeconfig=args.kubeconfig, install=install, snapshots_root=_root(args), verbose=args.verbose)
+    # SSM document policy (EKS only): the flag wins; otherwise config ssm_document (always = upload, ask/never = report only). SKILL.md asks the user when setup reports it missing
+    install_doc = bool(args.install_ssm_document) or cfg.ssm_document_policy == "always"
+    code, _ = _setup.run_setup(ctx, cfg, kubeconfig=args.kubeconfig, install=install, install_ssm_document=install_doc, snapshots_root=_root(args), verbose=args.verbose)
     return code
 
 
@@ -296,6 +298,25 @@ def cmd_checks(args) -> int:
     return EXIT_OK
 
 
+def cmd_node_commands(args) -> int:
+    """Every command kubegap runs on nodes, from the collector definitions and lib/node.py. --markdown writes deploy/node-access/COMMANDS.md, --ssm-document writes deploy/permissions/ssm-document.yaml (both checked by tests/test_node_commands.py)."""
+    from lib import nodecommands as _nc
+
+    cmds = _nc.node_commands()
+    if args.markdown:
+        sys.stdout.write(_nc.render_markdown(cmds))
+    elif args.ssm_document:
+        sys.stdout.write(_nc.render_ssm_document(cmds))
+    elif args.json:
+        print(_nc.as_json(cmds))
+    else:
+        for c in cmds:
+            first = c["text"].strip().splitlines()[0] if c["text"].strip() else ""
+            print(f"{c['step']:<48} {c['kind']:<12} {first[:120]}")
+        print(f"{len(cmds)} commands. Files: {_nc.COMMANDS_MD_PATH.relative_to(paths.ROOT)} (--markdown), {_nc.DOCUMENT_PATH.relative_to(paths.ROOT)} (--ssm-document), document name {_nc.DOCUMENT_NAME}")
+    return EXIT_OK
+
+
 def cmd_mask(args) -> int:
     """Mask report files. If inventory.json exists in the same folder, AWS account ids are masked too. SKILL.md calls this right before saving."""
     import json as _json
@@ -330,7 +351,37 @@ def cmd_nodes(args) -> int:
     inv = _json.loads((snap / "inventory.json").read_text(encoding="utf-8"))
     na = NodeAccess(inv, cfg)
     print(f"snapshot {snap.name}, backend {na.method}" + (" (overridden by config.yaml)" if cfg.get("node_access") else ""))
-    if args.cmd:
+    if na.method == "ssm":
+        from lib import nodecommands as _nc
+
+        st = na.ssm_document
+        if st.get("current"):
+            print(f"SSM document {_nc.DOCUMENT_NAME}: present and current (version {st.get('version')})")
+        else:
+            print(f"SSM document: {_nc.missing_document_message(st, na.aws_profile, na.aws_region)}")
+        if args.cmd:
+            print("--cmd is not available on the SSM backend: only the steps of the document can run (deploy/node-access/COMMANDS.md). Use --step <name>", file=sys.stderr)
+            return EXIT_ERROR
+    if args.step:
+        from lib import nodecommands as _nc
+
+        match = [c for c in _nc.node_commands() if c["step"] == args.step]
+        if not match:
+            print(f"unknown step {args.step}. `kubegap node-commands` lists them", file=sys.stderr)
+            return EXIT_ERROR
+        c = match[0]
+        text, params = c["text"], None
+        if c["kind"] == "pod-metrics":
+            # The curl needs a real pod IP; without it SSM would use the document default (127.0.0.1) and SSH would receive the literal placeholder.
+            if not args.pod_ip:
+                print(f"{args.step} curls a pod; pass --pod-ip <IP of a {c.get('namespace')} pod matching {c.get('selector')}>", file=sys.stderr)
+                return EXIT_ERROR
+            text, params = _nc.pod_metrics_cmd(args.pod_ip, c["port"], c["path"], c["keep"]), {"podIp": args.pod_ip}
+        elif args.pod_ip:
+            print("--pod-ip applies to pod-metrics steps only", file=sys.stderr)
+            return EXIT_ERROR
+        results = na.run_on_all(text, timeout=args.timeout, step=args.step, params=params)
+    elif args.cmd:
         results = na.run_on_all(args.cmd, timeout=args.timeout)
     else:
         results = na.probe()
@@ -344,7 +395,7 @@ def cmd_nodes(args) -> int:
             tail = (" | output: " + " / ".join(r.stdout.strip().splitlines()[:4])[:160]) if r.stdout.strip() else ""
             print(f"  failed {n:<48} [{r.backend}] {r.error}{tail}")
     print(f"reachable {ok}/{len(results)}")
-    if not args.cmd and ok and na.method == "ssh":
+    if not args.cmd and not args.step and ok and na.method == "ssh":
         import json as _json2
 
         caps = na.capabilities()
@@ -404,6 +455,7 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--install", action="store_true", help="install every missing tool (brew, then GitHub release, then dedicated venv)")
     g.add_argument("--install-only", metavar="NAME,NAME", help="install only the named tools")
     g.add_argument("--no-install", action="store_true", help="check only, even if install_tools is always in config.yaml")
+    s.add_argument("--install-ssm-document", action="store_true", help="EKS: upload or update the kubegap-node-read SSM document in the account (needs ssm:CreateDocument, ssm:UpdateDocument, ssm:UpdateDocumentDefaultVersion and ssm:ListDocumentVersions on the current credentials; not part of the read-only policy)")
     s.set_defaults(func=cmd_setup)
 
     s = sub.add_parser("contexts", parents=[common], help="list kube contexts, mark the current one, and say whether each is EKS")
@@ -447,6 +499,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--markdown", action="store_true", help="Markdown tables instead of plain text")
     s.set_defaults(func=cmd_checks)
 
+    s = sub.add_parser("node-commands", help="list every command kubegap runs on nodes; --markdown writes deploy/node-access/COMMANDS.md, --ssm-document writes deploy/permissions/ssm-document.yaml")
+    s.add_argument("--markdown", action="store_true", help="the COMMANDS.md text")
+    s.add_argument("--ssm-document", action="store_true", help="the SSM Command document (YAML) that pins these commands")
+    s.add_argument("--json", action="store_true", help="machine-readable list")
+    s.set_defaults(func=cmd_node_commands)
+
     s = sub.add_parser("mask", help="mask tokens, passwords, keys and AWS account ids in report files (SKILL.md calls this right before saving)")
     s.add_argument("files", nargs="+", help="files to mask (edited in place)")
     s.add_argument("--ips", action="store_true", help="also mask private IPv4 addresses as <ip>")
@@ -456,7 +514,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("nodes", parents=[common], help="verify node command backend (SSM/SSH) access. Default command: echo, uname, hostname")
     s.add_argument("--snapshot", default="latest", help="snapshot whose inventory.json to read. Default latest")
-    s.add_argument("--cmd", help="read-only command to run instead (e.g. 'df -h /')")
+    s.add_argument("--cmd", help="read-only command to run instead (e.g. 'df -h /'). SSH and DaemonSet backends only; SSM runs document steps, see --step")
+    s.add_argument("--step", help="run one named step from deploy/node-access/COMMANDS.md (e.g. core/node-os) instead of the probe")
+    s.add_argument("--pod-ip", help="with --step on a pod-metrics step: the pod IP to curl")
     s.add_argument("--timeout", type=float, default=60)
     s.set_defaults(func=cmd_nodes)
 
