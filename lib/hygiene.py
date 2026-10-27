@@ -16,6 +16,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from . import scrub
 from .snapshot import load_json, objects
 
 OPERATOR_PREFIXES = (
@@ -498,7 +499,7 @@ def _orphans(cx: _Ctx) -> dict:
     # Large ConfigMaps: etcd object limit is 1 MiB (apiserver --max-request-bytes is 1.5 MiB). Approximated by the character count of data+binaryData
     big_cm = []
     for c in cms:
-        size = sum(len(str(v)) for v in ((c.get("data") or {}).values())) + sum(len(str(v)) for v in ((c.get("binaryData") or {}).values()))
+        size = scrub.configmap_chars(c)  # values are not in the snapshot; the scrub record keeps the original character count
         if size >= 256 * 1024:
             big_cm.append({"namespace": c["metadata"]["namespace"], "name": c["metadata"]["name"], "kib": round(size / 1024), "keys": len(c.get("data") or {}) + len(c.get("binaryData") or {}), "prod": c["metadata"]["namespace"] in cx.prod})
     big_cm.sort(key=lambda r: -r["kib"])

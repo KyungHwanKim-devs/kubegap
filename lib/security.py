@@ -9,14 +9,13 @@ secrets (plaintext env candidates, variable names only; ExternalSecrets not sync
 
 from __future__ import annotations
 
-import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from . import scrub
 from .snapshot import load_json, objects
 
-SECRET_ENV_RE = re.compile(r"(PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_?KEY|ACCESS_KEY|CLIENT_SECRET|DSN|CONNECTION_STRING)", re.IGNORECASE)
-ENV_SKIP_RE = re.compile(r"(_FILE|_PATH|_DIR|_NAME|_KEY_ID|_REF|_ENABLED|_URL|_HEADER|_TTL|_LENGTH|_EXPIRY|_TIMEOUT)$", re.IGNORECASE)
+SECRET_ENV_RE, ENV_SKIP_RE = scrub.SECRET_ENV_RE, scrub.ENV_SKIP_RE  # shared with the collection-time ConfigMap scan
 DANGEROUS_CAPS = {"SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE", "SYS_MODULE", "ALL", "NET_RAW", "SYS_RAWIO", "DAC_READ_SEARCH"}
 SYSTEM_NS_PREFIX = ("kube-", "karpenter", "monitoring", "cert-manager", "external-secrets", "ingress-nginx", "metallb-system", "keda", "argocd", "arc-system", "arc-systems", "logging", "reloader")
 SYSTEM_SUBJECTS = {("Group", "system:masters"), ("User", "eks:addon-manager"), ("Group", "system:nodes"), ("User", "system:kube-controller-manager"), ("User", "system:kube-scheduler")}
@@ -254,20 +253,8 @@ def _secrets(snap: Path, prod: set, platform: str | None) -> dict:
         ns, name = cm["metadata"]["namespace"], cm["metadata"]["name"]
         if ns.startswith(SYSTEM_NS_PREFIX) or name.startswith("kube-root-ca") or ((cm["metadata"].get("annotations") or {}).get("meta.helm.sh/release-name") and name.endswith(("-dashboard", "-dashboards"))):
             continue
-        keys = []
-        for k, v in (cm.get("data") or {}).items():
-            v = str(v)
-            if SECRET_ENV_RE.search(k) and not ENV_SKIP_RE.search(k) and len(v) >= 8 and not v.isdigit() and not v.startswith("/") and v.lower() not in ("true", "false") and "\n" not in v:
-                keys.append(k)
-            elif "\n" in v and len(v) < 20000:
-                # password lines inside config files (HTTP_Passwd xxx, password: xxx, PASSWORD=xxx); key name only
-                for m in re.finditer(r"(?im)^\s*([A-Za-z_][A-Za-z0-9_.-]*(?:passw(?:or)?d|secret|token|api[_-]?key)[A-Za-z0-9_.-]*)\s*[:= ]\s*(\S{8,})\s*$", v):
-                    val = m.group(2).strip("\"'")
-                    if val.startswith(("${", "$(", "/", "<", "{{")) or val.lower() in ("changeme", "password", "null", "none") or "secretkeyref" in val.lower():
-                        continue
-                    keys.append(f"{k}:{m.group(1)}")
-                    if len(keys) >= 8:
-                        break
+        # The detection ran at collection time, before the values were dropped from the snapshot (lib/scrub.py); only key names are recorded.
+        keys = scrub.configmap_secret_like_keys(cm)
         if keys:
             cm_rows.append({"namespace": ns, "name": name, "target": f"{ns}/configmap/{name}", "prod": ns in prod, "keys": keys[:8], "mounted_by": sorted(cm_used.get((ns, name), set()))[:6]})
     es_bad = []

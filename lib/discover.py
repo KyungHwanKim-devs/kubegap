@@ -2,8 +2,8 @@
 
 From Pods, DaemonSets, Deployments, StatefulSets, CRDs, Namespaces, StorageClasses, Nodes and `aws eks describe-cluster` (on EKS),
 work out what the cluster is and what is installed, and write `inventory.json`. Prometheus/Loki retention, SSM-registered nodes,
-profile guess and node access method are decided here too. Raw objects are saved to `objects/<kind>.json` so that collect
-does not fetch them again.
+profile guess and node access method are decided here too. The objects are saved to `objects/<kind>.json` after component detection,
+scrubbed by lib/scrub.py (no Secret data, no ConfigMap values), so that collect does not fetch them again.
 
 k3s detection rule: `+k3s` in the node kubelet version, StorageClass `local-path`, `local-path-provisioner` in kube-system.
 When detected: profile guess `k3s`, node access `ssh`, EKS platform collector disabled.
@@ -35,7 +35,7 @@ import json
 import re
 from pathlib import Path
 
-from . import __version__, aws, kube, monitoring, paths
+from . import __version__, aws, kube, monitoring, paths, scrub
 from . import rubric as _rubric
 from .components import COMPONENTS
 from .config import Config
@@ -328,11 +328,14 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
     objs: dict = {}
     failures: dict = {}
     for kind, args in OBJECT_KINDS.items():
-        data, r = kube.kubectl_json(args, context=context, timeout=120, id=f"discover.get-{kind}", log=log, out_path=snap / "objects" / f"{kind}.json", kubeconfig=kubeconfig)
+        data, r = kube.kubectl_json(args, context=context, timeout=120, id=f"discover.get-{kind}", log=log, kubeconfig=kubeconfig)
         if data is None:
             failures[kind] = r.error or r.stderr.strip()[-200:]
         objs[kind] = data
         echo(f"  {kind:<28} {len(items(data)) if data is not None else 'failed: ' + failures[kind]}")
+    # Component detection below reads ConfigMap bodies (configmap_data_regex rules), so the objects are written only after that, scrubbed: ConfigMap values and Secret data never reach objects/ (lib/scrub.py).
+    (snap / "objects").mkdir(parents=True, exist_ok=True)
+    write_objects = lambda: [(snap / "objects" / f"{kind}.json").write_text(json.dumps(scrub.scrub_objects(data), ensure_ascii=False), encoding="utf-8") for kind, data in objs.items() if data is not None]  # noqa: E731
     ctx_info = kube.context_info(context, kubeconfig)
     ver, _ = kube.kubectl_json(["version"], context=context, timeout=20, id="discover.version", log=log, kubeconfig=kubeconfig)
     server_version = ((ver or {}).get("serverVersion") or {}).get("gitVersion")
@@ -345,6 +348,7 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
         aws_addons = list((eks_facts.get("addons") or {}).keys())
     comps = detect_components(objs, aws_addons)
     platform, platform_reasons = detect_platform(ctx_info, nodes, comps, objs)
+    write_objects()
     profile = _profile(platform, nodes, cfg, profile_override)
     node_access = _node_access(platform, nodes, cfg, ctx_info.get("eks") if ctx_info.get("is_eks") else None, log)
 
