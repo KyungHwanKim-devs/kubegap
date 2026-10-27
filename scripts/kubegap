@@ -10,6 +10,7 @@ Subcommands:
   summarize  snapshot -> summary.json
   evaluate   first-pass evaluation with checks.yaml -> findings-draft.json
   diff       object and first-pass status changes between two snapshots
+  prune      remove old snapshots, keeping the newest N daily and M full
 """
 
 from __future__ import annotations
@@ -439,6 +440,40 @@ def cmd_snapshots(args) -> int:
     return EXIT_OK
 
 
+def cmd_prune(args) -> int:
+    """Remove old snapshot folders of this context. The newest complete daily and full snapshots always stay (they are the diff baselines)."""
+    from lib import prune as _prune
+    from lib.config import load_config
+
+    cfg = load_config(args.config)
+    try:
+        keep_daily, keep_full = _prune.retention(cfg.get("retention"), args.keep_daily, args.keep_full)
+    except ValueError as e:
+        print(f"kubegap prune: {e}", file=sys.stderr)
+        return EXIT_USAGE
+    if keep_daily is None and keep_full is None:
+        print("kubegap prune: nothing to do. Pass --keep-daily N and/or --keep-full M, or set retention.keep_daily / retention.keep_full in config.yaml.", file=sys.stderr)
+        return EXIT_USAGE
+    ctx = _resolve_context(args)
+    if not ctx:
+        return EXIT_ERROR
+    base = paths.context_root(ctx, _root(args))
+    plan = _prune.plan(base, keep_daily, keep_full)
+    print(f"context: {ctx}\nroot:    {base}\nretention: daily {'all' if keep_daily is None else keep_daily}, full {'all' if keep_full is None else keep_full} (the latest of each mode always stays)")
+    for s in sorted(plan.keep + plan.remove):
+        print(f"  {'remove' if s in plan.remove else 'keep  '}  {s.name}  [{plan.reasons[s]}]")
+    if not plan.remove:
+        print("nothing to remove.")
+        return EXIT_OK
+    if args.dry_run:
+        size = sum(_prune.folder_size(s) for s in plan.remove)
+        print(f"dry run: would remove {len(plan.remove)} snapshots, {size / 1e6:.1f} MB")
+        return EXIT_OK
+    freed = _prune.apply(plan)
+    print(f"removed {len(plan.remove)} snapshots, {freed / 1e6:.1f} MB freed")
+    return EXIT_OK
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="kubegap", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--version", action="version", version=f"kubegap {__version__} (rubric {paths.rubric_version()}, signatures {paths.signatures_version()})")
@@ -524,6 +559,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("snapshots", parents=[common], help="list snapshot folders for this context (debugging)")
     s.set_defaults(func=cmd_snapshots)
+    s = sub.add_parser("prune", parents=[common], help="remove old snapshot folders of this context; the latest daily and the latest full always stay. Defaults from retention in config.yaml")
+    s.add_argument("--keep-daily", type=int, metavar="N", help="keep the newest N complete daily snapshots (minimum 1 is kept regardless)")
+    s.add_argument("--keep-full", type=int, metavar="M", help="keep the newest M complete full snapshots (minimum 1 is kept regardless)")
+    s.add_argument("--dry-run", action="store_true", help="print what would be removed without deleting")
+    s.set_defaults(func=cmd_prune)
     s = sub.add_parser("selftest", help="run each check's fail/warn/pass paths with the fake inputs from its test section in checks.yaml to catch expression errors (no cluster needed)")
     s.add_argument("--check", action="append", help="only this check id (repeatable)")
     s.add_argument("--snapshot", action="append", help="real snapshot folder (repeatable). Verifies that keys referenced by summary-type check expressions exist in that summary.json")

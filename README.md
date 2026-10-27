@@ -80,6 +80,8 @@ Supported platforms: macOS on Apple Silicon and Intel, Linux on amd64 and arm64,
 
 Set `mode: full` in `~/.kubegap/config.yaml` to make full the default. Daily and full snapshots live side by side under the same context folder and are never compared with each other.
 
+A full snapshot is about 40 MB. `scripts/kubegap prune --keep-daily 14 --keep-full 4` removes older ones, and `retention` in the config sets the defaults. It deletes without asking, so with `retention` set a bare `scripts/kubegap prune` already removes folders. Add `--dry-run` to see the list first. The latest daily and the latest full always stay.
+
 ## What it checks
 
 Twelve areas, 403 checks. Each row gives the count and a few examples; the full list is [`docs/CHECKS.md`](docs/CHECKS.md).
@@ -140,7 +142,7 @@ kubegap does not have its own credential store. It reuses what is already on you
 
 **Optional tools.** helm, krr, polaris, pluto, kubent, argocd, promtool, amtool are found on your `PATH`. `kubegap setup` lists what is missing, which checks each one powers, and installs them with your consent (policy `install_tools: ask|always|never` in the config).
 
-**The config file.** `~/.kubegap/config.yaml`, created by copying [`config.example.yaml`](config.example.yaml). Every key is listed there with a comment: `context`, `profile`, `namespace_profiles`, `confirm_context`, `install_tools`, `language`, `snapshots_root`, `aws_profile`, `aws_region`, `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url`, `grafana_api_token`, `node_access`, `ssh`, `suppress`, `overrides`. The file is optional; without it kubegap uses the current kube context and discovers everything else.
+**The config file.** `~/.kubegap/config.yaml`, created by copying [`config.example.yaml`](config.example.yaml). Every key is listed there with a comment: `context`, `profile`, `namespace_profiles`, `confirm_context`, `install_tools`, `language`, `snapshots_root`, `retention`, `aws_profile`, `aws_region`, `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url`, `grafana_api_token`, `node_access`, `ssh`, `suppress`, `overrides`. The file is optional; without it kubegap uses the current kube context and discovers everything else.
 
 **One command validates all of the above:** `kubegap setup --context <name>`. That is `scripts/kubegap setup`, and `/kubegap` runs it for you. It prints four sections:
 - which tools are missing and what each one powers;

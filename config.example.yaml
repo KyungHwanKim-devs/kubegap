@@ -11,6 +11,9 @@ ssm_document: ask            # EKS only. The SSM document kubegap-node-read (dep
 # mode: daily                # default collection mode. daily (default) skips node OS scripts, CloudWatch logs, cost and ECR data and the slow tools; full collects everything. /kubegap full overrides it
 
 # snapshots_root: ~/.kubegap/snapshots   # where snapshots (collected data and reports) are stored. Default is ~/.kubegap/snapshots. --snapshots-root and $KUBEGAP_SNAPSHOTS take precedence
+# retention:                # used by `scripts/kubegap prune` when --keep-daily / --keep-full are not given. A full snapshot is about 40 MB. The latest daily and the latest full always stay because they are the comparison baselines. prune deletes without asking; add --dry-run to see the list first
+#   keep_daily: 14
+#   keep_full: 4
 
 # ---- (2) Connection information (leave empty for auto-discovery) ----
 # context: my-cluster        # kube context to audit by default. /kubegap --context takes precedence
