@@ -14,6 +14,7 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ### Fixed
 
+- The adjustment table in `llm/adjustments.md` now also records every aggregate the agent recounted against the first pass, in its own `Recounted aggregates` table, so a number in the report that differs from `findings-draft.json` always has a reason next to it. Reported and fixed by [@junhoeKu](https://github.com/junhoeKu) in [#31](https://github.com/KyungHwanKim-devs/kubegap/pull/31). ([#13](https://github.com/KyungHwanKim-devs/kubegap/issues/13))
 - The password-line pattern of `security.plaintext-configmap-secret` missed lines whose key is the bare word, such as `password = ...`; it required one leading character.
 
 ### Added
