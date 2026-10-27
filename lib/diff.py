@@ -49,6 +49,9 @@ def _key(o: dict) -> str:
 
 
 def _body_hash(o: dict) -> str:
+    if o.get("kind") == "ConfigMap":
+        # Values are not in the snapshot (lib/scrub.py keeps {len, shape}); a change that keeps length and shape would be invisible, so compare the server's resourceVersion instead. No value hash: a short password would be guessable from it.
+        return f"rv:{(o.get('metadata') or {}).get('resourceVersion')}"
     body = {k: o.get(k) for k in BODY_KEYS if k in o}
     if not body:
         body = {k: v for k, v in o.items() if k not in ("metadata", "status", "kind", "apiVersion")}
@@ -79,7 +82,7 @@ def diff_objects(a: Path, b: Path) -> dict:
             if ha != hb:
                 ga = (ma[k].get("metadata") or {}).get("generation")
                 gb = (mb[k].get("metadata") or {}).get("generation")
-                out["changed"].append({"kind": kind, "name": k, "generation": [ga, gb], "changed_fields": _changed_fields(ma[k], mb[k])})
+                out["changed"].append({"kind": kind, "name": k, "generation": [ga, gb], "changed_fields": ["metadata.resourceVersion"] if ma[k].get("kind") == "ConfigMap" else _changed_fields(ma[k], mb[k])})
     out["summary"] = {"added": len(out["added"]), "removed": len(out["removed"]), "changed": len(out["changed"])}
     return out
 

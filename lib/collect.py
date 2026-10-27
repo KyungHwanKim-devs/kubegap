@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import aws as _aws
-from . import kube, nodecommands, paths, yamlite
+from . import kube, nodecommands, paths, scrub, yamlite
 from .config import Config
 from .portfwd import PortForward
 from .prom import Prometheus
@@ -52,17 +52,8 @@ class _Blocked:
 
 
 def _scrub(obj):
-    """Strip Secret values. Also handles Secret items inside lists."""
-    if isinstance(obj, dict):
-        if isinstance(obj.get("kind"), str) and obj.get("kind") in SECRET_KINDS:
-            obj.pop("data", None)
-            obj.pop("stringData", None)
-        for v in obj.values():
-            _scrub(v)
-    elif isinstance(obj, list):
-        for v in obj:
-            _scrub(v)
-    return obj
+    """Strip Secret values and ConfigMap values before anything is written to objects/ (rules in lib/scrub.py)."""
+    return scrub.scrub_objects(obj)
 
 
 def _glob_match(name: str, patterns: list[str]) -> bool:

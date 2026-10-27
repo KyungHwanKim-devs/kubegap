@@ -47,6 +47,20 @@ def _prom_dir(snap: Path, name: str) -> dict:
     return out
 
 
+def _csv_lines(v) -> int:
+    """policy.csv line count. The snapshot holds {lines, len} for it (lib/scrub.py); older snapshots hold the text."""
+    if isinstance(v, dict):
+        return int(v.get("lines") or 0)
+    return len([ln for ln in (v or "").splitlines() if ln.strip()])
+
+
+def _non_empty(v) -> bool:
+    """Whether a ConfigMap value is set. Scrubbed values are {len, shape} or {present, len}; older snapshots hold the string."""
+    if isinstance(v, dict):
+        return bool(v.get("present")) if "present" in v else int(v.get("len") or 0) > 0
+    return bool(v)
+
+
 def analyze(snap: Path, inv: dict | None) -> dict:
     inv = inv or {}
     apps = objects(snap, "applications.argoproj.io")
@@ -74,13 +88,13 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         v = d.get(k)
         return default if v is None else str(v).lower() == "true"
 
-    sso = bool(cm.get("dex.config") or cm.get("oidc.config"))
+    sso = _non_empty(cm.get("dex.config")) or _non_empty(cm.get("oidc.config"))
     reconcile_s = _dur_s(cm.get("timeout.reconciliation")) or 180
     config = {
         "url": cm.get("url"),
         "admin_enabled": flag(cm, "admin.enabled", True),
         "sso_configured": sso,
-        "sso_kind": "dex" if cm.get("dex.config") else ("oidc" if cm.get("oidc.config") else None),
+        "sso_kind": "dex" if _non_empty(cm.get("dex.config")) else ("oidc" if _non_empty(cm.get("oidc.config")) else None),
         "exec_enabled": flag(cm, "exec.enabled", False),
         "anonymous_enabled": flag(cm, "users.anonymous.enabled", False),
         "server_insecure": flag(params, "server.insecure", False),
@@ -89,8 +103,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "status_processors": params.get("controller.status.processors"),
         "operation_processors": params.get("controller.operation.processors"),
         "rbac_policy_default": rbac.get("policy.default", ""),
-        "rbac_policy_csv_lines": len([ln for ln in (rbac.get("policy.csv") or "").splitlines() if ln.strip()]),
-        "resource_exclusions": bool(cm.get("resource.exclusions")),
+        # The snapshot does not hold ConfigMap values (lib/scrub.py): policy.csv arrives as {lines, len} and resource.exclusions as {len, shape}. Older snapshots still carry the strings.
+        "rbac_policy_csv_lines": _csv_lines(rbac.get("policy.csv")),
+        "resource_exclusions": _non_empty(cm.get("resource.exclusions")),
         "ignore_resource_updates": sum(1 for k in cm if k.startswith("resource.customizations.ignoreResourceUpdates")),
         "application_namespaces": params.get("application.namespaces") or None,
         "notifications_triggers": [k for k in notif if k.startswith("trigger.")],

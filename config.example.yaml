@@ -5,6 +5,7 @@
 # ---- (1) Prompts and install policy ----
 confirm_context: true        # ask once at start whether this is the right context. false = do not ask
 install_tools: ask           # policy for missing tools. ask = show the list and reasons, ask once (default) / always = install without asking / never = skip without asking
+keep_component_logs: false   # component pod logs (24h) are collected to count log signatures. false (default) = summarize deletes the raw logs once summary.json has the counts and masked sample lines, so the agent never reads them. true = keep the raw logs in the snapshot; the agent may then open them and their content can reach the model API
 ssm_document: ask            # EKS only. The SSM document kubegap-node-read (deploy/permissions/ssm-document.yaml) must exist in the account for node OS checks. ask = setup reports it and the skill asks once before uploading (default) / always = upload or update without asking / never = report only
 # language: en               # language of the briefing and the report (en | ko). If unset, the skill asks once at the start of a run
 # mode: daily                # default collection mode. daily (default) skips node OS scripts, CloudWatch logs, cost and ECR data and the slow tools; full collects everything. /kubegap full overrides it

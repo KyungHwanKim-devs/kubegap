@@ -21,9 +21,10 @@ from pathlib import Path
 
 from . import paths
 from .controlplane import _normalize_msg, workload_of
+from .mask import mask_text
 from .signatures import Signature
 from .signatures import load as load_signatures
-from .snapshot import load_json
+from .snapshot import COMPONENT_LOGS_DIR, component_logs_aggregate, component_logs_removed, load_json
 
 ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})")
 KLOG_TS_RE = re.compile(r"\b[IWEF](\d{2})(\d{2}) (\d{2}:\d{2}:\d{2})")
@@ -174,7 +175,7 @@ def scan(snap: Path, sigs: list[Signature]) -> dict:
                             h["first"] = min(h["first"], ts) if h["first"] else ts
                             h["last"] = max(h["last"], ts) if h["last"] else ts
                         if len(h["samples"]) < 5:
-                            h["samples"].append(line[:240])
+                            h["samples"].append(mask_text(line[:240]).text)  # the raw log is deleted after summarize; these samples are what survives, so they are masked
             if not matched and ERROR_RE.search(line) and not NOT_ERROR_RE.search(line):
                 error_lines += 1
                 body, _pod = _strip_prefix(line)
@@ -183,7 +184,7 @@ def scan(snap: Path, sigs: list[Signature]) -> dict:
                 key = f"{component} | {_normalize_msg(body)[:140]}"
                 unclassified[key] += 1
                 uncl_files[key][rel] += 1
-                uncl_sample.setdefault(key, line[:240])
+                uncl_sample.setdefault(key, mask_text(line[:240]).text)
     by_id = {s.id: s for s in sigs}
     sig_rows = []
     for sid, h in hits.items():
@@ -436,21 +437,38 @@ def analyze_agents(snap: Path, inv: dict) -> dict:
     return out
 
 
-def analyze(snap: Path, inv: dict | None) -> dict:
-    inv = inv or {}
-    sigs, errors = load_signatures(inv.get("collectors_enabled") or ["core"])
+# The keys of the logs section that come from scanning the raw log files. summarize saves exactly these to logs/pods/AGGREGATED.json before deleting the component logs, and analyze() reads them back on a rerun.
+LOG_SCAN_KEYS = ("files_scanned", "lines_scanned", "error_lines_unclassified", "signatures", "unclassified_errors", "boot_window_skipped", "boot_window_seconds", "components_with_logs", "files", "scan_signatures_version")
+
+
+def scan_section(snap: Path, sigs: list[Signature]) -> dict:
+    """Everything in the logs section that needs the raw files: the signature scan plus the file and component lists."""
     res = scan(snap, sigs)
     ldir = snap / "logs"
     files = [str(f.relative_to(snap)) for f in sorted(ldir.rglob("*")) if f.is_file()] if ldir.is_dir() else []
-    pods_dir = snap / "logs" / "pods"
+    pods_dir = snap / COMPONENT_LOGS_DIR
     components = sorted(p.name for p in pods_dir.iterdir() if p.is_dir()) if pods_dir.is_dir() else []
+    return {"components_with_logs": components, "files": files, **res, "scan_signatures_version": paths.signatures_version()}
+
+
+def analyze(snap: Path, inv: dict | None) -> dict:
+    inv = inv or {}
+    sigs, errors = load_signatures(inv.get("collectors_enabled") or ["core"])
+    agg = component_logs_aggregate(snap) if component_logs_removed(snap) else None
+    if agg and isinstance(agg.get("log_scan"), dict):
+        # The raw component logs were deleted by an earlier summarize; scanning again would find only the node logs. Use what that run saved.
+        res = {k: agg["log_scan"].get(k) for k in LOG_SCAN_KEYS}
+        res["source_note"] = "component logs deleted after the first summarize; scan results read from logs/pods/AGGREGATED.json"
+    elif component_logs_removed(snap):
+        res = {**scan_section(snap, sigs), "source_note": "component logs deleted and no AGGREGATED.json found: only node logs were scanned; log signature checks are incomplete"}
+        res["scan_incomplete"] = True
+    else:
+        res = scan_section(snap, sigs)
     return {
         "source": "logs/ (signature matches) + loki/ + metrics/ + objects/pods.json",
         "signatures_version": paths.signatures_version(),
         "catalog_size": len(sigs),
         "catalog_errors": errors,
-        "components_with_logs": components,
-        "files": files,
         **res,
         "loki": analyze_loki(snap, inv),
         "agents": analyze_agents(snap, inv),

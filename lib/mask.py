@@ -1,7 +1,7 @@
 """Masking.
 
 Applied to the report body and the condensed version. After the LLM writes the report, it is passed through `scripts/kubegap mask <file>` once more before saving.
-The raw snapshot stays local and is read directly by the LLM, so it is not masked (Secret values are already stripped at collection time).
+The raw snapshot stays local and is read directly by the LLM, so it is not masked as a whole. What may hold a credential is kept out of it instead: Secret data and ConfigMap values are dropped at collection time (lib/scrub.py), and component pod logs are deleted after summarize, with only masked sample lines surviving in summary.json (lib/logs.py calls mask_text on them).
 
 What is masked:
 - token/password patterns: the values of `Bearer …`, `password=…`/`passwd:`/`pwd=`, `token=`, `api[_-]?key=`, `secret=`, `authorization:`
