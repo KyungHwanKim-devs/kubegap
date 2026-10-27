@@ -2,7 +2,7 @@
 
 kubegap **never changes a node**. To read the node operating-system layer (kernel log, k3s server log, datastore size, containerd state),
 you prepare each node once. Anything not prepared is reported as "no node access" and only those checks are skipped.
-EKS needs no preparation (SSM `send-command` runs as root).
+EKS needs no preparation on the node (SSM `send-command` runs as root); it needs the SSM document `kubegap-node-read` in the account, which `kubegap setup` uploads with your consent (see the main README). The complete list of commands that reach a node on any backend is [`COMMANDS.md`](COMMANDS.md).
 
 ## Step 1 — log-reading groups (recommended, one line)
 
