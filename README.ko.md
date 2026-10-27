@@ -80,6 +80,8 @@ $kubegap
 
 `~/.kubegap/config.yaml` 에 `mode: full` 을 두면 full 이 기본값이 됩니다. daily 와 full 스냅샷은 같은 컨텍스트 폴더에 나란히 쌓이고 서로 비교하지 않습니다.
 
+full 스냅샷 하나는 40 MB 안팎입니다. `scripts/kubegap prune --keep-daily 14 --keep-full 4` 로 오래된 스냅샷을 지웁니다 (`--dry-run` 을 붙이면 목록만 보여 줍니다. 설정의 `retention` 이 기본값이 됩니다). 직전 daily 와 직전 full 은 항상 남습니다.
+
 ## 점검하는 영역
 
 영역 12개, 항목 403개입니다. 영역마다 항목 수와 예시를 적었습니다. 전체 목록은 [`docs/CHECKS.md`](docs/CHECKS.md) 에 있습니다.
@@ -140,7 +142,7 @@ kubegap 에는 자체 자격 증명 저장소가 없습니다. 지금 쓰는 PC 
 
 **선택 도구.** helm, krr, polaris, pluto, kubent, argocd, promtool, amtool 은 `PATH` 에서 찾습니다. `kubegap setup` 이 없는 도구와 그 도구가 맡은 항목을 보여 주고, 동의를 받아 설치합니다. 정책은 설정의 `install_tools: ask|always|never` 입니다.
 
-**설정 파일.** `~/.kubegap/config.yaml` 입니다. [`config.example.yaml`](config.example.yaml) 을 복사해 만듭니다. 키마다 설명이 붙어 있습니다. `context`, `profile`, `namespace_profiles`, `confirm_context`, `install_tools`, `language`, `mode`, `snapshots_root`, `aws_profile`, `aws_region`, `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url`, `grafana_api_token`, `node_access`, `ssh`, `suppress`, `overrides`. 파일은 없어도 됩니다. 없으면 현재 kube 컨텍스트를 쓰고 나머지는 알아서 찾습니다.
+**설정 파일.** `~/.kubegap/config.yaml` 입니다. [`config.example.yaml`](config.example.yaml) 을 복사해 만듭니다. 키마다 설명이 붙어 있습니다. `context`, `profile`, `namespace_profiles`, `confirm_context`, `install_tools`, `language`, `mode`, `snapshots_root`, `retention`, `aws_profile`, `aws_region`, `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url`, `grafana_api_token`, `node_access`, `ssh`, `suppress`, `overrides`. 파일은 없어도 됩니다. 없으면 현재 kube 컨텍스트를 쓰고 나머지는 알아서 찾습니다.
 
 **위 전부를 한 번에 확인하는 명령.** `kubegap setup --context <이름>` 입니다. 실제로는 `scripts/kubegap setup` 이고 `/kubegap` 이 대신 돌려 줍니다. 결과는 네 절로 나옵니다.
 - 빠진 도구와 그 때문에 못 도는 항목
