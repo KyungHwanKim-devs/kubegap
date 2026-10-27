@@ -121,7 +121,7 @@ kubegap 에는 자체 자격 증명 저장소가 없습니다. 지금 쓰는 PC 
 | AWS, EKS 일 때만 | `~/.kubegap/config.yaml` 의 `aws_profile` 과 `aws_region`, 없으면 kubeconfig `exec` 환경의 `AWS_PROFILE`, 그것도 없으면 AWS CLI 기본값 | `aws sts get-caller-identity --profile <p>` |
 | Prometheus, Alertmanager, Loki, Grafana | 클러스터 안에서 찾아 포트포워딩. 또는 설정의 `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url` | `kubegap setup --context <이름>` 의 3절과 4절 |
 | Grafana 대시보드 | 설정의 `grafana_api_token`, Viewer 권한의 서비스 계정 토큰 | 같은 명령. 없으면 "자격 증명 없음" 으로 건너뜀 |
-| 노드 OS, EKS | SSM `send-command`, 위 AWS 자격 증명 사용 | `scripts/kubegap nodes --context <이름>` |
+| 노드 OS, EKS | SSM `send-command` 와 `kubegap-node-read` 문서, 위 AWS 자격 증명 사용 | `scripts/kubegap nodes --context <이름>` |
 | 노드 OS, k3s 와 베어메탈 | SSH. `~/.ssh/config` 의 사용자와 키, 또는 설정의 `ssh:` 블록 | `scripts/kubegap nodes --context <이름>` |
 | 노드 OS, SSM 도 SSH 도 없을 때 | `deploy/node-access/daemonset.yaml` 의 DaemonSet 을 `kubectl exec` 로 읽음 | `scripts/kubegap nodes --context <이름>` |
 | 선택 도구 | `PATH`. `kubegap setup` 이 없는 것을 보여 주고 동의를 받아 설치 | `kubegap setup --context <이름>` 의 1절 |
@@ -133,7 +133,7 @@ kubegap 에는 자체 자격 증명 저장소가 없습니다. 지금 쓰는 PC 
 **Prometheus, Alertmanager, Loki, Grafana.** 클러스터 안에서 kube-prometheus-stack, Loki, Grafana 의 Service 를 찾아 자동으로 포트포워딩합니다. 다른 클러스터, 관리형 서비스, VM 처럼 밖에 있으면 설정에 `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url` 을 적습니다. 그러면 포트포워딩 대신 그 주소를 씁니다. Grafana 데이터소스와 대시보드 항목에는 `grafana_api_token` 이 필요합니다. Viewer 권한의 서비스 계정 토큰입니다. 없으면 그 부분은 건너뛰고 "자격 증명 없음" 으로 씁니다. 메트릭 저장소가 아예 없으면 7일 사용 이력이 필요한 항목을 건너뛰고 리포트에 그렇게 씁니다.
 
 **노드 OS 접근.** 노드 쪽에 뭔가 준비해야 할 수도 있는 건 이것 하나뿐입니다.
-- EKS: SSM `send-command` 로 노드를 읽습니다. 문서는 `AWS-RunShellScript` 이고 읽기 전용 명령만 보냅니다. 로컬에서 따로 준비할 건 없지만 노드 IAM 역할에 `AmazonSSMManagedInstanceCore` 가 있어야 합니다. EKS 최적화 AMI 는 SSM 에이전트를 이미 돌리고 있습니다.
+- EKS: SSM `send-command` 로 노드를 읽습니다. 노드에서 돌릴 명령은 SSM 문서 [`deploy/permissions/ssm-document.yaml`](deploy/permissions/ssm-document.yaml) 안에 들어 있고, 이 문서가 계정에 한 번 올라가 있어야 합니다. `kubegap setup` 이 문서가 있는지, 최신인지 알려 주고, 동의하면 올려 줍니다. `setup --install-ssm-document` 한 번에만 `ssm:CreateDocument` 권한이 필요하고, 그건 본인 자격 증명에 있으면 됩니다. 매일 쓰는 키에는 필요 없습니다. 노드 IAM 역할에는 `AmazonSSMManagedInstanceCore` 가 있어야 합니다. EKS 최적화 AMI 는 SSM 에이전트를 이미 돌리고 있습니다.
 - k3s, 베어메탈, kubeadm: SSH 로 노드를 읽습니다. 각 노드의 InternalIP 에 `~/.ssh/config` 의 사용자와 키로 접속합니다. 그 주소로 접속이 안 되면 설정에 `ssh:` 블록을 둡니다. `user`, `key`, `port`, 그리고 노드 이름을 주소나 `user@주소` 로 잇는 `hosts:` 입니다. Tailscale 같은 오버레이 네트워크라서 InternalIP 가 안 닿을 때 씁니다. 접속 계정은 [`deploy/node-access/README.md`](deploy/node-access/README.md) 에 적힌 로그 읽기 그룹에 들어가 있어야 하고, 선택 사항인 sudoers 파일을 두면 root 만 읽을 수 있는 나머지도 읽습니다.
 - SSM 도 SSH 도 없을 때, 예를 들어 GKE, AKS, 관리형 노드: [`deploy/node-access/daemonset.yaml`](deploy/node-access/daemonset.yaml) 을 적용하면 kubegap 이 그 파드에 `kubectl exec` 로 들어가 노드를 읽습니다.
 - 셋 다 없으면 노드 OS 항목, 즉 `node.*` 만 "노드 접근 없음" 으로 건너뜁니다. 나머지는 전부 돕니다.
@@ -155,7 +155,8 @@ kubegap 에는 자체 자격 증명 저장소가 없습니다. 지금 쓰는 PC 
 kubegap 은 클러스터를 읽기만 하고 **아무것도 바꾸지 않습니다.** Secret 값은 읽지도 기록하지도 않습니다. 이름과 종류만 봅니다.
 
 - 클러스터: [`deploy/permissions/clusterrole.yaml`](deploy/permissions/clusterrole.yaml). 모든 리소스에 get, list, watch 와 `nodes/proxy`, `nodes/metrics`. Secret 은 제외.
-- AWS, EKS: [`deploy/permissions/iam-policy.json`](deploy/permissions/iam-policy.json). Describe, List, Get 동작과 CloudWatch `GetMetricData`, 그리고 노드 안을 읽기 위한 SSM `SendCommand`. SendCommand 는 `AWS-RunShellScript` 로 제한.
+- AWS, EKS: [`deploy/permissions/iam-policy.json`](deploy/permissions/iam-policy.json). Describe, List, Get 동작과 CloudWatch `GetMetricData`, 그리고 노드 안을 읽기 위한 SSM `SendCommand`. SendCommand 는 두 겹으로 제한됩니다. 문서는 `kubegap-node-read` ([`deploy/permissions/ssm-document.yaml`](deploy/permissions/ssm-document.yaml)) 하나만 허용하는데, 이 문서에는 읽기 명령이 고정으로 박혀 있고 바깥에서 명령을 넣을 자리가 없습니다. 대상은 `kubernetes.io/cluster/<CLUSTER_NAME>=owned` 태그가 붙은 인스턴스만 허용하는데, 이 태그는 관리형 노드 그룹과 Karpenter 가 노드마다 이미 붙여 둔 것입니다. 정책을 붙이기 전에 `<CLUSTER_NAME>` 을 클러스터 이름으로 바꿉니다. 이 정책을 가진 키로 할 수 있는 일은 그 클러스터 노드에서 그 명령을 돌리는 것뿐입니다.
+- 어느 백엔드로든 노드에 닿는 명령 전체: [`deploy/node-access/COMMANDS.md`](deploy/node-access/COMMANDS.md). 수집기 정의에서 생성되고, 테스트가 최신인지 확인합니다.
 - SSH 로 닿는 노드, k3s 와 베어메탈: [`deploy/node-access/README.md`](deploy/node-access/README.md). 로그 읽기 그룹에 넣는 한 줄과, 선택 사항으로 읽기 전용 명령을 허용하는 sudoers 파일. 없으면 그 노드 항목만 "노드 접근 없음" 으로 건너뜁니다.
 - SSM 도 SSH 도 없는 노드, GKE, AKS, kubeadm: [`deploy/node-access/daemonset.yaml`](deploy/node-access/daemonset.yaml) 을 적용하면 그 파드에 `kubectl exec` 로 들어가 읽습니다. 특권 파드이므로 점검이 끝나면 지워도 됩니다.
 
