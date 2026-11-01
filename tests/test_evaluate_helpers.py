@@ -1,6 +1,7 @@
 """lib/evaluate.py pure helpers: the sandboxed expression evaluator and the static helpers checks.yaml expressions call."""
 
 import datetime as dt
+from pathlib import Path
 
 import pytest
 
@@ -58,13 +59,27 @@ def test_excluded_uses_case_sensitive_globs():
     assert not _excluded("traffic.endpoint-zero", "x", {})
 
 
+def _ctx(inv: dict) -> Context:
+    return Context(Path("/nonexistent"), inv, {}, {"name": "prod"})
+
+
 def test_days_until():
     today = dt.date.today()
-    assert Context.days_until((today + dt.timedelta(days=10)).isoformat()) == 10
-    assert Context.days_until((today - dt.timedelta(days=3)).isoformat() + "T12:00:00Z") == -3
-    assert Context.days_until(None) is None
-    assert Context.days_until("") is None
-    assert Context.days_until("not-a-date") is None
+    c = _ctx({})
+    assert c.today == today
+    assert c.days_until((today + dt.timedelta(days=10)).isoformat()) == 10
+    assert c.days_until((today - dt.timedelta(days=3)).isoformat() + "T12:00:00Z") == -3
+    assert c.days_until(None) is None
+    assert c.days_until("") is None
+    assert c.days_until("not-a-date") is None
+
+
+def test_days_until_pinned_today():
+    """Embedded test cases set inv["today"] so date-based verdicts do not drift with the calendar."""
+    c = _ctx({"today": "2026-10-25"})
+    assert c.today == dt.date(2026, 10, 25)
+    assert c.days_until("2026-10-28") == 3
+    assert c.days_until("2026-10-25T00:00:00Z") == 0
 
 
 def test_addon_minor_gap():
