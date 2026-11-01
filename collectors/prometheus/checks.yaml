@@ -15,6 +15,9 @@
   why: >
     Prometheus keeps every active (head) series in memory and briefly uses more during the 2-hour compaction. Near the limit it gets OOMKilled during compaction or a large query (a 30-day Grafana panel) — alert evaluation stops at that moment, and after the restart there is a metrics gap for several minutes while the WAL replays. If Prometheus is unhealthy, every other check runs on wrong data.
     Measured on a real EKS cluster: working set 0.57 of a 1.5GiB limit (RSS 1.34GiB), last termination reason OOMKilled with one restart; Loki was also OOMKilled because of a 24-hour query from this skill (since fixed to a 1-hour window). A 2-node k3s k3s: 0.59, no OOM.
+  cases:
+    - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-25-prometheus-on-live-cluster-down.html }
+    - { who: Saifeddine Rajhi 2024, url: https://seifrajhi.github.io/blog/prometheus-manage-memory-overload/ }
   suggest: "Raise the limit (head series × about 8KB + compaction headroom) or reduce cardinality (prometheus.cardinality). Precompute long-range Grafana panels with recording rules."
   verify:
     - "kubectl -n monitoring top pod -l app.kubernetes.io/name=prometheus --containers"
@@ -454,6 +457,8 @@
   why: >
     With retention.size at 0B Prometheus only trims by time, so as series grow the disk fills first — once the disk is full, compaction fails and eventually writes stop. With emptyDir, the moment the pod moves to another node or the node is replaced, the whole retention window of metrics is gone (measured on a k3s: 30 days, 23.7GiB on emptyDir). If the actual oldest sample is much younger than the retention period, data has already been cut.
     Measured on a real EKS cluster: a 20GiB PVC at 43% (8.3GiB, 15-day retention, no size cap) → pass; the small k3s cluster on emptyDir → warn (the same fact as core observability.stack-storage-emptydir).
+  cases:
+    - { who: Saifeddine Rajhi 2024, url: https://seifrajhi.github.io/blog/prometheus-manage-memory-overload/ }
   suggest: "Set retention.size to 80-85% of the PVC (--storage.tsdb.retention.size=16GB). Replace emptyDir with a PVC (StorageClass). For failed compactions and WAL corruption, read the compaction failed / wal corruption lines in the Prometheus log."
   verify:
     - "kubectl -n monitoring exec prometheus-kube-prometheus-stack-prometheus-0 -c prometheus -- df -h /prometheus"
@@ -1002,6 +1007,8 @@
   why: >
     The series count determines memory, compaction time and query latency. Past 1 million a single Prometheus struggles (8GiB+ memory), and when one metric holds 1/4 of the series, dropping that one metric (usually apiserver/etcd histogram buckets, or an app metric with IDs or paths in labels) alone cuts it substantially.
     Measured on a real EKS cluster: 157k series; a k3s: 140k. In both, all top 10 were apiserver/etcd histogram buckets (61k = 39% on EKS) — control-plane metrics scraped by the kube-prometheus-stack defaults, so dropping the buckets with metricRelabelings removes about 1/3.
+  cases:
+    - { who: Saifeddine Rajhi 2024, url: https://seifrajhi.github.io/blog/prometheus-manage-memory-overload/ }
   suggest: "Drop unused _bucket series with metricRelabelings on the ServiceMonitors (kube-apiserver, kube-etcd). If an app metric is at the top, remove IDs and URLs from its labels. Check the top metrics each time via /api/v1/status/tsdb."
   verify:
     - "kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090 & curl -s localhost:9090/api/v1/status/tsdb | jq '.data.seriesCountByMetricName[:10]'"
@@ -2668,6 +2675,10 @@
   why: >
     While a single Prometheus restarts (OOM, node replacement, upgrade), scraping and alert evaluation stop for several minutes. With replicas 2, kube-prometheus-stack has both instances scrape the same targets and Alertmanager deduplicates (availability without Thanos). This matters more on EKS clusters with frequent node replacement (Karpenter consolidation).
     Measured on a real EKS cluster and a k3s: both 1. On a 2-node small k3s cluster it matters little — low.
+  cases:
+    - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-25-prometheus-on-live-cluster-down.html }
+    - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-11-01-prometheus-restarted.html }
+    - { who: UK Ministry of Justice 2024, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2024-04-15-prometheus.html }
   suggest: "prometheus.prometheusSpec.replicas: 2 + podAntiAffinity. For long-term retention, a Thanos sidecar."
   verify:
     - "kubectl -n monitoring get prometheus -o jsonpath='{.items[*].spec.replicas}'"

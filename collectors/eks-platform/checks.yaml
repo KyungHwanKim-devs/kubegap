@@ -66,6 +66,8 @@
   severity_default: high
   symptom_linked: false
   why: The apiserver is exposed to the internet. Authentication is IAM, but a single leaked token or vulnerability is enough, and indiscriminate requests become apiserver load.
+  cases:
+    - { who: Aqua Nautilus 2023, url: https://www.aquasec.com/blog/leveraging-kubernetes-rbac-to-backdoor-clusters/ }
   suggest: Restrict publicAccessCidrs to office/VPN CIDRs, or switch to private-only and access through a VPN or bastion.
   verify:
     - "aws eks describe-cluster --name {cluster} --query cluster.resourcesVpcConfig"
@@ -841,6 +843,9 @@
   why: >
     gp3 defaults to 3,000 IOPS and 125MB/s. A node root volume takes container images, write layers, logs (read by promtail/fluent-bit) and emptyDirs, so it saturates first on nodes with many log collectors, and then kubelet and containerd slow down, causing PLEG delays and slow pod starts. A sustained queue length of 1 or more means the disk cannot keep up. gp2 drops to baseline IOPS when its burst balance (BurstBalance) runs out.
     Measured on a real EKS cluster: 24 volumes (7 root, 17 PVC), max average queue 0.26 (a root volume, momentary peak 2.06), busiest-hour IOPS ratio max 5% → pass.
+  cases:
+    - { who: Blue Matador 2019, url: https://www.bluematador.com/blog/post-mortem-kubernetes-node-oom }
+    - { who: Datadog 2019, url: https://www.youtube.com/watch?v=QKI-JRs2RIE }
   suggest: "For root volumes with a high queue, raise iops/throughput in the EC2NodeClass blockDeviceMappings (gp3 can be tuned independently of volume size) or reduce logs and emptyDir use. For PVCs, the StorageClass parameters iops/throughput."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/EBS --metric-name VolumeQueueLength --dimensions Name=VolumeId,Value=<vol> --statistics Average --period 300 --start-time <24h ago> --end-time <now>"
@@ -981,6 +986,8 @@
   why: >
     A managed node group's AMI (the date at the end of releaseVersion) only changes when a node group update is run. EKS-optimized AMIs ship roughly every 2-4 weeks with kernel, containerd and runc security patches. Thresholds (defaults, user-adjustable): 90 days warn, 180 days fail. Karpenter nodes are covered by the EC2NodeClass AMI selection (karpenter.ec2nodeclass-al2, hardening).
     Measured on a real EKS cluster: a managed node group AMI about 320 days old → fail.
+  cases:
+    - { who: ZenML 2025, url: https://status.zenml.io/incidents/bnrlb8tck3v0 }
   suggest: "aws eks update-nodegroup-version --cluster-name <c> --nodegroup-name <ng> (rolling replacement). Automate with the node group's 'auto update' or a periodic pipeline."
   verify:
     - "aws eks describe-nodegroup --cluster-name <c> --nodegroup-name <ng> --query 'nodegroup.{ami:releaseVersion,status:status,health:health}'"

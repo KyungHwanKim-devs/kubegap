@@ -1065,6 +1065,10 @@
   why: >
     prune: true means "resources that disappear from Git are deleted from the cluster too". If a Namespace is among the managed resources, the moment its manifest leaves Git (directory move, rename, ApplicationSet generator change) Argo CD deletes the Namespace and everything inside it, PVCs included. The same applies to CRDs — deleting a CRD deletes all of its CRs.
     The Skyscanner 2021 incident had this shape (ApplicationSet generator change → apps removed → prune deleted everything). Measured on a real k3s: 7 apps managed a Namespace as a resource. The EKS cluster used CreateNamespace=true and did not manage Namespaces.
+  cases:
+    - { who: Skyscanner 2021, url: https://medium.com/@SkyscannerEng/how-a-couple-of-characters-brought-down-our-site-356ccaf1fbc3 }
+    - { who: InfluxData 2023, url: https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/ }
+    - { who: Argo CD issue 28630 2026, url: https://github.com/argoproj/argo-cd/issues/28630 }
   suggest: "Annotate Namespaces with argocd.argoproj.io/sync-options: Prune=false, or create namespaces via syncOptions CreateNamespace=true and remove them from the manifests. Move CRDs into a separate Application with prune off. Also review the Application finalizer in Argo CD 2.6+ and preservedResourcesOnDeletion on ApplicationSets."
   verify:
     - "kubectl get applications.argoproj.io -A -o json | jq -r '.items[] | select(.spec.syncPolicy.automated.prune==true) | .metadata.name as $n | .status.resources[]? | select(.kind==\"Namespace\" or .kind==\"CustomResourceDefinition\") | $n+\" \"+.kind+\"/\"+.name'"
@@ -3817,6 +3821,8 @@
   why: >
     Argo CD patches only the three latest minors. Since 3.0 (2025-05), 3.1 and 3.2 shipped, 2.x no longer receives security patches — Argo CD runs as cluster-admin and its UI is often open to the internet, so a server vulnerability (several UI XSS, SSRF and RBAC-bypass CVEs in 2024-2025) is full cluster control right away.
     Measured on real clusters: EKS ran 2.13.0 (2024-11), the small k3s cluster 3.2.0.
+  cases:
+    - { who: Cycode Labs 2024, url: https://cycode.com/blog/revealing-argo-cd-critical-vulnerability/ }
   suggest: "Upgrade 2.14 → 3.0 → 3.x following the upgrade notes (RBAC default policy change, log format, fine-grained RBAC). With Helm, use the argo-cd chart 8.x."
   verify:
     - "kubectl -n argocd get deploy argocd-server -o jsonpath='{.spec.template.spec.containers[0].image}'"
