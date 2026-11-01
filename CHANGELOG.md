@@ -10,6 +10,7 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ### Changed
 
+- Node SSH connections check host keys strictly (`StrictHostKeyChecking=yes`): only nodes already in `~/.ssh/known_hosts` are reached, and a refused key is reported with a hint. `ssh.accept_new_hosts: true` in config.yaml restores the earlier `accept-new` behaviour. `deploy/node-access/README.md` describes the preparation. ([#4](https://github.com/KyungHwanKim-devs/kubegap/issues/4))
 - EKS node commands run through a custom SSM document, `kubegap-node-read` (`deploy/permissions/ssm-document.yaml`), instead of `AWS-RunShellScript`. The document embeds every read command and takes no free command text; kubegap compares its sha256 with the account copy before sending and `kubegap setup` uploads it with consent (`--install-ssm-document`, config `ssm_document`). The IAM policy allows `ssm:SendCommand` only on that document and only on instances tagged `kubernetes.io/cluster/<CLUSTER_NAME>=owned`. ([#1](https://github.com/KyungHwanKim-devs/kubegap/issues/1))
 - `kubegap nodes --cmd` is no longer available on the SSM backend; `--step <name>` runs one documented step instead.
 

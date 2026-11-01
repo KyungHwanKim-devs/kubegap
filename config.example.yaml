@@ -37,6 +37,7 @@ ssm_document: ask            # EKS only. The SSM document kubegap-node-read (dep
 #     node-a: 100.64.0.11
 #     node-b: admin@100.64.0.12    # use user@address when the username differs per node
 #   prefer_hostname: false   # true = nodes not listed in hosts are reached by node name instead of InternalIP (when DNS resolves them)
+#   accept_new_hosts: false  # true = store the host key of a node seen for the first time without asking (ssh accept-new). Write true, not yes or 1. Default: only nodes already in ~/.ssh/known_hosts are reached, see deploy/node-access/README.md
 
 # ---- (3) Suppressions and threshold overrides ----
 # Suppressed findings appear in the report's suppression section as "N suppressed" with the reason and expiry. After the expiry date the suppression lifts automatically and is marked "suppression expired".

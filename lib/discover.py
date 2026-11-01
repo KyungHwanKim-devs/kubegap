@@ -268,7 +268,13 @@ def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log:
                 (out["ssm_registered"] if iid in online and online[iid] == "Online" else out["ssm_unregistered"]).append({"node": n["name"], "instance_id": iid})
     if out["method"] == "ssh":
         ssh_cfg = cfg.get("ssh") or {}
-        out["ssh"] = {"user": ssh_cfg.get("user"), "key": ssh_cfg.get("key"), "port": ssh_cfg.get("port", 22), "note": "If empty, the host settings from ~/.ssh/config are used. Connects by node name or InternalIP"}
+        out["ssh"] = {
+            "user": ssh_cfg.get("user"),
+            "key": ssh_cfg.get("key"),
+            "port": ssh_cfg.get("port", 22),
+            "accept_new_hosts": ssh_cfg.get("accept_new_hosts") is True,
+            "note": "If empty, the host settings from ~/.ssh/config are used. Connects by node name or InternalIP",
+        }
     return out
 
 

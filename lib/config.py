@@ -1,7 +1,7 @@
 """Read config.yaml. The file is optional; without it we run with an empty config.
 
 Known keys: context, profile, confirm_context (bool, default true), install_tools (ask|always|never, default ask), aws_profile, aws_region, prometheus_url, loki_url, alertmanager_url, grafana_url,
-node_access(ssm|ssh|daemonset|none), ssh(user, key, port), ssm_document (ask|always|never, default ask), keep_component_logs (bool, default false), retention(keep_daily, keep_full), suppress[], overrides{}.
+node_access(ssm|ssh|daemonset|none), ssh(user, key, port, hosts, prefer_hostname, accept_new_hosts), ssm_document (ask|always|never, default ask), keep_component_logs (bool, default false), retention(keep_daily, keep_full), suppress[], overrides{}.
 """
 
 from __future__ import annotations
