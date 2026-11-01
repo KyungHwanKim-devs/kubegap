@@ -237,6 +237,8 @@ def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log:
     out: dict = {"method": None, "source": "detected", "reasons": [], "ssm_registered": [], "ssm_unregistered": []}
     if forced in ("ssm", "ssh", "none"):
         out["method"], out["source"] = forced, "config.yaml"
+    elif forced == "daemonset":
+        out["method"], out["source"] = "daemonset", "config.yaml"  # kept even when no pod is Running, so the node steps fail visibly instead of silently falling back to the platform default
     elif platform == "eks":
         out["method"], out["reasons"] = "ssm", ["EKS: SSM send-command"]
     elif platform in ("k3s", "rke2", "unknown"):
@@ -254,6 +256,8 @@ def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log:
         if running:
             out["method"], out["reasons"] = "daemonset", [f"kubegap-node-reader DaemonSet: {len(running)} pods Running (namespace kubegap) — nodes are read via kubectl exec"]
             out["daemonset_nodes"] = running
+        elif forced == "daemonset":
+            out["reasons"], out["daemonset_nodes"] = ["config.yaml node_access: daemonset, but no kubegap-node-reader pod is Running in namespace kubegap. Apply deploy/node-access/daemonset.yaml; every node step fails until then"], []
     if out["method"] == "ssm" and eks is not None:
         prof = cfg.get("aws_profile") or eks.get("profile")
         region = cfg.get("aws_region") or eks.get("region")

@@ -405,6 +405,11 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     return {"ok": ok, "seconds": round(r.seconds, 1) if hasattr(r, "seconds") else None, "error": None if ok else (r.error or r.stderr.strip()[-300:] or "no output")}
 
 
+# The node command backends that collection sends node steps to. `none` is the absence of one. The DaemonSet backend was missing from this
+# list for a while, so collection skipped every node step on it although lib/node.py and deploy/node-access/daemonset.yaml were in place (#5).
+NODE_BACKENDS = ("ssh", "ssm", "daemonset")
+
+
 class NodeRunner:
     """For node command steps. Builds the NodeAccess and the capabilities table once and reuses them."""
 
@@ -430,7 +435,7 @@ class NodeRunner:
 
 
 def _run_node_step(st: dict, sid: str, name: str, inv: dict, cfg: Config, snap: Path, log: RunLog, runner: NodeRunner | None, timeout: float, echo) -> dict:
-    if runner is None or runner.na.method not in ("ssh", "ssm"):
+    if runner is None or runner.na.method not in NODE_BACKENDS:
         log.skip(id=f"{name}.{sid}", reason=f"no node command backend ({runner.na.method if runner else '-'})", collector=name)
         if echo:
             echo("    skipped: no node command backend")
@@ -573,8 +578,8 @@ class StepContext:
         return (self.inv.get("cluster") or {}).get("eks") or {}
 
     def node_backend_ok(self) -> bool:
-        """True when a node command backend exists (ssh or ssm), the precondition for the pod-metrics node-curl fallback."""
-        return self.node_access is not None and getattr(getattr(self.node_access, "na", None), "method", None) in ("ssh", "ssm")
+        """True when a node command backend exists (NODE_BACKENDS), the precondition for the pod-metrics node-curl fallback."""
+        return self.node_access is not None and getattr(getattr(self.node_access, "na", None), "method", None) in NODE_BACKENDS
 
     def skip(self, sid: str, reason: str, result: dict | None = None) -> dict:
         self.log.skip(id=f"{self.name}.{sid}", reason=reason, collector=self.name)
