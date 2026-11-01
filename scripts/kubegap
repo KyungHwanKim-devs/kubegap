@@ -343,7 +343,7 @@ def cmd_mask(args) -> int:
 
 
 def cmd_nodes(args) -> int:
-    """Verify node command backend (SSM/SSH) access. Sends `echo; uname -r; hostname` to every node listed in the latest snapshot's inventory.json."""
+    """Verify node command backend (SSM, SSH or DaemonSet) access. Sends `echo; uname -r; hostname` to every node listed in the latest snapshot's inventory.json."""
     import json as _json
 
     from lib.config import load_config
