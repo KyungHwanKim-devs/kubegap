@@ -9,6 +9,8 @@ behind one interface, `run_on_node(node, cmd)`:
                 Works only for nodes whose IAM role has SSM permissions and whose agent is registered. Unregistered nodes come back as "not registered with SSM".
 - ssh : small k3s cluster / bare metal. `ssh -o BatchMode=yes` (no password prompt). The host is chosen from config.yaml `ssh.hosts.<node>` → node Hostname →
                 InternalIP, in that order. User, key and port come from config.yaml `ssh.user/key/port`; when empty, ~/.ssh/config applies.
+                Host keys are checked strictly: only a node whose key is already in known_hosts is reached (`StrictHostKeyChecking=yes`). The user accepts
+                a new node once by hand, or sets `ssh.accept_new_hosts: true` to let ssh store first-seen keys (`accept-new`).
 - daemonset: anything without SSM or SSH (GKE, AKS, kubeadm). `kubectl exec` into the privileged kubegap-node-reader pod from deploy/node-access/daemonset.yaml, `chroot /host`.
 - none: no backend. Only node-exporter metrics are used.
 The detection result (inventory.node_access.method) picks the backend; config.yaml `node_access` overrides it.
@@ -46,6 +48,29 @@ class NodeResult:
     error: str | None = None
     seconds: float = 0.0
     detail: dict = field(default_factory=dict)
+
+
+def ssh_argv(ssh_cfg: dict, host: str, cmd: str) -> list[str]:
+    """The ssh command line for one node. BatchMode so no password prompt; host keys are checked strictly by default (only nodes already in
+    known_hosts are reached). `ssh.accept_new_hosts: true` relaxes that to accept-new, which stores a first-seen key without asking; a stored key that
+    changed is still refused."""
+    strict = "accept-new" if ssh_cfg.get("accept_new_hosts") is True else "yes"
+    argv = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "-o", f"StrictHostKeyChecking={strict}"]
+    if ssh_cfg.get("key"):
+        argv += ["-i", str(ssh_cfg["key"]).replace("~", str(Path.home()), 1)]
+    if ssh_cfg.get("port"):
+        argv += ["-p", str(ssh_cfg["port"])]
+    # If a hosts value is `user@address`, use that user (when usernames differ per node). Otherwise ssh.user, and failing that ~/.ssh/config
+    target = host if "@" in host else (f"{ssh_cfg['user']}@{host}" if ssh_cfg.get("user") else host)
+    return [*argv, target, "--", cmd]
+
+
+def ssh_hand_command(ssh_cfg: dict, host: str) -> str:
+    """The command a user runs once to see and store a node's host key, in the same form kubegap connects with. OpenSSH files a
+    non-default port under `[address]:port`, so the port must match."""
+    argv = ssh_argv(ssh_cfg, host, "true")
+    port = [f"-p {argv[i + 1]}" for i, a in enumerate(argv) if a == "-p"]
+    return " ".join(["ssh", *port, argv[-3], "true"])
 
 
 class NodeAccess:
@@ -223,19 +248,14 @@ class NodeAccess:
 
     def _ssh(self, node: str, cmd: str, timeout: float) -> NodeResult:
         host = self._ssh_host(node)
-        argv = ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "-o", "StrictHostKeyChecking=accept-new"]
-        if self.ssh.get("key"):
-            argv += ["-i", str(self.ssh["key"]).replace("~", str(Path.home()), 1)]
-        if self.ssh.get("port"):
-            argv += ["-p", str(self.ssh["port"])]
-        # If a hosts value is `user@address`, use that user (when usernames differ per node). Otherwise ssh.user, and failing that ~/.ssh/config
-        target = host if "@" in host else (f"{self.ssh['user']}@{host}" if self.ssh.get("user") else host)
-        argv += [target, "--", cmd]
+        argv = ssh_argv(self.ssh, host, cmd)
         r = shell.run(argv, timeout=timeout + 10)
         if not r.ok:
             err = r.error or r.stderr.strip()[-300:] or f"exit {r.code}"
             hint = ""
-            if "Permission denied" in err:
+            if "Host key verification failed" in err or "REMOTE HOST IDENTIFICATION HAS CHANGED" in err:
+                hint = f" → the host key of {host} is not in known_hosts, or differs from the stored one. Connect once by hand (`{ssh_hand_command(self.ssh, host)}`) to check and store the key, or set config.yaml ssh.accept_new_hosts: true to store first-seen keys automatically"
+            elif "Permission denied" in err:
                 hint = " → check config.yaml ssh.user / ssh.key (password login is not supported)"
             elif "Could not resolve" in err or "timed out" in err or "No route" in err:
                 hint = " → set config.yaml ssh.hosts.<node> to an address reachable from this machine (e.g. a Tailscale IP)"
