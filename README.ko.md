@@ -136,7 +136,7 @@ kubegap 에는 자체 자격 증명 저장소가 없습니다. 지금 쓰는 PC 
 
 **노드 OS 접근.** 노드 쪽에 뭔가 준비해야 할 수도 있는 건 이것 하나뿐입니다.
 - EKS: SSM `send-command` 로 노드를 읽습니다. 노드에서 돌릴 명령은 SSM 문서 [`deploy/permissions/ssm-document.yaml`](deploy/permissions/ssm-document.yaml) 안에 들어 있고, 이 문서가 계정에 한 번 올라가 있어야 합니다. `kubegap setup` 이 문서가 있는지, 최신인지 알려 주고, 동의하면 올려 줍니다. `setup --install-ssm-document` 를 돌리는 자격 증명에만 `ssm:CreateDocument`, `ssm:UpdateDocument`, `ssm:UpdateDocumentDefaultVersion`, `ssm:ListDocumentVersions` 가 필요하고, 그건 본인 자격 증명에 있으면 됩니다. 매일 쓰는 키에는 필요 없습니다. 노드 IAM 역할에는 `AmazonSSMManagedInstanceCore` 가 있어야 합니다. EKS 최적화 AMI 는 SSM 에이전트를 이미 돌리고 있습니다.
-- k3s, 베어메탈, kubeadm: SSH 로 노드를 읽습니다. 각 노드의 InternalIP 에 `~/.ssh/config` 의 사용자와 키로 접속합니다. 그 주소로 접속이 안 되면 설정에 `ssh:` 블록을 둡니다. `user`, `key`, `port`, 그리고 노드 이름을 주소나 `user@주소` 로 잇는 `hosts:` 입니다. Tailscale 같은 오버레이 네트워크라서 InternalIP 가 안 닿을 때 씁니다. 접속 계정은 [`deploy/node-access/README.md`](deploy/node-access/README.md) 에 적힌 로그 읽기 그룹에 들어가 있어야 하고, 선택 사항인 sudoers 파일을 두면 root 만 읽을 수 있는 나머지도 읽습니다.
+- k3s, 베어메탈, kubeadm: SSH 로 노드를 읽습니다. 각 노드의 InternalIP 에 `~/.ssh/config` 의 사용자와 키로 접속합니다. 그 주소로 접속이 안 되면 설정에 `ssh:` 블록을 둡니다. `user`, `key`, `port`, 그리고 노드 이름을 주소나 `user@주소` 로 잇는 `hosts:` 입니다. Tailscale 같은 오버레이 네트워크라서 InternalIP 가 안 닿을 때 씁니다. 호스트 키가 `~/.ssh/known_hosts` 에 이미 있는 노드만 접속하므로, 처음 돌리기 전에 노드마다 한 번 직접 ssh 로 들어가 두거나 그 블록에 `accept_new_hosts: true` 를 둡니다. 접속 계정은 [`deploy/node-access/README.md`](deploy/node-access/README.md) 에 적힌 로그 읽기 그룹에 들어가 있어야 하고, 선택 사항인 sudoers 파일을 두면 root 만 읽을 수 있는 나머지도 읽습니다.
 - SSM 도 SSH 도 없을 때, 예를 들어 GKE, AKS, 관리형 노드: [`deploy/node-access/daemonset.yaml`](deploy/node-access/daemonset.yaml) 을 적용하면 kubegap 이 그 파드에 `kubectl exec` 로 들어가 노드를 읽습니다.
 - 셋 다 없으면 노드 OS 항목, 즉 `node.*` 만 "노드 접근 없음" 으로 건너뜁니다. 나머지는 전부 돕니다.
 

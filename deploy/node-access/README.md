@@ -31,6 +31,10 @@ sudo chmod 440 /etc/sudoers.d/kubegap && sudo visudo -c
 scripts/kubegap nodes --context <name>            # per node: reachable or not, and which privileged reads are allowed (journal, kern.log, dmesg, k3s-db, crictl, sudo list)
 ```
 
+## Host keys
+
+kubegap connects with `StrictHostKeyChecking=yes`: a node is reached only when its host key is already in `~/.ssh/known_hosts`, and a key that changed is refused. Before the first run, connect to each node once by hand so you see and store its key, in the same form kubegap uses: `ssh <user>@<address> true`, with `-p <port>` when `ssh.port` is set. The address is the node InternalIP, the node name with `prefer_hostname: true`, or the value under `ssh.hosts` when the node is listed there. OpenSSH files a non-default port under `[address]:port`, so a key stored without `-p` is not found. Each unprepared node is reported as "no node access" with a hint. To let kubegap store first-seen keys itself, set `accept_new_hosts: true` under `ssh` in `config.yaml`.
+
 ## When the address or username differs per node
 
 Put `node-name: user@address` under `ssh.hosts` in `config.yaml` (for example an overlay-network address). Password login is not supported. To install your key on a node:
