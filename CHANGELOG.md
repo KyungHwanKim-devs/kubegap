@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-02
+
+The first milestone, permissions and the read-only claim, is complete: issues #1 to #5. Contributors to this release: [@junhoeKu](https://github.com/junhoeKu) (#31) and [@Rapil3090](https://github.com/Rapil3090) (#34).
+
 ### Removed
 
 - The `helm-values` collection step and the check `hygiene.helm-release-pure-defaults`. `helm get values` reads Helm's release Secrets and the values often hold credentials; they were stored raw in the snapshot. `helm list` stays, and the READMEs now say that it reads Helm's release records, which Helm keeps in Secrets, and that only their metadata is stored. When `helm list` fails for lack of secrets permission, the summary says so instead of "helm not installed". Rubric 0.1.52, 402 checks. ([#3](https://github.com/KyungHwanKim-devs/kubegap/issues/3))
@@ -41,5 +45,6 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 - Expectation profiles `prod`, `lab`, `small-prod`, `multi-az-prod` and `dev`.
 - English and Korean README and sample reports.
 
-[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/KyungHwanKim-devs/kubegap/releases/tag/v0.1.0
