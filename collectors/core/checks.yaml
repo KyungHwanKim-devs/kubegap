@@ -3935,19 +3935,22 @@
 # ---- Node OS (area node). Material is summary.nodeos (lib/nodeos.py). Read from inside the node, so only what does not overlap with the node-exporter metric checks (node.conntrack-usage etc.) lives here. ----
   test:
     profile: "k3s"
-    cases:
+    cases:  # `today` pins the date so the verdicts do not drift as end-of-support dates in rubric/k8s-versions.yaml pass
       - expect: "fail"
         inventory:
+          today: "2026-10-25"
           cluster:
             platform: "k3s"
             server_version: "v1.31.2+k3s1"
       - expect: "warn"
         inventory:
+          today: "2026-10-25"
           cluster:
             platform: "k3s"
             server_version: "v1.34.1+k3s1"
       - expect: "pass"
         inventory:
+          today: "2026-10-25"
           cluster:
             platform: "k3s"
             server_version: "v1.36.0+k3s1"
