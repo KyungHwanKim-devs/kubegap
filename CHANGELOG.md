@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- 108 checks now carry `cases`, public incident write-ups whose root cause is the condition the check detects, 203 links in all; before, 2 checks did. The sources are the 59 stories on k8s.af, read one by one, including the conference talks through their captions, and 24 write-ups from 2023 onward. Companies cited with a year in `why` but without a link now have one or were removed, and two webhook checks no longer cite a Skyscanner incident that was about Argo CD pruning. `docs/CHECKS.md` lists every case and says how many checks have one. Rubric 0.1.53. ([#28](https://github.com/KyungHwanKim-devs/kubegap/issues/28))
+
 ## [0.1.1] - 2026-11-02
 
 The first milestone, permissions and the read-only claim, is complete: issues #1 to #5. Contributors to this release: [@junhoeKu](https://github.com/junhoeKu) (#31) and [@Rapil3090](https://github.com/Rapil3090) (#34).

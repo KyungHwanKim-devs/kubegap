@@ -84,7 +84,7 @@ A full snapshot is about 40 MB. `scripts/kubegap prune --keep-daily 14 --keep-fu
 
 ## What it checks
 
-Twelve areas, 402 checks. Each row gives the count and a few examples; the full list is [`docs/CHECKS.md`](docs/CHECKS.md).
+Twelve areas, 402 checks. Each row gives the count and a few examples; the full list is [`docs/CHECKS.md`](docs/CHECKS.md), which also says how many checks carry a public incident write-up and links each one. The rest are configuration rules with no known public incident, and the report says so instead of inventing one.
 
 | Area | Checks | Examples |
 |---|---|---|
