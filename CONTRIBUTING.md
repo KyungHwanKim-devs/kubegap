@@ -25,7 +25,7 @@ uvx --from skills-ref agentskills validate "$PWD"      # run from the parent dir
 - Write what you found before what you changed: which file and line, what the issue got right or wrong, and what you verified. If you ran it against a real cluster, say which kind and what you saw. The body can be in English or in Korean and English.
 - Add one line to the `Unreleased` section of `CHANGELOG.md` under Added, Changed or Fixed, with the issue number. The release notes are built from it and name the contributors.
 - The first pull request from a fork does not run CI by itself: GitHub waits for a maintainer to approve the workflow run. Run the commands above locally; the maintainer approves and runs CI before merging.
-- Pull requests are merged with a merge commit, so your commits stay as you wrote them. The maintainer may push a small follow-up commit onto your branch before merging.
+- Pull requests are squash-merged: `main` gets one commit per pull request, titled after it. Inside the pull request, split your commits by topic anyway, such as code, documentation and CHANGELOG; it makes the review easier and the history stays on the pull request page. The maintainer may push a small follow-up commit onto your branch before merging.
 
 ## Rules
 
