@@ -73,6 +73,9 @@ class Context:
         self.prod_like = set((inv.get("namespaces") or {}).get("prod_like") or [])
         self._objects: dict[str, list] = {}
         self._k8s_versions = rubric.load_k8s_versions()
+        # `inv["today"]` (YYYY-MM-DD) pins the date the date-based checks compare against. Only the embedded test cases set it, so their
+        # expected verdicts do not change as the calendar moves past a version's end-of-support date. A real inventory has no such key.
+        self.today = _dt.date.fromisoformat(str(inv["today"])[:10]) if inv.get("today") else _dt.date.today()
         self._addon_versions: dict[str, dict] = {}
         self._owners: dict[tuple[str, str], str] | None = None
 
@@ -276,15 +279,14 @@ class Context:
             return False
         return self.has_service(obj)
 
-    @staticmethod
-    def days_until(date_str) -> int | None:
+    def days_until(self, date_str) -> int | None:
         if not date_str:
             return None
         try:
             d = _dt.date.fromisoformat(str(date_str)[:10])
         except ValueError:
             return None
-        return (d - _dt.date.today()).days
+        return (d - self.today).days
 
     def _addon_versions_for(self, addon: str) -> dict:
         if addon not in self._addon_versions:
