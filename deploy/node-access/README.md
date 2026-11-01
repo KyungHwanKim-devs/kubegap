@@ -3,6 +3,7 @@
 kubegap **never changes a node**. To read the node operating-system layer (kernel log, k3s server log, datastore size, containerd state),
 you prepare each node once. Anything not prepared is reported as "no node access" and only those checks are skipped.
 EKS needs no preparation on the node (SSM `send-command` runs as root); it needs the SSM document `kubegap-node-read` in the account, which `kubegap setup` uploads with your consent (see the main README). The complete list of commands that reach a node on any backend is [`COMMANDS.md`](COMMANDS.md).
+The DaemonSet backend (`daemonset.yaml`, for nodes with neither SSM nor SSH) needs no preparation on the node either: the scripts run as root inside the privileged pod. The kubeconfig user needs `get` and `create` on `pods/exec` in the `kubegap` namespace, from `deploy/permissions/role-daemonset-exec.yaml`, applied after `daemonset.yaml` because that file creates the namespace.
 
 ## Step 1 — log-reading groups (recommended, one line)
 

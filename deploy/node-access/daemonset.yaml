@@ -1,6 +1,7 @@
 # kubegap node-reader DaemonSet (third backend, for environments with neither SSM nor SSH: GKE, AKS, kubeadm, managed nodes with no other access path).
 # Applied by the user: kubectl apply -f deploy/node-access/daemonset.yaml
 # kubegap uses the pods automatically when they are Running (detected by discover, or forced with config.yaml node_access: daemonset) and runs `kubectl exec ... chroot /host /bin/sh -c <read-only script>` on each node.
+# The kubeconfig user needs `get` and `create` on pods/exec in this namespace: deploy/permissions/role-daemonset-exec.yaml, applied after this file (it creates the namespace), in addition to clusterrole.yaml.
 # Privileged, hostPID and a host root mount are required (journalctl, dmesg, crictl and du run as host binaries). Delete it after the audit if you like: kubectl delete -f deploy/node-access/daemonset.yaml
 apiVersion: v1
 kind: Namespace
