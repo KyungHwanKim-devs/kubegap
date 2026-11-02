@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- `vpccni.external-snat-off-with-private-routes`: warns when the VPC CNI keeps its default of SNATing pod traffic that leaves the VPC while the cluster VPC has routes to a peering connection, a transit gateway or a VPN. On those paths the destination sees the node IP instead of the pod IP, which is what cost MindTickle a month of lost packets in 2020. The full run now collects the VPC route tables, `aws/describe-route-tables.json`, through the `ec2:Describe*` permission the IAM policy already grants. Rubric 0.1.54, 403 checks. ([#43](https://github.com/KyungHwanKim-devs/kubegap/issues/43))
+
 ### Changed
 
 - 108 checks now carry `cases`, public incident write-ups whose root cause is the condition the check detects, 203 links in all; before, 2 checks did. The sources are the 59 stories on k8s.af, read one by one, including the conference talks through their captions, and 24 write-ups from 2023 onward. Companies cited with a year in `why` but without a link now have one or were removed, and two webhook checks no longer cite a Skyscanner incident that was about Argo CD pruning. `docs/CHECKS.md` lists every case and says how many checks have one. Rubric 0.1.53. ([#28](https://github.com/KyungHwanKim-devs/kubegap/issues/28))
