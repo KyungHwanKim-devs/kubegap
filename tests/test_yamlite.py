@@ -97,6 +97,24 @@ def test_empty_sequence_item_followed_by_nested_block():
         """) == {"items": [{"k": "v"}, "plain"]}
 
 
+def test_empty_sequence_item_then_sibling_dash_is_not_nested():
+    """Same-indent `- w` after an empty `-` is the next item, matching PyYAML (#66)."""
+    assert y("""
+        -
+        - w
+        """) == [None, "w"]
+    assert y("""
+        - a
+        -
+        - w
+        """) == ["a", None, "w"]
+    assert y("""
+        a:
+          -
+          - w
+        """) == {"a": [None, "w"]}
+
+
 def test_scalar_on_the_line_after_key_or_dash():
     assert y("""
         a:
