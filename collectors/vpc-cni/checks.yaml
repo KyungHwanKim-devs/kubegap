@@ -222,7 +222,7 @@
     kubelet's max-pods is the number of slots the scheduler sees; the CNI's IP limit is what can actually be handed out. If the former is larger, the scheduler sends pods, the CNI refuses, and pods stall in ContainerCreating (a difference equal to the hostNetwork pods that use no IP is fine).
     The EKS-optimized AMI formula for max-pods is ENI x (IP - 1) + 2. The +2 is for aws-node and kube-proxy, which are hostNetwork and use no IP, and is normal; anything larger means Karpenter set `maxPods` separately, or prefix delegation was turned on and then off.
   measured: >
-    Measured: every node was exactly +2.
+    Measured on an EKS cluster: every node was exactly +2.
   suggest: "Set kubelet.maxPods in the Karpenter EC2NodeClass to the IP limit (x16 with prefix delegation), or enable prefix delegation to raise the IP limit."
   verify:
     - "kubectl get node <node> -o jsonpath='{.status.allocatable.pods}' ; aws ec2 describe-instance-types --instance-types <type> --query 'InstanceTypes[].NetworkInfo.[MaximumNetworkInterfaces,Ipv4AddressesPerInterface]'"
@@ -744,7 +744,7 @@
   why: >
     aws-node exposes metrics on 61678 via hostNetwork. When the node security group blocks the apiserver pod proxy, it is read with curl from inside the node — nodes not registered in SSM or without SSH cannot be read, and their IP usage is the estimate "pods using an IP / computed limit".
   measured: >
-    Measured: the pod proxy timed out.
+    Measured on an EKS cluster: the pod proxy timed out.
   suggest: "Register with SSM (eks.ssm-unregistered) or install cni-metrics-helper (awscni_* to CloudWatch or Prometheus)."
   verify:
     - "kubectl get pods -n kube-system -l k8s-app=aws-node -o wide"

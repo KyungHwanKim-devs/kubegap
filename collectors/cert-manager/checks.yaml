@@ -15,7 +15,7 @@
   why: >
     A Certificate with Ready False either has no Secret (first issuance failed → the ingress answers with its default certificate, browser warning) or is frozen on an old certificate (renewal failed → the service breaks on the expiry date). The reason is in the Issuing condition message and in the CertificateRequest, Order and Challenge.
   measured: >
-    Measured on a real k3s: all 31 Ready, 114 CertificateRequests and 110 Orders all valid → pass.
+    Measured on a real k3s cluster: all 31 Ready, 114 CertificateRequests and 110 Orders all valid → pass.
   suggest: "Walk down from the Conditions/Events of kubectl describe certificate <name> → certificaterequest → order → challenge (cmctl status certificate <name>)."
   verify:
     - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[?(@.type==\"Ready\")].status,NOTAFTER:.status.notAfter"
@@ -363,7 +363,7 @@
   why: >
     Let's Encrypt certificates last 90 days and cert-manager renews them 30 days before expiry (renewBefore defaults to 1/3 of duration). So "expiring within 30 days" is the tail of a normal cycle, and "renewalTime passed but not renewed" is the real signal — caused by ACME challenge failures (HTTP-01 breaks when the ingress path or DNS changes), rate limits (50 per week) or account key problems.
   measured: >
-    Measured on a real k3s: nearest expiry 31 days (two certificates due for renewal the next day) → pass. Whether those two were renewed is the thing to confirm on the next run.
+    Measured on a real k3s cluster: nearest expiry 31 days (two certificates due for renewal the next day) → pass. Whether those two were renewed is the thing to confirm on the next run.
   suggest: "Try a manual renewal with cmctl renew <name> and watch the Challenge state. For HTTP-01, check that http://<host>/.well-known/acme-challenge/ is reachable from outside."
   verify:
     - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,RENEW:.status.renewalTime,NOTAFTER:.status.notAfter | sort -k3"
@@ -646,7 +646,7 @@
   why: >
     A Challenge that stays pending means Let's Encrypt cannot validate the domain — HTTP-01 needs the solver pod and temporary ingress to be reachable from outside (ingress controller LoadBalancer IP, port 80, firewall), DNS-01 needs correct DNS provider credentials. invalid is a validation failure (the Let's Encrypt response is in reason — 403 unauthorized, connection refused), errored is an error on the cert-manager side. Accumulating failed Orders hits the rate limit (5 failures per account and hostname per week) and blocks issuance for a week.
   measured: >
-    Measured on a real k3s: 110 Orders all valid, 0 Challenges → pass.
+    Measured on a real k3s cluster: 110 Orders all valid, 0 Challenges → pass.
   suggest: "Read the Reason in kubectl describe challenge -A. For HTTP-01, run curl -v http://<host>/.well-known/acme-challenge/x from outside."
   verify:
     - "kubectl get orders,challenges -A"
@@ -1000,7 +1000,7 @@
   why: >
     If an ACME issuer is not Ready (account registration failed, account key Secret missing, server URL typo), renewal stops for every certificate that references it — and stays quiet until expiry.
   measured: >
-    Measured on a real k3s: ClusterIssuers letsencrypt-production and staging and an Issuer selfsigned were all Ready. staging had 0 certificates (kept for testing).
+    Measured on a real k3s cluster: ClusterIssuers letsencrypt-production and staging and an Issuer selfsigned were all Ready. staging had 0 certificates (kept for testing).
   suggest: "Check Status in kubectl describe clusterissuer <name>. Confirm the ACME account key Secret (privateKeySecretRef) exists."
   verify:
     - "kubectl get clusterissuers,issuers -A -o wide"
@@ -1152,7 +1152,7 @@
   why: >
     Certificates from the staging ACME server chain to the "(STAGING) Let's Encrypt" root, so every browser warns. A common incident is an ingress whose issuerRef was never switched to production after testing. cert-manager may not reissue the Secret after the change, so the Secret may need deleting.
   measured: >
-    Measured on a real k3s: 0 → pass.
+    Measured on a real k3s cluster: 0 → pass.
   suggest: "Change the Certificate's issuerRef to production and trigger reissuance with kubectl delete secret <tls>."
   verify:
     - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ISSUER:.spec.issuerRef.name | grep -i staging"
@@ -1370,7 +1370,7 @@
   why: >
     Hand-placed TLS Secrets (a copied wildcard certificate, an external CA) have no expiry tracking — they break in the middle of the night a year later. When cert-manager manages them there is a Certificate object and a metric (expiration_timestamp). An Ingress without TLS is plain HTTP (ALB is the exception, since it does TLS through the certificate-arn annotation).
   measured: >
-    Measured on a real k3s: all 34 TLS entries managed by cert-manager, 0 Ingresses without TLS → pass.
+    Measured on a real k3s cluster: all 34 TLS entries managed by cert-manager, 0 Ingresses without TLS → pass.
   suggest: "Add the cert-manager.io/cluster-issuer annotation to the Ingress so ingress-shim creates the Certificate. For external CA certificates that are not a Certificate, at least monitor expiry (blackbox exporter probe_ssl_earliest_cert_expiry)."
   verify:
     - "kubectl get ingress -A -o json | jq -r '.items[] | .metadata.namespace+\"/\"+.metadata.name+\" \"+((.spec.tls//[])|map(.secretName)|join(\",\"))'"
@@ -1588,7 +1588,7 @@
   why: >
     Sync errors count how often the controller failed while reconciling some object (permissions, webhook, transient errors included), so a high number is not an outage by itself, but a steady climb means some Certificate is not progressing. ACME 4xx is rate limiting (429), bad requests (400) or account problems (403); 5xx is on the Let's Encrypt side.
   measured: >
-    Measured on a real k3s: 216 errors out of 1,574 syncs (13.7%), one 400 out of 49 ACME requests → warn (low). Every Certificate was Ready, so the errors were most likely past transient failures — confirm in the logs.
+    Measured on a real k3s cluster: 216 errors out of 1,574 syncs (13.7%), one 400 out of 49 ACME requests → warn (low). Every Certificate was Ready, so the errors were most likely past transient failures — confirm in the logs.
   suggest: "kubectl -n cert-manager logs deploy/cert-manager --since=24h | grep -iE 'error|failed' | sort | uniq -c | sort -rn | head"
   verify:
     - "kubectl get --raw /api/v1/namespaces/cert-manager/pods/<controller-pod>:9402/proxy/metrics | grep -E 'certmanager_controller_sync_error_count|certmanager_http_acme_client_request_count'"
@@ -1866,7 +1866,7 @@
   why: >
     cert-manager supports only the two latest minors (at 1.17/1.18, 1.14 is out of support). Old versions cannot follow ACME protocol changes (Let's Encrypt ending OCSP, ARI renewal info, short-lived certificates). If the webhook has failurePolicy Fail with 1 replica, Certificate and Ingress creation is rejected while the webhook pod restarts (same structure as ESO).
   measured: >
-    Measured on a real k3s: 1.14.4 (2024-03) → warn.
+    Measured on a real k3s cluster: 1.14.4 (2024-03) → warn.
   suggest: "Upgrade the cert-manager Helm chart one minor at a time (including the CRD upgrade: --set crds.enabled=true or kubectl apply cert-manager.crds.yaml)."
   verify:
     - "kubectl -n cert-manager get deploy -o jsonpath='{range .items[*]}{.metadata.name}{\" \"}{.spec.template.spec.containers[0].image}{\"\\n\"}{end}'"

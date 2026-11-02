@@ -655,8 +655,7 @@
   why: >
     L2 mode is failover, not load balancing — a service IP enters through one node's NIC only. If a single ingress controller is the only LoadBalancer, all external traffic passes through the leader node's NIC and then rides vxlan again to pods on other nodes. When the leader dies, traffic is down for about 10 seconds of ARP relearning. On a 2-node small k3s cluster this is a known trade-off, hence low — traffic.metallb-l2-leader-concentration looks at the same fact as a leader share.
   measured: >
-    Measured on a 2-node k3s cluster: 1 LoadBalancer (ingress-nginx) with the leader on one node.
-    That traffic was a share of the cluster's overlay traffic.
+    Measured on a 2-node k3s cluster: 1 LoadBalancer (ingress-nginx) with the leader on one node; the traffic it passed on to pods on the other node was part of that cluster's overlay traffic.
   suggest: "BGP mode (if the router supports it), or externalTrafficPolicy Local plus one service IP per node. For a small k3s cluster, record 'leader node = X, about 10 s outage if it dies' in the report."
   verify:
     - "kubectl get svc -A --field-selector spec.type=LoadBalancer; kubectl -n metallb-system get servicel2statuses.metallb.io -o wide"

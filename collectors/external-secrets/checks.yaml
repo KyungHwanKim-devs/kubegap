@@ -215,7 +215,7 @@
     auth.secretRef on a (Cluster)SecretStore keeps a long-lived access key in a cluster Secret. If the key leaks, every secret in the store is exposed, and rotation is manual. EKS uses short-lived credentials via IRSA/Pod Identity (jwt). A small k3s cluster outside AWS may have no alternative to a static key, but then narrow that key's IAM policy to secretsmanager:GetSecretValue + specific ARNs and set a rotation schedule.
   measured: >
     Measured on a real EKS cluster: the ClusterSecretStore used jwt auth (pass).
-    Measured on a real k3s: the ClusterSecretStore authenticated with an access key from a Secret, 33 prod ExternalSecrets → fail.
+    Measured on a real k3s cluster: the ClusterSecretStore authenticated with an access key from a Secret, 33 prod ExternalSecrets → fail.
   suggest: "EKS: IRSA/Pod Identity. Outside the cluster (small k3s cluster): minimize the IAM user policy to GetSecretValue + a resource ARN prefix with 90-day rotation, or consider OIDC federation (IAM Roles Anywhere, GitHub-style OIDC)."
   verify:
     - "kubectl get clustersecretstore -o jsonpath='{.items[*].spec.provider.aws.auth}'"

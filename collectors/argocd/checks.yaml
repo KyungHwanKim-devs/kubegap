@@ -1071,7 +1071,7 @@
     prune: true means "resources that disappear from Git are deleted from the cluster too". If a Namespace is among the managed resources, the moment its manifest leaves Git (directory move, rename, ApplicationSet generator change) Argo CD deletes the Namespace and everything inside it, PVCs included. The same applies to CRDs — deleting a CRD deletes all of its CRs.
     The Skyscanner 2021 incident had this shape (ApplicationSet generator change → apps removed → prune deleted everything).
   measured: >
-    Measured on a real k3s: 7 apps managed a Namespace as a resource. The EKS cluster used CreateNamespace=true and did not manage Namespaces.
+    Measured on a real k3s cluster: 7 apps managed a Namespace as a resource. The EKS cluster used CreateNamespace=true and did not manage Namespaces.
   cases:
     - { who: Skyscanner 2021, url: https://medium.com/@SkyscannerEng/how-a-couple-of-characters-brought-down-our-site-356ccaf1fbc3 }
     - { who: InfluxData 2023, url: https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/ }

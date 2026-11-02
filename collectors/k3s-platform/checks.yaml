@@ -1181,7 +1181,7 @@
   symptom_linked: false
   why: k3s writes every component's logs into a single journald. Without a cap it grows to the default (10% of the filesystem, max 4GB), which is noticeable on a small root disk. Retention is also undefined, so during an investigation you do not know how much history is left.
   measured: >
-    Measured: tens of thousands of journald lines a day.
+    Measured on a k3s cluster: tens of thousands of journald lines a day.
   suggest: "Put `SystemMaxUse=1G` and `MaxRetentionSec=14day` in /etc/systemd/journald.conf.d/kubegap.conf and run `systemctl restart systemd-journald`."
   verify:
     - "journalctl --disk-usage; cat /etc/systemd/journald.conf"

@@ -9365,7 +9365,7 @@
     Single-binary Loki dies from a memory spike on one big query (count_over_time over a wide time range, many streams). Logs still in memory (chunks not yet flushed) are lost at that moment, and if the storage is emptyDir everything is lost.
     kubegap's own queries can be the cause, so it only uses a 1-hour window.
   measured: >
-    Measured: a 24-hour query caused an OOMKill.
+    Measured on an EKS cluster: a 24-hour query caused an OOMKill.
   suggest: "Raise the memory limit (at least 1-2Gi), set max_query_length and max_entries_limit on the querier, and move storage to a PVC."
   verify:
     - "kubectl get pods -n monitoring -l app=loki -o jsonpath='{.items[*].status.containerStatuses[*].lastState}'"
@@ -10037,7 +10037,7 @@
   symptom_linked: false
   why: With consolidation (WhenUnderutilized) enabled, such nodes should disappear. The reasons they remain are do-not-disrupt pods, PDBs, budgets or recent creation. Read together with scaling.karpenter-expired-not-replaced.
   measured: >
-    Measured: one such node had been launched after a spot reclaim that day.
+    Measured on an EKS cluster: one such node had been launched after a spot reclaim that day.
   suggest: "Look through the node's pod list for the reason they cannot move (annotations, PDB, hostPath). If there is none, check the consolidation decisions in the Karpenter logs."
   verify:
     - "kubectl describe node <node> | grep -A20 'Non-terminated Pods'"
@@ -10480,7 +10480,7 @@
   why: >
     A literal value in the manifest is exposed in Git, kubectl describe pod, the Argo CD UI and crash dumps. Variables named PASSWORD, SECRET, TOKEN or API_KEY were selected; values that are numbers, booleans, short strings, paths or Reloader's STAKATER_* were excluded. It is still a name-based guess, so these are "candidates".
   measured: >
-    Measured on a k3s: an Elasticsearch/Kibana ELASTIC_PASSWORD set in plain text in a Deployment, a StatefulSet and a CronJob.
+    Measured on a k3s cluster: an Elasticsearch/Kibana ELASTIC_PASSWORD set in plain text in a Deployment, a StatefulSet and a CronJob.
   suggest: "Move to a Secret and use valueFrom.secretKeyRef. If there is an external store, pull it in with an ExternalSecret. Rotate the value (treat it as already exposed)."
   verify:
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].env[?(@.value)].name}'"
@@ -11618,7 +11618,7 @@
     On EKS the standard way to back up PVs from inside Kubernetes is CSI VolumeSnapshot (snapshot-controller add-on + VolumeSnapshotClass), and Velero uses it too. Without the CRD, the ebs-csi controller logs "VolumeSnapshotContent not found" about 1,500 times a day (log signature ebs-csi.snapshot-crd-missing) and backups depend solely on manual console/CLI snapshots.
     If the CRD exists but there are 0 snapshots, it is installed and unused.
   measured: >
-    Measured: a dozen "pre-delete backup" snapshots taken by hand.
+    Measured on an EKS cluster: a dozen "pre-delete backup" snapshots taken by hand.
   suggest: "Install the EKS snapshot-controller add-on -> VolumeSnapshotClass (ebs.csi.aws.com) -> daily snapshots of prod PVCs on a DLM or Velero schedule."
   verify:
     - "kubectl get crd volumesnapshots.snapshot.storage.k8s.io; kubectl get volumesnapshotclasses; aws eks describe-addon --cluster-name <c> --addon-name snapshot-controller"
@@ -11988,7 +11988,7 @@
     An image with :latest or no tag can come up as a different binary on restart or node replacement, and rollback is impossible (there is no record of which version it was).
     A pinned tag with imagePullPolicy Always goes to the registry on every start, so a registry outage becomes a start failure (warn).
   measured: >
-    Measured on a k3s: a TURN server on `coturn/coturn:latest` crashed for 27 days -- the image changing after a reboot was the likely cause.
+    Measured on a k3s cluster: a TURN server on `coturn/coturn:latest` crashed for 27 days -- the image changing after a reboot was the likely cause.
   cases:
     - { who: Datadog 2019, url: https://www.youtube.com/watch?v=QKI-JRs2RIE }
   suggest: "Pin the tag to a version (or digest) and use imagePullPolicy IfNotPresent. CI bumps the tag and Argo CD applies it."
@@ -12968,7 +12968,7 @@
   why: >
     A Pending PVC means no StorageClass or an AZ/capacity problem kept the volume from being created, so its pod is Pending too. A Released PV means the PVC was deleted but reclaim Retain kept the disk (EBS cost). A Bound PVC used by no pod is data from a deleted workload or a backup target.
   measured: >
-    Measured on a k3s: a leftover DB volume in default.
+    Measured on a k3s cluster: a leftover DB volume in default.
   suggest: "Pending: `kubectl describe pvc` events. Released PV: verify the data, then delete (EBS snapshot first). Unused PVC: back up, then delete."
   verify:
     - "kubectl get pvc -A | grep -v Bound; kubectl get pv | grep -E 'Released|Failed'"
@@ -16504,7 +16504,7 @@
   why: >
     If ports like 5432, 3306, 6379, 27017 or 9092 are open on an internet-facing LB or a NodePort (every node interface), a single password is all that stands in the way. A security group or sourceRanges may block it, so "open" is based on the LB/Service definition and actual reachability is verified manually (the tool does not curl).
   measured: >
-    Measured on a real EKS cluster: an internet-facing NLB created outside Kubernetes received MySQL, Postgres, Redis and Neo4j ports through a TargetGroupBinding, and a Kafka 9094 NLB was also internet-facing. On a k3s: 4 DBs opened via NodePort.
+    Measured on a real EKS cluster: an internet-facing NLB created outside Kubernetes received MySQL, Postgres, Redis and Neo4j ports through a TargetGroupBinding, and a Kafka 9094 NLB was also internet-facing. On a k3s cluster: 4 DBs opened via NodePort.
   suggest: "Change the NLB scheme to internal or narrow the security group to office/VPN ranges. NodePort DBs: ClusterIP + port-forward (or a Tailscale-only interface)."
   verify:
     - "aws elbv2 describe-load-balancers --query 'LoadBalancers[?Scheme==`internet-facing`].[LoadBalancerName,Type,DNSName]'"
@@ -17978,7 +17978,7 @@
   why: >
     Creation to Initialized is how long pending pods wait. Normally 60-90s. Over 3 minutes means a large AMI (mixed AL2 and AL2023 during a transition), slow bootstrap scripts or CNI init, or a large image pull delaying Initialized.
   measured: >
-    Measured: p50 62s.
+    Measured on an EKS cluster: p50 62s.
   suggest: "Look for a pattern (instance family, AZ) in summary.scaling.karpenter.latency_24h.slowest and check the node boot log (SSM) for the slow stage."
   verify:
     - "kubectl get nodeclaims -o custom-columns=NAME:.metadata.name,CREATED:.metadata.creationTimestamp,READY:.status.conditions[?(@.type==\"Ready\")].lastTransitionTime"
@@ -18330,7 +18330,7 @@
     In a cluster with several tenants (a namespace per client), without ResourceQuota one tenant's deployment mistake (replicas 100, no memory limit, a runaway CronJob) eats the other tenants' nodes.
     If Karpenter launches more nodes it becomes a bill instead of an outage; if NodePool limits are hit, it becomes other tenants' Pending pods. CI runners (ci) and dev burst heavily, so they warn even when not prod.
   measured: >
-    Measured on a real EKS cluster: none of the 8 production namespaces had a quota. On a k3s: only 3 of 7 production namespaces did.
+    Measured on a real EKS cluster: none of the 8 production namespaces had a quota. On a k3s cluster: only 3 of 7 production namespaces did.
   cases:
     - { who: Zalando 2019, url: https://www.slideshare.net/try_except_/lets-talk-about-failures-with-kubernetes-hamburg-meetup }
     - { who: Zalando 2018, url: https://www.slideshare.net/try_except_/running-kubernetes-in-production-a-million-ways-to-crash-your-cluster-devopscon-munich-2018 }
@@ -19721,7 +19721,7 @@
   why: >
     If runner placement is unconstrained, the scheduler puts runners on whichever production node has room (the cause of tenancy.ci-shares-prod-nodes). With only a nodeSelector and no taint on the pool, production pods land on the build nodes instead.
   measured: >
-    Measured on a real EKS cluster: an AutoscalingRunnerSet with nodeSelector workload-type=build + toleration and a tainted build NodePool — fully separated (pass). On a 2-node k3s: a RunnerDeployment without constraints, but separation is impossible with 2 nodes (none).
+    Measured on a real EKS cluster: an AutoscalingRunnerSet with nodeSelector workload-type=build + toleration and a tainted build NodePool — fully separated (pass). On a 2-node k3s cluster: a RunnerDeployment without constraints, but separation is impossible with 2 nodes (none).
   suggest: "Taint (NoSchedule) and label the runner pool; nodeSelector + toleration in the runner template. Give the runner pool spot capacity and limits so a build storm does not become a bill."
   verify:
     - "kubectl get autoscalingrunnersets -A -o jsonpath='{.items[*].spec.template.spec.nodeSelector}' ; kubectl get nodepools -o jsonpath='{.items[*].spec.template.spec.taints}'"
@@ -20126,7 +20126,7 @@
     The mechanical precursor of a noisy neighbor: one namespace uses more than half the node's CPU at p95, the node spent time above 90% within 7 days, and production runs on that node. When all three coincide, production latency is likely to line up with that namespace's load.
     Confirming the correlation (did production p99 rise at that time) is done by tenancy.noisy-neighbor (type: llm). If the node was never saturated (0 minutes), dominance alone does no harm, so it is a warning.
   measured: >
-    Measured on an EKS cluster and a k3s: 0 saturated minutes, max share 0.06 — no candidates.
+    Measured on an EKS cluster and a k3s cluster: 0 saturated minutes, max share 0.06 — no candidates.
   cases:
     - { who: 2i2c 2023, url: https://raw.githubusercontent.com/2i2c-org/incident-reports/main/reports/2023-02-01-daskhub-induced-evictions.md }
   suggest: "ResourceQuota (limits.cpu) or a dedicated pool for the dominant namespace. Keep production Guaranteed (request = limit) so CFS guarantees its share."
@@ -20430,7 +20430,7 @@
   why: >
     A tenant that is quiet most of the time and spikes tens of times higher (batch, CronJob, CI, AI inference) is invisible in averages. Without a quota or limits, that peak pushes out neighbors on the same node (noisy neighbor).
   measured: >
-    Measured on a real EKS cluster: a production backend namespace went from a median of 0.012 cores to a max of 2.6 cores (227x), no quota, sharing nodes with other production namespaces. On a k3s: 15.6x.
+    Measured on a real EKS cluster: a production backend namespace went from a median of 0.012 cores to a max of 2.6 cores (227x), no quota, sharing nodes with other production namespaces. On a k3s cluster: 15.6x.
   suggest: "Put a ResourceQuota (limits.cpu) and container CPU limits on that namespace, or for batch workloads a PriorityClass lower than production. To identify the peak (which pod, what time), look up the time of max_over_time in Prometheus."
   verify:
     - "max_over_time(sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"<ns>\",container!=\"\"}[5m]))[7d:15m])"
@@ -20917,7 +20917,7 @@
     If (1) is 0, the LLM writes "no room for neighbor damage in this window" and stops. If (1) > 0, it notes whether the dominant namespace (2) and the throttling (4) or ingress p95 (traffic section) of production on that node overlap on the same node, and because the material is instant values it writes "insufficient evidence — a range query at that time is needed" for time correlation. It does not assert.
     Throttling inside one production namespace is more likely caused by its own limit (resources section) than by a neighbor — write it that way.
   measured: >
-    Measured on an EKS cluster and a k3s: 0 saturated minutes on both; one small k3s cluster production namespace had a 17% throttle ratio from its own limit.
+    Measured on an EKS cluster and a k3s cluster: 0 saturated minutes on both; one small k3s cluster production namespace had a 17% throttle ratio from its own limit.
   cases:
     - { who: Airbnb 2019, url: https://www.youtube.com/watch?v=QXApVwRBeys }
     - { who: Datadog 2019, url: https://www.youtube.com/watch?v=QKI-JRs2RIE }
