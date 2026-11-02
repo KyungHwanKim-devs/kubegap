@@ -774,3 +774,61 @@
           nodes_near_ip_limit: []
           nodes_no_available_ip: []
           metrics_unavailable_nodes: []
+
+- id: vpccni.external-snat-off-with-private-routes
+  name: Pod traffic to peered networks is SNATed to the node IP (external SNAT off while the VPC has peering, transit gateway or VPN routes)
+  area: traffic
+  modes: [full]   # the VPC route tables are collected in the full run only
+  type: summary
+  each: vpccni.snat
+  cluster_level: true
+  rule:
+    warn_expr: "not item['external_snat'] and (item['peering_routes'] + item['transit_gateway_routes'] + item['vpn_routes'] + item['local_gateway_routes']) > 0"
+  target: "'cluster'"
+  evidence: "f\"AWS_VPC_K8S_CNI_EXTERNALSNAT false; private routes in the cluster VPC: peering {item['peering_routes']}, transit gateway {item['transit_gateway_routes']}, VPN {item['vpn_routes']}, Outposts local gateway {item['local_gateway_routes']}; destinations {item['private_destinations'][:6]}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    By default the VPC CNI rewrites the source of pod traffic that leaves the VPC to the node's primary IP (SNAT). The default exists for internet traffic: a pod IP is a secondary IP with no public mapping, so packets through an internet gateway would be dropped without it. The same rule applies to every destination outside the VPC CIDR, so when the VPC has routes to a peered VPC, a transit gateway, a VPN or an Outposts local gateway, traffic to those private networks is SNATed too. The other side then sees the node IP, not the pod IP: security groups and allowlists keyed on pod IPs fail, NLB client IP preservation shows the node, and many pods share one source IP, which brings the SNAT conntrack insert race and its 1 s and 3 s connection delays under load.
+    This is not a misconfiguration by itself. It becomes one when pods must be seen by their own IP across those routes. The incident below is exactly that: a month of intermittently lost packets from pods to an NLB in a peered VPC, fixed by turning SNAT off.
+  cases:
+    - { who: MindTickle 2020, url: https://yashmehrotra.com/post/2020-03-16-case-of-missing-packet/ }
+  suggest: "If pods talk to the peered VPC, transit gateway or VPN networks, set AWS_VPC_K8S_CNI_EXTERNALSNAT=true on aws-node (add-on configurationValues env). Before that, confirm every node subnet's route table reaches the internet through a NAT gateway: with external SNAT on, pod traffic leaves with the pod IP and relies on that route, so a subnet without it loses internet access for pods. Alternatively list the private CIDRs in AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS to exempt only them."
+  verify:
+    - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 SNAT"
+    - "aws ec2 describe-route-tables --filters Name=vpc-id,Values=<vpc id> --query 'RouteTables[].Routes[?VpcPeeringConnectionId != null || TransitGatewayId != null || CoreNetworkArn != null || LocalGatewayId != null || (GatewayId && starts_with(GatewayId, `vgw-`))]'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          external_snat: false
+          peering_routes: 1
+          transit_gateway_routes: 0
+          vpn_routes: 0
+          local_gateway_routes: 0
+          private_destinations: ["10.20.0.0/16"]
+      - expect: "warn"
+        item:
+          external_snat: false
+          peering_routes: 0
+          transit_gateway_routes: 2
+          vpn_routes: 1
+          local_gateway_routes: 0
+          private_destinations: ["10.30.0.0/16", "192.168.0.0/16"]
+      - expect: "pass"
+        item:
+          external_snat: false
+          peering_routes: 0
+          transit_gateway_routes: 0
+          vpn_routes: 0
+          local_gateway_routes: 0
+          private_destinations: []
+      - expect: "pass"
+        item:
+          external_snat: true
+          peering_routes: 1
+          transit_gateway_routes: 0
+          vpn_routes: 0
+          local_gateway_routes: 0
+          private_destinations: ["10.20.0.0/16"]
