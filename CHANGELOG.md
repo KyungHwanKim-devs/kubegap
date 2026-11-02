@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-02
+
+The repository hygiene milestone is complete: public incident cases are attached to the checks, and measurements are kept apart from them. Four checks came out of that case work. Contributors to this release: [@MinwooPark93](https://github.com/MinwooPark93) (#48) and [@hsgustn](https://github.com/hsgustn) (#49).
+
 ### Added
 
 - `vpccni.snat-port-randomization-off`: warns when the node SNAT rule does not use iptables `--random-fully` for source ports, with external SNAT off: `AWS_VPC_K8S_CNI_RANDOMIZESNAT` set to `none` or `hashrandom`, a VPC CNI below 1.7.0 with the setting unset, or an image without a version. Pods leaving the VPC then race on conntrack inserts and connection setup shows exact 1 s and 3 s delays, the Prezi 2019 incident. The VPC CNI summary records the setting and the resulting mode. Rubric 0.1.59, 407 checks. ([#47](https://github.com/KyungHwanKim-devs/kubegap/issues/47))
@@ -62,6 +66,7 @@ The first milestone, permissions and the read-only claim, is complete: issues #1
 - Expectation profiles `prod`, `lab`, `small-prod`, `multi-az-prod` and `dev`.
 - English and Korean README and sample reports.
 
-[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/KyungHwanKim-devs/kubegap/releases/tag/v0.1.0
