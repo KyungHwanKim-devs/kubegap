@@ -8,9 +8,9 @@
 
 Auditing a cluster is toil. Google's *Site Reliability Engineering* book calls work toil when it is manual, repetitive, automatable and grows with the service, and says reducing it is the point of SRE. kubegap takes that toil off your hands so your time goes to engineering.
 
-kubegap comes out of running three clusters alone on three platforms: a small k3s cluster, EKS at work, and a client's Kubernetes on Azure. Alerts and dashboards catch only what someone already defined. Everything else shows up only when you go digging through the cluster by hand, and three clusters do not leave time for that every day. kubegap does the digging: it reads the cluster, judges it against 406 written checks, and writes a report a person can read.
+kubegap comes out of running three clusters alone on three platforms: a small k3s cluster, EKS at work, and a client's Kubernetes on Azure. Alerts and dashboards catch only what someone already defined. Everything else shows up only when you go digging through the cluster by hand, and three clusters do not leave time for that every day. kubegap does the digging: it reads the cluster, judges it against 407 written checks, and writes a report a person can read.
 
-kubegap is a skill in the [Agent Skills](https://agentskills.io) standard, the open format that coding agents such as Claude Code and Codex read, so any of them can run it with one command. It reads your cluster, read-only, and never touches a Secret value. It grades the cluster against 406 checks in 12 areas. Then it writes you a report: what is wrong, what the evidence is, why it happened, what to do, and, when the check definition records one, a public case that looked the same.
+kubegap is a skill in the [Agent Skills](https://agentskills.io) standard, the open format that coding agents such as Claude Code and Codex read, so any of them can run it with one command. It reads your cluster, read-only, and never touches a Secret value. It grades the cluster against 407 checks in 12 areas. Then it writes you a report: what is wrong, what the evidence is, why it happened, what to do, and, when the check definition records one, a public case that looked the same.
 
 ![A kubegap daily run on an 8-node EKS cluster: collection, first-pass evaluation, two report files](docs/media/kubegap-run.gif)
 
@@ -72,7 +72,7 @@ Supported platforms: macOS on Apple Silicon and Intel, Linux on amd64 and arm64,
 | | `daily` (default) | `full` |
 |---|---|---|
 | Collects | Kubernetes objects, events, Prometheus metrics, component logs, AWS inventory | the same plus node OS scripts (SSM/SSH), CloudWatch control-plane logs and metrics, cost and pricing, ECR, service quotas, krr/polaris/pluto/kubent/helm |
-| Checks | 406 minus the ones that need full-only inputs; those are reported as "not collected", not as findings | all 406 |
+| Checks | 407 minus the ones that need full-only inputs; those are reported as "not collected", not as findings | all 407 |
 | Report | `report.md`: the 3 problems, each with evidence, cause, action and cases; what changed since the previous daily run; what the run could not see. `report-details.md`: every table | `report.md`: the same shape with 5 problems. `report-details.md`: the 12-area detail and the full first-pass list as well |
 | Compared with | the previous daily snapshot | the previous full snapshot |
 
@@ -82,14 +82,14 @@ A full snapshot is about 40 MB. `scripts/kubegap prune --keep-daily 14 --keep-fu
 
 ## What it checks
 
-Twelve areas, 406 checks. Each row gives the count and a few examples; the full list is [`docs/CHECKS.md`](docs/CHECKS.md), which also says how many checks carry a public incident write-up and links each one. The rest are configuration rules with no known public incident, and the report says so instead of inventing one.
+Twelve areas, 407 checks. Each row gives the count and a few examples; the full list is [`docs/CHECKS.md`](docs/CHECKS.md), which also says how many checks carry a public incident write-up and links each one. The rest are configuration rules with no known public incident, and the report says so instead of inventing one.
 
 | Area | Checks | Examples |
 |---|---|---|
 | Resources | 15 | requests 3x above 7-day p95 usage, repeated OOMKills, nodes full of requests but single-digit utilization |
 | Scaling | 27 | HPAs stuck at min for 15 days, expired Karpenter nodes never replaced, KEDA external triggers without fallback |
 | Observability | 64 | no symptom-based alerts, alerts firing for 7 days straight, observability stack on emptyDir, ingress controller metrics not scraped |
-| Traffic | 56 | database ports open to the internet, unhealthy ALB targets, deregistration delay longer than termination grace |
+| Traffic | 57 | database ports open to the internet, unhealthy ALB targets, deregistration delay longer than termination grace |
 | Resilience | 43 | all replicas on one node, no PDB, backup dumps on the same disk as the source, workloads that can only land on one node |
 | Hygiene | 35 | `latest` tags, deprecated APIs, Helm releases left in a pending or failed state, dependence on custom node labels |
 | Storage | 25 | unencrypted EBS, StorageClasses without expansion, local-path volumes over capacity |
