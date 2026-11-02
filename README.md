@@ -42,18 +42,16 @@ On its first run against a production EKS cluster, kubegap caught a live spot in
 ## Install
 
 ```bash
+# One line, any Agent Skills host: the skills CLI clones the repository and links it where your agent looks
+npx skills add KyungHwanKim-devs/kubegap
+
+# Or by hand
 git clone https://github.com/KyungHwanKim-devs/kubegap ~/src/kubegap
-
-# Claude Code
-ln -s ~/src/kubegap ~/.claude/skills/kubegap
-/kubegap
-
-# Codex
-ln -s ~/src/kubegap ~/.agents/skills/kubegap
-$kubegap
+ln -s ~/src/kubegap ~/.claude/skills/kubegap    # Claude Code, then /kubegap
+ln -s ~/src/kubegap ~/.agents/skills/kubegap    # Codex, then $kubegap
 ```
 
-The folder must be named `kubegap`. Other Agent Skills hosts such as Cursor and GitHub Copilot take the same link in their own skills folder, and `npx skills add KyungHwanKim-devs/kubegap` installs it in one line.
+The folder must be named `kubegap`. Other Agent Skills hosts such as Cursor and GitHub Copilot take the same link in their own skills folder.
 
 You need kubectl, jq, python3 3.11 or newer, and a kubeconfig that can read the cluster. `/kubegap` asks once whether you want the report in English or Korean and confirms the context. It checks for optional tools and installs them only with your consent. Then it finds and port-forwards Prometheus and Loki and runs collection through to the report. The optional tools aws, helm, krr, polaris, pluto, kubent, promtool, amtool, argocd and ssh are not required. If one is missing, only the checks that depend on it are dropped, and the report lists it under "tools missing".
 

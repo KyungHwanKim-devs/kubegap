@@ -42,18 +42,16 @@ daily 점검은 오늘 아침 클러스터를 책임지는 사람을 위한 것�
 ## 설치
 
 ```bash
+# 한 줄 설치, 어느 Agent Skills 호스트든: skills CLI 가 저장소를 받아 에이전트가 보는 자리에 연결합니다
+npx skills add KyungHwanKim-devs/kubegap
+
+# 또는 직접
 git clone https://github.com/KyungHwanKim-devs/kubegap ~/src/kubegap
-
-# Claude Code
-ln -s ~/src/kubegap ~/.claude/skills/kubegap
-/kubegap
-
-# Codex
-ln -s ~/src/kubegap ~/.agents/skills/kubegap
-$kubegap
+ln -s ~/src/kubegap ~/.claude/skills/kubegap    # Claude Code, 그 뒤 /kubegap
+ln -s ~/src/kubegap ~/.agents/skills/kubegap    # Codex, 그 뒤 $kubegap
 ```
 
-폴더 이름은 반드시 `kubegap` 이어야 합니다. Cursor, GitHub Copilot 등 다른 Agent Skills 호스트는 각자의 스킬 폴더에 같은 식으로 연결하고, `npx skills add KyungHwanKim-devs/kubegap` 한 줄로 설치할 수 있습니다.
+폴더 이름은 반드시 `kubegap` 이어야 합니다. Cursor, GitHub Copilot 등 다른 Agent Skills 호스트는 각자의 스킬 폴더에 같은 식으로 연결합니다.
 
 필요한 것은 kubectl, jq, python3 3.11 이상, 그리고 클러스터를 읽을 수 있는 kubeconfig 입니다. `/kubegap` 을 치면 리포트를 영어로 받을지 한국어로 받을지 한 번 묻고, 컨텍스트를 확인하고, 선택 도구가 있는지 보고 없으면 동의를 받아 설치하고, Prometheus 와 Loki 를 찾아 포트포워딩한 다음 수집부터 리포트까지 한 번에 갑니다. aws, helm, krr, polaris, pluto, kubent, promtool, amtool, argocd, ssh 는 선택 도구입니다. 없으면 그 도구가 맡은 항목만 빠지고 리포트에 "도구 없음" 으로 씁니다.
 
