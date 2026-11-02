@@ -13720,6 +13720,58 @@
           apiserver_storage_size_bytes:
             - labels: {}
               value: 6442450944
+- id: hygiene.configmap-changed-after-pod-start
+  name: ConfigMap changed after the pods that use it through env or subPath started, with no restart since
+  area: hygiene
+  type: summary
+  each: hygiene.config_changes.restart_needed
+  rule:
+    warn_expr: "item['restart_needed_pods'] > 0"
+  target: "f\"{item['namespace']}/configmap/{item['configmap']}\""
+  evidence: "f\"ConfigMap {item['namespace']}/{item['configmap']} changed {item['changed_at'][:16]} by {item['changed_by']}, {item['stale_hours']} h after the oldest pod started; {item['restart_needed_pods']} running pods still hold the old value through {', '.join(m for m in item['ref_modes'] if m != 'file')}: {', '.join(item['workloads'][:4])}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    A ConfigMap read through env, envFrom or a subPath mount is copied into the container when it starts and never updated afterwards. When someone edits the ConfigMap and does not restart the pods, the running pods keep the old value and nothing looks different. The change takes effect the next time the pods are recreated: a node replacement, a deploy of an unrelated image, an eviction, weeks later. If the change was wrong, the outage starts then, and the person restarting the pods changed nothing they know of. The outage Pusher described in 2019 followed exactly this path: a ConfigMap edited without a restart, surfacing during a node upgrade weeks later.
+    A plain file mount is different: the kubelet refreshes it within its sync period, so those pods are listed as refresh-only and not counted. A container that restarted after the change already read the new value and is not listed either; the comparison uses the start time of the containers that read the ConfigMap. Secrets are not collected by kubegap and are not judged. The change time is the latest managedFields entry that wrote data or binaryData; label or annotation writes do not count, but a re-apply of identical content (an Argo CD sync, a helm upgrade) does refresh it, so a listed ConfigMap may have been re-applied rather than edited; the evidence names the manager that wrote it.
+  cases:
+    - { who: Pusher 2019, url: https://www.youtube.com/watch?v=8P7-C44Gjj8 }
+  suggest: "Either restart the workloads now, while the change is fresh and its author is around, or make the restart automatic: a checksum of the ConfigMap in the pod template annotations (Helm's checksum/config pattern) or Reloader. Alternatively mount the ConfigMap as a directory without subPath so the kubelet refreshes it, if the application re-reads its files."
+  verify:
+    - "kubectl get configmap -n <ns> <name> -o json --show-managed-fields | jq '[.metadata.managedFields[] | {manager, time}]'"
+    - "kubectl get pods -n <ns> -o jsonpath='{range .items[*]}{.metadata.name}{\"\\t\"}{.status.startTime}{\"\\n\"}{end}'"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          namespace: "prod-a"
+          configmap: "app-cfg"
+          changed_at: "2026-10-05T12:00:00+00:00"
+          changed_by: "kubectl-edit"
+          prod: true
+          pods: ["app-6d7ff4dcdb-aaaaa"]
+          workloads: ["prod-a/app"]
+          restart_needed_pods: 1
+          refresh_only_pods: 0
+          ref_modes: ["env"]
+          oldest_pod_start: "2026-10-01T00:00:00+00:00"
+          stale_hours: 108.0
+      - expect: "pass"
+        item:
+          namespace: "prod-a"
+          configmap: "app-cfg"
+          changed_at: "2026-10-05T12:00:00+00:00"
+          changed_by: "argocd-controller"
+          prod: true
+          pods: ["app-6d7ff4dcdb-aaaaa"]
+          workloads: ["prod-a/app"]
+          restart_needed_pods: 0
+          refresh_only_pods: 1
+          ref_modes: ["file"]
+          oldest_pod_start: "2026-10-01T00:00:00+00:00"
+          stale_hours: 108.0
+
 - id: hygiene.large-configmaps
   name: Large ConfigMaps (near the 1MiB etcd object limit; apiserver and LIST load)
   area: hygiene
