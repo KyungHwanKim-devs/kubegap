@@ -313,6 +313,7 @@ def _eks_facts(eks: dict, cfg: Config, snap: Path, log: RunLog) -> dict:
             "support_type": (c.get("upgradePolicy") or {}).get("supportType"),
             "authentication_mode": (c.get("accessConfig") or {}).get("authenticationMode"),
             "subnet_ids": vpc.get("subnetIds"),
+            "vpc_id": vpc.get("vpcId"),
             "security_groups": (vpc.get("securityGroupIds") or []) + ([vpc.get("clusterSecurityGroupId")] if vpc.get("clusterSecurityGroupId") else []),
         }
     )
