@@ -15749,14 +15749,14 @@
   each: traffic.ingresses
   rule:
     expr: "(item['metrics'].get('errors_ratio') or 0) >= 0.01 and (item['metrics'].get('requests') or 0) >= 100"
-    warn_expr: "(item['metrics'].get('errors_ratio') or 0) >= 0.001 and (item['metrics'].get('requests') or 0) >= 100"
+    warn_expr: "((item['metrics'].get('errors_ratio') or 0) >= 0.001 and (item['metrics'].get('requests') or 0) >= 100) or (item['metrics'].get('errors_ratio') or 0) >= 0.05"
   target: "item['target']"
-  evidence: "f\"{item['hosts'][:2]}: {item['metrics'].get('window')} 5xx {item['metrics'].get('errors_5xx')} of {item['metrics'].get('requests')} requests = {(item['metrics'].get('errors_ratio') or 0)*100:.2f}% (source {item['metrics'].get('source')}), p95 max {item['metrics'].get('p95_s_max_1h')}s\""
+  evidence: "f\"{item['hosts'][:2]}: {item['metrics'].get('window')} 5xx {item['metrics'].get('errors_5xx')} of {item['metrics'].get('requests')} requests = {(item['metrics'].get('errors_ratio') or 0)*100:.2f}%{' (under 100 requests: warn only)' if item['metrics'].get('requests') is not None and item['metrics'].get('requests') < 100 else ''} (source {item['metrics'].get('source')}), p95 max {item['metrics'].get('p95_s_max_1h')}s\""
   severity_default: medium  # lowered because warns (0.1-1%) all landed as high. Fails above 1% are raised by the LLM based on traffic volume
   symptom_linked: true
   why: >
     5xx is the user-facing symptom itself (page on symptoms). Above 1% a 99% SLO is already broken, and even 0.1% is dozens of failures a day at a few thousand requests.
-    On EKS the source is the ALB's HTTPCode_Target_5XX_Count (5xx produced by targets); on a small k3s cluster it is ingress-nginx metrics. Under 100 requests the ratio is too noisy and is skipped.
+    On EKS the source is the ALB's HTTPCode_Target_5XX_Count (5xx produced by targets); on a small k3s cluster it is ingress-nginx metrics. Under 100 requests one error moves the ratio by a percent or more, so a fail needs 100 requests; below that the check warns from 5%, because a host that answers a quarter of its few requests with 5xx is still broken for those users.
   suggest: "Line up the backend's logs, restarts, OOM (resources.oomkilled) and readiness (traffic.pod-not-ready) over the same time window. Turn one 5xx-ratio alert into an SLO (observability.no-slo)."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name HTTPCode_Target_5XX_Count --dimensions Name=LoadBalancer,Value=<dim> Name=TargetGroup,Value=<dim> --statistics Sum --period 3600 --start-time <24h ago> --end-time <now>"
@@ -15845,7 +15845,7 @@
             unhealthy_now: 0
             target_groups:
               - "tg"
-      - expect: "pass"
+      - expect: "warn"
         item:
           namespace: "prod-a"
           name: "web"
@@ -15876,10 +15876,10 @@
           metrics:
             source: "alb-cloudwatch"
             window: "24h"
-            requests: 50
+            requests: 60
             rps_avg: 0.12
-            errors_5xx: 200
-            errors_ratio: 0.02
+            errors_5xx: 3
+            errors_ratio: 0.05
             p95_s_max_1h: 0.3
             p95_s_avg: 0.2
             unhealthy_max_24h: 0
@@ -15916,7 +15916,128 @@
           prod: true
           metrics:
             source: null
-
+      - expect: "warn"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "alb-cloudwatch"
+            window: "24h"
+            requests: 4
+            rps_avg: 0.12
+            errors_5xx: 1
+            errors_ratio: 0.25
+            p95_s_max_1h: 0.3
+            p95_s_avg: 0.2
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
+      - expect: "pass"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "alb-cloudwatch"
+            window: "24h"
+            requests: 50
+            rps_avg: 0.12
+            errors_5xx: 1
+            errors_ratio: 0.02
+            p95_s_max_1h: 0.3
+            p95_s_avg: 0.2
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
+      - expect: "warn"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "ingress-nginx"
+            window: "1h"
+            requests: 72
+            rps_avg: 0.12
+            errors_ratio: 0.25
+            p95_s_max_1h: 0.3
+            p95_s_avg: 0.2
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
 - id: traffic.ingress-p95-latency
   name: Ingress p95 response time is high
   area: traffic
@@ -15924,14 +16045,15 @@
   each: traffic.ingresses
   rule:
     expr: "(item['metrics'].get('p95_s_avg') or 0) >= 2.0 and (item['metrics'].get('requests') or 0) >= 100"
-    warn_expr: "(item['metrics'].get('p95_s_avg') or 0) >= 1.0 and (item['metrics'].get('requests') or 0) >= 100"
+    warn_expr: "(item['metrics'].get('p95_s_avg') or 0) >= 1.0"
   target: "item['target']"
-  evidence: "f\"{item['hosts'][:2]}: p95 avg {item['metrics'].get('p95_s_avg')}s, 1h max {item['metrics'].get('p95_s_max_1h')}s, latest 1h {item['metrics'].get('p95_s_last_1h')}s, {item['metrics'].get('requests')} requests/{item['metrics'].get('window')} (source {item['metrics'].get('source')})\""
+  evidence: "f\"{item['hosts'][:2]}: p95 avg {item['metrics'].get('p95_s_avg')}s, 1h max {item['metrics'].get('p95_s_max_1h')}s, latest 1h {item['metrics'].get('p95_s_last_1h')}s, {item['metrics'].get('requests')} requests/{item['metrics'].get('window')}{' (under 100 requests: warn only)' if item['metrics'].get('requests') is not None and item['metrics'].get('requests') < 100 else ''} (source {item['metrics'].get('source')})\""
   severity_default: medium
   symptom_linked: true
   why: >
     p95 response time is the latency signal of the four golden signals. ALB TargetResponseTime runs from the LB sending the request to the target until the first byte back, so it is app time without the network. An API above 1s feels slow to users; at 2s timeouts and retries begin.
     ALB gives a p95 over 1-hour statistics, so bursts inside the hour are hidden (check the 1-hour maximum alongside). With the ALB source the average is over the hourly p95 values of the window, so one bad hour can carry it over the threshold while the service is fine now; the latest 1-hour value says whether the slowness is still going on. That value is the current partial hour, or the newest hour that had requests when the service has been idle, so read it together with the request count. With the ingress-nginx source the three values are one 1-hour measurement. A daily report ranks a finding whose latest hour is back under the threshold as an ended event.
+    Under 100 requests in the window the p95 rests on a handful of requests, so the check only warns there; a fail needs 100 requests. It never passes a slow host for being quiet: a 34 s p95 on 77 requests is 77 people who waited.
   suggest: "Identify slow endpoints (app metrics, logs), check DB query and external call timeouts, and CPU limit throttling (resources.cpu-throttling)."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name TargetResponseTime --dimensions Name=LoadBalancer,Value=<dim> Name=TargetGroup,Value=<dim> --extended-statistics p95 --period 300 --start-time <1h ago> --end-time <now>"
@@ -16064,7 +16186,132 @@
             unhealthy_now: 0
             target_groups:
               - "tg"
-
+      - expect: "warn"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "alb-cloudwatch"
+            window: "24h"
+            requests: 77
+            rps_avg: 0.12
+            errors_5xx: 0
+            errors_ratio: 0.0
+            p95_s_max_1h: 34.2
+            p95_s_avg: 34.2
+            p95_s_last_1h: 34.2
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
+      - expect: "warn"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "alb-cloudwatch"
+            window: "24h"
+            requests: 40
+            rps_avg: 0.12
+            errors_5xx: 0
+            errors_ratio: 0.0
+            p95_s_max_1h: 3.1
+            p95_s_avg: 2.6
+            p95_s_last_1h: 2.4
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
+      - expect: "pass"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "alb-cloudwatch"
+            window: "24h"
+            requests: 77
+            rps_avg: 0.12
+            errors_5xx: 0
+            errors_ratio: 0.0
+            p95_s_max_1h: 0.3
+            p95_s_avg: 0.5
+            p95_s_last_1h: 0.2
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
 - id: traffic.alb-elb-5xx
   name: 5xx generated by the ALB itself (no target, timeout, rejected connection)
   area: traffic
