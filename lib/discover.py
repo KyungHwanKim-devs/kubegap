@@ -52,7 +52,12 @@ OBJECT_KINDS = {  # the minimum set of kinds inventory needs. collect fetches mo
     "statefulsets": ["get", "statefulsets", "-A"],
     "services": ["get", "services", "-A"],
     "pods": ["get", "pods", "-A"],
-    "configmaps": ["get", "configmaps", "-A"],  # configuration only visible in config bodies (e.g. the fluent-bit kubernetes_events input)
+    "configmaps": [
+        "get",
+        "configmaps",
+        "-A",
+        "--show-managed-fields",
+    ],  # configuration only visible in config bodies (e.g. the fluent-bit kubernetes_events input). managedFields carry the last change time per manager, which hygiene.config_changes compares with pod start times; kubectl drops them without the flag. Size: about 1 KB per ConfigMap, under 300 KB on a cluster with 93
 }
 
 
