@@ -135,11 +135,12 @@ def _parse_cri(lines: list[str]) -> dict:
                 in_imgs = False
                 continue
             size_s, img = ln.strip().split("\t", 1)
-            m2 = re.match(r"([0-9.]+)\s*([KMGT]?i?B)", size_s)
+            m2 = re.match(r"([0-9.]+)\s*([kKMGT]?i?B)", size_s)
             if m2:
                 n, u = float(m2.group(1)), m2.group(2)
-                mb = n / 1024 if u.startswith("K") else n if u.startswith("M") else n * 1024 if u.startswith("G") else n * 1024**2 if u.startswith("T") else n / 1024**2
-                imgs.append({"image": img, "size_mb": round(mb)})
+                base = 1024 if "i" in u else 1000  # crictl prints go-units HumanSize: B/kB/MB/GB/TB are decimal, KiB/MiB/GiB/TiB binary
+                exp = {"b": 0, "k": 1, "m": 2, "g": 3, "t": 4}[u[0].lower()]
+                imgs.append({"image": img, "size_mb": round(n * base**exp / 1024**2)})
     out["images_top"] = imgs
     out["largest_image_mb"] = max([i["size_mb"] for i in imgs], default=None)
     out["images_over_3gb"] = [i["image"] for i in imgs if i["size_mb"] >= 3072]
