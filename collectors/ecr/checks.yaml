@@ -33,12 +33,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -188,8 +188,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -235,12 +235,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -365,8 +365,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -412,12 +412,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: true
@@ -567,8 +567,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -614,12 +614,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -705,8 +705,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -774,12 +774,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -929,8 +929,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -976,12 +976,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -1105,8 +1105,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -1175,12 +1175,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -1330,8 +1330,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 25.0
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -1377,12 +1377,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -1532,8 +1532,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -1579,12 +1579,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -1730,8 +1730,8 @@
           repos_no_lifecycle: []
           repos_no_lifecycle_gib: 0.0
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -1778,7 +1778,7 @@
     expr: "(item['stale_pull_gib'] or 0) >= 100"
     warn_expr: "(item['stale_pull_gib'] or 0) >= 10 or (item['unused_gib'] or 0) >= 10"
   target: "'ecr/registry/' + str(item['account'])"
-  evidence: "f\"repositories with no pull for more than {item['stale_pull_days']} days {item['repos_stale_pull'][:8]} (name, GiB, days since last pull) (total {item['stale_pull_gib']}GiB), repositories not used by the cluster {item['repos_unused_by_cluster']} (total {item['unused_gib']}GiB), empty repositories {item['repos_empty']}, largest repository {item['largest']}\""
+  evidence: "f\"repositories with no pull for more than {item['stale_pull_days']} days: {'; '.join(str(r['name']) + ' ' + str(r['gib']) + ' GiB' + (', never pulled' if r['days_since_pull'] is None else ', last pull ' + str(r['days_since_pull']) + ' days ago') for r in item['repos_stale_pull'][:8])} (total {item['stale_pull_gib']} GiB), repositories not used by the cluster {item['repos_unused_by_cluster']} (total {item['unused_gib']} GiB), empty repositories {item['repos_empty']}, largest repositories by stored size {', '.join(str(r['name']) + ' ' + str(r['gib']) + ' GiB' for r in item['largest_repos'])}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -1800,12 +1800,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -1955,8 +1955,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 120.0
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -2002,12 +2002,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -2157,8 +2157,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 12.0
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -2204,12 +2204,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -2359,8 +2359,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 0.0
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -2406,12 +2406,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -2561,8 +2561,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 1.0
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -2635,12 +2635,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -2790,8 +2790,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -2837,12 +2837,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -2992,8 +2992,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -3040,12 +3040,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -3195,8 +3195,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -3270,12 +3270,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -3425,8 +3425,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -3473,12 +3473,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -3628,8 +3628,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -3676,12 +3676,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -3831,8 +3831,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -3900,12 +3900,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -4055,8 +4055,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -4102,12 +4102,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -4257,8 +4257,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -4304,12 +4304,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -4408,8 +4408,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -4477,12 +4477,12 @@
           untagged: 226
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -4632,8 +4632,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
@@ -4679,12 +4679,12 @@
           untagged: 12
           total_gib: 398.5
           monthly_usd: 42.8
-          largest:
-            - "('ecr-app-a-embedding-eks-prod', 96.59)"
-            - "('ecr-app-a-backend-eks-prod', 75.34)"
-            - "('ecr-app-h-frontend-eks-prod', 31.03)"
-            - "('ecr-app-d-ai-prod', 29.75)"
-            - "('ecr-app-d-ai-dev', 28.88)"
+          largest_repos:
+            - {name: "ecr-app-a-embedding-eks-prod", gib: 96.59}
+            - {name: "ecr-app-a-backend-eks-prod", gib: 75.34}
+            - {name: "ecr-app-h-frontend-eks-prod", gib: 31.03}
+            - {name: "ecr-app-d-ai-prod", gib: 29.75}
+            - {name: "ecr-app-d-ai-dev", gib: 28.88}
           scan_type: "BASIC"
           scan_rules: 0
           registry_scan_on_push: false
@@ -4834,8 +4834,8 @@
             - "bitnami/mysql"
           repos_no_lifecycle_gib: 10.9
           repos_stale_pull:
-            - "('app-c', 8.82, 885)"
-            - "('bitnami/mysql', 0.61, 107)"
+            - {name: "app-c", gib: 8.82, days_since_pull: 885}
+            - {name: "bitnami/mysql", gib: 0.61, days_since_pull: 107}
           stale_pull_gib: 9.4
           stale_pull_days: 90
           repos_unused_by_cluster:
