@@ -1,5 +1,7 @@
 # Severity rules. Code only assigns severity_default as a first-pass status; the LLM decides the final severity using these rules.
 # evaluate embeds this file verbatim in findings-draft.json so the LLM reads it.
+# A check definition and these rules do not see each other. A check's warn_expr is where the check records a mitigating signal it found,
+# so a rule never undoes a warn on its own by raising the item back to the fail severity; it says what the warn means, and only a reason written in the report raises it.
 levels: [critical, high, medium, low, info]
 rules:
   - id: symptom-linked
@@ -7,7 +9,7 @@ rules:
   - id: recurrence
     text: If something marked "resolved" in the previous report appears again, raise one level and mark it "recurrence". Same namespace, same check and a similar name suggests a resource rename; do not treat that as a recurrence.
   - id: critical-absences
-    text: These four absences are critical regardless of profile - no SLO defined, no symptom alerts, no backup tool, N+1 not met.
+    text: Four absences start at the top severity - no SLO defined, no symptom alerts, no backup tool, N+1 not met. When the check says fail, the item is critical. When the check says warn, it found a mitigating signal (sli/slo recording rules, burn-rate alerts or slo-labelled rules without an SLO tool; a few symptom or app-metric alerts under 15% of the alerting rules; etcd snapshots, backup CronJobs or VolumeSnapshots; a node autoscaler for N+1) and the item is high; raising it back to critical needs a reason in adjustments.md, for example when the app-metric alerts turn out to watch no user-facing symptom, or the backup CronJob writes to the same node. The profile-context rule applies to these four as to any other item.
   - id: profile-context
     text: Fit the profile context. "No multi-AZ spread" on a 2-node cluster is info at most.
   - id: explain-override
