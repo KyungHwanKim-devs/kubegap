@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Changed
+
+- The daily report ranks its Top 3 in a new order: new or recurred items that still have impact now, then the persisting critical and high items with the largest impact, then events that have ended. Before, "new or recurred first" put an hour-long p95 spike that was already over above a spot-node concentration that had caused four outages that day. An ended event that still makes the list says so in its title or first sentence. To make "still going on" checkable from the summary, the traffic summary now carries the latest hourly ALB p95 as `p95_s_last_1h` on load balancers, target groups and Ingresses, and `traffic.ingress-p95-latency` prints it in its evidence as `latest 1h`; the 24-hour average that the check judges is an average of hourly p95 values, so one bad hour can carry it over the threshold while the service is fine now. Ingresses measured through ingress-nginx get the same key with their single 1-hour value. `references/summary-shape.md` lists the key. Rubric 0.1.60. ([#8](https://github.com/KyungHwanKim-devs/kubegap/issues/8))
+
 ## [0.1.2] - 2026-11-02
 
 The repository hygiene milestone is complete: public incident cases are attached to the checks, and measurements are kept apart from them. Four checks came out of that case work. Contributors to this release: [@MinwooPark93](https://github.com/MinwooPark93) (#48) and [@hsgustn](https://github.com/hsgustn) (#49).
