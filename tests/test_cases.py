@@ -68,7 +68,8 @@ NOT_A_COMPANY = {
 }
 
 # A measurement on the clusters the check was written on, written into prose: "Measured on a real EKS cluster: …", "(seen on a first real run)".
-MEASUREMENT_IN_PROSE = re.compile(r"\bmeasured\b|\b(?:observed|seen) on\b|\bfirst real run|\bon (?:a )?real (?:EKS |k3s )?clusters?\b|\bk3s k3s\b", re.IGNORECASE)
+# "on a real cluster" alone is not one: "Not yet verified on a real cluster" in notes is the check's status.
+MEASUREMENT_IN_PROSE = re.compile(r"\bmeasured\b|\b(?:observed|seen) on\b|\bfirst real run|\bk3s k3s\b", re.IGNORECASE)
 
 
 def _checks():

@@ -83,7 +83,7 @@ Scope follows the arguments from section 0: `--namespace <ns>` narrows steps 2, 
 
 Continue with the "Review" part of `references/analysis-procedure.md` (steps 6–10: open the raw file for every fail and warn, compare anomalies against the check definitions, `type: llm` checks and correlation, reconcile conflicting findings, apply the severity rules ①–⑤ including `symptom_linked` and `rename_suspects`), then its "Read-only commands outside the snapshot", "Severity guidance" and "Values that collection itself disturbed" paragraphs. Do not start writing until every fail and warn has been reviewed.
 
-**A finding that disappears after a rubric version change is not a defect.** If a finding from the previous report is missing now and `rubric_version` went up, first read that check's `why` (it may carry a verdict-change note). If the change is intended there, do not record it as a "defect" in the tool notes (7-6); classify it under section 3 as a "criteria change".
+**A finding that disappears after a rubric version change is not a defect.** If a finding from the previous report is missing now and `rubric_version` went up, first read that check's `why` and `notes` (they may carry a verdict-change note). If the change is intended there, do not record it as a "defect" in the tool notes (7-6); classify it under section 3 as a "criteria change".
 
 **Read-only commands outside the snapshot** are allowed only under the three conditions in the reference: read only (section 9 applies unchanged), output saved as `$SNAP/extra/<name>.txt` and recorded in appendix 7-4, port-forwarding via `lib/portfwd.PortForward` without a foreground `sleep` loop.
 

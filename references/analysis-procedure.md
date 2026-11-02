@@ -26,7 +26,7 @@ With `--namespace <ns>`, in steps 2, 3 and 5 look only at that namespace's items
 
 ### A finding that disappears after a rubric version change is not a defect
 
-If a finding from the previous report is missing now and `rubric_version` went up, first read that check's `why` (it may carry a verdict-change note). If the change is intended there, do not record it as a "defect" in the tool notes (7-6); classify it under section 3 as a "criteria change". (`SKILL.md` section 6 states the same rule.)
+If a finding from the previous report is missing now and `rubric_version` went up, first read that check's `why` and `notes` (they may carry a verdict-change note). If the change is intended there, do not record it as a "defect" in the tool notes (7-6); classify it under section 3 as a "criteria change". (`SKILL.md` section 6 states the same rule.)
 
 ### Read-only commands outside the snapshot
 

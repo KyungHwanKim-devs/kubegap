@@ -742,7 +742,7 @@
   severity_default: low
   symptom_linked: false
   why: >
-    aws-node exposes metrics on 61678 via hostNetwork, but the apiserver pod proxy is blocked by the node security group. So it is read with curl from inside the node — nodes not registered in SSM or without SSH cannot be read, and their IP usage is the estimate "pods using an IP / computed limit".
+    aws-node exposes metrics on 61678 via hostNetwork. When the node security group blocks the apiserver pod proxy, it is read with curl from inside the node — nodes not registered in SSM or without SSH cannot be read, and their IP usage is the estimate "pods using an IP / computed limit".
   measured: >
     Measured: the pod proxy timed out.
   suggest: "Register with SSM (eks.ssm-unregistered) or install cni-metrics-helper (awscni_* to CloudWatch or Prometheus)."

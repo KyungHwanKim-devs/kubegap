@@ -558,9 +558,7 @@
   severity_default: medium
   symptom_linked: false
   why: >
-    storage.ebs-unencrypted reports the result — existing volumes that are not encrypted. This check reports the cause: without encrypted: "true" in the StorageClass parameters, future volumes will be the same. Enabling account-level "EBS encryption by default" removes the need to fix the class.
-  measured: >
-    Clusters have been observed with neither.
+    storage.ebs-unencrypted reports the result — existing volumes that are not encrypted. This check reports the cause: without encrypted: "true" in the StorageClass parameters, future volumes will be the same. Enabling account-level "EBS encryption by default" removes the need to fix the class, but neither is the default: the account setting is off in every region until someone turns it on, and the gp2 class EKS creates sets no encrypted parameter, so a cluster easily ends up with neither.
   suggest: "Set parameters.encrypted \"true\" on the gp3 class (+ optional kmsKeyId). Or aws ec2 enable-ebs-encryption-by-default (per region). Existing volumes only change via snapshot → encrypted copy."
   verify:
     - "kubectl get sc -o custom-columns=NAME:.metadata.name,PROV:.provisioner,ENC:.parameters.encrypted,EXP:.allowVolumeExpansion ; aws ec2 get-ebs-encryption-by-default"

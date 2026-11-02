@@ -18260,14 +18260,13 @@
   why: >
     Karpenter rounds percentage budgets up (allowed = roundup(nodes × ratio) − deleting − NotReady). So `nodes: "10%"` allows 1 even with a single node,
     and allowed 0 only happens when a budget without a schedule is set to `nodes: "0"` or `"0%"`. Then expiry (expireAfter), drift and consolidation are blocked permanently. A pool with 0 nodes has nothing to delete, so pass.
-    An earlier report that said "computed as 0, no disruption" was a floor-rounding bug in this check.
   measured: >
     Measured on a real EKS cluster: all four pools at 10%, and the `default` pool with 2-4 nodes executed 4 disruptions in a day.
   suggest: "If a permanent block is not the intent, switch to a budget with a schedule or set `nodes: \"1\"` or more. To protect specific nodes only, use the pod annotation `karpenter.sh/do-not-disrupt`."
   verify:
     - "kubectl get nodepool -o jsonpath='{range .items[*]}{.metadata.name}{\" \"}{.spec.disruption.budgets}{\"\\n\"}{end}'; kubectl get nodeclaims -L karpenter.sh/nodepool"
     - "kubectl logs -n karpenter deploy/karpenter --since=24h | grep -c 'disrupting via'"
-  notes: Fixed after a review of a real EKS run (floor → ceil, pool with 0 nodes passes).
+  notes: Fixed after a review of a real EKS run (floor → ceil, pool with 0 nodes passes). An earlier report that said "computed as 0, no disruption" was a floor-rounding bug in this check.
   test:
     profile: "eks"
     cases:
@@ -22427,12 +22426,11 @@
   why: >
     An alert says "something is bad"; a dashboard shows how much, since when and together with what. If a metric used in an alert rule is on no dashboard panel, the on-call person has to type PromQL by hand after receiving the alert. If 30% or more of alert metrics are like that, warn (default). The material is the panel expr from dashboard JSON fetched via the Grafana API (/api/dashboards/uid/<uid>) — without a token there is no data and no verdict (value.available false).
     Dashboard variables ($__rate_interval etc.) and Loki panels are excluded from metric-name extraction, so the session re-reads the "no panel" list together with the dashboard titles before writing it up.
-  measured: >
-    Not yet verified on a real cluster (grafana_api_token was unset).
   suggest: "Add runbook_url and dashboard_url annotations to every alert rule, and add panels for the uncovered metrics to the component's dashboard (the kube-prometheus-stack default dashboards cover most kube_* and node_* metrics)."
   verify:
     - "curl -s -H 'Authorization: Bearer $TOKEN' $GRAFANA/api/search?type=dash-db | jq length"
     - "curl -s -H 'Authorization: Bearer $TOKEN' $GRAFANA/api/dashboards/uid/<uid> | jq '[.dashboard.panels[].targets[].expr]'"
+  notes: Not yet verified on a real cluster (grafana_api_token was unset).
   profiles: [prod, lab]
   test:
     cases:

@@ -452,7 +452,7 @@
   symptom_linked: true
   why: >
     An app with auto-sync retries after a failure — if the same manifest error (validating webhook rejection, missing CRD, immutable field) fails every few minutes, that app's deployments have effectively stopped and only argocd_app_sync_total{phase="Failed"} keeps climbing.
-    Prometheus does not scrape these metrics (no ServiceMonitor), so the controller's :8082 is read from inside a node.
+    Without a ServiceMonitor Prometheus does not scrape these metrics, so the controller's :8082 is read from inside a node.
   measured: >
     Measured on a real EKS cluster: Failed 9 and Error 1 out of 1,304 (0.77%).
   suggest: "Use argocd app history <app> and operationState.message to find the failure cause. For repeated failures, fix the manifest or review syncOptions (Replace=true, ServerSideApply=true)."
