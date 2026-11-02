@@ -327,6 +327,8 @@ class _Parser:
                 raise YamlError(f"line {ln}: mapping indentation mismatch ({ind} > {indent})")
             if content.startswith("- "):
                 return out, idx
+            if content[0] in "&*!":  # parse_scalar rejects these in values; on a key they would become part of the key name
+                raise YamlError(f"line {ln}: anchors, aliases and tags are not supported: {content!r}")
             kv = _split_key(content)
             if kv is None:
                 raise YamlError(f"line {ln}: not a `key: value` entry: {content!r} (multi-line plain strings are not supported; use `>`)")
@@ -383,9 +385,16 @@ class _Parser:
             except YamlError as e:
                 raise YamlError(f"line {ln}: {e}") from None
         try:
-            return parse_scalar(rest), idx + 1
+            value = parse_scalar(rest)
         except YamlError as e:
             raise YamlError(f"line {ln}: {e}") from None
+        # a deeper line after a plain scalar continues it (YAML folds the lines into one string); say so instead of "indentation mismatch".
+        # A deeper `key: value` line is not a continuation in YAML either, so it keeps the indentation error.
+        nxt = self._skip_blank(idx + 1)
+        if rest[0] not in "'\"[{" and nxt < len(self.lines) and self.lines[nxt][0] > indent and _split_key(self.lines[nxt][1]) is None:
+            n, text = self.lines[nxt][2], self.lines[nxt][1]
+            raise YamlError(f"line {n}: {text!r} continues the plain scalar on line {ln}; multi-line plain scalars are not supported, use `>` or quotes")
+        return value, idx + 1
 
     def _block_scalar(self, header: str, idx: int, indent: int) -> tuple[str, int]:
         style, chomp = header[0], header[1:2]

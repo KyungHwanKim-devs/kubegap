@@ -259,6 +259,31 @@ def test_errors(text, match):
         load(text)
 
 
+@pytest.mark.parametrize(
+    ("text", "line"),
+    [
+        ("a: first\n  second\nb: 1", 2),
+        ("a: first\n\n  second", 3),
+        ("a: 1\n  2", 2),
+        ("- first\n  second", 2),
+        ("- k: one\n    two", 2),
+        ("x:\n  - a: 1\n    why: long text\n      continues here\n  - b", 4),
+        ("a: first\n  - second", 2),
+    ],
+)
+def test_multi_line_plain_scalar_names_the_continuation_line(text, line):
+    # PyYAML reads each of these as one folded string; before the fix the error was "indentation mismatch".
+    with pytest.raises(YamlError, match=rf"^line {line}: .*multi-line plain scalars are not supported"):
+        load(text)
+
+
+@pytest.mark.parametrize("text", ["&a key: v", "!!str key: v", "- &a k: v", "a:\n  *x: 1"])
+def test_anchor_or_tag_on_a_key_is_rejected(text):
+    # Before the fix these were read as a key named "&a key" and so on.
+    with pytest.raises(YamlError, match=r"^line \d+: anchors, aliases and tags are not supported"):
+        load(text)
+
+
 def test_load_file(tmp_path):
     p = tmp_path / "x.yaml"
     p.write_text("a: 1\nb: [x]\n", encoding="utf-8")
