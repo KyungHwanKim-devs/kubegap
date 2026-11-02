@@ -5,6 +5,7 @@
 - To add or modify a check, follow the procedure in `references/development.md`. A check is one entry in `collectors/<collector>/checks.yaml` and must have `test.cases`.
 - When the rubric changes, bump `rubric/version` in the same pull request and regenerate the catalog: `scripts/kubegap checks --markdown > docs/CHECKS.md` (a test checks that it is current). When signatures change, bump the version in `signatures/catalog.yaml`.
 - `checks.yaml` expressions are Python evaluated by `lib/evaluate.py`. They are code: review them like code.
+- The YAML files here are read by `lib/yamlite.py`, which supports only a subset of YAML; the subset is listed at the top of [`lib/yamlite.py`](lib/yamlite.py). Anchors, aliases, tags and plain strings continued on the next line raise an error with the line number. Keep a plain string on one line, or use a `>` block or quotes for long text.
 - Unit tests live in `tests/` (pytest; the YAML parser, rubric resolution, snapshot diff, platform detection and the evaluate helpers); add a test when you touch `lib/`.
 - Open a pull request against `main` from a branch; one topic per pull request, with a short description of what changed and why. Everything below must pass before you submit.
 - When a parser needs the value of a ConfigMap key, add that key to `KEEP_VALUES` in `lib/scrub.py`. Every other ConfigMap value is replaced by its length and shape before the snapshot is written, so the parser would otherwise see a dict.
