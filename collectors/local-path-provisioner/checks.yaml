@@ -88,8 +88,10 @@
   severity_default: high
   symptom_linked: false
   why: >
-    A local-path volume is a node directory, so the PVC capacity is a label only and the kernel does not enforce it — Elasticsearch writing 100GiB into a 20GiB PVC (measured on a small k3s cluster node) raises no error; instead the node root filesystem fills up. When root is full, kubelet evicts pods for DiskPressure and k3s SQLite (state.db) writes fail, stopping the whole cluster — what would be a single full volume on EBS becomes a node failure.
-    Measured on a 2-node k3s k3s: node A 21.9% free (not trending down), node B 50.1% free (+0.34GiB/day -> 670 days). Two over-capacity PVCs (Elasticsearch 5.0x, a backup PVC 1.3x) -> warn.
+    A local-path volume is a node directory, so the PVC capacity is a label only and the kernel does not enforce it — a pod writing 100GiB into a 20GiB PVC raises no error; instead the node root filesystem fills up. When root is full, kubelet evicts pods for DiskPressure and k3s SQLite (state.db) writes fail, stopping the whole cluster — what would be a single full volume on EBS becomes a node failure.
+  measured: >
+    Measured on a small k3s cluster node: Elasticsearch wrote 100GiB into a 20GiB PVC.
+    Measured on a 2-node k3s cluster: node A 21.9% free (not trending down), node B 50.1% free (+0.34GiB/day -> 670 days). Two over-capacity PVCs (Elasticsearch 5.0x, a backup PVC 1.3x) -> warn.
   suggest: "On the tight node, clean up the largest directories first (du -sm /var/lib/rancher/k3s/storage/*) or shorten backup PVC retention. To actually enforce capacity, use Longhorn or NFS instead of local-path, or mount a separate disk via nodePathMap to keep volumes off the OS disk."
   verify:
     - "ssh <node> df -h / && sudo du -sm /var/lib/rancher/k3s/storage/* | sort -rn | head"
@@ -751,7 +753,8 @@
   symptom_linked: false
   why: >
     When a PVC is deleted, the provisioner's helper pod (teardown) removes the directory. If the helper pod failed (node down, image pull failure) or reclaimPolicy is Retain, the directory stays, consumes space, and keeps old DB data in plaintext. A Released PV, whose claim is gone while the PV remains, has the same root cause.
-    Measured on a 2-node k3s k3s: 26 node directories = 26 PVs, 0 orphans, 0 Released -> pass (du reads only the top 30 entries, so with more than 30 directories some are not visible).
+  measured: >
+    Measured on a 2-node k3s cluster: 26 node directories = 26 PVs, 0 orphans, 0 Released -> pass (du reads only the top 30 entries, so with more than 30 directories some are not visible).
   suggest: "Confirm from the directory name (pvc-<uid>_<ns>_<pvc>) that the PVC really is gone, then delete it. Released PVs: kubectl delete pv."
   verify:
     - "ssh <node> sudo ls /var/lib/rancher/k3s/storage | sed 's/_.*//' | sort > /tmp/dirs; kubectl get pv -o name | sed 's#.*/##' | sort > /tmp/pvs; comm -23 /tmp/dirs /tmp/pvs"
@@ -1163,7 +1166,8 @@
   symptom_linked: false
   why: >
     EBS with Delete still has snapshots (DLM) and asynchronous volume deletion, which leaves room to recover; local-path Delete is an rm of the directory — the moment a StatefulSet is deleted by mistake or Argo CD prune removes the PVC, the DB data is gone (the same failure path as the Argo CD check argocd.prune-manages-namespace-or-crd). Read together with the resilience backup check (backup_locality) as "is the backup on another node or outside the cluster?".
-    Measured on a 2-node k3s k3s: all 19 prod PVs were Delete (both StorageClasses default to Delete). The backup PVCs were local-path on the same node as well.
+  measured: >
+    Measured on a 2-node k3s cluster: all 19 prod PVs were Delete (both StorageClasses default to Delete). The backup PVCs were local-path on the same node as well.
   suggest: "For DB and backup PVCs, create a second StorageClass with reclaimPolicy Retain (local-path-retain), or patch existing PVs with kubectl patch pv <pv> -p '{\"spec\":{\"persistentVolumeReclaimPolicy\":\"Retain\"}}'. Keep backups on another node or outside the cluster (S3, NAS)."
   verify:
     - "kubectl get pv -o custom-columns=PV:.metadata.name,NS:.spec.claimRef.namespace,PVC:.spec.claimRef.name,RECLAIM:.spec.persistentVolumeReclaimPolicy,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
@@ -1423,7 +1427,8 @@
   symptom_linked: true
   why: >
     If the provisioner is down, new PVCs stay Pending (existing volumes are directories and keep working); if there is no default StorageClass, PVCs without storageClassName stay Pending forever. An empty nodePathMap falls back to the DEFAULT path (/opt/local-path-provisioner; on k3s /var/lib/rancher/k3s/storage).
-    Measured on a k3s k3s: 1/1 ready, v0.0.31, default class local-path -> pass.
+  measured: >
+    Measured on a k3s cluster: 1/1 ready, v0.0.31, default class local-path -> pass.
   suggest: "kubectl -n kube-system logs deploy/local-path-provisioner. The default class is set by the storageclass.kubernetes.io/is-default-class annotation."
   verify:
     - "kubectl -n kube-system get deploy local-path-provisioner; kubectl get sc"

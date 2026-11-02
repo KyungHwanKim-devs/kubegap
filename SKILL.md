@@ -3,9 +3,9 @@ name: kubegap
 description: Kubernetes cluster operations gap audit — /kubegap [daily|full|focus <area>|explain <finding-id>] [--context <name>] [--profile <name>] [--namespace <ns>] [--snapshot <date>] [--compare <A> <B>]. Collects, summarizes and first-pass evaluates the cluster of the current kube context, then the LLM analyzes the result and writes a Markdown report. daily (default) is a short run compared with the previous daily run; full collects everything and writes the full report. Also use this skill for "audit my cluster", "operations audit", "what changed since last run", "explain this finding". EKS is the baseline; a small k3s cluster is a variant.
 compatibility: "Tested with Claude Code and Codex; usable in any Agent Skills host with a shell tool. Requires kubectl and python3 (3.11+). Optional: aws (EKS), ssh (k3s nodes), krr, polaris, pluto. Uses read-only cluster access (no command that changes the cluster; no Secret values read, except Helm's own release records via helm list, metadata only); node access via SSM or SSH. Snapshots are stored under ~/.kubegap/"
 metadata:
-  version: "0.1.1"
+  version: "0.1.2"
   author: KyungHwanKim-devs
-  rubric_version: "0.1.56"
+  rubric_version: "0.1.60"
 ---
 
 # /kubegap — cluster operations gap audit
@@ -83,7 +83,7 @@ Scope follows the arguments from section 0: `--namespace <ns>` narrows steps 2, 
 
 Continue with the "Review" part of `references/analysis-procedure.md` (steps 6–10: open the raw file for every fail and warn, compare anomalies against the check definitions, `type: llm` checks and correlation, reconcile conflicting findings, apply the severity rules ①–⑤ including `symptom_linked` and `rename_suspects`), then its "Read-only commands outside the snapshot", "Severity guidance" and "Values that collection itself disturbed" paragraphs. Do not start writing until every fail and warn has been reviewed.
 
-**A finding that disappears after a rubric version change is not a defect.** If a finding from the previous report is missing now and `rubric_version` went up, first read that check's `why` (it may carry a verdict-change note). If the change is intended there, do not record it as a "defect" in the tool notes (7-6); classify it under section 3 as a "criteria change".
+**A finding that disappears after a rubric version change is not a defect.** If a finding from the previous report is missing now and `rubric_version` went up, first read that check's `why` and `notes` (they may carry a verdict-change note). If the change is intended there, do not record it as a "defect" in the tool notes (7-6); classify it under section 3 as a "criteria change".
 
 **Read-only commands outside the snapshot** are allowed only under the three conditions in the reference: read only (section 9 applies unchanged), output saved as `$SNAP/extra/<name>.txt` and recorded in appendix 7-4, port-forwarding via `lib/portfwd.PortForward` without a foreground `sleep` loop.
 

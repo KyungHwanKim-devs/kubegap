@@ -720,7 +720,7 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
         rec.update(status=r["status"], counts=r.get("counts"), reason=r.get("reason"), thresholds=thresholds)
         for f in r["findings"]:
             f["thresholds"] = thresholds
-            for k in ("why", "suggest", "verify", "cases", "notes"):
+            for k in ("why", "suggest", "verify", "cases", "measured", "notes"):
                 f.setdefault(k, c.get(k))  # signature checks already carry the signature's description
             sup = next((s for s in active_sup if s.get("id") == c["id"] and (not s.get("namespaces") or f["target"].split("/")[0] in s["namespaces"])), None)
             if sup:

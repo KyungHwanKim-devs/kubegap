@@ -14,6 +14,7 @@
   symptom_linked: true
   why: >
     A datasource 429 means the store rate-limited Grafana's queries (Loki's per-tenant query limit, Prometheus query.max-concurrency) — dashboard panels go empty with "too many outstanding requests" and people read it as "there are no logs". 5xx means the store died while processing the query (Loki OOM, Prometheus timeout).
+  measured: >
     Measured on a real EKS cluster: Loki datasource 302 of 2,515 requests were 429 (12%) → fail. Prometheus and a second metrics store 0. API 500 9 times. Small k3s cluster: no datasource queries since start (active_users 0).
   suggest: "Raise Loki limits_config max_outstanding_per_tenant (default 100 → 2048) and querier.max-concurrent, and narrow the range of log panels in Grafana dashboards. For Prometheus: query.max-concurrency and query.timeout."
   verify:
@@ -278,6 +279,7 @@
   symptom_linked: false
   why: >
     Grafana patches only the latest and the previous major. After 12 (2025-05) came out, 10.x stopped receiving security patches — for a UI exposed to the internet, authentication bypass and XSS CVEs remain as they are.
+  measured: >
     Measured on real clusters: EKS 10.2.3 → warn, small k3s cluster 12.2.1 → pass.
   suggest: "Bump the grafana subchart version in the kube-prometheus-stack chart (10 → 11 → 12; check the impact of Angular panel removal)."
   verify:
@@ -446,6 +448,7 @@
   symptom_linked: false
   why: >
     If Grafana alerting (a system separate from Prometheus rules) is in use, evaluation failures (datasource errors) and notification failures (contact point configuration) accumulate here. With 0 rules Grafana alerting is not in use and Alertmanager is the only path.
+  measured: >
     Measured on real clusters: 0 Grafana alert rules and 0 failures on both EKS and small k3s cluster.
   suggest: "Look at Error/NoData in Grafana Alerting → rule state. Not splitting into two systems alongside Prometheus rules is easier to manage."
   verify:

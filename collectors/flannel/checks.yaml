@@ -491,7 +491,8 @@
   symptom_linked: true
   why: >
     flannel connects pods across nodes with vxlan (flannel.1) and within a node with a Linux bridge (cni0). With net.ipv4.ip_forward=0 all pod traffic leaving the node stops; with net.bridge.bridge-nf-call-iptables=0 traffic between two pods on the same node bypasses iptables (kube-proxy Service rules, NetworkPolicy), producing the intermittent failure "works to a pod on another node, fails on the same node". It happens when sysctl.d is lost after a reboot.
-    Measured on a real k3s: 1 on both nodes → pass.
+  measured: >
+    Measured on a real k3s cluster: 1 on both nodes → pass.
   suggest: "sysctl -w net.ipv4.ip_forward=1 net.bridge.bridge-nf-call-iptables=1 and persist in /etc/sysctl.d/99-kubernetes.conf (br_netfilter module in /etc/modules-load.d). k3s sets these at startup, but other tools can revert them."
   verify:
     - "sysctl net.ipv4.ip_forward net.bridge.bridge-nf-call-iptables"
@@ -576,7 +577,8 @@
   symptom_linked: false
   why: >
     vxlan only encapsulates; it does not encrypt. When the nodes share one L2 switch (the same /24) the LAN trust model is enough, but across subnets, a VPN (Tailscale) or a public network, pod-to-pod traffic (DB passwords and tokens included) travels in plain text. k3s turns on node-to-node encryption with a single `--flannel-backend=wireguard-native`.
-    Measured on a real k3s: both nodes in one private /24 subnet → pass (Tailscale was for node access, not the flannel underlay).
+  measured: >
+    Measured on a real k3s cluster: both nodes in one private /24 subnet → pass (Tailscale was for node access, not the flannel underlay).
   suggest: "If nodes span subnets, use the k3s server argument --flannel-backend=wireguard-native (all nodes must restart) or run the flannel underlay over a node-to-node VPN."
   verify:
     - "kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{\" \"}{.metadata.annotations.flannel\\.alpha\\.coreos\\.com/backend-type}{\" \"}{.metadata.annotations.flannel\\.alpha\\.coreos\\.com/public-ip}{\"\\n\"}{end}'"
@@ -693,7 +695,8 @@
   symptom_linked: true
   why: >
     The node script counters are cumulative since boot, so they cannot separate "old" from "now" (traffic.flannel-errors). If node-exporter's 24-hour increase is non-zero, overlay packets are being corrupted or dropped right now — causes are MTU mismatch (only large packets fail), the underlay NIC driver or conntrack saturation, and the symptoms are intermittent timeouts and slow DB queries. vxlan devices report operstate UNKNOWN, so node_network_up reads 0 and is not used.
-    Measured on a real k3s: 0 errors and 0 drops in 24h (12 cumulative drops), overlay traffic about 80GiB/day per node — the volume of pods crossing nodes to reach Elasticsearch and databases.
+  measured: >
+    Measured on a real k3s cluster: 0 errors and 0 drops in 24h (12 cumulative drops), overlay traffic about 80GiB/day per node — the volume of pods crossing nodes to reach Elasticsearch and databases.
   suggest: "Run ip -s link show flannel.1 twice 10 minutes apart to see which direction, and check MTU with ping -M do -s 1400 <pod IP on another node>. Together with ethtool -S errors on the underlay NIC."
   verify:
     - "curl -s localhost:9090/api/v1/query --data-urlencode 'query=increase(node_network_transmit_drop_total{device=\"flannel.1\"}[1d])'"

@@ -121,6 +121,7 @@ def _alb(snap: Path, objs: _Objects) -> dict:
                     "elb_5xx_ratio_24h": round((g("HTTPCode_ELB_5XX_Count_Sum") or 0) / req, 5) if req else None,
                     "p95_s_max_1h": g("TargetResponseTime_p95", "max"),
                     "p95_s_avg": g("TargetResponseTime_p95", "avg"),
+                    "p95_s_last_1h": g("TargetResponseTime_p95", "last"),
                     "p99_s_max_1h": g("TargetResponseTime_p99", "max"),
                     "rejected_connections_24h": g("RejectedConnectionCount_Sum") or 0,
                     "requests_peak_1h": g("RequestCount_Sum", "max"),
@@ -165,6 +166,7 @@ def _alb(snap: Path, objs: _Objects) -> dict:
             "target_5xx_ratio_24h": round((g("HTTPCode_Target_5XX_Count_Sum") or 0) / req, 5) if req else None,
             "p95_s_max_1h": g("TargetResponseTime_p95", "max"),
             "p95_s_avg": g("TargetResponseTime_p95", "avg"),
+            "p95_s_last_1h": g("TargetResponseTime_p95", "last"),
             "unhealthy_max_24h": g("UnHealthyHostCount_Maximum", "max"),
             "healthy_min_24h": g("HealthyHostCount_Minimum", "min"),
             "requests_per_target_24h": g("RequestCountPerTarget_Sum"),
@@ -233,6 +235,7 @@ def _ingresses(snap: Path, objs: _Objects, alb: dict) -> list[dict]:
                 "errors_ratio": round(e5 / req, 5) if req else None,
                 "p95_s_max_1h": max((t.get("p95_s_max_1h") or 0) for t in tgs) or None,
                 "p95_s_avg": max((t.get("p95_s_avg") or 0) for t in tgs) or None,
+                "p95_s_last_1h": max((t.get("p95_s_last_1h") or 0) for t in tgs) or None,
                 "unhealthy_max_24h": max((t.get("unhealthy_max_24h") or 0) for t in tgs),
                 "unhealthy_now": sum(len(t.get("targets_unhealthy") or []) for t in tgs),
                 "target_groups": [t["name"] for t in tgs],
@@ -247,6 +250,7 @@ def _ingresses(snap: Path, objs: _Objects, alb: dict) -> list[dict]:
                 "errors_ratio": round(nginx_5xx.get((ns, name), 0), 5),
                 "p95_s_avg": nginx_p95.get((ns, name)),
                 "p95_s_max_1h": nginx_p95.get((ns, name)),
+                "p95_s_last_1h": nginx_p95.get((ns, name)),
             }
         ep = [objs.endpoints_ready.get((ns, s)) for s in services]
         rows.append(
@@ -472,6 +476,81 @@ def _alb_groups(ingresses: list[dict]) -> list[dict]:
     return out
 
 
+# ---------- ingress-nginx controller ----------
+# The project retired: best-effort maintenance ended in March 2026, the repository was archived on 2026-03-24, and no further release or security fix
+# will come. IngressNightmare (CVE-2025-1974, CVSS 9.8, with four more CVEs, March 2025) is fixed in 1.12.1 and 1.11.5: below that, any pod that can reach the
+# admission webhook can run code in the controller and read every Secret.
+NGINX_FIXED = ((1, 11, 5), (1, 12, 1))
+
+
+def _semver(v: str | None) -> tuple[int, int, int] | None:
+    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", str(v or ""))
+    return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+
+
+def nginx_vulnerable(version: str | None) -> bool | None:
+    """True below the IngressNightmare fix of its line: 1.11.x below 1.11.5, everything else below 1.12.1. None when the version is unknown."""
+    t = _semver(version)
+    if t is None:
+        return None
+    if t[:2] == (1, 11):
+        return t < NGINX_FIXED[0]
+    return t < NGINX_FIXED[1]
+
+
+def _nginx(snap: Path, ingresses: list) -> dict | None:
+    """The ingress-nginx controller(s): image version, replicas, and whether the admission webhook is on. None when ingress-nginx is not deployed."""
+    rows = []
+    for stem, kind in (("deployments", "Deployment"), ("daemonsets", "DaemonSet")):
+        for o in objects(snap, stem):
+            tpl = ((o.get("spec") or {}).get("template") or {}).get("spec") or {}
+            for c in tpl.get("containers") or []:
+                img = str(c.get("image") or "")
+                if "ingress-nginx/controller" not in img and "nginx-ingress-controller" not in img:
+                    continue
+                m = re.search(r":v?(\d+\.\d+\.\d+)", img.split("@")[0])
+                st = o.get("status") or {}
+                rows.append(
+                    {
+                        "kind": kind,
+                        "namespace": o["metadata"]["namespace"],
+                        "name": o["metadata"]["name"],
+                        "image": img.split("@")[0],
+                        "version": m.group(1) if m else None,
+                        "replicas": (o.get("spec") or {}).get("replicas") if kind == "Deployment" else st.get("desiredNumberScheduled"),
+                        "ready": st.get("readyReplicas") if kind == "Deployment" else st.get("numberReady"),
+                        "webhook_arg": any(str(a).startswith("--validating-webhook") for a in (c.get("args") or []) + (c.get("command") or [])),
+                    }
+                )
+                break
+    if not rows:
+        return None
+    vwc = []
+    for w in objects(snap, "validatingwebhookconfigurations.admissionregistration.k8s.io"):
+        for h in w.get("webhooks") or []:
+            if "nginx.ingress.kubernetes.io" in str(h.get("name") or ""):
+                vwc.append({"configuration": w["metadata"]["name"], "failure_policy": h.get("failurePolicy")})
+    versions = [r["version"] for r in rows if r["version"]]
+    oldest = min(versions, key=lambda v: _semver(v) or (0, 0, 0)) if versions else None
+    unknown = [f"{r['namespace']}/{r['name']} ({r['image']})" for r in rows if not r["version"]]
+    # A controller whose image tag carries no version (digest only, a prefixed tag the regex misses) cannot be cleared: vulnerable stays None for the whole set
+    vulnerable = None if unknown else nginx_vulnerable(oldest)
+    return {
+        "present": True,
+        "controllers": rows,
+        "version": oldest,
+        "versions": sorted(set(versions)),
+        "unknown_version_controllers": unknown,
+        "admission_webhook": bool(vwc) or any(r["webhook_arg"] for r in rows),
+        "admission_webhooks": vwc,
+        "vulnerable": vulnerable,
+        "fixed_versions": ["1.12.1", "1.11.5"],
+        "retired": True,
+        "retired_note": "ingress-nginx: best-effort maintenance ended March 2026, repository archived 2026-03-24, no further security fixes",
+        "metrics_available": any(r["metrics"].get("source") == "ingress-nginx" for r in ingresses),
+    }
+
+
 def analyze(snap: Path, inv: dict | None) -> dict:
     objs = _Objects(snap, inv)
     alb = _alb(snap, objs)
@@ -484,7 +563,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "alb_groups": _alb_groups(ingresses),
         "ingress_metrics_source": dict(Counter(r["metrics"].get("source") or "none" for r in ingresses)),
         "alb": alb,
-        "nginx": {"metrics_available": any(r["metrics"].get("source") == "ingress-nginx" for r in ingresses)},
+        "nginx": _nginx(snap, ingresses),
         "exposure": exposure,
         "exposure_counts": dict(Counter(r["type"] for r in exposure)),
         "db_exposed": [r for r in exposure if r["db_port"] and "internal" not in str(r.get("scheme"))],

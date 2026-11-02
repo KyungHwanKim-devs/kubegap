@@ -12,7 +12,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    KEDA takes up three pods and one external.metrics.k8s.io APIService, and places a webhook and 7 CRDs in the cluster. With no ScaledObject in use, only the resources and the attack surface remain. Measured on a real k3s k3s: 2.19.0 installed, 0 ScaledObjects → warn.
+    KEDA takes up three pods and one external.metrics.k8s.io APIService, and places a webhook and 7 CRDs in the cluster. With no ScaledObject in use, only the resources and the attack surface remain.
+  measured: >
+    Measured on a real k3s cluster: 2.19.0 installed, 0 ScaledObjects → warn.
   suggest: "If there is no plan to use it, helm uninstall keda (including CRDs). If there is, move HPAs to ScaledObjects."
   verify:
     - "kubectl get scaledobjects,scaledjobs -A"
@@ -130,6 +132,7 @@
   symptom_linked: true
   why: >
     The path an HPA uses to read external metrics (kafka lag, queue length) is kube-apiserver → external.metrics APIService → keda-operator-metrics-apiserver → keda-operator (gRPC). If any of them dies, the HPA stops scaling with "unable to get external metric" (keeping the current replicas), does not grow on a spike and does not shrink after a surge. The default install has both at 1 replica with no PDB.
+  measured: >
     Measured on a real EKS cluster: all 1/1, no PDB, 3 prod ScaledObjects → warn.
   suggest: "metrics-apiserver replicas 2 (active-active is possible) + PDB; the operator uses leader election, so 2 gives a standby replica. With few nodes, at least a PDB."
   verify:
@@ -391,6 +394,7 @@
   symptom_linked: true
   why: >
     The kafka and metrics-api triggers read an external system (broker, app endpoint). When that system dies the scaler errors and the HPA freezes at its last value — consumers do not grow at the very moment the queue piles up. spec.fallback{failureThreshold, replicas} moves to a fixed replica count after N consecutive errors.
+  measured: >
     Measured on a real EKS cluster: all 3 prod ScaledObjects had no fallback (one kafka lag, two metrics-api).
   suggest: "Add fallback: {failureThreshold: 3, replicas: <usual peak count>} to the ScaledObject. For metrics-api triggers, consumers then stay up even when the app endpoint dies."
   verify:
@@ -505,6 +509,7 @@
   symptom_linked: false
   why: >
     Active means "the trigger crossed its threshold and there is a reason to scale", and lastActiveTime is the last time that happened. If it was never crossed for weeks, the threshold (kafka lagThreshold 1 should be crossed almost always) or the metric path is wrong, or the workload is unused. This is the KEDA counterpart of scaling.hpa-never-scaled.
+  measured: >
     Measured on a real EKS cluster: one worker inactive for 30.8 days (min 0, so it sat at 0 pods — possibly intended).
   suggest: "Query the trigger metric directly (the URL for metrics-api, the consumer group lag for kafka) and see whether values arrive. If the worker is unused, delete the ScaledObject and the Deployment."
   verify:
@@ -620,7 +625,9 @@
   severity_default: high
   symptom_linked: true
   why: >
-    With a broken authentication reference the scaler cannot reach the broker, repeats "error getting metrics" and the HPA freezes. A common cause of the log signature keda.scaler-error. Measured on a real EKS cluster: both had their Secret — pass.
+    With a broken authentication reference the scaler cannot reach the broker, repeats "error getting metrics" and the HPA freezes. A common cause of the log signature keda.scaler-error.
+  measured: >
+    Measured on a real EKS cluster: both had their Secret — pass.
   suggest: "Compare kubectl get triggerauthentication -n <ns> with the referenced Secret names. If an ExternalSecret has not synced yet, see security.externalsecret-not-ready."
   verify:
     - "kubectl get scaledobject -A -o jsonpath='{range .items[*]}{.metadata.namespace} {.spec.triggers[*].authenticationRef.name}{\"\\n\"}{end}'"
@@ -787,7 +794,9 @@
   severity_default: medium
   symptom_linked: true
   why: >
-    For every external metric request from the HPA controller, metrics-apiserver fetches the value from the operator over gRPC and answers. A 500 or gRPC Unknown means the HPA got no value at that moment. The counters are cumulative since process start, so they are judged as a ratio (measured on a real EKS cluster: 18 failures out of 390,734 = 0.005%).
+    For every external metric request from the HPA controller, metrics-apiserver fetches the value from the operator over gRPC and answers. A 500 or gRPC Unknown means the HPA got no value at that moment. The counters are cumulative since process start, so they are judged as a ratio.
+  measured: >
+    Measured on a real EKS cluster: 18 failures out of 390,734 = 0.005%.
   suggest: "Match the times failures cluster with scaler errors in the operator log (logs/pods/keda/). Availability of the trigger target (broker, app URL) is the cause in most cases."
   verify:
     - "apiserver_request_total{component=\"external-metrics\"} from the pod /metrics (metrics/pod/keda-metrics-apiserver/)"
@@ -999,7 +1008,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    When enabled the operator exposes keda_scaler_errors_total, keda_scaler_metrics_value (the value the trigger read), keda_scaler_metrics_latency and keda_internal_scale_loop_latency. When off, neither kubegap nor Grafana can see "what is the kafka lag right now" and errors are counted only from log signatures. Measured on real clusters: false on both.
+    When enabled the operator exposes keda_scaler_errors_total, keda_scaler_metrics_value (the value the trigger read), keda_scaler_metrics_latency and keda_internal_scale_loop_latency. When off, neither kubegap nor Grafana can see "what is the kafka lag right now" and errors are counted only from log signatures.
+  measured: >
+    Measured on real clusters: false on both.
   suggest: "Helm values prometheus.operator.enabled true (+ serviceMonitor). Trigger value trends and scale loop latency then accumulate in Prometheus."
   verify:
     - "kubectl get deploy -n keda keda-operator -o jsonpath='{.spec.template.spec.containers[0].args}'"
@@ -1163,7 +1174,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    The KEDA webhook validates only ScaledObject and TriggerAuthentication (unrelated to pod creation). The default is Ignore, so the impact is small, but in an install switched to Fail with a single webhook pod, ScaledObjects cannot be fixed while that pod is down. Measured on real clusters: Ignore on both — pass.
+    The KEDA webhook validates only ScaledObject and TriggerAuthentication (unrelated to pod creation). The default is Ignore, so the impact is small, but in an install switched to Fail with a single webhook pod, ScaledObjects cannot be fixed while that pod is down.
+  measured: >
+    Measured on real clusters: Ignore on both — pass.
   suggest: "If you keep Fail, set webhooks replicas 2."
   verify:
     - "kubectl get validatingwebhookconfiguration keda-admission -o jsonpath='{.webhooks[*].failurePolicy}'"

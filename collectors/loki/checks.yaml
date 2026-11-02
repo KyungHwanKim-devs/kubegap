@@ -14,6 +14,7 @@
   symptom_linked: true
   why: >
     In single-binary Loki the ingester (in-memory chunks) and the querier (chunk loading) share one process, so a single large range query can cause an OOMKill. At that moment ingestion stops too (promtail retries -> 429/5xx), and with emptyDir any chunks not recovered from the WAL after the restart are lost. core observability.loki-oomkilled reports the event itself; this check looks at current usage against the limit and at restarts.
+  measured: >
     Measured on a real EKS cluster: limit 512MiB, RSS 222MiB (0.43), last termination OOMKilled caused by a 24-hour count_over_time query (later reduced to a 1-hour window) -> warn.
   suggest: "Raise the limit to 1GiB or more, lower querier.max_concurrent, and set limits_config.max_query_series and max_entries_limit. Narrow query ranges and move long ranges to recording rules (ruler)."
   verify:
@@ -129,6 +130,7 @@
   symptom_linked: true
   why: >
     5xx means a query (series, query_range) died from memory pressure or a timeout, a panic means a bug or corruption, and WAL disk full means ingestion has stopped. Read together with Grafana 429s (grafana.datasource-errors) it separates "too many queries" from "Loki is too small".
+  measured: >
     Measured on a real EKS cluster: 1 5xx out of 273,468 requests (/loki/api/v1/series 500, triggered by this tool's own collection) -> warn (low). panics 0, WAL 0.
   suggest: "Break loki_request_duration_seconds_count{status_code=~\"5..\"} down by route. 5xx on series/query_range points to memory (loki.memory-pressure) and limits_config."
   verify:
@@ -304,6 +306,7 @@
   symptom_linked: false
   why: >
     Since Loki 3.0 (2024-04) the 2.x line receives no patches. 2.6 (2022-07) uses the boltdb-shipper index and single-binary defaults, so it lacks the 3.x TSDB index, structured metadata and bloom filters, and the loki-stack chart itself is no longer maintained (moved to the grafana/loki chart).
+  measured: >
     Measured on a real EKS cluster: 2.6.1 (loki-stack chart) -> warn. The small k3s cluster has no Loki.
   suggest: "Migrate to the grafana/loki chart (SingleBinary mode) and set up 3.x, the tsdb index and retention in one go. Keep the existing boltdb-shipper data as a separate period in schema_config."
   verify:

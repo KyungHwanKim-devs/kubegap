@@ -15,6 +15,7 @@
   why: >
     VPC CNI gives each pod a VPC IP as a secondary IP on an ENI. The instance type decides how many IPs a node can hold (ENIs x (IPv4 per ENI - 1)). Once they are used up, new pods stall in ContainerCreating with "failed to assign an IP address" — the most common EKS trap.
     `no_available_ip_events` is how many times ipamd answered "no IP to give" (cumulative since the process started), so any non-zero value means it has already happened at least once. ENIs attached up to the limit (eni_at_max) is normal with WARM_ENI_TARGET=1, so it is not a judgement axis — 4 or fewer remaining IPs (ip_headroom) or 75% usage is warn. max-pods exceeding the IP limit by 2 is normal: that is the hostNetwork pods' share.
+  measured: >
     Measured on a 7-node EKS cluster: an r8gd.xlarge node at ENI 4/4 and IP 42/56 had 4 'no available IP' events. Its max-pods was 58 while IPs stop at 56, so kubelet sees room and the CNI refuses.
   cases:
     - { who: Neon 2025, url: https://neon.com/blog/aws-cni-lessons-from-a-production-outage }
@@ -219,7 +220,9 @@
   symptom_linked: false
   why: >
     kubelet's max-pods is the number of slots the scheduler sees; the CNI's IP limit is what can actually be handed out. If the former is larger, the scheduler sends pods, the CNI refuses, and pods stall in ContainerCreating (a difference equal to the hostNetwork pods that use no IP is fine).
-    The EKS-optimized AMI formula for max-pods is ENI x (IP - 1) + 2. The +2 is for aws-node and kube-proxy, which are hostNetwork and use no IP, and is normal (measured: every node was exactly +2); anything larger means Karpenter set `maxPods` separately, or prefix delegation was turned on and then off.
+    The EKS-optimized AMI formula for max-pods is ENI x (IP - 1) + 2. The +2 is for aws-node and kube-proxy, which are hostNetwork and use no IP, and is normal; anything larger means Karpenter set `maxPods` separately, or prefix delegation was turned on and then off.
+  measured: >
+    Measured on an EKS cluster: every node was exactly +2.
   suggest: "Set kubelet.maxPods in the Karpenter EC2NodeClass to the IP limit (x16 with prefix delegation), or enable prefix delegation to raise the IP limit."
   verify:
     - "kubectl get node <node> -o jsonpath='{.status.allocatable.pods}' ; aws ec2 describe-instance-types --instance-types <type> --query 'InstanceTypes[].NetworkInfo.[MaximumNetworkInterfaces,Ipv4AddressesPerInterface]'"
@@ -429,6 +432,7 @@
   symptom_linked: true
   why: >
     Nodes, pods, ENIs and LBs all draw from the same subnet IPs. When the subnet is empty, new nodes cannot start (Karpenter InsufficientFreeAddressesInSubnet) and existing nodes cannot refill their warm pool. A /24 has 251 usable addresses, which a few nodes exhaust.
+  measured: >
     Measured on a 7-node EKS cluster: two /24 subnets with 148 and 151 free (40% used) — still fine.
   cases:
     - { who: loveholidays 2020, url: https://deploy.live/blog/when-gke-ran-out-of-ip-addresses/ }
@@ -487,6 +491,7 @@
   symptom_linked: false
   why: >
     The default (WARM_ENI_TARGET=1) pre-allocates one ENI's worth of IPs per node (e.g. 9 on m5.large, 14 on r8gd.xlarge). Pod startup is fast, but the subnet loses nodes x ENI-size IPs to reservations. Fine if the subnet is roomy; if not, reduce reservations with WARM_IP_TARGET and MINIMUM_IP_TARGET.
+  measured: >
     Measured on a 7-node EKS cluster: 148 and 151 free in the subnets, so no warning.
   cases:
     - { who: Neon 2025, url: https://neon.com/blog/aws-cni-lessons-from-a-production-outage }
@@ -737,7 +742,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    aws-node exposes metrics on 61678 via hostNetwork, but the apiserver pod proxy is blocked by the node security group (measured: timeout). So it is read with curl from inside the node — nodes not registered in SSM or without SSH cannot be read, and their IP usage is the estimate "pods using an IP / computed limit".
+    aws-node exposes metrics on 61678 via hostNetwork. When the node security group blocks the apiserver pod proxy, it is read with curl from inside the node — nodes not registered in SSM or without SSH cannot be read, and their IP usage is the estimate "pods using an IP / computed limit".
+  measured: >
+    Measured on an EKS cluster: the pod proxy timed out.
   suggest: "Register with SSM (eks.ssm-unregistered) or install cni-metrics-helper (awscni_* to CloudWatch or Prometheus)."
   verify:
     - "kubectl get pods -n kube-system -l k8s-app=aws-node -o wide"
@@ -774,6 +781,84 @@
           nodes_near_ip_limit: []
           nodes_no_available_ip: []
           metrics_unavailable_nodes: []
+
+- id: vpccni.snat-port-randomization-off
+  name: Node SNAT does not use --random-fully for source ports: pods leaving the VPC race on conntrack inserts and connection setup shows 1 s and 3 s delays
+  area: traffic
+  type: summary
+  each: vpccni.summary
+  cluster_level: true
+  rule:
+    warn_expr: "'snat_port_mode' in item and item['snat_port_mode'] in ('sequential', 'random', 'unknown')"
+  target: "'cluster'"
+  evidence: "f\"VPC CNI {item.get('cni_version') or 'version unknown'}, AWS_VPC_K8S_CNI_RANDOMIZESNAT {item.get('randomize_snat') or 'unset'}, external SNAT {item.get('external_snat')}; SNAT source ports: {item.get('snat_port_mode')}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    With external SNAT off, every pod connection that leaves the VPC is rewritten by an iptables SNAT rule on the node to the node's IP and a source port. When several pods open connections at the same moment and the rule hands out ports in a predictable order, they race to insert the same conntrack entry and the loser's SYN is dropped. TCP retransmits it after 1 s, then 3 s, so connection setup to anything outside the VPC shows exact 1 s and 3 s steps in the latency distribution while the service itself answers fast. The race needs load, so it appears first in the busiest paths.
+    VPC CNI 1.4.0 added AWS_VPC_K8S_CNI_RANDOMIZESNAT with the default hashrandom, iptables --random, and 1.7.0 changed the default to prng, iptables --random-fully. The incident Prezi described in 2019 was this race on EKS; the fix they wanted, prng, was unavailable because their node image's iptables could not do --random-fully, so they turned external SNAT on instead and the delays stopped. The three states this check tells apart from the image version and the setting: sequential (none, or a CNI below 1.4.0), random (hashrandom, or the 1.4.0 to 1.6.x default) and random-fully (prng on 1.4.0 or newer, the default from 1.7.0). Only random-fully passes. The image version cannot show whether the node's iptables actually supports --random-fully; the CNI falls back to --random when it does not, so the node-side verify command is the final word. With external SNAT on there is no SNAT rule and this does not apply.
+  cases:
+    - { who: Prezi 2019, url: https://engineering.prezi.com/https-engineering-prezi-com-a-kubernetes-crime-story-2e8d75a77630 }
+  suggest: "Upgrade the VPC CNI add-on to a current version on a current node image and leave AWS_VPC_K8S_CNI_RANDOMIZESNAT at its default prng; then confirm --random-fully on a node with the verify command. If the value was set to none because a NACL filters on the ephemeral port range, widen the NACL: hashrandom has the same effect on ports as prng. Turning external SNAT on also removes the race, but that changes the egress path and needs a NAT gateway route in every node subnet; see vpccni.external-snat-off-with-private-routes."
+  verify:
+    - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{\"\\n\"}{end}' | grep -E 'amazon-k8s-cni|SNAT'"
+    - "on a node: sudo iptables -t nat -S | grep -- '-j SNAT'   # expect --random-fully on the SNAT rule"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
+          randomize_snat: "none"
+          cni_version: "1.19.0-eksbuild.1"
+          snat_port_mode: "sequential"
+      - expect: "warn"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
+          randomize_snat: null
+          cni_version: "1.6.3"
+          snat_port_mode: "random"
+      - expect: "warn"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
+          randomize_snat: "hashrandom"
+          cni_version: "1.19.0-eksbuild.1"
+          snat_port_mode: "random"
+      - expect: "warn"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
+          randomize_snat: null
+          cni_version: null
+          snat_port_mode: "unknown"
+      - expect: "pass"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
+          randomize_snat: "prng"
+          cni_version: "1.19.0-eksbuild.1"
+          snat_port_mode: "random-fully"
+      - expect: "pass"
+        item:
+          present: true
+          nodes: 3
+          external_snat: true
+          randomize_snat: "prng"
+          cni_version: "1.6.3"
+          snat_port_mode: "not-applicable"
+      - expect: "pass"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
 
 - id: vpccni.external-snat-off-with-private-routes
   name: Pod traffic to peered networks is SNATed to the node IP (external SNAT off while the VPC has peering, transit gateway or VPN routes)

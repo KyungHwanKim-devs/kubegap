@@ -6,7 +6,7 @@ from the snapshot plus the fragments in <snapshot>/llm/. This file never repeats
 Rules for this file:
 - Written for a person who runs the cluster and reads this once, top to bottom, in five minutes (daily) or fifteen (full). A busy reader stops after the Top N.
 - Speak about things, not about checks: name the namespace, workload, node. Check ids appear only on the one "Evidence checks" line under each problem.
-- Each problem has six parts in this order: Problem, Evidence, Cause, Action, Why this happens (principle / cases / read next), Evidence checks.
+- Each problem has six parts in this order: Problem, Evidence, Cause, Action, Why this happens (principle / cases / measured when this check was written, only when it bears on the problem / read next), Evidence checks.
 - Tone follows the report tone rules in references/report-writing.md section 8: conclusion first, one idea per sentence, plain words, polite register, numbers with units, no parenthetical asides.
 - No analogies. No invention: every number comes from the snapshot, every source in a learning point comes from the check definition or a primary document.
 - {{...}} are slots. <!-- --> comments are instructions; delete them before saving. Headings are English in the template; translate them when the report language is Korean, keep ids, paths, commands and names as they are.
@@ -18,7 +18,7 @@ Rules for this file:
 <!-- Three to five sentences: what this cluster is (platform, size, profile), whether anything is on fire right now, the one thing that changed since the previous run of this mode, and whether a full run is due (daily only). No numbers table here. -->
 
 ## The {{n_top}} problems to work on
-<!-- daily: 3, chosen as new or recurred first, then the persisting critical/high items with the largest impact. full: 5, chosen by severity × impact × difficulty; with an SLO, by error-budget burn. Dozens of findings with one cause are one problem. Order 1 = most urgent. -->
+<!-- daily: 3, chosen in this order: new or recurred items that still have impact now, then the persisting critical/high items with the largest impact, then events that have ended. An event has ended when its latest measurement is back under the threshold, such as the latest 1-hour p95 in a latency finding, or its last occurrence is before this collection window; when one is in the Top N, the title or the first Problem sentence says it is over. full: 5, chosen by severity × impact × difficulty; with an SLO, by error-budget burn. Dozens of findings with one cause are one problem. Order 1 = most urgent. -->
 
 ### 1. {{problem_1_title}}
 <!-- Title is a plain sentence about the thing, e.g. "15 prod apps can only run on one node, and that node rebooted yesterday" -->
@@ -32,7 +32,8 @@ Rules for this file:
 
 **Why this happens.**
 - Principle: {{problem_1_theory}} <!-- the principle behind it in one or two sentences (how the mechanism works, which operating rule it breaks: e.g. CPU limits are a ceiling enforced per 100 ms CFS period; HPA scales on request, not limit). No analogies. -->
-- Cases: {{problem_1_experience}} <!-- a public case, named with year and taken from the check's `cases`/`why`/`notes` or a primary document (Kubernetes docs, Google SRE Book chapter, a vendor postmortem). If the check definition carries none, write "No public case recorded for this check." Never invent a source or a URL. -->
+- Cases: {{problem_1_experience}} <!-- a public case, named with year and taken from the check's `cases` or a primary document (Kubernetes docs, Google SRE Book chapter, a vendor postmortem). Never from `why`, `notes` or `measured`. If the check carries none, write "No public case recorded for this check." and nothing else. Never invent a source or a URL. -->
+- Measured when this check was written: {{problem_1_measured}} <!-- optional: delete the line unless the check's `measured` records a failure or a number that bears on this problem. One or two sentences. It comes from the clusters the check was developed on, not this cluster, and is not a case. -->
 - Read next: {{problem_1_study}} <!-- two or three search terms or document sections a reader can look up to go deeper, e.g. "CFS quota and throttling (kernel sched-bwc), Kubernetes docs: Resource Management for Pods, Google SRE Book ch. 4 Service Level Objectives". Terms, not links, unless the link is in the check definition. -->
 
 Evidence checks: `{{problem_1_findings}}`
@@ -45,6 +46,7 @@ Evidence checks: `{{problem_1_findings}}`
 **Why this happens.**
 - Principle: …
 - Cases: …
+- Measured when this check was written: … <!-- optional -->
 - Read next: …
 
 Evidence checks: …

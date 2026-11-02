@@ -13,6 +13,7 @@
   symptom_linked: false
   why: >
     If the only Alertmanager dies, Prometheus accumulates send errors and no notifications go out. With emptyDir data, silences and alert group state are lost on restart, so alerts that were silenced fire again. The official recommendation is a 3-member gossip cluster. On a 2-node small k3s cluster this matters less.
+  measured: >
     Measured on real clusters: both the EKS cluster and the small k3s cluster ran 1 replica, cluster disabled, emptyDir, 120h retention.
   suggest: "alertmanager.alertmanagerSpec.replicas: 3 (the operator configures cluster peers automatically) + storage.volumeClaimTemplate."
   verify:
@@ -95,6 +96,7 @@
   symptom_linked: false
   why: >
     If the configuration in an AlertmanagerConfig CR or the secret is invalid, Alertmanager keeps running on the old config — you believe the new receivers and routes are active but they are not. Invalid alerts are alerts with bad labels (rule label template errors) that get dropped.
+  measured: >
     Measured on real clusters: reload succeeded and invalid 0 on both the EKS cluster and the small k3s cluster.
   suggest: "kubectl -n monitoring logs alertmanager-... -c alertmanager | grep -i 'error loading config'. Check the AlertmanagerConfig CR status and the operator logs."
   verify:
@@ -206,6 +208,7 @@
   symptom_linked: false
   why: >
     A receiver that is declared but not referenced by any route is the channel "we thought alerts went to" (a previous owner removed the route, or a matcher is wrong). Without inhibit rules, when a critical fires the warning/info alerts for the same cause fire with it and cause fatigue (kube-prometheus-stack ships 3 severity-hierarchy inhibits by default).
+  measured: >
     Measured on real clusters: EKS used all receivers (null plus two Slack channels), 4 inhibits → pass. Small k3s cluster used null and discord, 4 inhibits → pass.
   suggest: "Delete unused receivers or attach a route. Start inhibits with the severity hierarchy (critical → warning|info, same namespace and alertname)."
   verify:
@@ -318,6 +321,7 @@
   symptom_linked: false
   why: >
     If thousands of firing alerts arrive per day and 0 went out through any integration (slack, email, webhook), then everything goes to the null receiver (null default receiver — core alertmanager-default-null), everything is swallowed by silences/inhibits, or the receiver configuration is broken. Either way nobody sees the alerts.
+  measured: >
     Measured on real clusters: EKS received firing 17,625 / resolved 1,915 and sent slack 9 → pass (repeated alerts such as Watchdog are grouped, so few go out). Small k3s cluster slack 27 → pass.
   suggest: "Review the route tree and the default receiver (core observability.alertmanager-default-null). Use amtool config routes test --config.file=... to check where sample labels end up."
   verify:

@@ -8,7 +8,7 @@
 - The YAML files here are read by `lib/yamlite.py`, which supports only a subset of YAML; the subset is listed at the top of [`lib/yamlite.py`](lib/yamlite.py). Anchors, aliases, tags and plain strings continued on the next line raise an error with the line number. Keep a plain string on one line, or use a `>` block or quotes for long text.
 - Unit tests live in `tests/` (pytest; the YAML parser, rubric resolution, snapshot diff, platform detection and the evaluate helpers); add a test when you touch `lib/`.
 - Open a pull request against `main` from a branch; one topic per pull request, with a short description of what changed and why. Everything below must pass before you submit.
-- When a parser needs the value of a ConfigMap key, add that key to `KEEP_VALUES` in `lib/scrub.py`. Every other ConfigMap value is replaced by its length and shape before the snapshot is written, so the parser would otherwise see a dict.
+- When a parser needs the value of a ConfigMap key, add that key to `KEEP_VALUES` in `lib/scrub.py`. Every other ConfigMap value is replaced by its length and shape before the snapshot is written, so the parser would otherwise see a dict. The same happens to the two annotations that carry a copy of the object, `kubectl.kubernetes.io/last-applied-configuration` and `objectset.rio.cattle.io/applied`.
 - When a node command changes (`collectors/*/collect.yaml` `type: node` or `type: pod-metrics` steps, the scripts they name, the probes in `lib/nodecommands.py`), regenerate the two files a test compares against: `scripts/kubegap node-commands --markdown > deploy/node-access/COMMANDS.md` and `scripts/kubegap node-commands --ssm-document > deploy/permissions/ssm-document.yaml`.
 
 ```bash
