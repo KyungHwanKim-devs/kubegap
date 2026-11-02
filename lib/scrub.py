@@ -9,7 +9,10 @@ credential is not written to disk at all. Masking after the fact only catches sh
   Argo CD flags), listed in KEEP_VALUES below. Two Argo CD keys that can carry a client secret are reduced to "present";
   the RBAC policy to its line count. Before the values go, they are inspected once for secret-like keys (the rule of
   `security.plaintext-configmap-secret`) and the resulting key names are stored under `kubegap_scrub`, so the check works
-  without the values. Component detection in lib/discover runs on the in-memory objects before this scrub.
+  without the values. Two annotations carry a copy of the whole object, `data` included: kubectl's
+  `kubectl.kubernetes.io/last-applied-configuration` (plain JSON) and the k3s helm-controller's `objectset.rio.cattle.io/applied`
+  (gzip, base64). Their values are replaced by length and shape too; the keys stay, so "applied with kubectl" remains visible.
+  Component detection in lib/discover runs on the in-memory objects before this scrub.
 
 Both writers (lib/discover for the kinds it fetches, lib/collect dump-all for the rest) call `scrub_objects`.
 """
@@ -36,6 +39,8 @@ KEEP_VALUES: list[tuple[str, str, tuple[str, ...]]] = [
 # Keys whose value is reduced to the string "present" (they can embed an OIDC client secret) or to "<n lines>".
 PRESENCE_ONLY = [("argocd", "argocd-cm", ("dex.config", "oidc.config"))]
 LINE_COUNT_ONLY = [("argocd", "argocd-rbac-cm", ("policy.csv",))]
+# Annotations whose value is a copy of the object, so a ConfigMap's data would survive in them after `data` is scrubbed.
+COPY_ANNOTATIONS = ("kubectl.kubernetes.io/last-applied-configuration", "objectset.rio.cattle.io/applied")
 
 # Secret-like key detection, moved here from lib/security.py so it can run before the values are dropped.
 SECRET_ENV_RE = re.compile(r"(PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_?KEY|ACCESS_KEY|CLIENT_SECRET|DSN|CONNECTION_STRING)", re.IGNORECASE)
@@ -106,6 +111,13 @@ def scrub_configmap(cm: dict) -> dict:
     lines = _keys_for(LINE_COUNT_ONLY, ns, name)
     chars = sum(len(str(v)) for v in data.values()) + sum(len(str(v)) for v in binary.values())
     found = secret_like_keys(data)
+    ann = meta.get("annotations") or {}
+    dropped_ann = []
+    for k in COPY_ANNOTATIONS:
+        if k in ann:
+            found = list(dict.fromkeys(found + _secret_like_in_applied(ann[k])))[:8]
+            ann[k] = {"len": len(str(ann[k])), "shape": shape(ann[k])}
+            dropped_ann.append(k)
     new_data: dict = {}
     for k, v in data.items():
         if k in keep:
@@ -120,8 +132,28 @@ def scrub_configmap(cm: dict) -> dict:
         cm["data"] = new_data
     if binary:
         cm["binaryData"] = {k: {"len": len(str(v))} for k, v in binary.items()}
-    cm[MARK] = {"values_dropped": True, "kept_keys": sorted(k for k in data if k in keep), "data_chars": chars, "secret_like_keys": found}
+    cm[MARK] = {"values_dropped": True, "kept_keys": sorted(k for k in data if k in keep), "data_chars": chars, "secret_like_keys": found, "annotations_dropped": dropped_ann}
     return cm
+
+
+def _secret_like_in_applied(value) -> list[str]:
+    """Secret-like keys in the `data` of an applied-object copy (plain JSON, or gzip+base64 as the k3s helm-controller writes it). Values are inspected, never returned."""
+    import base64
+    import gzip
+    import json
+
+    text = str(value)
+    if text.startswith("H4sI"):
+        try:
+            text = gzip.decompress(base64.b64decode(text)).decode("utf-8", "replace")
+        except Exception:
+            return []
+    try:
+        obj = json.loads(text)
+    except ValueError:
+        return []
+    d = obj.get("data") if isinstance(obj, dict) else None
+    return secret_like_keys(d if isinstance(d, dict) else {})
 
 
 def scrub_objects(obj):
@@ -131,6 +163,10 @@ def scrub_objects(obj):
         if isinstance(kind, str) and kind in SECRET_KINDS:
             obj.pop("data", None)
             obj.pop("stringData", None)
+            ann = (obj.get("metadata") or {}).get("annotations") or {}
+            for k in COPY_ANNOTATIONS:  # a kubectl-applied Secret would keep its values in the copy annotation; Secrets are never fetched, this is the defensive path
+                if k in ann:
+                    ann[k] = {"len": len(str(ann[k])), "shape": shape(ann[k])}
         elif isinstance(kind, str) and kind in CONFIGMAP_KINDS:
             scrub_configmap(obj)
             return obj
