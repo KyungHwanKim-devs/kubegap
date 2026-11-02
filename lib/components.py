@@ -39,7 +39,12 @@ COMPONENTS: list[dict] = [
     {
         "name": "ingress-nginx",
         "family": "ingress",
-        "any": [{"deployment": "*/*ingress-nginx-controller*"}, {"daemonset": "*/*ingress-nginx-controller*"}, {"image": "ingress-nginx/controller"}],
+        "any": [
+            {"deployment": "*/*ingress-nginx-controller*"},
+            {"daemonset": "*/*ingress-nginx-controller*"},
+            {"image": "ingress-nginx/controller"},
+            {"image": "nginx-ingress-controller"},
+        ],  # the second image is the Bitnami build of the same controller; lib/traffic._nginx matches the same two
     },  # the Helm release name is prefixed (e.g. nginx-ingress-ingress-nginx-controller)
     {"name": "traefik", "family": "ingress", "any": [{"deployment": "*/traefik*"}, {"daemonset": "*/traefik*"}, {"crd": "ingressroutes.traefik.io"}, {"crd": "ingressroutes.traefik.containo.us"}]},
     {"name": "metallb", "family": "loadbalancer", "any": [{"crd": "ipaddresspools.metallb.io"}, {"daemonset": "*/metallb-speaker*"}, {"daemonset": "*/speaker"}]},
