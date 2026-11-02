@@ -16535,6 +16535,121 @@
           note: "DB port open on an external address"
       - expect: "none"
 
+- id: traffic.ingress-nginx-vulnerable-version
+  name: ingress-nginx controller below the IngressNightmare fix (CVE-2025-1974): any pod that reaches the admission webhook can read every Secret
+  area: traffic
+  type: summary
+  each: traffic.nginx
+  cluster_level: true
+  rule:
+    expr: "item.get('present') and item['vulnerable'] is True and item['admission_webhook']"
+    warn_expr: "item.get('present') and item['vulnerable'] is not False"  # None = version unknown from the image: not cleared, so warn
+  target: "'cluster'"
+  evidence: "f\"ingress-nginx {item['version'] or 'version unknown'} ({', '.join(c['kind'] + ' ' + c['namespace'] + '/' + c['name'] for c in item['controllers'])}){'; no version in the image tag of ' + ', '.join(item['unknown_version_controllers']) if item['unknown_version_controllers'] else ''}; fixed in {' and '.join(item['fixed_versions'])}; admission webhook {'on' if item['admission_webhook'] else 'off'}{', failurePolicy ' + str(item['admission_webhooks'][0]['failure_policy']) if item['admission_webhooks'] else ''}\""
+  severity_default: high
+  symptom_linked: false
+  why: >
+    IngressNightmare is CVE-2025-1974, scored 9.8, together with four more CVEs in the ingress-nginx admission webhook, disclosed in March 2025. The webhook validates Ingress objects and is reachable over the network without authentication, so any pod in the cluster that can open a connection to it can inject NGINX configuration and run code in the controller pod. That pod's service account reads Secrets in every namespace, so the result is cluster takeover. The fix shipped in 1.12.1 and 1.11.5; every earlier version is exposed. When the admission webhook is disabled the injection path is closed, which is why this check only warns then. A controller whose image carries no version in its tag cannot be cleared and also warns.
+    The project is retired since March 2026 and will not fix anything newer; traffic.ingress-nginx-retired covers that.
+  cases:
+    - { who: Wiz 2025, url: https://www.wiz.io/blog/ingress-nginx-kubernetes-vulnerabilities }
+  suggest: "Upgrade the controller to 1.12.1 or newer today; 1.11.5 if the 1.11 line must stay. Until then, disable the admission webhook (Helm: controller.admissionWebhooks.enabled=false, or remove the --validating-webhook argument and the ingress-nginx-admission ValidatingWebhookConfiguration) or add a NetworkPolicy that lets only the API server reach the controller's webhook port 8443. Re-enable the webhook after the upgrade."
+  verify:
+    - "kubectl get deploy,ds -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{\" \"}{.spec.template.spec.containers[0].image}{\"\\n\"}{end}' | grep -E 'ingress-nginx/controller|nginx-ingress-controller'"
+    - "kubectl get validatingwebhookconfigurations -o name | grep ingress-nginx"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "fail"
+        item:
+          present: true
+          controllers: [{kind: "Deployment", namespace: "ingress-nginx", name: "ingress-nginx-controller", image: "registry.k8s.io/ingress-nginx/controller:v1.12.0", version: "1.12.0", replicas: 2, ready: 2, webhook_arg: true}]
+          version: "1.12.0"
+          versions: ["1.12.0"]
+          unknown_version_controllers: []
+          admission_webhook: true
+          admission_webhooks: [{configuration: "ingress-nginx-admission", failure_policy: "Fail"}]
+          vulnerable: true
+          fixed_versions: ["1.12.1", "1.11.5"]
+          retired: true
+          metrics_available: true
+      - expect: "warn"
+        item:
+          present: true
+          controllers: [{kind: "Deployment", namespace: "ingress-nginx", name: "ingress-nginx-controller", image: "registry.k8s.io/ingress-nginx/controller:v1.11.4", version: "1.11.4", replicas: 2, ready: 2, webhook_arg: false}]
+          version: "1.11.4"
+          versions: ["1.11.4"]
+          unknown_version_controllers: []
+          admission_webhook: false
+          admission_webhooks: []
+          vulnerable: true
+          fixed_versions: ["1.12.1", "1.11.5"]
+          retired: true
+          metrics_available: false
+      - expect: "pass"
+        item:
+          present: true
+          controllers: [{kind: "Deployment", namespace: "ingress-nginx", name: "ingress-nginx-controller", image: "registry.k8s.io/ingress-nginx/controller:v1.14.0", version: "1.14.0", replicas: 2, ready: 2, webhook_arg: true}]
+          version: "1.14.0"
+          versions: ["1.14.0"]
+          unknown_version_controllers: []
+          admission_webhook: true
+          admission_webhooks: [{configuration: "ingress-nginx-admission", failure_policy: "Fail"}]
+          vulnerable: false
+          fixed_versions: ["1.12.1", "1.11.5"]
+          retired: true
+          metrics_available: true
+      - expect: "warn"
+        item:
+          present: true
+          controllers: [{kind: "Deployment", namespace: "ingress-nginx", name: "ingress-nginx-controller", image: "registry.k8s.io/ingress-nginx/controller", version: null, replicas: 2, ready: 2, webhook_arg: true}]
+          version: null
+          versions: []
+          unknown_version_controllers: ["ingress-nginx/ingress-nginx-controller (registry.k8s.io/ingress-nginx/controller)"]
+          admission_webhook: true
+          admission_webhooks: []
+          vulnerable: null
+          fixed_versions: ["1.12.1", "1.11.5"]
+          retired: true
+          metrics_available: false
+
+- id: traffic.ingress-nginx-retired
+  name: ingress-nginx is retired: no further releases or security fixes, plan the move to a Gateway API implementation
+  area: traffic
+  type: summary
+  each: traffic.nginx
+  cluster_level: true
+  rule:
+    warn_expr: "item.get('present') and item['retired']"
+  target: "'cluster'"
+  evidence: "f\"ingress-nginx {item['version'] or 'version unknown'} ({', '.join(c['kind'] + ' ' + c['namespace'] + '/' + c['name'] for c in item['controllers'])}); {item['retired_note']}; admission webhook {'on' if item['admission_webhook'] else 'off'}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    Kubernetes SIG Network and the Security Response Committee announced in November 2025 that ingress-nginx would receive best-effort maintenance until March 2026 and then stop: no further releases, no bug fixes, and no updates for any security vulnerability discovered afterwards. The repository was archived on 2026-03-24. Existing deployments keep working, but the component that terminates traffic from the internet now has no one to patch it, and ingress-nginx had a 9.8 vulnerability as recently as March 2025. The project README says not to deploy it anew and to pick a Gateway API implementation instead; the announcement asks to begin the migration immediately.
+    This is a planning finding, not an outage: the warning stays until the controller is gone, so the migration has an owner and a date.
+  suggest: "Choose a Gateway API implementation (Envoy Gateway, Cilium, Istio, NGINX Gateway Fabric, or the cloud provider's) and migrate the Ingress objects; the ingress2gateway tool converts most of them. Until the migration, restrict who can reach the controller's admission webhook with a NetworkPolicy and keep the last release, 1.15.1, which is the final one."
+  verify:
+    - "kubectl get deploy,ds -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{\" \"}{.spec.template.spec.containers[0].image}{\"\\n\"}{end}' | grep -E 'ingress-nginx/controller|nginx-ingress-controller'"
+    - "kubectl get gatewayclasses"
+  profiles: [prod, lab]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          controllers: [{kind: "Deployment", namespace: "ingress-nginx", name: "ingress-nginx-controller", image: "registry.k8s.io/ingress-nginx/controller:v1.14.0", version: "1.14.0", replicas: 2, ready: 2, webhook_arg: true}]
+          version: "1.14.0"
+          versions: ["1.14.0"]
+          unknown_version_controllers: []
+          admission_webhook: true
+          admission_webhooks: []
+          vulnerable: false
+          fixed_versions: ["1.12.1", "1.11.5"]
+          retired: true
+          retired_note: "ingress-nginx: best-effort maintenance ended March 2026, repository archived 2026-03-24, no further security fixes"
+          metrics_available: true
+
 - id: traffic.external-exposure
   name: Externally exposed admin console without an authentication annotation (manual check needed)
   area: traffic
