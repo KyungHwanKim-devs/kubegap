@@ -3,7 +3,7 @@
 
 It reads only what kubegap's YAML needs (checks.yaml, config.yaml, profiles, signatures.yaml). Supported subset:
 - block mappings and block sequences by indentation (spaces only), mappings inside sequence items starting with `- key: value`, nested `- - x`
-- a sequence at the same indent as its parent key (`key:` followed by `- a` on the next line)
+- a sequence at the same indent as its parent key (`key:` followed by `- a` on the next line), and a scalar on the line after `key:` or `-`
 - single-line flow collections `{ a: 1, b: [x, y] }`, `[a, b]` (nesting allowed, must close on the same line)
 - block scalars `|` and `>` with chomping indicators `-` (strip) and `+` (keep); without an indicator one trailing newline is kept (clip)
 - quoted scalars 'single' (with '' escape) and "double" (with \\n \\t \\" \\\\ escapes); a quoted scalar may continue on following lines until the closing quote
@@ -327,6 +327,8 @@ class _Parser:
                 raise YamlError(f"line {ln}: mapping indentation mismatch ({ind} > {indent})")
             if content.startswith("- "):
                 return out, idx
+            if content[0] in "&*!":  # parse_scalar rejects these in values; on a key they would become part of the key name
+                raise YamlError(f"line {ln}: anchors, aliases and tags are not supported: {content!r}")
             kv = _split_key(content)
             if kv is None:
                 raise YamlError(f"line {ln}: not a `key: value` entry: {content!r} (multi-line plain strings are not supported; use `>`)")
@@ -342,6 +344,9 @@ class _Parser:
     def _nested_or_null(self, idx: int, indent: int) -> tuple[Any, int]:
         j = self._skip_blank(idx)
         if j < len(self.lines) and self.lines[j][0] > indent:
+            content = self.lines[j][1]
+            if _split_key(content) is None and not (content.startswith("- ") or content == "-"):
+                return self._inline_value(content, j, indent)  # a scalar on the line after `key:` or `-`
             return self.parse_block(j, self.lines[j][0])
         # a `- ` list at the same indent on the line after `key:` (allowed by YAML)
         if j < len(self.lines) and self.lines[j][0] == indent and self.lines[j][1].startswith("- "):
@@ -383,9 +388,16 @@ class _Parser:
             except YamlError as e:
                 raise YamlError(f"line {ln}: {e}") from None
         try:
-            return parse_scalar(rest), idx + 1
+            value = parse_scalar(rest)
         except YamlError as e:
             raise YamlError(f"line {ln}: {e}") from None
+        # a deeper line after a plain scalar continues it (YAML folds the lines into one string); say so instead of "indentation mismatch".
+        # A deeper `key: value` line is not a continuation in YAML either, so it keeps the indentation error.
+        nxt = self._skip_blank(idx + 1)
+        if rest[0] not in "'\"[{" and nxt < len(self.lines) and self.lines[nxt][0] > indent and _split_key(self.lines[nxt][1]) is None:
+            n, text = self.lines[nxt][2], self.lines[nxt][1]
+            raise YamlError(f"line {n}: {text!r} continues the plain scalar on line {ln}; multi-line plain scalars are not supported, use `>` or quotes")
+        return value, idx + 1
 
     def _block_scalar(self, header: str, idx: int, indent: int) -> tuple[str, int]:
         style, chomp = header[0], header[1:2]
