@@ -121,6 +121,7 @@ def _alb(snap: Path, objs: _Objects) -> dict:
                     "elb_5xx_ratio_24h": round((g("HTTPCode_ELB_5XX_Count_Sum") or 0) / req, 5) if req else None,
                     "p95_s_max_1h": g("TargetResponseTime_p95", "max"),
                     "p95_s_avg": g("TargetResponseTime_p95", "avg"),
+                    "p95_s_last_1h": g("TargetResponseTime_p95", "last"),
                     "p99_s_max_1h": g("TargetResponseTime_p99", "max"),
                     "rejected_connections_24h": g("RejectedConnectionCount_Sum") or 0,
                     "requests_peak_1h": g("RequestCount_Sum", "max"),
@@ -165,6 +166,7 @@ def _alb(snap: Path, objs: _Objects) -> dict:
             "target_5xx_ratio_24h": round((g("HTTPCode_Target_5XX_Count_Sum") or 0) / req, 5) if req else None,
             "p95_s_max_1h": g("TargetResponseTime_p95", "max"),
             "p95_s_avg": g("TargetResponseTime_p95", "avg"),
+            "p95_s_last_1h": g("TargetResponseTime_p95", "last"),
             "unhealthy_max_24h": g("UnHealthyHostCount_Maximum", "max"),
             "healthy_min_24h": g("HealthyHostCount_Minimum", "min"),
             "requests_per_target_24h": g("RequestCountPerTarget_Sum"),
@@ -233,6 +235,7 @@ def _ingresses(snap: Path, objs: _Objects, alb: dict) -> list[dict]:
                 "errors_ratio": round(e5 / req, 5) if req else None,
                 "p95_s_max_1h": max((t.get("p95_s_max_1h") or 0) for t in tgs) or None,
                 "p95_s_avg": max((t.get("p95_s_avg") or 0) for t in tgs) or None,
+                "p95_s_last_1h": max((t.get("p95_s_last_1h") or 0) for t in tgs) or None,
                 "unhealthy_max_24h": max((t.get("unhealthy_max_24h") or 0) for t in tgs),
                 "unhealthy_now": sum(len(t.get("targets_unhealthy") or []) for t in tgs),
                 "target_groups": [t["name"] for t in tgs],
@@ -247,6 +250,7 @@ def _ingresses(snap: Path, objs: _Objects, alb: dict) -> list[dict]:
                 "errors_ratio": round(nginx_5xx.get((ns, name), 0), 5),
                 "p95_s_avg": nginx_p95.get((ns, name)),
                 "p95_s_max_1h": nginx_p95.get((ns, name)),
+                "p95_s_last_1h": nginx_p95.get((ns, name)),
             }
         ep = [objs.endpoints_ready.get((ns, s)) for s in services]
         rows.append(
