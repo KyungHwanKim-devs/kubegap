@@ -16,6 +16,10 @@
     VPC CNI gives each pod a VPC IP as a secondary IP on an ENI. The instance type decides how many IPs a node can hold (ENIs x (IPv4 per ENI - 1)). Once they are used up, new pods stall in ContainerCreating with "failed to assign an IP address" — the most common EKS trap.
     `no_available_ip_events` is how many times ipamd answered "no IP to give" (cumulative since the process started), so any non-zero value means it has already happened at least once. ENIs attached up to the limit (eni_at_max) is normal with WARM_ENI_TARGET=1, so it is not a judgement axis — 4 or fewer remaining IPs (ip_headroom) or 75% usage is warn. max-pods exceeding the IP limit by 2 is normal: that is the hostNetwork pods' share.
     Measured on a 7-node EKS cluster: an r8gd.xlarge node at ENI 4/4 and IP 42/56 had 4 'no available IP' events. Its max-pods was 58 while IPs stop at 56, so kubelet sees room and the CNI refuses.
+  cases:
+    - { who: Neon 2025, url: https://neon.com/blog/aws-cni-lessons-from-a-production-outage }
+    - { who: Adevinta 2024, url: https://adevinta.com/techblog/how-we-avoided-an-outage-caused-by-running-out-of-ips-in-eks/ }
+    - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-21-vpc-cni-not-allocating-ip-addresses.html }
   suggest: "(1) prefix delegation (ENABLE_PREFIX_DELEGATION=true, /28 prefixes give 16x the IPs) — works immediately on nitro instances. (2) Or spread pods across nodes (topologySpread) and tune the Karpenter consolidation that packs them onto one large node. (3) Set max-pods below the IP limit."
   verify:
     - "on the node: curl -s localhost:61678/metrics | grep -E 'awscni_(assigned_ip_addresses|total_ip_addresses|eni_max|no_available_ip_addresses)'"
@@ -314,6 +318,8 @@
   why: >
     Prefix delegation attaches a /28 prefix (16 IPs) to one ENI secondary IP slot, raising pod IPs per node 16x. On nitro instances (all recent generations) it is a single setting, and the subnet needs contiguous /28 space.
     If node IPs are more than half used or 'no available IP' has occurred, this setting is the cheapest fix. Note that it reserves the subnet in /28 units per node, so small subnets (/24) run out faster — read together with subnet free IPs (vpccni.subnet-ips-low).
+  cases:
+    - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-21-vpc-cni-not-allocating-ip-addresses.html }
   suggest: "Set ENABLE_PREFIX_DELEGATION=true and WARM_PREFIX_TARGET=1 on aws-node (via add-on configurationValues). It applies to new nodes only, so it takes effect as Karpenter replaces nodes. Raise max-pods as well."
   verify:
     - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 PREFIX"
@@ -424,6 +430,10 @@
   why: >
     Nodes, pods, ENIs and LBs all draw from the same subnet IPs. When the subnet is empty, new nodes cannot start (Karpenter InsufficientFreeAddressesInSubnet) and existing nodes cannot refill their warm pool. A /24 has 251 usable addresses, which a few nodes exhaust.
     Measured on a 7-node EKS cluster: two /24 subnets with 148 and 151 free (40% used) — still fine.
+  cases:
+    - { who: loveholidays 2020, url: https://deploy.live/blog/when-gke-ran-out-of-ip-addresses/ }
+    - { who: Neon 2025, url: https://neon.com/blog/aws-cni-lessons-from-a-production-outage }
+    - { who: Adevinta 2024, url: https://adevinta.com/techblog/how-we-avoided-an-outage-caused-by-running-out-of-ips-in-eks/ }
   suggest: "A subnet cannot be widened; instead attach a secondary CIDR to the VPC and use custom networking (ENIConfig) to place only pods there. Or tidy per-node reservations with prefix delegation."
   verify:
     - "aws ec2 describe-subnets --subnet-ids <id> --query 'Subnets[].AvailableIpAddressCount'"
@@ -478,6 +488,8 @@
   why: >
     The default (WARM_ENI_TARGET=1) pre-allocates one ENI's worth of IPs per node (e.g. 9 on m5.large, 14 on r8gd.xlarge). Pod startup is fast, but the subnet loses nodes x ENI-size IPs to reservations. Fine if the subnet is roomy; if not, reduce reservations with WARM_IP_TARGET and MINIMUM_IP_TARGET.
     Measured on a 7-node EKS cluster: 148 and 151 free in the subnets, so no warning.
+  cases:
+    - { who: Neon 2025, url: https://neon.com/blog/aws-cni-lessons-from-a-production-outage }
   suggest: "Only when the subnet is tight: WARM_IP_TARGET=5, MINIMUM_IP_TARGET=10 or so. With prefix delegation, WARM_PREFIX_TARGET=1 is the default and these settings are ignored."
   verify:
     - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 -E 'WARM|MINIMUM'"

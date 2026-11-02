@@ -1154,6 +1154,8 @@
   why: >
     kube-proxy drops packets that conntrack judges INVALID (default since 1.29). A high count points to asymmetric routing (the reply leaves via another node), conntrack expiry of long-lived connections (tcpEstablishedTimeout), or NAT overlapping with the CNI. Apps see it as intermittent connection resets.
     Measured on a real EKS cluster: 1,038 packets in one hour on a single node.
+  cases:
+    - { who: Backpackr 2025, url: https://aws.amazon.com/ko/blogs/tech/optimizing-amazon-eks-journey-of-backpackr-part1 }
   suggest: "On that node, use conntrack -L to see the peers of the INVALID flows; for long-lived connections, set the app keep-alive interval shorter than the conntrack timeout. Also check NLB/ALB preserve-client-ip and asymmetric paths."
   verify:
     - "sum by (instance) (increase(kubeproxy_iptables_ct_state_invalid_dropped_packets_total[1h]))"

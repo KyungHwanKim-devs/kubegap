@@ -2614,6 +2614,10 @@
   why: >
     Docker Hub limits anonymous pulls to 100 per IP per hour (stricter since 2024-12). When nodes are replaced (Karpenter) or many pods start on one node, the pulls pouring through the same NAT IP get 429 and pods land in ImagePullBackOff — the Docker Hub outages (2020, 2023) caused restart failures of this shape (Datadog 2019). An ECR pull-through cache rule caches docker.io, quay.io and ghcr.io in ECR so pulls stay inside the VPC.
     Measured on a real EKS cluster: docker.io 31, quay.io 23, ghcr.io 9 containers, 0 pull-through rules.
+  cases:
+    - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-01-11-cluster-image-pull.html }
+    - { who: Target 2018, url: https://www.youtube.com/watch?v=V0DVkrHf08k }
+    - { who: Datadog 2019, url: https://www.youtube.com/watch?v=QKI-JRs2RIE }
   suggest: "aws ecr create-pull-through-cache-rule --ecr-repository-prefix docker-hub --upstream-registry-url registry-1.docker.io --credential-arn <Docker Hub credentials in Secrets Manager>, then point image references at <acct>.dkr.ecr.<region>.amazonaws.com/docker-hub/<img>. Or use global.imageRegistry in Helm values."
   verify:
     - "aws ecr describe-pull-through-cache-rules"
@@ -3245,6 +3249,11 @@
   why: >
     A pull failure is one of four things: registry authentication (ECR token expiring after 12 hours, IRSA permissions), missing tag (CI has not pushed yet), rate limit (Docker Hub) or network (NAT, no VPC endpoint). kubelet's PullImage metrics are dropped by the default kube-prometheus-stack configuration, so only events (1-hour retention) are used — 0 does not mean "none happened".
     Measured on real clusters: 0 on both EKS and the small k3s cluster.
+  cases:
+    - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-01-11-cluster-image-pull.html }
+    - { who: Airbnb 2020, url: https://www.youtube.com/watch?v=4CT0cI62YHk }
+    - { who: Airbnb 2019, url: https://www.youtube.com/watch?v=FrQ8Lwm9_j8 }
+    - { who: Datadog 2019, url: https://www.youtube.com/watch?v=QKI-JRs2RIE }
   suggest: "Classify by the message in the Events of kubectl describe pod <pod> (401 Unauthorized, manifest unknown, toomanyrequests, i/o timeout)."
   verify:
     - "kubectl get events -A --field-selector reason=Failed | grep -i pull"
