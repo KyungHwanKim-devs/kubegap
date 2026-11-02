@@ -15,6 +15,7 @@
   why: >
     VPC CNI gives each pod a VPC IP as a secondary IP on an ENI. The instance type decides how many IPs a node can hold (ENIs x (IPv4 per ENI - 1)). Once they are used up, new pods stall in ContainerCreating with "failed to assign an IP address" — the most common EKS trap.
     `no_available_ip_events` is how many times ipamd answered "no IP to give" (cumulative since the process started), so any non-zero value means it has already happened at least once. ENIs attached up to the limit (eni_at_max) is normal with WARM_ENI_TARGET=1, so it is not a judgement axis — 4 or fewer remaining IPs (ip_headroom) or 75% usage is warn. max-pods exceeding the IP limit by 2 is normal: that is the hostNetwork pods' share.
+  measured: >
     Measured on a 7-node EKS cluster: an r8gd.xlarge node at ENI 4/4 and IP 42/56 had 4 'no available IP' events. Its max-pods was 58 while IPs stop at 56, so kubelet sees room and the CNI refuses.
   cases:
     - { who: Neon 2025, url: https://neon.com/blog/aws-cni-lessons-from-a-production-outage }
@@ -219,7 +220,9 @@
   symptom_linked: false
   why: >
     kubelet's max-pods is the number of slots the scheduler sees; the CNI's IP limit is what can actually be handed out. If the former is larger, the scheduler sends pods, the CNI refuses, and pods stall in ContainerCreating (a difference equal to the hostNetwork pods that use no IP is fine).
-    The EKS-optimized AMI formula for max-pods is ENI x (IP - 1) + 2. The +2 is for aws-node and kube-proxy, which are hostNetwork and use no IP, and is normal (measured: every node was exactly +2); anything larger means Karpenter set `maxPods` separately, or prefix delegation was turned on and then off.
+    The EKS-optimized AMI formula for max-pods is ENI x (IP - 1) + 2. The +2 is for aws-node and kube-proxy, which are hostNetwork and use no IP, and is normal; anything larger means Karpenter set `maxPods` separately, or prefix delegation was turned on and then off.
+  measured: >
+    Measured on an EKS cluster: every node was exactly +2.
   suggest: "Set kubelet.maxPods in the Karpenter EC2NodeClass to the IP limit (x16 with prefix delegation), or enable prefix delegation to raise the IP limit."
   verify:
     - "kubectl get node <node> -o jsonpath='{.status.allocatable.pods}' ; aws ec2 describe-instance-types --instance-types <type> --query 'InstanceTypes[].NetworkInfo.[MaximumNetworkInterfaces,Ipv4AddressesPerInterface]'"
@@ -429,6 +432,7 @@
   symptom_linked: true
   why: >
     Nodes, pods, ENIs and LBs all draw from the same subnet IPs. When the subnet is empty, new nodes cannot start (Karpenter InsufficientFreeAddressesInSubnet) and existing nodes cannot refill their warm pool. A /24 has 251 usable addresses, which a few nodes exhaust.
+  measured: >
     Measured on a 7-node EKS cluster: two /24 subnets with 148 and 151 free (40% used) — still fine.
   cases:
     - { who: loveholidays 2020, url: https://deploy.live/blog/when-gke-ran-out-of-ip-addresses/ }
@@ -487,6 +491,7 @@
   symptom_linked: false
   why: >
     The default (WARM_ENI_TARGET=1) pre-allocates one ENI's worth of IPs per node (e.g. 9 on m5.large, 14 on r8gd.xlarge). Pod startup is fast, but the subnet loses nodes x ENI-size IPs to reservations. Fine if the subnet is roomy; if not, reduce reservations with WARM_IP_TARGET and MINIMUM_IP_TARGET.
+  measured: >
     Measured on a 7-node EKS cluster: 148 and 151 free in the subnets, so no warning.
   cases:
     - { who: Neon 2025, url: https://neon.com/blog/aws-cni-lessons-from-a-production-outage }
@@ -737,7 +742,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    aws-node exposes metrics on 61678 via hostNetwork, but the apiserver pod proxy is blocked by the node security group (measured: timeout). So it is read with curl from inside the node — nodes not registered in SSM or without SSH cannot be read, and their IP usage is the estimate "pods using an IP / computed limit".
+    aws-node exposes metrics on 61678 via hostNetwork. When the node security group blocks the apiserver pod proxy, it is read with curl from inside the node — nodes not registered in SSM or without SSH cannot be read, and their IP usage is the estimate "pods using an IP / computed limit".
+  measured: >
+    Measured on an EKS cluster: the pod proxy timed out.
   suggest: "Register with SSM (eks.ssm-unregistered) or install cni-metrics-helper (awscni_* to CloudWatch or Prometheus)."
   verify:
     - "kubectl get pods -n kube-system -l k8s-app=aws-node -o wide"

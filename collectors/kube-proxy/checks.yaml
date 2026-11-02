@@ -12,7 +12,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    The default kube-proxy metricsBindAddress is 127.0.0.1:10249, so Prometheus cannot scrape it from outside the node — all kube-proxy targets down in kube-prometheus-stack is the most common "red target". The EKS add-on changes it to 0.0.0.0 (measured: 7/7 up on a 7-node EKS cluster); on k3s the kube-proxy metrics are mixed into the kubelet scrape and are visible without a job.
+    The default kube-proxy metricsBindAddress is 127.0.0.1:10249, so Prometheus cannot scrape it from outside the node — all kube-proxy targets down in kube-prometheus-stack is the most common "red target". The EKS add-on changes it to 0.0.0.0; on k3s the kube-proxy metrics are mixed into the kubelet scrape and are visible without a job.
+  measured: >
+    Measured on a 7-node EKS cluster: 7/7 up.
   suggest: "EKS: set metricsBindAddress 0.0.0.0:10249 via the add-on configurationValues or the kube-proxy-config ConfigMap. kubeadm: edit the kube-proxy ConfigMap and restart."
   verify:
     - "up{job=~\".*kube-proxy.*\"} ; kubectl get cm -n kube-system kube-proxy-config -o yaml | grep metricsBindAddress"
@@ -248,6 +250,7 @@
   symptom_linked: true
   why: >
     One sync = rewriting the whole (or part of the) rule set via iptables-restore. When it is slow, a new pod is Ready but node routing only reflects it seconds later, causing 5xx and connection refused during rolling deployments. It scales with the rule count (services × endpoints) and node CPU.
+  measured: >
     Measured on a real EKS cluster: p99 0.13s (two m5.large nodes); a small k3s cluster node: 0.51s.
   suggest: "Above 1s in iptables mode, move to ipvs or nftables mode (GA in 1.31+). As a stopgap, set minSyncPeriod to 1-2s to batch bursts."
   verify:
@@ -736,7 +739,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    iptables mode evaluates rules linearly and rewrites all of them on every sync. With thousands of services and tens of thousands of endpoints, sync slows to seconds and per-packet latency grows. ipvs (hashing) or nftables (GA in 1.31, recommended from 1.33) is the fix. Small clusters (measured: 105 services on an EKS cluster, 80 on a small k3s cluster) are not affected.
+    iptables mode evaluates rules linearly and rewrites all of them on every sync. With thousands of services and tens of thousands of endpoints, sync slows to seconds and per-packet latency grows. ipvs (hashing) or nftables (GA in 1.31, recommended from 1.33) is the fix. Clusters with around a hundred services are not affected.
+  measured: >
+    Measured: 105 services on an EKS cluster, 80 on a small k3s cluster — not affected.
   suggest: "kube-proxy mode nftables (recommended on 1.33+) or ipvs. On EKS, mode in the add-on configurationValues."
   verify:
     - "max by (instance, table) (kubeproxy_sync_proxy_rules_iptables_total) ; kubectl get svc -A | wc -l"
@@ -1153,6 +1158,7 @@
   symptom_linked: false
   why: >
     kube-proxy drops packets that conntrack judges INVALID (default since 1.29). A high count points to asymmetric routing (the reply leaves via another node), conntrack expiry of long-lived connections (tcpEstablishedTimeout), or NAT overlapping with the CNI. Apps see it as intermittent connection resets.
+  measured: >
     Measured on a real EKS cluster: 1,038 packets in one hour on a single node.
   cases:
     - { who: Backpackr 2025, url: https://aws.amazon.com/ko/blogs/tech/optimizing-amazon-eks-journey-of-backpackr-part1 }

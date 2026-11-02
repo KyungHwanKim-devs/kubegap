@@ -236,7 +236,8 @@
   symptom_linked: true
   why: >
     In L2 mode a node without a speaker cannot announce any service IP — when the leader node dies, failover to that node does not happen, and an externalTrafficPolicy Local service that lives only on that node is never reachable. If the controller is down, new LoadBalancer services get no IP and stay Pending (existing IPs keep being announced by the speakers).
-    Measured on a 2-node k3s k3s: speaker 2/2 (2 nodes), controller 1/1, metrics 2/2 -> pass.
+  measured: >
+    Measured on a 2-node k3s cluster: speaker 2/2 (2 nodes), controller 1/1, metrics 2/2 -> pass.
   suggest: "kubectl -n metallb-system get ds speaker; check node taints (the speaker needs tolerations) and nodeSelector."
   verify:
     - "kubectl -n metallb-system get pods -o wide"
@@ -466,7 +467,8 @@
   symptom_linked: true
   why: >
     metallb_k8s_client_config_stale_bool=1 means the speaker rejected a new IPAddressPool or L2Advertisement (validation failed) and keeps running on the old config — you widened the pool but it never applied, and "no free IPs" still fires. config_loaded 0 means the config was never read. update_errors counts failures of the speaker writing Service status.
-    Measured on a 2-node k3s k3s: both speakers loaded 1, stale 0, errors 0; the leader speaker had 5,020 gratuitous ARPs (failover and periodic re-announcement) -> pass.
+  measured: >
+    Measured on a 2-node k3s cluster: both speakers loaded 1, stale 0, errors 0; the leader speaker had 5,020 gratuitous ARPs (failover and periodic re-announcement) -> pass.
   suggest: "kubectl -n metallb-system logs ds/speaker | grep -i 'config\\|error'. Rejected CRs have the validation reason in the controller log."
   verify:
     - "kubectl get --raw /api/v1/namespaces/metallb-system/pods/<speaker-pod>:7472/proxy/metrics | grep metallb_k8s_client"
@@ -651,8 +653,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    L2 mode is failover, not load balancing — a service IP enters through one node's NIC only. If a single ingress controller is the only LoadBalancer, all external traffic passes through the leader node's NIC and then rides vxlan again to pods on other nodes (a share of the small k3s cluster's overlay traffic). When the leader dies, traffic is down for about 10 seconds of ARP relearning. On a 2-node small k3s cluster this is a known trade-off, hence low — traffic.metallb-l2-leader-concentration looks at the same fact as a leader share.
-    Measured on a 2-node k3s k3s: 1 LoadBalancer (ingress-nginx) with the leader on one node.
+    L2 mode is failover, not load balancing — a service IP enters through one node's NIC only. If a single ingress controller is the only LoadBalancer, all external traffic passes through the leader node's NIC and then rides vxlan again to pods on other nodes. When the leader dies, traffic is down for about 10 seconds of ARP relearning. On a 2-node small k3s cluster this is a known trade-off, hence low — traffic.metallb-l2-leader-concentration looks at the same fact as a leader share.
+  measured: >
+    Measured on a 2-node k3s cluster: 1 LoadBalancer (ingress-nginx) with the leader on one node; the traffic it passed on to pods on the other node was part of that cluster's overlay traffic.
   suggest: "BGP mode (if the router supports it), or externalTrafficPolicy Local plus one service IP per node. For a small k3s cluster, record 'leader node = X, about 10 s outage if it dies' in the report."
   verify:
     - "kubectl get svc -A --field-selector spec.type=LoadBalancer; kubectl -n metallb-system get servicel2statuses.metallb.io -o wide"
@@ -837,7 +840,8 @@
   symptom_linked: false
   why: >
     0.13 moved configuration from a ConfigMap to CRDs (IPAddressPool, L2Advertisement), and 0.14 added FRR-K8s and L2 interface selection among others. 0.13 and below receive no patches.
-    Measured on a k3s k3s: 0.14.5 -> pass.
+  measured: >
+    Measured on a k3s cluster: 0.14.5 -> pass.
   suggest: "Upgrade the metallb Helm chart. CRD changes are in the release notes."
   verify:
     - "kubectl -n metallb-system get ds speaker -o jsonpath='{.spec.template.spec.containers[0].image}'"

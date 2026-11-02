@@ -28,7 +28,7 @@ A tool that one person points at production without a review board must be safe 
 
 ## 5. The rubric is data, with a version
 
-Checks live in `collectors/<name>/checks.yaml` with their thresholds, rationale, public cases and embedded test cases. `rubric/version` changes whenever a check changes and is printed in every report.
+Checks live in `collectors/<name>/checks.yaml` with their thresholds, rationale, public cases, what was measured when they were written, and embedded test cases. A measurement on the author's clusters lives in `measured`, apart from `cases`, so a report never presents it as a public incident. `rubric/version` changes whenever a check changes and is printed in every report.
 
 When the number of findings moves between two runs, the reader needs to know whether the cluster changed or the criteria did. The version makes the two distinguishable, and a report can say that a finding disappeared because a rule changed, which is not a fix.
 

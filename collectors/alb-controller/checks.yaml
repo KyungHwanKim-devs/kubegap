@@ -14,6 +14,7 @@
   symptom_linked: false
   why: >
     Even when the controller stops, the ALBs and target groups it already created keep serving traffic. But targets are no longer registered or deregistered as pods change (RegisterTargets/DeregisterTargets), so after a rolling deploy traffic goes to dead pod IPs or new pods never receive traffic, and new Ingress or certificate changes are not applied.
+  measured: >
     Measured on a real EKS cluster: 2/2 replicas on different nodes with PDB and antiAffinity — pass.
   suggest: "Keep replicas 2 + podAntiAffinity + PDB (minAvailable 1). Check that both replicas do not land on the same node during node replacement (Karpenter)."
   verify:
@@ -410,6 +411,7 @@
   symptom_linked: false
   why: >
     The controller needs permission to create and delete ELBs, change security group rules and look up ACM certificates. Without a dedicated role those permissions must live on the node instance role, and on nodes with IMDS hop limit 2 every pod can delete load balancers and open security groups.
+  measured: >
     Measured on a real EKS cluster: a dedicated load balancer controller role was present — pass.
   suggest: "Attach a dedicated role with AWSLoadBalancerControllerIAMPolicy via IRSA or Pod Identity and remove ELB permissions from the node role."
   verify:
@@ -582,6 +584,7 @@
   symptom_linked: true
   why: >
     mpod.elbv2.k8s.aws is a mutating webhook that injects readiness gates at pod creation. With failurePolicy Fail and no namespaceSelector/objectSelector, the moment all controller pods are gone **every pod creation in the cluster is rejected** (the controller itself cannot start — a deadlock, same conclusion as operators.webhook-self-lock). The default chart scopes it with the `elbv2.k8s.aws/pod-readiness-gate-inject: enabled` namespace selector.
+  measured: >
     Measured on a real EKS cluster: the mpod webhook had a namespaceSelector and objectSelector, 2 endpoints, 0 5xx — pass.
   suggest: "Keep the namespaceSelector on the mpod webhook and use a controller PDB so both replicas do not go down at once. Keep a runbook step for switching failurePolicy to Ignore in an emergency."
   verify:
@@ -905,6 +908,7 @@
   symptom_linked: false
   why: >
     A reconcile error means the controller failed to make one Ingress, Service or TargetGroupBinding match AWS (permissions, bad annotation, missing certificate, limits). The counter accumulates since the leader process started, so a small number may be a past event — read it together with the log signature alb-controller.reconcile-error (24 hours).
+  measured: >
     Measured on a real EKS cluster: 41 errors (ingress controller), 34,713 requeues — close to the pattern of one Ingress with a bad annotation being retried forever (0 errors in the 24-hour logs, so a past event).
   suggest: "Run kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller | grep -i 'reconciler error' to find which Ingress it is, then fix the annotation, certificate or security group."
   verify:
@@ -1226,6 +1230,7 @@
   symptom_linked: false
   why: >
     The controller runs DescribeTargetHealth for every target group and calls Register/DeregisterTargets every time a pod changes. Rising retries per call mean the ELB API limit is being hit; apiserver 429s mean the controller's LIST/WATCH hit the apiserver priority limits.
+  measured: >
     Measured on a real EKS cluster: 232,463 calls since leader start (DescribeTargetHealth 73,740, DescribeTargetGroupAttributes 40,600, DescribeInstances 36,913, Register/Deregister about 11k each), average retries 0, apiserver 429/503 total 123 — warn.
   suggest: "Reduce the number of target groups (ALB group sharing may already be in place) or the pod churn rate (HPA flapping, CronJob pods). If retries rise, tune the --aws-api-throttle argument and look for Throttling in the controller logs."
   verify:
@@ -1473,6 +1478,7 @@
   symptom_linked: true
   why: >
     A TargetGroupBinding says "register this Service's pods into this target group". If observedGeneration lags behind generation the controller could not process that binding, and if the Service is missing the target group is empty and returns 503. Hand-made TGBs (the pattern of exposing a DB through an NLB) leave the target group behind when deleted, unlike an Ingress.
+  measured: >
     Measured on a real EKS cluster: all 51 applied, 10 hand-made TGBs (DB NLBs — the same targets as traffic.db-exposed).
   suggest: "If stale, look for that TGB's reconcile error in the controller logs. Delete TGBs whose Service is missing and clean up the target group on the AWS side too."
   verify:
@@ -1967,6 +1973,7 @@
   symptom_linked: false
   why: >
     A LoadBalancer Service without annotations gets a Classic LB from the in-tree AWS provider in kube-controller-manager. It is legacy: no NLB features (IP targets, TLS termination, PROXY protocol) and on the removal path from 1.27+. With the controller present, switch to `service.beta.kubernetes.io/aws-load-balancer-type: external` or `loadBalancerClass: service.k8s.aws/nlb`.
+  measured: >
     Measured on a real EKS cluster: the single LB Service (an external kafka listener) was controller-owned — pass.
   suggest: "Set loadBalancerClass service.k8s.aws/nlb on the Service (a new LB is created and the DNS name changes, so plan the cutover)."
   verify:
@@ -2138,7 +2145,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    The controller exposes the standard controller-runtime metrics (reconcile, webhook, workqueue) plus AWS API call latency and retries on :8080. kube-prometheus-stack does not scrape it by default. If the pod proxy is blocked by a security group (seen on a real EKS cluster) it is read from inside a node via the pod IP, which also fails when neither SSM nor SSH works.
+    The controller exposes the standard controller-runtime metrics (reconcile, webhook, workqueue) plus AWS API call latency and retries on :8080. kube-prometheus-stack does not scrape it by default. If the pod proxy is blocked by a security group it is read from inside a node via the pod IP, which also fails when neither SSM nor SSH works.
+  measured: >
+    Seen on a real EKS cluster: a security group blocked the pod proxy.
   suggest: "Enable the ServiceMonitor (serviceMonitor.enabled true) so Prometheus scrapes it and kubegap uses that. Otherwise prepare node access (SSM registration)."
   verify:
     - "kubectl get --raw /api/v1/namespaces/kube-system/pods/<pod>:8080/proxy/metrics | head"

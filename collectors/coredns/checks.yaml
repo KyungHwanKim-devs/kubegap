@@ -13,8 +13,11 @@
   severity_default: medium
   symptom_linked: false
   why: >
-    Pod resolv.conf has ndots:5. A name with fewer than 5 dots (api.example.com) is first queried with the search domains appended (<ns>.svc.cluster.local → svc.cluster.local → cluster.local → VPC domain), so one real name drags 3-4 NXDOMAINs along. CoreDNS answers the cluster.local suffixes directly, but the VPC domain suffix goes all the way upstream — on a real small k3s cluster 83% of upstream queries were NXDOMAIN.
-    The query count becomes a multiple of the real name count, and upstream calls (Route 53 Resolver, external resolvers) grow, causing latency, cost and throttling. Measured on real clusters: EKS NXDOMAIN 50% (60 queries per second), small k3s cluster 70%.
+    Pod resolv.conf has ndots:5. A name with fewer than 5 dots (api.example.com) is first queried with the search domains appended (<ns>.svc.cluster.local → svc.cluster.local → cluster.local → VPC domain), so one real name drags 3-4 NXDOMAINs along. CoreDNS answers the cluster.local suffixes directly, but the VPC domain suffix goes all the way upstream.
+    The query count becomes a multiple of the real name count, and upstream calls (Route 53 Resolver, external resolvers) grow, causing latency, cost and throttling.
+  measured: >
+    Measured on a real small k3s cluster: 83% of upstream queries were NXDOMAIN.
+    Measured on real clusters: EKS NXDOMAIN 50% (60 queries per second), small k3s cluster 70%.
   cases:
     - { who: Zalando 2019, url: https://www.slideshare.net/try_except_/lets-talk-about-failures-with-kubernetes-hamburg-meetup }
     - { who: Zalando 2019, url: https://github.com/zalando-incubator/kubernetes-on-aws/blob/dev/docs/postmortems/jan-2019-dns-outage.md }
@@ -283,6 +286,7 @@
   symptom_linked: true
   why: >
     When CoreDNS stops, service names stop resolving and every app fails at once — the user symptom is "everything is slow, everything errors". With 1 replica, DNS is gone for seconds to tens of seconds whenever that pod's node dies or the pod restarts or redeploys. Two replicas on the same node give no protection.
+  measured: >
     Measured on real clusters: the small k3s cluster had 1 replica and no PDB — had the other node been the one powered off, DNS would have been down cluster-wide. EKS had 2 replicas on different nodes with a PDB.
   cases:
     - { who: Freshworks 2025, url: https://medium.com/freshworks-engineering-blog/decoding-coredns-failures-75ebdc89ac0b }
@@ -544,7 +548,9 @@
   symptom_linked: false
   why: >
     The default 2 replicas become a bottleneck as nodes grow. The convention is cluster-proportional-autoscaler (proportional to node or core count, e.g. "1 per 16 nodes or 1 per 256 cores") or an HPA. The EKS add-on has an autoScaling option.
-    Under 8 nodes, 2 replicas are enough and this is not evaluated. Measured on real clusters: EKS 7 nodes / 2 replicas, small k3s cluster 2 nodes / 1 replica (the availability check's job).
+    Under 8 nodes, 2 replicas are enough and this is not evaluated.
+  measured: >
+    Measured on real clusters: EKS 7 nodes / 2 replicas, small k3s cluster 2 nodes / 1 replica (the availability check's job).
   cases:
     - { who: Oath 2018, url: https://www.youtube.com/watch?v=likHm-KHGWQ }
   suggest: "EKS: autoScaling in the coredns add-on configurationValues (enabled true, minReplicas 2, maxReplicas 10). Elsewhere: deploy cluster-proportional-autoscaler."
@@ -759,7 +765,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    A low hit ratio means every query hits the kubernetes plugin or the upstream. Common causes are a short cache TTL (default cap 30s) or names that differ every time (search path noise also lands in the cache as NXDOMAIN). Measured on real clusters: EKS 0.90, small k3s cluster 0.85 — both normal.
+    A low hit ratio means every query hits the kubernetes plugin or the upstream. Common causes are a short cache TTL (default cap 30s) or names that differ every time (search path noise also lands in the cache as NXDOMAIN).
+  measured: >
+    Measured on real clusters: EKS 0.90, small k3s cluster 0.85 — both normal.
   suggest: "Raise the success and denial TTLs in the Corefile cache block (e.g. cache 300 { success 9984 300 / denial 9984 60 }) and reduce ndots noise (coredns.nxdomain-ratio-high)."
   verify:
     - "sum(rate(coredns_cache_hits_total[1h])) / (sum(rate(coredns_cache_hits_total[1h])) + sum(rate(coredns_cache_misses_total[1h])))"
@@ -923,8 +931,10 @@
   severity_default: low
   symptom_linked: false
   why: >
-    The glibc resolver asks A and AAAA at the same time in getaddrinfo. In a cluster without IPv6 every AAAA query has an empty answer, so half of all DNS queries are wasted. Multiplied with search path noise (ndots), the query count reaches 8× the real name count. Measured on real clusters: AAAA 50% on both EKS and the small k3s cluster.
+    The glibc resolver asks A and AAAA at the same time in getaddrinfo. In a cluster without IPv6 every AAAA query has an empty answer, so half of all DNS queries are wasted. Multiplied with search path noise (ndots), the query count reaches 8× the real name count.
     Not a risk, only a cost and latency factor, so it never goes beyond warn.
+  measured: >
+    Measured on real clusters: AAAA 50% on both EKS and the small k3s cluster.
   cases:
     - { who: MindTickle 2019, url: https://medium.com/techmindtickle/intermittent-delays-in-kubernetes-e9de8239e2fa }
     - { who: Jack Lindamood (cep.dev) 2025, url: https://medium.com/@cep21/my-process-to-debug-dns-timeouts-in-a-large-eks-cluster-9f731bd5617d }
@@ -1520,7 +1530,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    The kube-dns Service is UDP, so conntrack pins the client → pod mapping for a long time. If the queries of a few large nodes land on one pod, only that pod saturates and p99 spikes. Measured on a real EKS cluster: 1.01 — even.
+    The kube-dns Service is UDP, so conntrack pins the client → pod mapping for a long time. If the queries of a few large nodes land on one pod, only that pod saturates and p99 spikes.
+  measured: >
+    Measured on a real EKS cluster: 1.01 — even.
   cases:
     - { who: Airbnb 2019, url: https://www.youtube.com/watch?v=QXApVwRBeys }
   suggest: "NodeLocal DNSCache (node-local cache, TCP upstream) is the real fix. As a stopgap, restarting the CoreDNS pods reshuffles the mapping."
@@ -1684,7 +1696,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    NodeLocal DNSCache runs a cache daemon on every node and talks to the upstream (CoreDNS) over TCP, removing the UDP conntrack race (5-second delay) and CoreDNS hotspots. With few nodes and a low p99 it is unnecessary. Measured on real clusters: EKS p99 1.1ms (not needed), small k3s cluster p99 86ms with 2 nodes (below the node threshold).
+    NodeLocal DNSCache runs a cache daemon on every node and talks to the upstream (CoreDNS) over TCP, removing the UDP conntrack race (5-second delay) and CoreDNS hotspots. With few nodes and a low p99 it is unnecessary.
+  measured: >
+    Measured on real clusters: EKS p99 1.1ms (not needed), small k3s cluster p99 86ms with 2 nodes (below the node threshold).
   cases:
     - { who: Preply 2020, url: https://medium.com/preply-engineering/dns-postmortem-e169efd45afd }
     - { who: MindTickle 2019, url: https://medium.com/techmindtickle/intermittent-delays-in-kubernetes-e9de8239e2fa }
@@ -1949,7 +1963,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    CoreDNS exposes metrics on :9153, but if Prometheus does not scrape them the NXDOMAIN ratio, cache, latency and upstream errors are all invisible. kube-prometheus-stack creates a coredns ServiceMonitor by default (present on both clusters observed).
+    CoreDNS exposes metrics on :9153, but if Prometheus does not scrape them the NXDOMAIN ratio, cache, latency and upstream errors are all invisible. kube-prometheus-stack creates a coredns ServiceMonitor by default.
+  measured: >
+    Measured: the coredns ServiceMonitor was present on both clusters.
   suggest: "Set coreDns.enabled true in the kube-prometheus-stack values, or attach a ServiceMonitor to the kube-dns Service in kube-system (port metrics 9153)."
   verify:
     - "count({__name__=~\"coredns_.*\"})"

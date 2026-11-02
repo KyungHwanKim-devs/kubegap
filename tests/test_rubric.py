@@ -100,6 +100,12 @@ def test_validate_accepts_warn_only_check():
     assert rubric.validate(c, "src") == []
 
 
+def test_validate_measured_is_text():
+    assert rubric.validate(check(measured="Measured on a real EKS cluster: 2/2 replicas."), "src") == []
+    assert any("measured" in e for e in rubric.validate(check(measured=""), "src"))
+    assert any("measured" in e for e in rubric.validate(check(measured=["a list"]), "src"))
+
+
 # ---------- active_suppressions ----------
 
 
