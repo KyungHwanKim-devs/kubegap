@@ -88,7 +88,9 @@ def test_summary_snat_only_when_routes_collected(tmp_path):
     [
         ("1.19.0-eksbuild.1", "prng", False, "random-fully"),
         ("1.19.0", None, False, "random-fully"),
-        ("1.19.0", "PRNG", False, "random-fully"),
+        ("1.19.0", "PRNG", False, "random-fully"),  # not a recognised value: the CNI falls back to the version default, prng on 1.19
+        ("1.6.3", "PRNG", False, "random"),  # same fallback on an old CNI: hashrandom
+        ("1.19.0", "NONE", False, "random-fully"),
         ("1.7.0", None, False, "random-fully"),
         ("1.6.3", None, False, "random"),
         ("1.6.3", "hashrandom", False, "random"),
