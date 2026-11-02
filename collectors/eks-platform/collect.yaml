@@ -1,7 +1,7 @@
 # EKS platform collection. Read-only calls throughout. Results go to the aws/ folder.
 # Already fetched and saved by detection (discover): aws/describe-cluster.json, aws/list-addons.json, aws/describe-addon-<name>.json,
 # aws/list-nodegroups.json. The rest is collected here.
-# Placeholders available in aws item args: {cluster} {region} {account}, plus {item} when for_each is set.
+# Placeholders available in aws item args: {cluster} {region} {account} {k8s_version} {vpc_id}, plus {item} when for_each is set.
 # for_each values: eks.nodegroups | eks.addons | eks.subnet_ids (read from cluster.eks in inventory.json)
 # A plural placeholder such as `{subnet_ids}` expands the whole list into multiple arguments.
 - id: nodegroup
@@ -33,6 +33,12 @@
   type: aws
   args: [ec2, describe-subnets, --subnet-ids, "{subnet_ids}"]
   out: aws/describe-subnets.json
+  timeout: 60
+- id: route-tables
+  modes: [full]   # skipped by the daily run
+  type: aws
+  args: [ec2, describe-route-tables, --filters, "Name=vpc-id,Values={vpc_id}"]   # routes to peering, transit gateway and VPN targets decide whether external SNAT matters (vpccni.external-snat-off-with-private-routes)
+  out: aws/describe-route-tables.json
   timeout: 60
 - id: ssm-instances
   type: aws

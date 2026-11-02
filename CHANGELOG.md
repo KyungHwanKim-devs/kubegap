@@ -4,10 +4,18 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- `vpccni.external-snat-off-with-private-routes`: warns when the VPC CNI keeps its default of SNATing pod traffic that leaves the VPC while the cluster VPC has routes to a peering connection, a transit gateway or a VPN. On those paths the destination sees the node IP instead of the pod IP, which is what cost MindTickle a month of lost packets in 2020. The full run now collects the VPC route tables, `aws/describe-route-tables.json`, through the `ec2:Describe*` permission the IAM policy already grants. Rubric 0.1.54, 403 checks. ([#43](https://github.com/KyungHwanKim-devs/kubegap/issues/43))
+
 ### Changed
 
-- Measurements taken on the clusters a check was written on now live in a new `measured` field, apart from `cases`. They had been written into `why` on 200 checks, and the report rule let a report take a case from `why`, so the Cases line of `resilience.prod-concentration`, `hygiene.mutable-image-tag` and `prometheus.storage-risk` printed the author's own cluster as if it were a public incident. A report now takes cases from `cases` only and may add a separate "Measured when this check was written" line. A test keeps measurements out of `why` and `notes`. Rubric 0.1.54. ([#17](https://github.com/KyungHwanKim-devs/kubegap/issues/17))
+- Measurements taken on the clusters a check was written on now live in a new `measured` field, apart from `cases`. They had been written into `why` on 200 checks, and the report rule let a report take a case from `why`, so the Cases line of `resilience.prod-concentration`, `hygiene.mutable-image-tag` and `prometheus.storage-risk` printed the author's own cluster as if it were a public incident. A report now takes cases from `cases` only and may add a separate "Measured when this check was written" line. A test keeps measurements out of `why` and `notes`. Rubric 0.1.56. ([#17](https://github.com/KyungHwanKim-devs/kubegap/issues/17))
 - 108 checks now carry `cases`, public incident write-ups whose root cause is the condition the check detects, 203 links in all; before, 2 checks did. The sources are the 59 stories on k8s.af, read one by one, including the conference talks through their captions, and 24 write-ups from 2023 onward. Companies cited with a year in `why` but without a link now have one or were removed, and two webhook checks no longer cite a Skyscanner incident that was about Argo CD pruning. `docs/CHECKS.md` lists every case and says how many checks have one. Rubric 0.1.53. ([#28](https://github.com/KyungHwanKim-devs/kubegap/issues/28))
+
+### Fixed
+
+- Image sizes are reported with the right unit. `crictl images` sizes are decimal (`1.23GB` is 10⁹ bytes), so `lib/nodeos.py` no longer converts them with 1024 steps, and lowercase `kB` sizes are no longer dropped. The ECR summary's unlabeled tuples, once misread by a report as a "96 GB image", are labeled rows with the unit in the key: `largest` became `largest_repos[{name, gib}]` and `repos_stale_pull` became `[{name, gib, days_since_pull}]`. The `ecr.stale-storage` and `node.*` image evidence now writes GiB/MiB, and `references/report-writing.md` says to never write a number without its unit. Fixed by [@MinwooPark93](https://github.com/MinwooPark93) in [#48](https://github.com/KyungHwanKim-devs/kubegap/pull/48). Rubric 0.1.55. ([#10](https://github.com/KyungHwanKim-devs/kubegap/issues/10))
 
 ## [0.1.1] - 2026-11-02
 
