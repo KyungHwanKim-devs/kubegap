@@ -15926,12 +15926,12 @@
     expr: "(item['metrics'].get('p95_s_avg') or 0) >= 2.0 and (item['metrics'].get('requests') or 0) >= 100"
     warn_expr: "(item['metrics'].get('p95_s_avg') or 0) >= 1.0 and (item['metrics'].get('requests') or 0) >= 100"
   target: "item['target']"
-  evidence: "f\"{item['hosts'][:2]}: p95 avg {item['metrics'].get('p95_s_avg')}s, 1h max {item['metrics'].get('p95_s_max_1h')}s, {item['metrics'].get('requests')} requests/{item['metrics'].get('window')} (source {item['metrics'].get('source')})\""
+  evidence: "f\"{item['hosts'][:2]}: p95 avg {item['metrics'].get('p95_s_avg')}s, 1h max {item['metrics'].get('p95_s_max_1h')}s, latest 1h {item['metrics'].get('p95_s_last_1h')}s, {item['metrics'].get('requests')} requests/{item['metrics'].get('window')} (source {item['metrics'].get('source')})\""
   severity_default: medium
   symptom_linked: true
   why: >
     p95 response time is the latency signal of the four golden signals. ALB TargetResponseTime runs from the LB sending the request to the target until the first byte back, so it is app time without the network. An API above 1s feels slow to users; at 2s timeouts and retries begin.
-    ALB gives a p95 over 1-hour statistics, so bursts inside the hour are hidden (check the 1-hour maximum alongside).
+    ALB gives a p95 over 1-hour statistics, so bursts inside the hour are hidden (check the 1-hour maximum alongside). With the ALB source the average is over the hourly p95 values of the window, so one bad hour can carry it over the threshold while the service is fine now; the latest 1-hour value says whether the slowness is still going on. That value is the current partial hour, or the newest hour that had requests when the service has been idle, so read it together with the request count. With the ingress-nginx source the three values are one 1-hour measurement. A daily report ranks a finding whose latest hour is back under the threshold as an ended event.
   suggest: "Identify slow endpoints (app metrics, logs), check DB query and external call timeouts, and CPU limit throttling (resources.cpu-throttling)."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name TargetResponseTime --dimensions Name=LoadBalancer,Value=<dim> Name=TargetGroup,Value=<dim> --extended-statistics p95 --period 300 --start-time <1h ago> --end-time <now>"
@@ -15973,8 +15973,9 @@
             rps_avg: 0.12
             errors_5xx: 0
             errors_ratio: 0.0
-            p95_s_max_1h: 0.3
+            p95_s_max_1h: 19.4
             p95_s_avg: 2.5
+            p95_s_last_1h: 0.05
             unhealthy_max_24h: 0
             unhealthy_now: 0
             target_groups:
@@ -16014,8 +16015,9 @@
             rps_avg: 0.12
             errors_5xx: 0
             errors_ratio: 0.0
-            p95_s_max_1h: 0.3
+            p95_s_max_1h: 1.4
             p95_s_avg: 1.2
+            p95_s_last_1h: 1.1
             unhealthy_max_24h: 0
             unhealthy_now: 0
             target_groups:
@@ -16057,6 +16059,7 @@
             errors_ratio: 0.0
             p95_s_max_1h: 0.3
             p95_s_avg: 0.2
+            p95_s_last_1h: 0.2
             unhealthy_max_24h: 0
             unhealthy_now: 0
             target_groups:
