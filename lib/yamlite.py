@@ -3,7 +3,7 @@
 
 It reads only what kubegap's YAML needs (checks.yaml, config.yaml, profiles, signatures.yaml). Supported subset:
 - block mappings and block sequences by indentation (spaces only), mappings inside sequence items starting with `- key: value`, nested `- - x`
-- a sequence at the same indent as its parent key (`key:` followed by `- a` on the next line)
+- a sequence at the same indent as its parent key (`key:` followed by `- a` on the next line), and a scalar on the line after `key:` or `-`
 - single-line flow collections `{ a: 1, b: [x, y] }`, `[a, b]` (nesting allowed, must close on the same line)
 - block scalars `|` and `>` with chomping indicators `-` (strip) and `+` (keep); without an indicator one trailing newline is kept (clip)
 - quoted scalars 'single' (with '' escape) and "double" (with \\n \\t \\" \\\\ escapes); a quoted scalar may continue on following lines until the closing quote
@@ -344,6 +344,9 @@ class _Parser:
     def _nested_or_null(self, idx: int, indent: int) -> tuple[Any, int]:
         j = self._skip_blank(idx)
         if j < len(self.lines) and self.lines[j][0] > indent:
+            content = self.lines[j][1]
+            if _split_key(content) is None and not (content.startswith("- ") or content == "-"):
+                return self._inline_value(content, j, indent)  # a scalar on the line after `key:` or `-`
             return self.parse_block(j, self.lines[j][0])
         # a `- ` list at the same indent on the line after `key:` (allowed by YAML)
         if j < len(self.lines) and self.lines[j][0] == indent and self.lines[j][1].startswith("- "):

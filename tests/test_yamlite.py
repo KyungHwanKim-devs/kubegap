@@ -97,6 +97,18 @@ def test_empty_sequence_item_followed_by_nested_block():
         """) == {"items": [{"k": "v"}, "plain"]}
 
 
+def test_scalar_on_the_line_after_key_or_dash():
+    assert y("""
+        a:
+          value
+        b:
+          "q"
+        c:
+          -
+            x
+        """) == {"a": "value", "b": "q", "c": ["x"]}
+
+
 def test_quoted_key_and_duplicate_key():
     assert load("'a b': 1") == {"a b": 1}
     with pytest.raises(YamlError, match="duplicate key"):
@@ -269,6 +281,8 @@ def test_errors(text, match):
         ("- k: one\n    two", 2),
         ("x:\n  - a: 1\n    why: long text\n      continues here\n  - b", 4),
         ("a: first\n  - second", 2),
+        ("a:\n  first\n  second", 3),
+        ("-\n  first\n  second", 3),
     ],
 )
 def test_multi_line_plain_scalar_names_the_continuation_line(text, line):
