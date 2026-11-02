@@ -15,6 +15,7 @@
   symptom_linked: false
   why: >
     Without scanning, nobody knows how many known CVEs the images running in prod carry. ECR basic scanning (BASIC, Clair-based) is free and needs a single scanOnPush line, but if it is off on every repository and there is no registry-level rule, the number of scanned images is 0. Enhanced scanning (Inspector) keeps rescanning OS and language packages (paid).
+  measured: >
     Measured on a real cluster: 39 of 43 repositories had scanOnPush off (including 25 used by prod), scanned images 0/783.
   suggest: "aws ecr put-registry-scanning-configuration --scan-type ENHANCED --rules '[{\"scanFrequency\":\"SCAN_ON_PUSH\",\"repositoryFilters\":[{\"filter\":\"*\",\"filterType\":\"WILDCARD\"}]}]' or --image-scanning-configuration scanOnPush=true per repository. Results via describe-image-scan-findings."
   verify:
@@ -757,6 +758,7 @@
   symptom_linked: false
   why: >
     With IMMUTABLE, a tag once pushed cannot be overwritten with a different image — the "v1.2.3 is different from yesterday" incident (accidental re-push, CI rerun, supply chain attack) is prevented and no node ends up running a different binary. When Argo CD deploys by tag, tag immutability is the precondition for rollback. Digest pinning is stronger but more cumbersome to operate.
+  measured: >
     Measured on a real cluster: 42/43 MUTABLE (a single immutable repository), digest-pinned 2/205, no repositories with a latest tag.
   suggest: "aws ecr put-image-tag-mutability --repository-name <r> --image-tag-mutability IMMUTABLE (CI re-pushing the same tag will fail, so put the git sha in the tag). In Terraform, image_tag_mutability."
   verify:
@@ -1158,6 +1160,7 @@
   symptom_linked: false
   why: >
     ECR keeps everything forever unless deleted and bills per GB-month. A repository without a lifecycle policy ("delete untagged after 1 day, keep only the latest 30 tagged") grows with every CI run. A single repository above 100GiB alone costs 10 USD a month.
+  measured: >
     Measured on a real cluster: 39/43 had a policy (untagged 1 day, tagged 30). The 4 without: one abandoned app repository (8.8GiB, no push or pull for over a year), two mirrored base images and one database image. Total 398.5GiB ≈ 42.8 USD/month.
   suggest: "Attach the same policy to those repositories (aws ecr put-lifecycle-policy). With a Terraform module, make lifecycle_policy the default."
   verify:
@@ -1783,6 +1786,7 @@
   symptom_linked: false
   why: >
     If lastRecordedPullTime is 90 days ago, no node pulled any image from that repository for three months — space that nothing would miss if deleted. Repositories the cluster does not use (absent from pod images) are the same. But other clusters or CI may pull them, so the report should say "confirm, then delete".
+  measured: >
     Measured on a real cluster: an abandoned app repository of 8.8GiB (885 days), a prod repository of 29.8GiB with no push for months. The largest repositories were two ML image repositories of 96.6GiB and 75.3GiB (lifecycle keeping 30 × large ML images).
   suggest: "Confirm with the owner and delete repositories with no pull history, or cut their lifecycle to 'latest 5 only'. For large repositories such as ML images, reduce the retained count from 30 to 10."
   verify:
@@ -2613,6 +2617,7 @@
   symptom_linked: false
   why: >
     Docker Hub limits anonymous pulls to 100 per IP per hour (stricter since 2024-12). When nodes are replaced (Karpenter) or many pods start on one node, the pulls pouring through the same NAT IP get 429 and pods land in ImagePullBackOff — the Docker Hub outages (2020, 2023) caused restart failures of this shape (Datadog 2019). An ECR pull-through cache rule caches docker.io, quay.io and ghcr.io in ECR so pulls stay inside the VPC.
+  measured: >
     Measured on a real EKS cluster: docker.io 31, quay.io 23, ghcr.io 9 containers, 0 pull-through rules.
   cases:
     - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-01-11-cluster-image-pull.html }
@@ -3248,6 +3253,7 @@
   symptom_linked: true
   why: >
     A pull failure is one of four things: registry authentication (ECR token expiring after 12 hours, IRSA permissions), missing tag (CI has not pushed yet), rate limit (Docker Hub) or network (NAT, no VPC endpoint). kubelet's PullImage metrics are dropped by the default kube-prometheus-stack configuration, so only events (1-hour retention) are used — 0 does not mean "none happened".
+  measured: >
     Measured on real clusters: 0 on both EKS and the small k3s cluster.
   cases:
     - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-01-11-cluster-image-pull.html }
@@ -3883,6 +3889,7 @@
   symptom_linked: false
   why: >
     ECR is a regional service. If ECR in the cluster's region is down, every node replacement and restart fails to pull (a fresh node with no image cache cannot start anything), and in a regional recovery (DR) the manifests alone deploy nothing without the images. Cross-region replication is automatic with one rule and only doubles storage cost. For a single-region, single-cluster organization, "we know" is enough — low.
+  measured: >
     Measured on a real cluster: 0 replication rules.
   suggest: "If a DR region is defined, replicate only the prod repositories with aws ecr put-replication-configuration (repositoryFilters). Otherwise write 'single-region dependency' in the report."
   verify:
@@ -4460,6 +4467,7 @@
   symptom_linked: false
   why: >
     Re-pushing the same tag leaves the previous image behind without a tag (untagged) — nobody can pull it, but it uses space. The provenance/SBOM attestation manifests BuildKit uploads alongside (1-2KB) also appear untagged but have no size, so they are excluded here. Even with a lifecycle "delete untagged after 1 day", the child manifests referenced by a multi-architecture index are not deleted, so a count may remain.
+  measured: >
     Measured on a real cluster: 226/783 untagged (mostly per-platform child manifests of multi-arch indexes), 150 attestations.
   suggest: "Confirm the lifecycle untagged rule, and note in the report that multi-arch child manifests are normal. Judge actual space by GiB per repository."
   verify:

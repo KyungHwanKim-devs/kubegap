@@ -617,6 +617,7 @@
   symptom_linked: false
   why: >
     Karpenter 1.x compares the cluster version against its own support table at startup and in the nodeclass.status controller; outside the table it stops resolving AMIs, so new nodes fail to launch or launch only with old AMIs. The log signature (karpenter.version-unsupported) is one line a day and stays at warn, so this check compares the versions directly.
+  measured: >
     Measured on a real EKS cluster: Karpenter 0.37.0 (max 1.30) on a 1.32 cluster.
   suggest: "Upgrade Karpenter in step with EKS (0.37 → 1.0 → 1.1 → ... one minor at a time, including CRD migrations). The compatibility table is rubric/karpenter-compat.yaml."
   verify:
@@ -666,6 +667,7 @@
   symptom_linked: false
   why: >
     On EKS, ingress TLS is usually an ACM certificate attached to the ALB rather than cert-manager. ACM renews automatically as long as DNS validation holds, but with RenewalEligibility INELIGIBLE (CNAME deleted, domain moved) it expires silently, and IMPORTED certificates never renew — on the expiry date every host behind it breaks with browser warnings. Pairs with the "certificate expiry" alert gap in observability.failure-mode-uncovered.
+  measured: >
     Measured on a real EKS cluster: 7 of 12 in use, nearest expiry 71 days (an earlier-expiring one was unused), 1 expired unused certificate → pass.
   suggest: "If RenewalEligibility is INELIGIBLE, restore the validation CNAME in Route53. Re-import IMPORTED certificates 30 days before expiry or replace them with ACM-issued ones. Delete expired unused certificates."
   verify:
@@ -772,6 +774,7 @@
   symptom_linked: false
   why: >
     When the vCPU, ENI, EIP, ALB, target group or listener rule limit is reached, Karpenter node creation, ALB Controller ingress reconciliation and NodePort allocation fail with "InsufficientCapacity/LimitExceeded", which inside Kubernetes shows only as pending and events. Quota increases take a day or more, so request them at 60%. Usage is the 1-hour maximum from CloudWatch AWS/Usage (only quotas with a usage metric; services ec2, vpc, elasticloadbalancing, ebs).
+  measured: >
     Measured on a real EKS cluster: 20 of 65 quotas had usage, VPCs 3/5 (60%) → warn; listener rules per ALB 47/100 (a shared ALB — same root as traffic.shared-alb-group), target groups per ALB 40/100.
   suggest: "aws service-quotas request-service-quota-increase --service-code <svc> --quota-code <L-...> --desired-value <n>. For listener rules per ALB, split the ingresses into two ALB groups."
   verify:
@@ -842,6 +845,7 @@
   symptom_linked: true
   why: >
     gp3 defaults to 3,000 IOPS and 125MB/s. A node root volume takes container images, write layers, logs (read by promtail/fluent-bit) and emptyDirs, so it saturates first on nodes with many log collectors, and then kubelet and containerd slow down, causing PLEG delays and slow pod starts. A sustained queue length of 1 or more means the disk cannot keep up. gp2 drops to baseline IOPS when its burst balance (BurstBalance) runs out.
+  measured: >
     Measured on a real EKS cluster: 24 volumes (7 root, 17 PVC), max average queue 0.26 (a root volume, momentary peak 2.06), busiest-hour IOPS ratio max 5% → pass.
   cases:
     - { who: Blue Matador 2019, url: https://www.bluematador.com/blog/post-mortem-kubernetes-node-oom }
@@ -920,6 +924,7 @@
   symptom_linked: false
   why: >
     The EKS cluster security group is attached to the control plane ENIs and the nodes. If 0.0.0.0/0 inbound is open on ports other than 443 (or on all ports), the nodes' kubelet 10250, NodePorts 30000-32767 and SSH 22 are exposed to the internet. Thresholds (defaults, user-adjustable): only 443 open to the world is pass, other ports warn, all ports fail. The endpoint public CIDRs are covered by eks.public-endpoint-open.
+  measured: >
     Measured on a real EKS cluster: 2 security groups, 0 world-open inbound rules → pass.
   suggest: "Keep only cluster SG and ALB SG references as node security group inbound and delete CIDR rules. Replace SSH with SSM."
   verify:
@@ -985,6 +990,7 @@
   symptom_linked: false
   why: >
     A managed node group's AMI (the date at the end of releaseVersion) only changes when a node group update is run. EKS-optimized AMIs ship roughly every 2-4 weeks with kernel, containerd and runc security patches. Thresholds (defaults, user-adjustable): 90 days warn, 180 days fail. Karpenter nodes are covered by the EC2NodeClass AMI selection (karpenter.ec2nodeclass-al2, hardening).
+  measured: >
     Measured on a real EKS cluster: a managed node group AMI about 320 days old → fail.
   cases:
     - { who: ZenML 2025, url: https://status.zenml.io/incidents/bnrlb8tck3v0 }

@@ -14,6 +14,7 @@
   symptom_linked: true
   why: >
     Without the controller, no nodes come up for Pending pods and nobody handles the 2-minute spot interruption warning (interruption queue), so pods are cut off without a drain. If the controller runs on a node it created, consolidating that node removes its own footing — the Karpenter docs say to put it on a managed node group or Fargate.
+  measured: >
     Measured on a real EKS cluster: 2/2 on two managed node group nodes with a PDB — pass.
   suggest: "Keep replicas 2 + PDB and pin it to a managed node group with a nodeSelector."
   verify:
@@ -373,6 +374,7 @@
   why: >
     End of support for the Amazon Linux 2 EKS AMI was announced in 2024-11 and no AL2 AMI is published from Kubernetes 1.33 on. After an EKS upgrade Karpenter cannot find an AMI for new nodes and scale-out stops (eks.node-os-skew looks at the OS of current nodes; this check looks at the configuration of nodes yet to come).
     If the AMI is not pinned (no amiSelectorTerms, or @latest), every new AMI release replaces nodes through drift — fine if intended, but business-hours replacement must be blocked with budgets.
+  measured: >
     Measured on a real EKS cluster: the default class was AL2 with no selector → fail.
   suggest: "Switch amiFamily to AL2023 and set amiSelectorTerms alias al2023@v2026… (pinned version). Drift is on (Drift=true), so nodes are replaced in sequence — set budgets first. Karpenter 0.37 should be upgraded to 1.x first (platform.karpenter-version-compat)."
   verify:
@@ -562,6 +564,7 @@
   symptom_linked: false
   why: >
     security.imds-hop-limit looks at the value on instances running now. This check looks at the **cause** — EC2NodeClass metadataOptions.httpPutResponseHopLimit is 2, so every new node also comes up with hop 2. With hop 1, pods (one hop behind the bridge) cannot obtain the node role credentials. httpTokens required enforces IMDSv2. Without root volume encrypted, the node disk (container images, logs, emptyDir) is plaintext.
+  measured: >
     Measured on a real EKS cluster: hop 2 (fail), tokens required, 50Gi gp3 root volume without encryption (warn).
   suggest: "EC2NodeClass metadataOptions.httpPutResponseHopLimit 1 (pods using IRSA or Pod Identity are unaffected), blockDeviceMappings.ebs.encrypted true. Nodes are replaced through drift."
   verify:
@@ -916,7 +919,9 @@
   severity_default: high
   symptom_linked: false
   why: >
-    Karpenter needs EC2 RunInstances, TerminateInstances, CreateFleet and IAM PassRole permissions. Without a dedicated role those permissions end up in the node role, and every pod on the node can create and delete instances. Measured on a real EKS cluster: a dedicated controller role was present — pass.
+    Karpenter needs EC2 RunInstances, TerminateInstances, CreateFleet and IAM PassRole permissions. Without a dedicated role those permissions end up in the node role, and every pod on the node can create and delete instances.
+  measured: >
+    Measured on a real EKS cluster: a dedicated controller role was present — pass.
   suggest: "A dedicated role with KarpenterControllerPolicy via IRSA or Pod Identity."
   verify:
     - "kubectl get sa -n karpenter karpenter -o jsonpath='{.metadata.annotations}'"
@@ -1106,6 +1111,7 @@
   symptom_linked: true
   why: >
     Without an interruption queue (SQS + EventBridge) the 2-minute spot reclaim warning is never received and pods are cut off without a drain (same premise as scaling.karpenter-no-interruption-queue — this check adds "how many were received and actually handled"). SpotInterruptionKind in the hundreds means a pool with frequent spot reclaims, so prod must not sit on a single spot type (resilience.prod-concentration).
+  measured: >
     Measured on a real EKS cluster: queue present; since leader start 252 spot interruptions, 313 rebalance recommendations, 1,005 CordonAndDrain actions, 251 NodeClaims terminated for interruption — warn. 33 cloud API errors (NodeClaimNotFound — re-reading an already deleted node, harmless).
   suggest: "Mix on-demand into the prod NodePool (capacity-type spot,on-demand + weights) or widen the instance types to lower the reclaim probability. If CordonAndDrain is low compared to interruption messages, check the queue permissions."
   verify:
@@ -1451,7 +1457,9 @@
   severity_default: medium
   symptom_linked: true
   why: >
-    NodePool spec.limits is a ceiling against runaway growth, but once the limit is reached that pool cannot grow and pods stay Pending (Karpenter log "exceeds limit"). The metrics karpenter_nodepool_usage/limit give the current ratio. Measured on a real EKS cluster: at most 4.6% — plenty of headroom.
+    NodePool spec.limits is a ceiling against runaway growth, but once the limit is reached that pool cannot grow and pods stay Pending (Karpenter log "exceeds limit"). The metrics karpenter_nodepool_usage/limit give the current ratio.
+  measured: >
+    Measured on a real EKS cluster: at most 4.6% — plenty of headroom.
   suggest: "Raise the limits (see the cost section for a cost ceiling) or split the pool."
   verify:
     - "kubectl get nodepools -o custom-columns=NAME:.metadata.name,LIMITS:.spec.limits,USAGE:.status.resources"
@@ -1719,6 +1727,7 @@
   symptom_linked: false
   why: >
     With cluster_state_synced 0 Karpenter has not read the full node and pod state and stops making scheduling decisions (normal briefly after startup). Consistency errors (check=Termination etc.) mean a NodeClaim and the real instance disagree — a node whose termination never finished may be left behind.
+  measured: >
     Measured on a real EKS cluster: synced, 3 consistency errors (Termination), 0 reconcile errors — warn.
   suggest: "Compare non-Ready entries in kubectl get nodeclaims with instances shutting down in the EC2 console."
   verify:
@@ -1991,7 +2000,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    By default spot-to-spot consolidation is off (to avoid churn), so while a spot node is running it is not replaced even when a cheaper or safer spot type appears. When enabled it only acts with 15 or more candidate instance types, and the Unconsolidatable events disappear. Measured on a real EKS cluster: off, 42 Unconsolidatable events.
+    By default spot-to-spot consolidation is off (to avoid churn), so while a spot node is running it is not replaced even when a cheaper or safer spot type appears. When enabled it only acts with 15 or more candidate instance types, and the Unconsolidatable events disappear.
+  measured: >
+    Measured on a real EKS cluster: off, 42 Unconsolidatable events.
   suggest: "FEATURE_GATES=SpotToSpotConsolidation=true plus a wide instance type list in the NodePool. Turn it off again if churn appears."
   verify:
     - "kubectl get deploy -n karpenter karpenter -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 FEATURE"

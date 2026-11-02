@@ -93,9 +93,11 @@
   severity_default: high
   symptom_linked: true
   why: >
-    An OOM today and an OOM five months ago are different: fail if the last termination is within 7 days, warn if older (measured on a real EKS cluster: OOMs from five months and 19 days ago were reported as high).
+    An OOM today and an OOM five months ago are different: fail if the last termination is within 7 days, warn if older.
     The container exceeded its memory limit and the cgroup OOM killer killed only that container. Either the limit is below real usage or there is a memory leak.
     This differs from SystemOOM, where the whole node runs out of memory (that is the node OS check).
+  measured: >
+    Measured on a real EKS cluster: OOMs from five months and 19 days ago were reported as high.
   cases:
     - { who: Zalando 2019, url: https://www.slideshare.net/try_except_/lets-talk-about-failures-with-kubernetes-hamburg-meetup }
     - { who: Zalando 2019, url: https://github.com/zalando-incubator/kubernetes-on-aws/blob/dev/docs/postmortems/jan-2019-dns-outage.md }
@@ -487,6 +489,7 @@
   why: >
     The scheduler fills nodes by requests. When requests are far above real usage the node is idle yet looks "full", and a new node is started.
     On EKS Karpenter provisions nodes from requests, so this gap is the bill. Real usage is the 7-day p95 (the 5-minute instant value is for reference).
+  measured: >
     Measured on a real EKS cluster: during a spot reclaim a node at 88% requested CPU was using 5%, and a production pod waited two minutes for a slot.
   suggest: Start with the most over-requested workloads, using the KRR recommendation (summary.resources.krr) and the container list of resources.cpu-request-overprovisioned.
   verify:
@@ -581,11 +584,13 @@
     The request is what the scheduler uses to reserve a slot on a node. When p95 usage is below 20% of the request, that difference is idle capacity counted as "full":
     new nodes start (a bill on EKS, lost N+1 headroom in a small k3s cluster) and other pods cannot be placed. Only pods with a request of 100m or more that lived over a day are considered (p95 is meaningless for short-lived pods).
     Over-allocation is safer than under-allocation, so when changing it set the new request to 1.5-2x p95.
+  measured: >
+    Measured on a 2-node small k3s cluster: 18 pods with the 100m default request would have failed without the 250m floor.
   suggest: "Lower the request to p95 x 1.5. If an HPA scales on CPU, a lower request means more frequent scale-outs, so review targetUtilization together. Cross-check with the KRR recommendation (summary.resources.krr.workloads)."
   verify:
     - "quantile_over_time(0.95, rate(container_cpu_usage_seconds_total{namespace=\"<ns>\",container=\"<c>\"}[5m])[7d:15m])"
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].resources.requests.cpu}'"
-  notes: Threshold 0.3 split into fail 0.2 and warn 0.35 to avoid flapping at the 0.3 boundary. fail only for requests of 250m or more (dozens of pods with the 100m default would otherwise all fail; measured as 18 such pods on a 2-node small k3s cluster).
+  notes: Threshold 0.3 split into fail 0.2 and warn 0.35 to avoid flapping at the 0.3 boundary. fail only for requests of 250m or more (dozens of pods with the 100m default would otherwise all fail).
   profiles: [prod, lab]
   test:
     cases:
@@ -841,7 +846,9 @@
   symptom_linked: true
   why: >
     The kernel kills the process the moment memory exceeds the limit (OOMKilled). If p95 is at 90% of the limit, p99 and the maximum have probably already touched it, and a small traffic increase means a restart.
-    resources.oomkilled is the signal after the death; this check is the signal before it. Measured on a real EKS cluster: Loki (512Mi) and the Argo CD controller (768Mi) were OOMKilled this way.
+    resources.oomkilled is the signal after the death; this check is the signal before it.
+  measured: >
+    Measured on a real EKS cluster: Loki (512Mi) and the Argo CD controller (768Mi) were OOMKilled this way.
   cases:
     - { who: Zalando 2019, url: https://www.slideshare.net/try_except_/lets-talk-about-failures-with-kubernetes-hamburg-meetup }
     - { who: Zalando 2019, url: https://github.com/zalando-incubator/kubernetes-on-aws/blob/dev/docs/postmortems/jan-2019-dns-outage.md }
@@ -949,10 +956,12 @@
   symptom_linked: false
   why: >
     KRR (Robusta) recommends per-container requests and limits from 14 days of Prometheus history (simple strategy: CPU request = p95, no CPU limit, memory request = limit = max + 15%).
-    KRR CRITICAL also includes "memory limit larger than the recommendation (max + 15%)", which is noise if used as is (most of the 19 CRITICALs on a 2-node small k3s cluster), so kubegap re-grades on request differences only (lib/resources.py kubegap_level):
+    KRR CRITICAL also includes "memory limit larger than the recommendation (max + 15%)", which is noise if used as is, so kubegap re-grades on request differences only (lib/resources.py kubegap_level):
     fail = memory request below the recommendation (under-allocated: OOM, node overcommit) or CPU request over by 0.2 cores or more / memory request over by 512 MB or more. warn = a smaller difference. A limit-only difference is pass (the CPU limit removal advice is cpu_limit_remove_recommended in the summary).
     UNKNOWN means no data (short-lived pod or absent from Prometheus) or a CPU-based HPA target that KRR declines to recommend for.
     It asks the same question as the kubegap p95 checks (cpu/memory-*-p95) over a different window (14 days) with a different calculation, so a workload flagged by both is certain.
+  measured: >
+    Measured on a 2-node small k3s cluster: most of the 19 KRR CRITICALs were this memory-limit noise.
   suggest: "Look at the saved cores and MB in summary.resources.krr.totals first, then fix requests in top_over_cpu, top_under_memory order. Handle the CPU limit removal list (cpu_limit_remove_recommended) together with the throttling check."
   verify:
     - "krr simple -n <ns> -p http://localhost:9090"
@@ -1973,7 +1982,7 @@
   suggest: Create a 5xx ratio and p99 latency alert for every traffic-receiving service. If the app has no http_* metrics, use the ingress controller or ALB CloudWatch as the source.
   verify:
     - "summary.json observability.rules.symptom_rules / app_rules ; kubectl get prometheusrules -A"
-  notes: "Classification history: at first only http_*, grpc_*, ingress and SLO metrics counted as symptoms, so the app's own metrics (queue length, processing delay) were all classified as cause and a real cluster showed 0 symptoms as critical. Now only container_*, node_* and kube_* are cause; other app metrics are assumed symptoms (app) and the LLM reclassifies them from name and description. That is why expr counts symptom and app separately."
+  notes: "Classification history: at first only http_*, grpc_*, ingress and SLO metrics counted as symptoms, so the app's own metrics (queue length, processing delay) were all classified as cause and the check reported 0 symptoms as critical. Now only container_*, node_* and kube_* are cause; other app metrics are assumed symptoms (app) and the LLM reclassifies them from name and description. That is why expr counts symptom and app separately."
   profiles: [prod, lab]
   test:
     cases:
@@ -2371,6 +2380,7 @@
   symptom_linked: false
   why: >
     If Alertmanager routes do not split by severity, "wake me now" and "look tomorrow" land in the same channel and both get ignored. This is the first cause of alert fatigue (page only on symptoms).
+  measured: >
     Measured: one EKS cluster split routes only by service (env, service, slo) so critical and warning both went to a single Slack channel; a small k3s cluster dropped only info/none to null and sent everything else to a single Discord channel.
   suggest: "Add routes for severity=\"critical\" (or page) -> paging channel and severity=\"warning\" -> ticket or low-priority channel, with a different repeat_interval per severity."
   verify:
@@ -2501,6 +2511,7 @@
   why: >
     "CPU 80%" is a cause; users do not know about CPU. Cause alerts at page severity pile up as impact-free night pages until alerts get ignored. observability.no-symptom-alerts only covers the **absence** of symptom alerts; this check is its counterpart.
     The absence of symptom alerts is already a fail from observability.no-symptom-alerts, so this only warns (no double fail).
+  measured: >
     Measured on real clusters (EKS and small k3s cluster): about 40 kube-prometheus-stack default rules are critical cause alerts (KubeNodeNotReady and the like; some node and control plane rules deserve a page even though they are causes, so the LLM decides by name).
   suggest: "Lower cause rules to severity warning (ticket, dashboard) and keep critical only on symptom rules (5xx ratio, p99, SLO burn rate). Leave platform rules such as node NotReady and etcd as exceptions."
   verify:
@@ -2609,6 +2620,7 @@
   symptom_linked: false
   why: >
     Latency, traffic and errors are visible from the outside via ingress or ALB metrics, but saturation (queue length, DB connection pool, thread pool, in-flight requests) is visible only if the app exports it. Without it you miss "the moment it starts to slow down" and learn only after errors. observability.golden-signals-missing covers latency, traffic and errors; saturation, the signal most often missing, is counted separately here.
+  measured: >
     Measured: 36/36 ingress backends on an EKS cluster and 28/29 on a small k3s cluster had no saturation metric (on EKS only the Kafka namespace and one application namespace exposed queue and pool metrics).
   suggest: "Enable the pool and queue metrics of the app framework (HikariCP, SQLAlchemy pool, uvicorn/gunicorn worker busy, Kafka consumer lag, Redis connected_clients). Failing that, put container CPU throttling and memory working set on a dashboard as saturation proxies."
   verify:
@@ -2699,6 +2711,7 @@
   symptom_linked: false
   why: >
     If there are signs of defined SLOs (Sloth, Pyrra, sli:/slo: recording rules, slo-labelled rules) but no burn rate (error budget consumption speed) alert, the SLO is only a document, and nobody gets paged when the budget burns in a day (burn rate alerts: 14.4 on a 1h/5m window, 6 on a 6h/30m window). observability.no-slo covers the case of **no SLO at all**; this check covers "present but half done".
+  measured: >
     Measured on a real EKS cluster: five slo-labelled rules (success rate and duration of inference and training jobs) but zero burn rate alerts.
   suggest: "Creating SLO CRDs with Sloth or Pyrra generates the recording rules and multi-window burn rate alerts together. If writing by hand, use the six-window rules from SRE Workbook chapter 5."
   verify:
@@ -3178,7 +3191,9 @@
   symptom_linked: false
   why: >
     In-tree provisioners such as kubernetes.io/aws-ebs were removed by the CSI migration from 1.27. PVs created from this StorageClass still work, translated to CSI,
-    but a new PVC bound here is created as gp2 (IOPS tied to size, expensive) with limited volume expansion and snapshot features. Measured on a real EKS cluster: gp2 remained while the default was gp3.
+    but a new PVC bound here is created as gp2 (IOPS tied to size, expensive) with limited volume expansion and snapshot features.
+  measured: >
+    Measured on a real EKS cluster: gp2 remained while the default was gp3.
   suggest: Delete the StorageClass if no PVC uses it; otherwise plan a migration to gp3 (ebs.csi.aws.com). Confirm that the default StorageClass is gp3.
   verify:
     - "kubectl get sc ; kubectl get pvc -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,SC:.spec.storageClassName | grep gp2"
@@ -3263,6 +3278,7 @@
   symptom_linked: false
   why: >
     With retention_enabled false, nothing is deleted even if retention_period (31d) is set. When a single-pod Loki fills its disk, ingestion is refused and logs are lost wholesale.
+  measured: >
     Measured on a real EKS cluster: configured 31d but enabled false, effectively unlimited.
   suggest: "Enable limits_config.retention_period and compactor.retention_enabled: true together. Review with the PVC usage check."
   verify:
@@ -9347,7 +9363,9 @@
   symptom_linked: false
   why: >
     Single-binary Loki dies from a memory spike on one big query (count_over_time over a wide time range, many streams). Logs still in memory (chunks not yet flushed) are lost at that moment, and if the storage is emptyDir everything is lost.
-    kubegap's own queries can be the cause, so it only uses a 1-hour window (measured: a 24-hour query caused an OOMKill).
+    kubegap's own queries can be the cause, so it only uses a 1-hour window.
+  measured: >
+    Measured: a 24-hour query caused an OOMKill.
   suggest: "Raise the memory limit (at least 1-2Gi), set max_query_length and max_entries_limit on the querier, and move storage to a PVC."
   verify:
     - "kubectl get pods -n monitoring -l app=loki -o jsonpath='{.items[*].status.containerStatuses[*].lastState}'"
@@ -9623,7 +9641,9 @@
   symptom_linked: false
   why: >
     Prometheus, Alertmanager, Loki and Grafana data disappears with the pod. When the pod moves to another node or restarts after an OOMKill, metric retention, alert silences, logs and dashboards start from zero.
-    This is the kube-prometheus-stack default (no storageSpec) and the loki-stack default (persistence.enabled=false). Observed on the first real runs.
+    This is the kube-prometheus-stack default (no storageSpec) and the loki-stack default (persistence.enabled=false).
+  measured: >
+    Observed on the first real runs.
   suggest: "Prometheus: prometheusSpec.storageSpec.volumeClaimTemplate. Alertmanager: alertmanagerSpec.storage. Loki: persistence.enabled=true. Grafana: persistence.enabled=true (or an external DB)."
   verify:
     - "kubectl get sts,deploy -n monitoring -o json | jq -r '.items[] | select(.spec.template.spec.volumes[]? | has(\"emptyDir\")) | .metadata.name'"
@@ -9762,7 +9782,9 @@
   symptom_linked: false
   why: >
     Idle cost = node hourly price x (1 - 7-day CPU p95 utilization). Nodes stay empty because requests exceed actual usage and the scheduler sees them as "full", so this pairs with cost.request-waste (request excess leads to node excess).
-    On-demand uses the Pricing API list price, so Savings Plan and RI discounts are not reflected -- read it next to the actual Cost Explorer bill (summary.cost.bill). Measured on a 7-node EKS cluster: 0.71 of 15.5 cores used at p95 (4.6%), and most of the estimated 400 USD/month idle cost came from the system nodes (managed node group plus on-demand system pool).
+    On-demand uses the Pricing API list price, so Savings Plan and RI discounts are not reflected -- read it next to the actual Cost Explorer bill (summary.cost.bill).
+  measured: >
+    Measured on a 7-node EKS cluster: 0.71 of 15.5 cores used at p95 (4.6%), and most of the estimated 400 USD/month idle cost came from the system nodes (managed node group plus on-demand system pool).
   suggest: "(1) Lower requests to the p95 level (KRR) so nodes empty out and Karpenter consolidation removes them. (2) Move the system pool to smaller instances (t family). (3) Absorb the managed node group into a Karpenter pool."
   verify:
     - "sum(rate(container_cpu_usage_seconds_total{container!=\"\"}[5m])) / sum(kube_node_status_allocatable{resource=\"cpu\"})"
@@ -9965,7 +9987,9 @@
   evidence: "f\"Of {item.get('load_balancers')} LBs (base charge {item.get('lb_monthly_usd_base')} USD/month), zero requests and bytes in 24h: {item.get('idle_load_balancers')}. NAT gateways {item.get('nat_gateways')} ({item.get('nat_monthly_usd_base')} USD/month + data)\""
   severity_default: low
   symptom_linked: false
-  why: ALB and NLB cost 0.0225 USD per hour (16 USD per month) even with no requests. If 24-hour RequestCount (ALB) or ProcessedBytes (NLB) is 0, nobody uses it. Measured on a real EKS cluster: an internet-facing NLB in front of a DB port (the same target as traffic.db-exposed).
+  why: ALB and NLB cost 0.0225 USD per hour (16 USD per month) even with no requests. If 24-hour RequestCount (ALB) or ProcessedBytes (NLB) is 0, nobody uses it.
+  measured: >
+    Measured on a real EKS cluster: an internet-facing NLB in front of a DB port (the same target as traffic.db-exposed).
   suggest: "Delete it if unused (in Terraform if it is defined there). If it is in use and just quiet for 24 hours, leave it."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/NetworkELB --metric-name ProcessedBytes --dimensions Name=LoadBalancer,Value=<dim> --statistics Sum --period 86400 --start-time <24h ago> --end-time <now>"
@@ -10011,7 +10035,9 @@
   evidence: "f\"Node {item['node']} ({item['instance_type']}, pool {item['pool']}): CPU p95 {item['cpu_p95_ratio']}, memory p95 {item['memory_p95_ratio']}, {item['monthly_usd']} USD/month\""
   severity_default: low
   symptom_linked: false
-  why: With consolidation (WhenUnderutilized) enabled, such nodes should disappear. The reasons they remain are do-not-disrupt pods, PDBs, budgets or recent creation (measured: a node freshly launched after a spot reclaim that day). Read together with scaling.karpenter-expired-not-replaced.
+  why: With consolidation (WhenUnderutilized) enabled, such nodes should disappear. The reasons they remain are do-not-disrupt pods, PDBs, budgets or recent creation. Read together with scaling.karpenter-expired-not-replaced.
+  measured: >
+    Measured: one such node had been launched after a spot reclaim that day.
   suggest: "Look through the node's pod list for the reason they cannot move (annotations, PDB, hostPath). If there is none, check the consolidation decisions in the Karpenter logs."
   verify:
     - "kubectl describe node <node> | grep -A20 'Non-terminated Pods'"
@@ -10040,7 +10066,9 @@
   evidence: "f\"{item.get('nodes')} nodes, allocatable {item.get('allocatable_cpu')} cores, 7-day p95 actual use {item.get('p95_used_cpu')} cores ({item.get('p95_util_ratio')}), request total {item.get('requested_cpu')} cores ({item.get('request_over_usage')}x actual use). Would requests still fit without the largest node: {item.get('can_drop_largest_node')}\""
   severity_default: low
   symptom_linked: false
-  why: A small k3s cluster has no bill, so look at efficiency instead. Under 10% p95 utilization, most of the hardware is only burning electricity; when requests are over 5x actual use, "can one node be removed" comes out false because of requests -- lowering requests is the first step toward removing a node. Measured on a 2-node k3s k3s: 0.92 of 18 cores at p95 (5.1%), 6.42 cores requested (7x), N-1 not possible.
+  why: A small k3s cluster has no bill, so look at efficiency instead. Under 10% p95 utilization, most of the hardware is only burning electricity; when requests are over 5x actual use, "can one node be removed" comes out false because of requests -- lowering requests is the first step toward removing a node.
+  measured: >
+    Measured on a 2-node k3s cluster: 0.92 of 18 cores at p95 (5.1%), 6.42 cores requested (7x), N-1 not possible.
   suggest: "Lower requests to the p95 level (KRR). Once N-1 fits, power off one node or repurpose it."
   verify:
     - "sum(rate(container_cpu_usage_seconds_total{container!=\"\"}[1h])) / sum(kube_node_status_allocatable{resource=\"cpu\"})"
@@ -10311,6 +10339,7 @@
   symptom_linked: false
   why: >
     privileged, hostPID, hostIPC and SYS_ADMIN/NET_ADMIN remove container isolation. If that container is compromised, the node is compromised. System DaemonSets such as CNI, CSI and node-exporter need it by design and are kept separately as severe_system. hostNetwork and hostPath are rated one level lower (warn).
+  measured: >
     Measured on real clusters: a VPN proxy with NET_ADMIN and hostPath /dev/net/tun on EKS; a TURN server with hostNetwork on the small k3s cluster.
   cases:
     - { who: JW Player 2019, url: https://medium.com/jw-player-engineering/how-a-cryptocurrency-miner-made-its-way-onto-our-internal-kubernetes-clusters-9b09c4704205 }
@@ -10450,6 +10479,7 @@
   symptom_linked: false
   why: >
     A literal value in the manifest is exposed in Git, kubectl describe pod, the Argo CD UI and crash dumps. Variables named PASSWORD, SECRET, TOKEN or API_KEY were selected; values that are numbers, booleans, short strings, paths or Reloader's STAKATER_* were excluded. It is still a name-based guess, so these are "candidates".
+  measured: >
     Measured on a k3s: an Elasticsearch/Kibana ELASTIC_PASSWORD set in plain text in a Deployment, a StatefulSet and a CronJob.
   suggest: "Move to a Secret and use valueFrom.secretKeyRef. If there is an external store, pull it in with an ExternalSecret. Rotate the value (treat it as already exposed)."
   verify:
@@ -10574,7 +10604,9 @@
   symptom_linked: false
   why: >
     NetworkPolicy is implemented by the CNI. VPC CNI needs the add-on setting enableNetworkPolicy (aws-eks-nodeagent --enable-network-policy=true), and only then are PolicyEndpoint objects created. When it is off, policies are merely stored and all traffic passes. Whoever wrote the policy believes it is blocking.
-    Measured on a real EKS cluster: 3 NetworkPolicies in production namespaces with --enable-network-policy=false and 0 PolicyEndpoints. k3s enforces by default through its built-in kube-router (unless --disable-network-policy).
+    k3s enforces by default through its built-in kube-router (unless --disable-network-policy).
+  measured: >
+    Measured on a real EKS cluster: 3 NetworkPolicies in production namespaces with --enable-network-policy=false and 0 PolicyEndpoints.
   suggest: "VPC CNI add-on configurationValues {\"enableNetworkPolicy\": \"true\"} (aws eks update-addon, suggestion only) -> confirm PolicyEndpoints are created -> then default-deny."
   verify:
     - "kubectl -n kube-system get ds aws-node -o jsonpath='{.spec.template.spec.containers[?(@.name==\"aws-eks-nodeagent\")].args}'; kubectl get policyendpoints -A"
@@ -10696,7 +10728,9 @@
   symptom_linked: false
   why: >
     With a hop limit of 2, a pod network namespace can reach 169.254.169.254 and obtain the node instance role's credentials. Then every pod not using IRSA has the node role's permissions (the EKS node role covers ECR, CNI, EBS and more). With hop limit 1 only the node can reach it.
-    Workloads using IRSA or Pod Identity do not need IMDS. Measured on a 7-node EKS cluster: all nodes at hop 2 (tokens required), 6 IRSA SAs.
+    Workloads using IRSA or Pod Identity do not need IMDS.
+  measured: >
+    Measured on a 7-node EKS cluster: all nodes at hop 2 (tokens required), 6 IRSA SAs.
   suggest: "Karpenter EC2NodeClass spec.metadataOptions.httpPutResponseHopLimit 1, and 1 in the managed node group launch template as well. Only hostNetwork pods (CNI, CSI) need IMDS and they work with hop 1."
   verify:
     - "aws ec2 describe-instances --filters Name=tag:kubernetes.io/cluster/<c>,Values=owned --query 'Reservations[].Instances[].MetadataOptions.HttpPutResponseHopLimit'"
@@ -10754,8 +10788,10 @@
   severity_default: medium
   symptom_linked: false
   why: >
-    The Polaris Security category rates runAsRootAllowed, privilegeEscalationAllowed, runAsPrivileged, hostNetwork/PID, dangerousCapabilities and sensitiveContainerEnvVar as danger. On both measured clusters more than half of user workloads allowed runAsRoot and privilegeEscalation -- the cause is chart defaults (no securityContext),
-    so a finding per workload would be dozens of items (68 on the small k3s cluster); instead one cluster-level finding is reported and the list goes into the evidence and summary.security.polaris.workloads. What actually breaks isolation is reported separately as fail by privileged-or-host-access.
+    The Polaris Security category rates runAsRootAllowed, privilegeEscalationAllowed, runAsPrivileged, hostNetwork/PID, dangerousCapabilities and sensitiveContainerEnvVar as danger. These usually come from chart defaults (no securityContext),
+    so a finding per workload would be dozens of items; instead one cluster-level finding is reported and the list goes into the evidence and summary.security.polaris.workloads. What actually breaks isolation is reported separately as fail by privileged-or-host-access.
+  measured: >
+    Measured: on both clusters more than half of user workloads allowed runAsRoot and privilegeEscalation, 68 workloads on the small k3s cluster.
   cases:
     - { who: JW Player 2019, url: https://medium.com/jw-player-engineering/how-a-cryptocurrency-miner-made-its-way-onto-our-internal-kubernetes-clusters-9b09c4704205 }
     - { who: Target 2018, url: https://www.youtube.com/watch?v=V0DVkrHf08k }
@@ -11207,7 +11243,9 @@
   symptom_linked: false
   why: >
     Delete is the default, so deleting the PVC (namespace deletion, Argo CD prune, a StatefulSet recreation mistake) removes the EBS volume or disk immediately. With a backup it is a recovery-time problem; without one it is final (read with resilience.no-backup and eks.no-backup-policy).
-    Measured on a real EKS cluster: a dozen "pre-delete backup of orphan PVC" snapshots -- someone took manual snapshots before deleting PVCs. reclaimPolicy Retain replaces that procedure.
+    reclaimPolicy Retain replaces the manual snapshot-before-delete procedure.
+  measured: >
+    Measured on a real EKS cluster: a dozen "pre-delete backup of orphan PVC" snapshots -- someone took manual snapshots before deleting PVCs.
   cases:
     - { who: InfluxData 2023, url: https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/ }
   suggest: "Keep a separate StorageClass with reclaimPolicy Retain for DBs, or patch existing PVs with `kubectl patch pv <pv> -p '{\"spec\":{\"persistentVolumeReclaimPolicy\":\"Retain\"}}'` (suggestion only). Exclude PVCs from Argo CD prune."
@@ -11577,8 +11615,10 @@
   severity_default: medium
   symptom_linked: false
   why: >
-    On EKS the standard way to back up PVs from inside Kubernetes is CSI VolumeSnapshot (snapshot-controller add-on + VolumeSnapshotClass), and Velero uses it too. Without the CRD, the ebs-csi controller logs "VolumeSnapshotContent not found" about 1,500 times a day (log signature ebs-csi.snapshot-crd-missing) and backups depend solely on manual console/CLI snapshots (measured: a dozen "pre-delete backup" snapshots).
+    On EKS the standard way to back up PVs from inside Kubernetes is CSI VolumeSnapshot (snapshot-controller add-on + VolumeSnapshotClass), and Velero uses it too. Without the CRD, the ebs-csi controller logs "VolumeSnapshotContent not found" about 1,500 times a day (log signature ebs-csi.snapshot-crd-missing) and backups depend solely on manual console/CLI snapshots.
     If the CRD exists but there are 0 snapshots, it is installed and unused.
+  measured: >
+    Measured: a dozen "pre-delete backup" snapshots taken by hand.
   suggest: "Install the EKS snapshot-controller add-on -> VolumeSnapshotClass (ebs.csi.aws.com) -> daily snapshots of prod PVCs on a DLM or Velero schedule."
   verify:
     - "kubectl get crd volumesnapshots.snapshot.storage.k8s.io; kubectl get volumesnapshotclasses; aws eks describe-addon --cluster-name <c> --addon-name snapshot-controller"
@@ -11945,8 +11985,10 @@
   severity_default: medium
   symptom_linked: false
   why: >
-    An image with :latest or no tag can come up as a different binary on restart or node replacement, and rollback is impossible (there is no record of which version it was). Measured on a k3s: a TURN server on `coturn/coturn:latest` crashed for 27 days -- the image changing after a reboot was the likely cause.
+    An image with :latest or no tag can come up as a different binary on restart or node replacement, and rollback is impossible (there is no record of which version it was).
     A pinned tag with imagePullPolicy Always goes to the registry on every start, so a registry outage becomes a start failure (warn).
+  measured: >
+    Measured on a k3s: a TURN server on `coturn/coturn:latest` crashed for 27 days -- the image changing after a reboot was the likely cause.
   cases:
     - { who: Datadog 2019, url: https://www.youtube.com/watch?v=QKI-JRs2RIE }
   suggest: "Pin the tag to a version (or digest) and use imagePullPolicy IfNotPresent. CI bumps the tag and Argo CD applies it."
@@ -12066,7 +12108,9 @@
   symptom_linked: false
   why: >
     Standard app.kubernetes.io/* labels let dashboards, alerts, cost aggregation, NetworkPolicy and PDB selectors pick workloads consistently. Without them every monitoring tool ends up using a different label; Polaris metadataAndInstanceMismatched points at the same thing.
-    Measured: 23% on a small k3s cluster, 91% on an EKS cluster. A finding per workload would be dozens of items, so one cluster-level ratio is reported and the list goes into the evidence.
+    A finding per workload would be dozens of items, so one cluster-level ratio is reported and the list goes into the evidence.
+  measured: >
+    Measured: 23% on a small k3s cluster, 91% on an EKS cluster.
   suggest: "Put app.kubernetes.io/name, instance, version, part-of and managed-by into the chart or kustomize base common labels (commonLabels)."
   verify:
     - "kubectl get deploy -A -o json | jq -r '.items[] | select((.metadata.labels // {} | keys | map(startswith(\"app.kubernetes.io/\")) | any) | not) | .metadata.namespace+\"/\"+.metadata.name'"
@@ -12922,7 +12966,9 @@
   severity_default: medium
   symptom_linked: false
   why: >
-    A Pending PVC means no StorageClass or an AZ/capacity problem kept the volume from being created, so its pod is Pending too. A Released PV means the PVC was deleted but reclaim Retain kept the disk (EBS cost). A Bound PVC used by no pod is data from a deleted workload or a backup target (measured on a k3s: a leftover DB volume in default).
+    A Pending PVC means no StorageClass or an AZ/capacity problem kept the volume from being created, so its pod is Pending too. A Released PV means the PVC was deleted but reclaim Retain kept the disk (EBS cost). A Bound PVC used by no pod is data from a deleted workload or a backup target.
+  measured: >
+    Measured on a k3s: a leftover DB volume in default.
   suggest: "Pending: `kubectl describe pvc` events. Released PV: verify the data, then delete (EBS snapshot first). Unused PVC: back up, then delete."
   verify:
     - "kubectl get pvc -A | grep -v Bound; kubectl get pv | grep -E 'Released|Failed'"
@@ -13013,8 +13059,10 @@
   severity_default: low
   symptom_linked: false
   why: >
-    A Deployment keeps revisionHistoryLimit (default 10) old ReplicaSets for rollback. With 60 Deployments, 600 ReplicaSets pile up in etcd and apiserver LIST and watch get heavier (measured on an EKS cluster: the most numerous etcd object type was ReplicaSets in kube-system, over 400).
+    A Deployment keeps revisionHistoryLimit (default 10) old ReplicaSets for rollback. With 60 Deployments, 600 ReplicaSets pile up in etcd and apiserver LIST and watch get heavier.
     Rollback usually needs only the previous 1-2, and with GitOps, Git is the history.
+  measured: >
+    Measured on an EKS cluster: the most numerous etcd object type was ReplicaSets in kube-system, over 400.
   cases:
     - { who: Airbnb 2020, url: https://www.youtube.com/watch?v=4CT0cI62YHk }
   suggest: "Deployment spec.revisionHistoryLimit 3 (as a shared chart value)."
@@ -13079,6 +13127,7 @@
   symptom_linked: false
   why: >
     The ALB idle timeout is "how long to wait on a connection with no request or response flowing". The default is 60s; when it is raised to 300-3600s because of slow backends, a stalled dependency makes clients and the ALB hold connections for that long and the incident spreads slowly. App-level timeouts cannot be seen from manifests, so only the ALB annotation (idle_timeout.timeout_seconds) is considered. Long is intentional for WebSocket and SSE -- the LLM decides from the hostname.
+  measured: >
     Measured on a real EKS cluster: a shared ALB at 300s (5x the 60s default); not applicable to NLBs.
   suggest: "Split WebSocket and streaming ingresses into a separate ALB group and keep the rest at 60-120s. Set explicit timeouts in the app's HTTP clients and DB drivers."
   verify:
@@ -13120,6 +13169,7 @@
   symptom_linked: false
   why: >
     target-type instance is two hops (ALB -> node NodePort -> kube-proxy -> pod), so there is no per-pod distribution (pods on one node get swamped, keep-alive skew) and pod readiness gates cannot guarantee "traffic only after target registration", producing 5xx during deployments. ip mode is recommended and works directly with VPC CNI.
+  measured: >
     Measured on a real EKS cluster: all 52 target groups were ip -> pass.
   suggest: "Ingress annotation alb.ingress.kubernetes.io/target-type: ip (Service as ClusterIP). On the namespace, elbv2.k8s.aws/pod-readiness-gate-inject: enabled."
   verify:
@@ -13170,6 +13220,7 @@
   symptom_linked: false
   why: >
     On pod deletion, kubelet sends SIGTERM and SIGKILLs after the grace period. Under 15s, the pod dies before ALB deregistration (several seconds) and in-flight requests finish, so every deployment and drain produces 5xx; over 300s, drains, rolling updates and Karpenter consolidation stall for that long. Pairs with preStop presence (resilience.no-prestop) and PID 1 shells (shell-pid1-no-prestop).
+  measured: >
     Measured: all prod serving workloads on both the EKS cluster and the small k3s cluster were at the default 30s -> pass.
   cases:
     - { who: loveholidays 2019, url: https://deploy.live/blog/the-shipwreck-of-gke-cluster-upgrade/ }
@@ -13251,6 +13302,7 @@
   symptom_linked: false
   why: >
     A Deployment keeps revisionHistoryLimit (default 10) previous ReplicaSets and `kubectl rollout undo` reverts to them. At 0 the old ReplicaSet is deleted right after the rollout and rollback is impossible -- even with GitOps, Git revert -> sync takes minutes. The opposite of hygiene.old-replicasets (too many piling up).
+  measured: >
     Measured: no user workload at 0 (only the 3 k3s built-ins in the small k3s cluster's kube-system -- managed by the distribution, excluded).
   suggest: "revisionHistoryLimit 3-5. Even under Argo CD, rollout undo is the fastest emergency rollback."
   verify:
@@ -13340,6 +13392,7 @@
   symptom_linked: true
   why: >
     Separate from the allocatable that kubelet sees, this is the real headroom including the kernel, page cache, host daemons and containers without limits. Below 10%, kubelet's memory.available eviction starts or the kernel OOM killer may kill kubelet or containerd (a precursor of node.kernel-oom-node-level). The metric (node_memory_available_ratio) had been collected without a check until now.
+  measured: >
     Measured: lowest 0.38 on an EKS node, 0.65 on the small k3s cluster -> pass.
   cases:
     - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-25-prometheus-on-live-cluster-down.html }
@@ -13390,6 +13443,7 @@
   symptom_linked: true
   why: >
     NIC errors are corrupted packets being retransmitted, which apps only see as intermittent timeouts and slow responses. ENA driver errors and link flaps on EKS, cable and driver problems on bare metal are caught here. Virtual interfaces (veth, cni, flannel, tailscale) are excluded -- flannel is covered by traffic.flannel-*.
+  measured: >
     Measured on a real EKS cluster: one node's eth0 had 1,705 errors in 24h while the others had 0. Small k3s cluster 0.
   suggest: "On the node, ethtool -S eth0 | grep -i err shows the kind (rx_crc, tx_timeout, bw_in_allowance_exceeded, etc.). ENA allowance exceeded means the instance network limit was hit, so use a larger instance type or split the traffic."
   verify:
@@ -13441,6 +13495,7 @@
   symptom_linked: true
   why: >
     Pods leaving the cluster are SNATed to the node IP, and many short connections tie up the source ports (net.ipv4.ip_local_port_range, about 28,000 by default) in TIME_WAIT until they run out -- new connections are delayed 1-3s or fail while node CPU and memory look normal, so it is hard to find (Prezi incident). node.sysctl-tuning covers the port range width; this check looks at the actual socket count.
+  measured: >
     Measured: max 208 on the EKS cluster, 220 on the small k3s cluster -> pass.
   suggest: "Reuse connections with keep-alive (HTTP client pools), or widen net.ipv4.ip_local_port_range (1024 65535) and set tcp_tw_reuse=1. Spread workloads with many external calls across NAT gateways or egress."
   verify:
@@ -13488,6 +13543,7 @@
   symptom_linked: true
   why: >
     kubelet periodically asks the container runtime for the status of all pods again (PLEG relist). With many containers or a slow runtime or disk this takes longer, and if it exceeds 3s for 3 minutes kubelet marks the node NotReady with "PLEG is not healthy" -- every pod on that node is evicted. The log signature kubelet.pleg-not-healthy looks after the event; this metric looks before it.
+  measured: >
     Measured: p99 5ms on the EKS cluster, 17ms on the small k3s cluster -> pass.
   cases:
     - { who: Target 2019, url: https://danveloper.medium.com/on-infrastructure-at-scale-a-cascading-failure-of-distributed-systems-7cff2a3cd2df }
@@ -13538,6 +13594,7 @@
   symptom_linked: false
   why: >
     Each WATCH occupies apiserver memory and etcd event fan-out. kubelet, kube-proxy and the CNI opening dozens per node is normal; beyond that means controllers, CI runners or dashboards creating a new informer per resource. Combined with a restart storm (informer resync) it spreads into apiserver latency and 429s.
+  measured: >
     Measured: 108 per node on a 7-node EKS cluster, 637 on a 2-node small k3s cluster (some 20 controllers on 2 nodes -- fewer nodes means a higher per-node figure) -> small k3s cluster warn.
   cases:
     - { who: Civis Analytics 2019, url: https://medium.com/@CivisAnalytics/https-medium-com-civis-analytics-breaking-kubernetes-how-we-broke-and-fixed-our-k8s-cluster-adfa6fbade61 }
@@ -13584,6 +13641,7 @@
   symptom_linked: false
   why: >
     A 401 is a call with a wrong token or certificate. A steady rate above 0.05/s (180 per hour) means a pod with an expired ServiceAccount token, CI using a revoked user's kubeconfig, or a wrong Prometheus scrape config; a spike may be an intrusion attempt. On EKS, controlplane.authenticator-failures sees the same thing from logs.
+  measured: >
     Measured: 0 on both the EKS cluster and the small k3s cluster.
   cases:
     - { who: Oath 2018, url: https://www.youtube.com/watch?v=likHm-KHGWQ }
@@ -13627,7 +13685,9 @@
   severity_default: high
   symptom_linked: false
   why: >
-    EKS etcd is invisible, but the apiserver reports the DB size as apiserver_storage_size_bytes (exposed on EKS 1.32 as measured). EKS etcd becomes read-only at 8GiB and the cluster stops. Events, completed Jobs and CR status (Argo CD Application, cert-manager Order, etc.) are the usual culprits. For the small k3s cluster's embedded etcd, platform.k3s-datastore-large sees the same via du.
+    EKS etcd is invisible, but the apiserver reports the DB size as apiserver_storage_size_bytes. EKS etcd becomes read-only at 8GiB and the cluster stops. Events, completed Jobs and CR status (Argo CD Application, cert-manager Order, etc.) are the usual culprits. For the small k3s cluster's embedded etcd, platform.k3s-datastore-large sees the same via du.
+  measured: >
+    Measured: apiserver_storage_size_bytes was exposed on EKS 1.32.
     Measured: 108 MiB on the EKS cluster, 38 MiB on the small k3s cluster -> pass.
   cases:
     - { who: Fullstaq (anonymous client) 2019, url: https://pieterlange.github.io/failure-stories/2019-06.dex.html }
@@ -13709,6 +13769,7 @@
   symptom_linked: true
   why: >
     The JVM uses metaspace, thread stacks, direct memory and the code cache on top of the heap. If -Xmx equals the limit or exceeds 85% of it, the whole container is OOMKilled before the heap fills -- the app log has no OutOfMemoryError, so the cause is never found (Airbnb 2019). MaxRAMPercentage=100 is the same. Conversely, with no heap setting the JVM uses only its default (25% of the limit) and the other 75% is reserved and wasted (warn for prod only).
+  measured: >
     Measured: Kafka with -Xmx1024m / limit 2Gi (0.5) passed; a jmx-exporter with MaxRAMPercentage=100 / limit 128Mi (heap = limit) -> fail; on the small k3s cluster an API server at 50% and Elasticsearch with -Xmx1g / 3Gi passed.
   cases:
     - { who: Airbnb 2019, url: https://www.youtube.com/watch?v=FrQ8Lwm9_j8 }
@@ -13796,6 +13857,7 @@
   symptom_linked: false
   why: >
     Mesh proxies, log collectors and metrics exporter sidecars attach to every pod and multiply by the replica count. When the sidecar request total exceeds the main container's, half the node capacity goes to auxiliary functions and KRR recommendations and bin-packing math get blurred as much. The main container is the one with the largest request.
+  measured: >
     Measured: all multi-container workloads on both clusters (7 on EKS, 4 on the small k3s cluster) had a sidecar share under 50% -> pass.
   suggest: "Cut sidecar requests to the 7-day p95 (resources.p95), and see whether exporters can move from pod sidecars to a single Deployment per namespace."
   verify:
@@ -13852,6 +13914,7 @@
   symptom_linked: false
   why: >
     A rule with no host accepts any Host header, and *.example.com accepts every subdomain -- scanners, typo domains and another team's new subdomain land on this backend, and path priority gets mixed with other ingresses on the same LB (shared ALB group) (Target 2018, told in the KubeCon talk "How NOT to do Kubernetes"). Only internet-facing ingresses are considered.
+  measured: >
     Measured: no public Ingress with a wildcard or missing host on either cluster -> pass.
   cases:
     - { who: Target 2018, url: https://www.youtube.com/watch?v=V0DVkrHf08k }
@@ -13918,7 +13981,9 @@
   symptom_linked: false
   why: >
     The kubelet rate-limits its writes of pod and node status to the apiserver with kubeAPIQPS (old default 5, default 50 since 1.27). With dozens of pods on a node, 5 QPS makes status updates lag after restarts or evictions, so Deployments sit in "progressing" for a long time and HPA/PDB decisions come late (Zalando 2019 kubelet QPS postmortem). On clusters with many nodes this compounds apiserver 429s.
-    Measured: a small k3s cluster passes with 50/100 (k3s default); EKS AL2 nodes also default to 50.
+    k3s defaults to 50/100 and EKS AL2 nodes to 50.
+  measured: >
+    Measured: a small k3s cluster passed with 50/100.
   cases:
     - { who: Zalando 2019, url: https://github.com/zalando-incubator/kubernetes-on-aws/blob/dev/docs/postmortems/jun-2019-kubelet-qps.md }
   suggest: "Set kubeAPIQPS 50 and kubeAPIBurst 100 in the kubelet config (on EKS: kubelet-extra-args in the node group launch template, or EC2NodeClass.spec.kubelet)."
@@ -14215,7 +14280,8 @@
   symptom_linked: false
   why: >
     An exec probe forks a process inside the container every period. With many pods it eats node CPU (Datadog case), and when the node is busy it does not finish within timeoutSeconds 1s, producing false failures and false restarts.
-    Measured on a k3s k3s: a Postgres pg_isready exec probe hit the 1s timeout during CPU throttling and produced 15 Unhealthy events.
+  measured: >
+    Measured on a k3s cluster: a Postgres pg_isready exec probe hit the 1s timeout during CPU throttling and produced 15 Unhealthy events.
   cases:
     - { who: NRE Labs 2018, url: https://oswalt.dev/2018/12/december-4-nre-labs-outage-post-mortem/ }
     - { who: Datadog 2019, url: https://www.youtube.com/watch?v=QKI-JRs2RIE }
@@ -14646,7 +14712,9 @@
   symptom_linked: true
   why: >
     The point of 2 replicas is to survive one dying, but if both sit on the same node they vanish together the moment that node dies (Moonlight case). Without a spread declaration (topologySpreadConstraints, podAntiAffinity)
-    the scheduler packs pods onto whichever node has room, and Karpenter consolidation actively gathers them onto one node. Measured on a real EKS cluster: all 4 production Deployments on a single node.
+    the scheduler packs pods onto whichever node has room, and Karpenter consolidation actively gathers them onto one node.
+  measured: >
+    Measured on a real EKS cluster: all 4 production Deployments on a single node.
   cases:
     - { who: Moonlight 2019, url: https://updates.moonlightwork.com/outage-post-mortem-87370 }
     - { who: Airbnb 2019, url: https://www.youtube.com/watch?v=QXApVwRBeys }
@@ -14755,8 +14823,9 @@
   symptom_linked: true
   why: >
     If there are two or more nodes but required nodeAffinity, nodeSelector or taints leave only one eligible node, every replica is on that node no matter the replica count or topologySpread declaration — and when that node dies the workload cannot come back anywhere.
-    Measured on a 2-node k3s k3s: a required nodeAffinity avoiding the `role=observability` label (intent: keep apps off the observability node) combined with that label on node B pinned 15 production Deployments to node A, and when node A went down abruptly they were all unavailable for about 3 minutes.
     A hostname nodeSelector (resilience.single-node-dependency) is an explicit pin; this check catches label combinations that leave only one node as a side effect.
+  measured: >
+    Measured on a 2-node k3s cluster: a required nodeAffinity avoiding the `role=observability` label (intent: keep apps off the observability node) combined with that label on node B pinned 15 production Deployments to node A, and when node A went down abruptly they were all unavailable for about 3 minutes.
   suggest: "Change required to preferred (weight 100): the node is preferred normally and pods move elsewhere when it dies. Keep genuinely necessary pins (local-path PV, GPU) and record the reason."
   verify:
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.affinity.nodeAffinity}' ; kubectl get nodes --show-labels"
@@ -15017,8 +15086,10 @@
   symptom_linked: true
   why: >
     If allocatable minus the largest node is smaller than the sum of all requests (excluding DaemonSets), some pods find no room when one node is lost. On a small k3s cluster without an autoscaler those pods never start again;
-    with Karpenter they wait until a new node is up (measured p50 62s, longer without spot capacity). Measured on a real EKS cluster: 43.5GB of memory requests vs 40GB — a backend was Pending for 2 minutes during a spot reclaim that day.
+    with Karpenter they wait until a new node is up (1-2 minutes, longer without spot capacity).
     Unmet N+1 is a critical candidate regardless of profile — the LLM raises it based on production impact.
+  measured: >
+    Measured on a real EKS cluster: new nodes came up in p50 62s; 43.5GB of memory requests vs 40GB — a backend was Pending for 2 minutes during a spot reclaim that day.
   suggest: "Reduce over-requesting first (resources.cpu-request-overprovisioned, KRR) — actual usage is often single-digit percent, so trimming requests alone usually restores N+1. Then add a node or an on-demand fallback in the Karpenter requirements."
   verify:
     - "sum(kube_node_status_allocatable{resource=\"memory\"}) - max(kube_node_status_allocatable{resource=\"memory\"})"
@@ -15233,7 +15304,8 @@
   symptom_linked: true
   why: >
     Backup, cleanup and sync CronJobs are only worth anything when they succeed. If the last success is more than 3 intervals ago, it has stopped quietly (image pull failure, expired secret, full disk). If failed Jobs remain, the reason is in the Job's conditions.
-    Measured on a k3s k3s: 6 CronJobs with no success for days to weeks.
+  measured: >
+    Measured on a k3s cluster: 6 CronJobs with no success for days to weeks.
   suggest: "`kubectl get jobs -n <ns> -l <cronjob label>` and the pod logs of the failed Job. Check whether a KubeJobFailed alert had been firing (observability.alert-firing-stale)."
   verify:
     - "kubectl get cronjobs -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,SCHEDULE:.spec.schedule,LAST:.status.lastScheduleTime,SUCCESS:.status.lastSuccessfulTime"
@@ -15495,7 +15567,9 @@
   severity_default: low
   symptom_linked: false
   why: >
-    Finished Jobs and pods that are never deleted weigh on etcd and apiserver LIST calls (measured on a small k3s cluster as the cause of 8 rps of event LISTs) and make kubectl get pods hard to read. Pods that went Failed through eviction are not cleaned up by the ReplicaSet and keep KubePodNotReady firing (12 of them measured on an EKS cluster).
+    Finished Jobs and pods that are never deleted weigh on etcd and apiserver LIST calls and make kubectl get pods hard to read. Pods that went Failed through eviction are not cleaned up by the ReplicaSet and keep KubePodNotReady firing.
+  measured: >
+    Measured: on a small k3s cluster they caused 8 rps of event LISTs; on an EKS cluster 12 evicted pods kept KubePodNotReady firing.
   cases:
     - { who: Zalando 2019, url: https://www.slideshare.net/try_except_/lets-talk-about-failures-with-kubernetes-hamburg-meetup }
     - { who: Zalando 2018, url: https://www.slideshare.net/try_except_/running-kubernetes-in-production-a-million-ways-to-crash-your-cluster-devopscon-munich-2018 }
@@ -15543,6 +15617,7 @@
   symptom_linked: false
   why: >
     When nodes are full the scheduler evicts lower-priority pods to make room for higher ones. If non-critical pods (batch, dev) outrank production, production gets pushed out (Grafana Labs case). If everything is 0, eviction order is left to chance, and under node pressure the kubelet chooses by usage relative to request only.
+  measured: >
     Measured on two clusters: zero user PriorityClasses, every user pod at priority 0.
   cases:
     - { who: Grafana Labs 2019, url: https://grafana.com/blog/2019/07/24/how-a-production-outage-was-caused-using-kubernetes-pod-priorities/ }
@@ -16076,7 +16151,9 @@
   severity_default: high
   symptom_linked: true
   why: >
-    The ALB does not route to targets its own health check marks unhealthy. If some are unhealthy, load piles onto the rest; **if all are unhealthy it fails open and routes to all of them** (not a 503 — measured on a real EKS cluster, a frontend whose targets were all unhealthy still served 17,213 requests. So this is not "an outage" but "a health check that filters nothing"). It is separate from Kubernetes readiness, so a pod can be Ready yet excluded by the ALB.
+    The ALB does not route to targets its own health check marks unhealthy. If some are unhealthy, load piles onto the rest; **if all are unhealthy it fails open and routes to all of them** (not a 503 — so this is not "an outage" but "a health check that filters nothing"). It is separate from Kubernetes readiness, so a pod can be Ready yet excluded by the ALB.
+  measured: >
+    Measured on a real EKS cluster: a frontend whose targets were all unhealthy still served 17,213 requests.
     Measured on a real EKS cluster: 6 target groups with Target.ResponseCodeMismatch — the health check path returned 404 or 307 (no healthcheck-path annotation, so '/', and the app redirects to login). With a single replica the service stops when that one target is excluded.
   suggest: "Add `alb.ingress.kubernetes.io/healthcheck-path: /healthz` (a path that returns 200) and `success-codes: 200-399` to the Ingress. If the app has no health endpoint, create one."
   verify:
@@ -16179,11 +16256,13 @@
   why: >
     When a pod is deleted the ALB controller takes a few seconds to deregister the target, and the ALB keeps sending to that pod meanwhile. If the pod closes its listener on SIGTERM immediately, those requests become 502s.
     The deregistration delay (default 300s) is how long the ALB keeps the target "draining"; the pod dies within terminationGracePeriod (default 30s). A preStop sleep of 5-10s plus the app finishing existing connections after SIGTERM is needed to make the two line up. The classic cause of a handful of 502s on every deploy.
+  measured: >
+    Measured on an EKS cluster: all 18 production hits overlapped with resilience.no-prestop.
   suggest: "On the Deployment: `lifecycle.preStop.exec.command: [sleep, \"10\"]` and terminationGracePeriodSeconds 45 or more. Target group annotation `alb.ingress.kubernetes.io/target-group-attributes: deregistration_delay.timeout_seconds=30`."
   verify:
     - "aws elbv2 describe-target-group-attributes --target-group-arn <arn> | grep deregistration"
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.terminationGracePeriodSeconds} {.spec.template.spec.containers[*].lifecycle}'"
-  notes: warn only. The fail comes from resilience.no-prestop on the same workload (do not count twice — measured on an EKS cluster, all 18 production hits overlapped). This check adds the ALB-side number (deregistration delay) to the evidence
+  notes: warn only. The fail comes from resilience.no-prestop on the same workload (do not count twice). This check adds the ALB-side number (deregistration delay) to the evidence
   profiles: [prod]
   test:
     cases:
@@ -16372,6 +16451,7 @@
   symptom_linked: false
   why: >
     If ports like 5432, 3306, 6379, 27017 or 9092 are open on an internet-facing LB or a NodePort (every node interface), a single password is all that stands in the way. A security group or sourceRanges may block it, so "open" is based on the LB/Service definition and actual reachability is verified manually (the tool does not curl).
+  measured: >
     Measured on a real EKS cluster: an internet-facing NLB created outside Kubernetes received MySQL, Postgres, Redis and Neo4j ports through a TargetGroupBinding, and a Kafka 9094 NLB was also internet-facing. On a k3s: 4 DBs opened via NodePort.
   suggest: "Change the NLB scheme to internal or narrow the security group to office/VPN ranges. NodePort DBs: ClusterIP + port-forward (or a Tailscale-only interface)."
   verify:
@@ -16705,7 +16785,9 @@
   severity_default: medium
   symptom_linked: true
   why: >
-    DNS sits in front of every service call. If p99 exceeds 50ms, a pod with ndots:5 that issues 4-5 queries per external domain loses hundreds of ms. A spike near 5s is the UDP conntrack race. Measured: 1.1ms on an EKS cluster, 62ms on a small k3s cluster whose CoreDNS runs under a CPU limit.
+    DNS sits in front of every service call. If p99 exceeds 50ms, a pod with ndots:5 that issues 4-5 queries per external domain loses hundreds of ms. A spike near 5s is the UDP conntrack race.
+  measured: >
+    Measured: 1.1ms on an EKS cluster, 62ms on a small k3s cluster whose CoreDNS runs under a CPU limit.
   cases:
     - { who: MindTickle 2019, url: https://medium.com/techmindtickle/intermittent-delays-in-kubernetes-e9de8239e2fa }
     - { who: Zalando 2018, url: https://www.slideshare.net/try_except_/running-kubernetes-in-production-a-million-ways-to-crash-your-cluster-devopscon-munich-2018 }
@@ -17786,8 +17868,10 @@
   severity_default: high
   symptom_linked: true
   why: >
-    Karpenter normally brings up a node within 1-2 minutes (measured on an EKS cluster: launched→initialized p50 62s). Pending for more than 10 minutes means room cannot be made: NodePool limits or requirement mismatch, capacity shortage (InsufficientInstanceCapacity), PVC binding, taints/affinity.
+    Karpenter normally brings up a node within 1-2 minutes. Pending for more than 10 minutes means room cannot be made: NodePool limits or requirement mismatch, capacity shortage (InsufficientInstanceCapacity), PVC binding, taints/affinity.
     A small k3s cluster has no node autoscaler, so Pending there means "cannot start once one node is gone".
+  measured: >
+    Measured on an EKS cluster: launched→initialized p50 62s.
   cases:
     - { who: UK Ministry of Justice 2025, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2025-03-18-aws-eks-upgrade-to-1-30.html }
     - { who: Datadog 2019, url: https://www.youtube.com/watch?v=QKI-JRs2RIE }
@@ -17840,7 +17924,9 @@
   severity_default: medium
   symptom_linked: true
   why: >
-    Creation to Initialized is how long pending pods wait. Normally 60-90s (measured p50 62s). Over 3 minutes means a large AMI (mixed AL2 and AL2023 during a transition), slow bootstrap scripts or CNI init, or a large image pull delaying Initialized.
+    Creation to Initialized is how long pending pods wait. Normally 60-90s. Over 3 minutes means a large AMI (mixed AL2 and AL2023 during a transition), slow bootstrap scripts or CNI init, or a large image pull delaying Initialized.
+  measured: >
+    Measured: p50 62s.
   suggest: "Look for a pattern (instance family, AZ) in summary.scaling.karpenter.latency_24h.slowest and check the node boot log (SSM) for the slow stage."
   verify:
     - "kubectl get nodeclaims -o custom-columns=NAME:.metadata.name,CREATED:.metadata.creationTimestamp,READY:.status.conditions[?(@.type==\"Ready\")].lastTransitionTime"
@@ -17945,6 +18031,7 @@
   symptom_linked: false
   why: >
     expireAfter periodically rotates nodes onto a fresh AMI so they receive security patches. If a node is expired but still there a day later, something is blocking disruption: a pod's `karpenter.sh/do-not-disrupt` annotation, a PDB, or a zero budget (scaling.karpenter-budget-zero).
+  measured: >
     Measured on a real EKS cluster: a node stayed more than 31 days because of one pod's do-not-disrupt annotation, and 27 production pods and 87% disk usage piled up on it.
   suggest: "Resolve the cause in the DisruptionBlocked message (remove the annotation, relax the PDB). Spread that node's pods first (topologySpread) before replacing it."
   verify:
@@ -18121,7 +18208,9 @@
   why: >
     Karpenter rounds percentage budgets up (allowed = roundup(nodes × ratio) − deleting − NotReady). So `nodes: "10%"` allows 1 even with a single node,
     and allowed 0 only happens when a budget without a schedule is set to `nodes: "0"` or `"0%"`. Then expiry (expireAfter), drift and consolidation are blocked permanently. A pool with 0 nodes has nothing to delete, so pass.
-    Measured on a real EKS cluster: all four pools at 10%, and the `default` pool with 2-4 nodes executed 4 disruptions in a day. An earlier report that said "computed as 0, no disruption" was a floor-rounding bug in this check.
+    An earlier report that said "computed as 0, no disruption" was a floor-rounding bug in this check.
+  measured: >
+    Measured on a real EKS cluster: all four pools at 10%, and the `default` pool with 2-4 nodes executed 4 disruptions in a day.
   suggest: "If a permanent block is not the intent, switch to a budget with a schedule or set `nodes: \"1\"` or more. To protect specific nodes only, use the pod annotation `karpenter.sh/do-not-disrupt`."
   verify:
     - "kubectl get nodepool -o jsonpath='{range .items[*]}{.metadata.name}{\" \"}{.spec.disruption.budgets}{\"\\n\"}{end}'; kubectl get nodeclaims -L karpenter.sh/nodepool"
@@ -18189,6 +18278,7 @@
     If all tenants belong to one organization (a single human owner) and there was no node saturation in 7 days, it is not urgent, so warn. With signs of multiple organizations (two or more Users/Groups in RoleBindings) or node saturation, fail.
     In a cluster with several tenants (a namespace per client), without ResourceQuota one tenant's deployment mistake (replicas 100, no memory limit, a runaway CronJob) eats the other tenants' nodes.
     If Karpenter launches more nodes it becomes a bill instead of an outage; if NodePool limits are hit, it becomes other tenants' Pending pods. CI runners (ci) and dev burst heavily, so they warn even when not prod.
+  measured: >
     Measured on a real EKS cluster: none of the 8 production namespaces had a quota. On a k3s: only 3 of 7 production namespaces did.
   cases:
     - { who: Zalando 2019, url: https://www.slideshare.net/try_except_/lets-talk-about-failures-with-kubernetes-hamburg-meetup }
@@ -18445,7 +18535,8 @@
   symptom_linked: true
   why: >
     A quota rejects silently the moment it is exceeded — new pods only leave a ReplicaSet FailedCreate "exceeded quota" event, and a rolling update stalls because it cannot create the new replica. When the PVC count quota is full, StatefulSet scale-out goes Pending.
-    Measured on a k3s k3s: a production namespace at persistentvolumeclaims 2/2.
+  measured: >
+    Measured on a k3s cluster: a production namespace at persistentvolumeclaims 2/2.
   suggest: "Raise the quota (2x actual p95) or clean up the resource at its limit. Add an alert at 80% quota usage (kube_resourcequota{type=\"used\"} / kube_resourcequota{type=\"hard\"})."
   verify:
     - "kubectl describe quota -n <ns> <name> ; kubectl get events -n <ns> --field-selector reason=FailedCreate"
@@ -18954,6 +19045,7 @@
   why: >
     CI runners use every core during a build and hammer disk and network (a tenant with large bursts). On the same node as production, production p99 spikes at build time, and under memory pressure BestEffort/Burstable production pods get evicted.
     The fix is a dedicated NodePool with a taint plus nodeSelector/toleration in the runner template. A small k3s cluster with fewer than 3 nodes and no Karpenter cannot separate at all, so it is a warning only.
+  measured: >
     Measured on a real EKS cluster: ARC runners were separated onto a build pool (taint workload-type=build) and absent from production nodes — this check passed.
   suggest: "Taint (workload-type=build:NoSchedule) and label the runner pool, and add nodeSelector + toleration to the AutoscalingRunnerSet template. On a small k3s cluster, set explicit runner requests to avoid BestEffort."
   verify:
@@ -19272,6 +19364,7 @@
   why: >
     dev is where experimental deploys, debug tools and containers without limits show up. If the memory limit total on a shared node exceeds 1.5x allocatable, a dev memory leak spreads into production OOMs and evictions.
     Sharing dev and prod nodes is a common cost choice on small clusters, so fail only when overcommit (limit total ≥ 1.5x) coincides.
+  measured: >
     Measured on a 7-node EKS cluster: dev and prod coexisted on 5 of 7 nodes, limit total/allocatable 1.5-1.7.
   cases:
     - { who: Airbnb 2019, url: https://www.youtube.com/watch?v=QXApVwRBeys }
@@ -19576,6 +19669,7 @@
   symptom_linked: false
   why: >
     If runner placement is unconstrained, the scheduler puts runners on whichever production node has room (the cause of tenancy.ci-shares-prod-nodes). With only a nodeSelector and no taint on the pool, production pods land on the build nodes instead.
+  measured: >
     Measured on a real EKS cluster: an AutoscalingRunnerSet with nodeSelector workload-type=build + toleration and a tainted build NodePool — fully separated (pass). On a 2-node k3s: a RunnerDeployment without constraints, but separation is impossible with 2 nodes (none).
   suggest: "Taint (NoSchedule) and label the runner pool; nodeSelector + toleration in the runner template. Give the runner pool spot capacity and limits so a build storm does not become a bill."
   verify:
@@ -19678,6 +19772,7 @@
   why: >
     Memory cannot be compressed. If the limit total is 2x allocatable, the node is full when every container uses only half its limit, and the kubelet evicts pods that exceed their request first — whoever used the memory, the damage lands on the neighbor tenant that set a small request.
     Nodes with a single tenant are its own responsibility and excluded; only nodes with two or more tenants are checked.
+  measured: >
     Measured on a 7-node EKS cluster: 5 of 7 shared nodes at 1.5x or more (max 1.68).
   suggest: "Raise requests to 50% or more of limits (narrow the Burstable gap) to bring overcommit below 1.5x. Block containers without limits with LimitRange defaults."
   verify:
@@ -19979,6 +20074,7 @@
   why: >
     The mechanical precursor of a noisy neighbor: one namespace uses more than half the node's CPU at p95, the node spent time above 90% within 7 days, and production runs on that node. When all three coincide, production latency is likely to line up with that namespace's load.
     Confirming the correlation (did production p99 rise at that time) is done by tenancy.noisy-neighbor (type: llm). If the node was never saturated (0 minutes), dominance alone does no harm, so it is a warning.
+  measured: >
     Measured on an EKS cluster and a k3s: 0 saturated minutes, max share 0.06 — no candidates.
   cases:
     - { who: 2i2c 2023, url: https://raw.githubusercontent.com/2i2c-org/incident-reports/main/reports/2023-02-01-daskhub-induced-evictions.md }
@@ -20282,6 +20378,7 @@
   symptom_linked: false
   why: >
     A tenant that is quiet most of the time and spikes tens of times higher (batch, CronJob, CI, AI inference) is invisible in averages. Without a quota or limits, that peak pushes out neighbors on the same node (noisy neighbor).
+  measured: >
     Measured on a real EKS cluster: a production backend namespace went from a median of 0.012 cores to a max of 2.6 cores (227x), no quota, sharing nodes with other production namespaces. On a k3s: 15.6x.
   suggest: "Put a ResourceQuota (limits.cpu) and container CPU limits on that namespace, or for batch workloads a PriorityClass lower than production. To identify the peak (which pod, what time), look up the time of max_over_time in Prometheus."
   verify:
@@ -20572,6 +20669,7 @@
   why: >
     The quota (resource boundary), NetworkPolicy (network boundary) and PSA (privilege boundary) are each checked by a different area. This check takes the tenant view: does the namespace have any boundary at all — with none of the three, it is `default` under another name.
     It overlaps in targets with security.prod-no-default-deny and security.psa-missing in the security area, but the severity here is lower and the point is to read them together.
+  measured: >
     Measured on a real EKS cluster: many of the 8 production namespaces had neither quota, NetworkPolicy nor PSA.
   suggest: "Create one tenant namespace template (ResourceQuota + LimitRange + default-deny NetworkPolicy + PSA restricted/baseline label) and apply it to every prod-* namespace through an Argo CD ApplicationSet."
   verify:
@@ -20766,7 +20864,9 @@
   why: >
     A noisy neighbor cannot be caught by one rule. The code gathers the material: (1) minutes a node spent above 90% CPU (7 days), (2) the namespace that dominates that node and its share, (3) bursty tenants (7-day max/median), (4) CPU throttle ratio of production namespaces, (5) the tenant mix on each node.
     If (1) is 0, the LLM writes "no room for neighbor damage in this window" and stops. If (1) > 0, it notes whether the dominant namespace (2) and the throttling (4) or ingress p95 (traffic section) of production on that node overlap on the same node, and because the material is instant values it writes "insufficient evidence — a range query at that time is needed" for time correlation. It does not assert.
-    Measured on an EKS cluster and a k3s: 0 saturated minutes on both. A 17% throttle ratio in one small k3s cluster production namespace is more likely caused by its own limit (resources section) than by a neighbor — write it that way.
+    Throttling inside one production namespace is more likely caused by its own limit (resources section) than by a neighbor — write it that way.
+  measured: >
+    Measured on an EKS cluster and a k3s: 0 saturated minutes on both; one small k3s cluster production namespace had a 17% throttle ratio from its own limit.
   cases:
     - { who: Airbnb 2019, url: https://www.youtube.com/watch?v=QXApVwRBeys }
     - { who: Datadog 2019, url: https://www.youtube.com/watch?v=QKI-JRs2RIE }
@@ -20795,6 +20895,7 @@
   why: >
     An Evicted pod's object remains even after the ReplicaSet has created a replacement. Nobody deletes it until kube-controller-manager's terminated-pod-gc-threshold (default 12,500) is reached.
     `kubectl get pods` gets cluttered, and more importantly **why the pod was evicted (node disk or memory pressure)** is buried uninvestigated. Job-owned pods belong to resilience.finished-jobs-accumulating and are excluded.
+  measured: >
     Measured on a real EKS cluster: 12 Evicted pods (7 in one production namespace), the oldest 31 days.
   suggest: "Read the reasons with `kubectl get pods -A --field-selector status.phase=Failed` and delete them. If evictions recur, look at that node's DiskPressure/MemoryPressure first (node and events sections)."
   verify:
@@ -20863,7 +20964,9 @@
   symptom_linked: false
   why: >
     When the node disk (logs, emptyDir, writable layer) fills up, the kubelet evicts pods for DiskPressure; without ephemeral-storage requests there is no record of who agreed to use how much, so eviction order is arbitrary and the scheduler ignores disk entirely.
-    An emptyDir without sizeLimit lets one pod consume the whole node disk. To pin down the container behind a node at 87% disk (seen on a first real run), read it together with writable_layers_top in the node section.
+    An emptyDir without sizeLimit lets one pod consume the whole node disk. To pin down the container behind a filling node disk, read it together with writable_layers_top in the node section.
+  measured: >
+    Seen on a first real run: a node at 87% disk.
   suggest: "Set an ephemeral-storage request (e.g. 1Gi) and limit on production containers and a sizeLimit on emptyDirs. Enforce per namespace with LimitRange defaults."
   verify:
     - "kubectl get pods -A -o json | jq '[.items[].spec.containers[] | select(.resources.requests[\"ephemeral-storage\"] == null)] | length'"
@@ -20908,9 +21011,11 @@
   severity_default: high
   symptom_linked: true
   why: >
-    On a first real run, a single spot reclaim took a production service down for 2 minutes 7 seconds. That node held 27 production pods (64%) — the next reclaim would cut several services at once.
+    When most production pods sit on one node, losing that node stops several services at once; on spot, a single reclaim is enough.
     Unlike per-workload spreading (resilience.replicas-same-node), this check takes the node view: dozens of single-replica services packed onto one node are invisible to the per-workload check.
     On a 2-node small k3s cluster 50% or more is unavoidable, so it only applies with 3 or more nodes or with spot.
+  measured: >
+    On a first real run, a single spot reclaim took a production service down for 2 minutes 7 seconds. That node held 27 production pods (64%), so the next reclaim would have cut several services at once.
   cases:
     - { who: Moonlight 2019, url: https://updates.moonlightwork.com/outage-post-mortem-87370 }
   suggest: "Make topologySpreadConstraints (topologyKey hostname, maxSkew 1, ScheduleAnyway) the default in production namespaces, or steer the Karpenter pool toward several smaller instances (instance-size limits). On spot pools, together with PDBs."
@@ -21108,7 +21213,8 @@
   symptom_linked: false
   why: >
     If one run takes longer than the interval it overlaps the next. With concurrencyPolicy Allow, Jobs pile up (two DB dumps eating disk and CPU at once) and pressure the node; with Forbid, runs are skipped quietly and "the hourly job" runs every two hours.
-    Measured on a k3s k3s: a watchdog CronJob on a 1-minute schedule ran for 52s (0.87) — any slowdown makes it overlap.
+  measured: >
+    Measured on a k3s cluster: a watchdog CronJob on a 1-minute schedule ran for 52s (0.87) — any slowdown makes it overlap.
   suggest: "Lengthen the interval or split the work. If Allow, switch to Forbid or Replace and set activeDeadlineSeconds."
   verify:
     - "kubectl get jobs -n <ns> -l <cronjob label> -o custom-columns=NAME:.metadata.name,START:.status.startTime,END:.status.completionTime"
@@ -21315,6 +21421,7 @@
   symptom_linked: true
   why: >
     A DB can stop responding for more than 1s during a checkpoint, VACUUM or a large fsync. If a liveness probe with the default timeoutSeconds 1 fails at that moment, the kubelet kills the DB, and after the restart WAL recovery eats the disk again and it fails again.
+  measured: >
     Measured: 4 dev MySQL instances on an EKS cluster and 14 Postgres/Redis containers on a small k3s cluster.
   cases:
     - { who: Datadog 2019, url: https://www.youtube.com/watch?v=QKI-JRs2RIE }
@@ -21445,7 +21552,8 @@
   why: >
     The purpose of a backup is to recover even when the node disk dies. If the dump PVC is local-path on the same node as the source DB, a single disk failure takes source and backup together.
     A network volume such as EBS survives node failure but not an AZ or account incident — so the check still looks for a second copy to another store such as S3 (offsite_hint). The hint is a string match on commands, args and env values, so it is a candidate.
-    Measured on a k3s k3s: 5 of 7 backup CronJobs dumped to the same node as the source, and none of the 7 showed any off-node copy.
+  measured: >
+    Measured on a k3s cluster: 5 of 7 backup CronJobs dumped to the same node as the source, and none of the 7 showed any off-node copy.
   suggest: "After the dump, send a copy off the node (S3, B2, NAS) with `rclone copy`, `aws s3 cp` or restic. At minimum put the dump PVC on a different node (nodeSelector) and rehearse a restore once."
   verify:
     - "kubectl get cronjob -n <ns> <name> -o yaml | grep -A3 -E 'command|args|persistentVolumeClaim' ; kubectl get pv -o custom-columns=PV:.metadata.name,CLAIM:.spec.claimRef.name,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
@@ -21626,6 +21734,7 @@
   symptom_linked: false
   why: >
     resilience.no-backup asks whether the cluster has any backup mechanism (Velero, k8up, etcd snapshots, dump CronJobs). This check is one level down — does each DB have a dump. A CronJob with backup, dump or snapshot in its name in the same namespace counts as present (operator CR backups and external backups are invisible → warn at most).
+  measured: >
     Measured: on an EKS cluster none of the 5 production DBs had one (nor EBS snapshots, storage section); on a small k3s cluster, 2 production Postgres instances.
   suggest: "A dump CronJob (pg_dump, mysqldump) per DB plus an off-node copy. On EKS an EBS snapshot policy (DLM) or Velero can replace it — then suppress this warning."
   verify:
@@ -21687,7 +21796,8 @@
   why: >
     Unlike a Secret, a ConfigMap is readable by anyone with configmaps get/list in RBAC and appears as-is in the Argo CD UI, kubectl describe and Git. A password line inside a config file (e.g. a fluent-bit `HTTP_Passwd`) is the same.
     Detection uses key names (PASSWORD, SECRET, TOKEN, API_KEY) and value shape (8+ characters; not a number, boolean, path or template), and **values are never recorded**. Being name-based, it is still a candidate.
-    Measured on a k3s k3s: three ConfigMaps carrying an OAuth client secret, a JWT secret and third-party API tokens.
+  measured: >
+    Measured on a k3s cluster: three ConfigMaps carrying an OAuth client secret, a JWT secret and third-party API tokens.
   suggest: "Move to a Secret and mount via envFrom secretRef or a volume. Pull hardcoded values out of scripts into env sourced from the Secret. Rotate anything already exposed."
   verify:
     - "kubectl get configmap -n <ns> <name> -o jsonpath='{.data}' | grep -oiE '(password|secret|token|api_key)[^,]{0,20}' | head"
@@ -21742,6 +21852,7 @@
   why: >
     Ingresses grouped by group.name share one ALB, one listener rule set (limit 100), one security group and one access log. A bad rule on a dev ingress (overlapping path, certificate, group.order) or its deletion becomes a change to the production ALB, and one tenant's rule explosion hitting the limit blocks everyone.
     Merging for cost (about 16 USD per ALB per month) is a reasonable choice, so fail only when production and non-production are mixed.
+  measured: >
     Measured on a real EKS cluster: one group with 40 ingresses, 47 hosts and 15 namespaces (8 prod, 4 dev, argocd, monitoring and a tools namespace).
   suggest: "Split a production group from a dev/internal-tools group (2 ALBs). Within a group, set group.order explicitly and always put a host on dev ingresses."
   verify:
@@ -21950,7 +22061,8 @@
   symptom_linked: false
   why: >
     A docker daemon that Kubernetes does not use, running on the same node, consumes disk (/var/lib/docker images and container logs) and memory without the kubelet knowing, and docker's iptables rules mix with kube-proxy and CNI rules.
-    Measured on a k3s k3s: docker, containerd and k3s-agent all active on one node.
+  measured: >
+    Measured on a k3s cluster: docker, containerd and k3s-agent all active on one node.
   suggest: "Disable docker on the node (systemctl disable --now docker), or if it is really needed, put /var/lib/docker on a separate filesystem and turn off docker's iptables (\"iptables\": false)."
   verify:
     - "systemctl is-active docker containerd k3s k3s-agent ; du -sh /var/lib/docker"
@@ -22027,7 +22139,9 @@
   symptom_linked: false
   why: >
     When a container writes to its own filesystem instead of a volume (cache, logs, uploads), the node's containerd snapshot directory fills up. The data is lost on restart, and it is a common cause of node disk pressure that `kubectl top` does not show.
-    On a first real run this number was needed to pin down the cause of a node at 87% disk. The material is the top 10 writableLayer.usedBytes from `crictl stats -a` on the node.
+    The material is the top 10 writableLayer.usedBytes from `crictl stats -a` on the node.
+  measured: >
+    On a first real run this number was needed to pin down the cause of a node at 87% disk.
   suggest: "Move the paths that container writes to into an emptyDir (sizeLimit) or a PVC, and send logs to stdout. Enabling readOnlyRootFilesystem prevents it from now on."
   verify:
     - "crictl stats -a -o json | jq -r '.stats[] | [.writableLayer.usedBytes.value, .attributes.labels[\"io.kubernetes.pod.namespace\"], .attributes.labels[\"io.kubernetes.pod.name\"]] | @tsv' | sort -rn | head"
@@ -22260,7 +22374,9 @@
   symptom_linked: false
   why: >
     An alert says "something is bad"; a dashboard shows how much, since when and together with what. If a metric used in an alert rule is on no dashboard panel, the on-call person has to type PromQL by hand after receiving the alert. If 30% or more of alert metrics are like that, warn (default). The material is the panel expr from dashboard JSON fetched via the Grafana API (/api/dashboards/uid/<uid>) — without a token there is no data and no verdict (value.available false).
-    Not yet verified on a real cluster (grafana_api_token was unset). Dashboard variables ($__rate_interval etc.) and Loki panels are excluded from metric-name extraction, so the session re-reads the "no panel" list together with the dashboard titles before writing it up.
+    Dashboard variables ($__rate_interval etc.) and Loki panels are excluded from metric-name extraction, so the session re-reads the "no panel" list together with the dashboard titles before writing it up.
+  measured: >
+    Not yet verified on a real cluster (grafana_api_token was unset).
   suggest: "Add runbook_url and dashboard_url annotations to every alert rule, and add panels for the uncovered metrics to the component's dashboard (the kube-prometheus-stack default dashboards cover most kube_* and node_* metrics)."
   verify:
     - "curl -s -H 'Authorization: Bearer $TOKEN' $GRAFANA/api/search?type=dash-db | jq length"
@@ -22303,7 +22419,9 @@
   severity_default: medium
   symptom_linked: false
   why: >
-    ingress-nginx and Traefik expose request count, latency and response codes per ingress. If those metrics are not in Prometheus (no ServiceMonitor/PodMonitor, or controller.metrics.enabled false), every backend without its own app metrics loses all four golden signals at once. One cause, so one finding — the per-backend list (golden-signals-missing) is supporting material that shows the scope of this finding (on a small k3s cluster, all 20 such fails had this single cause).
+    ingress-nginx and Traefik expose request count, latency and response codes per ingress. If those metrics are not in Prometheus (no ServiceMonitor/PodMonitor, or controller.metrics.enabled false), every backend without its own app metrics loses all four golden signals at once. One cause, so one finding — the per-backend list (golden-signals-missing) is supporting material that shows the scope of this finding.
+  measured: >
+    Measured on a small k3s cluster: all 20 golden-signals-missing fails had this single cause.
   suggest: "ingress-nginx: Helm values controller.metrics.enabled=true and controller.metrics.serviceMonitor.enabled=true (match the kube-prometheus-stack release= label). Traefik: metrics.prometheus plus a ServiceMonitor."
   verify:
     - "kubectl get servicemonitor,podmonitor -A | grep -i -E 'ingress|traefik'"

@@ -14,6 +14,7 @@
   symptom_linked: true
   why: >
     Without the controller, new PVC provisioning, attach after node replacement, snapshots and expansion all stop — when a node dies and a StatefulSet moves, the PV cannot attach to the new node and the pod stays Pending. The default is 2 replicas with leader election; if both are on the same node, both disappear when that node fails.
+  measured: >
     Measured on a real EKS cluster: 2/2 on different nodes (both system nodes without SSM registration).
   suggest: "Keep replicas 2 and confirm podAntiAffinity (present in the defaults). Also check that the node plugin (ebs-csi-node) is Ready on every node."
   verify:
@@ -243,6 +244,7 @@
   symptom_linked: false
   why: >
     Without a dedicated role the controller uses the node instance role's EC2 volume permissions (CreateVolume, AttachVolume, DeleteVolume, CreateSnapshot). Those permissions then have to live on the node role, and on nodes with IMDS hop limit 2 (security.imds-hop-limit) every pod can create and delete volumes.
+  measured: >
     Measured on a real EKS cluster: a dedicated IRSA role for the EBS CSI driver was present — pass.
   suggest: "Set a role with AmazonEBSCSIDriverPolicy as the add-on serviceAccountRoleArn and remove EBS permissions from the node role."
   verify:
@@ -556,7 +558,9 @@
   severity_default: medium
   symptom_linked: false
   why: >
-    storage.ebs-unencrypted reports the result — existing volumes that are not encrypted. This check reports the cause: without encrypted: "true" in the StorageClass parameters, future volumes will be the same. Enabling account-level "EBS encryption by default" removes the need to fix the class, but clusters have been observed with neither.
+    storage.ebs-unencrypted reports the result — existing volumes that are not encrypted. This check reports the cause: without encrypted: "true" in the StorageClass parameters, future volumes will be the same. Enabling account-level "EBS encryption by default" removes the need to fix the class.
+  measured: >
+    Clusters have been observed with neither.
   suggest: "Set parameters.encrypted \"true\" on the gp3 class (+ optional kmsKeyId). Or aws ec2 enable-ebs-encryption-by-default (per region). Existing volumes only change via snapshot → encrypted copy."
   verify:
     - "kubectl get sc -o custom-columns=NAME:.metadata.name,PROV:.provisioner,ENC:.parameters.encrypted,EXP:.allowVolumeExpansion ; aws ec2 get-ebs-encryption-by-default"
@@ -729,6 +733,7 @@
   symptom_linked: true
   why: >
     kubelet sends NodeStageVolume (mount the device on the node) and NodePublishVolume (bind into the pod path) to the CSI node plugin; on failure the pod stays in ContainerCreating with FailedMount events. The non-OK codes of csi_operations_seconds and the fail-unknown of storage_operation_duration_seconds are those counts.
+  measured: >
     Measured on a real EKS cluster: 0 failures and 0 events in 24h.
   suggest: "Read the FailedMount event message and the ebs-csi-node logs (logs/pods/ebs-csi/). Device name conflicts, filesystem corruption and incomplete attach are common."
   verify:
@@ -962,6 +967,7 @@
   symptom_linked: true
   why: >
     After node replacement or a spot reclaim, the time for a StatefulSet pod to come up on a new node is "EBS detach + attach + Stage (mount)". A Stage p99 above 30 seconds delays DB recovery by tens of seconds per node; above 2 minutes the attach itself is being retried.
+  measured: >
     Measured on a real EKS cluster: no Stage calls within 24h, so no value (the pods moved by that day's spot reclaim did not use EBS).
   suggest: "If slow, check the controller --batching (enabled) and EC2 API throttling (visible only when ebscsi.controller-metrics is enabled). With many nodes, raise attacher --worker-threads."
   verify:

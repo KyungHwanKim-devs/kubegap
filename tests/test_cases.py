@@ -1,11 +1,13 @@
-"""`cases` on a check: the public incident write-ups the report may cite. Shape only; reachability is checked by the person who adds a case."""
+"""`cases` on a check: the public incident write-ups the report may cite. Shape only; reachability is checked by the person who adds a case.
+
+`measured` holds what was measured on the clusters the check was written on; it stays out of `why` and `notes` so a report never cites it as a case."""
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
-from lib import paths, rubric
+from lib import evaluate, paths, rubric, selftest
 
 # "Company YEAR" inside prose: one to three capitalised words followed by a year. Words that are not a company are excluded.
 NAME_YEAR_IN_WHY = re.compile(r"\b([A-Z][A-Za-z0-9.&'-]+(?: [A-Z][A-Za-z0-9.&'-]+){0,2}),? \(?((?:19|20)\d\d)\)?")
@@ -65,6 +67,9 @@ NOT_A_COMPANY = {
     "Docker Hub",
 }
 
+# A measurement on the clusters the check was written on, written into prose: "Measured on a real EKS cluster: …", "(seen on a first real run)".
+MEASUREMENT_IN_PROSE = re.compile(r"\bmeasured\b|\b(?:observed|seen) on\b|\bfirst real run|\bon (?:a )?real (?:EKS |k3s )?clusters?\b|\bk3s k3s\b", re.IGNORECASE)
+
 
 def _checks():
     checks, errors = rubric.load_checks([p.name for p in sorted(paths.COLLECTORS_DIR.iterdir()) if (p / "checks.yaml").is_file()])
@@ -94,6 +99,22 @@ def test_no_name_only_citation_outside_cases():
                 if name in NOT_A_COMPANY or name.split()[0] in NOT_A_COMPANY:
                     continue
                 assert name.split()[-1] in who or name in who, f"{c['id']}: {k} names {m.group(0)!r} but cases has no entry for it"
+
+
+def test_measurements_live_in_measured_not_in_why_or_notes():
+    """The report takes cases from `cases` only and labels `measured` separately; a measurement left in `why` or `notes` reads as a case."""
+    for c in _checks():
+        for k in ("why", "notes"):
+            m = MEASUREMENT_IN_PROSE.search(str(c.get(k) or ""))
+            assert not m, f"{c['id']}: {k} carries a measurement ({m.group(0)!r}); move it to measured"
+
+
+def test_measured_reaches_the_findings(tmp_path):
+    c = next(c for c in _checks() if c["id"] == "resilience.prod-concentration")
+    selftest._build_snapshot(tmp_path, c, c["test"]["cases"][0], "prod")
+    out = evaluate.evaluate(tmp_path, {}, echo=None)
+    f = next(f for f in out["findings"] if f["check"] == c["id"])
+    assert f["measured"] == c["measured"] and f["cases"] == c["cases"]
 
 
 def test_catalog_counts_cases():

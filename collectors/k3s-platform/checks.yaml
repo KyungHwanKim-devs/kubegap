@@ -1179,7 +1179,9 @@
   evidence: "f\"journald usage {item['journald'].get('disk_mb')}MB, no journald.conf setting (default: 10% of the filesystem, max 4GB), k3s log lines in 24h {item['journald'].get('k3s_lines_24h')}\""
   severity_default: low
   symptom_linked: false
-  why: k3s writes every component's logs into a single journald (measured at tens of thousands of lines a day). Without a cap it grows to the default (10% of the filesystem, max 4GB), which is noticeable on a small root disk. Retention is also undefined, so during an investigation you do not know how much history is left.
+  why: k3s writes every component's logs into a single journald. Without a cap it grows to the default (10% of the filesystem, max 4GB), which is noticeable on a small root disk. Retention is also undefined, so during an investigation you do not know how much history is left.
+  measured: >
+    Measured: tens of thousands of journald lines a day.
   suggest: "Put `SystemMaxUse=1G` and `MaxRetentionSec=14day` in /etc/systemd/journald.conf.d/kubegap.conf and run `systemctl restart systemd-journald`."
   verify:
     - "journalctl --disk-usage; cat /etc/systemd/journald.conf"
@@ -2050,7 +2052,8 @@
   symptom_linked: true
   why: >
     etcd logs "apply request took too long" when an apply exceeds 100ms. When disk fsync is slow (a SATA SSD competing with other I/O such as Elasticsearch, databases or backups), leader heartbeats are delayed, the apiserver times out, and in bad cases the leader changes (on a single server etcd pauses briefly) or nodes flap to NotReady. It is the first thing to make noise when one small k3s cluster server node carries the datastore, the workloads and the log store all at once.
-    Measured on a 2-node k3s k3s: the server node (embedded etcd, DB 578MB) had 200 warn lines in 24h (capped; the real count was higher, about one hour's worth), 95 slow applies (max 1,447ms, 7 over 1s), 2 slow fdatasync -> fail. The same node hosted Elasticsearch (102GiB), a registry and databases.
+  measured: >
+    Measured on a 2-node k3s cluster: the server node (embedded etcd, DB 578MB) had 200 warn lines in 24h (capped; the real count was higher, about one hour's worth), 95 slow applies (max 1,447ms, 7 over 1s), 2 slow fdatasync -> fail. The same node hosted Elasticsearch (102GiB), a registry and databases.
   suggest: "Move etcd to a different disk (NVMe) via --data-dir, or reduce disk I/O on the same node (move Elasticsearch and backups to another node). If etcd_disk_wal_fsync_duration_seconds p99 exceeds 10ms it is a disk problem. For kine (SQLite): journalctl -u k3s | grep 'slow sql'."
   verify:
     - "ssh <server> sudo journalctl -u k3s --since -1h | grep -cE 'took too long|slow fdatasync|leader changed'"
@@ -2259,7 +2262,8 @@
   symptom_linked: false
   why: >
     Once etcd exceeds its default 2GiB quota it rejects writes (NOSPACE alarm) and the cluster becomes read-only; compaction and defragmentation are needed before that. k3s compacts automatically every 5 minutes but never defragments, so the du size (file) stays larger than the logical size. Clusters that write many events and CR statuses (Argo CD Applications, cert-manager Orders) grow fast. kine (SQLite) has no quota but slows down past 1GB.
-    Measured on a 2-node k3s k3s: 578MB (28%) -> pass.
+  measured: >
+    Measured on a 2-node k3s cluster: 578MB (28%) -> pass.
   suggest: "After k3s etcd-snapshot, run ETCDCTL_API=3 etcdctl --endpoints 127.0.0.1:2379 defrag (certificates in /var/lib/rancher/k3s/server/tls/etcd/). Find large key ranges with etcdctl get --prefix --keys-only /registry/events | wc -l."
   verify:
     - "ssh <server> sudo du -sm /var/lib/rancher/k3s/server/db"
