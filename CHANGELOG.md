@@ -14,7 +14,7 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ### Fixed
 
-- Image sizes are reported with the right unit. `crictl images` sizes are decimal (`1.23GB` is 10⁹ bytes), so `lib/nodeos.py` no longer converts them with 1024 steps, and lowercase `kB` sizes are no longer dropped. The ECR summary's unlabeled tuples, once misread by a report as a "96 GB image", are labeled rows with the unit in the key: `largest` became `largest_repos[{name, gib}]` and `repos_stale_pull` became `[{name, gib, days_since_pull}]`. The `ecr.stale-storage` and `node.*` image evidence now writes GiB/MiB, and `references/report-writing.md` says to never write a number without its unit. Rubric 0.1.55. ([#10](https://github.com/KyungHwanKim-devs/kubegap/issues/10))
+- Image sizes are reported with the right unit. `crictl images` sizes are decimal (`1.23GB` is 10⁹ bytes), so `lib/nodeos.py` no longer converts them with 1024 steps, and lowercase `kB` sizes are no longer dropped. The ECR summary's unlabeled tuples, once misread by a report as a "96 GB image", are labeled rows with the unit in the key: `largest` became `largest_repos[{name, gib}]` and `repos_stale_pull` became `[{name, gib, days_since_pull}]`. The `ecr.stale-storage` and `node.*` image evidence now writes GiB/MiB, and `references/report-writing.md` says to never write a number without its unit. Fixed by [@MinwooPark93](https://github.com/MinwooPark93) in [#48](https://github.com/KyungHwanKim-devs/kubegap/pull/48). Rubric 0.1.55. ([#10](https://github.com/KyungHwanKim-devs/kubegap/issues/10))
 
 ## [0.1.1] - 2026-11-02
 
