@@ -98,7 +98,7 @@ Twelve areas, 403 checks. Each row gives the count and a few examples; the full 
 | Security | 46 | NetworkPolicies not enforced, IMDSv1 allowed, plaintext secret env vars (names only), wildcard RBAC |
 | Cost | 13 | idle compute ratio, monthly cost of request waste, ECR repos without lifecycle |
 | Multi-tenancy | 13 | prod namespaces without quota/NetworkPolicy/PSA, CI and prod on the same nodes |
-| Node OS | 37 | disk and inodes, kernel OOM and NIC errors, no kubelet reservations, cgroup v1, images over 3 GB |
+| Node OS | 37 | disk and inodes, kernel OOM and NIC errors, no kubelet reservations, cgroup v1, images over 3 GiB |
 | Platform | 32 | Kubernetes EOL, outdated add-ons, AMI age, service quotas near limit, slow k3s etcd, secrets encryption off |
 
 Where it runs:

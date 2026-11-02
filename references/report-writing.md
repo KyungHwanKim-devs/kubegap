@@ -52,7 +52,7 @@ Order of work: analyse → write the fragments (small files) → write `report.m
 - When writing in Korean, end sentences in the polite conversational (haeyo) style, not the plain declarative (handa) style. When writing in English, use plain sentences addressed to the reader. Short table values, finding ids, commands and YAML stay as they are.
 - Conclusion first. Describe a problem in the order "what happened → what the impact is now → what to do".
 - Short sentences, one idea each. Do not chain three things with commas.
-- Numbers with units, ratios as %, as in "the disk is 87% full".
+- Numbers with units, ratios as %, as in "the disk is 87% full". Never write a number without its unit. Take the unit from the summary key name (`size_mb`, `gib`) or from `references/summary-shape.md`, and never guess it: GB and GiB are different numbers. Do not describe an aggregate as a single thing — `ecr.summary.largest_repos` is repository totals, not image sizes.
 - No blaming, no exclamations, no analogies. Facts and actions only.
 - **English register.** US spelling (labeled, behavior, center). Money as `$365 a month`, not `365 USD`. Start an uncertain cause with "Most likely," or "Probably", never with the label "Likely:". The opening paragraph is at most four sentences; a sentence longer than about 30 words is split. No semicolons inside parentheses, no parentheses at all outside code (section above). Avoid colloquial phrasing such as "lie around" or "a shell gateway"; say "are still present", "exposes a shell".
 - In `report.md` speak about things (namespace/workload/node), not about checks. Check ids live on the "Evidence checks" line and in details.

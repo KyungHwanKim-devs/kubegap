@@ -98,7 +98,7 @@ full 스냅샷 하나는 40 MB 안팎입니다. `scripts/kubegap prune --keep-da
 | 보안 | 46 | 적용되지 않는 NetworkPolicy, 허용된 IMDSv1, 평문 비밀 환경 변수, 와일드카드 RBAC |
 | 비용 | 13 | 유휴 컴퓨트 비율, requests 과잉이 만드는 월 비용, 수명주기 정책 없는 ECR 저장소 |
 | 멀티테넌시 | 13 | 쿼터·NetworkPolicy·PSA 가 없는 prod 네임스페이스, 같은 노드를 쓰는 CI 와 prod |
-| 노드 OS | 37 | 디스크와 inode, 커널 OOM 과 NIC 오류, kubelet 예약 없음, cgroup v1, 3GB 넘는 이미지 |
+| 노드 OS | 37 | 디스크와 inode, 커널 OOM 과 NIC 오류, kubelet 예약 없음, cgroup v1, 3 GiB 넘는 이미지 |
 | 플랫폼 | 32 | Kubernetes 지원 종료, 오래된 애드온, AMI 나이, 한도에 가까운 서비스 쿼터, 느린 k3s etcd, 꺼진 시크릿 암호화 |
 
 어떤 클러스터에서 쓸 수 있는지는 이렇습니다.

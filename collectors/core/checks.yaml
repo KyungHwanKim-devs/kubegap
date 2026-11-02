@@ -6328,7 +6328,7 @@
     expr: "(item['cri'].get('states') or {}).get('Exited', 0) >= 100"
     warn_expr: "(item['cri'].get('states') or {}).get('Exited', 0) >= 30"
   target: "item['node']"
-  evidence: "f\"crictl ps -a: Running {(item['cri'].get('states') or {}).get('Running')}, Exited {(item['cri'].get('states') or {}).get('Exited')}, Unknown {(item['cri'].get('states') or {}).get('Unknown')}. {item['cri'].get('images')} images, {item['cri'].get('imagefs_used_gb')}GB\""
+  evidence: "f\"crictl ps -a: Running {(item['cri'].get('states') or {}).get('Running')}, Exited {(item['cri'].get('states') or {}).get('Exited')}, Unknown {(item['cri'].get('states') or {}).get('Unknown')}. {item['cri'].get('images')} images, {item['cri'].get('imagefs_used_gb')} GiB\""
   severity_default: medium
   symptom_linked: false
   why: The kubelet keeps only one exited container per pod (maxPerPodContainer) and deletes the rest. Dozens piled up means many CrashLooping pods or GC falling behind, and they eat disk and inodes.
@@ -22127,7 +22127,7 @@
           permission_gaps: []
 
 - id: node.large-images
-  name: Node has container images of 3 GB or more (pull time, disk, slower scale-out)
+  name: Node has container images of 3 GiB or more (pull time, disk, slower scale-out)
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
@@ -22135,11 +22135,11 @@
   rule:
     warn_expr: "bool(((item.get('cri') or {}).get('images_over_3gb')) or [])"
   target: "item['node']"
-  evidence: "f\"Node {item['node']}: images of 3GB or more {len((item.get('cri') or {}).get('images_over_3gb') or [])} — {', '.join(((item.get('cri') or {}).get('images_over_3gb') or [])[:3])} (largest {(item.get('cri') or {}).get('largest_image_mb')} MB)\""
+  evidence: "f\"Node {item['node']}: images of 3 GiB or more {len((item.get('cri') or {}).get('images_over_3gb') or [])} — {', '.join(((item.get('cri') or {}).get('images_over_3gb') or [])[:3])} (largest {(item.get('cri') or {}).get('largest_image_mb')} MiB)\""
   severity_default: low
   symptom_linked: false
   why: >
-    Large images lengthen the pull when a new node comes up, delaying scale-out and failure recovery (node boot → Ready → pod Running), and fill the node disk (containerd data path) quickly. The 3 GB threshold is a default — machine-learning images (with CUDA) commonly exceed it, so "large" is not itself the problem; this is material for seeing which image is large and why, and whether a multi-stage build, a different base or layer caching (pre-loading images on nodes) can shrink it.
+    Large images lengthen the pull when a new node comes up, delaying scale-out and failure recovery (node boot → Ready → pod Running), and fill the node disk (containerd data path) quickly. The 3 GiB threshold is a default — machine-learning images (with CUDA) commonly exceed it, so "large" is not itself the problem; this is material for seeing which image is large and why, and whether a multi-stage build, a different base or layer caching (pre-loading images on nodes) can shrink it.
     The material is the top 15 of `crictl images` from the node script (images_top). Without crictl or sudoers the list is empty → that is no data, not a pass (see nodeos.nodes[].gaps).
   cases:
     - { who: CNCF blog (Onkar Shelke) 2026, url: https://www.cncf.io/blog/2026/10/05/kubelet-watches-inodes-just-not-until-its-an-emergency/ }
