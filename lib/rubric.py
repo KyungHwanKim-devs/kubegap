@@ -55,6 +55,9 @@ def validate(check: dict, source: str) -> list[str]:
         errs.append(f"{source}: {check.get('id')} requires rule.expr or rule.warn_expr")
     if check.get("type") == "absence" and not (check.get("family") or check.get("component")):
         errs.append(f"{source}: {check.get('id')} absence requires family or component")
+    if "measured" in check and not (isinstance(check["measured"], str) and check["measured"].strip()):
+        # What was measured on the clusters the check was written on; the report keeps it apart from public cases
+        errs.append(f"{source}: {check.get('id')} measured must be non-empty text")
     modes = check.get("modes")
     if modes is not None and (not isinstance(modes, list) or not modes or any(m not in ("daily", "full") for m in modes)):
         errs.append(f"{source}: {check.get('id')} modes must be a non-empty list of daily/full")
