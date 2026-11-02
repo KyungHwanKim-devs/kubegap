@@ -132,6 +132,7 @@ def _aws_vars(eks: dict) -> dict:
         "region": eks.get("region"),
         "account": eks.get("account"),
         "k8s_version": eks.get("version"),
+        "vpc_id": eks.get("vpc_id"),
         "date_30d_ago": (today - _dt.timedelta(days=30)).isoformat(),
         "date_7d_ago": (today - _dt.timedelta(days=7)).isoformat(),
         "date_today": today.isoformat(),
@@ -192,6 +193,9 @@ def _run_aws_step(st: dict, sid: str, name: str, eks: dict, cfg: Config, snap: P
         v = {**vars_, "item": item, "item_safe": str(item).replace("/", "__") if item is not None else ""}  # for file names (ECR repository names contain /: bitnami/kafka)
         if any(k in str(st["args"]) for k in ("{subnet_ids}", "{security_groups}")) and not any(lists[k] for k in ("subnet_ids", "security_groups") if "{" + k + "}" in str(st["args"])):
             return item or sid, {"ok": False, "error": "list is empty"}, None
+        missing = [k for k, val in vars_.items() if val in (None, "") and "{" + k + "}" in str(st["args"])]  # e.g. {vpc_id} from an inventory written before it was recorded: AWS would accept Values=None and return an empty list
+        if missing:
+            return item or sid, {"ok": False, "error": f"placeholder {missing[0]} has no value in the inventory"}, None
         try:
             args = _expand_args(st["args"], v, lists)
             out = snap / str(st["out"]).format(**v)

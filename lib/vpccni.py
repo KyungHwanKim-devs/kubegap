@@ -1,6 +1,6 @@
 """VPC CNI (aws-node) summary (collectors/vpc-cni).
 
-Inputs: objects/daemonsets (aws-node env and image), eniconfigs.crd.k8s.amazonaws.com, logs/node/<node>/awscni.prom (ipamd metrics, curl from inside the node),
+Inputs: objects/daemonsets (aws-node env and image), eniconfigs.crd.k8s.amazonaws.com, aws/describe-route-tables.json (private routes, full mode), logs/node/<node>/awscni.prom (ipamd metrics, curl from inside the node),
 aws/instance-type-<type>.json (ENI/IP limits), aws/describe-subnets.json (free IPs), aws/describe-addon-vpc-cni.json, events.json (FailedCreatePodSandBox), inventory (nodes, prod_like).
 
 Output is the `vpccni` section of summary.json: present, settings (version, prefix delegation, warm settings, custom networking, pod ENI, network policy mode),
@@ -103,9 +103,42 @@ def _settings(snap: Path) -> dict:
     }
 
 
+def _private_routes(snap: Path) -> dict:
+    """Routes of the cluster VPC whose target is another private network: VPC peering (pcx-), transit gateway (tgw-) or Cloud WAN core network,
+    virtual private gateway / VPN (vgw-), Outposts local gateway (lgw-). These are the destinations where the external SNAT default matters: a pod
+    reaching them is seen as the node IP. Not counted: local, internet and egress-only gateways, NAT gateways, gateway endpoints (AWS services),
+    carrier gateways, and routes through an instance or ENI (a NAT or firewall appliance; the destination alone does not say whether it is private).
+    Blackhole routes (target deleted) move no traffic and are ignored. `collected` is false when the describe-route-tables step did not run (daily
+    mode, no permission) or returned no table at all, which only happens when the VPC filter was wrong; the check then skips instead of passing."""
+    d = load_json(snap / "aws" / "describe-route-tables.json")
+    tables = (d or {}).get("RouteTables") or []
+    if not tables:
+        return {"collected": False, "peering": 0, "transit_gateway": 0, "vpn": 0, "local_gateway": 0, "destinations": []}
+    peering, tgw, vpn, lgw, dests = 0, 0, 0, 0, []
+    for rt in tables:
+        for r in rt.get("Routes") or []:
+            if r.get("State") == "blackhole":
+                continue
+            dest = r.get("DestinationCidrBlock") or r.get("DestinationPrefixListId") or r.get("DestinationIpv6CidrBlock")
+            if r.get("VpcPeeringConnectionId"):
+                peering += 1
+            elif r.get("TransitGatewayId") or r.get("CoreNetworkArn"):
+                tgw += 1
+            elif str(r.get("GatewayId") or "").startswith("vgw-"):
+                vpn += 1
+            elif r.get("LocalGatewayId"):
+                lgw += 1
+            else:
+                continue
+            if dest and dest not in dests:
+                dests.append(dest)
+    return {"collected": True, "peering": peering, "transit_gateway": tgw, "vpn": vpn, "local_gateway": lgw, "destinations": sorted(dests)}
+
+
 def analyze(snap: Path, inv: dict | None) -> dict:
     inv = inv or {}
     st = _settings(snap)
+    st["private_routes"] = _private_routes(snap)
     if not st.get("present"):
         return {"present": False}
     prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
@@ -255,7 +288,22 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             "metrics_unavailable_nodes": gaps,
             "subnets_low": [s["subnet_id"] for s in subs if (s["available_ratio"] or 1) < 0.25],
             "max_pods_rule": "normal when max-pods <= IP limit + 2 (allowance for hostNetwork pods)",
+            "external_snat": st["external_snat"],
+            "private_routes": st["private_routes"],
         },
+        # Present only when the full run collected the VPC route tables, so vpccni.external-snat-off-with-private-routes is skipped as "not collected" otherwise instead of passing on no data.
+        "snat": (
+            {
+                "external_snat": st["external_snat"],
+                "peering_routes": st["private_routes"]["peering"],
+                "transit_gateway_routes": st["private_routes"]["transit_gateway"],
+                "vpn_routes": st["private_routes"]["vpn"],
+                "local_gateway_routes": st["private_routes"]["local_gateway"],
+                "private_destinations": st["private_routes"]["destinations"],
+            }
+            if st["private_routes"]["collected"]
+            else None
+        ),
         "nodes_near_ip_limit": [r["node"] for r in nodes if (r["ip_usage_ratio"] or 0) >= 0.75],
         "nodes_eni_at_max": [r["node"] for r in nodes if r["eni_at_max"]],
         "nodes_no_available_ip": [r["node"] for r in nodes if (r["no_available_ip_events"] or 0) > 0],
