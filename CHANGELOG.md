@@ -6,6 +6,7 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- `hygiene.configmap-changed-after-pod-start`: warns when a ConfigMap was changed after the pods that read it through env, envFrom or a subPath mount started, so the running pods still hold the old value and the change will apply at the next unrelated restart. Plain file mounts are refreshed by the kubelet and are listed as refresh-only. The change time comes from `managedFields`, so discover now fetches ConfigMaps with `--show-managed-fields`; snapshots without it skip the check as not collected. Secrets are not collected and not judged. Rubric 0.1.56, 404 checks. ([#45](https://github.com/KyungHwanKim-devs/kubegap/issues/45))
 - `vpccni.external-snat-off-with-private-routes`: warns when the VPC CNI keeps its default of SNATing pod traffic that leaves the VPC while the cluster VPC has routes to a peering connection, a transit gateway or a VPN. On those paths the destination sees the node IP instead of the pod IP, which is what cost MindTickle a month of lost packets in 2020. The full run now collects the VPC route tables, `aws/describe-route-tables.json`, through the `ec2:Describe*` permission the IAM policy already grants. Rubric 0.1.54, 403 checks. ([#43](https://github.com/KyungHwanKim-devs/kubegap/issues/43))
 
 ### Changed
