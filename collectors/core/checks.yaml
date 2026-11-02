@@ -15134,12 +15134,12 @@
     warn_expr: "item.get('available') and not item['ok']"
   target: "'cluster'"
   evidence: "f\"Allocatable without the largest node {item['largest_node']} ({item['largest_node_cpu']} cores, {item['largest_node_memory_gb']}GB): CPU {item['allocatable_cpu_without_largest']} cores vs total requests {item['requests_cpu_total']} ({'OK' if item['cpu_ok'] else 'short'}), memory {item['allocatable_memory_gb_without_largest']}GB vs {item['requests_memory_gb_total']}GB ({'OK' if item['memory_ok'] else 'short'}). Pods on that node {item['pods_on_largest_node']} (prod {item['prod_pods_on_largest_node']}). Pods that fit on no other node {item['cannot_fit_elsewhere']}. Node autoscaler {'present (delay until a new node)' if item['karpenter'] else 'absent (permanent)'}\""
-  severity_default: high
+  severity_default: critical
   symptom_linked: true
   why: >
     If allocatable minus the largest node is smaller than the sum of all requests (excluding DaemonSets), some pods find no room when one node is lost. On a small k3s cluster without an autoscaler those pods never start again;
     with Karpenter they wait until a new node is up (1-2 minutes, longer without spot capacity).
-    Unmet N+1 is a critical candidate regardless of profile — the LLM raises it based on production impact.
+    Without an autoscaler the loss is permanent, so the fail is critical like the other three absences (no SLO, no symptom alerts, no backup); with an autoscaler the check says warn, a lower severity, because the gap closes once a new node is up.
   measured: >
     Measured on a real EKS cluster: new nodes came up in p50 62s; 43.5GB of memory requests vs 40GB — a backend was Pending for 2 minutes during a spot reclaim that day.
   suggest: "Reduce over-requesting first (resources.cpu-request-overprovisioned, KRR) — actual usage is often single-digit percent, so trimming requests alone usually restores N+1. Then add a node or an on-demand fallback in the Karpenter requirements."
