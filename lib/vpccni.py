@@ -98,6 +98,9 @@ def _settings(snap: Path) -> dict:
         "network_policy_mode": env.get("NETWORK_POLICY_ENFORCING_MODE"),
         "nodeagent_enable_network_policy": (netpol.lower() == "true") if netpol is not None else None,
         "external_snat": flag("AWS_VPC_K8S_CNI_EXTERNALSNAT"),
+        "randomize_snat": str(env["AWS_VPC_K8S_CNI_RANDOMIZESNAT"]).lower()
+        if env.get("AWS_VPC_K8S_CNI_RANDOMIZESNAT")
+        else None,  # prng (--random-fully, default since 1.7.0), hashrandom (--random, default 1.4.0-1.6.x), none; None = unset, the version decides
         "env": {k: v for k, v in env.items() if k.startswith(("WARM", "MINIMUM", "ENABLE", "AWS_VPC", "NETWORK", "DISABLE", "ANNOTATE", "MAX_ENI"))},
         "eniconfigs": len(objects(snap, "eniconfigs.crd.k8s.amazonaws.com")),
     }
@@ -133,6 +136,34 @@ def _private_routes(snap: Path) -> dict:
             if dest and dest not in dests:
                 dests.append(dest)
     return {"collected": True, "peering": peering, "transit_gateway": tgw, "vpn": vpn, "local_gateway": lgw, "destinations": sorted(dests)}
+
+
+def snat_port_mode(version: str | None, randomize_snat: str | None, external_snat: bool) -> str:
+    """How the node SNAT rule picks source ports, as far as the image version and the aws-node setting can tell.
+    - 'not-applicable': external SNAT is on, there is no SNAT rule.
+    - 'sequential': AWS_VPC_K8S_CNI_RANDOMIZESNAT=none, or a CNI below 1.4.0, which had no randomization at all.
+    - 'random': iptables --random (hashrandom), the default from 1.4.0 to 1.6.x. Prezi hit the conntrack insert race in this state.
+    - 'random-fully': iptables --random-fully (prng), the default since 1.7.0. The CNI falls back to --random when the node's iptables
+      lacks --random-fully, which the image version cannot show; the node-side verify command settles it.
+    - 'unknown': the image carries no version."""
+    if external_snat:
+        return "not-applicable"
+    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", str(version or ""))
+    ver = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+    value = str(randomize_snat).lower() if randomize_snat else None
+    if value == "none":
+        return "sequential"
+    if value in ("hashrandom", "prng"):
+        if ver is None:
+            return "unknown"
+        if ver < (1, 4, 0):
+            return "sequential"  # the setting did not exist yet
+        return "random-fully" if value == "prng" else "random"
+    if ver is None:  # unset or unrecognised value: the default depends on the version
+        return "unknown"
+    if ver < (1, 4, 0):
+        return "sequential"
+    return "random-fully" if ver >= (1, 7, 0) else "random"
 
 
 def analyze(snap: Path, inv: dict | None) -> dict:
@@ -290,6 +321,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             "max_pods_rule": "normal when max-pods <= IP limit + 2 (allowance for hostNetwork pods)",
             "external_snat": st["external_snat"],
             "private_routes": st["private_routes"],
+            "randomize_snat": st["randomize_snat"],
+            "cni_version": st["version"],
+            "snat_port_mode": snat_port_mode(st["version"], st["randomize_snat"], st["external_snat"]),
         },
         # Present only when the full run collected the VPC route tables, so vpccni.external-snat-off-with-private-routes is skipped as "not collected" otherwise instead of passing on no data.
         "snat": (

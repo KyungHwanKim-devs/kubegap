@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 
+import pytest
+
 from lib import vpccni
 
 
@@ -79,3 +81,29 @@ def test_summary_snat_only_when_routes_collected(tmp_path):
     _write(tmp_path, [{"DestinationCidrBlock": "10.20.0.0/16", "VpcPeeringConnectionId": "pcx-1", "State": "active"}])
     snat = vpccni.analyze(tmp_path, inv)["snat"]
     assert snat["external_snat"] is False and snat["peering_routes"] == 1 and snat["private_destinations"] == ["10.20.0.0/16"]
+
+
+@pytest.mark.parametrize(
+    "version,randomize,external,expected",
+    [
+        ("1.19.0-eksbuild.1", "prng", False, "random-fully"),
+        ("1.19.0", None, False, "random-fully"),
+        ("1.19.0", "PRNG", False, "random-fully"),
+        ("1.7.0", None, False, "random-fully"),
+        ("1.6.3", None, False, "random"),
+        ("1.6.3", "hashrandom", False, "random"),
+        ("1.6.3", "prng", False, "random-fully"),
+        ("1.19.0", "hashrandom", False, "random"),
+        ("1.19.0", "none", False, "sequential"),
+        ("1.3.0", None, False, "sequential"),
+        ("1.4.0", None, False, "random"),
+        ("1.3.0", "prng", False, "sequential"),
+        ("1.19.0", "prng", True, "not-applicable"),
+        (None, "prng", False, "unknown"),
+        (None, None, False, "unknown"),
+        ("latest", "prng", False, "unknown"),
+        (None, "none", False, "sequential"),
+    ],
+)
+def test_snat_port_mode(version, randomize, external, expected):
+    assert vpccni.snat_port_mode(version, randomize, external) == expected
