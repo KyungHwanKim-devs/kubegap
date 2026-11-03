@@ -452,7 +452,7 @@ def summarize_run(snap: Path) -> dict:
     recs = read_runlog(snap / "run.log")
     cmds = [r for r in recs if r.get("kind") == "command"]
     skips = [r for r in recs if r.get("kind") == "skip"]
-    failed = [r for r in cmds if (r.get("code") not in (0, None)) or r.get("timed_out") or (r.get("code") is None and r.get("error"))]
+    failed = [r for r in cmds if (r.get("code") not in (0, None)) or r.get("timed_out") or r.get("error")]  # error is None for every ok command; a scrub failure has code 0 and an error
     return {
         "source": "run.log",
         "commands": len(cmds),

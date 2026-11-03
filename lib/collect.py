@@ -54,11 +54,6 @@ class _Blocked:
     error = "proxy blocked (skipped)"
 
 
-def _scrub(obj):
-    """Strip Secret values and ConfigMap values before anything is written to objects/ (rules in lib/scrub.py)."""
-    return scrub.scrub_objects(obj)
-
-
 def _glob_match(name: str, patterns: list[str]) -> bool:
     import fnmatch
 
@@ -114,7 +109,12 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
         if data is None:
             summary["failed"][full] = r.error or r.stderr.strip()[-200:]
             continue
-        _scrub(data)
+        err = scrub.scrub_or_error(data)
+        if err:  # the kind is not written; run.log and the step record carry the failure so report section 7-1 shows it
+            summary["failed"][full] = err
+            summary["ok"] = False
+            log.command(id=f"{collector}.scrub-{full}", cmd=["scrub", full], code=0, seconds=0.0, error=err, collector=collector)
+            continue
         write_private(snap / "objects" / f"{file_stem}.json", json.dumps(data, ensure_ascii=False))
         n = len(data.get("items", []) or [])
         summary["kinds"] += 1
@@ -624,6 +624,22 @@ class StepContext:
 # ---------- step handlers. Signature: (ctx: StepContext, st: dict) -> dict (the per-step entry in collect-result.json) ----------
 
 
+def _metrics_filter(keep: str | None):
+    """A `shell.run` transform that makes the proxy path look like the node path before the file exists: drop comments and histogram buckets,
+    and keep only the lines a `keep` regex matches (on a k3s, where the proxy worked, a 324 KB raw Argo CD server metrics dump was once stored as is).
+    An invalid regex keeps every non-comment line rather than failing the step."""
+    try:
+        rx = re.compile(keep) if keep else None
+    except re.error:
+        rx = None
+
+    def fn(text: str) -> str:
+        lines = [ln for ln in text.splitlines() if ln and not ln.startswith("#") and "_bucket{" not in ln and (rx is None or rx.search(ln))]
+        return "\n".join(lines) + ("\n" if lines else "")
+
+    return fn
+
+
 def _step_kubectl_dump_all(ctx: StepContext, st: dict) -> dict:
     return dump_all(ctx.context, ctx.kubeconfig, ctx.snap, st.get("exclude", []), float(st.get("timeout", 60)), ctx.log, ctx.name, ctx.echo)
 
@@ -635,24 +651,19 @@ def _step_kubectl(ctx: StepContext, st: dict) -> dict:
         runs = {}
         for node in [n["name"] for n in (ctx.inv.get("nodes") or {}).get("nodes", [])]:
             out = ctx.snap / str(st["out"]).format(item=node, node=node)
-            out.parent.mkdir(parents=True, exist_ok=True)
-            r = kube.kubectl([str(a).format(item=node, node=node) for a in st["args"]], context=ctx.context, timeout=timeout, id=f"{ctx.name}.{sid}.{node}", log=ctx.log, out_path=out, kubeconfig=ctx.kubeconfig, collector=ctx.name)
+            tf = scrub.json_scrubber()[0] if out.suffix == ".json" else None
+            r = kube.kubectl(
+                [str(a).format(item=node, node=node) for a in st["args"]], context=ctx.context, timeout=timeout, id=f"{ctx.name}.{sid}.{node}", log=ctx.log, out_path=out, kubeconfig=ctx.kubeconfig, collector=ctx.name, transform=tf
+            )
             runs[node] = {"ok": r.ok, "out": str(out.relative_to(ctx.snap)) if r.ok else None, "error": None if r.ok else (r.error or r.stderr.strip()[-200:])}
         if ctx.echo:
             ctx.echo(f"    {sum(1 for x in runs.values() if x['ok'])} of {len(runs)} nodes saved ({st['out']})")
         return {"ok": any(x["ok"] for x in runs.values()), "nodes": runs}
     out = ctx.snap / st["out"]
-    r = kube.kubectl(list(st["args"]), context=ctx.context, timeout=timeout, id=f"{ctx.name}.{sid}", log=ctx.log, out_path=out, kubeconfig=ctx.kubeconfig, collector=ctx.name)
-    if r.ok and out.suffix == ".json":
-        try:
-            data = json.loads(out.read_text(encoding="utf-8"))
-            _scrub(data)
-            write_private(out, json.dumps(data, ensure_ascii=False))
-            n = len(data.get("items", []) or []) if isinstance(data, dict) else None
-        except json.JSONDecodeError:
-            n = None
-    else:
-        n = None
+    # JSON output is scrubbed inside shell.run before the file exists (lib/scrub.py json_scrubber); if scrubbing raises, nothing is written and the step fails
+    tf, info = scrub.json_scrubber() if out.suffix == ".json" else (None, {"items": None})
+    r = kube.kubectl(list(st["args"]), context=ctx.context, timeout=timeout, id=f"{ctx.name}.{sid}", log=ctx.log, out_path=out, kubeconfig=ctx.kubeconfig, collector=ctx.name, transform=tf)
+    n = info["items"] if r.ok else None
     res = {"ok": r.ok, "items": n, "error": None if r.ok else (r.error or r.stderr.strip()[-200:])}
     if ctx.echo:
         ctx.echo(f"    {'saved ' + st['out'] + (f' ({n} items)' if n is not None else '') if r.ok else 'failed: ' + str(res['error'])[:120]}")
@@ -697,20 +708,13 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
                     out_path=out,
                     kubeconfig=ctx.kubeconfig,
                     collector=name,
+                    transform=_metrics_filter(st.get("keep")),
                 )
                 err_text = ((rr.error or "") + (getattr(rr, "stderr", "") or "")).lower()
                 # kubectl reports a blocked proxy as "Client.Timeout exceeded" or "context deadline exceeded" (never "timed out"); an earlier version matched only "timed out", so every pod waited the full 20 s on EKS
                 if not rr.ok and (getattr(rr, "timed_out", False) or any(k in err_text for k in ("timed out", "timeout", "deadline exceeded"))) and node_ok:
                     ctx.state.proxy_blocked.add(context)
             via = "apiserver-proxy"
-            if rr.ok and out.exists():
-                # Make the proxy path look like the node path — drop comments and histogram buckets, and keep only matching lines if a keep regex exists (seen on a k3s: where the proxy worked, a 324 KB raw Argo CD server metrics dump was stored as is).
-                try:
-                    _keep = re.compile(st["keep"]) if st.get("keep") else None
-                    _lines = [ln for ln in out.read_text(encoding="utf-8", errors="replace").splitlines() if ln and not ln.startswith("#") and "_bucket{" not in ln and (_keep is None or _keep.search(ln))]
-                    write_private(out, "\n".join(_lines) + ("\n" if _lines else ""))
-                except (OSError, re.error):
-                    pass
             if not rr.ok and node_ok:
                 # Fallback for clusters where apiserver -> pod proxy is blocked by the node security group (timeouts seen on EKS and small k3s cluster): curl the pod IP from inside a reachable node.
                 # Try the node hosting the pod first, then (if e.g. not registered in SSM) another node — the pod network is reachable from any node.

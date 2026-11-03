@@ -351,7 +351,18 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
         echo(f"  {kind:<28} {len(items(data)) if data is not None else 'failed: ' + failures[kind]}")
     # Component detection below reads ConfigMap bodies (configmap_data_regex rules), so the objects are written only after that, scrubbed: ConfigMap values and Secret data never reach objects/ (lib/scrub.py).
     (snap / "objects").mkdir(parents=True, exist_ok=True)
-    write_objects = lambda: [write_private(snap / "objects" / f"{kind}.json", json.dumps(scrub.scrub_objects(data), ensure_ascii=False)) for kind, data in objs.items() if data is not None]  # noqa: E731
+
+    def write_objects() -> None:
+        for kind, data in objs.items():
+            if data is None:
+                continue
+            err = scrub.scrub_or_error(data)
+            if err:  # the kind is not written at all; inventory.json records why under fetch_failures and run.log carries the failure
+                failures[kind] = err
+                log.command(id=f"discover.scrub-{kind}", cmd=["scrub", kind], code=0, seconds=0.0, error=err)
+                continue
+            write_private(snap / "objects" / f"{kind}.json", json.dumps(data, ensure_ascii=False))
+
     ctx_info = kube.context_info(context, kubeconfig)
     ver, _ = kube.kubectl_json(["version"], context=context, timeout=20, id="discover.version", log=log, kubeconfig=kubeconfig)
     server_version = ((ver or {}).get("serverVersion") or {}).get("gitVersion")
