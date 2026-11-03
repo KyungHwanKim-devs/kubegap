@@ -350,8 +350,10 @@ class _Parser:
             return self.parse_block(j, self.lines[j][0])
         # a `- ` list at the same indent on the line after `key:` (allowed by YAML);
         # after a sequence `-` it is the next item, not a nested sequence (#66)
-        if from_mapping and j < len(self.lines) and self.lines[j][0] == indent and self.lines[j][1].startswith("- "):
-            return self._sequence(j, indent)
+        if from_mapping and j < len(self.lines) and self.lines[j][0] == indent:
+            content = self.lines[j][1]
+            if content.startswith("- ") or content == "-":
+                return self._sequence(j, indent)
         return None, idx
 
     @staticmethod
