@@ -6,6 +6,11 @@
   query: >
     topk(200, sum by (namespace, pod, container) (rate(container_cpu_cfs_throttled_periods_total{container!=""}[5m]))
       / sum by (namespace, pod, container) (rate(container_cpu_cfs_periods_total{container!=""}[5m])) > 0.01)
+- id: cpu_throttle_ratio_24h
+  why: The same ratio over 24 hours, weighted by the periods each hour ran. The 5-minute value says "now", this one says "through the day"; resources.cpu-throttling fails only on this one and warns on a 5-minute spike alone
+  query: >
+    topk(500, sum by (namespace, pod, container) (increase(container_cpu_cfs_throttled_periods_total{container!=""}[24h]))
+      / sum by (namespace, pod, container) (increase(container_cpu_cfs_periods_total{container!=""}[24h])) > 0.001)
 - id: oomkilled_last_terminated
   why: Containers whose last termination reason was OOMKilled. Memory limit too small or a leak
   query: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
@@ -15,6 +20,19 @@
   query: >
     (sum by (namespace, pod, container) (increase(container_oom_events_total{container!="", container!="POD"}[7d])) > 0)
       or (sum by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total[7d])) and on (namespace, pod, container) (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1))
+- id: oom_pods_7d
+  why: Every container that ended with OOMKilled at any time in 7 days and restarted in the window, including pods a rollout has since replaced, with the 7-day restart increase of that pod; a pod whose last OOM is older than the window keeps the reason label but has no restart in it and is left out. resources.oomkilled-repeated counts a workload's OOM history from this, not from the pods alive at collection time
+  query: >
+    (sum by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total[7d])) > 0.5)
+      and on (namespace, pod, container) (max_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[7d]) == 1)
+- id: pod_info_7d
+  why: uid, node and owner of the pods in oom_pods_7d, replaced ones included. The kernel's oom-kill line names the pod by uid, and this is how a uid of a pod that no longer exists is mapped back to its workload
+  query: >
+    last_over_time(kube_pod_info[7d])
+      and on (namespace, pod) (max_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[7d]) == 1)
+- id: nodes_seen_1d
+  why: Every node-exporter instance seen in the last 24 hours with its node name and the time of its last sample. A node here but not in inventory.json left the cluster within the window; its remaining series are not judged by the node checks and the summary lists it under nodes.gone_24h
+  query: last_over_time(timestamp(node_uname_info)[1d:1m])   # timestamp() of each sample, then the last one in the day: the time the node was last scraped. timestamp(last_over_time(...)) would return the evaluation time
 - id: restarts_24h
   why: Top restart counts over 24h. A combined signal of CrashLoop, OOM and probe failures
   query: topk(50, sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total[24h])) > 0)

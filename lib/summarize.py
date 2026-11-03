@@ -224,8 +224,37 @@ def summarize_objects(snap: Path, inv: dict | None) -> dict:
             if c.get("type") in ("MemoryPressure", "DiskPressure", "PIDPressure") and c.get("status") == "True"
         ],
         "unschedulable": [n["metadata"]["name"] for n in nodes if (n.get("spec") or {}).get("unschedulable")],
+        **_nodes_gone_24h(snap, nodes),
     }
     return out
+
+
+def _nodes_gone_24h(snap: Path, nodes: list) -> dict:
+    """Nodes that node-exporter saw in the last 24 hours but that are no longer in the cluster: the series a spot reclaim or a replacement leaves behind.
+    From `metrics/nodes_seen_1d.json` (node_uname_info over 1d, value = time of the last sample) against objects/nodes.json by name and InternalIP."""
+    d = load_json(snap / "metrics" / "nodes_seen_1d.json") or {}
+    if not d.get("ok"):
+        return {"gone_24h": None, "seen_24h": None}
+    current_names = {n["metadata"]["name"] for n in nodes}
+    current_ips = {a.get("address") for n in nodes for a in ((n.get("status") or {}).get("addresses") or []) if a.get("type") in ("InternalIP", "ExternalIP")}
+    gone, seen = [], 0
+    for r in d.get("result") or []:
+        lab = r.get("metric") or {}
+        inst = str(lab.get("instance") or "").rsplit(":", 1)[0]
+        name = lab.get("nodename")
+        seen += 1
+        if name in current_names or inst in current_ips:
+            continue
+        try:
+            last = _dt.datetime.fromtimestamp(float(r["value"][1]), tz=_dt.UTC).isoformat(timespec="seconds")
+        except (KeyError, ValueError, TypeError, IndexError):
+            last = None
+        gone.append({"node": name, "internal_ip": inst or None, "last_seen": last})
+    if seen and len(gone) == seen:
+        # not one instance matches a node: node-exporter is not on the host network, so instance is a pod address and nodename a pod name. Nothing can be said about departed nodes.
+        # A day in which every node was replaced looks the same and is also given up; the inventory's node list is the report's source for that
+        return {"gone_24h": None, "seen_24h": seen, "note": "node-exporter instances do not match the node addresses or names; the exporter is not on the host network"}
+    return {"gone_24h": sorted(gone, key=lambda g: g.get("last_seen") or ""), "seen_24h": seen}
 
 
 # ---------- external tools / logs (placeholder) ----------
