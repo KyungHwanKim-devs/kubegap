@@ -191,14 +191,17 @@ def collect(snap: Path, out_rel: str, *, profile: str | None, region: str | None
     out["security_groups"] = {}
     out["security_groups_read"] = False
     if sg_ids:
-        # a filter instead of --group-ids: an id that no longer exists or belongs to another account is skipped instead of failing the whole call
-        sgs, r = _aws.aws_json(["ec2", "describe-security-groups", "--filters", f"Name=group-id,Values={','.join(sg_ids)}"], id=f"{collector}.alb.describe-security-groups", timeout=60, **kw)
-        if sgs is None:
-            errors.append(f"describe-security-groups: {r.error or r.stderr.strip()[-200:]}")
-        else:
-            out["security_groups_read"] = True
+        # a filter instead of --group-ids: an id that no longer exists or belongs to another account is skipped instead of failing the whole call. A filter takes at most 200 values.
+        read_all = True
+        for i in range(0, len(sg_ids), 200):
+            sgs, r = _aws.aws_json(["ec2", "describe-security-groups", "--filters", f"Name=group-id,Values={','.join(sg_ids[i : i + 200])}"], id=f"{collector}.alb.describe-security-groups", timeout=60, **kw)
+            if sgs is None:
+                errors.append(f"describe-security-groups: {r.error or r.stderr.strip()[-200:]}")
+                read_all = False
+                continue
             for g in sgs.get("SecurityGroups") or []:
                 out["security_groups"][g["GroupId"]] = {"name": g.get("GroupName"), "description": (g.get("Description") or "")[:120], "inbound": [_rule(pm) for pm in g.get("IpPermissions") or []]}
+        out["security_groups_read"] = read_all
     # CloudWatch: call in batches of 100
     metrics: dict = {"lb": {}, "tg": {}}
     end = _dt.datetime.now(_dt.UTC).replace(microsecond=0)

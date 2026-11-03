@@ -406,8 +406,10 @@ def sg_text(item: dict) -> str:
     if state == "allow-list":
         n = max(allowed.values(), default=0)
         widths = list((item.get("widest_prefix") or {}).values())
-        if widths and all(w is not None for w in widths):
-            width = f"widest /{min(widths)}"
+        known = [w for w in widths if w is not None]
+        hidden = sum(1 for w in widths if w is None)
+        if known:
+            width = f"widest /{min(known)}" + (f"; {hidden} port{'s' if hidden != 1 else ''} also allow{'s' if hidden == 1 else ''} a prefix list or security group reference" if hidden else "")
         else:
             width = "width unknown, a prefix list or security group reference"
         return f"allow-list, at most {n} source{'s' if n != 1 else ''} per port, {width}"

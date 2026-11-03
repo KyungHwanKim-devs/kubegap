@@ -17003,6 +17003,7 @@
           bound_services: []
           sg_exposure: "not-read"
           allowed_sources: {}
+          widest_prefix: {}
           open_ports: []
           note: "NLB created outside Kubernetes; no TargetGroupBinding, DB inferred from the target group port. DB port on an external address; the security group could not be read"
       # an NLB with no security group at all passes everything: fail
@@ -17024,6 +17025,7 @@
           bound_services: ["prod-a/postgresql"]
           sg_exposure: "no-security-group"
           allowed_sources: {}
+          widest_prefix: {}
           open_ports: []
           note: "NLB created outside Kubernetes; 1 TargetGroupBinding binds it to prod-a/postgresql. DB port on an external address with no security group on the load balancer; only the targets' security groups filter it, which this check does not read"
       # no inbound TCP rule covers the database listeners: unreachable, pass
@@ -17045,6 +17047,7 @@
           bound_services: ["prod-a/postgresql"]
           sg_exposure: "blocked"
           allowed_sources: { "5432": 0 }
+          widest_prefix: { "5432": null }
           open_ports: []
           note: "NLB created outside Kubernetes; 1 TargetGroupBinding binds it to prod-a/postgresql. DB port on an external address, but no inbound rule of the security group covers it"
       # one port allow-listed and another open: the row is open and fails

@@ -189,6 +189,32 @@ def test_service_source_ranges_judge_an_nlb_without_groups(tmp_path):
     assert "Service's sourceRanges" in kafka["note"] and "node groups are not read" in kafka["note"]
 
 
+def test_source_ranges_that_are_not_cidrs_are_ignored(tmp_path):
+    _snapshot(tmp_path)
+    d = json.loads((tmp_path / "aws" / "alb-metrics.json").read_text())
+    d["lbs"][0]["security_groups"] = []
+    (tmp_path / "aws" / "alb-metrics.json").write_text(json.dumps(d))
+    svc = json.loads((tmp_path / "objects" / "services.json").read_text())
+    svc["items"][0]["spec"]["loadBalancerSourceRanges"] = ["", "garbage"]
+    (tmp_path / "objects" / "services.json").write_text(json.dumps(svc))
+    rows, _ = _rows(tmp_path)
+    kafka = rows["loadbalancer/middleware/kafka-external"]
+    assert kafka["sg_exposure"] == "no-security-group"  # nothing usable in the ranges: the verdict and its note stay
+    assert "no security group on the load balancer" in kafka["note"]
+
+
+def test_sg_text_widths():
+    from lib.evaluate import sg_text
+
+    assert sg_text({"sg_exposure": "allow-list", "allowed_sources": {"3306": 4, "5432": 2}, "widest_prefix": {"3306": 32, "5432": 24}}) == "allow-list, at most 4 sources per port, widest /24"
+    assert (
+        sg_text({"sg_exposure": "allow-list", "allowed_sources": {"3306": 1, "5432": 2}, "widest_prefix": {"3306": None, "5432": 32}})
+        == "allow-list, at most 2 sources per port, widest /32; 1 port also allows a prefix list or security group reference"
+    )
+    assert sg_text({"sg_exposure": "allow-list", "allowed_sources": {"3306": 1}, "widest_prefix": {"3306": None}}) == "allow-list, at most 1 source per port, width unknown, a prefix list or security group reference"
+    assert sg_text({"sg_exposure": "open", "open_ports": [9094, 443]}) == "open to 0.0.0.0/0 on 443, 9094"
+
+
 def test_eks_without_alb_metrics_is_not_read(tmp_path):
     _snapshot(tmp_path)
     (tmp_path / "aws" / "alb-metrics.json").unlink()

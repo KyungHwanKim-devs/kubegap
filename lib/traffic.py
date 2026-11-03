@@ -100,11 +100,12 @@ class _Objects:
 OPEN_CIDRS = ("0.0.0.0/0", "::/0")
 
 
-def _prefix_len(cidr: str) -> int:
+def _prefix_len(cidr: str) -> int | None:
+    """Prefix length of a CIDR, None when the string is not one. A hand-typed loadBalancerSourceRanges entry can be anything."""
     try:
         return ipaddress.ip_network(cidr, strict=False).prefixlen
     except ValueError:
-        return 0
+        return None
 
 
 def _covers_everything(cidrs: set[str]) -> bool:
@@ -151,26 +152,26 @@ def sg_exposure(lb: dict | None, ports: list[int]) -> dict:
     for port in ports:
         cidrs: set[str] = set()
         hidden = 0
-        for r in lb.get("_inbound_rules") or lb.get("inbound_rules") or []:
+        for r in lb.get("_inbound_rules") or lb.get("inbound_rules") or []:  # `inbound_rules` as a fallback only for tests that build the row by hand; the summary row carries prefix lengths, not addresses
             if _rule_covers(r, port):
                 cidrs |= set(r.get("cidrs") or []) | set(r.get("cidrs_v6") or [])
                 hidden += len(r.get("prefix_lists") or []) + len(r.get("security_groups") or [])
         if cidrs & set(OPEN_CIDRS) or _covers_everything(cidrs):
             open_ports.append(port)
         allowed[str(port)] = len(cidrs) + hidden
-        widest[str(port)] = None if hidden else (min((_prefix_len(c) for c in cidrs), default=None))
+        widest[str(port)] = None if hidden else min((n for n in (_prefix_len(c) for c in cidrs) if n is not None), default=None)
     state = "open" if open_ports else ("allow-list" if any(allowed.values()) else "blocked")
     return {"sg_exposure": state, "allowed_sources": allowed, "widest_prefix": widest, "open_ports": sorted(open_ports)}
 
 
 def _ranges_exposure(ranges: list[str], ports: list[int]) -> dict:
     """The same shape from a Service's loadBalancerSourceRanges, for a load balancer that has no security group of its own: the controller writes those ranges into the node groups, which the check does not read."""
-    cidrs = {str(c) for c in ranges if c}
+    cidrs = {str(c) for c in ranges if c and _prefix_len(str(c)) is not None}  # entries that are not a CIDR are ignored
     ports = [p for p in ports if isinstance(p, int)]
     if not cidrs or not ports:
         return {}
     opened = bool(cidrs & set(OPEN_CIDRS)) or _covers_everything(cidrs)
-    widest = min((_prefix_len(c) for c in cidrs), default=None)
+    widest = min(_prefix_len(c) for c in cidrs)
     return {"sg_exposure": "open" if opened else "allow-list", "allowed_sources": {str(p): len(cidrs) for p in ports}, "widest_prefix": {str(p): widest for p in ports}, "open_ports": ports if opened else []}
 
 
@@ -194,8 +195,8 @@ def _alb(snap: Path, objs: _Objects) -> dict:
         row["inbound_rules"] = [
             {
                 **{k: r.get(k) for k in ("protocol", "from_port", "to_port", "prefix_lists", "security_groups")},
-                "cidr_prefixes": sorted(_prefix_len(c) for c in r.get("cidrs") or []),
-                "cidr_v6_prefixes": sorted(_prefix_len(c) for c in r.get("cidrs_v6") or []),
+                "cidr_prefixes": sorted(n for n in (_prefix_len(c) for c in r.get("cidrs") or []) if n is not None),
+                "cidr_v6_prefixes": sorted(n for n in (_prefix_len(c) for c in r.get("cidrs_v6") or []) if n is not None),
             }
             for r in row["_inbound_rules"]
         ]
@@ -427,8 +428,10 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
                 sg["sg_exposure"] = "not-read"  # nothing was described: the call failed, or the file is missing on an EKS run
         if sg.get("sg_exposure") == "no-security-group" and sp.get("loadBalancerSourceRanges"):
             # an NLB without groups of its own: the controller wrote the Service's sourceRanges into the node groups, which are not read; the ranges are the best statement of the AWS-layer control
-            sg = {**sg, **_ranges_exposure(sp.get("loadBalancerSourceRanges") or [], judged)}
-            sg_from_ranges = True
+            ranged = _ranges_exposure(sp.get("loadBalancerSourceRanges") or [], judged)
+            if ranged:
+                sg = {**sg, **ranged}
+                sg_from_ranges = True
         rows.append(
             {
                 "type": t.lower(),
