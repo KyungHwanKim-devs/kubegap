@@ -318,6 +318,10 @@ def render_details(snap: Path, language: str = "en") -> Path:
         skipped = [f"{sid} ({st.get('skipped')})" for sid, st in steps.items() if isinstance(st, dict) and st.get("skipped")]
         rows.append([name, len(steps), ", ".join(failed) or "", "; ".join(skipped) or (c.get("skipped") or "")])
     w(_table(["Collector", "Steps", "Failed", "Skipped (reason)"], rows))
+    npk = ((cr.get("core") or {}).get("steps") or {}).get("objects.dump-all", {}).get("not_permitted") or []
+    if npk:
+        w("")
+        w(f"Kinds the ClusterRole does not grant ({len(npk)}; a check that needs one of them is skipped, not passed): " + ", ".join(f"`{k}`" for k in npk))
     sm = cr.get("_summary") or {}
     run = summary.get("run") or {}
     w("")
