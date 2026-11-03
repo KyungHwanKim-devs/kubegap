@@ -16893,18 +16893,24 @@
   type: summary
   each: traffic.db_exposed
   rule:
-    expr: "True"
+    expr: "item.get('sg_exposure') != 'allow-list'"
+    warn_expr: "item.get('sg_exposure') == 'allow-list'"
   target: "item['target']"
-  evidence: "f\"{item['type']} {item.get('namespace') or ''}/{item['name']}: ports {item.get('ports')}, exposure {item.get('scheme')}, addresses {item.get('hosts')}, sourceRanges {item.get('source_ranges')}. {item.get('note') or ''}\""
+  evidence: "f\"{item['type']} {item.get('namespace') or ''}/{item['name']}: ports {item.get('ports')}, exposure {item.get('scheme')}, addresses {item.get('hosts')}, sourceRanges {item.get('source_ranges')}, security group {_sg_text(item)}. {item.get('note') or ''}\""
   severity_default: high
   symptom_linked: false
   why: >
-    If ports like 5432, 3306, 6379, 27017 or 9092 are open on an internet-facing LB or a NodePort (every node interface), a single password is all that stands in the way. A security group or sourceRanges may block it, so "open" is based on the LB/Service definition and actual reachability is verified manually (the tool does not curl).
+    If ports like 5432, 3306, 6379, 27017 or 9092 are open on an internet-facing LB or a NodePort (every node interface), a single password is all that stands in the way.
+    On AWS the security groups of the load balancer decide who can connect, so the check reads their inbound rules: a database port reachable from 0.0.0.0/0 or ::/0 is open and fails;
+    a load balancer without security groups passes everything and fails too; rules that could not be read fail with "not read" in the evidence, since the Service definition alone cannot clear it.
+    When every database port is limited to listed addresses, prefix lists or other security groups the check warns: the data is not open to the internet, but an internet-facing load balancer in front of a database still relies on that list being right, and an internal scheme or a VPN is the safer shape.
+    A NodePort has no security group of its own in this check and fails as before. The tool never connects to the ports.
   measured: >
-    Measured on a real EKS cluster: an internet-facing NLB created outside Kubernetes received MySQL, Postgres, Redis and Neo4j ports through a TargetGroupBinding, and a Kafka 9094 NLB was also internet-facing. On a k3s cluster: 4 DBs opened via NodePort.
-  suggest: "Change the NLB scheme to internal or narrow the security group to office/VPN ranges. NodePort DBs: ClusterIP + port-forward (or a Tailscale-only interface)."
+    Measured on a real EKS cluster: an internet-facing NLB created outside Kubernetes received MySQL, Postgres, Redis and Neo4j ports through nine hand-made TargetGroupBindings; its security group allowed four /32 addresses per port, while the Kafka 9094 NLB next to it allowed 0.0.0.0/0. Before the rules were read both failed as open. On a k3s cluster: 4 DBs opened via NodePort.
+  suggest: "Change the NLB scheme to internal or narrow the security group to office/VPN ranges. NodePort DBs: ClusterIP + port-forward (or a Tailscale-only interface). An allow-listed NLB: review the list and prefer an internal scheme reached through the VPN."
   verify:
-    - "aws elbv2 describe-load-balancers --query 'LoadBalancers[?Scheme==`internet-facing`].[LoadBalancerName,Type,DNSName]'"
+    - "aws elbv2 describe-load-balancers --query 'LoadBalancers[?Scheme==`internet-facing`].[LoadBalancerName,Type,DNSName,SecurityGroups]'"
+    - "aws ec2 describe-security-groups --group-ids <sg> --query 'SecurityGroups[].IpPermissions[].[FromPort,ToPort,IpRanges[].CidrIp]'"
     - "kubectl get svc -A --field-selector spec.type=NodePort"
   profiles: [prod, lab]
   test:
@@ -16930,6 +16936,68 @@
           external_traffic_policy: null
           source_ranges: null
           note: "DB port open on an external address"
+      # Service LoadBalancer whose security group opens the Kafka port to the internet
+      - expect: "fail"
+        item:
+          type: "loadbalancer"
+          namespace: "middleware"
+          name: "kafka-external"
+          target: "loadbalancer/middleware/kafka-external"
+          hosts: ["k8s-kafka-1.elb.ap-northeast-2.amazonaws.com"]
+          ports: [9094, 443]
+          node_ports: [31779, 31290]
+          scheme: "internet-facing"
+          tls: false
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          db_port: true
+          prod: false
+          external_traffic_policy: "Cluster"
+          source_ranges: null
+          sg_exposure: "open"
+          allowed_cidrs: { "9094": ["0.0.0.0/0"], "443": ["0.0.0.0/0"] }
+          note: "DB port open to the internet by the security group"
+      # NLB built outside the cluster whose security group allows four office addresses per database port: warn, not fail (#73)
+      - expect: "warn"
+        item:
+          type: "nlb (defined outside the cluster)"
+          namespace: null
+          name: "db-shared"
+          target: "nlb/db-shared"
+          hosts: ["db-shared-1.elb.ap-northeast-2.amazonaws.com"]
+          ports: [3306, 5432, 6379, 7687]
+          scheme: "internet-facing"
+          tls: null
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          db_port: true
+          prod: true
+          bound_services: ["prod-a/mysql", "prod-b/postgresql"]
+          sg_exposure: "allow-list"
+          allowed_cidrs: { "3306": ["203.0.113.1/32", "203.0.113.2/32"], "5432": ["203.0.113.1/32"], "6379": ["203.0.113.1/32"], "7687": ["203.0.113.1/32"] }
+          note: "NLB created outside Kubernetes; 2 TargetGroupBindings bind it to prod-a/mysql, prod-b/postgresql. DB port on an external address, limited by the security group to listed addresses"
+      # the security groups could not be read: fail, with "not read" in the evidence
+      - expect: "fail"
+        item:
+          type: "nlb (defined outside the cluster)"
+          namespace: null
+          name: "db-shared"
+          target: "nlb/db-shared"
+          hosts: ["db-shared-1.elb.ap-northeast-2.amazonaws.com"]
+          ports: [3306]
+          scheme: "internet-facing"
+          tls: null
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          db_port: true
+          prod: true
+          bound_services: []
+          sg_exposure: "not-read"
+          allowed_cidrs: {}
+          note: "NLB created outside Kubernetes; no TargetGroupBinding, DB inferred from the target group port. DB port on an external address; the security group could not be read"
       - expect: "none"
 
 - id: traffic.ingress-nginx-vulnerable-version
