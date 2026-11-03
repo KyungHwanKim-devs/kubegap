@@ -8,10 +8,12 @@ Secrets are never fetched through kubectl. If Secrets are mixed into fetched obj
 from __future__ import annotations
 
 import contextlib
+import ipaddress
 import json
 import re
 import threading
 import time as _time
+import urllib.parse
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
@@ -227,6 +229,7 @@ class Stores:
         self._lock = threading.Lock()  # several collectors may ask for the same store at once
         self._url: dict[str, str] = {}
         self._svc = {}
+        self.warned_plain_http: set[str] = set()  # hosts already warned about a token over plain http, once per run
         for kind, info in (inv.get("stores") or {}).items():
             if info.get("service"):
                 self._svc[kind] = info["service"]
@@ -258,6 +261,27 @@ class Stores:
             pf.stop()
 
 
+def plain_http_token_host(base: str) -> str | None:
+    """The host a token would travel to in clear text: the URL is plain http and the host is not loopback. None otherwise.
+
+    A port-forward and the `http://localhost:3000` of config.example.yaml stay on this machine, so they are not reported.
+    """
+    u = urllib.parse.urlsplit(base)
+    host = u.hostname
+    if u.scheme != "http" or not host:
+        return None
+    if host == "localhost":
+        return None
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return host
+    mapped = getattr(ip, "ipv4_mapped", None)  # ::ffff:127.0.0.1; is_loopback honours it only from Python 3.12
+    if ip.is_loopback or (mapped is not None and mapped.is_loopback):
+        return None
+    return host
+
+
 def _run_http_step(st: dict, sid: str, name: str, cfg: Config, snap: Path, log: RunLog, stores: Stores, timeout: float, echo) -> dict:
     from . import http as _http
 
@@ -277,6 +301,15 @@ def _run_http_step(st: dict, sid: str, name: str, cfg: Config, snap: Path, log: 
                 echo(f"    skipped: config.yaml has no {st['auth']}, so the authenticated endpoint {st['path']} is not read")
             return {"ok": False, "skipped": f"{st['auth']} missing"}
         headers["Authorization"] = f"Bearer {token}"
+        plain_host = plain_http_token_host(base)
+        with stores._lock:
+            first = bool(plain_host) and plain_host not in stores.warned_plain_http
+            if first:
+                stores.warned_plain_http.add(plain_host)
+        if first:
+            log.note("token sent over plain http", host=plain_host, store=kind)
+            if echo:
+                echo(f"    warning: {kind}_url is plain http, so {st['auth']} travels to {plain_host} in clear text; use an https address or a port-forward")
     import time as _t
 
     t0 = _t.monotonic()
