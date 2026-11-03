@@ -109,18 +109,97 @@ def diff_findings(a: Path, b: Path) -> dict:
         return {"missing": "findings-draft.json missing on one side (run evaluate first)", "a": bool(da), "b": bool(db)}
     fa = {f["id"]: f for f in da.get("findings", [])}
     fb = {f["id"]: f for f in db.get("findings", [])}
-    new = [fb[i] for i in sorted(set(fb) - set(fa))]
-    resolved = [fa[i] for i in sorted(set(fa) - set(fb))]
-    changed = []
+    ca = {c["id"]: c for c in da.get("check_results") or []}
+    cb = {c["id"]: c for c in db.get("check_results") or []}
+    # A finding appears or disappears for one of two reasons: the cluster changed, or the criteria did. The criteria are known from check_results:
+    # whether the check existed and was allowed to run on each side (absent, disabled, not-collected, tool-missing, error), the rule_hash of its verdict-deciding
+    # parts (recorded since rubric 0.1.66) and the thresholds in force. A check that was `skip` on one side (its inputs were absent, as when Argo CD was installed
+    # between the runs) is a cluster change, and the row carries both statuses and the skip reason so the report can say so. When a side has no rule_hash the finding
+    # stays a cluster change marked `rule_known: false`; the report reads the check's notes for those only.
+    crit: dict[str, list] = {"new_checks": [], "dropped_checks": [], "rule_changed": [], "thresholds_changed": []}
+    unknown_checks: set[str] = set()
+    GATED = ("disabled", "not-collected", "tool-missing", "error")
+
+    def gate(c: dict | None) -> bool:
+        """True when the check could not produce findings on this side for a reason that is not the cluster: it did not exist or a gate kept it out."""
+        return not c or c.get("status") in GATED
+
+    def classify(check_id: str) -> tuple[str | None, bool]:
+        """(bucket or None for a cluster change, rule_known)."""
+        x, y = ca.get(check_id), cb.get(check_id)
+        if not ca or not cb:
+            return None, True  # a findings-draft.json from before check_results existed: nothing to say, the old behaviour
+        if gate(x):
+            return "new_checks", True
+        if gate(y):
+            return "dropped_checks", True
+        hx, hy = x.get("rule_hash"), y.get("rule_hash")
+        if hx and hy:
+            if hx != hy:
+                return "rule_changed", True
+            if (x.get("thresholds") or {}) != (y.get("thresholds") or {}):
+                return "thresholds_changed", True
+            return None, True
+        if da.get("rubric_version") != db.get("rubric_version"):
+            unknown_checks.add(check_id)
+            return None, False
+        return None, True
+
+    def crit_row(f: dict, kind: str, bucket: str) -> dict:
+        x, y = ca.get(f["check"]) or {}, cb.get(f["check"]) or {}
+        row = {
+            "id": f["id"],
+            "check": f["check"],
+            "kind": kind,
+            "bucket": bucket,
+            "status": f.get("status"),
+            "severity_default": f.get("severity_default"),
+            "check_status": [x.get("status"), y.get("status")],
+            "check_reason": [x.get("reason"), y.get("reason")],
+            "rule_hash": [x.get("rule_hash"), y.get("rule_hash")],
+            "evidence": f.get("evidence"),
+        }
+        if bucket == "thresholds_changed":
+            row["thresholds"] = [x.get("thresholds"), y.get("thresholds")]
+        return row
+
+    def cluster_row(f: dict, known: bool, with_evidence: bool) -> dict:
+        x, y = ca.get(f["check"]) or {}, cb.get(f["check"]) or {}
+        row = {"id": f["id"], "status": f["status"], "severity_default": f["severity_default"]}
+        if with_evidence:
+            row["evidence"] = f.get("evidence")
+        if ca and cb:
+            row["check_status"] = [x.get("status"), y.get("status")]
+            if x.get("status") == "skip" or y.get("status") == "skip":
+                row["check_reason"] = [x.get("reason"), y.get("reason")]  # the inputs appeared or vanished: an installation or removal, which is a cluster change
+        if not known:
+            row["rule_known"] = False
+        return row
+
+    new, resolved, changed = [], [], []
+    for i in sorted(set(fb) - set(fa)):
+        b, known = classify(fb[i]["check"])
+        (crit[b].append(crit_row(fb[i], "new", b)) if b else new.append(cluster_row(fb[i], known, True)))
+    for i in sorted(set(fa) - set(fb)):
+        b, known = classify(fa[i]["check"])
+        (crit[b].append(crit_row(fa[i], "resolved", b)) if b else resolved.append(cluster_row(fa[i], known, False)))
     for i in sorted(set(fa) & set(fb)):
         x, y = fa[i], fb[i]
         if x["status"] != y["status"] or x["severity_default"] != y["severity_default"]:
-            changed.append({"id": i, "status": [x["status"], y["status"]], "severity_default": [x["severity_default"], y["severity_default"]]})
+            b, known = classify(y["check"])
+            row = {"id": i, "status": [x["status"], y["status"]], "severity_default": [x["severity_default"], y["severity_default"]]}
+            if b:
+                crit[b].append({**crit_row(y, "changed", b), **row})
+            else:
+                if not known:
+                    row["rule_known"] = False
+                changed.append(row)
     # Rename suspects: within the same check and namespace one finding disappeared and one appeared
     rename_suspects = []
     for r in resolved:
-        ns = r["target"].split("/")[0]
-        cand = [n for n in new if n["check"] == r["check"] and n["target"].split("/")[0] == ns]
+        rf = fa[r["id"]]
+        ns = rf["target"].split("/")[0]
+        cand = [fb[n["id"]] for n in new if fb[n["id"]]["check"] == rf["check"] and fb[n["id"]]["target"].split("/")[0] == ns]
         if cand:
             rename_suspects.append({"resolved": r["id"], "new_candidates": [c["id"] for c in cand][:3]})
 
@@ -132,11 +211,16 @@ def diff_findings(a: Path, b: Path) -> dict:
         "profile": [(da.get("profile") or {}).get("name"), (db.get("profile") or {}).get("name")],
         "counts_before": {"fail": sev(da, "fail"), "warn": sev(da, "warn")},
         "counts_after": {"fail": sev(db, "fail"), "warn": sev(db, "warn")},
-        "new": [{"id": f["id"], "status": f["status"], "severity_default": f["severity_default"], "evidence": f.get("evidence")} for f in new],
-        "resolved": [{"id": f["id"], "status": f["status"], "severity_default": f["severity_default"]} for f in resolved],
+        "new": new,
+        "resolved": resolved,
         "changed": changed,
         "rename_suspects": rename_suspects,
-        "summary": {"new": len(new), "resolved": len(resolved), "changed": len(changed)},
+        "criteria_changes": {
+            **crit,
+            "rule_unknown_checks": sorted(unknown_checks),
+            "note": "Findings whose check did not exist or was gated off on one side (new_checks, dropped_checks), whose rule_hash differs (rule_changed) or whose thresholds in force differ (thresholds_changed) are criteria changes and are kept out of new, resolved and changed. rule_unknown_checks are checks that predate rule hashes while the rubric version differs; their findings stay in new, resolved and changed with rule_known: false, and the report reads those checks' notes.",
+        },
+        "summary": {"new": len(new), "resolved": len(resolved), "changed": len(changed), "criteria_changes": sum(len(v) for v in crit.values()), "rule_unknown_checks": len(unknown_checks)},
     }
 
 

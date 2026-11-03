@@ -1,0 +1,16 @@
+# Open defects of kubegap itself, attached to the checks they affect (#76).
+# evaluate puts them on the check's result and on every finding of the check, with "known issue #N" at the end of the evidence, and the report's tool notes cite the number instead of describing the defect again.
+# The PR that closes an issue removes its lines. tests/test_report_artifacts.py checks that every check id here exists.
+checks:
+  observability.no-slo:
+    - issue: 15
+      note: the check looks for an SLO tool (Sloth, Pyrra), not for SLOs; a team running SLOs from Grafana and documents gets a critical
+  hygiene.change-correlation:
+    - issue: 9
+      note: why cites SRE Book chapter 8; the change-causes-outages material is chapter 1
+  platform.k8s-version-eol:
+    - issue: 11
+      note: upstream end of life and EKS end of standard support are both written as EOL with different dates
+  eks.extended-support:
+    - issue: 11
+      note: upstream end of life and EKS end of standard support are both written as EOL with different dates

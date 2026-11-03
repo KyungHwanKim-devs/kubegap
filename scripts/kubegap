@@ -295,11 +295,15 @@ def cmd_checks(args) -> int:
         print("| Area | Checks | With a public case |\n|---|---|---|")
         for a in areas:
             print(f"| [{a}](#{a}) | {len(by_area[a])} | {sum(1 for c in by_area[a] if c.get('cases'))} |")
+        known, _known_errors = _rubric.load_known_issues()
+        if known:
+            print(f"\n{len(known)} checks have an open defect of kubegap itself on the tracker (`rubric/known-issues.yaml`); a finding of such a check says `known issue #N` at the end of its evidence.")
         for a in areas:
-            print(f"\n## {a}\n\n| id | What it checks | Default severity | Profiles | Collector | Public cases |\n|---|---|---|---|---|---|")
+            print(f"\n## {a}\n\n| id | What it checks | Default severity | Profiles | Collector | Public cases | Known issues |\n|---|---|---|---|---|---|---|")
             for c in sorted(by_area[a], key=lambda c: c["id"]):
                 cases = ", ".join(f"[{x['who']}]({x['url']})" for x in c.get("cases") or [])
-                print(f"| `{c['id']}` | {c['name']} | {c['severity_default']} | {', '.join(c.get('profiles') or [])} | {c['collector']} | {cases} |")
+                issues = ", ".join(f"[#{k['issue']}](https://github.com/KyungHwanKim-devs/kubegap/issues/{k['issue']})" for k in known.get(c["id"]) or [])
+                print(f"| `{c['id']}` | {c['name']} | {c['severity_default']} | {', '.join(c.get('profiles') or [])} | {c['collector']} | {cases} | {issues} |")
         return EXIT_OK
     for a in areas:
         print(f"{a} ({len(by_area[a])})")

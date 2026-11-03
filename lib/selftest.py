@@ -84,8 +84,8 @@ def _build_snapshot(root: Path, check: dict, case: dict, profile_name: str):
     return inv, summary
 
 
-KEY_HARD_RE = re.compile(r"item\['([^']+)'\]")
-KEY_SOFT_RE = re.compile(r"item\.get\('([^']+)'")
+KEY_HARD_RE = _ev.KEY_HARD_RE  # the same regexes build a finding's `details`
+KEY_SOFT_RE = _ev.KEY_SOFT_RE
 
 
 def audit_against_snapshot(checks: list[dict], snap: Path) -> list[dict]:

@@ -19,6 +19,7 @@ English because it comes from the check definitions. Masking (`scripts/kubegap m
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from . import __version__, paths
@@ -70,8 +71,24 @@ LABELS: dict[str, dict[str, str]] = {
         "(not written this run)": "(이번 실행에서 쓰지 않음)",
         "(daily mode: no per-area detail; see section 2 and `report.md`)": "(daily 모드에는 영역별 세부가 없습니다. 2절과 `report.md` 를 보세요)",
         "No earlier {mode} snapshot to compare with.": "비교할 이전 {mode} 스냅샷이 없습니다.",
+        "### 3-0. Criteria changes, not cluster changes": "### 3-0. 기준 변경, 클러스터 변경이 아닌 것",
+        "These findings appeared, disappeared or changed because the checks did, not the cluster, and they are kept out of the lists above. Taken from `diff.json` `findings.criteria_changes`; the report writes them as a criteria change and never as a tool defect.": "체크가 바뀌어서 생기거나 사라지거나 바뀐 발견 사항입니다. 위 목록에서 빼 두었습니다. `diff.json` 의 `findings.criteria_changes` 에서 그대로 가져왔고, 리포트는 이것을 기준 변경으로 쓰며 도구 결함으로 쓰지 않습니다.",
+        "Checks absent or gated off in the previous run": "지난 실행에 없었거나 모드·프로파일·도구 때문에 돌지 않은 체크",
+        "Checks absent or gated off in this run": "이번 실행에 없었거나 모드·프로파일·도구 때문에 돌지 않은 체크",
+        "Checks whose rule changed between the runs": "두 실행 사이에 룰이 바뀐 체크",
+        "Checks whose thresholds in force changed": "적용된 임계값이 바뀐 체크",
+        "Checks from before rule hashes, under a different rubric version; their findings stay in the lists above marked `rule_known: false`, and the report reads these checks' notes:": "룰 해시가 없던 때의 체크이고 룰 버전이 다릅니다. 그 발견 사항은 위 목록에 `rule_known: false` 표시로 남아 있고, 리포트는 이 체크들의 notes 를 봅니다:",
+        "The table cuts each evidence at 300 characters and a check may cut a list in its evidence; nothing is lost. Every finding below carries, folded, the material its rule judged, taken from `findings-draft.json` `details`.": "표는 근거를 300자에서 자르고 체크도 근거 안의 목록을 자를 수 있지만 잃는 것은 없습니다. 아래에 발견 사항마다 룰이 판정한 재료 전체가 접혀 있습니다. `findings-draft.json` 의 `details` 입니다.",
     },
 }
+
+
+def _evidence(f: dict, limit: int) -> str:
+    """The evidence cell: the check's text cut for the table, then the open tracker issues of the check, so a reader sees `known issue #15` next to the finding."""
+    ev = f.get("evidence") or ""
+    ev = ev if isinstance(ev, str) else str(ev)
+    tag = ", ".join(f"#{k.get('issue')}" for k in (f.get("known_issues") or []) if isinstance(k, dict))
+    return ev[:limit] + (f" known issue {tag}" if tag else "")
 
 
 def _cell(v) -> str:
@@ -191,7 +208,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w("")
     persisted = _persisted(diff)
     ch = [f for f in findings if f.get("status") == "fail" and f.get("severity_default") in ("critical", "high")]
-    w(_table([L("Finding"), L("Severity"), L("Consecutive runs"), L("Evidence")], [[f"`{f['id']}`", f.get("severity_default"), persisted.get(f["id"], "") or "", (f.get("evidence") or "")[:220]] for f in ch]))
+    w(_table([L("Finding"), L("Severity"), L("Consecutive runs"), L("Evidence")], [[f"`{f['id']}`", f.get("severity_default"), persisted.get(f["id"], "") or "", _evidence(f, 220)] for f in ch]))
     if not persisted:
         w("")
         w("(consecutive-run counts need diff.json; none for this snapshot)")
@@ -218,6 +235,31 @@ def render_details(snap: Path, language: str = "en") -> Path:
         )
         evc = [e for e in ((diff.get("events") or {}).get("changed") or []) if e.get("type") == "Warning"]
         w("- **Warning events**: " + (", ".join(f"{e.get('reason')} {e.get('delta'):+d} ({(e.get('objects_top_after') or [''])[0]})" for e in evc[:10]) if evc else "no change"))
+        crit = df.get("criteria_changes") or {}
+        n_crit = sum(len(v) for k, v in crit.items() if isinstance(v, list))  # rule_unknown_checks counts too: the section then explains the rule_known marks
+        if n_crit:
+            w("")
+            w(L("### 3-0. Criteria changes, not cluster changes"))
+            w("")
+            w(
+                L(
+                    "These findings appeared, disappeared or changed because the checks did, not the cluster, and they are kept out of the lists above. Taken from `diff.json` `findings.criteria_changes`; the report writes them as a criteria change and never as a tool defect."
+                )
+            )
+            w("")
+            for key, label in (
+                ("new_checks", "Checks absent or gated off in the previous run"),
+                ("dropped_checks", "Checks absent or gated off in this run"),
+                ("rule_changed", "Checks whose rule changed between the runs"),
+                ("thresholds_changed", "Checks whose thresholds in force changed"),
+            ):
+                rows = crit.get(key) or []
+                if rows:
+                    w(f"- **{L(label)} ({len(rows)})**: " + ", ".join(f"`{r.get('id')}` ({r.get('kind')}, {r.get('status')}/{r.get('severity_default')})" for r in rows))
+            unk = crit.get("rule_unknown_checks") or []
+            if unk:
+                w("")
+                w(L("Checks from before rule hashes, under a different rubric version; their findings stay in the lists above marked `rule_known: false`, and the report reads these checks' notes:") + " " + ", ".join(f"`{c}`" for c in unk))
         pers = df.get("persisted") or {}
         if pers:
             w(
@@ -313,7 +355,20 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w(L("### 7-5. Full first-pass status (every fail and warn, code results as-is)"))
     w("")
     fw = sorted((f for f in findings if f.get("status") in ("fail", "warn")), key=lambda f: (SEVERITIES.index(f.get("severity_default", "info")) if f.get("severity_default") in SEVERITIES else 9, f.get("status") != "fail", f.get("id", "")))
-    w(_table(["id", "Status", "Default severity", "Evidence"], [[f"`{f['id']}`", f.get("status"), f.get("severity_default"), (f.get("evidence") or "")[:300]] for f in fw]))
+    w(_table(["id", "Status", "Default severity", "Evidence"], [[f"`{f['id']}`", f.get("status"), f.get("severity_default"), _evidence(f, 300)] for f in fw]))
+    w("")
+    w(L("The table cuts each evidence at 300 characters and a check may cut a list in its evidence; nothing is lost. Every finding below carries, folded, the material its rule judged, taken from `findings-draft.json` `details`."))
+    w("")
+    for f in fw:
+        if f.get("details") is None:
+            continue
+        w(f"<details><summary><code>{f['id']}</code></summary>")
+        w("")
+        w("```json")
+        w(json.dumps(f["details"], ensure_ascii=False, indent=1, default=str))
+        w("```")
+        w("")
+        w("</details>")
     w("")
     w(L("### 7-6. Tool notes (about kubegap itself)"))
     w("")
