@@ -13,7 +13,7 @@ import re
 import threading
 import time as _time
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -872,6 +872,40 @@ def run_collector(
     return result
 
 
+class Progress:
+    """Counts finished collectors and renders the one-line progress text that `collect` prints and writes into INCOMPLETE."""
+
+    def __init__(self, total: int, t_start: float):
+        self.total = total
+        self.t_start = t_start
+        self.finished = 0
+        self.last: tuple[str, float] | None = None
+
+    def done(self, name: str, seconds: float, running: list[str]) -> str:
+        self.finished += 1
+        self.last = (name, seconds)
+        return self.text(running)
+
+    def text(self, running: list[str]) -> str:
+        elapsed = _time.monotonic() - self.t_start
+        return progress_line(self.finished, self.total, elapsed, self.last, running)
+
+
+def progress_line(finished: int, total: int, elapsed: float, last: tuple[str, float] | None, running: list[str]) -> str:
+    """`progress: 7/21 collectors done, elapsed 61 s, last eks-platform 42 s, running core, karpenter`. Stable prefix so a reader can grep it."""
+    parts = [f"progress: {finished}/{total} collectors done", f"elapsed {elapsed:.0f} s"]
+    if last:
+        parts.append(f"last {last[0]} {last[1]:.0f} s")
+    if running:
+        parts.append("running " + ", ".join(running))
+    return ", ".join(parts)
+
+
+def _write_incomplete(snap: Path, line: str) -> None:
+    """INCOMPLETE marks a collection that has not finished; its text is the latest progress line so a waiting session can read how far the run is."""
+    (snap / "INCOMPLETE").write_text(line + "\nIf this file remains, the snapshot was interrupted.\n", encoding="utf-8")
+
+
 def collect(context: str, cfg: Config, inv: dict, snap: Path, log: RunLog, *, kubeconfig: str | None = None, only: list[str] | None = None, mode: str = paths.DEFAULT_MODE, echo=print) -> dict:
     if mode not in paths.MODES:
         raise ValueError(f"unknown collection mode {mode!r} (expected one of {', '.join(paths.MODES)})")
@@ -881,8 +915,8 @@ def collect(context: str, cfg: Config, inv: dict, snap: Path, log: RunLog, *, ku
     if only:
         enabled = [c for c in enabled if c in only]
     results = {}
-    (snap / "INCOMPLETE").write_text("collect in progress. If this file remains, the snapshot was interrupted.\n", encoding="utf-8")
     t_start = _time.monotonic()
+    _write_incomplete(snap, f"progress: 0/{len(enabled)} collectors done, elapsed 0 s")
     prom = Prometheus.connect(context, cfg.url("prometheus"), kubeconfig, log=log)
     if prom is None:
         echo("  Could not connect to Prometheus; all PromQL steps are skipped")
@@ -891,23 +925,40 @@ def collect(context: str, cfg: Config, inv: dict, snap: Path, log: RunLog, *, ku
     state = CollectState()
     print_lock = threading.Lock()
 
-    def run_one(name: str) -> tuple[str, dict]:
+    running: list[str] = []
+    progress = Progress(len(enabled), t_start)
+
+    def run_one(name: str) -> tuple[str, dict, float]:
         # Collectors are independent of each other (a step only reads outputs of earlier steps in the same collector), so they run concurrently.
         # Output lines are buffered per collector and printed as one block when it finishes, so the log stays readable.
+        with print_lock:
+            running.append(name)
+        t_one = _time.monotonic()
         buf: list[str] = []
         res = run_collector(name, context, cfg, inv, snap, log, kubeconfig=kubeconfig, prom=prom, stores=stores, node_access=node_runner, echo=buf.append if echo else None, state=state, mode=mode)
-        if echo:
-            with print_lock:
+        seconds = _time.monotonic() - t_one
+        with print_lock:
+            running.remove(name)
+            if echo:
                 for line in buf:
                     echo(line)
-        return name, res
+        return name, res, seconds
 
     try:
         # `core` is submitted first: it is the longest collector (object dump, events, the PromQL list), so starting it first keeps it from becoming the tail of the run
         order = [c for c in enabled if c == "core"] + [c for c in enabled if c != "core"]
+        _write_incomplete(snap, progress.text(list(running)))
         with ThreadPoolExecutor(max_workers=COLLECTOR_WORKERS, thread_name_prefix="collector") as pool:
-            for name, res in pool.map(run_one, order):
+            futures = [pool.submit(run_one, name) for name in order]
+            for fut in as_completed(futures):
+                name, res, seconds = fut.result()
                 results[name] = res
+                # One progress line per finished collector, and the same text in INCOMPLETE: whoever waits for the file to disappear reads it to learn how far the run is
+                with print_lock:
+                    line = progress.done(name, seconds, list(running))
+                    _write_incomplete(snap, line)
+                    if echo:
+                        echo(line)
         results = {name: results[name] for name in enabled}  # keep collect-result.json in the inventory's collector order
     finally:
         if prom:
