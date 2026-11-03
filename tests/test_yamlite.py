@@ -80,6 +80,25 @@ def test_sequence_at_same_indent_as_key():
         """) == {"disabled_checks": ["a.b", "c.d"], "other": 1}
 
 
+def test_bare_dash_at_same_indent_as_key():
+    """A bare `-` at the key's indent starts the list as `- x` does, so a leading empty item loads (PyYAML gives the same)."""
+    assert y("""
+        a:
+        -
+        - y
+        """) == {"a": [None, "y"]}
+    assert y("""
+        - k:
+          -
+          - w
+        """) == [{"k": [None, "w"]}]
+    assert y("""
+        a:
+        -
+        b: 1
+        """) == {"a": [None], "b": 1}
+
+
 def test_nested_sequence_with_double_dash():
     assert y("""
         - - 1
