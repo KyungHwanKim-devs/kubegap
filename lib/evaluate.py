@@ -397,19 +397,23 @@ class Context:
 
 
 def sg_text(item: dict) -> str:
-    """One phrase for the evidence of traffic.db-exposed: what the load balancer's security groups let in, counted, never the addresses themselves."""
+    """One phrase for the evidence of traffic.db-exposed: what the load balancer's security groups let in, as counts, never the addresses themselves."""
     state = item.get("sg_exposure")
-    allowed = item.get("allowed_cidrs") or {}
+    allowed = item.get("allowed_sources") or {}
     if state == "open":
-        ports = sorted(p for p, c in allowed.items() if any(x in ("0.0.0.0/0", "::/0") for x in c))
-        return "open to 0.0.0.0/0 on " + ", ".join(ports) if ports else "open to 0.0.0.0/0"
+        ports = ", ".join(str(p) for p in sorted(int(p) for p in item.get("open_ports") or []))
+        return f"open to 0.0.0.0/0 on {ports}" if ports else "open to 0.0.0.0/0"
     if state == "allow-list":
-        n = max((len(c) for c in allowed.values()), default=0)
+        n = max(allowed.values(), default=0)
         return f"allow-list, at most {n} source{'s' if n != 1 else ''} per port"
+    if state == "blocked":
+        return "no inbound rule covers the ports"
     if state == "no-security-group":
         return "none, nothing filters the listener"
     if state == "not-read":
         return "not read"
+    if state == "unmatched":
+        return "unknown, no described load balancer matched the Service address"
     return "not applicable"
 
 

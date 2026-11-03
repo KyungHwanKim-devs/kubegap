@@ -1,10 +1,10 @@
 """ALB/NLB and target group state plus CloudWatch metrics. EKS only, read-only calls.
 
-aws elbv2 describe-load-balancers / describe-load-balancer-attributes / describe-target-groups / describe-target-group-attributes / describe-target-health,
+aws elbv2 describe-load-balancers / describe-load-balancer-attributes / describe-listeners / describe-target-groups / describe-target-group-attributes / describe-target-health,
 aws cloudwatch get-metric-data (24 hours, 1-hour period). Output is a single aws/alb-metrics.json. lib/traffic.py joins it to k8s Services/Ingresses via TargetGroupBindings.
 
 CloudWatch dimensions: LoadBalancer = the 'app/<name>/<id>' part of the ARN (NLB: 'net/...'), TargetGroup = 'targetgroup/<name>/<id>'. Measured on a real cluster: 1 ALB and 40 target groups took 6 get-metric-data calls in 0.6 s.
-Required permissions: elasticloadbalancing:Describe*, cloudwatch:GetMetricData, ec2:DescribeSecurityGroups (the inbound rules of every load balancer's security groups, one call).
+Required permissions: elasticloadbalancing:Describe*, cloudwatch:GetMetricData, ec2:DescribeSecurityGroups (the inbound rules of every load balancer's security groups, one additional call; describe-listeners per load balancer).
 """
 
 from __future__ import annotations
@@ -93,6 +93,7 @@ def collect(snap: Path, out_rel: str, *, profile: str | None, region: str | None
             "created": lb.get("CreatedTime"),
             "azs": [z.get("ZoneName") for z in lb.get("AvailabilityZones") or []],
             "security_groups": lb.get("SecurityGroups") or [],
+            "listeners": [],
             "ip_address_type": lb.get("IpAddressType"),
             "idle_timeout_s": int(a["idle_timeout.timeout_seconds"]) if a.get("idle_timeout.timeout_seconds") else None,
             "deletion_protection": a.get("deletion_protection.enabled") == "true",
@@ -104,6 +105,20 @@ def collect(snap: Path, out_rel: str, *, profile: str | None, region: str | None
         }
         if attrs is None:
             errors.append(f"lb-attributes {row['name']}: {r.error or r.stderr.strip()[-120:]}")
+        lis, r = _aws.aws_json(["elbv2", "describe-listeners", "--load-balancer-arn", arn], id=f"{collector}.alb.describe-listeners", timeout=60, **kw)
+        if lis is None:
+            errors.append(f"describe-listeners {row['name']}: {r.error or r.stderr.strip()[-120:]}")
+        row["listeners"] = [
+            {
+                "port": li.get("Port"),
+                "protocol": li.get("Protocol"),
+                "target_groups": sorted(
+                    {(a.get("TargetGroupArn") or "").rsplit("/", 2)[-2] for a in li.get("DefaultActions") or [] if a.get("TargetGroupArn")}
+                    | {(g.get("TargetGroupArn") or "").rsplit("/", 2)[-2] for a in li.get("DefaultActions") or [] for g in ((a.get("ForwardConfig") or {}).get("TargetGroups") or [])}
+                ),
+            }
+            for li in (lis or {}).get("Listeners") or []
+        ]
         tgs, r = _aws.aws_json(["elbv2", "describe-target-groups", "--load-balancer-arn", arn], id=f"{collector}.alb.describe-target-groups", timeout=60, **kw)
         if tgs is None:
             errors.append(f"describe-target-groups {row['name']}: {r.error or r.stderr.strip()[-120:]}")
