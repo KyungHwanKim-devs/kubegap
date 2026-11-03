@@ -389,10 +389,39 @@ class Context:
             "backup_signals": self.backup_signals,
             "serves_traffic": self.serves_traffic,
             "db_like": self.db_like,
+            "_sg_text": sg_text,
             "inv": self.inv,
             "summary": self.summary,
             "ctx": {"profile": self.profile.get("name"), "platform": (self.inv.get("cluster") or {}).get("platform"), "prod_like": sorted(self.prod_like)},
         }
+
+
+def sg_text(item: dict) -> str:
+    """One phrase for the evidence of traffic.db-exposed: what the load balancer's security groups let in, as counts, never the addresses themselves."""
+    state = item.get("sg_exposure")
+    allowed = item.get("allowed_sources") or {}
+    if state == "open":
+        ports = ", ".join(str(p) for p in sorted(int(p) for p in item.get("open_ports") or []))
+        return f"open to 0.0.0.0/0 on {ports}" if ports else "open to 0.0.0.0/0"
+    if state == "allow-list":
+        n = max(allowed.values(), default=0)
+        widths = list((item.get("widest_prefix") or {}).values())
+        known = [w for w in widths if w is not None]
+        hidden = sum(1 for w in widths if w is None)
+        if known:
+            width = f"widest /{min(known)}" + (f"; {hidden} port{'s' if hidden != 1 else ''} also allow{'s' if hidden == 1 else ''} a prefix list or security group reference" if hidden else "")
+        else:
+            width = "width unknown, a prefix list or security group reference"
+        return f"allow-list, at most {n} source{'s' if n != 1 else ''} per port, {width}"
+    if state == "blocked":
+        return "no inbound rule covers the ports"
+    if state == "no-security-group":
+        return "none on the load balancer, only the targets' groups filter it"
+    if state == "not-read":
+        return "not read"
+    if state == "unmatched":
+        return "unknown, no described load balancer matched the Service address"
+    return "not applicable"
 
 
 def _eval(expr: str, env: dict):
