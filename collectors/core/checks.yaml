@@ -16902,7 +16902,8 @@
   why: >
     If ports like 5432, 3306, 6379, 27017 or 9092 are open on an internet-facing LB or a NodePort, which listens on every node interface, a single password is all that stands in the way.
     On AWS the security groups of the load balancer decide who can connect, so the check reads their inbound TCP rules against the listener ports: a database port reachable from 0.0.0.0/0 or ::/0 is open and fails;
-    a load balancer without security groups passes everything and fails too; rules that could not be read, or a Service whose address matches no described load balancer, fail with that said in the evidence, since the Service definition alone cannot clear it.
+    a load balancer without security groups of its own fails too, since only the targets' groups filter it and the check does not read those; rules that could not be read, or a Service whose address matches no described load balancer, fail with that said in the evidence, since the Service definition alone cannot clear it.
+    Only the database ports decide: an open 443 next to an allow-listed 5432 does not make the row open.
     When every reachable database port is limited to listed addresses, prefix lists or other security groups the check warns: the data is not open to the internet, but an internet-facing load balancer in front of a database still relies on that list being right, and an internal scheme or a VPN is the safer shape.
     When no inbound rule covers the ports at all the listener is unreachable and the check passes. A NodePort has no security group of its own in this check and fails as before. The tool never connects to the ports.
   measured: >
@@ -17022,7 +17023,28 @@
           sg_exposure: "no-security-group"
           allowed_sources: {}
           open_ports: []
-          note: "NLB created outside Kubernetes; 1 TargetGroupBindings bind it to prod-a/postgresql. DB port on an external address with no security group, so nothing filters it"
+          note: "NLB created outside Kubernetes; 1 TargetGroupBinding binds it to prod-a/postgresql. DB port on an external address with no security group on the load balancer; only the targets' security groups filter it, which this check does not read"
+      # no inbound TCP rule covers the database listeners: unreachable, pass
+      - expect: "pass"
+        item:
+          type: "nlb (defined outside the cluster)"
+          namespace: null
+          name: "db-closed"
+          target: "nlb/db-closed"
+          hosts: ["db-closed-1.elb.ap-northeast-2.amazonaws.com"]
+          ports: [5432]
+          scheme: "internet-facing"
+          tls: null
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          db_port: true
+          prod: true
+          bound_services: ["prod-a/postgresql"]
+          sg_exposure: "blocked"
+          allowed_sources: { "5432": 0 }
+          open_ports: []
+          note: "NLB created outside Kubernetes; 1 TargetGroupBinding binds it to prod-a/postgresql. DB port on an external address, but no inbound rule of the security group covers it"
       # one port allow-listed and another open: the row is open and fails
       - expect: "fail"
         item:

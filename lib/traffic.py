@@ -102,7 +102,7 @@ def _rule_covers(rule: dict, port: int) -> bool:
     """TCP and all-protocol rules only: the listeners this check judges are TCP, so a UDP rule on the same port opens nothing."""
     if rule.get("protocol") == "-1":
         return True
-    if str(rule.get("protocol")).lower() != "tcp":
+    if str(rule.get("protocol")).lower() not in ("tcp", "6"):
         return False
     lo, hi = rule.get("from_port"), rule.get("to_port")
     return lo is not None and hi is not None and lo <= port <= hi
@@ -112,7 +112,8 @@ def sg_exposure(lb: dict | None, ports: list[int]) -> dict:
     """What the load balancer's security groups let in on these listener ports, as counts, never the addresses themselves.
     `open`: some port is reachable from 0.0.0.0/0 or ::/0. `allow-list`: every reachable port is limited to listed CIDRs, prefix lists or security groups.
     `blocked`: no inbound rule covers any of the ports. `no-security-group`: the load balancer has none, so nothing filters it (an NLB without groups passes everything).
-    `not-read`: the groups could not be described. `allowed_sources` counts the sources per port; `open_ports` lists the ports open to everyone."""
+    `not-read`: the groups could not be described. `allowed_sources` counts the distinct sources per port, CIDRs, prefix lists and referenced security groups alike; `open_ports` lists the ports open to everyone.
+    Pass only the ports that matter for the verdict: for a database exposure, the database ports, so an open 443 next to an allow-listed 5432 does not make the row open."""
     if not lb:
         return {"sg_exposure": None, "allowed_sources": {}, "open_ports": []}
     if not lb.get("security_groups"):
@@ -127,7 +128,7 @@ def sg_exposure(lb: dict | None, ports: list[int]) -> dict:
         sources: set[str] = set()
         for r in lb.get("inbound_rules") or []:
             if _rule_covers(r, port):
-                sources |= set(r.get("cidrs") or []) | set(r.get("cidrs_v6") or []) | {f"prefix-list {p}" for p in r.get("prefix_lists") or []} | ({f"sg:{r['security_groups']}"} if r.get("security_groups") else set())
+                sources |= set(r.get("cidrs") or []) | set(r.get("cidrs_v6") or []) | {f"prefix-list {p}" for p in r.get("prefix_lists") or []} | {f"sg:{g}" for g in r.get("security_groups") or []}
         if sources & set(OPEN_CIDRS):
             open_ports.append(port)
         allowed[str(port)] = len(sources)
@@ -370,9 +371,11 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
         if t == "NodePort":
             scheme = "node-ip (all node interfaces)"
         lb_row = next((lb_dns[a] for a in addrs if a in lb_dns), None) if t == "LoadBalancer" else None
-        sg = sg_exposure(lb_row, [p for p in ports if isinstance(p, int)])
+        judged = [p for p, tp in zip(ports, tports, strict=False) if isinstance(p, int) and (not db or p in DB_PORTS or (isinstance(tp, int) and tp in DB_PORTS))]
+        sg = sg_exposure(lb_row, judged)
         if t == "LoadBalancer" and lb_row is None and alb.get("available"):
-            sg["sg_exposure"] = "unmatched"  # the Service's address is among no described load balancer: another account, a stale status, or alb-metrics older than the Service
+            # the Service's address is among no described load balancer: another account, a stale status, or alb-metrics older than the Service. When no load balancer was described at all, the groups were simply not read.
+            sg["sg_exposure"] = "unmatched" if alb.get("lbs") else "not-read"
         rows.append(
             {
                 "type": t.lower(),
@@ -403,7 +406,10 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
             listener_ports = sorted({li["port"] for li in ln.get("listeners") or [] if isinstance(li.get("port"), int)})
             tg_ports = sorted({t["port"] for t in tgs if isinstance(t.get("port"), int)})
             nlb_ports = listener_ports or tg_ports  # the security group filters the listener port; the target group port is what the pod listens on
-            sg = sg_exposure(ln, nlb_ports)
+            tg_port_by_name = {t["name"]: t.get("port") for t in tgs}
+            db_listeners = sorted({li["port"] for li in ln.get("listeners") or [] if isinstance(li.get("port"), int) and (li["port"] in DB_PORTS or any(tg_port_by_name.get(n) in DB_PORTS for n in li.get("target_groups") or []))})
+            judged = db_listeners or [p for p in nlb_ports if p in DB_PORTS] or nlb_ports  # only the database listeners decide; a public 443 next to them does not
+            sg = sg_exposure(ln, judged)
             db = any(p in DB_PORTS for p in nlb_ports + tg_ports)
             rows.append(
                 {
@@ -425,7 +431,11 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
                     **sg,
                     "note": (
                         "NLB created outside Kubernetes; "
-                        + (f"{len(bound)} TargetGroupBindings bind it to {', '.join(bound[:6])}" + (f" and {len(bound) - 6} more" if len(bound) > 6 else "") if bound else "no TargetGroupBinding, DB inferred from the target group port")
+                        + (
+                            f"{len(bound)} TargetGroupBinding{'s bind' if len(bound) != 1 else ' binds'} it to {', '.join(bound[:6])}" + (f" and {len(bound) - 6} more" if len(bound) > 6 else "")
+                            if bound
+                            else "no TargetGroupBinding, DB inferred from the target group port"
+                        )
                         + (". " + _db_note(db, ln["scheme"], sg["sg_exposure"]) if db else "")
                     ),
                 }
@@ -438,7 +448,7 @@ def _db_note(db: bool, scheme, sg_state: str | None) -> str | None:
         return None
     return {
         "open": "DB port open to the internet by the security group",
-        "no-security-group": "DB port on an external address with no security group, so nothing filters it",
+        "no-security-group": "DB port on an external address with no security group on the load balancer; only the targets' security groups filter it, which this check does not read",
         "not-read": "DB port on an external address; the security group could not be read",
         "unmatched": "DB port on an external address; no described load balancer matched the Service's address, so its security group is unknown",
         "allow-list": "DB port on an external address, limited by the security group to listed addresses",

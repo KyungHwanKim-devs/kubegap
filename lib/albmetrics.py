@@ -61,8 +61,25 @@ def _rule(pm: dict) -> dict:
         "cidrs": [r.get("CidrIp") for r in pm.get("IpRanges") or []],
         "cidrs_v6": [r.get("CidrIpv6") for r in pm.get("Ipv6Ranges") or []],
         "prefix_lists": [r.get("PrefixListId") for r in pm.get("PrefixListIds") or []],
-        "security_groups": len(pm.get("UserIdGroupPairs") or []),
+        "security_groups": [g.get("GroupId") for g in pm.get("UserIdGroupPairs") or []],
     }
+
+
+def _tg_name(arn: str | None) -> str | None:
+    """`arn:...:targetgroup/<name>/<id>` -> `<name>`."""
+    if not arn or "targetgroup/" not in arn:
+        return None
+    return arn.split("targetgroup/", 1)[1].split("/", 1)[0]
+
+
+def _listener(li: dict) -> dict:
+    """Port, protocol and the target groups a listener forwards to by default, through a plain forward action or a weighted ForwardConfig; a fixed-response or redirect listener has none."""
+    names = set()
+    for a in li.get("DefaultActions") or []:
+        names.add(_tg_name(a.get("TargetGroupArn")))
+        for g in (a.get("ForwardConfig") or {}).get("TargetGroups") or []:
+            names.add(_tg_name(g.get("TargetGroupArn")))
+    return {"port": li.get("Port"), "protocol": li.get("Protocol"), "target_groups": sorted(n for n in names if n)}
 
 
 def collect(snap: Path, out_rel: str, *, profile: str | None, region: str | None, log: RunLog, collector: str, timeout: float = 300, hours: int = 24, echo=None) -> dict:
@@ -108,17 +125,7 @@ def collect(snap: Path, out_rel: str, *, profile: str | None, region: str | None
         lis, r = _aws.aws_json(["elbv2", "describe-listeners", "--load-balancer-arn", arn], id=f"{collector}.alb.describe-listeners", timeout=60, **kw)
         if lis is None:
             errors.append(f"describe-listeners {row['name']}: {r.error or r.stderr.strip()[-120:]}")
-        row["listeners"] = [
-            {
-                "port": li.get("Port"),
-                "protocol": li.get("Protocol"),
-                "target_groups": sorted(
-                    {(a.get("TargetGroupArn") or "").rsplit("/", 2)[-2] for a in li.get("DefaultActions") or [] if a.get("TargetGroupArn")}
-                    | {(g.get("TargetGroupArn") or "").rsplit("/", 2)[-2] for a in li.get("DefaultActions") or [] for g in ((a.get("ForwardConfig") or {}).get("TargetGroups") or [])}
-                ),
-            }
-            for li in (lis or {}).get("Listeners") or []
-        ]
+        row["listeners"] = [_listener(li) for li in (lis or {}).get("Listeners") or []]
         tgs, r = _aws.aws_json(["elbv2", "describe-target-groups", "--load-balancer-arn", arn], id=f"{collector}.alb.describe-target-groups", timeout=60, **kw)
         if tgs is None:
             errors.append(f"describe-target-groups {row['name']}: {r.error or r.stderr.strip()[-120:]}")

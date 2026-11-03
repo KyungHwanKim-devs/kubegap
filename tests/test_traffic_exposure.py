@@ -70,11 +70,11 @@ def _snapshot(tmp_path, *, db_sg=("sg-db",), read=True, db_cidrs=("203.0.113.1/3
                     "name": "k8s-kafka",
                     "description": "",
                     "inbound": [
-                        {"protocol": "tcp", "from_port": 9094, "to_port": 9094, "cidrs": ["0.0.0.0/0"], "cidrs_v6": [], "prefix_lists": [], "security_groups": 0},
-                        {"protocol": "tcp", "from_port": 443, "to_port": 443, "cidrs": ["0.0.0.0/0"], "cidrs_v6": [], "prefix_lists": [], "security_groups": 0},
+                        {"protocol": "tcp", "from_port": 9094, "to_port": 9094, "cidrs": ["0.0.0.0/0"], "cidrs_v6": [], "prefix_lists": [], "security_groups": []},
+                        {"protocol": "tcp", "from_port": 443, "to_port": 443, "cidrs": ["0.0.0.0/0"], "cidrs_v6": [], "prefix_lists": [], "security_groups": []},
                     ],
                 },
-                "sg-db": {"name": "db-shared-nlb", "description": "office only", "inbound": [{"protocol": "tcp", "from_port": 3306, "to_port": 3311, "cidrs": list(db_cidrs), "cidrs_v6": [], "prefix_lists": [], "security_groups": 0}]},
+                "sg-db": {"name": "db-shared-nlb", "description": "office only", "inbound": [{"protocol": "tcp", "from_port": 3306, "to_port": 3311, "cidrs": list(db_cidrs), "cidrs_v6": [], "prefix_lists": [], "security_groups": []}]},
             }
             if read
             else {},
@@ -105,7 +105,7 @@ def test_open_security_group_and_allow_list_are_told_apart(tmp_path):
     assert "203.0.113" not in json.dumps(db)  # counts only, never the addresses
     assert db["bound_services"] == ["prod-a/mysql"]
     assert db["prod"] is True
-    assert "1 TargetGroupBindings bind it to prod-a/mysql" in db["note"]
+    assert "1 TargetGroupBinding binds it to prod-a/mysql" in db["note"]
     assert "limited by the security group to listed addresses" in db["note"]
     assert out["alb"]["lbs"][1]["security_groups_read"] is True
     assert [r["target"] for r in out["db_exposed"]] == ["loadbalancer/middleware/kafka-external", "nlb/db-shared"]
@@ -115,7 +115,7 @@ def test_nlb_without_security_group_counts_as_open(tmp_path):
     _snapshot(tmp_path, db_sg=())
     rows, out = _rows(tmp_path)
     assert rows["nlb/db-shared"]["sg_exposure"] == "no-security-group"
-    assert "no security group" in rows["nlb/db-shared"]["note"]
+    assert "no security group on the load balancer" in rows["nlb/db-shared"]["note"]
     assert out["alb"]["lbs"][1]["security_groups_read"] is None
 
 
@@ -145,21 +145,66 @@ def test_service_lb_without_a_described_load_balancer_is_unmatched(tmp_path):
     assert "no described load balancer matched" in kafka["note"]
 
 
+def test_only_database_ports_decide(tmp_path):
+    _snapshot(tmp_path)
+    d = json.loads((tmp_path / "aws" / "alb-metrics.json").read_text())
+    # the kafka Service: 9094 allow-listed, 443 open to everyone but forwarding to a non-database port -> the row is allow-list, not open
+    d["security_groups"]["sg-kafka"]["inbound"][0]["cidrs"] = ["203.0.113.9/32"]
+    svc = json.loads((tmp_path / "objects" / "services.json").read_text())
+    svc["items"][0]["spec"]["ports"][1]["targetPort"] = 8443
+    (tmp_path / "objects" / "services.json").write_text(json.dumps(svc))
+    # the db NLB gains a public 443 listener forwarding to a non-database target group
+    d["lbs"][1]["listeners"].append({"port": 443, "protocol": "TCP", "target_groups": ["tg-web"]})
+    d["security_groups"]["sg-db"]["inbound"].append({"protocol": "tcp", "from_port": 443, "to_port": 443, "cidrs": ["0.0.0.0/0"], "cidrs_v6": [], "prefix_lists": [], "security_groups": []})
+    (tmp_path / "aws" / "alb-metrics.json").write_text(json.dumps(d))
+    rows, _ = _rows(tmp_path)
+    assert rows["loadbalancer/middleware/kafka-external"]["sg_exposure"] == "allow-list"
+    assert rows["nlb/db-shared"]["sg_exposure"] == "allow-list"
+    assert rows["nlb/db-shared"]["ports"] == [443, 3306, 3307]  # every listener is listed, only the database ones are judged
+
+
+def test_describe_load_balancers_failure_is_not_read(tmp_path):
+    _snapshot(tmp_path)
+    (tmp_path / "aws" / "alb-metrics.json").write_text(json.dumps({"window_hours": 24, "lbs": [], "target_groups": [], "errors": ["describe-load-balancers: AccessDenied"], "metrics": {"lb": {}, "tg": {}}}))
+    rows, _ = _rows(tmp_path)
+    assert rows["loadbalancer/middleware/kafka-external"]["sg_exposure"] == "not-read"
+
+
+def test_listener_parsing():
+    from lib.albmetrics import _listener, _tg_name
+
+    assert _tg_name("arn:aws:elasticloadbalancing:ap-northeast-2:1:targetgroup/tg-web/abc") == "tg-web"
+    assert _tg_name(None) is None and _tg_name("") is None
+    li = {
+        "Port": 443,
+        "Protocol": "HTTPS",
+        "DefaultActions": [
+            {
+                "Type": "forward",
+                "TargetGroupArn": "arn:aws:elasticloadbalancing:ap-northeast-2:1:targetgroup/tg-a/1",
+                "ForwardConfig": {"TargetGroups": [{"TargetGroupArn": "arn:aws:elasticloadbalancing:ap-northeast-2:1:targetgroup/tg-b/2", "Weight": 1}, {"Weight": 0}]},
+            }
+        ],
+    }
+    assert _listener(li) == {"port": 443, "protocol": "HTTPS", "target_groups": ["tg-a", "tg-b"]}
+    assert _listener({"Port": 80, "Protocol": "HTTP", "DefaultActions": [{"Type": "redirect"}]}) == {"port": 80, "protocol": "HTTP", "target_groups": []}
+
+
 def test_sg_exposure_rules():
-    lb = {"security_groups": ["sg"], "security_groups_read": True, "inbound_rules": [{"protocol": "-1", "from_port": None, "to_port": None, "cidrs": ["10.0.0.0/8"], "cidrs_v6": [], "prefix_lists": [], "security_groups": 2}]}
-    assert sg_exposure(lb, [5432]) == {"sg_exposure": "allow-list", "allowed_sources": {"5432": 2}, "open_ports": []}
-    lb["inbound_rules"].append({"protocol": "tcp", "from_port": 5432, "to_port": 5432, "cidrs": [], "cidrs_v6": ["::/0"], "prefix_lists": [], "security_groups": 0})
+    lb = {"security_groups": ["sg"], "security_groups_read": True, "inbound_rules": [{"protocol": "-1", "from_port": None, "to_port": None, "cidrs": ["10.0.0.0/8"], "cidrs_v6": [], "prefix_lists": [], "security_groups": ["sg-a", "sg-b"]}]}
+    assert sg_exposure(lb, [5432]) == {"sg_exposure": "allow-list", "allowed_sources": {"5432": 3}, "open_ports": []}  # one CIDR and two referenced groups
+    lb["inbound_rules"].append({"protocol": "tcp", "from_port": 5432, "to_port": 5432, "cidrs": [], "cidrs_v6": ["::/0"], "prefix_lists": [], "security_groups": []})
     assert sg_exposure(lb, [5432])["sg_exposure"] == "open"
     assert sg_exposure(None, [5432]) == {"sg_exposure": None, "allowed_sources": {}, "open_ports": []}
     # a UDP rule on the port opens nothing; no covering rule at all is blocked; one open port among allow-listed ones makes the row open
-    udp = {"security_groups": ["sg"], "security_groups_read": True, "inbound_rules": [{"protocol": "udp", "from_port": 3306, "to_port": 3306, "cidrs": ["0.0.0.0/0"], "cidrs_v6": [], "prefix_lists": [], "security_groups": 0}]}
+    udp = {"security_groups": ["sg"], "security_groups_read": True, "inbound_rules": [{"protocol": "udp", "from_port": 3306, "to_port": 3306, "cidrs": ["0.0.0.0/0"], "cidrs_v6": [], "prefix_lists": [], "security_groups": []}]}
     assert sg_exposure(udp, [3306])["sg_exposure"] == "blocked"
     mixed = {
         "security_groups": ["sg"],
         "security_groups_read": True,
         "inbound_rules": [
-            {"protocol": "tcp", "from_port": 3306, "to_port": 3306, "cidrs": ["203.0.113.1/32"], "cidrs_v6": [], "prefix_lists": [], "security_groups": 0},
-            {"protocol": "tcp", "from_port": 5432, "to_port": 5432, "cidrs": ["0.0.0.0/0"], "cidrs_v6": [], "prefix_lists": [], "security_groups": 0},
+            {"protocol": "tcp", "from_port": 3306, "to_port": 3306, "cidrs": ["203.0.113.1/32"], "cidrs_v6": [], "prefix_lists": [], "security_groups": []},
+            {"protocol": "tcp", "from_port": 5432, "to_port": 5432, "cidrs": ["0.0.0.0/0"], "cidrs_v6": [], "prefix_lists": [], "security_groups": []},
         ],
     }
     assert sg_exposure(mixed, [3306, 5432]) == {"sg_exposure": "open", "allowed_sources": {"3306": 1, "5432": 1}, "open_ports": [5432]}

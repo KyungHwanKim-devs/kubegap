@@ -409,7 +409,7 @@ def sg_text(item: dict) -> str:
     if state == "blocked":
         return "no inbound rule covers the ports"
     if state == "no-security-group":
-        return "none, nothing filters the listener"
+        return "none on the load balancer, only the targets' groups filter it"
     if state == "not-read":
         return "not read"
     if state == "unmatched":
