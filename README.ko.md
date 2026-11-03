@@ -166,7 +166,7 @@ kubegap 자체는 어디로도 데이터를 보내지 않습니다. 수집한 �
 
 ## 선택 설정
 
-설정 파일이 없어도 동작합니다. 컨텍스트를 고정하거나, AWS 프로파일을 정하거나, Prometheus 와 Grafana 주소를 주거나, SSH 접속 주소를 적거나, 특정 항목을 끄거나 임계값을 바꾸려면 [`config.example.yaml`](config.example.yaml) 을 `~/.kubegap/config.yaml` 로 복사해 고칩니다. 수집한 데이터와 리포트는 `~/.kubegap/snapshots/<컨텍스트>/<시각>/` 아래 쌓이고, 실행할 때마다 같은 모드의 직전 결과와 비교합니다.
+설정 파일이 없어도 동작합니다. 컨텍스트를 고정하거나, AWS 프로파일을 정하거나, Prometheus 와 Grafana 주소를 주거나, SSH 접속 주소를 적거나, 특정 항목을 끄거나 임계값을 바꾸려면 [`config.example.yaml`](config.example.yaml) 을 `~/.kubegap/config.yaml` 로 복사해 고칩니다. 수집한 데이터와 리포트는 `~/.kubegap/snapshots/<컨텍스트>/<시각>/` 아래 쌓이고, 실행할 때마다 같은 모드의 직전 결과와 비교합니다. 스냅샷 폴더와 파일은 내 계정만 읽을 수 있게 만듭니다. 이미 있던 폴더가 다른 사용자에게 열려 있으면 실행마다 경고 한 줄을 내고 그대로 둡니다. 설정 파일은 직접 만드는 파일이고 `grafana_api_token` 이 들어갈 수 있으니 `chmod 600` 해 두세요.
 
 ## 동작 방식
 
