@@ -552,6 +552,91 @@ def _finding(check: dict, target: str, status: str, evidence, source: str, extra
     }
 
 
+KEY_HARD_RE = re.compile(r"item\['([^']+)'\]")
+KEY_SOFT_RE = re.compile(r"item\.get\('([^']+)'")
+
+
+def referenced_keys(check: dict) -> set[str]:
+    """The `item` keys a summary check's expressions read: `item['k']` and `item.get('k')` across rule, target and evidence. selftest audits these against a real summary; `details` keeps exactly these."""
+    rule = check.get("rule") or {}
+    texts = " ".join(str(x) for x in (rule.get("expr"), rule.get("warn_expr"), check.get("target"), check.get("evidence")) if x)
+    return set(KEY_HARD_RE.findall(texts)) | set(KEY_SOFT_RE.findall(texts))
+
+
+class ItemRecorder(dict):
+    """A summary or inventory item that remembers which top-level keys the rule, target, evidence and the helpers they call actually read. `details` keeps exactly those keys,
+    so a helper such as `_oom_text(item)` that reads `last_kill` leaves `last_kill` in the finding, which a regex over the expression text could never know. Iterating the whole
+    item (`str(item)`, `item.items()`) counts as reading every key."""
+
+    def __init__(self, data: dict):
+        super().__init__(data)
+        self.read: set[str] = set()
+        self.read_all = False
+
+    def __getitem__(self, k):
+        self.read.add(k)
+        return super().__getitem__(k)
+
+    def get(self, k, default=None):
+        self.read.add(k)
+        return super().get(k, default)
+
+    def __contains__(self, k):
+        self.read.add(k)
+        return super().__contains__(k)
+
+    def _all(self):
+        self.read_all = True
+
+    def items(self):
+        self._all()
+        return super().items()
+
+    def values(self):
+        self._all()
+        return super().values()
+
+    def __iter__(self):
+        self._all()
+        return super().__iter__()
+
+    def __repr__(self):
+        self._all()
+        return super().__repr__()
+
+    def kept(self) -> dict:
+        if self.read_all:
+            return dict(self)
+        return {k: super(ItemRecorder, self).__getitem__(k) for k in self.read if dict.__contains__(self, k)}
+
+
+def _details(check: dict, env: dict) -> dict | None:
+    """The material the rule judged, kept whole on the finding (#64). The evidence is one line for a table and may cut a list; `details` is where the rest lives.
+    summary and inventory checks: the item's keys that were actually read while judging it (ItemRecorder), never a key the check did not read.
+    metric checks: labels and the value, or every joined value. object checks: namespace, name and kind. Checks without an item (absence, cluster-level object checks) carry none."""
+    item = env.get("item")
+    if isinstance(item, ItemRecorder):
+        kept = item.kept()
+        return {"key": env.get("key"), "item": kept} if "key" in env else kept
+    if isinstance(item, dict):
+        keys = referenced_keys(check)
+        kept = {k: item[k] for k in keys if k in item} if keys else item
+        return {"key": env.get("key"), "item": kept} if "key" in env else kept
+    if item is not None and "key" in env:
+        return {"key": env.get("key"), "item": item}
+    if isinstance(env.get("labels"), dict):
+        out: dict = {"labels": env["labels"]}
+        if isinstance(env.get("v"), dict):
+            out["values"] = env["v"]
+        elif "value" in env:
+            out["value"] = env["value"]
+        return out
+    obj = env.get("obj")
+    if isinstance(obj, dict):
+        return {"namespace": env.get("ns"), "name": env.get("name"), "kind": obj.get("kind")}
+    return None
+
+
 class _Run:
     """Mutable state of one check evaluation shared by the type handlers: the check, its thresholds, the collected findings and status counts.
 
@@ -580,6 +665,7 @@ class _Run:
         if st not in ("fail", "warn"):
             return
         ev = _eval(check["evidence"], env) if check.get("evidence") else None
+        det = _details(check, env)
         if target in self._by_target:
             # When several pods of one workload (Job pods of a CronJob, replicas) map to the same target, merge their evidence into one finding
             f = self._by_target[target]
@@ -588,10 +674,13 @@ class _Run:
                 f["evidence"].append(ev)
             else:
                 f["evidence"] = [f["evidence"], ev]
+            if det is not None:
+                prev = f.get("details")
+                f["details"] = [d for d in ((prev if isinstance(prev, list) else [prev]) + [det]) if d is not None]
             if self._ORDER[st] < self._ORDER[f["status"]]:
                 f["status"] = st
             return
-        f = _finding(check, target, st, ev, source)
+        f = _finding(check, target, st, ev, source, {"details": det} if det is not None else None)
         self._by_target[target] = f
         self.findings.append(f)
 
@@ -626,7 +715,18 @@ def _eval_signature(cx: Context, check: dict, run: _Run) -> dict:
             f"{sig['count']} occurrences" + (f" ({sig.get('first')} ~ {sig.get('last')})" if sig.get("first") else "") + f", thresholds warn {sig['warn_at']}/fail {sig['fail_at']}"
             f". Files: {list(sig.get('files') or {})[:3]}. Samples: {[x[:160] for x in (sig.get('samples') or [])[:2]]}"
         )
-        f = _finding(check, sig["id"], st, ev, "summary.json:logs.signatures", {"signature": sig["id"], "component": sig["component"]})
+        f = _finding(
+            check,
+            sig["id"],
+            st,
+            ev,
+            "summary.json:logs.signatures",
+            {
+                "signature": sig["id"],
+                "component": sig["component"],
+                "details": {k: sig.get(k) for k in ("count", "first", "last", "warn_at", "fail_at", "files", "samples") if k in sig},
+            },  # the evidence cuts files and samples; details keeps them
+        )
         f.update(
             area=sig["area"],
             severity_default=sig["severity"],
@@ -774,8 +874,10 @@ def _eval_summary(cx: Context, check: dict, run: _Run) -> dict:
     if check.get("cluster_level") or isinstance(seq, dict):
         seq = [seq]  # If the path is a single dict, it is the one item (cluster level)
     for item in seq:
-        env = {**run.base_env, "item": item, "prod": cx.is_prod((item or {}).get("namespace")) if isinstance(item, dict) else False}
-        run.emit(env, str(item)[:60], "summary.json:" + check["each"])
+        default_target = str(item)[:60]
+        rec = ItemRecorder(item) if isinstance(item, dict) else item  # after the default target is formed, so forming it does not count as reading every key
+        env = {**run.base_env, "item": rec, "prod": cx.is_prod((item or {}).get("namespace")) if isinstance(item, dict) else False}
+        run.emit(env, default_target, "summary.json:" + check["each"])
     return run.done()
 
 
@@ -787,7 +889,9 @@ def _eval_inventory(cx: Context, check: dict, run: _Run) -> dict:
             return run.skip(f"inventory.{check['each']} missing")
         pairs = list(seq.items()) if isinstance(seq, dict) else [(None, x) for x in seq]
         for key, item in pairs:
-            run.emit({**run.base_env, "item": item, "key": key, "prod": False}, str(key if key is not None else item)[:60], "inventory.json:" + check["each"])
+            default_target = str(key if key is not None else item)[:60]
+            rec = ItemRecorder(item) if isinstance(item, dict) else item
+            run.emit({**run.base_env, "item": rec, "key": key, "prod": False}, default_target, "inventory.json:" + check["each"])
         return run.done()
     if check["type"] == "inventory" and check["id"].startswith("eks.") and not (cx.inv.get("cluster") or {}).get("eks"):
         return run.skip("not EKS")
@@ -835,8 +939,21 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
     results: list[dict] = []
     findings: list[dict] = []
     suppressed: list[dict] = []
+    known, known_errors = rubric.load_known_issues()
+    errors = list(errors) + known_errors
+    catalog = rubric.catalog_hash()
     for c in checks:
-        rec = {"id": c["id"], "name": c["name"], "area": c["area"], "type": c["type"], "collector": c["collector"], "severity_default": c["severity_default"]}
+        rec = {
+            "id": c["id"],
+            "name": c["name"],
+            "area": c["area"],
+            "type": c["type"],
+            "collector": c["collector"],
+            "severity_default": c["severity_default"],
+            "rule_hash": rubric.rule_hash(c, extra=catalog if c["type"] == "signature" else None),
+        }
+        if c["id"] in known:
+            rec["known_issues"] = known[c["id"]]  # open defects of kubegap that affect this check; the finding carries them too, so a tool note cites the number instead of describing the defect again
         applies = pname in (c.get("profiles") or []) or (profile.get("base") in (c.get("profiles") or []))  # derived profiles (small-prod, multi-az-prod, dev) inherit the check set of their base profile
         if not applies or c["id"] in (profile.get("disabled_checks") or []):
             rec.update(status="disabled", reason=f"disabled in profile {pname}")
@@ -865,6 +982,8 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
             f["thresholds"] = thresholds
             for k in ("why", "suggest", "verify", "cases", "measured", "notes"):
                 f.setdefault(k, c.get(k))  # signature checks already carry the signature's description
+            if c["id"] in known:
+                f["known_issues"] = known[c["id"]]  # the evidence is left as the check wrote it; render appends "known issue #N" in its tables
             sup = next((s for s in active_sup if s.get("id") == c["id"] and (not s.get("namespaces") or f["target"].split("/")[0] in s["namespaces"])), None)
             if sup:
                 f["status"] = "suppressed"

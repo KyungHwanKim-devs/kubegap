@@ -24,9 +24,13 @@ With `--namespace <ns>`, in steps 2, 3 and 5 look only at that namespace's items
 9. **Reconcile conflicting findings.** E.g. node request over-provisioning (lower requests) and CPU throttling (remove limits) on the same workload: remove the limit first, cut requests only after reviewing the 7-day p95. OOMKilled and no memory limit in the same namespace: not "drop the limit" but "set it from the p95". A database, cache or message queue that the over-request checks mark "database-like": do not cut its request to the p95 at all; remove its CPU limit if it has one and leave the request, see the writing rule in `report-writing.md`.
 10. **Apply the severity rules (`findings-draft.severity_rules`).** ① If `symptom_linked` and a real symptom (5xx, restart surge, Evicted, latency) is visible in the summary or events, raise one level. ② If something marked "resolved" in the previous report reappears, mark it "recurred" and raise one level; but if it is in `diff.json.findings.rename_suspects`, suspect a rename and do not treat it as recurrence. ③ No SLO, no symptom alert, no backup, N+1 not met: critical when the check says fail, high when it says warn, because a warn means the check found a mitigating signal; do not raise a warn back to critical without a reason in `adjustments.md`. ④ Profile context: under the lab profile, a 1–3 node cluster, "multi-AZ" items and "no HPA" (`scaling.no-hpa-serving-prod`) are info or lower. ⑤ When you overturn the first-pass status (two or more levels, or fail→pass), write the reason on that item.
 
-### A finding that disappears after a rubric version change is not a defect
+### A finding that appeared or disappeared because the checks changed is not a defect
 
-If a finding from the previous report is missing now and `rubric_version` went up, first read that check's `why` and `notes` (they may carry a verdict-change note). If the change is intended there, do not record it as a "defect" in the tool notes (7-6); classify it under section 3 as a "criteria change". (`SKILL.md` section 6 states the same rule.)
+`diff.json` `findings.criteria_changes` lists them, sorted by code into `new_checks`, `dropped_checks`, `rule_changed` and `thresholds_changed`; `new`, `resolved` and `changed` hold cluster changes only. A row there with `check_reason` says the check's inputs appeared or vanished, an installation or removal. Write the criteria changes in section 3 as such and never in the tool notes (7-6). Only for rows marked `rule_known: false`, checks from before rule hashes were recorded, read the check's `notes` to say whether the rule changed. (`SKILL.md` section 6 states the same rule.)
+
+### When an evidence cuts a list
+
+An evidence is one line for a table and may end a list early. The finding's `details` in `findings-draft.json` holds the material the rule judged, whole, and `report-details.md` section 7-5 shows it folded under the finding. Read `details` instead of re-reading the raw objects to count.
 
 ### Read-only commands outside the snapshot
 

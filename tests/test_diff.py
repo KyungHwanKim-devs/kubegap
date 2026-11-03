@@ -15,11 +15,14 @@ def finding(check, target, status="fail", sev="high"):
     return {"id": f"{check}.{target}", "check": check, "status": status, "severity_default": sev, "target": target, "evidence": {"v": 1}}
 
 
-def write_snapshot(folder, deployments, pods, findings, taken_at, nodes=("n1",)):
+def write_snapshot(folder, deployments, pods, findings, taken_at, nodes=("n1",), check_results=None, rubric_version="0.1.0"):
     (folder / "objects").mkdir(parents=True)
     (folder / "objects" / "deployments.apps.json").write_text(json.dumps({"items": deployments}))
     (folder / "objects" / "pods.json").write_text(json.dumps({"items": pods}))
-    (folder / "findings-draft.json").write_text(json.dumps({"rubric_version": "0.1.0", "profile": {"name": "prod"}, "findings": findings}))
+    draft = {"rubric_version": rubric_version, "profile": {"name": "prod"}, "findings": findings}
+    if check_results is not None:
+        draft["check_results"] = check_results
+    (folder / "findings-draft.json").write_text(json.dumps(draft))
     inv = {
         "taken_at": taken_at,
         "cluster": {"server_version": "v1.31.0-eks-abc"},
@@ -77,7 +80,7 @@ def test_diff_findings(snapshots):
     assert out["new"][0]["evidence"] == {"v": 1}
     assert [f["id"] for f in out["resolved"]] == ["resilience.no-pdb.default/gone"]
     assert out["changed"] == [{"id": "hygiene.x.default/flip", "status": ["warn", "fail"], "severity_default": ["low", "low"]}]
-    assert out["summary"] == {"new": 1, "resolved": 1, "changed": 1}
+    assert out["summary"] == {"new": 1, "resolved": 1, "changed": 1, "criteria_changes": 0, "rule_unknown_checks": 0}
     assert out["counts_before"] == {"fail": {"high": 2}, "warn": {"low": 1}}
     assert out["counts_after"] == {"fail": {"high": 2, "low": 1}, "warn": {}}
     assert out["profile"] == ["prod", "prod"] and out["rubric_version"] == ["0.1.0", "0.1.0"]
@@ -151,3 +154,74 @@ def test_append_history_writes_and_replaces_row(snapshots):
     assert len(path.read_text().splitlines()) == 2
     row = dict(zip(diffmod.HISTORY_COLUMNS, first[1].split(","), strict=True))
     assert row["snapshot"] == b.name and row["high"] == "2" and row["low"] == "1" and row["warn"] == "0" and row["nodes"] == "2"
+
+
+def _cr(check, status="done", rule_hash=None):
+    rec = {"id": check, "status": status}
+    if rule_hash:
+        rec["rule_hash"] = rule_hash
+    return rec
+
+
+def test_criteria_changes_sort_new_checks_rule_changes_and_unknowns_out_of_cluster_changes(tmp_path):
+    a, b = tmp_path / "a", tmp_path / "b"
+    pod = {"kind": "Pod", "metadata": {"namespace": "default", "name": "p1"}}
+    write_snapshot(
+        a,
+        [],
+        [pod],
+        findings=[finding("same.rule", "default/x"), finding("rule.moved", "default/y"), finding("dropped.check", "default/z"), finding("old.check", "default/w")],
+        taken_at="2026-01-01T00:00:00+00:00",
+        check_results=[
+            _cr("same.rule", rule_hash="aaaaaaaaaaaa"),
+            _cr("rule.moved", rule_hash="bbbbbbbbbbbb"),
+            _cr("dropped.check", rule_hash="cccccccccccc"),
+            _cr("old.check"),
+            _cr("new.check", status="not-collected"),
+        ],  # a gate, not absent inputs: skip would be a cluster change
+        rubric_version="0.1.65",
+    )
+    write_snapshot(
+        b,
+        [],
+        [pod],
+        findings=[finding("same.rule", "default/x2"), finding("rule.moved", "default/y", status="warn"), finding("new.check", "default/n"), finding("old.check", "default/w2")],
+        taken_at="2026-01-02T00:00:00+00:00",
+        check_results=[_cr("same.rule", rule_hash="aaaaaaaaaaaa"), _cr("rule.moved", rule_hash="bbbbbbbbbbb2"), _cr("dropped.check", status="not-collected"), _cr("old.check"), _cr("new.check", rule_hash="dddddddddddd")],
+        rubric_version="0.1.66",
+    )
+    d = diffmod.diff_findings(a, b)
+    # the one check evaluated on both sides under the same hash is the only cluster change
+    assert [f["id"] for f in d["resolved"]] == ["old.check.default/w", "same.rule.default/x"] and d["changed"] == []
+    crit = d["criteria_changes"]
+    assert [r["id"] for r in crit["new_checks"]] == ["new.check.default/n"] and crit["new_checks"][0]["check_status"] == ["not-collected", "done"]
+    assert [r["id"] for r in crit["dropped_checks"]] == ["dropped.check.default/z"]
+    assert [(r["id"], r["kind"]) for r in crit["rule_changed"]] == [("rule.moved.default/y", "changed")] and crit["rule_changed"][0]["status"] == ["fail", "warn"]
+    # no hash on either side and the rubric moved: the findings stay cluster changes, marked, and the check is named once
+    assert crit["rule_unknown_checks"] == ["old.check"]
+    assert [(f["id"], f.get("rule_known")) for f in d["new"]] == [("old.check.default/w2", False), ("same.rule.default/x2", None)]
+    assert d["summary"] == {"new": 2, "resolved": 2, "changed": 0, "criteria_changes": 3, "rule_unknown_checks": 1}
+
+
+def test_without_check_results_everything_is_a_cluster_change(snapshots):
+    d = diffmod.diff_findings(*snapshots)
+    assert d["summary"]["criteria_changes"] == 0 and len(d["new"]) == 1 and len(d["resolved"]) == 1
+
+
+def test_skip_to_done_is_a_cluster_change_with_the_reason(tmp_path):
+    a, b = tmp_path / "a", tmp_path / "b"
+    pod = {"kind": "Pod", "metadata": {"namespace": "default", "name": "p1"}}
+    write_snapshot(a, [], [pod], findings=[], taken_at="2026-01-01T00:00:00+00:00", check_results=[{"id": "argocd.x", "status": "skip", "reason": "summary.argocd missing", "rule_hash": "aaaaaaaaaaaa"}], rubric_version="0.1.66")
+    write_snapshot(b, [], [pod], findings=[finding("argocd.x", "argocd/app")], taken_at="2026-01-02T00:00:00+00:00", check_results=[{"id": "argocd.x", "status": "done", "rule_hash": "aaaaaaaaaaaa"}], rubric_version="0.1.66")
+    d = diffmod.diff_findings(a, b)
+    assert [f["id"] for f in d["new"]] == ["argocd.x.argocd/app"] and d["new"][0]["check_status"] == ["skip", "done"] and d["new"][0]["check_reason"][0] == "summary.argocd missing"
+    assert d["summary"]["criteria_changes"] == 0
+
+
+def test_thresholds_in_force_change_is_a_criteria_change(tmp_path):
+    a, b = tmp_path / "a", tmp_path / "b"
+    pod = {"kind": "Pod", "metadata": {"namespace": "default", "name": "p1"}}
+    write_snapshot(a, [], [pod], findings=[], taken_at="2026-01-01T00:00:00+00:00", check_results=[{"id": "r.x", "status": "done", "rule_hash": "aaaaaaaaaaaa", "thresholds": {"threshold": 0.5}}])
+    write_snapshot(b, [], [pod], findings=[finding("r.x", "a/b")], taken_at="2026-01-02T00:00:00+00:00", check_results=[{"id": "r.x", "status": "done", "rule_hash": "aaaaaaaaaaaa", "thresholds": {"threshold": 0.2}}])
+    d = diffmod.diff_findings(a, b)
+    assert d["new"] == [] and d["criteria_changes"]["thresholds_changed"][0]["thresholds"] == [{"threshold": 0.5}, {"threshold": 0.2}]
