@@ -54,16 +54,78 @@ def _kv(lines: list[str]) -> dict[str, str]:
     return d
 
 
+# The kernel's oom-kill summary line (mm/oom_kill.c dump_oom_summary): `oom-kill:constraint=CONSTRAINT_MEMCG,...,oom_memcg=/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod<uid>.slice,...,task=<comm>,pid=<n>,uid=<n>`
+# cgroup v2 writes the pod uid with underscores inside the slice name; cgroup v1 writes `/kubepods/burstable/pod<uid>/<container id>` with dashes.
+_OOM_KILL_RE = re.compile(r"oom-kill:(?P<fields>.*)")
+_OOM_POD_UID_RE = re.compile(r"pod(?P<uid>[0-9a-f]{8}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{12})")
+_OOM_FIELD_RE = re.compile(r"(?P<k>[a-z_]+)=(?P<v>[^,]*)")
+_OOM_TS_RE = re.compile(r"^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{4}|Z)?)")
+
+
+def parse_oom_kill(line: str) -> dict | None:
+    """One kernel `oom-kill:` line → {time, pod_uid, task, constraint, memcg}. None for any other line. The pod uid comes from oom_memcg, the cgroup that ran out, so a kill inside a pod's cgroup is attributed to that pod even when the victim task name says nothing about it."""
+    m = _OOM_KILL_RE.search(line)
+    if not m:
+        return None
+    fields = dict(_OOM_FIELD_RE.findall(m.group("fields")))
+    memcg = fields.get("oom_memcg") or fields.get("task_memcg") or ""
+    um = _OOM_POD_UID_RE.search(memcg)
+    ts = _OOM_TS_RE.match(line.strip())
+    return {
+        "time": ts.group("ts") if ts else None,
+        "pod_uid": um.group("uid").replace("_", "-") if um else None,
+        "task": fields.get("task"),
+        "constraint": fields.get("constraint"),
+        "node_level": fields.get("constraint") not in (None, "CONSTRAINT_MEMCG"),  # CONSTRAINT_NONE is the whole node running out, the subject of node.kernel-oom-node-level
+    }
+
+
 def _parse_kernel(lines: list[str]) -> dict:
+    stripped = [ln.strip() for ln in lines]
     kv = _kv([ln for ln in lines if not ln.startswith(" ") and "samples:" not in ln])
     counts = {k[2:]: _int(v) for k, v in kv.items() if k.startswith("c:")}
     samples: list[str] = []
-    if "samples:" in [ln.strip() for ln in lines]:
-        idx = [ln.strip() for ln in lines].index("samples:")
-        samples = [ln for ln in lines[idx + 1 :] if ln.strip()]
+    oom_samples: list[str] = []
+    if "samples:" in stripped:
+        idx = stripped.index("samples:")
+        end = stripped.index("oom_samples:") if "oom_samples:" in stripped else len(lines)
+        samples = [ln for ln in lines[idx + 1 : end] if ln.strip()]
+    if "oom_samples:" in stripped:
+        idx = stripped.index("oom_samples:")
+        oom_samples = [ln for ln in lines[idx + 1 :] if ln.strip()]
     src = kv.get("source")
     window = "24 hours (journalctl -k)" if src == "journalctl" else ("since boot (dmesg; journald does not hold 24 hours)" if src == "dmesg" else "unreadable")
-    return {"source": src, "window": window, "lines": _int(kv.get("lines")), "counts": counts, "samples": samples[-40:], "total_events": sum(v for k, v in counts.items() if k != "oom_cgroup")}
+    kills = [k for k in (parse_oom_kill(ln) for ln in oom_samples) if k]
+    return {
+        "source": src,
+        "window": window,
+        "lines": _int(kv.get("lines")),
+        "counts": counts,
+        "samples": samples[-40:],
+        "oom_samples": oom_samples[-60:],
+        "oom_section": "oom_samples:" in stripped,  # False for an os.txt written by the node script before rubric 0.1.66, which kept no oom-kill lines
+        "oom_kills": kills,  # one entry per kernel oom-kill line, with the pod uid when the cgroup path carries one. An older node script has no oom_samples section, so this stays empty and the counts above are all there is
+        "total_events": sum(v for k, v in counts.items() if k != "oom_cgroup"),
+    }
+
+
+def kernel_oom_kills(snap: Path, nodes: list[str]) -> dict:
+    """The container-level OOM kills of the kernel logs of every node whose os.txt was collected: {node: {source, kills[]}}. Shared with lib.resilience, which maps the pod uids to workloads."""
+    out: dict = {}
+    for name in nodes:
+        path = snap / "logs" / "node" / name / "os.txt"
+        if not path.is_file():
+            continue
+        sec = parse_sections(path.read_text(encoding="utf-8", errors="replace"))
+        kern = _parse_kernel(sec.get("kernel", []))
+        out[name] = {
+            "source": kern["source"],
+            "window": kern["window"],
+            "oom_section": kern["oom_section"],
+            "oom_cgroup_count": kern["counts"].get("oom_cgroup") or 0,  # the count the older script already had, for nodes whose lines cannot be attributed
+            "kills": [k for k in kern["oom_kills"] if not k["node_level"]],
+        }
+    return out
 
 
 def _sysctl_issues(v: dict[str, str], has_search_engine: bool) -> list[str]:

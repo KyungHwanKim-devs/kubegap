@@ -16,20 +16,29 @@
   name: Containers with a high CPU throttling ratio
   area: resources
   type: metric
-  inputs: [cpu_throttle_ratio_5m]
+  inputs: [cpu_throttle_ratio_24h, cpu_throttle_ratio_5m]
+  join_on: [namespace, pod, container]
+  join_any: true   # a series in either input is judged: a spike that the 24-hour query's floor left out still warns, and a snapshot from before the 24-hour query is judged on the 5-minute value alone
   exclude_transient: true  # exclude Job, CronJob and GitHub Actions runner pods
   rule:
-    expr: "value >= threshold"
-    warn_expr: "value >= warn_threshold"
+    expr: "v.get('cpu_throttle_ratio_24h', 0) >= threshold"
+    warn_expr: "v.get('cpu_throttle_ratio_24h', 0) >= warn_threshold or v.get('cpu_throttle_ratio_5m', 0) >= threshold"
     threshold: { prod: 0.25, lab: 0.25 }
     warn_threshold: { prod: 0.10, lab: 0.10 }
   target: "workload(labels) + ':' + labels['container']"
-  evidence: "f\"pod {labels['pod']}: 5m throttling ratio {value:.2f} (stalled for {value*100:.0f}% of periods)\""
+  evidence: "(f\"pod {labels['pod']}: throttling ratio now {v.get('cpu_throttle_ratio_5m', 0):.2f}, 24 h or the pod's life {v['cpu_throttle_ratio_24h']:.2f}: \" + ('throttled through the day' if v['cpu_throttle_ratio_24h'] >= threshold else ('throttled through the day, below the fail line' if v['cpu_throttle_ratio_24h'] >= warn_threshold else 'throttled this moment, not through the day')) + ('; no 5-minute value, under 0.01 now' if 'cpu_throttle_ratio_5m' not in v else '')) if 'cpu_throttle_ratio_24h' in v else f\"pod {labels['pod']}: throttling ratio now {v.get('cpu_throttle_ratio_5m', 0):.2f}, no 24-hour value: under 0.001 through the day or the query was not collected, so this is a spike this moment at most\""
   severity_default: high
   symptom_linked: true
   why: >
     The kernel CFS interprets a limit as "N ms per 100 ms period". A multi-threaded app that spends its quota early in the period stalls for the rest of it.
     Average CPU usage looks low while latency spikes. At 0.25 a quarter of all periods were stalled.
+    Two windows are judged. The 24-hour ratio, stalled periods over all periods of the day, says whether the container lives throttled; it alone can fail the check.
+    The 5-minute ratio says what is happening at collection time; a spike there with a quiet day is a warn that names itself momentary, so one busy minute does not become a high item that vanishes on the next run.
+    The line is the same share of periods in both windows, 0.25, because the ratio is what the CFS does to the container in each 100 ms period whatever the window: a quarter of the periods stalled is the same statement about the app over a day as over five minutes, and the day is the one that can be trusted.
+    A pod younger than a day is judged over its life. A snapshot without the 24-hour query is judged on the 5-minute value alone and the evidence says so.
+  measured: >
+    Measured on a real EKS cluster: two frontend pods at 0.25 and 0.26 over 5 minutes were at 0.24 over 24 hours and 0.24 to 0.26 over 7 days, throttled all day just under the fail line. On a small k3s cluster a database at 7.9% to 10.2% over 5 minutes
+    appeared and disappeared on every run.
   cases:
     - { who: Buffer 2020, url: https://erickhun.com/posts/kubernetes-faster-services-no-cpu-limits/ }
     - { who: Omio 2020, url: https://engineering.omio.com/cpu-limits-and-aggressive-throttling-in-kubernetes-c5b20bd8a718 }
@@ -40,44 +49,73 @@
     - { who: Airbnb 2019, url: https://www.youtube.com/watch?v=QXApVwRBeys }
   suggest: >
     Remove the CPU limit and keep only the request, or set request=limit (Guaranteed). For JVM and Go, first align the thread count (GOMAXPROCS) with the limit.
+    A warn that says "this moment" needs no change yet; watch whether the 24-hour value follows.
   verify:
+    - "sum by (namespace, pod, container) (increase(container_cpu_cfs_throttled_periods_total[24h])) / sum by (namespace, pod, container) (increase(container_cpu_cfs_periods_total[24h]))"
     - "sum by (namespace, pod, container) (rate(container_cpu_cfs_throttled_periods_total[5m])) / sum by (namespace, pod, container) (rate(container_cpu_cfs_periods_total[5m]))"
     - "On the node (SSM/SSH): nr_throttled and throttled_usec in cat /sys/fs/cgroup/<pod path>/cpu.stat"
+  notes: Until rubric 0.1.66 the 5-minute ratio alone decided fail and warn. A finding that goes from fail to warn across that version is the criteria change, not a fix.
   profiles: [prod, lab]
   test:
     cases:
-      - expect: "fail"
+      - expect: "fail"   # throttled through the day
         metric:
+          cpu_throttle_ratio_24h:
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
+              value: 0.3
           cpu_throttle_ratio_5m:
-            - labels:
-                namespace: "prod-a"
-                pod: "web-6d7ff4dcdb-abcde"
-                container: "app"
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
               value: 0.5
-      - expect: "warn"
+      - expect: "fail"   # the day is bad even though this moment is quiet
         metric:
+          cpu_throttle_ratio_24h:
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
+              value: 0.3
           cpu_throttle_ratio_5m:
-            - labels:
-                namespace: "prod-a"
-                pod: "web-6d7ff4dcdb-abcde"
-                container: "app"
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
+              value: 0.02
+      - expect: "warn"   # a spike this moment on a quiet day never fails
+        metric:
+          cpu_throttle_ratio_24h:
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
+              value: 0.03
+          cpu_throttle_ratio_5m:
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
+              value: 0.6
+      - expect: "warn"   # part of the day
+        metric:
+          cpu_throttle_ratio_24h:
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
+              value: 0.15
+          cpu_throttle_ratio_5m:
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
               value: 0.15
       - expect: "pass"
         metric:
-          cpu_throttle_ratio_5m:
-            - labels:
-                namespace: "prod-a"
-                pod: "web-6d7ff4dcdb-abcde"
-                container: "app"
+          cpu_throttle_ratio_24h:
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
               value: 0.02
-      # boundary: value exactly at the fail threshold
-      - expect: "fail"
+          cpu_throttle_ratio_5m:
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
+              value: 0.15
+      - expect: "warn"   # a spike the 24-hour query's floor left out, or a snapshot without the 24-hour query: judged on the moment, never a fail
         metric:
           cpu_throttle_ratio_5m:
-            - labels:
-                namespace: "prod-a"
-                pod: "web-6d7ff4dcdb-abcde"
-                container: "app"
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
+              value: 0.6
+      - expect: "pass"   # a pod with a 24-hour value but no 5-minute one is idle now
+        metric:
+          cpu_throttle_ratio_24h:
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
+              value: 0.05
+      # boundary: 24-hour value exactly at the fail threshold
+      - expect: "fail"
+        metric:
+          cpu_throttle_ratio_24h:
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
+              value: 0.25
+          cpu_throttle_ratio_5m:
+            - labels: { namespace: "prod-a", pod: "web-6d7ff4dcdb-abcde", container: "app" }
               value: 0.25
 
 - id: resources.oomkilled
@@ -96,6 +134,7 @@
     An OOM today and an OOM five months ago are different: fail if the last termination is within 7 days, warn if older.
     The container exceeded its memory limit and the cgroup OOM killer killed only that container. Either the limit is below real usage or there is a memory leak.
     This differs from SystemOOM, where the whole node runs out of memory (that is the node OS check).
+    This check sees only the pods alive at collection time. How often a workload dies of OOM across rollouts is resources.oomkilled-repeated, which counts replaced pods and the kernel log.
   measured: >
     Measured on a real EKS cluster: OOMs from five months and 19 days ago were reported as high.
   cases:
@@ -172,61 +211,50 @@
               value: 0
 
 - id: resources.oomkilled-repeated
-  name: Containers repeatedly killed by OOM over 7 days
+  name: Workloads repeatedly killed by OOM over 7 days, replaced pods included
   area: resources
-  type: metric
-  inputs: [oom_events_7d]
+  type: summary
+  each: resilience.oom_7d.rows
   rule:
-    expr: "value >= threshold"
-    warn_expr: "value >= 1"
+    expr: "item.get('kernel_kills_24h', 0) >= threshold or item.get('restarts_of_those_pods', 0) >= threshold"
+    warn_expr: "item.get('pods_oomkilled', 0) >= 1 or item.get('kernel_kills_24h', 0) >= 1"
     threshold: { prod: 3, lab: 3 }
-  target: "workload(labels) + ':' + labels['container']"
-  evidence: "f\"pod {labels['pod']} container {labels['container']}: {value:.0f} OOMs in 7 days (increase of cAdvisor container_oom_events_total)\""
+  target: "item['target']"
+  evidence: "_oom_text(item)"
   severity_default: high
   symptom_linked: true
   why: >
-    resources.oomkilled only asks "was the last death an OOM"; it cannot tell one death from several a day.
-    cAdvisor container_oom_events_total counts OOM killer invocations in the container cgroup, so the 7-day increase is the frequency. More than 3 means the limit is too small or there is a leak, and requests are dropped between restarts.
-  suggest: "Raise the limit using the 7-day memory p95 (the near-limit list in summary.resources and the KRR recommendation) or fix the leak. If the same container also appears in resources.memory-limit-near-p95, report them as one item."
+    resources.oomkilled only asks whether the last death of a pod that is alive now was an OOM. A workload that is rolled out several times a day loses that history with every rollout: the new pod has one death, the old pods are gone.
+    This check counts per workload and container over every pod that existed in 7 days. Two sources are kept apart. Prometheus keeps kube-state-metrics for replaced pods, so it knows which pods ended with OOMKilled and how often they restarted; restarts are an upper bound, a probe failure restarts a container too.
+    The kernel log, read in full mode from the nodes the node backend reaches, has one oom-kill line per kill with the pod uid in the cgroup path; it is exact and covers 24 hours.
+    cAdvisor's container_oom_events_total is shown but not judged: on cgroup v2 nodes it counted 1 for the one live pod while the kernel logged five kills across that pod and its replaced predecessors.
+    Three kernel kills in a day, or three restarts in 7 days across the pods of one workload that ended by OOM, mean the limit is too small or there is a leak, and requests are dropped between restarts.
+    Both counts are rates of dying, not of deploying: a workload rolled out eight times a day and one rolled out once a week are judged the same way. The number of pods that died is shown but does not decide, since it follows the rollout frequency.
+  measured: >
+    Measured on a real EKS cluster: a service deployed 8 times in one day had 5 kernel oom-kill lines on two nodes and three pods that ended with OOMKilled, 5 restarts between them, while the check read "1 OOM in 7 days" from the one pod still alive.
+  suggest: "Raise the limit using the 7-day memory p95 (the near-limit list in summary.resources and the KRR recommendation) or fix the leak. If the same container also appears in resources.memory-limit-near-p95, report them as one item. When the kernel count and the Prometheus count differ, the kernel count is the number of kills in 24 hours and the Prometheus numbers cover 7 days."
   verify:
-    - "sum by (namespace, pod, container) (increase(container_oom_events_total[7d])) > 0"
+    - "max_over_time(kube_pod_container_status_last_terminated_reason{reason=\"OOMKilled\"}[7d]) == 1"
+    - "increase(kube_pod_container_status_restarts_total{namespace=\"<ns>\"}[7d])"
+    - "journalctl -k --since -24h | grep oom-kill"
     - "kubectl get events -A --field-selector reason=OOMKilling"
+  notes: Until rubric 0.1.66 this was a metric check on cAdvisor's container_oom_events_total with the live pods' restarts as fallback, so it saw only the pods alive at collection time. A count that rises across that version is the criteria change. On a snapshot without metrics/oom_pods_7d.json the check skips; a node whose os.txt came from the older node script contributes no attributed kills and the evidence says so.
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "fail"   # kernel kills
+        item: { target: "prod-a/deploy/api:app", namespace: "prod-a", workload: "deploy/api", container: "app", prod: true, pods_oomkilled: 3, pods_replaced: 2, restarts_of_those_pods: 13, live_pod_restarts_max: 9, kernel_kills_24h: 5, kernel_nodes_read: 2, kernel_nodes_total: 2, kernel_log_read: true, last_kill: "2026-11-02T09:38:06+0000", cadvisor_oom_events_7d: 0 }
+      - expect: "fail"   # three restarts across two OOM-ended pods, kernel log not read
+        item: { target: "prod-a/deploy/api:app", namespace: "prod-a", workload: "deploy/api", container: "app", prod: true, pods_oomkilled: 2, pods_replaced: 1, restarts_of_those_pods: 3, live_pod_restarts_max: 2, kernel_kills_24h: 0, kernel_nodes_read: 0, kernel_nodes_total: 2, kernel_log_read: false, kernel_any_node_read: false, last_kill: null, cadvisor_oom_events_7d: 0 }
+      - expect: "warn"   # two pods, one OOM each: two deaths in a week, whatever the rollout count
+        item: { target: "prod-a/deploy/api:app", namespace: "prod-a", workload: "deploy/api", container: "app", prod: true, pods_oomkilled: 2, pods_replaced: 1, restarts_of_those_pods: 2, live_pod_restarts_max: 1, kernel_kills_24h: 0, kernel_nodes_read: 0, kernel_nodes_total: 2, kernel_log_read: false, kernel_any_node_read: true, last_kill: null, cadvisor_oom_events_7d: 0 }
+      - expect: "warn"   # one pod, one OOM
+        item: { target: "prod-a/deploy/api:app", namespace: "prod-a", workload: "deploy/api", container: "app", prod: true, pods_oomkilled: 1, pods_replaced: 0, restarts_of_those_pods: 1, live_pod_restarts_max: 1, kernel_kills_24h: 1, kernel_nodes_read: 1, kernel_nodes_total: 1, kernel_log_read: true, last_kill: "2026-11-02T09:38:06+0000", cadvisor_oom_events_7d: 0 }
+      - expect: "pass"   # a row opened by cAdvisor alone, nothing else
+        item: { target: "prod-a/deploy/api:app", namespace: "prod-a", workload: "deploy/api", container: "app", prod: true, pods_oomkilled: 0, pods_replaced: 0, restarts_of_those_pods: 0, live_pod_restarts_max: 0, kernel_kills_24h: 0, kernel_nodes_read: 1, kernel_nodes_total: 1, kernel_log_read: true, last_kill: null, cadvisor_oom_events_7d: 1 }
+      # boundary: kernel kills exactly at the threshold
       - expect: "fail"
-        metric:
-          oom_events_7d:
-            - labels:
-                namespace: "prod-a"
-                pod: "web-6d7ff4dcdb-abcde"
-                container: "app"
-              value: 5
-      - expect: "warn"
-        metric:
-          oom_events_7d:
-            - labels:
-                namespace: "prod-a"
-                pod: "web-6d7ff4dcdb-abcde"
-                container: "app"
-              value: 1
-      - expect: "pass"
-        metric:
-          oom_events_7d:
-            - labels:
-                namespace: "prod-a"
-                pod: "web-6d7ff4dcdb-abcde"
-                container: "app"
-              value: 0
-      # boundary: value exactly at the fail threshold
-      - expect: "fail"
-        metric:
-          oom_events_7d:
-            - labels:
-                namespace: "prod-a"
-                pod: "web-6d7ff4dcdb-abcde"
-                container: "app"
-              value: 3
+        item: { target: "prod-a/deploy/api:app", namespace: "prod-a", workload: "deploy/api", container: "app", prod: true, pods_oomkilled: 1, pods_replaced: 0, restarts_of_those_pods: 3, live_pod_restarts_max: 3, kernel_kills_24h: 3, kernel_nodes_read: 1, kernel_nodes_total: 1, kernel_log_read: true, last_kill: null, cadvisor_oom_events_7d: 0 }
 
 - id: resources.node-memory-request-usage-gap
   name: Node memory requests are full while real usage is low (over-requested)
@@ -13630,6 +13658,7 @@
   verify:
     - "increase(node_network_receive_errs_total{device=\"eth0\"}[1d])"
     - "On the node: ethtool -S eth0 | grep -iE 'err|drop|exceeded'"
+  notes: A series of a node that inventory.json no longer lists is not judged; the node left within the 24-hour window and the check's result names it under gone_nodes, as summary.objects.nodes.gone_24h does with its last sample time. The same applies to every metric check whose series name a node.
   profiles: [prod, lab]
   test:
     cases:

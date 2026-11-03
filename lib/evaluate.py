@@ -178,6 +178,37 @@ class Context:
     def metric(self, qid: str) -> dict | None:
         return load_json(self.snap / "metrics" / f"{qid}.json")
 
+    @functools.cached_property
+    def _node_ids(self) -> set[str]:
+        """Names and addresses of the nodes in inventory.json. Empty when the inventory lists no nodes, as in the embedded test cases; then no series is treated as a gone node."""
+        ids: set[str] = set()
+        for n in ((self.inv.get("nodes") or {}).get("nodes") or []) if isinstance(self.inv.get("nodes"), dict) else []:
+            for k in ("name", "internal_ip", "external_ip"):
+                if n.get(k):
+                    ids.add(str(n[k]))
+        return ids
+
+    def node_gone(self, labels: dict, area: str | None = None) -> str | None:
+        """For a series that names a node: the node's name or address when the inventory knows the cluster's nodes and this one is not among them, else None.
+        A series names a node when it carries a `node` label without a `pod` label, or, in a check of area `node`, an `instance` label (node-exporter's `<ip>:9100`; prometheus-operator adds the
+        exporter's `pod` label to those, so the pod label does not disqualify a node-area series). `instance` labels of other areas belong to apiservers, kube-state-metrics or Prometheus itself
+        and are never compared. The port is dropped and IPv6 brackets removed before the comparison. A node that left within the metric window still has series in it, and a check about the
+        nodes of the cluster has nothing to say about a node that is no longer one of them."""
+        if not self._node_ids:
+            return None
+        if labels.get("node") and not labels.get("pod"):
+            raw = str(labels["node"])
+        elif area == "node" and (labels.get("node") or labels.get("instance")):
+            raw = str(labels.get("node") or labels.get("instance"))
+        else:
+            return None
+        name = raw
+        if m := re.match(r"^\[(.+)\](?::\d+)?$", raw):
+            name = m.group(1)
+        elif ":" in raw and raw.rsplit(":", 1)[1].isdigit() and raw.count(":") == 1:
+            name = raw.rsplit(":", 1)[0]
+        return None if (name in self._node_ids or raw in self._node_ids) else name
+
     def aws_file(self, name: str):
         return load_json(self.snap / "aws" / name)
 
@@ -405,6 +436,7 @@ class Context:
             "serves_traffic": self.serves_traffic,
             "db_like": self.db_like,
             "_sg_text": sg_text,
+            "_oom_text": oom_text,
             "inv": self.inv,
             "summary": self.summary,
             "ctx": {"profile": self.profile.get("name"), "platform": (self.inv.get("cluster") or {}).get("platform"), "prod_like": sorted(self.prod_like)},
@@ -437,6 +469,30 @@ def sg_text(item: dict) -> str:
     if state == "unmatched":
         return "unknown, no described load balancer matched the Service address"
     return "not applicable"
+
+
+def oom_text(item: dict) -> str:
+    """The evidence of resources.oomkilled-repeated from a `resilience.oom_7d` row: both sources with their windows, never one number standing for the other."""
+    total = item.get("kernel_nodes_total") or 0
+    if item.get("kernel_log_read"):
+        n = item.get("kernel_kills_24h") or 0
+        kern = f"kernel log: {n} kill{'s' if n != 1 else ''} in 24 h on {item.get('kernel_nodes_read')} of {total} node{'s' if total != 1 else ''} read"
+        if item.get("last_kill"):
+            kern += f", last {item['last_kill']}"
+        if item.get("kernel_nodes_old_script"):
+            kern += f"; {item['kernel_nodes_old_script']} node{'s' if item['kernel_nodes_old_script'] != 1 else ''} ran the older node script, which keeps no oom-kill lines"
+    elif item.get("kernel_nodes_old_script"):
+        kern = f"kernel log read on {item['kernel_nodes_old_script']} node{'s' if item['kernel_nodes_old_script'] != 1 else ''} with the older node script, which keeps no oom-kill lines, so kills are not attributed; {item.get('kernel_cgroup_ooms_on_nodes') or 0} container OOM{'s' if (item.get('kernel_cgroup_ooms_on_nodes') or 0) != 1 else ''} counted on those nodes for every workload together"
+    elif not item.get("kernel_any_node_read"):
+        kern = "kernel log not read in this mode"
+    elif total == 0:
+        kern = "kernel log read, but the nodes of this workload's pods are unknown"
+    else:
+        kern = "kernel log not read on its node, no node access there"
+    pods = item.get("pods_oomkilled") or 0
+    rep = item.get("pods_replaced") or 0
+    prom = f"Prometheus: {pods} pod{'s' if pods != 1 else ''} ended by OOM in 7 days" + (f", {rep} already replaced" if rep else "") + f", {item.get('restarts_of_those_pods') or 0} restarts in those pods"
+    return f"{kern}. {prom}. cAdvisor counter {item.get('cadvisor_oom_events_7d') or 0}"
 
 
 def _eval(expr: str, env: dict):
@@ -511,6 +567,7 @@ class _Run:
         self.findings: list[dict] = []
         self.counts: Counter = Counter()
         self._by_target: dict[str, dict] = {}
+        self.gone_nodes: set[str] = set()
 
     def emit(self, env: dict, default_target: str, source: str) -> None:
         check, cx = self.check, self.cx
@@ -538,8 +595,16 @@ class _Run:
         self._by_target[target] = f
         self.findings.append(f)
 
+    def gone_node(self, name: str) -> None:
+        """A series of a node that is no longer in the cluster: not judged, counted, and named in the check's result so the report can say the node left within the window."""
+        self.gone_nodes.add(name)
+        self.counts["gone_node"] += 1
+
     def done(self) -> dict:
-        return {"status": "done", "counts": dict(self.counts), "findings": self.findings}
+        out = {"status": "done", "counts": dict(self.counts), "findings": self.findings}
+        if self.gone_nodes:
+            out["gone_nodes"] = sorted(self.gone_nodes)
+        return out
 
     @staticmethod
     def skip(reason: str) -> dict:
@@ -625,6 +690,9 @@ def _eval_metric(cx: Context, check: dict, run: _Run) -> dict:
             except (KeyError, ValueError, TypeError, IndexError):
                 continue
             labels = s.get("metric", {})
+            if gone := cx.node_gone(labels, check.get("area")):
+                run.gone_node(gone)
+                continue
             env = {**run.base_env, "value": value, "labels": labels, "prod": cx.is_prod(labels.get("namespace")), "pod": labels.get("pod")}
             default_target = _metric_target(cx, labels, "/".join(x for x in (labels.get("namespace"), labels.get("node") or labels.get("instance")) if x) or "cluster")
             if check.get("exclude_transient") and labels.get("pod") and cx.is_transient(labels):
@@ -634,14 +702,17 @@ def _eval_metric(cx: Context, check: dict, run: _Run) -> dict:
         return run.done()
     key = check.get("join_on") or "node"
     keys = list(key) if isinstance(key, list) else [key]  # join_on is one label or a list ([namespace, pod, container])
-    primary = inputs[0]  # Series absent from the first input are not judged (secondary inputs only supply evidence numbers)
+    primary = inputs[0]  # Series absent from the first input are not judged (secondary inputs only supply evidence numbers) unless the check says `join_any: true`, where a series in any input is judged and the rule reads `v` with .get()
+    join_any = bool(check.get("join_any"))
     joined: dict[tuple, dict] = {}
+    present = []
     for qid in inputs:
         m = cx.metric(qid)
         if not m or not m.get("ok"):
-            if qid == primary:
+            if qid == primary and not join_any:
                 return run.skip(f"metrics/{qid}.json missing or failed")
             continue
+        present.append(qid)
         for s in m.get("result", []):
             lab = s.get("metric", {})
             k = tuple(lab.get(x) for x in keys)
@@ -649,11 +720,16 @@ def _eval_metric(cx: Context, check: dict, run: _Run) -> dict:
                 continue
             with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
                 joined.setdefault(k, {})[qid] = float(s["value"][1])
+    if join_any and not present:
+        return run.skip("metrics/" + ",".join(inputs) + " all missing or failed")
     for k, v in joined.items():
-        if primary not in v:
+        if primary not in v and not join_any:
             continue
         labels = dict(zip(keys, k, strict=False))
-        env = {**run.base_env, "v": v, "value": v[primary], "labels": labels, "prod": cx.is_prod(labels.get("namespace")), "pod": labels.get("pod")}
+        if gone := cx.node_gone(labels, check.get("area")):
+            run.gone_node(gone)
+            continue
+        env = {**run.base_env, "v": v, "value": v.get(primary, next(iter(v.values()))), "labels": labels, "prod": cx.is_prod(labels.get("namespace")), "pod": labels.get("pod")}
         default_target = _metric_target(cx, labels, "/".join(str(x) for x in k))
         if check.get("exclude_transient") and labels.get("pod") and cx.is_transient(labels):
             run.counts["excluded"] += 1
@@ -783,6 +859,8 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
             results.append(rec)
             continue
         rec.update(status=r["status"], counts=r.get("counts"), reason=r.get("reason"), thresholds=thresholds)
+        if r.get("gone_nodes"):
+            rec["gone_nodes"] = r["gone_nodes"]  # node series the inventory no longer lists: left within the metric window, not judged
         for f in r["findings"]:
             f["thresholds"] = thresholds
             for k in ("why", "suggest", "verify", "cases", "measured", "notes"):
