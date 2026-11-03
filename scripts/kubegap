@@ -171,7 +171,7 @@ def cmd_collect(args) -> int:
             print(f"error: a collection is already in progress for this context: {other} (run.log updated {int(_time.time() - rl.stat().st_mtime)} s ago). Wait for it to finish or override with --force.")
             return EXIT_ERROR
     snap = _new_snapshot(args, ctx)
-    (snap / "INCOMPLETE").write_text("Discovery/collection in progress. If this file remains, the snapshot was interrupted (an interrupted folder was once picked up as the diff baseline).\n", encoding="utf-8")
+    (snap / "INCOMPLETE").write_text("progress: discovering the cluster, no collector started yet\nIf this file remains, the snapshot was interrupted. An interrupted folder was once picked up as the diff baseline, so the marker keeps it out of latest and previous.\n", encoding="utf-8")
     log = RunLog(snap / "run.log", echo=args.verbose)
     log.meta(kubegap=__version__, context=ctx, command="collect", args=vars(args))
     print(f"context {ctx} -> {snap}\n== discover")
