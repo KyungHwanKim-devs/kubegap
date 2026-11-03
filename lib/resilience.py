@@ -24,6 +24,24 @@ DB_SELF_PROBE_RE = re.compile(
     r"(pg_isready|mysqladmin|mysql .*-e|redis-cli|valkey-cli|mongosh|mongo .*ping|cqlsh|nodetool|clickhouse-client|rabbitmq-diagnostics|rabbitmqctl|etcdctl endpoint|_cluster/health|minio.*health)", re.IGNORECASE
 )  # standard probes that check the DB's own response — not external dependencies (seen: 6 mysql false positives)
 DB_HINT_RE = re.compile(r"(postgres|pgsql|mysql|mariadb|mongo|redis|valkey|elastic|opensearch|kafka|rabbit|clickhouse|qdrant|milvus|minio|etcd|cassandra|neo4j|influx|timescale)", re.IGNORECASE)
+NOT_DB_RE = re.compile(r"exporter|operator|controller|proxy|ui|insight|commander|express|dashboards|agent|connect|backup|telegraf|console", re.IGNORECASE)
+
+
+def image_repo(image: str | None) -> str:
+    """`public.ecr.aws/bitnami/redis:7.2.3` -> `redis`. The tag is left out: umami:postgresql-latest was once caught as a DB."""
+    return (image or "").split("@")[0].rsplit("/", 1)[-1].split(":")[0]
+
+
+def is_db_like(container: str | None, image: str | None, workload: str | None) -> bool:
+    """Does this container run a database, cache or message queue? Judged from the container name, the image repository name and the workload name;
+    a container whose name, image or workload says exporter, operator, controller, proxy, ui, insight, commander, express, dashboards, agent, connect, backup, telegraf or console is not one, so the metrics sidecar next to a Redis, a redis-commander UI or the MongoDB operator's agent are left out. Shared by the probe rows and the request checks in evaluate."""
+    c, repo = container or "", image_repo(image)
+    if DB_HINT_RE.search(c) and not NOT_DB_RE.search(f"{c} {repo}"):
+        return True  # a container named kafka running a kafka image is the broker even when the StatefulSet is called kafka-controller, as Bitnami names its KRaft nodes
+    names = f"{c} {workload or ''} {repo}"
+    return bool(DB_HINT_RE.search(names)) and not NOT_DB_RE.search(names)
+
+
 SHELLS = ("sh", "/bin/sh", "bash", "/bin/bash", "/usr/bin/bash", "ash", "/bin/ash")
 
 
@@ -246,8 +264,7 @@ def _probes(cx: _Ctx) -> dict:
                     "initial_delay_s": pr.get("initialDelaySeconds", 0),
                 }
             lv, rd, st = probes["livenessProbe"], probes["readinessProbe"], probes["startupProbe"]
-            img_repo = (c.get("image") or "").split("@")[0].rsplit("/", 1)[-1].split(":")[0]  # tag excluded — umami:postgresql-latest was caught as a DB
-            db_like = bool(DB_HINT_RE.search(f"{c.get('name')} {img_repo} {o['metadata']['name']}")) and not re.search(r"exporter|operator|controller|proxy|ui|insight", f"{c.get('name')} {o['metadata']['name']}", re.IGNORECASE)
+            db_like = is_db_like(c.get("name"), c.get("image"), o["metadata"]["name"])
             self_probe = bool(lv and lv["type"] == "exec" and lv["path"] and DB_SELF_PROBE_RE.search(str(lv["path"])))
             if lv and lv["path"] and SUSPECT_LIVENESS_RE.search(str(lv["path"])) and not (db_like and self_probe):
                 flags.append(f"liveness path looks like a dependency/ready check (suspect: {lv['path']})")

@@ -572,25 +572,27 @@
   join_on: [namespace, pod, container]
   exclude_transient: true  # exclude Job, CronJob and GitHub Actions runner pods
   rule:
-    expr: "value <= threshold and v.get('container_cpu_request_cores', 0) >= 0.25"
+    expr: "value <= threshold and v.get('container_cpu_request_cores', 0) >= 0.25 and not db_like(labels)"
     warn_expr: "value <= warn_threshold"
     threshold: { prod: 0.20, lab: 0.20 }
     warn_threshold: { prod: 0.35, lab: 0.35 }
   target: "workload(labels) + ':' + labels['container']"
-  evidence: "f\"pod {labels['pod']}: 7d CPU p95 {v.get('cpu_p95_7d_cores', 0):.3f} cores / request {v.get('container_cpu_request_cores', 0):.2f} cores = {value:.2f}\""
+  evidence: "f\"pod {labels['pod']}: 7d CPU p95 {v.get('cpu_p95_7d_cores', 0):.3f} cores / request {v.get('container_cpu_request_cores', 0):.2f} cores = {value:.2f}{'; database-like: keep the request' if db_like(labels) else ''}\""
   severity_default: medium
   symptom_linked: false
   why: >
     The request is what the scheduler uses to reserve a slot on a node. When p95 usage is below 20% of the request, that difference is idle capacity counted as "full":
     new nodes start (a bill on EKS, lost N+1 headroom in a small k3s cluster) and other pods cannot be placed. Only pods with a request of 100m or more that lived over a day are considered (p95 is meaningless for short-lived pods).
     Over-allocation is safer than under-allocation, so when changing it set the new request to 1.5-2x p95.
+    A database, cache or message queue container never fails this check, only warns, and its evidence says "database-like". Its 7-day p95 misses the moments that matter: a backup, VACUUM, compaction, replication catch-up or a restart with recovery
+    takes many times the quiet-hour CPU, and a request cut to the quiet p95 leaves it fighting for CPU exactly then. The container is judged by its name, image repository and workload name, as in resilience.db-probe-timeout.
   measured: >
     Measured on a 2-node small k3s cluster: 18 pods with the 100m default request would have failed without the 250m floor.
-  suggest: "Lower the request to p95 x 1.5. If an HPA scales on CPU, a lower request means more frequent scale-outs, so review targetUtilization together. Cross-check with the KRR recommendation (summary.resources.krr.workloads)."
+  suggest: "Lower the request to p95 x 1.5. If an HPA scales on CPU, a lower request means more frequent scale-outs, so review targetUtilization together. Cross-check with the KRR recommendation (summary.resources.krr.workloads). For a database-like container do not lower the request from the p95; remove its CPU limit if it has one, and either leave the request or measure the database's CPU during a backup or VACUUM and size from that."
   verify:
     - "quantile_over_time(0.95, rate(container_cpu_usage_seconds_total{namespace=\"<ns>\",container=\"<c>\"}[5m])[7d:15m])"
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].resources.requests.cpu}'"
-  notes: Threshold 0.3 split into fail 0.2 and warn 0.35 to avoid flapping at the 0.3 boundary. fail only for requests of 250m or more (dozens of pods with the 100m default would otherwise all fail).
+  notes: Threshold 0.3 split into fail 0.2 and warn 0.35 to avoid flapping at the 0.3 boundary. fail only for requests of 250m or more (dozens of pods with the 100m default would otherwise all fail). Database-like containers stay at warn since rubric 0.1.63; a Neo4j StatefulSet at 1% of its request used to fail and the report advised cutting it to the p95.
   profiles: [prod, lab]
   test:
     cases:
@@ -675,6 +677,88 @@
                 pod: "web-6d7ff4dcdb-abcde"
                 container: "app"
               value: 0.5
+      # database-like container: 1% of a 500m request, would fail, stays at warn (#6)
+      - expect: "warn"
+        metric:
+          cpu_request_p95_ratio_7d:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 0.01
+          cpu_p95_7d_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 0.004
+          container_cpu_request_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 0.5
+        objects:
+          pods:
+            - metadata:
+                namespace: "prod-a"
+                name: "app-neo4j-0"
+                ownerReferences: [{ kind: "StatefulSet", name: "app-neo4j" }]
+              spec:
+                containers:
+                  - { name: "neo4j", image: "neo4j:2026.05.0-community" }
+      # the metrics exporter sidecar next to a database is not database-like and fails as any container
+      - expect: "fail"
+        metric:
+          cpu_request_p95_ratio_7d:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 0.01
+          cpu_p95_7d_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 0.003
+          container_cpu_request_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 0.3
+        objects:
+          pods:
+            - metadata:
+                namespace: "prod-a"
+                name: "redis-master-0"
+                ownerReferences: [{ kind: "StatefulSet", name: "redis-master" }]
+              spec:
+                containers:
+                  - { name: "redis", image: "public.ecr.aws/bitnami/redis:7.2.3-debian-11-r1" }
+                  - { name: "metrics", image: "public.ecr.aws/bitnami/redis-exporter:1.55.0-debian-11-r2" }
+      # pod already gone from the snapshot: judged from the pod and container names
+      - expect: "warn"
+        metric:
+          cpu_request_p95_ratio_7d:
+            - labels:
+                namespace: "prod-a"
+                pod: "shop-postgresql-0"
+                container: "postgresql"
+              value: 0.05
+          cpu_p95_7d_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "shop-postgresql-0"
+                container: "postgresql"
+              value: 0.025
+          container_cpu_request_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "shop-postgresql-0"
+                container: "postgresql"
+              value: 0.5
 
 - id: resources.cpu-limit-near-p95
   name: 7-day CPU p95 above 90% of the limit (constant throttling)
@@ -743,18 +827,20 @@
   join_on: [namespace, pod, container]
   exclude_transient: true  # exclude Job, CronJob and GitHub Actions runner pods
   rule:
-    expr: "value <= threshold and v.get('container_memory_request_bytes', 0) >= 1073741824"
+    expr: "value <= threshold and v.get('container_memory_request_bytes', 0) >= 1073741824 and not db_like(labels)"
     warn_expr: "value <= warn_threshold"
     threshold: { prod: 0.20, lab: 0.20 }
     warn_threshold: { prod: 0.35, lab: 0.35 }
   target: "workload(labels) + ':' + labels['container']"
-  evidence: "f\"pod {labels['pod']}: 7d memory working set p95 {v.get('memory_p95_7d_bytes', 0)/1048576:.0f} MB / request {v.get('container_memory_request_bytes', 0)/1048576:.0f} MB = {value:.2f}\""
+  evidence: "f\"pod {labels['pod']}: 7d memory working set p95 {v.get('memory_p95_7d_bytes', 0)/1048576:.0f} MB / request {v.get('container_memory_request_bytes', 0)/1048576:.0f} MB = {value:.2f}{'; database-like: keep the request' if db_like(labels) else ''}\""
   severity_default: low
   symptom_linked: false
   why: >
     Over-requested memory makes a node look "full" just like CPU. But memory is not compressible (shortage means OOM), so more headroom is normal, and for apps that pre-allocate a heap (JVM) the working set is the request.
-    The severity is therefore one step below the CPU check. Only pods with a request of 256Mi or more that lived over a day are considered.
-  suggest: "Lower the request to p95 x 1.3 (slightly more than the 15% memory buffer of KRR simple). Setting limit equal to request (Guaranteed) makes OOM behaviour predictable."
+    The severity is therefore one step below the CPU check. Only containers with a request of 1 GiB or more fail; smaller ones warn. Pods that lived under a day are not considered.
+    A database, cache or message queue container never fails this check, only warns, and its evidence says "database-like". A database uses memory as its page or buffer cache and grows into what it is given, so a low working set on a small dataset says
+    nothing about what it needs under load, and a backup, a large query or a restart with recovery pushes it well past the quiet p95. The container is judged by its name, image repository and workload name, as in resilience.db-probe-timeout.
+  suggest: "Lower the request to p95 x 1.3 (slightly more than the 15% memory buffer of KRR simple). Setting limit equal to request (Guaranteed) makes OOM behaviour predictable. For a database-like container keep the request; size it from the database's configured cache, such as shared_buffers or innodb_buffer_pool_size, plus headroom, not from the p95."
   verify:
     - "quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"<ns>\",container=\"<c>\"}[7d:15m])"
   profiles: [prod, lab]
@@ -829,6 +915,67 @@
                 pod: "web-6d7ff4dcdb-abcde"
                 container: "app"
               value: 2147483648
+      # the metrics exporter sidecar next to a database is not database-like and fails as any container
+      - expect: "fail"
+        metric:
+          memory_request_p95_ratio_7d:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 0.05
+          memory_p95_7d_bytes:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 60000000
+          container_memory_request_bytes:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 1073741824
+        objects:
+          pods:
+            - metadata:
+                namespace: "prod-a"
+                name: "redis-master-0"
+                ownerReferences: [{ kind: "StatefulSet", name: "redis-master" }]
+              spec:
+                containers:
+                  - { name: "redis", image: "public.ecr.aws/bitnami/redis:7.2.3-debian-11-r1" }
+                  - { name: "metrics", image: "public.ecr.aws/bitnami/redis-exporter:1.55.0-debian-11-r2" }
+      # database-like container: 766 MB working set on a 4 GB request, would fail, stays at warn (#6)
+      - expect: "warn"
+        metric:
+          memory_request_p95_ratio_7d:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 0.19
+          memory_p95_7d_bytes:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 803209216
+          container_memory_request_bytes:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 4294967296
+        objects:
+          pods:
+            - metadata:
+                namespace: "prod-a"
+                name: "app-neo4j-0"
+                ownerReferences: [{ kind: "StatefulSet", name: "app-neo4j" }]
+              spec:
+                containers:
+                  - { name: "neo4j", image: "neo4j:2026.05.0-community" }
 
 - id: resources.memory-limit-near-p95
   name: 7-day memory p95 above 90% of the limit (about to be OOMKilled)

@@ -1,6 +1,7 @@
 """lib/evaluate.py pure helpers: the sandboxed expression evaluator and the static helpers checks.yaml expressions call."""
 
 import datetime as dt
+import json
 from pathlib import Path
 
 import pytest
@@ -124,3 +125,72 @@ def test_symptom_metric_regex():
     assert evaluate.SYMPTOM_METRIC_RE.search("sum(rate(http_requests_total[5m]))")
     assert evaluate.SYMPTOM_METRIC_RE.search("probe_success == 0")
     assert not evaluate.SYMPTOM_METRIC_RE.search("node_memory_MemAvailable_bytes")
+
+
+# ---------- database-like containers ----------
+
+
+def test_is_db_like_by_name_image_and_workload():
+    from lib.resilience import is_db_like
+
+    assert is_db_like("neo4j", "neo4j:2026.05.0-community", "app-neo4j")
+    assert is_db_like("db", "public.ecr.aws/bitnami/postgresql:16", "shop-db")
+    assert is_db_like("app", "ghcr.io/x/y:1", "shop-postgresql")  # the workload name alone is enough
+    assert not is_db_like("metrics", "public.ecr.aws/bitnami/redis-exporter:1.55.0", "redis-master")  # the exporter next to a database
+    assert not is_db_like("kafka-ui", "docker.io/provectuslabs/kafka-ui:v0.7.1", "kafka-ui")
+    assert is_db_like("kafka", "docker.io/bitnami/kafka:3.7", "kafka-controller")  # Bitnami names its KRaft brokers kafka-controller
+    assert not is_db_like("umami", "ghcr.io/umami-software/umami:postgresql-latest", "umami")  # the tag is not looked at
+    assert not is_db_like("web", "nginx:1.27", "web")
+    assert not is_db_like("mongodb-agent", "quay.io/mongodb/mongodb-agent:107", "my-mongo")  # the operator's sidecar in a database pod
+    assert not is_db_like("redis-commander", "rediscommander/redis-commander:latest", "redis-commander")
+    assert not is_db_like("kafka-connect", "confluentinc/cp-kafka-connect:7.6", "kafka-connect")
+    assert not is_db_like("kafka", "confluentinc/cp-kafka-connect:7.6", "kafka-connect")  # the container name says kafka, the image says connect
+
+
+def test_image_repo():
+    from lib.resilience import image_repo
+
+    assert image_repo("neo4j:2026.05.0-community") == "neo4j"
+    assert image_repo("public.ecr.aws/bitnami/redis:7.2.3-debian-11-r1") == "redis"
+    assert image_repo("localhost:5000/redis:7") == "redis"
+    assert image_repo("ghcr.io/x/postgres@sha256:abcd") == "postgres"
+    assert image_repo(None) == ""
+
+
+def _cx_with_pods(tmp_path, pods):
+    (tmp_path / "objects").mkdir()
+    (tmp_path / "objects" / "pods.json").write_text(json.dumps({"items": pods}), encoding="utf-8")
+    return Context(tmp_path, {}, {}, {"name": "prod"})
+
+
+def test_db_like_labels_look_up_the_pod_container(tmp_path):
+    pods = [
+        {
+            "metadata": {"namespace": "prod-a", "name": "redis-master-0", "ownerReferences": [{"kind": "StatefulSet", "name": "redis-master"}]},
+            "spec": {"containers": [{"name": "redis", "image": "public.ecr.aws/bitnami/redis:7.2.3"}, {"name": "metrics", "image": "public.ecr.aws/bitnami/redis-exporter:1.55.0"}]},
+        }
+    ]
+    cx = _cx_with_pods(tmp_path, pods)
+    assert cx.db_like({"namespace": "prod-a", "pod": "redis-master-0", "container": "redis"})
+    assert not cx.db_like({"namespace": "prod-a", "pod": "redis-master-0", "container": "metrics"})
+    assert not cx.db_like({"namespace": "prod-a", "pod": "redis-master-0"})  # no container label: the exporter sidecar keeps the pod from counting
+    assert not cx.db_like({"namespace": "prod-a"})
+
+
+def test_db_like_sees_init_container_sidecars(tmp_path):
+    pods = [
+        {
+            "metadata": {"namespace": "prod-a", "name": "shop-postgresql-0", "ownerReferences": [{"kind": "StatefulSet", "name": "shop-postgresql"}]},
+            "spec": {"initContainers": [{"name": "postgresql", "image": "postgres:16", "restartPolicy": "Always"}], "containers": [{"name": "app", "image": "ghcr.io/x/app:1"}]},
+        }
+    ]
+    cx = _cx_with_pods(tmp_path, pods)
+    assert cx.db_like({"namespace": "prod-a", "pod": "shop-postgresql-0", "container": "postgresql"})
+    assert cx.db_like({"namespace": "prod-a", "pod": "shop-postgresql-0", "container": "app"})  # the workload name shop-postgresql carries the hint
+    assert not cx.db_like({"namespace": "prod-a", "pod": "shop-postgresql-0", "container": "nothing"})
+
+
+def test_db_like_guesses_a_gone_pod_from_its_name(tmp_path):
+    cx = _cx_with_pods(tmp_path, [])
+    assert cx.db_like({"namespace": "prod-a", "pod": "shop-postgresql-0", "container": "postgresql"})
+    assert not cx.db_like({"namespace": "prod-a", "pod": "web-6d7ff4dcdb-abcde", "container": "app"})

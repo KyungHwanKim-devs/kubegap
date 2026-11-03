@@ -25,6 +25,7 @@ from typing import ClassVar
 
 from . import __version__, paths, rubric
 from .config import Config
+from .resilience import is_db_like
 from .snapshot import items, load_json
 
 SAFE_BUILTINS = {
@@ -78,6 +79,7 @@ class Context:
         self.today = _dt.date.fromisoformat(str(inv["today"])[:10]) if inv.get("today") else _dt.date.today()
         self._addon_versions: dict[str, dict] = {}
         self._owners: dict[tuple[str, str], str] | None = None
+        self._pods: dict[tuple[str, str], dict] | None = None
 
     # ---- Stable finding ids: pod -> owning workload ----
     _KIND_SHORT: ClassVar[dict[str, str]] = {"Deployment": "deploy", "StatefulSet": "sts", "DaemonSet": "ds", "Job": "job", "CronJob": "cronjob", "ReplicaSet": "rs", "ReplicationController": "rc"}
@@ -131,6 +133,24 @@ class Context:
             if "?" in w and (ns, w.replace("?", "")) in self._known_owner_names:
                 w = w.replace("?", "")
         return f"{ns}/{w}"
+
+    def db_like(self, labels: dict) -> bool:
+        """Does the metric's container run a database, cache or message queue? Looks the pod up in objects/pods.json and judges the container named in
+        `labels['container']` by its name, image repository and owning workload, with lib.resilience.is_db_like. Init containers count, since a native sidecar reports its own series.
+        Without a container label every container of the pod must be database-like, so a pod-level series of a Redis with an exporter sidecar is not.
+        A pod that is already gone from the snapshot is judged from the pod and container names alone."""
+        ns, pod, container = labels.get("namespace"), labels.get("pod"), labels.get("container")
+        if not pod:
+            return False
+        if self._pods is None:
+            self._pods = {(p["metadata"]["namespace"], p["metadata"]["name"]): p for p in self.objects("pods")}
+        wl = self.workload(labels).rsplit("/", 1)[-1]  # `ns/deploy/name`, `ns/deploy?/name`, `ns/pod/name`: the name never contains `/`
+        obj = self._pods.get((ns, pod))
+        if obj is None:
+            return is_db_like(container, None, wl)
+        spec = self.pod_spec(obj)
+        cs = [c for c in (spec.get("containers") or []) + (spec.get("initContainers") or []) if not container or c.get("name") == container]
+        return bool(cs) and all(is_db_like(c.get("name"), c.get("image"), wl) for c in cs)
 
     TRANSIENT_KINDS: ClassVar[tuple[str, ...]] = ("job", "cronjob", "cronjob?", "runner", "ephemeralrunner", "autoscalingrunnerset")
 
@@ -368,6 +388,7 @@ class Context:
             "eol_badge": self.eol_badge,
             "backup_signals": self.backup_signals,
             "serves_traffic": self.serves_traffic,
+            "db_like": self.db_like,
             "inv": self.inv,
             "summary": self.summary,
             "ctx": {"profile": self.profile.get("name"), "platform": (self.inv.get("cluster") or {}).get("platform"), "prod_like": sorted(self.prod_like)},
