@@ -299,7 +299,7 @@ class _Parser:
                 return out, idx
             rest = content[1:].strip()
             if rest == "":
-                val, idx = self._nested_or_null(idx + 1, indent)
+                val, idx = self._nested_or_null(idx + 1, indent, from_mapping=False)
                 out.append(val)
                 continue
             # `- key: v` or `- - x`: replace the dash with a space and re-read the same line as a block at indent+2
@@ -336,20 +336,21 @@ class _Parser:
             if key in out:
                 raise YamlError(f"line {ln}: duplicate key {key!r}")
             if rest == "":
-                val, idx = self._nested_or_null(idx + 1, indent)
+                val, idx = self._nested_or_null(idx + 1, indent, from_mapping=True)
             else:
                 val, idx = self._inline_value(rest, idx, indent)
             out[key] = val
 
-    def _nested_or_null(self, idx: int, indent: int) -> tuple[Any, int]:
+    def _nested_or_null(self, idx: int, indent: int, *, from_mapping: bool) -> tuple[Any, int]:
         j = self._skip_blank(idx)
         if j < len(self.lines) and self.lines[j][0] > indent:
             content = self.lines[j][1]
             if _split_key(content) is None and not (content.startswith("- ") or content == "-"):
                 return self._inline_value(content, j, indent)  # a scalar on the line after `key:` or `-`
             return self.parse_block(j, self.lines[j][0])
-        # a `- ` list at the same indent on the line after `key:` (allowed by YAML)
-        if j < len(self.lines) and self.lines[j][0] == indent and self.lines[j][1].startswith("- "):
+        # a `- ` list at the same indent on the line after `key:` (allowed by YAML);
+        # after a sequence `-` it is the next item, not a nested sequence (#66)
+        if from_mapping and j < len(self.lines) and self.lines[j][0] == indent and self.lines[j][1].startswith("- "):
             return self._sequence(j, indent)
         return None, idx
 
