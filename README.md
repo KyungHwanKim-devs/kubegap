@@ -124,7 +124,7 @@ kubegap does not have its own credential store. It reuses what is already on you
 | Node OS (EKS) | SSM `send-command` with the `kubegap-node-read` document, using the AWS credentials above | `scripts/kubegap nodes --context <name>` |
 | Node OS (k3s, bare metal) | SSH with `~/.ssh/config` user and key, or the `ssh:` block in config | `scripts/kubegap nodes --context <name>` |
 | Node OS (no SSM, no SSH) | the DaemonSet in `deploy/node-access/daemonset.yaml`, read through `kubectl exec` | `scripts/kubegap nodes --context <name>` |
-| Optional tools | your `PATH`; `kubegap setup` lists what is missing and installs with consent | `kubegap setup --context <name>` (section 1/4) |
+| Optional tools | your `PATH`; `kubegap setup` lists what is missing and installs with consent; without Homebrew, a pinned version whose sha256 is verified | `kubegap setup --context <name>` (section 1/4) |
 
 **Kubernetes.** kubegap uses your kubeconfig's current context (`kubectl config current-context`) or the context given with `--context <name>`. You must already be able to run `kubectl get nodes` against the cluster with read permissions (see [Required permissions](#required-permissions) for the exact ClusterRole). There is nothing else to configure.
 
@@ -138,7 +138,7 @@ kubegap does not have its own credential store. It reuses what is already on you
 - Neither SSM nor SSH (GKE, AKS, managed nodes): apply [`deploy/node-access/daemonset.yaml`](deploy/node-access/daemonset.yaml) and kubegap reads nodes through `kubectl exec` into that pod. The kubeconfig user also needs [`deploy/permissions/role-daemonset-exec.yaml`](deploy/permissions/role-daemonset-exec.yaml) for the exec.
 - Without any of these, only the node-OS checks (`node.*`) are skipped as "no node access". Everything else runs.
 
-**Optional tools.** helm, krr, polaris, pluto, kubent, argocd, promtool, amtool are found on your `PATH`. `kubegap setup` lists what is missing, which checks each one powers, and installs them with your consent (policy `install_tools: ask|always|never` in the config).
+**Optional tools.** helm, krr, polaris, pluto, kubent, argocd, promtool, amtool are found on your `PATH`. `kubegap setup` lists what is missing, which checks each one powers, and installs them with your consent (policy `install_tools: ask|always|never` in the config). An install goes through Homebrew when it is there (polaris and pluto come from a third-party tap, so for those the pinned download goes first and brew is the fallback); otherwise it downloads the official release binary of a version pinned in `lib/tools.py`, with the sha256 of that asset for each platform pinned next to it, and places the file in `.tools/bin/` only when the digest matches. Nothing asks the publisher what is newest during an install; `kubegap setup --check-tool-updates` does that and prints the material of the next pin. krr goes into its own Python virtualenv from a tagged source archive.
 
 **The config file.** `~/.kubegap/config.yaml`, created by copying [`config.example.yaml`](config.example.yaml). Every key is listed there with a comment: `context`, `profile`, `namespace_profiles`, `confirm_context`, `install_tools`, `language`, `snapshots_root`, `retention`, `aws_profile`, `aws_region`, `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url`, `grafana_api_token`, `node_access`, `ssh`, `suppress`, `overrides`. The file is optional; without it kubegap uses the current kube context and discovers everything else.
 

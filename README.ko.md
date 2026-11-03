@@ -124,7 +124,7 @@ kubegap 에는 자체 자격 증명 저장소가 없습니다. 지금 쓰는 PC 
 | 노드 OS, EKS | SSM `send-command` 와 `kubegap-node-read` 문서, 위 AWS 자격 증명 사용 | `scripts/kubegap nodes --context <이름>` |
 | 노드 OS, k3s 와 베어메탈 | SSH. `~/.ssh/config` 의 사용자와 키, 또는 설정의 `ssh:` 블록 | `scripts/kubegap nodes --context <이름>` |
 | 노드 OS, SSM 도 SSH 도 없을 때 | `deploy/node-access/daemonset.yaml` 의 DaemonSet 을 `kubectl exec` 로 읽음 | `scripts/kubegap nodes --context <이름>` |
-| 선택 도구 | `PATH`. `kubegap setup` 이 없는 것을 보여 주고 동의를 받아 설치 | `kubegap setup --context <이름>` 의 1절 |
+| 선택 도구 | `PATH`. `kubegap setup` 이 없는 것을 보여 주고 동의를 받아 설치. Homebrew 가 없으면 고정된 버전을 받고 sha256 을 대조 | `kubegap setup --context <이름>` 의 1절 |
 
 **Kubernetes.** kubeconfig 의 현재 컨텍스트를 쓰거나 `--context <이름>` 으로 지정합니다. 그 클러스터에서 읽기 권한으로 `kubectl get nodes` 가 이미 돼야 합니다. 정확한 ClusterRole 은 아래 [필요한 권한](#필요한-권한) 절에 있습니다. 그 밖에 설정할 것은 없습니다.
 
@@ -138,7 +138,7 @@ kubegap 에는 자체 자격 증명 저장소가 없습니다. 지금 쓰는 PC 
 - SSM 도 SSH 도 없을 때, 예를 들어 GKE, AKS, 관리형 노드: [`deploy/node-access/daemonset.yaml`](deploy/node-access/daemonset.yaml) 을 적용하면 kubegap 이 그 파드에 `kubectl exec` 로 들어가 노드를 읽습니다. exec 에는 [`deploy/permissions/role-daemonset-exec.yaml`](deploy/permissions/role-daemonset-exec.yaml) 도 필요합니다.
 - 셋 다 없으면 노드 OS 항목, 즉 `node.*` 만 "노드 접근 없음" 으로 건너뜁니다. 나머지는 전부 돕니다.
 
-**선택 도구.** helm, krr, polaris, pluto, kubent, argocd, promtool, amtool 은 `PATH` 에서 찾습니다. `kubegap setup` 이 없는 도구와 그 도구가 맡은 항목을 보여 주고, 동의를 받아 설치합니다. 정책은 설정의 `install_tools: ask|always|never` 입니다.
+**선택 도구.** helm, krr, polaris, pluto, kubent, argocd, promtool, amtool 은 `PATH` 에서 찾습니다. `kubegap setup` 이 없는 도구와 그 도구가 맡은 항목을 보여 주고, 동의를 받아 설치합니다. 정책은 설정의 `install_tools: ask|always|never` 입니다. 설치는 Homebrew 가 있으면 그것으로 (polaris 와 pluto 는 서드파티 탭 formula 라서 고정된 다운로드가 먼저고 brew 가 대안입니다), 없으면 `lib/tools.py` 에 고정된 버전의 공식 릴리스 바이너리를 받습니다. 플랫폼별 자산의 sha256 도 그 옆에 고정돼 있어서, 받은 파일의 digest 가 맞을 때만 `.tools/bin/` 에 놓습니다. 설치 중에는 퍼블리셔에게 최신 버전을 묻지 않습니다. 그 일은 `kubegap setup --check-tool-updates` 가 하고, 다음 고정값으로 쓸 내용을 출력합니다. krr 은 태그가 붙은 소스 아카이브로 전용 Python 가상환경에 들어갑니다.
 
 **설정 파일.** `~/.kubegap/config.yaml` 입니다. [`config.example.yaml`](config.example.yaml) 을 복사해 만듭니다. 키마다 설명이 붙어 있습니다. `context`, `profile`, `namespace_profiles`, `confirm_context`, `install_tools`, `language`, `mode`, `snapshots_root`, `retention`, `aws_profile`, `aws_region`, `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url`, `grafana_api_token`, `node_access`, `ssh`, `suppress`, `overrides`. 파일은 없어도 됩니다. 없으면 현재 kube 컨텍스트를 쓰고 나머지는 알아서 찾습니다.
 

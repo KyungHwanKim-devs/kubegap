@@ -6,7 +6,8 @@ The missing input shows up as an "error"/"note" field in the module's own output
 
 Every file under a snapshot or context folder is written through `write_private` and nothing else: it writes a temporary file next to the target,
 syncs it and renames it over the target, so a reader sees the old file or the new one and never a truncated one, and the file is readable by
-its owner only; missing folders on the way are created owner-only as well (`paths.ensure_private_dir`). `tests/test_snapshot_write.py` asserts that no other module in `lib/` writes text files.
+its owner only; missing folders on the way are created owner-only as well (`paths.ensure_private_dir`). `write_private_bytes` is the same for binary
+content (the tool binaries `kubegap setup --install` places in `.tools/bin/`). `tests/test_snapshot_write.py` asserts that no other module in `lib/` writes files.
 """
 
 from __future__ import annotations
@@ -27,17 +28,22 @@ def write_private(path: Path, text: str, *, mode: int = 0o600) -> None:
     A temporary file `.<name>.<random>.tmp` in the same folder takes the content, is flushed and fsynced, gets `mode`, and replaces `path`
     in one rename. On any error the temporary file is removed and the error re-raised; `path` keeps whatever it held before.
     """
+    write_private_bytes(path, text.encode("utf-8"), mode=mode)
+
+
+def write_private_bytes(path: Path, data: bytes, *, mode: int = 0o600) -> None:
+    """`write_private` for bytes: the same temporary file, fsync, chmod and rename. `mode` 0o700 places an executable."""
     path = Path(path)
     paths.ensure_private_dir(path.parent)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
         try:
-            f = os.fdopen(fd, "w", encoding="utf-8", newline="")
+            f = os.fdopen(fd, "wb")
         except BaseException:
             os.close(fd)
             raise
         with f:
-            f.write(text)
+            f.write(data)
             f.flush()
             os.fsync(f.fileno())
         os.chmod(tmp, mode)

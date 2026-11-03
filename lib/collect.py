@@ -442,6 +442,8 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
         return {"ok": any(x["ok"] for x in runs.values()) if runs else False, "runs": len(runs), "failed": sum(1 for x in runs.values() if not x["ok"]), "detail": runs}
     cmd = build({})
     r = _shell.run(cmd, timeout=timeout, id=f"{name}.{sid}", log=log, collector=name, out_path=None if st.get("writes_out") else out)
+    if st.get("writes_out") and out.is_file():
+        out.chmod(0o600)  # the tool wrote the file with its own mode (krr: 0644); every file in a snapshot is owner-only
     ok = r.ok and out.is_file() and out.stat().st_size > 0
     if echo:
         echo(f"    {'saved ' + st['out'] + f' ({out.stat().st_size // 1024} KB)' if ok else 'failed: ' + str(r.error or r.stderr.strip()[-200:] or 'no output')}")
