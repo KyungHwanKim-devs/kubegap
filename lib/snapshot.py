@@ -1,15 +1,60 @@
-"""Shared readers for snapshot files. Every summary module used to carry its own copy of these three helpers; they live here now.
+"""Shared readers and the one writer for snapshot files. Every summary module used to carry its own copy of the three readers; they live here now.
 
 A snapshot folder holds `objects/<resource>.json` (kubectl get -o json output, a list under "items"), `metrics/<query>.json`, `aws/*.json` and so on.
 Reads are forgiving on purpose: a missing or corrupt file returns None (or an empty list), because one failed collection step must not stop the summary.
 The missing input shows up as an "error"/"note" field in the module's own output and from there in the report's tool-notes section.
+
+Every file under a snapshot or context folder is written through `write_private` and nothing else: it writes a temporary file next to the target,
+syncs it and renames it over the target, so a reader sees the old file or the new one and never a truncated one, and the file is readable by
+its owner only. `tests/test_snapshot_write.py` asserts that no other module in `lib/` writes text files.
 """
 
 from __future__ import annotations
 
+import contextlib
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
+
+
+def write_private(path: Path, text: str, *, mode: int = 0o600) -> None:
+    """Write `text` to `path` atomically with owner-only permissions. Creates missing parent folders.
+
+    A temporary file `.<name>.<random>.tmp` in the same folder takes the content, is flushed and fsynced, gets `mode`, and replaces `path`
+    in one rename. On any error the temporary file is removed and the error re-raised; `path` keeps whatever it held before.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+    try:
+        try:
+            f = os.fdopen(fd, "w", encoding="utf-8", newline="")
+        except BaseException:
+            os.close(fd)
+            raise
+        with f:
+            f.write(text)
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, mode)
+        os.replace(tmp, path)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.unlink(tmp)
+        raise
+
+
+def remove_stale_temp(root: Path) -> int:
+    """Remove `.<name>.<random>.tmp` files that a killed process left under `root`, so no directory walk mistakes one for data. Returns the count."""
+    n = 0
+    for p in Path(root).rglob(".*.tmp"):
+        if p.is_file():
+            with contextlib.suppress(OSError):
+                p.unlink()
+                n += 1
+    return n
 
 
 def load_json(path: Path) -> Any:

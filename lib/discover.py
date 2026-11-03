@@ -40,7 +40,7 @@ from . import rubric as _rubric
 from .components import COMPONENTS
 from .config import Config
 from .runlog import RunLog
-from .snapshot import items
+from .snapshot import items, write_private
 
 OBJECT_KINDS = {  # the minimum set of kinds inventory needs. collect fetches more kinds beyond these.
     "nodes": ["get", "nodes"],
@@ -351,7 +351,7 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
         echo(f"  {kind:<28} {len(items(data)) if data is not None else 'failed: ' + failures[kind]}")
     # Component detection below reads ConfigMap bodies (configmap_data_regex rules), so the objects are written only after that, scrubbed: ConfigMap values and Secret data never reach objects/ (lib/scrub.py).
     (snap / "objects").mkdir(parents=True, exist_ok=True)
-    write_objects = lambda: [(snap / "objects" / f"{kind}.json").write_text(json.dumps(scrub.scrub_objects(data), ensure_ascii=False), encoding="utf-8") for kind, data in objs.items() if data is not None]  # noqa: E731
+    write_objects = lambda: [write_private(snap / "objects" / f"{kind}.json", json.dumps(scrub.scrub_objects(data), ensure_ascii=False)) for kind, data in objs.items() if data is not None]  # noqa: E731
     ctx_info = kube.context_info(context, kubeconfig)
     ver, _ = kube.kubectl_json(["version"], context=context, timeout=20, id="discover.version", log=log, kubeconfig=kubeconfig)
     server_version = ((ver or {}).get("serverVersion") or {}).get("gitVersion")
@@ -433,7 +433,7 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
         "collectors_enabled": _collectors_enabled(platform, profile["name"], present),
         "fetch_failures": failures,
     }
-    (snap / "inventory.json").write_text(json.dumps(inv, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+    write_private(snap / "inventory.json", json.dumps(inv, ensure_ascii=False, indent=2, default=str))
     log.stage("discover", "end", platform=platform, profile=profile["name"], components=len(present))
     return inv
 

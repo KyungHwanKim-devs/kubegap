@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import __version__, paths
 from .runlog import read_runlog
-from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, items, load_json
+from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, items, load_json, remove_stale_temp, write_private
 
 WAITING_REASONS = ("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "CreateContainerConfigError", "CreateContainerError", "InvalidImageName", "RunContainerError")
 LABEL_KEEP = ("__name__", "namespace", "pod", "container", "node", "instance", "mountpoint", "qos_class", "reason", "job", "horizontalpodautoscaler", "endpoint", "kind", "phase", "poddisruptionbudget", "service", "deployment")
@@ -533,13 +533,14 @@ def remove_component_logs(snap: Path, summary: dict | None = None) -> int:
     }
     shutil.rmtree(d)
     d.mkdir(parents=True, exist_ok=True)
-    (d / COMPONENT_LOGS_AGGREGATE).write_text(json.dumps(agg, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
-    (d / COMPONENT_LOGS_MARKER).write_text(COMPONENT_LOGS_MARKER_TEXT, encoding="utf-8")
+    write_private(d / COMPONENT_LOGS_AGGREGATE, json.dumps(agg, ensure_ascii=False, indent=1, default=str))
+    write_private(d / COMPONENT_LOGS_MARKER, COMPONENT_LOGS_MARKER_TEXT)
     return len(files)
 
 
 def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> dict:
     """Build summary.json. Unless keep_component_logs is true the component pod logs are deleted afterwards, with their log-derived aggregates saved to logs/pods/AGGREGATED.json; lib/logs.py and lib/scaling.py read that file on a rerun, so the result does not change."""
+    remove_stale_temp(snap)
     inv = load_json(snap / "inventory.json")
     s = {
         "kubegap": __version__,
@@ -599,7 +600,7 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
     removed = 0 if keep_component_logs else remove_component_logs(snap, s)
     if isinstance(s.get("logs"), dict):
         s["logs"]["component_logs_removed"] = component_logs_removed(snap)  # from the marker, so a later keep_component_logs: true does not claim the logs are there
-    (snap / "summary.json").write_text(json.dumps(s, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+    write_private(snap / "summary.json", json.dumps(s, ensure_ascii=False, indent=1, default=str))
     if echo:
         if removed:
             echo(f"component logs: {removed} files aggregated into {COMPONENT_LOGS_DIR}/{COMPONENT_LOGS_AGGREGATE} and deleted ({COMPONENT_LOGS_MARKER} left in place)")

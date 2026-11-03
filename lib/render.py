@@ -23,7 +23,7 @@ import json
 from pathlib import Path
 
 from . import __version__, paths
-from .snapshot import load_json
+from .snapshot import load_json, write_private
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 FRAGMENTS = ("adjustments", "changes", "areas", "files-read", "tool-notes")
@@ -375,5 +375,5 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w(_fragment(snap, "tool-notes", missing))
     w("")
     p = snap / "report-details.md"
-    p.write_text("\n".join(out), encoding="utf-8")
+    write_private(p, "\n".join(out))
     return p

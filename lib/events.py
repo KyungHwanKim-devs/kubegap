@@ -14,7 +14,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-from .snapshot import load_json
+from .snapshot import load_json, write_private
 
 # reason: (meaning, default severity)
 TRACKED: dict[str, tuple[str, str]] = {
@@ -142,5 +142,5 @@ def build_history(context_root: Path, current: Path | None = None) -> dict:
         "tracked_silent": tracked_silent,
         "note": "The same event (uid) grows its count across snapshots, so only the largest count is kept. Event TTL is 1 hour, so most events between runs are lost (see the event-retention absence check)",
     }
-    (context_root / "events-history.json").write_text(json.dumps(hist, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+    write_private(context_root / "events-history.json", json.dumps(hist, ensure_ascii=False, indent=1, default=str))
     return hist

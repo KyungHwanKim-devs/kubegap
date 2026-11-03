@@ -10,6 +10,7 @@ from pathlib import Path
 from . import http, monitoring, yamlite
 from .portfwd import PortForward
 from .runlog import RunLog
+from .snapshot import write_private
 
 PROMQL_WORKERS = 3  # concurrent instant queries. Heavy 7-day range queries compete for Prometheus CPU: at 6 they took 20-29 s each on a real cluster (3-6 s when serial), so keep this low
 
@@ -84,7 +85,7 @@ class Prometheus:
                 summary["ok"] += 1
             else:
                 summary["failed"] += 1
-            (out_dir / f"{qid}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1), encoding="utf-8")
+            write_private(out_dir / f"{qid}.json", json.dumps(rec, ensure_ascii=False, indent=1))
             summary["queries"][qid] = {"ok": res["ok"], "series": rec.get("series"), "error": res.get("error")}
             if log:
                 log.command(id=f"promql.{qid}", cmd=["promql", expr], code=0 if res["ok"] else 1, seconds=secs, out_path=f"metrics/{qid}.json" if res["ok"] else None, error=res.get("error"), collector=collector)

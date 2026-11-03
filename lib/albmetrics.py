@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import aws as _aws
 from .runlog import RunLog
+from .snapshot import write_private
 
 LB_METRICS_ALB = [
     ("RequestCount", "Sum"),
@@ -207,10 +208,9 @@ def collect(snap: Path, out_rel: str, *, profile: str | None, region: str | None
     end = _dt.datetime.now(_dt.UTC).replace(microsecond=0)
     start = end - _dt.timedelta(hours=hours)
     tmp = snap / "aws" / "_mdq.json"
-    tmp.parent.mkdir(parents=True, exist_ok=True)
     for i in range(0, len(queries), 100):
         chunk = queries[i : i + 100]
-        tmp.write_text(json.dumps(chunk), encoding="utf-8")
+        write_private(tmp, json.dumps(chunk))
         res, r = _aws.aws_json(
             ["cloudwatch", "get-metric-data", "--metric-data-queries", f"file://{tmp}", "--start-time", start.strftime("%Y-%m-%dT%H:%M:%SZ"), "--end-time", end.strftime("%Y-%m-%dT%H:%M:%SZ")],
             id=f"{collector}.alb.get-metric-data",
@@ -252,6 +252,4 @@ def collect(snap: Path, out_rel: str, *, profile: str | None, region: str | None
 
 
 def _write(snap: Path, out_rel: str, out: dict):
-    p = snap / out_rel
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(out, ensure_ascii=False, default=str), encoding="utf-8")
+    write_private(snap / out_rel, json.dumps(out, ensure_ascii=False, default=str))

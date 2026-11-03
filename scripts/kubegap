@@ -30,6 +30,7 @@ from lib import (  # noqa: E402  lib is importable only after the skill folder i
 )
 from lib import rubric as _rubric  # noqa: E402
 from lib import yamlite as _yamlite  # noqa: E402
+from lib.snapshot import write_private  # noqa: E402
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -171,7 +172,7 @@ def cmd_collect(args) -> int:
             print(f"error: a collection is already in progress for this context: {other} (run.log updated {int(_time.time() - rl.stat().st_mtime)} s ago). Wait for it to finish or override with --force.")
             return EXIT_ERROR
     snap = _new_snapshot(args, ctx)
-    (snap / "INCOMPLETE").write_text("progress: discovering the cluster, no collector started yet\nIf this file remains, the snapshot was interrupted. An interrupted folder was once picked up as the diff baseline, so the marker keeps it out of latest and previous.\n", encoding="utf-8")
+    write_private(snap / "INCOMPLETE", "progress: discovering the cluster, no collector started yet\nIf this file remains, the snapshot was interrupted. An interrupted folder was once picked up as the diff baseline, so the marker keeps it out of latest and previous.\n")
     log = RunLog(snap / "run.log", echo=args.verbose)
     log.meta(kubegap=__version__, context=ctx, command="collect", args=vars(args))
     print(f"context {ctx} -> {snap}\n== discover")
@@ -418,7 +419,7 @@ def cmd_nodes(args) -> int:
         print("  " + f"{'NODE':<12}" + "".join(f"{k:<12}" for k in keys))
         for n, c in caps.items():
             print("  " + f"{n:<12}" + "".join(f"{(c['caps'].get(k) or '-'):<12}" for k in keys))
-        (snap.parent / "node-access.json").write_text(_json2.dumps({"snapshot": snap.name, "method": na.method, "nodes": caps}, ensure_ascii=False, indent=1), encoding="utf-8")
+        write_private(snap.parent / "node-access.json", _json2.dumps({"snapshot": snap.name, "method": na.method, "nodes": caps}, ensure_ascii=False, indent=1))
         print(f"saved: {snap.parent / 'node-access.json'}")
     return EXIT_OK if ok == len(results) else EXIT_ERROR
 

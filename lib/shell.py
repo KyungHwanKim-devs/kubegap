@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .runlog import RunLog
+from .snapshot import write_private
 
 DEFAULT_TIMEOUT = 60
 
@@ -84,8 +85,7 @@ def run(
 
     rel_out = None
     if out_path is not None and res.ok:
-        out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(res.stdout, encoding="utf-8")
+        write_private(out_path, res.stdout)
         rel_out = str(out_path)
         if log is not None and log.path is not None:
             with contextlib.suppress(ValueError):
