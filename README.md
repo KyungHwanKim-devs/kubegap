@@ -174,7 +174,7 @@ Scripts collect and grade; the agent interprets and writes. The script side runs
 
 `scripts/kubegap` gathers data with kubectl, PromQL, the AWS CLI, HTTP APIs and node shells and condenses it into `summary.json`. It then grades every check in `checks.yaml` under each `collectors/` folder as pass, warn or fail and writes the result to `findings-draft.json`. The agent reads that first pass, adjusts severity for symptoms, recurrence and cluster profile, and writes the report. A check is one YAML entry with its rule, why it matters, the fix, verification commands and test cases, and `scripts/kubegap selftest` runs every check's test cases.
 
-Docs: [`SKILL.md`](SKILL.md) is the agent procedure, [`references/development.md`](references/development.md) explains how to change checks and the rubric, [`CONTRIBUTING.md`](CONTRIBUTING.md) is the contribution guide, and [`docs/DESIGN-DECISIONS.md`](docs/DESIGN-DECISIONS.md) records the choices that shape the tool and why.
+Docs: [`SKILL.md`](SKILL.md) is the agent procedure, [`references/development.md`](references/development.md) explains how to change checks and the rubric, [`CONTRIBUTING.md`](CONTRIBUTING.md) is the contribution guide, [`docs/DESIGN-DECISIONS.md`](docs/DESIGN-DECISIONS.md) records the choices that shape the tool and why, and [`docs/HEADLESS.md`](docs/HEADLESS.md) shows how to run it headless and on a schedule.
 
 ## License
 

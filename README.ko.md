@@ -174,7 +174,7 @@ kubegap 자체는 어디로도 데이터를 보내지 않습니다. 수집한 �
 
 `scripts/kubegap` 이 kubectl, PromQL, AWS CLI, HTTP API, 노드 셸에서 데이터를 모아 `summary.json` 으로 요약합니다. 그다음 `collectors/` 아래 각 폴더의 `checks.yaml` 에 있는 항목마다 pass, warn, fail 을 정해 `findings-draft.json` 에 씁니다. 에이전트는 그 결과를 읽고 증상, 재발, 클러스터 프로파일에 따라 심각도를 조정한 뒤 리포트를 씁니다. 점검 항목 하나는 YAML 항목 하나입니다. 판정 조건, 왜 중요한지, 고치는 법, 확인 명령, 테스트 케이스가 들어 있고, `scripts/kubegap selftest` 가 모든 항목의 테스트 케이스를 돌립니다.
 
-문서: [`SKILL.md`](SKILL.md) 는 에이전트 절차, [`references/development.md`](references/development.md) 는 점검 항목과 룰을 바꾸는 법, [`CONTRIBUTING.md`](CONTRIBUTING.md) 는 기여 안내, [`docs/DESIGN-DECISIONS.md`](docs/DESIGN-DECISIONS.md) 는 이 도구의 설계 결정과 그 이유입니다.
+문서: [`SKILL.md`](SKILL.md) 는 에이전트 절차, [`references/development.md`](references/development.md) 는 점검 항목과 룰을 바꾸는 법, [`CONTRIBUTING.md`](CONTRIBUTING.md) 는 기여 안내, [`docs/DESIGN-DECISIONS.md`](docs/DESIGN-DECISIONS.md) 는 이 도구의 설계 결정과 그 이유, [`docs/HEADLESS.md`](docs/HEADLESS.md) 는 헤드리스 실행과 예약 실행 방법입니다.
 
 ## 라이선스
 
