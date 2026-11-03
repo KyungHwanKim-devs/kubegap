@@ -1,23 +1,31 @@
-# kubegap read-only ClusterRole.
-# get, list and watch on every resource. Secrets are excluded: list returns the values, so kubegap never reads Secrets through kubectl
-# and only sees names and types via kube-state-metrics kube_secret_info. Helm stores release records in Secrets, so with this role `helm list` fails and the two Helm checks are skipped; grant secrets read if you want them. nodes/proxy is for kubelet configz and metrics, nodes/metrics for node metrics.
-# The DaemonSet node backend additionally needs `get` and `create` on pods/exec in the kubegap namespace; that is role-daemonset-exec.yaml, kept separate so this role stays get/list/watch only.
+# kubegap read-only ClusterRole. Every grant here is something the code calls; tests/test_permissions.py keeps it that way.
+# get and list on the core resources and API groups kubegap reads. Secrets are excluded: list returns the values, so kubegap never reads Secrets through kubectl
+# and only sees names and types via kube-state-metrics kube_secret_info. Helm stores release records in Secrets, so with this role `helm list` fails and the two Helm checks are skipped; grant secrets read if you want them. pluto and kubent are run in their modes that do not read Helm releases for the same reason.
+# Kinds of groups not listed here (CSRs, flow control, runtime classes, external-secrets generators, operator CRDs kubegap has no checks for) are reported by the dump-all step as "not permitted", not as failures; no check reads them.
+# nodes/proxy: GET /api/v1/nodes/<node>/proxy/configz (kubelet configuration, full mode).
+# pods/proxy: GET of a component pod's /metrics through the API server proxy (type: pod-metrics steps). Read only. When the proxy is blocked by the node security group kubegap reads the same URL with curl from inside a node instead.
+# pods/portforward: `kubectl port-forward svc/<prometheus|alertmanager|loki|grafana>` to read the stores. The verb is `create` because that is how the API server names opening the stream; nothing is created in the cluster. If config.yaml sets prometheus_url, alertmanager_url, loki_url and grafana_url, this rule can be dropped.
+# The DaemonSet node backend additionally needs `get` and `create` on pods/exec in the kubegap namespace; that is role-daemonset-exec.yaml, kept separate.
+# The external tools of the core collector (krr, polaris, pluto, kubent, helm) list kinds of their own choosing within these grants; `helm list` is the one that needs Secrets and fails under this role.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: kubegap-readonly
 rules:
   - apiGroups: [""]
-    resources: ["pods", "pods/log", "pods/status", "nodes", "nodes/proxy", "nodes/metrics", "nodes/status", "services", "endpoints", "events", "namespaces", "configmaps", "persistentvolumes", "persistentvolumeclaims", "resourcequotas", "limitranges", "serviceaccounts", "replicationcontrollers"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["apps", "batch", "autoscaling", "policy", "networking.k8s.io", "storage.k8s.io", "rbac.authorization.k8s.io", "admissionregistration.k8s.io", "apiextensions.k8s.io", "discovery.k8s.io", "scheduling.k8s.io", "coordination.k8s.io", "metrics.k8s.io", "apiregistration.k8s.io"]
+    resources: ["pods", "pods/log", "pods/proxy", "nodes", "nodes/proxy", "services", "endpoints", "events", "namespaces", "configmaps", "persistentvolumes", "persistentvolumeclaims", "resourcequotas", "limitranges", "serviceaccounts"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["pods/portforward"]
+    verbs: ["create"]
+  - apiGroups: ["apps", "batch", "autoscaling", "policy", "networking.k8s.io", "storage.k8s.io", "rbac.authorization.k8s.io", "admissionregistration.k8s.io", "apiextensions.k8s.io", "discovery.k8s.io", "scheduling.k8s.io", "metrics.k8s.io", "apiregistration.k8s.io"]
     resources: ["*"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list"]
   # Component CRDs (only installed ones are read; missing groups are ignored)
-  - apiGroups: ["monitoring.coreos.com", "karpenter.sh", "karpenter.k8s.aws", "keda.sh", "external-secrets.io", "argoproj.io", "cert-manager.io", "acme.cert-manager.io", "metallb.io", "elbv2.k8s.aws", "networking.k8s.aws", "crd.k8s.amazonaws.com", "vpcresources.k8s.aws", "snapshot.storage.k8s.io", "helm.cattle.io", "k3s.cattle.io", "actions.github.com", "actions.summerwind.dev"]
+  - apiGroups: ["monitoring.coreos.com", "karpenter.sh", "karpenter.k8s.aws", "keda.sh", "external-secrets.io", "argoproj.io", "cert-manager.io", "acme.cert-manager.io", "metallb.io", "elbv2.k8s.aws", "networking.k8s.aws", "crd.k8s.amazonaws.com", "snapshot.storage.k8s.io", "k3s.cattle.io", "actions.github.com", "actions.summerwind.dev"]
     resources: ["*"]
-    verbs: ["get", "list", "watch"]
-  - nonResourceURLs: ["/metrics", "/readyz", "/livez", "/version", "/api", "/apis", "/apis/*"]
+    verbs: ["get", "list"]
+  - nonResourceURLs: ["/version", "/api", "/api/*", "/apis", "/apis/*"]   # kubectl version and API discovery; the default system:discovery binding already grants these to every authenticated user, they are listed so the role reads complete on its own
     verbs: ["get"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

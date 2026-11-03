@@ -93,14 +93,14 @@
   modes: [full]   # skipped by the daily run
   type: tool
   tool: pluto
-  cmd: [pluto, detect-all-in-cluster, --kube-context, "{context}", -o, json, --target-versions, "k8s={k8s_next_minor}"]
+  cmd: [pluto, detect-api-resources, --kube-context, "{context}", -o, json, --target-versions, "k8s={k8s_next_minor}"]   # not detect-all-in-cluster: its helm-detect lists release Secrets, which the ClusterRole forbids, and the whole run then fails
   out: tools/pluto.json
   timeout: 300
 - id: kubent
   modes: [full]   # skipped by the daily run
   type: tool
   tool: kubent
-  cmd: [kubent, --context, "{context}", -o, json, -t, "{k8s_next_minor_short}"]
+  cmd: [kubent, --context, "{context}", -o, json, -t, "{k8s_next_minor_short}", --helm3=false]   # the Helm v3 collector lists release Secrets, which the ClusterRole forbids; the cluster collector is enough
   out: tools/kubent.json
   timeout: 300
 # Helm keeps each release record in a Secret (sh.helm.release.v1.<name>.v<n>), so `helm list` reads Secrets. kubegap stores only what list prints: name, namespace, status, revision, chart and app version, updated. User values (`helm get values`) are not collected: they often hold credentials. The shipped ClusterRole has no secrets permission, so with it this step fails and the Helm checks are skipped (lib/hygiene.py says why).

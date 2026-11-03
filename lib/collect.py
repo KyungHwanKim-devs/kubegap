@@ -88,7 +88,7 @@ def list_api_resources(context: str | None, kubeconfig: str | None, log: RunLog)
 def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: list[str], timeout: float, log: RunLog, collector: str, echo=None) -> dict:
     resources = list_api_resources(context, kubeconfig, log)
     done = {p.stem for p in (snap / "objects").glob("*.json")}
-    summary = {"kinds": 0, "items": 0, "skipped": [], "failed": {}, "excluded": []}
+    summary = {"kinds": 0, "items": 0, "skipped": [], "failed": {}, "excluded": [], "not_permitted": []}
     hard_exclude = ["secrets", "secrets.*"]
     for res in resources:
         full, name = res["full"], res["name"]
@@ -107,7 +107,10 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
         args = ["get", full] + (["-A"] if res["namespaced"] else [])
         data, r = kube.kubectl_json(args, context=context, timeout=timeout, id=f"collect.get-{full}", log=log, kubeconfig=kubeconfig, collector=collector)
         if data is None:
-            summary["failed"][full] = r.error or r.stderr.strip()[-200:]
+            if "is forbidden:" in (r.stderr or "") or "(Forbidden)" in (r.stderr or ""):  # RBAC denial: the ClusterRole does not grant this kind. A check that needs it skips as "missing", never passes
+                summary["not_permitted"].append(full)
+            else:
+                summary["failed"][full] = r.error or r.stderr.strip()[-200:]
             continue
         err = scrub.scrub_or_error(data)
         if err:  # the kind is not written; run.log and the step record carry the failure so report section 7-1 shows it
@@ -120,7 +123,9 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
         summary["kinds"] += 1
         summary["items"] += n
     if echo:
-        echo(f"    {summary['kinds']} kinds, {summary['items']} objects saved. skipped (fetched by discovery) {len(summary['skipped'])}, excluded {len(summary['excluded'])}, failed {len(summary['failed'])}")
+        echo(
+            f"    {summary['kinds']} kinds, {summary['items']} objects saved. skipped (fetched by discovery) {len(summary['skipped'])}, excluded {len(summary['excluded'])}, not permitted by the ClusterRole {len(summary['not_permitted'])}, failed {len(summary['failed'])}"
+        )
         for k, v in summary["failed"].items():
             echo(f"      failed {k}: {v[:100]}")
     return summary
