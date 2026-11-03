@@ -11,11 +11,17 @@ import os
 import shutil
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .runlog import RunLog
 from .snapshot import write_private
+
+
+class _NamedError(Exception):
+    """An exception whose message already says what failed (lib.scrub.ScrubFailed is one); shell.run reports it as is, others with their type."""
+
 
 DEFAULT_TIMEOUT = 60
 
@@ -58,8 +64,12 @@ def run(
     log: RunLog | None = None,
     out_path: Path | None = None,
     collector: str | None = None,
+    transform: Callable[[str], str] | None = None,
 ) -> Result:
     """Run a command. If `out_path` is given, stdout is saved to that file (only on success).
+    `transform`, when given with `out_path`, is applied to stdout before it is written, so what it returns is the only text that reaches disk;
+    if it raises, nothing is written and the result fails with the exception's message (collect uses it to scrub kubectl JSON before the file
+    exists). Without `out_path` it is not applied.
 
     If `id` and `log` are given, one line is written to run.log. The saved path is recorded relative to the
     snapshot folder so the LLM can open it directly from the report appendix.
@@ -84,6 +94,11 @@ def run(
     res.seconds = time.monotonic() - t0
 
     rel_out = None
+    if out_path is not None and res.ok and transform is not None:
+        try:
+            res.stdout = transform(res.stdout)
+        except Exception as e:
+            res.error = str(e) if isinstance(e, _NamedError) else f"{type(e).__name__}: {e}"
     if out_path is not None and res.ok:
         write_private(out_path, res.stdout)
         rel_out = str(out_path)

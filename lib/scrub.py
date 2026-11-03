@@ -14,13 +14,17 @@ credential is not written to disk at all. Masking after the fact only catches sh
   (gzip, base64). Their values are replaced by length and shape too; the keys stay, so "applied with kubectl" remains visible.
   Component detection in lib/discover runs on the in-memory objects before this scrub.
 
-Both writers (lib/discover for the kinds it fetches, lib/collect dump-all for the rest) call `scrub_objects`.
+The three writers of kubectl JSON go through `scrub_or_error`: lib/discover for the kinds it fetches, lib/collect dump-all for the rest, and
+the `type: kubectl` steps through `json_scrubber`, which lib/shell applies before the file exists. A scrub that raises writes nothing and fails the step.
 """
 
 from __future__ import annotations
 
 import fnmatch
+import json
 import re
+
+from . import shell
 
 SECRET_KINDS = {"Secret", "SecretList"}
 CONFIGMAP_KINDS = {"ConfigMap"}
@@ -154,6 +158,47 @@ def _secret_like_in_applied(value) -> list[str]:
         return []
     d = obj.get("data") if isinstance(obj, dict) else None
     return secret_like_keys(d if isinstance(d, dict) else {})
+
+
+class ScrubFailed(shell._NamedError):
+    """Scrubbing raised, so the text must not be written. The message starts with "scrub failed:"."""
+
+
+def scrub_or_error(obj) -> str | None:
+    """Scrub `obj` in place. None on success; on any exception the message "scrub failed: <type>: <text>" and the caller writes nothing."""
+    try:
+        scrub_objects(obj)
+    except Exception as e:
+        return f"scrub failed: {type(e).__name__}: {e}"
+    return None
+
+
+def json_scrubber():
+    """A `shell.run` transform for kubectl JSON output plus the item count it saw.
+
+    Returns (fn, info). `fn(text)` parses the JSON, scrubs it and returns the scrubbed JSON text; text that is not JSON is returned unchanged,
+    because the scrubber would find no Secret in it. If scrubbing raises, `fn` raises ScrubFailed and `shell.run` writes nothing.
+    `info["items"]` holds the number of items of the parsed List, None when the text was not a JSON object.
+    """
+    info: dict = {"items": None}
+
+    def fn(text: str) -> str:
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError:
+            return text
+        except Exception as e:
+            raise ScrubFailed(f"scrub failed: {type(e).__name__}: {e}") from e
+        err = scrub_or_error(data)
+        if err:
+            raise ScrubFailed(err)
+        try:
+            info["items"] = len(data.get("items", []) or []) if isinstance(data, dict) else None
+            return json.dumps(data, ensure_ascii=False)
+        except Exception as e:
+            raise ScrubFailed(f"scrub failed: {type(e).__name__}: {e}") from e
+
+    return fn, info
 
 
 def scrub_objects(obj):

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+from collections.abc import Callable
 from pathlib import Path
 
 from . import shell
@@ -22,7 +23,18 @@ def current_context(kubeconfig: str | None = None) -> str | None:
     return r.stdout.strip() if r.ok and r.stdout.strip() else None
 
 
-def kubectl(args: list[str], *, context: str | None, timeout: float = 60, id: str | None = None, log: RunLog | None = None, out_path: Path | None = None, collector: str | None = None, kubeconfig: str | None = None) -> shell.Result:
+def kubectl(
+    args: list[str],
+    *,
+    context: str | None,
+    timeout: float = 60,
+    id: str | None = None,
+    log: RunLog | None = None,
+    out_path: Path | None = None,
+    collector: str | None = None,
+    kubeconfig: str | None = None,
+    transform: Callable[[str], str] | None = None,
+) -> shell.Result:
     cmd = ["kubectl"]
     if context:
         cmd += ["--context", context]
@@ -30,7 +42,7 @@ def kubectl(args: list[str], *, context: str | None, timeout: float = 60, id: st
         cmd += ["--kubeconfig", kubeconfig]
     cmd += ["--request-timeout", f"{int(timeout)}s"]
     cmd += args
-    return shell.run(cmd, timeout=timeout + 5, id=id, log=log, out_path=out_path, collector=collector)
+    return shell.run(cmd, timeout=timeout + 5, id=id, log=log, out_path=out_path, collector=collector, transform=transform)
 
 
 def kubectl_json(args: list[str], *, context: str | None, timeout: float = 60, **kw) -> tuple[dict | list | None, shell.Result]:
