@@ -4,7 +4,7 @@ aws elbv2 describe-load-balancers / describe-load-balancer-attributes / describe
 aws cloudwatch get-metric-data (24 hours, 1-hour period). Output is a single aws/alb-metrics.json. lib/traffic.py joins it to k8s Services/Ingresses via TargetGroupBindings.
 
 CloudWatch dimensions: LoadBalancer = the 'app/<name>/<id>' part of the ARN (NLB: 'net/...'), TargetGroup = 'targetgroup/<name>/<id>'. Measured on a real cluster: 1 ALB and 40 target groups took 6 get-metric-data calls in 0.6 s.
-Required permissions: elasticloadbalancing:Describe*, cloudwatch:GetMetricData.
+Required permissions: elasticloadbalancing:Describe*, cloudwatch:GetMetricData, ec2:DescribeSecurityGroups (the inbound rules of every load balancer's security groups, one call).
 """
 
 from __future__ import annotations
@@ -50,6 +50,19 @@ def _dim(arn: str, kind: str) -> str:
 
 def _attrs(lst: list | None) -> dict:
     return {a.get("Key"): a.get("Value") for a in (lst or [])}
+
+
+def _rule(pm: dict) -> dict:
+    """One inbound rule of a security group: protocol, port range, the IPv4 and IPv6 CIDRs and how many other security groups it names. `-1` protocol means every port."""
+    return {
+        "protocol": pm.get("IpProtocol"),
+        "from_port": pm.get("FromPort"),
+        "to_port": pm.get("ToPort"),
+        "cidrs": [r.get("CidrIp") for r in pm.get("IpRanges") or []],
+        "cidrs_v6": [r.get("CidrIpv6") for r in pm.get("Ipv6Ranges") or []],
+        "prefix_lists": [r.get("PrefixListId") for r in pm.get("PrefixListIds") or []],
+        "security_groups": len(pm.get("UserIdGroupPairs") or []),
+    }
 
 
 def collect(snap: Path, out_rel: str, *, profile: str | None, region: str | None, log: RunLog, collector: str, timeout: float = 300, hours: int = 24, echo=None) -> dict:
@@ -151,6 +164,18 @@ def collect(snap: Path, out_rel: str, *, profile: str | None, region: str | None
             queries.append({"Id": qid, "MetricStat": {"Metric": {"Namespace": ns_, "MetricName": mname, "Dimensions": [{"Name": "LoadBalancer", "Value": row["dim"]}]}, "Period": 3600, "Stat": stat}})
             qmeta[qid] = ("lb", row["dim"], f"{mname}_{stat}")
         out["lbs"].append(row)
+    # Security groups of every load balancer, one describe call. The inbound rules decide who can reach a listener; lib/traffic.py judges exposure from them.
+    sg_ids = sorted({g for lb in out["lbs"] for g in lb.get("security_groups") or []})
+    out["security_groups"] = {}
+    out["security_groups_read"] = False
+    if sg_ids:
+        sgs, r = _aws.aws_json(["ec2", "describe-security-groups", "--group-ids", *sg_ids], id=f"{collector}.alb.describe-security-groups", timeout=60, **kw)
+        if sgs is None:
+            errors.append(f"describe-security-groups: {r.error or r.stderr.strip()[-200:]}")
+        else:
+            out["security_groups_read"] = True
+            for g in sgs.get("SecurityGroups") or []:
+                out["security_groups"][g["GroupId"]] = {"name": g.get("GroupName"), "description": (g.get("Description") or "")[:120], "inbound": [_rule(pm) for pm in g.get("IpPermissions") or []]}
     # CloudWatch: call in batches of 100
     metrics: dict = {"lb": {}, "tg": {}}
     end = _dt.datetime.now(_dt.UTC).replace(microsecond=0)

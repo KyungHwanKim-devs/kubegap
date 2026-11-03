@@ -95,6 +95,41 @@ class _Objects:
         return [w for w in self.workloads if w["namespace"] == ns and _selector_match(sel, w["labels"])]
 
 
+OPEN_CIDRS = ("0.0.0.0/0", "::/0")
+
+
+def _rule_covers(rule: dict, port: int) -> bool:
+    if rule.get("protocol") == "-1":
+        return True
+    lo, hi = rule.get("from_port"), rule.get("to_port")
+    return lo is not None and hi is not None and lo <= port <= hi
+
+
+def sg_exposure(lb: dict | None, ports: list[int]) -> dict:
+    """What the load balancer's security groups let in on these ports. `open` when any port is reachable from 0.0.0.0/0 or ::/0;
+    `allow-list` when every port is limited to named CIDRs, prefix lists or security groups; `no-security-group` when the load balancer has none
+    (an NLB without security groups passes everything, so this counts as open); `not-read` when the groups could not be described."""
+    if not lb:
+        return {"sg_exposure": None, "allowed_cidrs": {}}
+    if not lb.get("security_groups"):
+        return {"sg_exposure": "no-security-group", "allowed_cidrs": {}}
+    if lb.get("security_groups_read") is False:
+        return {"sg_exposure": "not-read", "allowed_cidrs": {}}
+    allowed: dict[str, list[str]] = {}
+    state = "allow-list"
+    for port in ports:
+        if not isinstance(port, int):
+            continue
+        cidrs: list[str] = []
+        for r in lb.get("inbound_rules") or []:
+            if _rule_covers(r, port):
+                cidrs += (r.get("cidrs") or []) + (r.get("cidrs_v6") or []) + [f"prefix-list {p}" for p in r.get("prefix_lists") or []] + ([f"{r['security_groups']} security group(s)"] if r.get("security_groups") else [])
+        if any(c in OPEN_CIDRS for c in cidrs):
+            state = "open"
+        allowed[str(port)] = sorted(set(cidrs))
+    return {"sg_exposure": state, "allowed_cidrs": allowed}
+
+
 def _alb(snap: Path, objs: _Objects) -> dict:
     d = load_json(snap / "aws" / "alb-metrics.json")
     if not d:
@@ -108,6 +143,9 @@ def _alb(snap: Path, objs: _Objects) -> dict:
             return (m.get(k) or {}).get(f)
 
         row = {**{k: lb.get(k) for k in ("name", "dns", "type", "scheme", "idle_timeout_s", "deletion_protection", "access_logs", "drop_invalid_headers", "azs", "created")}, "target_groups": len(lb.get("target_groups") or [])}
+        row["security_groups"] = lb.get("security_groups") or []
+        row["inbound_rules"] = [r for g in row["security_groups"] for r in ((d.get("security_groups") or {}).get(g) or {}).get("inbound") or []]
+        row["security_groups_read"] = bool(d.get("security_groups_read")) if row["security_groups"] else None
         if lb.get("type") == "application":
             req = g("RequestCount_Sum") or 0
             row.update(
@@ -324,6 +362,8 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
             scheme = ln.get("scheme") if ln else ("lan" if any(re.match(r"^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)", str(a)) for a in addrs) else ("internet-facing" if addrs else "unknown"))
         if t == "NodePort":
             scheme = "node-ip (all node interfaces)"
+        lb_row = next((lb_dns[a] for a in addrs if a in lb_dns), None) if t == "LoadBalancer" else None
+        sg = sg_exposure(lb_row, [p for p in ports if isinstance(p, int)])
         rows.append(
             {
                 "type": t.lower(),
@@ -342,13 +382,18 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
                 "prod": ns in objs.prod,
                 "external_traffic_policy": sp.get("externalTrafficPolicy"),
                 "source_ranges": sp.get("loadBalancerSourceRanges"),
-                "note": "DB port open on an external address" if db and scheme and "internal" not in str(scheme) else None,
+                **sg,
+                "note": _db_note(db, scheme, sg["sg_exposure"]),
             }
         )
     # LBs created outside Kubernetes (no TGB) also go in the exposure list (e.g. a shared DB NLB)
     for ln in alb.get("lbs") or []:
         if ln["type"] == "network" and ln.get("scheme") == "internet-facing" and not any(ln.get("dns") in (r.get("hosts") or []) for r in rows):
             tgs = [t for t in alb.get("target_groups") or [] if t["lb"] == ln["name"]]
+            bound = sorted({f"{t['namespace']}/{t['service']}" for t in tgs if t.get("namespace")})
+            nlb_ports = sorted({t["port"] for t in tgs if isinstance(t.get("port"), int)})
+            sg = sg_exposure(ln, nlb_ports)
+            db = any(p in DB_PORTS for p in nlb_ports)
             rows.append(
                 {
                     "type": "nlb (defined outside the cluster)",
@@ -362,12 +407,29 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
                     "auth_hint": {},
                     "has_auth_hint": False,
                     "admin_like": False,
-                    "db_port": any(t["port"] in DB_PORTS for t in tgs),
-                    "prod": True,
-                    "note": "no TargetGroupBinding; NLB created outside Kubernetes (Terraform etc.). DB inferred from the target group port" if any(t["port"] in DB_PORTS for t in tgs) else "no TargetGroupBinding",
+                    "db_port": db,
+                    "prod": any(t.get("prod") for t in tgs) or not bound,
+                    "bound_services": bound,
+                    **sg,
+                    "note": (
+                        "NLB created outside Kubernetes; "
+                        + (f"{len(bound)} TargetGroupBindings bind it to {', '.join(bound[:6])}" if bound else "no TargetGroupBinding, DB inferred from the target group port")
+                        + (". " + _db_note(db, ln["scheme"], sg["sg_exposure"]) if db else "")
+                    ),
                 }
             )
     return rows
+
+
+def _db_note(db: bool, scheme, sg_state: str | None) -> str | None:
+    if not (db and scheme and "internal" not in str(scheme)):
+        return None
+    return {
+        "open": "DB port open to the internet by the security group",
+        "no-security-group": "DB port on an external address with no security group, so nothing filters it",
+        "not-read": "DB port on an external address; the security group could not be read",
+        "allow-list": "DB port on an external address, limited by the security group to listed addresses",
+    }.get(sg_state, "DB port open on an external address")
 
 
 def _pod_skew(snap: Path, objs: _Objects) -> dict:
