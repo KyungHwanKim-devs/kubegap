@@ -19,6 +19,7 @@ from .snapshot import items, load_json
 SYMPTOM_RE = re.compile(
     r"\b(http_[a-z_]+|grpc_server_[a-z_]+|nginx_ingress_controller_[a-z_]+|traefik_[a-z_]+|aws_applicationelb_[a-z_]+|probe_[a-z_]+|sli:[a-z_:]+|slo:[a-z_:]+|[a-z_:]*error_budget[a-z_:]*|[a-z_:]*burn_?rate[a-z_:]*|haproxy_[a-z_]+|envoy_[a-z_]+|istio_requests_total)"
 )
+APP_SYMPTOM_RE = re.compile(r"(error|fail|5xx|succe|avail|latenc|duration|p9\d|timeout|lag|backlog|queue|stale|drop|reject|slow|unhealthy|down)", re.IGNORECASE)
 INFRA_RE = re.compile(r"\b(container_|node_|kube_|apiserver_|etcd_|kubelet_|prometheus_|alertmanager_|coredns_|kubeproxy_|scheduler_|workqueue_|rest_client_|go_|process_|up\b|ALERTS|vector\(|absent\()")
 METRIC_NAME_RE = re.compile(r"\b([a-zA-Z_:][a-zA-Z0-9_:]*)\s*(?:\{|\[|\s*[<>=!]|\)|$|\s+(?:by|on|without|ignoring|group_left|group_right|and|or|unless)\b)")
 
@@ -181,7 +182,10 @@ def metric_names(expr: str) -> set[str]:
     return names
 
 
-def classify_expr(expr: str) -> str:
+STATUS_LABEL_RE = re.compile(r"\b(status|code|status_code|response_code|grpc_code)\s*(!=|=~|!~|=)")
+
+
+def classify_expr(expr: str, name: str | None = None) -> str:
     names = metric_names(expr)
     all_infra = bool(names) and all(n.startswith(INFRA_PREFIXES) or n == "up" for n in names)
     platform_grpc = bool(re.search(r'job\s*=~?\s*"[^"]*(etcd|apiserver|kube)', expr or "")) and not re.search(r"\bhttp_", expr or "")
@@ -189,7 +193,9 @@ def classify_expr(expr: str) -> str:
         return "symptom"  # grpc/latency of etcd_*/apiserver_* is platform-internal and not counted as a user symptom
     if not names or all_infra:
         return "cause"
-    return "app"
+    # the app's own metric: a symptom only when the expression looks at a user-facing quantity (errors, latency, success, availability, lag, timeouts); a build-info or up-style app metric is a cause
+    # the rule's name and a status or code label selector count as well: an error-rate rule written as status!="ok" over a request counter looks at failures
+    return "app" if APP_SYMPTOM_RE.search(expr or "") or APP_SYMPTOM_RE.search(name or "") or STATUS_LABEL_RE.search(expr or "") else "app-cause"
 
 
 def _rules_from_api(snap: Path) -> tuple[list[dict], list[dict], str | None]:
@@ -263,7 +269,7 @@ def _walk_routes(route: dict, depth: int = 0, acc: list | None = None) -> list[d
 def _rules(alerting: list[dict], recording: list[dict], src: str | None) -> dict:
     """Rule classification (symptom/cause/app), severity counts and unhealthy rules; sets r["class"] on each alerting rule. Reads nothing (rules come from _rules_from_api)."""
     for r in alerting:
-        r["class"] = classify_expr(r.get("expr") or "")
+        r["class"] = classify_expr(r.get("expr") or "", r.get("name"))
     cls = Counter(r["class"] for r in alerting)
     sev = Counter(r.get("severity") or "none" for r in alerting)
     unhealthy_rules = [{"name": r["name"], "group": r["group"], "health": r["health"], "error": (r.get("last_error") or "")[:160]} for r in alerting + recording if r.get("health") not in (None, "ok")]
@@ -276,6 +282,7 @@ def _rules(alerting: list[dict], recording: list[dict], src: str | None) -> dict
         "symptom_ratio": round(cls.get("symptom", 0) / len(alerting), 3) if alerting else None,
         "symptom_rules": [r["name"] for r in alerting if r["class"] == "symptom"][:40],
         "app_rules": [r["name"] for r in alerting if r["class"] == "app"][:60],
+        "app_cause_rules": [r["name"] for r in alerting if r["class"] == "app-cause"][:60],
         "unhealthy": unhealthy_rules,
         "page_severity_cause": [r["name"] for r in alerting if r["class"] == "cause" and (r.get("severity") or "") == "critical"][:40],
     }

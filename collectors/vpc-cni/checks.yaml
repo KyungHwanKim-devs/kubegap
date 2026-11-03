@@ -782,6 +782,84 @@
           nodes_no_available_ip: []
           metrics_unavailable_nodes: []
 
+- id: vpccni.snat-port-randomization-off
+  name: Node SNAT does not use --random-fully for source ports: pods leaving the VPC race on conntrack inserts and connection setup shows 1 s and 3 s delays
+  area: traffic
+  type: summary
+  each: vpccni.summary
+  cluster_level: true
+  rule:
+    warn_expr: "'snat_port_mode' in item and item['snat_port_mode'] in ('sequential', 'random', 'unknown')"
+  target: "'cluster'"
+  evidence: "f\"VPC CNI {item.get('cni_version') or 'version unknown'}, AWS_VPC_K8S_CNI_RANDOMIZESNAT {item.get('randomize_snat') or 'unset'}, external SNAT {item.get('external_snat')}; SNAT source ports: {item.get('snat_port_mode')}\""
+  severity_default: medium
+  symptom_linked: false
+  why: >
+    With external SNAT off, every pod connection that leaves the VPC is rewritten by an iptables SNAT rule on the node to the node's IP and a source port. When several pods open connections at the same moment and the rule hands out ports in a predictable order, they race to insert the same conntrack entry and the loser's SYN is dropped. TCP retransmits it after 1 s, then 3 s, so connection setup to anything outside the VPC shows exact 1 s and 3 s steps in the latency distribution while the service itself answers fast. The race needs load, so it appears first in the busiest paths.
+    VPC CNI 1.4.0 added AWS_VPC_K8S_CNI_RANDOMIZESNAT with the default hashrandom, iptables --random, and 1.7.0 changed the default to prng, iptables --random-fully. The incident Prezi described in 2019 was this race on EKS; the fix they wanted, prng, was unavailable because their node image's iptables could not do --random-fully, so they turned external SNAT on instead and the delays stopped. The three states this check tells apart from the image version and the setting: sequential (none, or a CNI below 1.4.0), random (hashrandom, or the 1.4.0 to 1.6.x default) and random-fully (prng on 1.4.0 or newer, the default from 1.7.0). Only random-fully passes. The image version cannot show whether the node's iptables actually supports --random-fully; the CNI falls back to --random when it does not, so the node-side verify command is the final word. With external SNAT on there is no SNAT rule and this does not apply.
+  cases:
+    - { who: Prezi 2019, url: https://engineering.prezi.com/https-engineering-prezi-com-a-kubernetes-crime-story-2e8d75a77630 }
+  suggest: "Upgrade the VPC CNI add-on to a current version on a current node image and leave AWS_VPC_K8S_CNI_RANDOMIZESNAT at its default prng; then confirm --random-fully on a node with the verify command. If the value was set to none because a NACL filters on the ephemeral port range, widen the NACL: hashrandom has the same effect on ports as prng. Turning external SNAT on also removes the race, but that changes the egress path and needs a NAT gateway route in every node subnet; see vpccni.external-snat-off-with-private-routes."
+  verify:
+    - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{\"\\n\"}{end}' | grep -E 'amazon-k8s-cni|SNAT'"
+    - "on a node: sudo iptables -t nat -S | grep -- '-j SNAT'   # expect --random-fully on the SNAT rule"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "warn"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
+          randomize_snat: "none"
+          cni_version: "1.19.0-eksbuild.1"
+          snat_port_mode: "sequential"
+      - expect: "warn"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
+          randomize_snat: null
+          cni_version: "1.6.3"
+          snat_port_mode: "random"
+      - expect: "warn"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
+          randomize_snat: "hashrandom"
+          cni_version: "1.19.0-eksbuild.1"
+          snat_port_mode: "random"
+      - expect: "warn"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
+          randomize_snat: null
+          cni_version: null
+          snat_port_mode: "unknown"
+      - expect: "pass"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
+          randomize_snat: "prng"
+          cni_version: "1.19.0-eksbuild.1"
+          snat_port_mode: "random-fully"
+      - expect: "pass"
+        item:
+          present: true
+          nodes: 3
+          external_snat: true
+          randomize_snat: "prng"
+          cni_version: "1.6.3"
+          snat_port_mode: "not-applicable"
+      - expect: "pass"
+        item:
+          present: true
+          nodes: 3
+          external_snat: false
+
 - id: vpccni.external-snat-off-with-private-routes
   name: Pod traffic to peered networks is SNATed to the node IP (external SNAT off while the VPC has peering, transit gateway or VPN routes)
   area: traffic
@@ -790,9 +868,9 @@
   each: vpccni.snat
   cluster_level: true
   rule:
-    warn_expr: "not item['external_snat'] and (item['peering_routes'] + item['transit_gateway_routes'] + item['vpn_routes'] + item['local_gateway_routes']) > 0"
+    warn_expr: "not item['external_snat'] and len(item['private_destinations']) > 0"
   target: "'cluster'"
-  evidence: "f\"AWS_VPC_K8S_CNI_EXTERNALSNAT false; private routes in the cluster VPC: peering {item['peering_routes']}, transit gateway {item['transit_gateway_routes']}, VPN {item['vpn_routes']}, Outposts local gateway {item['local_gateway_routes']}; destinations {item['private_destinations'][:6]}\""
+  evidence: "f\"AWS_VPC_K8S_CNI_EXTERNALSNAT false; private routes {'in the node subnets' if item.get('scoped_to_node_subnets') else 'in the cluster VPC'}: peering {item['peering_routes']}, transit gateway {item['transit_gateway_routes']}, VPN {item['vpn_routes']}, Outposts local gateway {item['local_gateway_routes']}, appliance {item.get('appliance_routes', 0)}; destinations still SNATed {item['private_destinations'][:6]}{'; exempted by AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS ' + str(item.get('excluded_destinations')) if item.get('excluded_destinations') else ''}\""
   severity_default: medium
   symptom_linked: false
   why: >

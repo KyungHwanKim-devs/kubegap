@@ -572,25 +572,27 @@
   join_on: [namespace, pod, container]
   exclude_transient: true  # exclude Job, CronJob and GitHub Actions runner pods
   rule:
-    expr: "value <= threshold and v.get('container_cpu_request_cores', 0) >= 0.25"
+    expr: "value <= threshold and v.get('container_cpu_request_cores', 0) >= 0.25 and not db_like(labels)"
     warn_expr: "value <= warn_threshold"
     threshold: { prod: 0.20, lab: 0.20 }
     warn_threshold: { prod: 0.35, lab: 0.35 }
   target: "workload(labels) + ':' + labels['container']"
-  evidence: "f\"pod {labels['pod']}: 7d CPU p95 {v.get('cpu_p95_7d_cores', 0):.3f} cores / request {v.get('container_cpu_request_cores', 0):.2f} cores = {value:.2f}\""
+  evidence: "f\"pod {labels['pod']}: 7d CPU p95 {v.get('cpu_p95_7d_cores', 0):.3f} cores / request {v.get('container_cpu_request_cores', 0):.2f} cores = {value:.2f}{'; database-like: keep the request' if db_like(labels) else ''}\""
   severity_default: medium
   symptom_linked: false
   why: >
     The request is what the scheduler uses to reserve a slot on a node. When p95 usage is below 20% of the request, that difference is idle capacity counted as "full":
     new nodes start (a bill on EKS, lost N+1 headroom in a small k3s cluster) and other pods cannot be placed. Only pods with a request of 100m or more that lived over a day are considered (p95 is meaningless for short-lived pods).
     Over-allocation is safer than under-allocation, so when changing it set the new request to 1.5-2x p95.
+    A database, cache or message queue container never fails this check, only warns, and its evidence says "database-like". Its 7-day p95 misses the moments that matter: a backup, VACUUM, compaction, replication catch-up or a restart with recovery
+    takes many times the quiet-hour CPU, and a request cut to the quiet p95 leaves it fighting for CPU exactly then. The container is judged by its name, image repository and workload name, as in resilience.db-probe-timeout.
   measured: >
     Measured on a 2-node small k3s cluster: 18 pods with the 100m default request would have failed without the 250m floor.
-  suggest: "Lower the request to p95 x 1.5. If an HPA scales on CPU, a lower request means more frequent scale-outs, so review targetUtilization together. Cross-check with the KRR recommendation (summary.resources.krr.workloads)."
+  suggest: "Lower the request to p95 x 1.5. If an HPA scales on CPU, a lower request means more frequent scale-outs, so review targetUtilization together. Cross-check with the KRR recommendation (summary.resources.krr.workloads). For a database-like container do not lower the request from the p95; remove its CPU limit if it has one, and either leave the request or measure the database's CPU during a backup or VACUUM and size from that."
   verify:
     - "quantile_over_time(0.95, rate(container_cpu_usage_seconds_total{namespace=\"<ns>\",container=\"<c>\"}[5m])[7d:15m])"
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].resources.requests.cpu}'"
-  notes: Threshold 0.3 split into fail 0.2 and warn 0.35 to avoid flapping at the 0.3 boundary. fail only for requests of 250m or more (dozens of pods with the 100m default would otherwise all fail).
+  notes: Threshold 0.3 split into fail 0.2 and warn 0.35 to avoid flapping at the 0.3 boundary. fail only for requests of 250m or more (dozens of pods with the 100m default would otherwise all fail). Database-like containers stay at warn since rubric 0.1.63; a Neo4j StatefulSet at 1% of its request used to fail and the report advised cutting it to the p95.
   profiles: [prod, lab]
   test:
     cases:
@@ -675,6 +677,88 @@
                 pod: "web-6d7ff4dcdb-abcde"
                 container: "app"
               value: 0.5
+      # database-like container: 1% of a 500m request, would fail, stays at warn (#6)
+      - expect: "warn"
+        metric:
+          cpu_request_p95_ratio_7d:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 0.01
+          cpu_p95_7d_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 0.004
+          container_cpu_request_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 0.5
+        objects:
+          pods:
+            - metadata:
+                namespace: "prod-a"
+                name: "app-neo4j-0"
+                ownerReferences: [{ kind: "StatefulSet", name: "app-neo4j" }]
+              spec:
+                containers:
+                  - { name: "neo4j", image: "neo4j:2026.05.0-community" }
+      # the metrics exporter sidecar next to a database is not database-like and fails as any container
+      - expect: "fail"
+        metric:
+          cpu_request_p95_ratio_7d:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 0.01
+          cpu_p95_7d_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 0.003
+          container_cpu_request_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 0.3
+        objects:
+          pods:
+            - metadata:
+                namespace: "prod-a"
+                name: "redis-master-0"
+                ownerReferences: [{ kind: "StatefulSet", name: "redis-master" }]
+              spec:
+                containers:
+                  - { name: "redis", image: "public.ecr.aws/bitnami/redis:7.2.3-debian-11-r1" }
+                  - { name: "metrics", image: "public.ecr.aws/bitnami/redis-exporter:1.55.0-debian-11-r2" }
+      # pod already gone from the snapshot: judged from the pod and container names
+      - expect: "warn"
+        metric:
+          cpu_request_p95_ratio_7d:
+            - labels:
+                namespace: "prod-a"
+                pod: "shop-postgresql-0"
+                container: "postgresql"
+              value: 0.05
+          cpu_p95_7d_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "shop-postgresql-0"
+                container: "postgresql"
+              value: 0.025
+          container_cpu_request_cores:
+            - labels:
+                namespace: "prod-a"
+                pod: "shop-postgresql-0"
+                container: "postgresql"
+              value: 0.5
 
 - id: resources.cpu-limit-near-p95
   name: 7-day CPU p95 above 90% of the limit (constant throttling)
@@ -743,18 +827,20 @@
   join_on: [namespace, pod, container]
   exclude_transient: true  # exclude Job, CronJob and GitHub Actions runner pods
   rule:
-    expr: "value <= threshold and v.get('container_memory_request_bytes', 0) >= 1073741824"
+    expr: "value <= threshold and v.get('container_memory_request_bytes', 0) >= 1073741824 and not db_like(labels)"
     warn_expr: "value <= warn_threshold"
     threshold: { prod: 0.20, lab: 0.20 }
     warn_threshold: { prod: 0.35, lab: 0.35 }
   target: "workload(labels) + ':' + labels['container']"
-  evidence: "f\"pod {labels['pod']}: 7d memory working set p95 {v.get('memory_p95_7d_bytes', 0)/1048576:.0f} MB / request {v.get('container_memory_request_bytes', 0)/1048576:.0f} MB = {value:.2f}\""
+  evidence: "f\"pod {labels['pod']}: 7d memory working set p95 {v.get('memory_p95_7d_bytes', 0)/1048576:.0f} MB / request {v.get('container_memory_request_bytes', 0)/1048576:.0f} MB = {value:.2f}{'; database-like: keep the request' if db_like(labels) else ''}\""
   severity_default: low
   symptom_linked: false
   why: >
     Over-requested memory makes a node look "full" just like CPU. But memory is not compressible (shortage means OOM), so more headroom is normal, and for apps that pre-allocate a heap (JVM) the working set is the request.
-    The severity is therefore one step below the CPU check. Only pods with a request of 256Mi or more that lived over a day are considered.
-  suggest: "Lower the request to p95 x 1.3 (slightly more than the 15% memory buffer of KRR simple). Setting limit equal to request (Guaranteed) makes OOM behaviour predictable."
+    The severity is therefore one step below the CPU check. Only containers with a request of 1 GiB or more fail; smaller ones warn. Pods that lived under a day are not considered.
+    A database, cache or message queue container never fails this check, only warns, and its evidence says "database-like". A database uses memory as its page or buffer cache and grows into what it is given, so a low working set on a small dataset says
+    nothing about what it needs under load, and a backup, a large query or a restart with recovery pushes it well past the quiet p95. The container is judged by its name, image repository and workload name, as in resilience.db-probe-timeout.
+  suggest: "Lower the request to p95 x 1.3 (slightly more than the 15% memory buffer of KRR simple). Setting limit equal to request (Guaranteed) makes OOM behaviour predictable. For a database-like container keep the request; size it from the database's configured cache, such as shared_buffers or innodb_buffer_pool_size, plus headroom, not from the p95."
   verify:
     - "quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"<ns>\",container=\"<c>\"}[7d:15m])"
   profiles: [prod, lab]
@@ -829,6 +915,67 @@
                 pod: "web-6d7ff4dcdb-abcde"
                 container: "app"
               value: 2147483648
+      # the metrics exporter sidecar next to a database is not database-like and fails as any container
+      - expect: "fail"
+        metric:
+          memory_request_p95_ratio_7d:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 0.05
+          memory_p95_7d_bytes:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 60000000
+          container_memory_request_bytes:
+            - labels:
+                namespace: "prod-a"
+                pod: "redis-master-0"
+                container: "metrics"
+              value: 1073741824
+        objects:
+          pods:
+            - metadata:
+                namespace: "prod-a"
+                name: "redis-master-0"
+                ownerReferences: [{ kind: "StatefulSet", name: "redis-master" }]
+              spec:
+                containers:
+                  - { name: "redis", image: "public.ecr.aws/bitnami/redis:7.2.3-debian-11-r1" }
+                  - { name: "metrics", image: "public.ecr.aws/bitnami/redis-exporter:1.55.0-debian-11-r2" }
+      # database-like container: 766 MB working set on a 4 GB request, would fail, stays at warn (#6)
+      - expect: "warn"
+        metric:
+          memory_request_p95_ratio_7d:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 0.19
+          memory_p95_7d_bytes:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 803209216
+          container_memory_request_bytes:
+            - labels:
+                namespace: "prod-a"
+                pod: "app-neo4j-0"
+                container: "neo4j"
+              value: 4294967296
+        objects:
+          pods:
+            - metadata:
+                namespace: "prod-a"
+                name: "app-neo4j-0"
+                ownerReferences: [{ kind: "StatefulSet", name: "app-neo4j" }]
+              spec:
+                containers:
+                  - { name: "neo4j", image: "neo4j:2026.05.0-community" }
 
 - id: resources.memory-limit-near-p95
   name: 7-day memory p95 above 90% of the limit (about to be OOMKilled)
@@ -1970,7 +2117,7 @@
   each: observability.rules
   cluster_level: true
   rule:
-    expr: "item.get('alerting', 0) > 0 and item['by_class'].get('symptom', 0) + item['by_class'].get('app', 0) == 0"  # rules on the app's own metrics (success rate, latency) count as symptom rules; counting them as 0 produced a false critical fail on a real cluster
+    expr: "item.get('alerting', 0) > 0 and item['by_class'].get('symptom', 0) + item['by_class'].get('app', 0) == 0"  # app = rules on the app's own metrics that look at errors, latency, success or lag; app-cause = the app's other metrics, not counted
     warn_expr: "item.get('alerting', 0) > 0 and (item['by_class'].get('symptom', 0) + item['by_class'].get('app', 0)) / max(item.get('alerting', 1), 1) < 0.15"
   target: "'cluster'"
   evidence: "f\"{item['alerting']} alert rules: symptom {item['by_class'].get('symptom', 0)}, cause {item['by_class'].get('cause', 0)}, app metrics (assumed symptom) {item['by_class'].get('app', 0)}. Symptom ratio {item.get('symptom_ratio')}. Symptom rules: {item['symptom_rules'][:8]}\""
@@ -2799,7 +2946,7 @@
     # no tool (Velero, k8up), but signals of backup activity lower this to warn. Signals = k3s etcd snapshot objects, CronJobs named backup/dump/snapshot, VolumeSnapshots.
     # code cannot tell whether those copies leave the node, so the LLM judges from the CronJob destination storage.
     warn_expr: "backup_signals()['any']"
-  evidence: "f\"no backup tool (family backup). Alternative signals: etcd snapshots {backup_signals()['etcd_snapshots']}, backup-like CronJobs {backup_signals()['backup_cronjobs']}, VolumeSnapshots {backup_signals()['volume_snapshots']}. If signals exist, the LLM checks whether copies leave the node\""
+  evidence: "f\"no backup tool (family backup). Alternative signals: etcd snapshots {backup_signals()['etcd_snapshots']}, backup-like CronJobs that ran in the last 7 days {backup_signals()['backup_cronjobs']}, VolumeSnapshots {backup_signals()['volume_snapshots']}{'; backup-like CronJobs that are suspended or have not succeeded in 7 days, not counted: ' + str(backup_signals()['stale_backup_cronjobs']) if backup_signals()['stale_backup_cronjobs'] else ''}. If signals exist, the LLM checks whether copies leave the node\""
   severity_default: critical
   symptom_linked: false
   why: There is no way to recover cluster state (objects) and PV data. Deleting a namespace by mistake or a broken etcd or PV is the end. A CronJob dump without a tool is often "a backup kept on the same node disk", which disappears with the original when the node disk dies.
@@ -2852,6 +2999,40 @@
             - metadata:
                 namespace: "prod-a"
                 name: "pg-backup"
+              status:
+                lastSuccessfulTime: "2026-10-28T02:00:00Z"
+          etcdsnapshotfiles.k3s.cattle.io: []
+          volumesnapshots.snapshot.storage.k8s.io: []
+      # a backup CronJob that is suspended, or last succeeded months ago, is not a backup: fail
+      - expect: "fail"
+        inventory:
+          families_present:
+            - "metrics-store"
+            - "logs-store"
+            - "alert-router"
+            - "event-retention"
+            - "secrets-manager"
+            - "slo"
+            - "certificates"
+            - "node-autoscaler"
+            - "kube-state-metrics"
+            - "node-exporter"
+          components_present: []
+        objects:
+          cronjobs.batch:
+            - metadata:
+                namespace: "prod-a"
+                name: "pg-backup"
+              spec:
+                suspend: true
+              status:
+                lastSuccessfulTime: "2026-10-28T02:00:00Z"
+            - metadata:
+                namespace: "prod-a"
+                name: "mysql-dump"
+                creationTimestamp: "2026-01-10T00:00:00Z"
+              status:
+                lastSuccessfulTime: "2026-07-01T02:00:00Z"
           etcdsnapshotfiles.k3s.cattle.io: []
           volumesnapshots.snapshot.storage.k8s.io: []
       - expect: "pass"
@@ -15130,16 +15311,16 @@
   each: resilience.n_plus_one
   cluster_level: true
   rule:
-    expr: "item.get('available') and not item['ok'] and not item['karpenter']"
-    warn_expr: "item.get('available') and not item['ok']"
+    expr: "item.get('available') and not item['ok'] and not item.get('autoscaler', item.get('karpenter'))"
+    warn_expr: "item.get('available') and (not item['ok'] or item.get('tight'))"  # ok covers the cluster-wide sum and every pool of pods bound to a subset of nodes; tight = fits only inside the 2% margin
   target: "'cluster'"
-  evidence: "f\"Allocatable without the largest node {item['largest_node']} ({item['largest_node_cpu']} cores, {item['largest_node_memory_gb']}GB): CPU {item['allocatable_cpu_without_largest']} cores vs total requests {item['requests_cpu_total']} ({'OK' if item['cpu_ok'] else 'short'}), memory {item['allocatable_memory_gb_without_largest']}GB vs {item['requests_memory_gb_total']}GB ({'OK' if item['memory_ok'] else 'short'}). Pods on that node {item['pods_on_largest_node']} (prod {item['prod_pods_on_largest_node']}). Pods that fit on no other node {item['cannot_fit_elsewhere']}. Node autoscaler {'present (delay until a new node)' if item['karpenter'] else 'absent (permanent)'}\""
-  severity_default: high
+  evidence: "f\"Allocatable without the largest node {item['largest_node']} ({item['largest_node_cpu']} cores, {item['largest_node_memory_gb']}GB): CPU {item['allocatable_cpu_without_largest']} cores vs total requests {item['requests_cpu_total']} ({'OK' if item['cpu_ok'] else 'short'}), memory {item['allocatable_memory_gb_without_largest']}GB vs {item['requests_memory_gb_total']}GB ({'OK' if item['memory_ok'] else 'short'}). Pods on that node {item['pods_on_largest_node']} (prod {item['prod_pods_on_largest_node']}). Pods that fit on no other node {item['cannot_fit_elsewhere']}.{' Pools short of room: ' + '; '.join(str(p['pods']) + ' pods limited to ' + (', '.join(p['eligible_nodes']) or 'no other node') + ' need ' + str(p['needed_cpu']) + ' cores and ' + str(p['needed_memory_gb']) + ' GB, free there ' + str(p['free_cpu']) + ' cores and ' + str(p['free_memory_gb']) + ' GB' for p in item.get('pools_short') or []) + '.' if item.get('pools_short') else ''}{' Fits only inside the 2% margin.' if item.get('tight') and not item.get('pools_short') else ''} Node autoscaler {(item.get('autoscaler_name') or 'present') + ' (delay until a new node)' if item.get('autoscaler', item.get('karpenter')) else 'absent (permanent)'}\""
+  severity_default: critical
   symptom_linked: true
   why: >
     If allocatable minus the largest node is smaller than the sum of all requests (excluding DaemonSets), some pods find no room when one node is lost. On a small k3s cluster without an autoscaler those pods never start again;
     with Karpenter they wait until a new node is up (1-2 minutes, longer without spot capacity).
-    Unmet N+1 is a critical candidate regardless of profile — the LLM raises it based on production impact.
+    Without an autoscaler the loss is permanent, so the fail is critical like the other three absences (no SLO, no symptom alerts, no backup); with an autoscaler the check says warn, a lower severity, because the gap closes once a new node is up.
   measured: >
     Measured on a real EKS cluster: new nodes came up in p50 62s; 43.5GB of memory requests vs 40GB — a backend was Pending for 2 minutes during a spot reclaim that day.
   suggest: "Reduce over-requesting first (resources.cpu-request-overprovisioned, KRR) — actual usage is often single-digit percent, so trimming requests alone usually restores N+1. Then add a node or an on-demand fallback in the Karpenter requirements."
@@ -15170,6 +15351,7 @@
           cannot_fit_elsewhere: []
           cannot_fit_prod: []
           karpenter: false
+          autoscaler: false
           note: "n"
       - expect: "warn"
         item:
@@ -15192,6 +15374,7 @@
           cannot_fit_elsewhere: []
           cannot_fit_prod: []
           karpenter: true
+          autoscaler: true
           note: "n"
       - expect: "pass"
         item:
@@ -15214,6 +15397,7 @@
           cannot_fit_elsewhere: []
           cannot_fit_prod: []
           karpenter: true
+          autoscaler: true
           note: "n"
       - expect: "pass"
         item:
@@ -15748,15 +15932,16 @@
   type: summary
   each: traffic.ingresses
   rule:
-    expr: "(item['metrics'].get('errors_ratio') or 0) >= 0.01 and (item['metrics'].get('requests') or 0) >= 100"
-    warn_expr: "(item['metrics'].get('errors_ratio') or 0) >= 0.001 and (item['metrics'].get('requests') or 0) >= 100"
+    expr: "(item['metrics'].get('errors_ratio') or 0) >= 0.01 and ((item['metrics'].get('requests_24h_equiv') if item['metrics'].get('requests_24h_equiv') is not None else item['metrics'].get('requests') or 0) >= 100 or (item['metrics'].get('errors_5xx') or 0) >= 10)"
+    warn_expr: "((item['metrics'].get('errors_ratio') or 0) >= 0.001 and (item['metrics'].get('requests_24h_equiv') if item['metrics'].get('requests_24h_equiv') is not None else item['metrics'].get('requests') or 0) >= 100) or (item['metrics'].get('errors_ratio') or 0) >= 0.05"
   target: "item['target']"
-  evidence: "f\"{item['hosts'][:2]}: {item['metrics'].get('window')} 5xx {item['metrics'].get('errors_5xx')} of {item['metrics'].get('requests')} requests = {(item['metrics'].get('errors_ratio') or 0)*100:.2f}% (source {item['metrics'].get('source')}), p95 max {item['metrics'].get('p95_s_max_1h')}s\""
+  evidence: "f\"{item['hosts'][:2]}: {item['metrics'].get('window')} 5xx {item['metrics'].get('errors_5xx')} of {item['metrics'].get('requests')} requests = {(item['metrics'].get('errors_ratio') or 0)*100:.2f}%{' (under 100 requests a day and under 10 errors: warn only)' if (item['metrics'].get('requests_24h_equiv') if item['metrics'].get('requests_24h_equiv') is not None else item['metrics'].get('requests') or 0) < 100 and (item['metrics'].get('errors_5xx') or 0) < 10 else ''} (source {item['metrics'].get('source')}), p95 max {item['metrics'].get('p95_s_max_1h')}s\""
   severity_default: medium  # lowered because warns (0.1-1%) all landed as high. Fails above 1% are raised by the LLM based on traffic volume
   symptom_linked: true
   why: >
     5xx is the user-facing symptom itself (page on symptoms). Above 1% a 99% SLO is already broken, and even 0.1% is dozens of failures a day at a few thousand requests.
-    On EKS the source is the ALB's HTTPCode_Target_5XX_Count (5xx produced by targets); on a small k3s cluster it is ingress-nginx metrics. Under 100 requests the ratio is too noisy and is skipped.
+    On EKS the source is the ALB's HTTPCode_Target_5XX_Count, the 5xx the targets produced; the 502, 503 and 504 the ALB itself answers when a target resets, is unhealthy or times out carry no target-group dimension in CloudWatch and are counted on the load balancer row, not per host. On a small k3s cluster the source is ingress-nginx metrics over one hour, scaled to a day so the same 100-request line serves both sources.
+    The verdict rests on the ratio and on the evidence behind it: a fail needs the ratio over 1% and either 100 requests a day or 10 errors, so 60 errors in 99 requests fail while 1 error in 4 does not; below that the check warns from 5%, because a host that answers a quarter of its few requests with 5xx is still broken for those users.
   suggest: "Line up the backend's logs, restarts, OOM (resources.oomkilled) and readiness (traffic.pod-not-ready) over the same time window. Turn one 5xx-ratio alert into an SLO (observability.no-slo)."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name HTTPCode_Target_5XX_Count --dimensions Name=LoadBalancer,Value=<dim> Name=TargetGroup,Value=<dim> --statistics Sum --period 3600 --start-time <24h ago> --end-time <now>"
@@ -15845,7 +16030,7 @@
             unhealthy_now: 0
             target_groups:
               - "tg"
-      - expect: "pass"
+      - expect: "warn"
         item:
           namespace: "prod-a"
           name: "web"
@@ -15876,10 +16061,10 @@
           metrics:
             source: "alb-cloudwatch"
             window: "24h"
-            requests: 50
+            requests: 60
             rps_avg: 0.12
-            errors_5xx: 200
-            errors_ratio: 0.02
+            errors_5xx: 3
+            errors_ratio: 0.05
             p95_s_max_1h: 0.3
             p95_s_avg: 0.2
             unhealthy_max_24h: 0
@@ -15916,22 +16101,145 @@
           prod: true
           metrics:
             source: null
-
+      - expect: "warn"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "alb-cloudwatch"
+            window: "24h"
+            requests: 4
+            rps_avg: 0.12
+            errors_5xx: 1
+            errors_ratio: 0.25
+            p95_s_max_1h: 0.3
+            p95_s_avg: 0.2
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
+      - expect: "pass"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "alb-cloudwatch"
+            window: "24h"
+            requests: 50
+            rps_avg: 0.12
+            errors_5xx: 1
+            errors_ratio: 0.02
+            p95_s_max_1h: 0.3
+            p95_s_avg: 0.2
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
+      - expect: "warn"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "ingress-nginx"
+            window: "1h"
+            requests: 72
+            rps_avg: 0.12
+            errors_ratio: 0.25
+            p95_s_max_1h: 0.3
+            p95_s_avg: 0.2
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
 - id: traffic.ingress-p95-latency
   name: Ingress p95 response time is high
   area: traffic
   type: summary
   each: traffic.ingresses
   rule:
-    expr: "(item['metrics'].get('p95_s_avg') or 0) >= 2.0 and (item['metrics'].get('requests') or 0) >= 100"
-    warn_expr: "(item['metrics'].get('p95_s_avg') or 0) >= 1.0 and (item['metrics'].get('requests') or 0) >= 100"
+    expr: "(item['metrics'].get('p95_s_weighted') if item['metrics'].get('p95_s_weighted') is not None else item['metrics'].get('p95_s_avg') or 0) >= 2.0 and (item['metrics'].get('requests_24h_equiv') if item['metrics'].get('requests_24h_equiv') is not None else item['metrics'].get('requests') or 0) >= 100"
+    warn_expr: "(item['metrics'].get('p95_s_weighted') if item['metrics'].get('p95_s_weighted') is not None else item['metrics'].get('p95_s_avg') or 0) >= 1.0"
   target: "item['target']"
-  evidence: "f\"{item['hosts'][:2]}: p95 avg {item['metrics'].get('p95_s_avg')}s, 1h max {item['metrics'].get('p95_s_max_1h')}s, {item['metrics'].get('requests')} requests/{item['metrics'].get('window')} (source {item['metrics'].get('source')})\""
+  evidence: "f\"{item['hosts'][:2]}: p95 request-weighted {item['metrics'].get('p95_s_weighted')}s, hourly average {item['metrics'].get('p95_s_avg')}s, 1h max {item['metrics'].get('p95_s_max_1h')}s, latest hour with requests {item['metrics'].get('p95_s_last_1h')}s on {item['metrics'].get('requests_last_1h')} requests{' at ' + str(item['metrics'].get('p95_s_last_at'))[:16] if item['metrics'].get('p95_s_last_at') else ''}{', ' + str(item['metrics'].get('hours_since_requests')) + ' hours before the newest hour, no requests since' if (item['metrics'].get('hours_since_requests') or 0) > 0 else ''}, {item['metrics'].get('requests')} requests/{item['metrics'].get('window')}{' (under 100 requests a day: warn only)' if item['metrics'].get('requests_24h_equiv') is not None and item['metrics'].get('requests_24h_equiv') < 100 else ''} (source {item['metrics'].get('source')})\""
   severity_default: medium
   symptom_linked: true
   why: >
     p95 response time is the latency signal of the four golden signals. ALB TargetResponseTime runs from the LB sending the request to the target until the first byte back, so it is app time without the network. An API above 1s feels slow to users; at 2s timeouts and retries begin.
-    ALB gives a p95 over 1-hour statistics, so bursts inside the hour are hidden (check the 1-hour maximum alongside).
+    ALB gives a p95 per hour, so bursts inside the hour are hidden (check the 1-hour maximum alongside). The check judges the request-weighted p95 of the window: each hour's p95 weighted by that hour's requests, so a busy slow hour counts for what it was and an idle hour with two requests does not. The plain hourly average is shown next to it.
+    CloudWatch writes no latency datapoint for an hour without requests, so "latest" is the newest hour that carried requests, with its request count and time; when that hour is older than the newest hour the evidence says how many hours ago and that no requests came since, and a daily report must not call such an event ended. With the ingress-nginx source the values are one 1-hour measurement.
+    Under 100 requests a day the p95 rests on a handful of requests, so the check only warns there; a fail needs 100 requests a day, counted over 24 hours for the ALB and scaled from the 1-hour rate for ingress-nginx. It never passes a slow host for being quiet: a 34 s p95 on 77 requests is 77 people who waited.
   suggest: "Identify slow endpoints (app metrics, logs), check DB query and external call timeouts, and CPU limit throttling (resources.cpu-throttling)."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name TargetResponseTime --dimensions Name=LoadBalancer,Value=<dim> Name=TargetGroup,Value=<dim> --extended-statistics p95 --period 300 --start-time <1h ago> --end-time <now>"
@@ -15973,8 +16281,9 @@
             rps_avg: 0.12
             errors_5xx: 0
             errors_ratio: 0.0
-            p95_s_max_1h: 0.3
+            p95_s_max_1h: 19.4
             p95_s_avg: 2.5
+            p95_s_last_1h: 0.05
             unhealthy_max_24h: 0
             unhealthy_now: 0
             target_groups:
@@ -16014,8 +16323,9 @@
             rps_avg: 0.12
             errors_5xx: 0
             errors_ratio: 0.0
-            p95_s_max_1h: 0.3
+            p95_s_max_1h: 1.4
             p95_s_avg: 1.2
+            p95_s_last_1h: 1.1
             unhealthy_max_24h: 0
             unhealthy_now: 0
             target_groups:
@@ -16057,11 +16367,137 @@
             errors_ratio: 0.0
             p95_s_max_1h: 0.3
             p95_s_avg: 0.2
+            p95_s_last_1h: 0.2
             unhealthy_max_24h: 0
             unhealthy_now: 0
             target_groups:
               - "tg"
-
+      - expect: "warn"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "alb-cloudwatch"
+            window: "24h"
+            requests: 77
+            rps_avg: 0.12
+            errors_5xx: 0
+            errors_ratio: 0.0
+            p95_s_max_1h: 34.2
+            p95_s_avg: 34.2
+            p95_s_last_1h: 34.2
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
+      - expect: "warn"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "alb-cloudwatch"
+            window: "24h"
+            requests: 40
+            rps_avg: 0.12
+            errors_5xx: 0
+            errors_ratio: 0.0
+            p95_s_max_1h: 3.1
+            p95_s_avg: 2.6
+            p95_s_last_1h: 2.4
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
+      - expect: "pass"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          class: "alb"
+          hosts:
+            - "www.example.com"
+          services:
+            - "web"
+          workloads:
+            - "deployment/web"
+          tls: true
+          scheme: "internet-facing"
+          lb:
+            - "x.elb.amazonaws.com"
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          timeouts:
+            alb_idle_timeout_s: 300
+          healthcheck_path: null
+          success_codes: null
+          rate_limit: null
+          body_size: null
+          endpoints_ready: 2
+          endpoints_not_ready: 0
+          prod: true
+          metrics:
+            source: "alb-cloudwatch"
+            window: "24h"
+            requests: 77
+            rps_avg: 0.12
+            errors_5xx: 0
+            errors_ratio: 0.0
+            p95_s_max_1h: 0.3
+            p95_s_avg: 0.5
+            p95_s_last_1h: 0.2
+            unhealthy_max_24h: 0
+            unhealthy_now: 0
+            target_groups:
+              - "tg"
 - id: traffic.alb-elb-5xx
   name: 5xx generated by the ALB itself (no target, timeout, rejected connection)
   area: traffic
@@ -16496,18 +16932,26 @@
   type: summary
   each: traffic.db_exposed
   rule:
-    expr: "True"
+    expr: "item.get('sg_exposure') not in ('allow-list', 'blocked')"
+    warn_expr: "item.get('sg_exposure') == 'allow-list'"
   target: "item['target']"
-  evidence: "f\"{item['type']} {item.get('namespace') or ''}/{item['name']}: ports {item.get('ports')}, exposure {item.get('scheme')}, addresses {item.get('hosts')}, sourceRanges {item.get('source_ranges')}. {item.get('note') or ''}\""
+  evidence: "f\"{item['type']} {item.get('namespace') or ''}/{item['name']}: ports {item.get('ports')}, exposure {item.get('scheme')}, addresses {item.get('hosts')}, sourceRanges {item.get('source_ranges')}, security group {_sg_text(item)}. {item.get('note') or ''}\""
   severity_default: high
   symptom_linked: false
   why: >
-    If ports like 5432, 3306, 6379, 27017 or 9092 are open on an internet-facing LB or a NodePort (every node interface), a single password is all that stands in the way. A security group or sourceRanges may block it, so "open" is based on the LB/Service definition and actual reachability is verified manually (the tool does not curl).
+    If ports like 5432, 3306, 6379, 27017 or 9092 are open on an internet-facing LB or a NodePort, which listens on every node interface, a single password is all that stands in the way.
+    On AWS the security groups of the load balancer decide who can connect, so the check reads their inbound TCP rules against the listener ports: a database port reachable from everywhere, through 0.0.0.0/0, ::/0 or CIDRs that together cover the whole space, is open and fails;
+    a load balancer without security groups of its own fails too, since only the targets' groups filter it and the check does not read those; rules that could not be read, or a Service whose address matches no described load balancer, fail with that said in the evidence, since the Service definition alone cannot clear it.
+    Only the database ports decide: an open 443 next to an allow-listed 5432 does not make the row open.
+    When every reachable database port is limited to listed addresses, prefix lists or other security groups the check warns and the evidence says how many sources and how wide the widest is, /32 for single addresses, /8 for a whole block: the data is not open to the internet, but an internet-facing load balancer in front of a database still relies on that list being right, and an internal scheme or a VPN is the safer shape.
+    A load balancer without groups of its own whose Service sets loadBalancerSourceRanges is judged by those ranges, since the controller writes them into the node groups, which the check does not read.
+    When no inbound rule covers the ports at all the listener is unreachable and the check passes. Only Service LoadBalancers, NodePorts and NLBs built outside the cluster are judged here; an ALB or HTTP proxy in front of a database is not. A NodePort has no security group of its own in this check and fails as before. The tool never connects to the ports.
   measured: >
-    Measured on a real EKS cluster: an internet-facing NLB created outside Kubernetes received MySQL, Postgres, Redis and Neo4j ports through a TargetGroupBinding, and a Kafka 9094 NLB was also internet-facing. On a k3s cluster: 4 DBs opened via NodePort.
-  suggest: "Change the NLB scheme to internal or narrow the security group to office/VPN ranges. NodePort DBs: ClusterIP + port-forward (or a Tailscale-only interface)."
+    Measured on a real EKS cluster: an internet-facing NLB created outside Kubernetes forwarded ten listeners, 3306 to 3311, 5432, 5433, 6379 and 7687, to MySQL, Postgres, Redis and Neo4j; nine hand-made TargetGroupBindings bound nine of its ten target groups to database Services. Its security group allowed at most four /32 addresses per port and one on the Redis port, while the Kafka 9094 NLB next to it allowed 0.0.0.0/0. Before the rules were read both failed as open. The listener ports differed from the target group ports, so the rules are matched on the listeners. On a k3s cluster: 4 DBs opened via NodePort.
+  suggest: "Change the NLB scheme to internal or narrow the security group to office/VPN ranges. NodePort DBs: ClusterIP + port-forward, or an interface reachable only over Tailscale. An allow-listed NLB: review the list and prefer an internal scheme reached through the VPN."
   verify:
-    - "aws elbv2 describe-load-balancers --query 'LoadBalancers[?Scheme==`internet-facing`].[LoadBalancerName,Type,DNSName]'"
+    - "aws elbv2 describe-load-balancers --query 'LoadBalancers[?Scheme==`internet-facing`].[LoadBalancerName,Type,DNSName,SecurityGroups]'"
+    - "aws ec2 describe-security-groups --group-ids <sg> --query 'SecurityGroups[].IpPermissions[].[FromPort,ToPort,IpRanges[].CidrIp]'"
     - "kubectl get svc -A --field-selector spec.type=NodePort"
   profiles: [prod, lab]
   test:
@@ -16533,6 +16977,141 @@
           external_traffic_policy: null
           source_ranges: null
           note: "DB port open on an external address"
+      # Service LoadBalancer whose security group opens the Kafka port to the internet
+      - expect: "fail"
+        item:
+          type: "loadbalancer"
+          namespace: "middleware"
+          name: "kafka-external"
+          target: "loadbalancer/middleware/kafka-external"
+          hosts: ["k8s-kafka-1.elb.ap-northeast-2.amazonaws.com"]
+          ports: [9094, 443]
+          node_ports: [31779, 31290]
+          scheme: "internet-facing"
+          tls: false
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          db_port: true
+          prod: false
+          external_traffic_policy: "Cluster"
+          source_ranges: null
+          sg_exposure: "open"
+          allowed_sources: { "9094": 1, "443": 1 }
+          widest_prefix: { "9094": 0, "443": 0 }
+          open_ports: [443, 9094]
+          note: "DB port open to the internet by the security group"
+      # NLB built outside the cluster whose security group allows four office addresses per database port: warn, not fail (#73)
+      - expect: "warn"
+        item:
+          type: "nlb (defined outside the cluster)"
+          namespace: null
+          name: "db-shared"
+          target: "nlb/db-shared"
+          hosts: ["db-shared-1.elb.ap-northeast-2.amazonaws.com"]
+          ports: [3306, 3307, 5432, 6379, 7687]
+          target_group_ports: [3306, 5432, 6379, 7687]
+          scheme: "internet-facing"
+          tls: null
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          db_port: true
+          prod: true
+          bound_services: ["prod-a/mysql", "prod-b/postgresql"]
+          sg_exposure: "allow-list"
+          allowed_sources: { "3306": 4, "3307": 4, "5432": 4, "6379": 1, "7687": 4 }
+          widest_prefix: { "3306": 32, "3307": 32, "5432": 32, "6379": 32, "7687": 32 }
+          open_ports: []
+          note: "NLB created outside Kubernetes; 2 TargetGroupBindings bind it to prod-a/mysql, prod-b/postgresql. DB port on an external address, limited by the security group to listed addresses"
+      # the security groups could not be read: fail, with "not read" in the evidence
+      - expect: "fail"
+        item:
+          type: "nlb (defined outside the cluster)"
+          namespace: null
+          name: "db-shared"
+          target: "nlb/db-shared"
+          hosts: ["db-shared-1.elb.ap-northeast-2.amazonaws.com"]
+          ports: [3306]
+          scheme: "internet-facing"
+          tls: null
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          db_port: true
+          prod: true
+          bound_services: []
+          sg_exposure: "not-read"
+          allowed_sources: {}
+          widest_prefix: {}
+          open_ports: []
+          note: "NLB created outside Kubernetes; no TargetGroupBinding, DB inferred from the target group port. DB port on an external address; the security group could not be read"
+      # an NLB with no security group at all passes everything: fail
+      - expect: "fail"
+        item:
+          type: "nlb (defined outside the cluster)"
+          namespace: null
+          name: "db-legacy"
+          target: "nlb/db-legacy"
+          hosts: ["db-legacy-1.elb.ap-northeast-2.amazonaws.com"]
+          ports: [5432]
+          scheme: "internet-facing"
+          tls: null
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          db_port: true
+          prod: true
+          bound_services: ["prod-a/postgresql"]
+          sg_exposure: "no-security-group"
+          allowed_sources: {}
+          widest_prefix: {}
+          open_ports: []
+          note: "NLB created outside Kubernetes; 1 TargetGroupBinding binds it to prod-a/postgresql. DB port on an external address with no security group on the load balancer; only the targets' security groups filter it, which this check does not read"
+      # no inbound TCP rule covers the database listeners: unreachable, pass
+      - expect: "pass"
+        item:
+          type: "nlb (defined outside the cluster)"
+          namespace: null
+          name: "db-closed"
+          target: "nlb/db-closed"
+          hosts: ["db-closed-1.elb.ap-northeast-2.amazonaws.com"]
+          ports: [5432]
+          scheme: "internet-facing"
+          tls: null
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          db_port: true
+          prod: true
+          bound_services: ["prod-a/postgresql"]
+          sg_exposure: "blocked"
+          allowed_sources: { "5432": 0 }
+          widest_prefix: { "5432": null }
+          open_ports: []
+          note: "NLB created outside Kubernetes; 1 TargetGroupBinding binds it to prod-a/postgresql. DB port on an external address, but no inbound rule of the security group covers it"
+      # one port allow-listed and another open: the row is open and fails
+      - expect: "fail"
+        item:
+          type: "nlb (defined outside the cluster)"
+          namespace: null
+          name: "db-mixed"
+          target: "nlb/db-mixed"
+          hosts: ["db-mixed-1.elb.ap-northeast-2.amazonaws.com"]
+          ports: [3306, 5432]
+          scheme: "internet-facing"
+          tls: null
+          auth_hint: {}
+          has_auth_hint: false
+          admin_like: false
+          db_port: true
+          prod: true
+          bound_services: ["prod-a/mysql", "prod-a/postgresql"]
+          sg_exposure: "open"
+          allowed_sources: { "3306": 2, "5432": 1 }
+          widest_prefix: { "3306": 32, "5432": 0 }
+          open_ports: [5432]
+          note: "NLB created outside Kubernetes; 2 TargetGroupBindings bind it to prod-a/mysql, prod-a/postgresql. DB port open to the internet by the security group"
       - expect: "none"
 
 - id: traffic.ingress-nginx-vulnerable-version
@@ -16542,10 +17121,10 @@
   each: traffic.nginx
   cluster_level: true
   rule:
-    expr: "item.get('present') and item['vulnerable'] is True and item['admission_webhook']"
-    warn_expr: "item.get('present') and item['vulnerable'] is not False"  # None = version unknown from the image: not cleared, so warn
+    expr: "item.get('present') and item['vulnerable'] is True and item['admission_webhook'] and not (item.get('webhook_network_policy') or {}).get('mitigated')"
+    warn_expr: "item.get('present') and item['vulnerable'] is not False"  # None = version unknown from the image: not cleared, so warn; a NetworkPolicy that closes the webhook port to pods also leaves a warn
   target: "'cluster'"
-  evidence: "f\"ingress-nginx {item['version'] or 'version unknown'} ({', '.join(c['kind'] + ' ' + c['namespace'] + '/' + c['name'] for c in item['controllers'])}){'; no version in the image tag of ' + ', '.join(item['unknown_version_controllers']) if item['unknown_version_controllers'] else ''}; fixed in {' and '.join(item['fixed_versions'])}; admission webhook {'on' if item['admission_webhook'] else 'off'}{', failurePolicy ' + str(item['admission_webhooks'][0]['failure_policy']) if item['admission_webhooks'] else ''}\""
+  evidence: "f\"ingress-nginx {item['version'] or 'version unknown'} ({', '.join(c['kind'] + ' ' + c['namespace'] + '/' + c['name'] for c in item['controllers'])}){'; no version in the image tag of ' + ', '.join(item['unknown_version_controllers']) if item['unknown_version_controllers'] else ''}; fixed in {' and '.join(item['fixed_versions'])}; admission webhook {'on' if item['admission_webhook'] else 'off'}{', failurePolicy ' + str(item['admission_webhooks'][0]['failure_policy']) if item['admission_webhooks'] else ''}{'; webhook port closed to pods by NetworkPolicy ' + ', '.join((item.get('webhook_network_policy') or {}).get('policies') or []) if (item.get('webhook_network_policy') or {}).get('mitigated') else ''}\""
   severity_default: high
   symptom_linked: false
   why: >

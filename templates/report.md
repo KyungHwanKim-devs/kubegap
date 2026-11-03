@@ -18,7 +18,7 @@ Rules for this file:
 <!-- Three to five sentences: what this cluster is (platform, size, profile), whether anything is on fire right now, the one thing that changed since the previous run of this mode, and whether a full run is due (daily only). No numbers table here. -->
 
 ## The {{n_top}} problems to work on
-<!-- daily: 3, chosen as new or recurred first, then the persisting critical/high items with the largest impact. full: 5, chosen by severity × impact × difficulty; with an SLO, by error-budget burn. Dozens of findings with one cause are one problem. Order 1 = most urgent. -->
+<!-- daily: 3, chosen in this order: new or recurred items that still have impact now, then the persisting critical/high items with the largest impact, then events that have ended. An event has ended when its latest measurement is back under the threshold, such as the latest 1-hour p95 in a latency finding, or its last occurrence is before this collection window; when one is in the Top N, the title or the first Problem sentence says it is over. full: 5, chosen by severity × impact × difficulty; with an SLO, by error-budget burn. Dozens of findings with one cause are one problem. Order 1 = most urgent. -->
 
 ### 1. {{problem_1_title}}
 <!-- Title is a plain sentence about the thing, e.g. "15 prod apps can only run on one node, and that node rebooted yesterday" -->

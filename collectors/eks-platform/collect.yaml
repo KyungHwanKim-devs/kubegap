@@ -112,7 +112,7 @@
 - id: ec2-instances-imds
   modes: [full]   # skipped by the daily run
   type: aws
-  args: [ec2, describe-instances, --filters, "Name=tag:kubernetes.io/cluster/{cluster},Values=owned", "Name=instance-state-name,Values=running", --query, "Reservations[].Instances[].{id:InstanceId,type:InstanceType,hop_limit:MetadataOptions.HttpPutResponseHopLimit,tokens:MetadataOptions.HttpTokens,endpoint:MetadataOptions.HttpEndpoint,profile:IamInstanceProfile.Arn,name:Tags[?Key==`Name`].Value|[0]}"]
+  args: [ec2, describe-instances, --filters, "Name=tag:kubernetes.io/cluster/{cluster},Values=owned", "Name=instance-state-name,Values=running", --query, "Reservations[].Instances[].{id:InstanceId,type:InstanceType,hop_limit:MetadataOptions.HttpPutResponseHopLimit,tokens:MetadataOptions.HttpTokens,endpoint:MetadataOptions.HttpEndpoint,profile:IamInstanceProfile.Arn,subnet:SubnetId,name:Tags[?Key==`Name`].Value|[0]}"]
   out: aws/ec2-instances-imds.json
   timeout: 60
 - id: pod-identity-associations

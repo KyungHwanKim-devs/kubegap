@@ -25,6 +25,7 @@ from typing import ClassVar
 
 from . import __version__, paths, rubric
 from .config import Config
+from .resilience import is_db_like, mounts_pvc
 from .snapshot import items, load_json
 
 SAFE_BUILTINS = {
@@ -78,6 +79,7 @@ class Context:
         self.today = _dt.date.fromisoformat(str(inv["today"])[:10]) if inv.get("today") else _dt.date.today()
         self._addon_versions: dict[str, dict] = {}
         self._owners: dict[tuple[str, str], str] | None = None
+        self._pods: dict[tuple[str, str], dict] | None = None
 
     # ---- Stable finding ids: pod -> owning workload ----
     _KIND_SHORT: ClassVar[dict[str, str]] = {"Deployment": "deploy", "StatefulSet": "sts", "DaemonSet": "ds", "Job": "job", "CronJob": "cronjob", "ReplicaSet": "rs", "ReplicationController": "rc"}
@@ -131,6 +133,26 @@ class Context:
             if "?" in w and (ns, w.replace("?", "")) in self._known_owner_names:
                 w = w.replace("?", "")
         return f"{ns}/{w}"
+
+    def db_like(self, labels: dict) -> bool:
+        """Does the metric's container run a database, cache or message queue? Looks the pod up in objects/pods.json and judges the container named in
+        `labels['container']` by its name, image repository and owning workload, with lib.resilience.is_db_like. Init containers count, since a native sidecar reports its own series.
+        Without a container label every container of the pod must be database-like, so a pod-level series of a Redis with an exporter sidecar is not.
+        A pod that is already gone from the snapshot is judged from the pod and container names alone."""
+        ns, pod, container = labels.get("namespace"), labels.get("pod"), labels.get("container")
+        if not pod:
+            return False
+        if self._pods is None:
+            self._pods = {(p["metadata"]["namespace"], p["metadata"]["name"]): p for p in self.objects("pods")}
+        owner = self.workload(labels)  # `ns/deploy/name`, `ns/deploy?/name`, `ns/sts/name`, `ns/pod/name`: the name never contains `/`
+        wl = owner.rsplit("/", 1)[-1]
+        obj = self._pods.get((ns, pod))
+        if obj is None:
+            return is_db_like(container, None, wl)
+        spec = self.pod_spec(obj)
+        stateful = "/sts/" in owner and mounts_pvc(spec)  # a StatefulSet pod with a PersistentVolumeClaim is a store whatever its image is called
+        cs = [c for c in (spec.get("containers") or []) + (spec.get("initContainers") or []) if not container or c.get("name") == container]
+        return bool(cs) and all(is_db_like(c.get("name"), c.get("image"), wl, stateful=stateful) for c in cs)
 
     TRANSIENT_KINDS: ClassVar[tuple[str, ...]] = ("job", "cronjob", "cronjob?", "runner", "ephemeralrunner", "autoscalingrunnerset")
 
@@ -267,9 +289,22 @@ class Context:
     def backup_signals(self) -> dict:
         """There may be backup activity even without a backup tool: k3s etcd snapshot objects, CronJobs named backup/dump/snapshot, VolumeSnapshots."""
         etcd = self.objects("etcdsnapshotfiles.k3s.cattle.io")
-        cron = [f"{c['metadata']['namespace']}/{c['metadata']['name']}" for c in self.objects("cronjobs.batch") if re.search(r"backup|dump|snapshot|archive", c["metadata"]["name"], re.IGNORECASE)]
+        cron, stale = [], []
+        for c in self.objects("cronjobs.batch"):
+            if not re.search(r"backup|dump|snapshot|archive", c["metadata"]["name"], re.IGNORECASE):
+                continue
+            name = f"{c['metadata']['namespace']}/{c['metadata']['name']}"
+            last = self.days_until((c.get("status") or {}).get("lastSuccessfulTime"))
+            created = self.days_until(c["metadata"].get("creationTimestamp"))
+            # a CronJob is a backup signal only while it produces copies: not suspended and succeeded within 7 days, or created in the last 2 days and not yet due
+            if (c.get("spec") or {}).get("suspend"):
+                stale.append(f"{name} (suspended)")
+            elif (last is not None and last >= -7) or (last is None and created is not None and created >= -2):
+                cron.append(name)
+            else:
+                stale.append(f"{name} (last success {-last} days ago)" if last is not None else f"{name} (never succeeded)")
         vs = self.objects("volumesnapshots.snapshot.storage.k8s.io")
-        return {"etcd_snapshots": len(etcd), "backup_cronjobs": cron, "volume_snapshots": len(vs), "any": bool(etcd or cron or vs)}
+        return {"etcd_snapshots": len(etcd), "backup_cronjobs": cron, "stale_backup_cronjobs": stale, "volume_snapshots": len(vs), "any": bool(etcd or cron or vs)}
 
     def serves_traffic(self, obj: dict) -> bool:
         """Is this a target for readiness/preStop checks: replicas not 0, has a container port, and a Service points at it."""
@@ -368,10 +403,40 @@ class Context:
             "eol_badge": self.eol_badge,
             "backup_signals": self.backup_signals,
             "serves_traffic": self.serves_traffic,
+            "db_like": self.db_like,
+            "_sg_text": sg_text,
             "inv": self.inv,
             "summary": self.summary,
             "ctx": {"profile": self.profile.get("name"), "platform": (self.inv.get("cluster") or {}).get("platform"), "prod_like": sorted(self.prod_like)},
         }
+
+
+def sg_text(item: dict) -> str:
+    """One phrase for the evidence of traffic.db-exposed: what the load balancer's security groups let in, as counts, never the addresses themselves."""
+    state = item.get("sg_exposure")
+    allowed = item.get("allowed_sources") or {}
+    if state == "open":
+        ports = ", ".join(str(p) for p in sorted(int(p) for p in item.get("open_ports") or []))
+        return f"open to 0.0.0.0/0 on {ports}" if ports else "open to 0.0.0.0/0"
+    if state == "allow-list":
+        n = max(allowed.values(), default=0)
+        widths = list((item.get("widest_prefix") or {}).values())
+        known = [w for w in widths if w is not None]
+        hidden = sum(1 for w in widths if w is None)
+        if known:
+            width = f"widest /{min(known)}" + (f"; {hidden} port{'s' if hidden != 1 else ''} also allow{'s' if hidden == 1 else ''} a prefix list or security group reference" if hidden else "")
+        else:
+            width = "width unknown, a prefix list or security group reference"
+        return f"allow-list, at most {n} source{'s' if n != 1 else ''} per port, {width}"
+    if state == "blocked":
+        return "no inbound rule covers the ports"
+    if state == "no-security-group":
+        return "none on the load balancer, only the targets' groups filter it"
+    if state == "not-read":
+        return "not read"
+    if state == "unmatched":
+        return "unknown, no described load balancer matched the Service address"
+    return "not applicable"
 
 
 def _eval(expr: str, env: dict):

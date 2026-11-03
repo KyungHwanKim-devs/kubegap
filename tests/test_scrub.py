@@ -117,3 +117,63 @@ def test_presence_only_is_false_for_empty_values_and_keys_are_deduped():
     assert cm["data"]["dex.config"]["present"] is False and cm["data"]["oidc.config"]["present"] is True
     conf = "[OUTPUT]\n    HTTP_Passwd realpassword99\n[OUTPUT]\n    HTTP_Passwd realpassword99\n"
     assert scrub.secret_like_keys({"fluent-bit.conf": conf}) == ["fluent-bit.conf:HTTP_Passwd"]
+
+
+def _applied_copy(cm: dict) -> str:
+    return json.dumps({"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": cm["metadata"]["name"], "namespace": cm["metadata"]["namespace"]}, "data": cm["data"]})
+
+
+def test_applied_annotations_are_dropped_and_keys_kept():
+    import base64
+    import gzip
+
+    raw = copy.deepcopy(APP)
+    plain = _applied_copy(raw)
+    packed = base64.b64encode(gzip.compress(plain.encode())).decode()
+    raw["metadata"]["annotations"] = {"kubectl.kubernetes.io/last-applied-configuration": plain, "objectset.rio.cattle.io/applied": packed, "argocd.argoproj.io/tracking-id": "app:v1/ConfigMap:prod/app"}
+    cm = scrub.scrub_configmap(raw)
+    text = json.dumps(cm)
+    for secret in ("hunter2hunter2", "s3cr3t-value-1", "https://api.example.com"):
+        assert secret not in text
+    assert packed not in text
+    ann = cm["metadata"]["annotations"]
+    assert ann["kubectl.kubernetes.io/last-applied-configuration"] == {"len": len(plain), "shape": "text"}
+    assert ann["objectset.rio.cattle.io/applied"] == {"len": len(packed), "shape": "word"}
+    assert ann["argocd.argoproj.io/tracking-id"] == "app:v1/ConfigMap:prod/app"  # other annotations are untouched
+    assert cm[scrub.MARK]["annotations_dropped"] == ["kubectl.kubernetes.io/last-applied-configuration", "objectset.rio.cattle.io/applied"]
+    assert cm[scrub.MARK]["secret_like_keys"] == ["DB_PASSWORD", "config.ini:password"]  # the copy carries the same keys; no duplicates
+
+
+def test_applied_annotation_secret_keys_are_found_even_when_data_differs():
+    raw = copy.deepcopy(APP)
+    raw["data"] = {"PLAIN": "nothing-secret-here"}
+    raw["metadata"]["annotations"] = {"kubectl.kubernetes.io/last-applied-configuration": json.dumps({"kind": "ConfigMap", "data": {"API_TOKEN": "tok-0123456789abcdef"}})}
+    cm = scrub.scrub_configmap(raw)
+    assert cm[scrub.MARK]["secret_like_keys"] == ["API_TOKEN"]
+    assert "tok-0123456789abcdef" not in json.dumps(cm)
+
+
+def test_scrub_without_annotations_and_twice():
+    raw = copy.deepcopy(APP)
+    raw["metadata"].pop("annotations", None)
+    cm = scrub.scrub_configmap(raw)
+    assert cm[scrub.MARK]["annotations_dropped"] == []
+    assert scrub.scrub_configmap(copy.deepcopy(cm)) == cm
+
+
+def test_plain_json_objectset_and_odd_copies_do_not_break():
+    raw = copy.deepcopy(APP)
+    raw["metadata"]["annotations"] = {"objectset.rio.cattle.io/applied": json.dumps({"kind": "ConfigMap", "data": {"API_TOKEN": "tok-0123456789abcdef"}})}
+    cm = scrub.scrub_configmap(raw)
+    assert cm[scrub.MARK]["secret_like_keys"] == ["DB_PASSWORD", "config.ini:password", "API_TOKEN"]
+    for odd in (json.dumps({"data": ["not", "a", "dict"]}), json.dumps(["list"]), "not json", "H4sInotreallygzip"):
+        raw = copy.deepcopy(APP)
+        raw["metadata"]["annotations"] = {"kubectl.kubernetes.io/last-applied-configuration": odd}
+        assert scrub.scrub_configmap(raw)[scrub.MARK]["annotations_dropped"] == ["kubectl.kubernetes.io/last-applied-configuration"]
+
+
+def test_secret_copy_annotation_is_dropped_in_the_defensive_path():
+    sec = copy.deepcopy(SECRET)
+    sec["metadata"]["annotations"] = {"kubectl.kubernetes.io/last-applied-configuration": json.dumps({"kind": "Secret", "data": {"password": "aHVudGVyMg=="}})}
+    out = scrub.scrub_objects(sec)
+    assert "aHVudGVyMg==" not in json.dumps(out) and out["metadata"]["annotations"]["kubectl.kubernetes.io/last-applied-configuration"]["len"] > 0

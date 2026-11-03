@@ -1,161 +1,220 @@
-# my-cluster — full audit, 2026-10-26 16:27 KST
+# my-cluster — full audit, 2026-11-03 11:17 KST
 
-This is the EKS cluster `my-cluster` (kube context `my-cluster`, Kubernetes 1.32.13, region us-east-1, profile prod), 8 nodes, 25 namespaces, 157 pods, running 8 production services (app-r, app-q, app-m, app-o, app-l, app-p, app-n, app-s) in 8 prod namespaces and 4 dev namespaces. Nothing is on fire at the moment of collection, and the 95 minutes since the 14:52 full run were quiet: no spot reclaim, no node change, no deployment. That also means the five problems below are the same five as in the 14:52 and 05:14 reports, and none of their actions has been started, so the next spot reclaim will take the same six workloads down again. The one thing that moved is the CPU throttling of the app-m frontend, which crossed the 25% line. This collection started 9 minutes after the 16:18 daily collection, so the apiserver numbers include kubegap's own load and are not counted.
+This is the EKS cluster `my-cluster` in us-east-1, audited through the kube context `my-cluster`. It runs Kubernetes 1.32.13 on 8 nodes with 145 pods and eight prod namespaces, under the prod profile. Nothing is down now, but `prod-app-q/app-q-ai` was OOM-killed three times during yesterday's rollout, and no alert told anyone. Of the last full report's five problems, only the evicted pods were cleaned up, and its claim of an open database load balancer was wrong.
 
 ## The 5 problems to work on
 
-### 1. 28 of 42 prod pods still sit on one expired spot node that AWS can take back with two minutes' notice, and the last four reclaims each stopped a production service
-**Problem.** Application pods can only run on nodes labelled `workload-type=app`, which today is two spot nodes in one availability zone: `ip-10-0-1-139` (r8gd.xlarge, 28 of 42 prod pods from 22 workloads) and `ip-10-0-1-62` (r8gd.large, 5 prod pods, created at 14:17 KST today when its predecessor was reclaimed). AWS has reclaimed the second app node four times in 26 hours. Each time the six pods on it were evicted and waited about 80 seconds for Karpenter to launch a new node, because the big node has no CPU request room left, and `prod-app-p/app-p-backend` with one replica and strategy Recreate was unreachable for the whole wait. Five 2-replica prod Deployments have both replicas on the big node, so when that node goes, app-r, app-o-ai, app-o-backend, app-l-backend and app-l-frontend go with it, and the cluster cannot absorb its loss on memory. The big node is 54 hours past its Karpenter expiry and is held in place by one `karpenter.sh/do-not-disrupt` annotation on `prod-app-m/app-m-admin`.
+### 1. Seven production databases have no backup, and each volume is deleted together with its claim
+**Problem.** Seven prod databases keep their data on EBS volumes with reclaim policy Delete. They are the MySQL databases of app-m, app-o and app-n, the PostgreSQL databases of app-q, app-p and app-s, and the Neo4j database of app-l. If someone deletes a namespace or a PVC by mistake, the volume goes with it, and there is no copy to restore. There is no backup tool, no backup CronJob, no AWS Backup plan and no DLM policy. DLM is the AWS service that takes scheduled EBS snapshots of volumes selected by tag. The only snapshots were taken by hand before old claims were deleted, and the newest is four weeks old.
 
-**Evidence.** 28 of 42 prod pods are on `ip-10-0-1-139`, 5 on `ip-10-0-1-62`, both in us-east-1. Source: summary.json resilience.placement. CPU requests on `ip-10-0-1-139` are 99.5% of allocatable while the 7-day p95 usage is 5.6%. Source: metrics/node_cpu_request_ratio.json and metrics/node_cpu_usage_ratio_p95_7d.json. Without that node the cluster has 46.0 GB of allocatable memory against 47.5 GB requested. Source: summary.json resilience.n_plus_one. The control-plane log holds 113 "no fit" scheduler lines in 24 hours, 23 each for app-m-backend, app-p-backend and app-l-embedding-server and 19 for app-m-api. Source: summary.json controlplane.scheduler. Karpenter logged "initiating delete from interruption message" at 2026-10-25T20:09:52Z, 2026-10-26T03:33:23Z and 05:17:28Z. Source: logs/pods/karpenter/karpenter_karpenter.log. The do-not-disrupt pod has blocked disruption of this node 14,163 times since 2026-10-06. Source: events.json. app-p-backend still has replicas 1 and strategy Recreate at generation 5. Source: objects/deployments.json.
+**Evidence.** The cluster has 17 PersistentVolumes holding 280 GB. All of them have reclaim policy Delete, and none is encrypted. Source: summary.json storage.pv and storage.ebs. The account has 0 DLM policies, in aws/dlm-lifecycle-policies.json, and 0 backup plans, in aws/backup-plans.json. All 12 EBS snapshots of the last 30 days are named "pre-delete backup of orphan PVC", and the newest is from 2026-10-06. Source: aws/ec2-snapshots-30d.json. The VolumeSnapshot CRD is not installed, so the EBS CSI snapshot sidecar logged 1,500 errors in 4 hours 41 minutes. Source: summary.json logs.signatures. The largest prod database volume is app-o MySQL at 48.9 GB. Source: summary.json storage.pvcs.
 
-**Cause.** Prod runs on two spot nodes in the Karpenter `default` pool with no spread rule, so pods pack onto whichever node has room. Requests 18 times above real use make the scheduler see the big node as full, so every evicted pod waits for a new node instead of rescheduling in seconds. Karpenter sizes the replacement for the six waiting pods only, so the new node is small and is reclaimed again as cheap spot capacity. The `app-amd64-fallback` pool that could hold on-demand capacity has 0 nodes and a 10% budget that has blocked 83,933 times. Likely: the do-not-disrupt annotation on app-m-admin was added once to protect a session and never removed.
+**Cause.** The databases run on the default gp3 StorageClass, and no backup layer was added after they were deployed. The EBS CSI add-on ships the snapshot sidecar. The `snapshot-controller` add-on, which provides the CRD the sidecar needs, was never installed.
 
-**Action.** ① Lower CPU requests to the 7-day p95 in the shared prod chart: app-l-backend 500 m → 150 m, app-l-embedding-server 500 m → 160 m, app-p-backend 500 m → 150 m, app-l-neo4j 500 m → 50 m, and neo4j memory 4 Gi → 1 Gi. Effect: `ip-10-0-1-139` drops to roughly 60% requested, evicted pods reschedule in seconds, and the N+1 memory gap closes. Takes 1 hour. ② app-p-backend: replicas 2, RollingUpdate with maxSurge 1 and maxUnavailable 0, a 5-second preStop. Takes 20 minutes. ③ Add topologySpreadConstraints on hostname and on zone to the shared prod chart, plus a PDB with minAvailable 1 for app-o-ai and app-o-backend. Takes 2 to 3 hours including the Argo CD sync. ④ Remove `karpenter.sh/do-not-disrupt` from the app-m-admin template. Takes 10 minutes. Karpenter then replaces the expired node, which also clears problem 2. Do ① to ③ before ④, otherwise the pods regroup on whichever node replaces it. ⑤ Give the `app-amd64-fallback` pool a usable budget and an on-demand capacity-type requirement, and add a spread on `karpenter.sh/capacity-type` so prod is never spot-only. Takes half a day.
-```yaml
-# shared prod chart values -> Deployment template.spec
-replicas: 2
-strategy: { type: RollingUpdate, rollingUpdate: { maxSurge: 1, maxUnavailable: 0 } }
-topologySpreadConstraints:
-- maxSkew: 1
-  topologyKey: kubernetes.io/hostname
-  whenUnsatisfiable: DoNotSchedule
-  labelSelector: { matchLabels: { app.kubernetes.io/name: "{{ .name }}" } }
-- maxSkew: 1
-  topologyKey: topology.kubernetes.io/zone
-  whenUnsatisfiable: ScheduleAnyway
-  labelSelector: { matchLabels: { app.kubernetes.io/name: "{{ .name }}" } }
-containers:
-- resources: { requests: { cpu: 150m } }
-  lifecycle: { preStop: { exec: { command: ["sleep", "5"] } } }
+**Action.**
+- ① Create one DLM policy that snapshots, daily, every volume tagged with a prod namespace, and keeps 14 snapshots. From tonight on there will be a copy of every database volume. Takes 1 hour.
+- ② Patch the seven prod database PVs to `Retain`, so a deleted claim leaves its volume behind. Run `kubectl patch pv <pv-name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'` once for each. Takes 10 minutes.
+- ③ Add a nightly logical dump for each database to S3 from a CronJob, using mysqldump, pg_dump or `neo4j-admin database dump`. Then restore one dump into a scratch namespace to prove the path works. A DLM snapshot is a crash-consistent block copy, and a dump is what lets you restore single tables. Takes half a day.
+- ④ Install the `snapshot-controller` EKS add-on and one VolumeSnapshotClass. That stops the sidecar errors and makes CSI snapshots possible. Takes 30 minutes.
+- ⑤ After that, make an encrypted, expandable gp3 class the default. Move the volumes to encrypted copies during a restore test. The manifest is in report-details.md, section 4, Storage. Takes a day.
+
+```json
+{ "PolicyType": "EBS_SNAPSHOT_MANAGEMENT", "ResourceTypes": ["VOLUME"],
+  "TargetTags": [
+    {"Key": "kubernetes.io/created-for/pvc/namespace", "Value": "prod-app-m"},
+    {"Key": "kubernetes.io/created-for/pvc/namespace", "Value": "prod-app-o"},
+    {"Key": "kubernetes.io/created-for/pvc/namespace", "Value": "prod-app-n"},
+    {"Key": "kubernetes.io/created-for/pvc/namespace", "Value": "prod-app-q"},
+    {"Key": "kubernetes.io/created-for/pvc/namespace", "Value": "prod-app-p"},
+    {"Key": "kubernetes.io/created-for/pvc/namespace", "Value": "prod-app-l-backend"},
+    {"Key": "kubernetes.io/created-for/pvc/namespace", "Value": "app-s-prod"} ],
+  "Schedules": [{ "Name": "daily", "CopyTags": true,
+    "CreateRule": {"Interval": 24, "IntervalUnit": "HOURS", "Times": ["18:00"]},
+    "RetainRule": {"Count": 14} }] }
 ```
 
 **Why this happens.**
-- Principle: A spot interruption gives two minutes' notice. Karpenter drains the node at once and provisions a replacement sized for the pending pods, so the gap users see equals node launch time plus pod start time unless the remaining nodes have request headroom. The scheduler places by requests, not usage, so requests far above real use turn an idle node into a full one, and without a spread constraint the scheduler and Karpenter consolidation pack replicas onto the same node.
-- Cases: No public case recorded for this check. The check definition records its own measurement: on its first real run a single spot reclaim stopped a production service for 2 minutes 7 seconds while that node held 27 production pods.
-- Read next: "Kubernetes docs: Pod Topology Spread Constraints", "Karpenter docs: Disruption (expiration, consolidation, interruption)", "AWS docs: EC2 Spot Instance interruption notices".
+- Principle: Kubernetes removes a PersistentVolume with reclaim policy Delete together with its claim, and deleting a namespace deletes every claim in it. A copy survives both a wrong `kubectl delete` and the loss of a volume only if it is taken on a schedule and stored outside the cluster.
+- Cases: Spotify's 2019 talk about deleting its own production Kubernetes clusters by mistake is one of the public cases recorded for this check.
+- Read next: the AWS documentation on Amazon Data Lifecycle Manager, the Kubernetes documentation on Persistent Volumes and their reclaim policy, and chapter 26, "Data Integrity: What You Read Is What You Wrote", of Google's Site Reliability Engineering book.
 
-Evidence checks: `resilience.prod-concentration.node-1-139`, `resilience.n-plus-one.cluster`, `resilience.replicas-same-node.prod-app-r/deployment/app-r`, `resilience.replicas-same-node.prod-app-o/deployment/app-o-ai`, `resilience.replicas-same-node.prod-app-o/deployment/app-o-backend`, `resilience.replicas-same-node.prod-app-l-backend/deployment/app-l-backend`, `resilience.replicas-same-node.prod-app-l-backend/deployment/app-l-frontend`, `resilience.replicas-same-zone.*` ×9, `resilience.single-replica-in-prod.prod-app-p/app-p-backend`, `resilience.recreate-strategy-serving.prod-app-p/deployment/app-p-backend`, `resilience.no-pdb.prod-app-o/app-o-ai`, `resilience.no-pdb.prod-app-o/app-o-backend`, `controlplane.scheduler-unschedulable.prod-app-m/app-m-api`, `controlplane.scheduler-unschedulable.prod-app-m/app-m-backend`, `controlplane.scheduler-unschedulable.prod-app-l-backend/app-l-embedding-server`, `controlplane.scheduler-unschedulable.prod-app-p/app-p-backend`, `resources.node-request-usage-gap.node-1-139`, `resources.cpu-request-overprovisioned.*` (39), `resources.krr-recommendation.*` (31), `scaling.karpenter-expired-not-replaced.default-n44bh`, `karpenter.spot-to-spot-consolidation-off.cluster`, `resilience.priority-inversion.cluster`, `observability.failure-mode-uncovered.Scheduling failure`
+Evidence checks: `resilience.no-backup.cluster`, `eks.no-backup-policy.cluster`, `resilience.prod-db-without-backup-cronjob.cluster`, `storage.prod-db-reclaim-delete.cluster`, `storage.csi-snapshot-unavailable.cluster`, `logs.signatures.ebs-csi.snapshot-crd-missing`, `storage.ebs-unencrypted.cluster`, `ebscsi.storageclass-unencrypted.cluster`, `storage.no-volume-expansion.gp3`, `storage.no-volume-expansion.gp3-2a`, `storage.no-volume-expansion.gp3-2c`
 
-### 2. The disk of node `ip-10-0-1-139` is 87% full, image cleanup has failed 902 times since 2026-10-23, and 12 pods evicted for disk pressure still lie around keeping 12 alerts firing
-**Problem.** The root disk of the node that carries 28 prod pods has 6.8 GB left of 50 GB. The kubelet, the node agent that runs pods, evicts pods when free space falls under 10%, and it has already done so 12 times, 11 of them prod pods. Image cleanup cannot help because every image on the node is in use. The 12 evicted pods stay in Failed state, the oldest since 2026-09-24, and each keeps a `KubePodNotReady` alert firing in Slack, 12 of the 17 alerts firing now, so a real pod failure would be one more line in an already ignored list. Nothing has changed since the 14:52 run except 19 more failed cleanups.
+### 2. app-q-ai was OOM-killed three times in yesterday's rollout, three public hosts answer in 3 seconds or more, and no alert reached anyone
+**Problem.** On 2026-11-02 the new app-q-ai image was killed twice at startup and once 44 minutes later. Each time, its uvicorn process hit the 768 Mi memory limit. During the first two kills, the old pod was still serving. At 09:38 UTC the kill hit the only running replica, and the service was down until the restart finished. In the same 24 hours, three hosts had a p95 response time of 3 seconds or more:
+- api.v1.example-b.ai, 20.5 seconds
+- app-q-ai, 14.1 seconds
+- app-l.my-cluster, 3.1 seconds, with one hour at 41.5 seconds
 
-**Evidence.** Root disk 87% used, 6.8 GB free of 50 GB. Source: summary.json nodeos.nodes[].disk. containerd holds 38.9 GB in 45 images, pod logs 290 MB, emptyDir 1.3 GB. Source: summary.json nodeos.nodes[].cri and .disk. `FreeDiskSpaceFailed` 902 occurrences since 2026-10-23T01:20Z, "attempted to free 3,428,302,028 bytes, found 0 bytes eligible". Source: events.json. 12 pods in phase Failed with reason Evicted: 7 in prod-app-l-backend, 2 in prod-app-r, 1 in app-s-prod, 1 in dev-app-o, 1 more prod. Source: objects/pods.json. KubePodNotReady is firing 12 times, the longest for 17.4 days. Source: summary.json observability.alerts.firing_now.
+None of this raised an alert. Only app-m image inference and LoRA training have symptom alerts, and no rule covers OOM kills. Four prod target groups also mark every target unhealthy, so the load balancer would keep sending requests to a pod that has died.
 
-**Cause.** A 50 GB root volume shared by images, logs and emptyDir on the node with two thirds of prod, and the two largest ECR repositories store 96.6 GiB and 75.3 GiB of images for app-l embedding and backend; the kubelet's image garbage collection only deletes unused images, and every image here belongs to a running pod. Evicted pods are not cleaned up by anything, so the alerts stay.
+**Evidence.** The kernel on `ip-10-0-1-62` logged "Memory cgroup out of memory: Killed process (uvicorn)" at 08:34, 08:35 and 09:38 UTC, with anon-rss of 771 to 773 MB. Source: logs/node/node-1-62/os.txt. The 24-hour p95 of app-q-ai.my-cluster went from 2.07 s to 14.09 s since 2026-10-27, and app-l.my-cluster went from 0.27 s to 3.14 s. Source: summary.json traffic.ingresses in both snapshots. Of 157 alert rules, 3 watch a user symptom, and all 3 are for app-m. Source: prometheus/rules.json. The health checks of app-q-backend, app-l-backend, app-o-frontend and app-n-frontend request `/` and get 404 or 307, and each of these target groups has 0 healthy targets. Source: aws/alb-metrics.json. `KubeControllerManagerDown` and `KubeSchedulerDown` have fired for 55.6 days. These two alerts can never clear on EKS, because the managed control plane is not scraped. Source: summary.json observability.alerts.
 
-**Action.** ① Problem 1 ④ replaces the node and clears the disk at once. ② EC2NodeClass `default`: root volume 50Gi → 100Gi, `encrypted: true`, `instanceStorePolicy: RAID0` so image and emptyDir data land on the local NVMe of the r8gd instances. Takes 30 minutes and applies from the next node on, the same change as problem 5. ③ Add `ephemeral-storage` requests 1Gi and limits 4Gi to prod containers and `sizeLimit: 4Gi` to the embedding server's model-cache emptyDir in the same chart change as problem 1 ①. ④ Delete the 12 Failed pods. Takes 5 minutes, changes the cluster, so a proposal only: `kubectl delete pod -A --field-selector=status.phase=Failed`. This clears 12 alerts immediately.
+**Cause.** Most likely, the image deployed on 2026-11-02 needs more memory at start than its 768 Mi limit. KRR's 607 MB recommendation comes from the 14 days before that image. The alert rules are the kube-prometheus-stack defaults plus the app-m team's own rules. Nobody wrote rules on the ALB metrics the account already collects. The health-check path was left at `/` on apps that redirect or return 404 there. The snapshot cannot tell whether 20 seconds is normal for api.v1.example-b.ai. Its pods use 0.013 cores at the p95, so the time is spent waiting, most likely on image generation outside the pod.
+
+**Action.**
+- ① Give app-q-ai a 1Gi memory request, a 1536Mi limit and two replicas, and add a PDB with `minAvailable: 1`. The next OOM will not take the service down, and the next rollout will not hit the limit at start. Takes 15 minutes.
+- ② Add the OOM rule below and route it to `slack-sre`. Takes 20 minutes.
+- ③ For every public prod host, alert when the 5xx ratio stays above 1% for 5 minutes, and when the p95 stays above 3 seconds for 10 minutes. Until a CloudWatch exporter feeds Prometheus, CloudWatch alarms on `HTTPCode_Target_5XX_Count` and `TargetResponseTime` per target group do the same job. Takes half a day.
+- ④ Set `alb.ingress.kubernetes.io/healthcheck-path` on the four prod ingresses to each app's health endpoint. Where the app redirects, set `success-codes: "200-399"`. Takes 20 minutes.
+- ⑤ Set `kubeControllerManager.enabled`, `kubeScheduler.enabled` and `kubeEtcd.enabled` to `false` in the chart values. The two permanent alerts disappear. Takes 10 minutes.
+- ⑥ Decide with the app-m team whether 20 seconds is the expected time for api.v1.example-b.ai. If it is, record it as that host's latency objective and alert on that number.
+
 ```yaml
-# EC2NodeClass default
+# app-q chart values, ai
+replicas: 2
+resources:
+  requests: { cpu: 100m, memory: 1Gi }
+  limits: { cpu: "1", memory: 1536Mi }
+---
+# PrometheusRule
+- alert: ContainerOOMKilled
+  expr: |
+    increase(kube_pod_container_status_restarts_total[10m]) > 0
+    and on (namespace, pod, container)
+    kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+  for: 0m
+  labels: { severity: warning, env: prod }
+```
+
+**Why this happens.**
+- Principle: The kernel enforces a container memory limit with the cgroup OOM killer at once. The process gets signal 9, and the kubelet restarts it, so the only traces are a restart count and a kernel line. Users feel errors and slow answers, not memory percentages. Alerts should therefore watch each public host's success rate and latency, and handle a cause such as OOM with one targeted rule.
+- Cases: Zalando's January 2019 DNS outage postmortem, in its kubernetes-on-aws repository, is recorded as a public case for the OOM check.
+- Measured when this check was written: on the cluster the health-check rule was developed on, a frontend whose targets were all unhealthy still served 17,213 requests. Six target groups failed with Target.ResponseCodeMismatch because `/` returned 404 or 307.
+- Read next: chapter 6, "Monitoring Distributed Systems", of Google's Site Reliability Engineering book, the Kubernetes documentation on Resource Management for Pods and Containers, and the AWS documentation on health checks for Application Load Balancer target groups.
+
+Evidence checks: `resources.oomkilled.prod-app-q/deploy/app-q-ai:ai`, `resources.oomkilled-repeated.prod-app-q/deploy/app-q-ai:ai`, `observability.failure-mode-uncovered.OOMKill`, `observability.failure-mode-uncovered.Scheduling failure`, `observability.failure-mode-uncovered.VPC CNI IP exhaustion`, `observability.no-symptom-alerts.cluster`, `observability.no-slo.cluster`, `observability.slo-without-burn-rate.cluster`, `traffic.ingress-p95-latency.prod-app-q/app-q-ai`, `traffic.ingress-p95-latency.prod-app-m/app-m-api`, `traffic.ingress-p95-latency.prod-app-l-backend/app-l-frontend`, `traffic.alb-unhealthy-targets.prod-app-q/app-q-backend`, `traffic.alb-unhealthy-targets.prod-app-l-backend/app-l-backend`, `traffic.alb-unhealthy-targets.prod-app-o/app-o-frontend`, `traffic.alb-unhealthy-targets.prod-app-n/app-n-frontend`, `observability.alerts-always-firing.KubeControllerManagerDown`, `observability.alerts-always-firing.KubeSchedulerDown`, `observability.alert-firing-stale.KubeControllerManagerDown`, `observability.alert-firing-stale.KubeSchedulerDown`, `resilience.single-replica-in-prod.prod-app-q/app-q-ai`, `hygiene.change-correlation.cluster`
+
+### 3. 33 of 42 prod pods run on two spot nodes in one zone, and the larger node is 10 days past its expiry because one annotation holds it
+**Problem.** Application pods can only run on nodes labeled `workload-type=app`. Today those are two spot nodes, both in us-east-1. `ip-10-0-1-139` holds 20 prod pods of 15 workloads, and `ip-10-0-1-62` holds 13. AWS can reclaim a spot node with two minutes' notice. If it reclaims `ip-10-0-1-139`, its 31 app pods cannot move to `ip-10-0-1-62`, which has only 0.16 cores of CPU request room left. All of them would wait for Karpenter to start a new node. app-r, app-o-ai, app-o-backend and app-l-frontend have every replica on that node, so they would all go down together. The node should have been replaced on 2026-10-24. The `karpenter.sh/do-not-disrupt` annotation on the prod app-m-admin pod template blocks that, and the node's root disk is now 82% full. No app node was reclaimed in the last seven days, so this is a risk, not an incident.
+
+**Evidence.** Prod pods: 20 on `ip-10-0-1-139` and 13 on `ip-10-0-1-62`, both spot nodes in us-east-1. Source: summary.json resilience.placement. CPU requests are 89% and 92% of allocatable on these two nodes, while their 7-day p95 use is 5.5% and 5.3%. Source: metrics/node_cpu_request_ratio.json and metrics/node_cpu_usage_ratio_p95_7d.json. Five pods request 0.5 cores each and use at most 0.002 cores: app-p-backend, two app-l-backend and two app-l-embedding-server. Source: objects/pods.json and metrics/cpu_p95_7d_cores.json. NodeClaim `default-n44bh` is 241.4 hours past its 720-hour expiry. Karpenter recorded 19,728 blocked disruptions caused by that one pod. Source: summary.json scaling.karpenter and events.json. Over 24 hours, new app nodes took 61 seconds at the median and 93 seconds at most to become ready. Source: logs/pods/AGGREGATED.json. The root disk has 9.2 GB free of 50 GB. Source: summary.json nodeos.
+
+**Cause.** A few services request hundreds of times the CPU they use. The scheduler therefore sees the app nodes as full, and every scale-up needs a new node. Nothing spreads replicas across nodes or zones, so the scheduler puts them wherever the requests fit. The do-not-disrupt annotation sits in the Deployment template, so every new app-m-admin pod carries it again. The `default` NodePool allows spot and on-demand, and Karpenter chooses spot whenever both are allowed.
+
+**Action.**
+- ① Lower the CPU request of app-p-backend, app-l-backend and app-l-embedding-server from 500m to 100m. This frees 2.0 cores and takes the two app nodes to about 59% and 50% requested. KEDA workers can then start without a new node. Takes 30 minutes. Leave the requests of app-l-neo4j and the other databases as they are.
+- ② Add hostname and zone topologySpreadConstraints to the shared prod chart for Deployments with two or more replicas. The fragment is in report-details.md, section 4, Resilience. Takes 1 to 2 hours through Argo CD.
+- ③ After ① and ②, remove `karpenter.sh/do-not-disrupt` from the prod app-m-admin template. Karpenter then replaces the expired node, which also starts it on a fresh disk. Takes 10 minutes.
+- ④ app-p-backend runs one replica with the Recreate strategy, and its spec changed 13 times in seven days. Each change was an outage. If the app can run two copies, switch to 2 replicas and RollingUpdate with `maxSurge: 1`, `maxUnavailable: 0`. Takes 20 minutes.
+- ⑤ Keep at least one replica of each prod service on on-demand capacity. One way is a small on-demand NodePool that carries the `workload-type=app` label, combined with the zone spread from ②. Takes half a day.
+
+```yaml
+# prod app-m chart, admin Deployment
 spec:
+  template:
+    metadata:
+      annotations: {}   # drop karpenter.sh/do-not-disrupt: "true"
+# app-p, app-l-backend, app-l-embedding-server charts
+resources:
+  requests: { cpu: 100m }
+```
+
+**Why this happens.**
+- Principle: The scheduler places pods by their requests, not by their use, so requests far above use make an idle node look full. After a spot interruption, Karpenter starts a replacement sized for the pending pods. When no other node has request room, users wait for the node to start and the images to pull. Karpenter replaces an expired node only when every pod on it may be disrupted. One do-not-disrupt pod stops that indefinitely.
+- Cases: Moonlight's 2019 outage post-mortem is the public case recorded for both the prod-concentration and the same-node checks.
+- Measured when this check was written: on the cluster these checks were developed on, one spot reclaim took a production service down for 2 minutes 7 seconds. The node it hit held 27 production pods. Another node stayed more than 31 days because of one do-not-disrupt annotation, and its disk filled to 87%.
+- Read next: the Kubernetes documentation on Pod Topology Spread Constraints, the Karpenter documentation on Disruption, and the AWS documentation on EC2 Spot Instance interruption notices.
+
+Evidence checks: `resilience.prod-concentration.node-1-139`, `resilience.n-plus-one.cluster`, `resilience.replicas-same-node.prod-app-r/deployment/app-r`, `resilience.replicas-same-node.prod-app-o/deployment/app-o-ai`, `resilience.replicas-same-node.prod-app-o/deployment/app-o-backend`, `resilience.replicas-same-node.prod-app-l-backend/deployment/app-l-frontend`, `resilience.replicas-same-zone.prod-app-m/deployment/app-m-api`, `resilience.replicas-same-zone.prod-app-m/deployment/app-m-backend`, `resilience.replicas-same-zone.prod-app-m/deployment/app-m-frontend`, `resilience.replicas-same-zone.prod-app-l-backend/deployment/app-l-backend`, `resilience.replicas-same-zone.prod-app-l-backend/deployment/app-l-embedding-server`, `scaling.karpenter-expired-not-replaced.default-n44bh`, `resources.node-request-usage-gap.node-1-139`, `resources.node-request-usage-gap.node-1-62`, `resources.cpu-request-overprovisioned.prod-app-l-backend/deploy/app-l-backend:backend`, `resources.cpu-request-overprovisioned.prod-app-l-backend/deploy/app-l-embedding-server:embedding`, `resources.krr-recommendation.prod-app-p/deployment/app-p-backend:backend`, `resources.large-request-binpacking.prod-app-l-backend/deploy/app-l-embedding-server:embedding`, `resilience.recreate-strategy-serving.prod-app-p/deployment/app-p-backend`, `resilience.single-replica-in-prod.prod-app-p/app-p-backend`, `resilience.no-pdb.prod-app-o/app-o-ai`, `resilience.no-pdb.prod-app-o/app-o-backend`, `node.disk-usage.<ip>:9100:/`, `events.tracked-warning-reasons.FreeDiskSpaceFailed`, `events.tracked-warning-reasons.FailedScheduling`, `controlplane.scheduler-unschedulable.prod-app-l-backend/app-l-file-worker`, `controlplane.scheduler-unschedulable.prod-app-l-backend/app-l-graph-worker`, `karpenter.spot-to-spot-consolidation-off.cluster`, `resilience.priority-inversion.cluster`
+
+### 4. Kafka's external listener accepts connections from the whole internet, the Argo CD admin login has no SSO, and the three NetworkPolicies are not enforced
+**Problem.** The Kafka broker in `middleware` has an internet-facing NLB whose security group allows ports 9094 and 443 from 0.0.0.0/0, and real traffic passes through it. The snapshot does not show whether the listener requires authentication. Argo CD can deploy anything into every namespace. It is reachable at deploy.my-cluster with the built-in admin account, no SSO and an empty RBAC policy. All 12 of its applications sit in the `default` project, whose sources and destinations are `*`. The EKS API endpoint is open to 0.0.0.0/0. Inside the cluster, the NetworkPolicies in prod-app-q, prod-app-p and app-s-prod have no effect, because the VPC CNI policy agent is turned off. The shared database NLB is better than the last report said. Its security group admits four office addresses and nothing else.
+
+**Evidence.** Security group `sg-kafka-nlb` on the Kafka NLB allows tcp 9094 and 443 from 0.0.0.0/0. Source: extra/nlb-security-groups.txt. That NLB processed 2.8 GB in 24 hours, with up to 441 concurrent flows. Source: aws/alb-metrics.json. In Argo CD, admin is enabled, SSO is not configured, policy.csv has 0 lines, and 12 of 12 applications are in `default`. Source: summary.json argocdctl. The EKS public access CIDR is 0.0.0.0/0. Source: inventory.json cluster.eks. `aws-eks-nodeagent` runs with `--enable-network-policy=false`, and there are 0 PolicyEndpoints. Source: summary.json security.networkpolicy. Security group `sg-db-shared-nlb` on `acme-db-shared` admits the database ports from four /32 addresses. Source: extra/nlb-security-groups.txt.
+
+**Cause.** Most likely, the Kafka listener was opened for the on-premise consumers. The alert rules expect 16 members in the `on-premise` consumer group. Argo CD and the API endpoint still run with their installation defaults. Network policy enforcement is an opt-in setting of the VPC CNI add-on, and it was never turned on.
+
+**Action.**
+- ① Set `loadBalancerSourceRanges` on `middleware/kafka-controller-0-external` to the egress addresses of the on-premise consumers. Confirm that the external listener uses SASL over TLS, and check afterwards that `kafka_consumergroup_members{consumergroup="on-premise"}` stays at 16. Takes 30 minutes.
+- ② Turn on SSO in Argo CD through Dex or OIDC. Set `admin.enabled: "false"` and `policy.default: role:readonly`, and move the applications into one AppProject per team. Takes half a day.
+- ③ Restrict the EKS public endpoint to the office and CI addresses, or make it private. Takes 30 minutes.
+- ④ Enable network policy in the VPC CNI add-on configuration with `{"enableNetworkPolicy": "true"}`. The three existing policies start blocking traffic at that moment, so read them first. Takes 1 hour.
+- ⑤ Set the IMDS hop limit to 1 in the EC2NodeClass, so pods cannot reach the node's credentials. Six service accounts already use IRSA. Takes 20 minutes and applies to new nodes.
+
+```yaml
+# middleware/kafka-controller-0-external
+spec:
+  loadBalancerSourceRanges: ["<on-prem egress>/32"]
+---
+# argocd-cm
+data: { admin.enabled: "false" }
+---
+# argocd-rbac-cm
+data: { policy.default: role:readonly }
+```
+
+**Why this happens.**
+- Principle: A load balancer's security group is the only filter between the internet and the service behind it. An open broker port lets anyone try credentials or known exploits against the broker. A tool that deploys into every namespace has the power of cluster-admin, so its login needs to be as strong as the cluster's. A NetworkPolicy is only an API object until a network plugin enforces it.
+- Cases: Aqua Nautilus reported in 2023 that attackers used Kubernetes RBAC to backdoor clusters whose API servers were reachable from the internet. It is the case recorded for the public endpoint check.
+- Read next: the Kubernetes documentation on Network Policies, the Argo CD documentation on User Management and RBAC Configuration, and the Amazon EKS documentation on cluster API server endpoint access.
+
+Evidence checks: `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external`, `traffic.db-exposed.nlb/acme-db-shared`, `eks.public-endpoint-open.cluster`, `argocd.admin-account-no-sso.cluster`, `argocd.default-project-wildcard.cluster`, `traffic.external-exposure.ingress/argocd/argocd-server`, `security.networkpolicy-not-enforced.cluster`, `security.networkpolicy-coverage.cluster`, `security.imds-hop-limit.cluster`, `karpenter.ec2nodeclass-hardening.cluster`, `security.psa-not-enforced.cluster`
+
+### 5. Kubernetes 1.32 left standard support 225 days ago, and AL2 nodes and Karpenter 0.37 block the upgrade
+**Problem.** EKS 1.32 has been on extended support since 2026-03-23. Extended support ends on 2027-03-23, and after that AWS upgrades the control plane by itself. Two things block the upgrade to 1.33:
+- The EC2NodeClass for every Karpenter node requests Amazon Linux 2, and Amazon stopped publishing AL2 EKS images on 2025-11-26. After an upgrade, new app nodes could not start.
+- Karpenter 0.37.0 supports Kubernetes only up to 1.30. The component that handles every spot interruption already runs two versions outside its support range, and it logged a version validation error yesterday.
+
+Four managed add-ons are behind as well.
+
+**Evidence.** The server is v1.32.13. Standard support ended on 2026-03-23, and the support type is EXTENDED. Source: inventory.json cluster.eks. The EKS upgrade insight "Amazon Linux 2 compatibility" is ERROR for 1.33. Source: aws/list-insights.json. EC2NodeClass `default` uses amiFamily AL2 with no pinned AMI and a 50 GB unencrypted root volume. Source: summary.json karpenterctl. Karpenter logged "failed validating kubernetes version" at 2026-11-02T08:46:33Z. Source: summary.json logs.signatures. The EBS CSI driver is at v1.37.0 against v1.67.2 available, and VPC CNI at v1.19.0 against v1.23.2. Source: inventory.json cluster.eks.addons. The managed node group AMI is 329 days old. Source: summary.json eksplatform.nodegroups.
+
+**Cause.** The cluster was built in December 2025 with the defaults of that time, and nobody has touched the platform layer since. Karpenter, the node image family and the add-ons are still at the versions they were installed with.
+
+**Action.**
+- ① Upgrade Karpenter from 0.37 to 1.x following the v1 migration guide. The NodePool and EC2NodeClass APIs move from v1beta1 to v1. Takes 2 to 3 hours, including a dry run on the dev applications.
+- ② Change the EC2NodeClass to AL2023 with a pinned alias, IMDS hop limit 1 and an encrypted 100Gi root volume. Drift then replaces the six AL2 nodes one at a time. Do this after ① and ② of problem 3, so that pods spread as they move. Takes half a day.
+- ③ Upgrade the four add-ons, enable prefix delegation in VPC CNI, and refresh the managed node group AMI. Takes 2 hours.
+- ④ Upgrade EKS from 1.32 to 1.33 to 1.34, one minor version at a time, and dev first. Takes a day per minor version.
+
+```yaml
+# EC2NodeClass default, after Karpenter v1
+spec:
+  amiFamily: AL2023
+  amiSelectorTerms: [{ alias: al2023@vYYYYMMDD }]   # pin the version you tested
+  metadataOptions: { httpEndpoint: enabled, httpPutResponseHopLimit: 1, httpTokens: required }
   blockDeviceMappings:
   - deviceName: /dev/xvda
     ebs: { volumeSize: 100Gi, volumeType: gp3, encrypted: true }
-  instanceStorePolicy: RAID0
 ```
 
 **Why this happens.**
-- Principle: The kubelet watches the image filesystem and evicts pods when `nodefs.available` falls under 10%; image garbage collection runs between the high and low thresholds of 85% and 80% but can only remove images no container uses, so a node where every image is in use keeps evicting until a human adds space or moves pods. Evicted pods stay as Failed objects until something deletes them, and Prometheus rules built on `kube_pod_status_phase` treat them as not ready forever.
-- Cases: No public case recorded for this check.
-- Read next: "Kubernetes docs: Node-pressure Eviction", "Kubernetes docs: Garbage Collection of unused containers and images", "Karpenter docs: EC2NodeClass blockDeviceMappings and instanceStorePolicy".
+- Principle: Each EKS minor version gets 14 months of standard support and 12 more months of paid extended support. After that, AWS upgrades the control plane automatically. Node images, the autoscaler and the CNI each publish their own compatibility table. An upgrade is possible only when all of them already support the target version.
+- Cases: ZenML's 2025 incident, published on its status page, is the public case recorded for the version end-of-life check.
+- Read next: the Amazon EKS documentation on the Kubernetes version lifecycle and extended support, the Karpenter documentation on upgrading to v1, and the Amazon EKS documentation on the EKS-optimized Amazon Linux 2023 AMIs.
 
-Evidence checks: `node.disk-usage.<ip>:9100:/`, `events.tracked-warning-reasons.FreeDiskSpaceFailed`, `logs.signatures.kubelet.image-gc-failed`, `logs.signatures.containerd.shim-error`, `observability.alerts-always-firing.KubePodNotReady`, `observability.alert-firing-stale.KubePodNotReady/*` ×4, `scaling.karpenter-expired-not-replaced.default-n44bh`, `karpenter.ec2nodeclass-hardening.cluster`
+Evidence checks: `platform.k8s-version-eol.cluster`, `eks.extended-support.cluster`, `platform.karpenter-version-compat.cluster`, `logs.signatures.karpenter.version-unsupported`, `karpenter.ec2nodeclass-al2.cluster`, `hygiene.eks-upgrade-insight.Amazon Linux 2 compatibility`, `eks.node-os-skew.cluster`, `eks.nodegroup-ami-old.nodegroups`, `eks.addon-outdated.aws-ebs-csi-driver`, `eks.addon-outdated.vpc-cni`, `eks.addon-outdated.coredns`, `eks.addon-outdated.kube-proxy`, `vpccni.prefix-delegation-off.cluster`, `argocd.version-eol.cluster`
 
-### 3. The 7 production databases have no backup of any kind, every EBS volume is unencrypted, and the snapshot path is broken
-**Problem.** Seven production databases, MySQL for app-m, app-o and app-n, PostgreSQL for app-q, app-p and app-s, Neo4j for app-l, keep their data on EBS volumes whose reclaim policy is Delete, so deleting a namespace or a PVC by mistake destroys the data with no way back. There is no backup tool, no backup CronJob, no DLM policy, AWS's tag-based EBS snapshot scheduler, no AWS Backup plan, and the VolumeSnapshot CRDs are missing, so the EBS CSI driver's snapshot sidecar logs an error every 11 seconds. All 17 volumes and all four StorageClasses are unencrypted, and none allows expansion, so the one volume at 90%, a dev MySQL, cannot grow in place. The only snapshots that exist were taken by hand before PVC deletions.
+Quick fix outside the list: the dev ExternalSecret `database/mysql-app-n-secret` has not read its key since December 2025, and it has failed 2,351 times. Create the key in Secrets Manager or delete the ExternalSecret. It takes 5 minutes and clears five findings.
 
-**Evidence.** Seven prod database PVCs: app-o MySQL 48.9 GB, app-l Neo4j 19.5 GB, three PostgreSQL 9.7 GB each, two MySQL 7.8 GB each. Source: summary.json storage.pvcs. 17 EBS volumes, 280 GB, all gp3, all unencrypted. Source: aws/ec2-volumes.json via summary.json storage. 0 DLM policies, 0 AWS Backup plans, 0 VolumeSnapshots, 0 etcd snapshots, 0 backup CronJobs. Source: findings-draft.json eks.no-backup-policy and resilience.no-backup. 1,500 snapshot-CRD-missing log lines from the EBS CSI controller. Source: summary.json logs.signatures. 12 EBS snapshots in 30 days, all named "pre-delete backup of orphan PVC". Source: findings-draft.json storage.csi-snapshot-unavailable. `dev-app-t/data-app-t-mysql-0` 90.2% of 9.7 GB with `allowVolumeExpansion: false`. Source: findings-draft.json storage.pvc-usage-high.
+## Since the previous full run (2026-10-27 15:30 KST)
+The previous full snapshot is 6 days and 20 hours old, and nobody wrote a report for it. 16 Deployments received new images, and no replica, resource, strategy or placement field changed. The app-q-ai rollout on 2026-11-02 brought three OOM kills, and its p95 rose from 2.07 s to 14.09 s. app-l.my-cluster slowed from 0.27 s to 3.14 s after the app-l-backend rollout on 2026-10-30, but that link is only a correlation in time. Karpenter replaced the build node `ip-10-0-1-4` with `ip-10-0-2-144`, and no app node was reclaimed. The 20 pods evicted for disk pressure are gone, `KubePodNotReady` stopped firing, and the last `FreeDiskSpaceFailed` was on 2026-10-27. Some new findings come from criteria, not the cluster: the six Argo CD findings and the IMDS finding appear because the older summary lacked that data, and the rubric went from 0.1.51 to 0.1.63.
 
-**Cause.** Databases were moved into the cluster with the default gp3 class and nobody added a backup layer; the EBS CSI add-on ships its snapshot sidecar but the `snapshot-controller` add-on that provides the CRDs was never installed.
-
-**Action.** ① One DLM policy: volumes tagged `kubernetes.io/created-for/pvc/namespace` matching `prod-*` or `app-s-prod`, daily, 14-day retention. Takes 1 hour and ends "no recovery path" today. ② Patch the 7 prod PVs to `persistentVolumeReclaimPolicy: Retain` and create the encrypted class below as default with `allowVolumeExpansion: true`. Takes 10 minutes. ③ Install the `snapshot-controller` EKS add-on plus a VolumeSnapshotClass. Takes 30 minutes, stops the 1,500 errors and makes CSI snapshots possible. ④ Turn on account-level EBS default encryption and migrate the 17 volumes by snapshot, encrypted copy and swap, combined with a restore rehearsal. Takes a day. ⑤ Velero with EBS CSI snapshots for namespace-level restore. Takes a day.
-```yaml
-apiVersion: storage.k8s.io/v1
-kind: StorageClass
-metadata:
-  name: gp3-encrypted
-  annotations: { storageclass.kubernetes.io/is-default-class: "true" }
-provisioner: ebs.csi.aws.com
-parameters: { type: gp3, encrypted: "true" }
-allowVolumeExpansion: true
-volumeBindingMode: WaitForFirstConsumer
-reclaimPolicy: Retain
-```
-
-**Why this happens.**
-- Principle: A PersistentVolume with reclaim policy Delete is removed together with its PVC, and a namespace deletion removes every PVC in it; a snapshot taken by a schedule outside the cluster is the only copy that survives both a wrong `kubectl delete` and a lost node. Encryption at rest on EBS is a volume attribute set at creation, so existing volumes can only be migrated, not switched.
-- Cases: No public case recorded for this check.
-- Read next: "AWS docs: Amazon Data Lifecycle Manager", "Kubernetes docs: Volume Snapshots and the snapshot controller", "Kubernetes docs: PersistentVolume reclaim policy".
-
-Evidence checks: `resilience.no-backup.cluster`, `eks.no-backup-policy.cluster`, `storage.csi-snapshot-unavailable.cluster`, `logs.signatures.ebs-csi.snapshot-crd-missing`, `ebscsi.storageclass-unencrypted.cluster`, `storage.no-volume-expansion.gp3`, `storage.no-volume-expansion.gp3-2a`, `storage.no-volume-expansion.gp3-2c`, `storage.pvc-usage-high.dev-app-t/data-app-t-mysql-0`, `ecr.scan-disabled.ecr/registry/<account>`
-
-### 4. No alert watches what users see: today's reclaims and an error rate of 0.6% on `api.example-b.ai` went unpaged, four prod health checks filter nothing, and three frontends are stalled by a 200 m CPU limit
-**Problem.** All 157 alert rules watch causes or application counters; 0 watch a user symptom such as an error ratio or latency on a public host, and there is no SLO, a written target for availability or latency, to say what normal is. Today's four spot reclaims and the app-p outage produced no alert, while `KubeControllerManagerDown` and `KubeSchedulerDown`, which can never be true on EKS, have been in Slack for 47.8 days. The public API `api.example-b.ai` returned 723 5xx responses in 24 hours and had one hour with a p95 of 10 seconds. The load balancer marks every target of four prod services unhealthy because the health check hits `/` and gets 404 or 307, so when a pod really breaks nothing changes. The Next.js frontends of app-m, app-o and app-n share a template with a 10 m request and a 200 m limit, and the app-m frontend is now stalled for 27% of CPU periods, up from 23%.
-
-**Evidence.** 157 alerting rules, 0 symptom, 138 cause, 19 application metrics; 3 failure modes without any rule: OOMKill, scheduling failure, VPC CNI IP exhaustion. Source: summary.json observability.rules and failure_modes. 723 5xx of 120,939 requests, one hour with 105 5xx and a p95 of 10.03 s, last hour 4 of 1,202. Source: aws/alb-metrics.json target group k8s-app-svc-d65740e6d5. Four prod target groups with 0 healthy targets: app-q-backend 404 with 4,545 requests in 24 h, app-l-backend 404 on both targets, app-o-frontend 307, app-n-frontend 307 with 7,998 requests. Source: aws/alb-metrics.json HealthyHostCount_Minimum. Throttling ratio app-m-frontend 0.27 and 0.23, Prometheus 0.27, app-o-frontend 0.14. Source: metrics/cpu_throttle_ratio_5m.json. 17 alerts firing: KubePodNotReady ×12, KubeControllerManagerDown and KubeSchedulerDown for 47.8 days, InfoInhibitor ×2, Watchdog. Source: summary.json observability.alerts.firing_now. `api.v1.example-b.ai` p95 average 11.50 s and max 34.62 s on 77 requests, below the check's request minimum. Source: summary.json traffic.ingresses.
-
-**Cause.** The kube-prometheus-stack defaults were installed and never trimmed: the control-plane rules assume self-managed components, and no rule was written on the ALB metrics the cluster already pays for. Health check paths were left at `/` on apps that redirect or 404 there. The frontend template copies a 200 m limit that fits an idle Node.js process but not a render burst. Likely: the app-m-backend 5xx hour is upstream time-outs, since its p95 reached 10 s in the same hour.
-
-**Action.** ① Add the YACE CloudWatch exporter for the ALB target groups and create two rules per public host, 5xx ratio above 1% for 5 minutes and p95 above 2 s for 10 minutes, routed to `slack-sre`. Takes half a day. Until then a CloudWatch alarm on `HTTPCode_Target_5XX_Count` for `k8s-app-svc-d65740e6d5` takes 10 minutes. ② Disable `KubeControllerManagerDown` and `KubeSchedulerDown` with `kubeControllerManager.enabled: false`, `kubeScheduler.enabled: false`, `kubeEtcd.enabled: false` in the chart values and delete the 12 Failed pods from problem 2. Takes 10 minutes and empties the channel of its 14 standing alerts. ③ Set `alb.ingress.kubernetes.io/healthcheck-path` to a real health route on the four prod ingresses, or `success-codes: 200-399` where the app redirects. Takes 20 minutes. ④ Remove the CPU limit from the shared frontend template and raise the request to 100 m; raise Prometheus's CPU limit to 1. Takes 20 minutes. ⑤ Write one SLO per public host, 99.5% of requests non-5xx and under 2 s over 30 days, and alert on burn rate. Takes a day.
-```yaml
-# shared frontend chart
-resources:
-  requests: { cpu: 100m, memory: 256Mi }
-  limits: { memory: 384Mi }
-# ingress annotations
-alb.ingress.kubernetes.io/healthcheck-path: /api/health
-alb.ingress.kubernetes.io/success-codes: "200-399"
-```
-
-**Why this happens.**
-- Principle: Page on symptoms, put causes on dashboards: a user notices a 5xx or a slow response, never a CPU percentage, so an alert that cannot be traced to a user-visible symptom either wakes nobody or wakes everybody for nothing. A CPU limit is enforced per 100 ms scheduler period: once a container uses its quota it waits for the rest of the period, which shows as latency, not as CPU usage, and the HPA scales on request, not limit.
-- Cases: Buffer 2020 and Omio 2020 documented latency drops after removing CPU limits from services that showed low average CPU but high throttling, as recorded in the `resources.cpu-throttling` check definition. No public case is recorded for the alerting checks.
-- Read next: "Google SRE Book ch. 6, Monitoring Distributed Systems, Symptoms Versus Causes", "Google SRE Workbook ch. 5, Alerting on SLOs", "CFS bandwidth control (kernel sched-bwc)", "AWS docs: Health checks for Application Load Balancer target groups".
-
-Evidence checks: `observability.no-symptom-alerts.cluster`, `observability.no-slo.cluster`, `observability.failure-mode-uncovered.OOMKill`, `observability.failure-mode-uncovered.Scheduling failure`, `observability.failure-mode-uncovered.VPC CNI IP exhaustion`, `observability.alerts-always-firing.KubeControllerManagerDown`, `observability.alerts-always-firing.KubeSchedulerDown`, `observability.alert-firing-stale.KubeControllerManagerDown`, `observability.alert-firing-stale.KubeSchedulerDown`, `traffic.ingress-5xx-ratio.prod-app-m/app-m-backend`, `traffic.alb-unhealthy-targets.prod-app-q/app-q-backend`, `traffic.alb-unhealthy-targets.prod-app-l-backend/app-l-backend`, `traffic.alb-unhealthy-targets.prod-app-o/app-o-frontend`, `traffic.alb-unhealthy-targets.prod-app-n/app-n-frontend`, `resources.cpu-throttling.prod-app-m/deploy/app-m-frontend:frontend`, `resources.cpu-throttling.prod-app-o/deploy/app-o-frontend:frontend`, `resources.cpu-throttling.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus`, `observability.stack-storage-emptydir.monitoring/loki-stack`, `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager`, `observability.loki-oomkilled.cluster`, `observability.no-event-retention.cluster`
-
-### 5. Kubernetes 1.32 has been out of standard support for 217 days, the AL2 node image is no longer published, Karpenter 0.37 does not support this version, and the deployment tool and four databases are reachable from the internet
-**Problem.** The cluster runs Kubernetes 1.32, whose standard support ended on 2026-03-23; extended support ends 2027-03-23. The upgrade to 1.33 is blocked twice: Amazon stopped publishing Amazon Linux 2 node images on 2025-11-26 and the Karpenter EC2NodeClass still asks for AL2, so after an upgrade no new app node could launch; and Karpenter 0.37.0 supports Kubernetes up to 1.30, so the autoscaler that handles every spot reclaim is already two versions past what it supports. Four managed add-ons are behind, the EBS CSI driver by 30 minor versions, the managed node group image is 321 days old, and all 8 instances let pods reach the node's credentials through IMDS hop limit 2. The deployment tool Argo CD is on the internet at `deploy.my-cluster` with a single admin account, no SSO and every application in a wildcard project. An NLB created outside the cluster opens MySQL, PostgreSQL, Redis and Neo4j ports to the internet, and the Kafka external listener as well.
-
-**Evidence.** Server v1.32.13, end of standard support 2026-03-23, 217 days ago, support type EXTENDED. Source: inventory.json cluster.eks and findings-draft.json platform.k8s-version-eol. EKS upgrade insight "Amazon Linux 2 compatibility" status ERROR for 1.33. Source: findings-draft.json hygiene.eks-upgrade-insight. EC2NodeClass `default` amiFamily AL2, AMI not pinned, root 50 GB unencrypted, IMDS hop 2. Source: findings-draft.json karpenter.ec2nodeclass-al2 and karpenter.ec2nodeclass-hardening. Karpenter 0.37.0 against Kubernetes 1.32, one "version unsupported" log line. Source: logs/pods/karpenter/karpenter_karpenter.log. Add-ons: EBS CSI v1.37.0 against v1.67.2, VPC CNI v1.19.0 against v1.23.2, CoreDNS v1.11.3 against v1.11.4, kube-proxy v1.32.0 against v1.32.13. Source: inventory.json cluster.eks.addons. NLB `acme-db-shared` ports 3306, 5432, 6379, 7687 internet-facing with no source range; `middleware/kafka-controller-0-external` port 9094 internet-facing. Source: findings-draft.json traffic.db-exposed. Argo CD admin enabled, SSO false, RBAC policy empty, 12 of 12 applications in the `default` project with sources and destinations `*`. Source: summary.json argocdctl.config. API endpoint public to 0.0.0.0/0. Source: inventory.json cluster.eks.public_access_cidrs.
-
-**Cause.** The cluster was built in late 2025 on the then-current defaults and the platform layer has not been touched since; Karpenter, the node image family and the add-ons were pinned at install time. The shared database NLB and the Argo CD exposure were conveniences for a small team that were never narrowed.
-
-**Action.** ① Upgrade Karpenter 0.37 → 1.x following the v1 migration guide; the CRD API moves from v1beta1 to v1. Takes 2 to 3 hours with a dry run on the dev applications. ② Switch the EC2NodeClass to `amiFamily: AL2023` with a pinned `amiSelectorTerms` alias, `httpPutResponseHopLimit: 1`, the 100Gi encrypted root volume from problem 2, and a disruption budget of 1 node at a time outside business hours; Drift then replaces the 6 AL2 nodes one by one. Takes half a day, after problem 1 ① to ③ so the pods spread as they move. ③ Upgrade the four add-ons, VPC CNI with `ENABLE_PREFIX_DELEGATION=true`, and refresh the managed node group AMI. Takes 2 hours. ④ Upgrade EKS 1.32 → 1.33 → 1.34, one minor at a time, dev first. Takes a day per minor. ⑤ Restrict the NLB `acme-db-shared` and the Kafka listener to the office and VPN CIDRs or move them to internal, restrict the API endpoint CIDRs, and put Argo CD behind SSO with a per-team AppProject. Takes half a day.
-```yaml
-# EC2NodeClass default
-spec:
-  amiFamily: AL2023
-  amiSelectorTerms: [{ alias: al2023@v20251201 }]
-  metadataOptions: { httpPutResponseHopLimit: 1, httpTokens: required }
-```
-
-**Why this happens.**
-- Principle: A Kubernetes minor version receives patches for about 14 months upstream; on EKS the standard window is 14 months and extended support adds 12, after which the control plane is force-upgraded. Node images, the autoscaler and the CNI each publish their own supported-version matrix, so an upgrade is only possible when every one of them already supports the target version, which is why the platform layer must be kept one step ahead of the cluster rather than one step behind.
-- Cases: No public case recorded for these checks.
-- Read next: "AWS docs: Amazon EKS Kubernetes release calendar and extended support", "Karpenter docs: v1 migration", "AWS docs: EKS-optimized Amazon Linux 2023 AMI", "AWS docs: Instance metadata service version 2 and hop limit".
-
-Evidence checks: `platform.k8s-version-eol.cluster`, `eks.extended-support.cluster`, `platform.karpenter-version-compat.cluster`, `logs.signatures.karpenter.version-unsupported`, `karpenter.ec2nodeclass-al2.cluster`, `karpenter.ec2nodeclass-hardening.cluster`, `hygiene.eks-upgrade-insight.Amazon Linux 2 compatibility`, `eks.node-os-skew.cluster`, `eks.nodegroup-ami-old.nodegroups`, `eks.addon-outdated.aws-ebs-csi-driver`, `eks.addon-outdated.vpc-cni`, `eks.addon-outdated.coredns`, `eks.addon-outdated.kube-proxy`, `security.imds-hop-limit.cluster`, `eks.public-endpoint-open.cluster`, `traffic.db-exposed.nlb/acme-db-shared`, `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external`, `argocd.admin-account-no-sso.cluster`, `argocd.default-project-wildcard.cluster`, `argocd.components-not-ha.cluster`, `security.networkpolicy-not-enforced.cluster`, `vpccni.prefix-delegation-off.cluster`, `vpccni.node-ip-exhaustion.node-1-139`
-
-Quick fix outside the list: the dev ExternalSecret `database/mysql-app-n-secret` has failed 1,638 times since 2025-12-17 because the key `dev/app-n-db` does not exist; creating the key or deleting the ExternalSecret takes 5 minutes and removes five findings.
-
-## Since the previous full run (2026-10-26 14:52 KST)
-The 95 minutes between the two runs were quiet. No node was added or removed, no spot reclaim happened, and no Deployment, StatefulSet or Helm release changed its spec; the only object that disappeared is a finished CertificateSigningRequest. The events of the 14:17 KST reclaim aged out of the 1-hour event window, which is why the FailedScheduling and Unhealthy findings show as resolved rather than fixed. The counters that never stop kept climbing: image cleanup failures on `ip-10-0-1-139` 883 → 902, the dev ExternalSecret 1,632 → 1,638 failed syncs, and the do-not-disrupt block on the expired node 14,114 → 14,163. Two findings are new and both are measurements: the apiserver PATCH latency taken while two collections overlapped, and the app-o frontend crossing the 10% throttling line at 14%; the app-m frontend's throttling rose from 23% to 27% and became a fail. Two latency warnings cleared on their own, `app-l.my-cluster` from a p95 average of 2.20 s to 0.067 s and `app-p-api.my-cluster` from 1.19 s to 0.78 s, with no change to either Deployment, so the earlier values were traffic, not a regression. The rubric moved from 0.1.49 to 0.1.50 with the same 356 checks evaluated and no finding added or removed by it, so there is no criteria change to report.
-
-Progress on the previous report's problems: Problem 1 (spot layout: request cuts, app-p-backend replicas 2, topology spread, remove the do-not-disrupt annotation, on-demand fallback) not started; app-p-backend still has replicas 1 and Recreate at generation 5, `ip-10-0-1-139` still holds 28 of 42 prod pods, `DisruptionBlocked` 14,163. Problem 2 (disk 87% on `ip-10-0-1-139`, 12 evicted pods) not started; disk 86.4%, 12 Failed pods, `FreeDiskSpaceFailed` 902. Problem 3 (no backup, unencrypted volumes, registry scanning) not started; 0 DLM policies, 17 of 17 volumes unencrypted, scan on push off on 39 repositories. Problem 4 (no symptom alerts, 4 prod ALB health checks, Loki on emptyDir) not started; 0 symptom rules, the same 4 prod target groups fully unhealthy, Loki storage still emptyDir. Problem 5 (Kubernetes 1.32 past standard support, AL2 nodes, Karpenter 0.37, Argo CD open) not started; version 1.32.13, EC2NodeClass still AL2, Karpenter 0.37.0, Argo CD admin without SSO.
+Progress on the previous report's problems, from the 2026-10-26 16:47 full report:
+- Problem 1, prod on spot nodes: not started. `ip-10-0-1-139` holds 20 prod pods, down from 28 only through rescheduling. app-l-backend still requests 500m. app-p-backend is still at 1 replica with Recreate. The do-not-disrupt block count went from 14,171 to 19,728.
+- Problem 2, the disk of `ip-10-0-1-139` and the evicted pods: started. Failed pods went from 12 to 0, and the disk from 87% to 82%. The node was not replaced, and the EC2NodeClass still has a 50 GB root volume.
+- Problem 3, backups: not started. There are still 0 DLM policies, 0 backup plans, and 17 of 17 volumes unencrypted.
+- Problem 4, symptom alerts and health checks: not started. The 157 rules are unchanged, the same four prod target groups are unhealthy, and `KubeControllerManagerDown` went from 47.8 to 55.6 days of firing.
+- Problem 5, platform and exposure: not started. The cluster still runs 1.32.13, AL2 and Karpenter 0.37.0, and Argo CD admin has no SSO. The previous report's statement that the database NLB is open to the internet was wrong. It is limited to four office addresses.
 
 ## What this run could not see
-The profile expects a backup tool, event retention, SLO definitions, certificate management in-cluster and progressive delivery, and none is present; section 5 of the details lists them. All 356 checks that apply to this profile were evaluated, 2 are disabled for EKS and 1 skipped because there is no fluent-bit, and no required or optional tool is missing. 24 commands failed, listed in section 7-1 of the details: 19 were node commands and controller-metrics reads on the two managed nodes `ip-10-0-1-117` and `ip-10-0-2-60`, which are not registered in SSM, so their OS state, kube-proxy mode and VPC CNI counters are unknown and the ALB controller, Argo CD, Grafana and Karpenter metrics come only from Prometheus; 1 pod-proxy read of the ALB controller timed out; 4 were ECR lifecycle-policy lookups on repositories that have none. Grafana datasources and dashboards were skipped because no API token is configured, and KEDA operator metrics because its Prometheus endpoint is off. This collection started 9 minutes after the 16:18 daily collection, so the apiserver 503 rate of 0.0037 per second and the PATCH p99 of 0.541 s were measured during collection and likely include kubegap's own requests; neither is counted as user impact. Two prod hosts with a p95 above 10 s, `api.v1.example-b.ai` on 77 requests and `app-r.my-cluster` on 7, are below the latency check's request minimum and appear only in this report, not as findings.
+The profile expects five component families that are absent: a backup tool, event retention, an SLO tool, in-cluster certificate management and progressive delivery. Of 365 checks, 358 were evaluated. Two are disabled on EKS, and three were skipped because fluent-bit and ingress-nginx are not installed. No tool was missing, and Helm data was read normally. 24 collection commands failed:
+- 19 were node commands and controller metric reads on `ip-10-0-1-117` and `ip-10-0-2-60`. Those two managed nodes are not registered in SSM, so their OS state, kube-proxy mode and VPC CNI counters are unknown.
+- 4 were ECR lifecycle lookups on repositories that have no policy.
+- 1 was an ALB controller proxy timeout.
+
+Grafana datasources and dashboards were skipped because no API token is configured, and KEDA operator metrics are turned off. The snapshot has only 24-hour aggregates per target group, so it cannot say when app-l.my-cluster had its 41.5-second hour. Container logs are outside kubegap's scope, so app-q-ai's own error output and the Kafka listener's authentication settings are unknown. The apiserver LIST and PATCH p99 of about 0.7 s were measured during collection and likely include kubegap's own requests, so they are not counted as user impact. The security groups of the two NLBs were read once more after collection, read-only, and saved in extra/nlb-security-groups.txt.
 
 ## Numbers
 | Severity | fail | warn | vs. previous full run |
 |---|---|---|---|
-| critical | 2 | 3 | ±0 (the same five: no backup, prod concentration raised by the four reclaims, N+1 raised by rule ③, no SLO, no symptom alerts) |
-| high | 39 | 10 | fail +2 (14:52 report: 37; the two dev ALB target groups were lowered to medium in both runs, and the app-m-frontend throttling moved from warn to fail here). Warn +1 (14:52: 9): first pass 20 → 10 after lowering the same 11 items as the 14:52 report (system-node IP counts, the account VPC quota, CI runner scheduling, dev scheduling, the dev ExternalSecret pair, Prometheus memory and its 19-day-old OOM, apiserver 503 during collection) and raising the app-m 5xx ratio |
-| medium | 105 | 159 | fail +3 (14:52: 102): the 14:52 report lowered more node-level items to low than this run. Warn +2 (14:52: 157): first pass 171, plus the five items lowered from high, minus the four moved to low or high |
-| low | 18 | 161 | fail −6 (14:52: 24). Warn −9 (14:52: 170): first pass 140 plus prod-without-quota ×13, the CI runner, the PATCH latency, the fresh-node network errors, the admin 5xx ratio, the account quota, two system-node IP counts and the old Prometheus OOM |
-| info | 3 | 0 | fail ±0 (14:52: 3): audit log off, no progressive delivery, and the network-errors finding on the deleted node `ip-10-0-2-149` lowered here |
+| critical | 2 | 0 | fail +1, warn −2 |
+| high | 20 | 12 | fail −16, warn −11 |
+| medium | 116 | 172 | fail +9, warn +2 |
+| low | 20 | 150 | fail +2, warn +14 |
+| info | 2 | 1 | fail ±0, warn +1 |
 
-Final critical+high in the fail column is 41 against a first pass of 39 (1 + 38), and 54 against 61 when the warn column is included; the composition is listed in details section 1-1.
+The 2026-10-27 run has no report, so the deltas compare against its first-pass counts. The final critical and high total is 34, 26 fewer than the first pass of 60. Most of the gap comes from lowering dev items, ended events and the database NLB, and the reasons are in report-details.md section 1-1. history.csv counts the first pass.
 
-Details, every table and the full first-pass list: [`report-details.md`](report-details.md) · kubegap 0.1.0, rubric 0.1.50 · snapshot `~/.kubegap/snapshots/my-cluster/2026-10-26T16-27-58`
+Details, every table and the full first-pass list: [`report-details.md`](report-details.md) · kubegap 0.1.2, rubric 0.1.63 · snapshot `2026-11-03T11-17-15`

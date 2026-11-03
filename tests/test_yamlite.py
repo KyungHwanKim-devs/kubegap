@@ -80,6 +80,25 @@ def test_sequence_at_same_indent_as_key():
         """) == {"disabled_checks": ["a.b", "c.d"], "other": 1}
 
 
+def test_bare_dash_at_same_indent_as_key():
+    """A bare `-` at the key's indent starts the list as `- x` does, so a leading empty item loads (PyYAML gives the same)."""
+    assert y("""
+        a:
+        -
+        - y
+        """) == {"a": [None, "y"]}
+    assert y("""
+        - k:
+          -
+          - w
+        """) == [{"k": [None, "w"]}]
+    assert y("""
+        a:
+        -
+        b: 1
+        """) == {"a": [None], "b": 1}
+
+
 def test_nested_sequence_with_double_dash():
     assert y("""
         - - 1
@@ -95,6 +114,36 @@ def test_empty_sequence_item_followed_by_nested_block():
             k: v
           - plain
         """) == {"items": [{"k": "v"}, "plain"]}
+
+
+def test_empty_sequence_item_then_sibling_dash_is_not_nested():
+    """Same-indent `- w` after an empty `-` is the next item, matching PyYAML (#66)."""
+    assert y("""
+        -
+        - w
+        """) == [None, "w"]
+    assert y("""
+        - a
+        -
+        - w
+        """) == ["a", None, "w"]
+    assert y("""
+        a:
+          -
+          - w
+        """) == {"a": [None, "w"]}
+
+
+def test_scalar_on_the_line_after_key_or_dash():
+    assert y("""
+        a:
+          value
+        b:
+          "q"
+        c:
+          -
+            x
+        """) == {"a": "value", "b": "q", "c": ["x"]}
 
 
 def test_quoted_key_and_duplicate_key():
@@ -256,6 +305,33 @@ def test_quoted_scalar_spanning_lines_is_joined_with_spaces():
 )
 def test_errors(text, match):
     with pytest.raises(YamlError, match=match):
+        load(text)
+
+
+@pytest.mark.parametrize(
+    ("text", "line"),
+    [
+        ("a: first\n  second\nb: 1", 2),
+        ("a: first\n\n  second", 3),
+        ("a: 1\n  2", 2),
+        ("- first\n  second", 2),
+        ("- k: one\n    two", 2),
+        ("x:\n  - a: 1\n    why: long text\n      continues here\n  - b", 4),
+        ("a: first\n  - second", 2),
+        ("a:\n  first\n  second", 3),
+        ("-\n  first\n  second", 3),
+    ],
+)
+def test_multi_line_plain_scalar_names_the_continuation_line(text, line):
+    # PyYAML reads each of these as one folded string; before the fix the error was "indentation mismatch".
+    with pytest.raises(YamlError, match=rf"^line {line}: .*multi-line plain scalars are not supported"):
+        load(text)
+
+
+@pytest.mark.parametrize("text", ["&a key: v", "!!str key: v", "- &a k: v", "a:\n  *x: 1"])
+def test_anchor_or_tag_on_a_key_is_rejected(text):
+    # Before the fix these were read as a key named "&a key" and so on.
+    with pytest.raises(YamlError, match=r"^line \d+: anchors, aliases and tags are not supported"):
         load(text)
 
 

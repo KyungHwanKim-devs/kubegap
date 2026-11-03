@@ -12,6 +12,8 @@ ENI arithmetic: pod IPs a node can hold = ENI count x (IPv4 per ENI - 1). The fi
 
 from __future__ import annotations
 
+import contextlib
+import ipaddress
 import re
 from pathlib import Path
 
@@ -80,7 +82,12 @@ def _settings(snap: Path) -> dict:
     return {
         "present": True,
         "image": image,
-        "version": m.group(1) if m else None,
+        "version": m.group(1)
+        if m
+        else (re.search(r"v?(\d+\.\d+\.\d+)", str(addon.get("addonVersion") or "")) or [None, None])[1]
+        if addon.get("addonVersion")
+        else None,  # a digest-pinned or mirrored image carries no tag version; the managed add-on version is the same binary
+        "image_version": m.group(1) if m else None,
         "addon_version": addon.get("addonVersion"),
         "addon_status": addon.get("status"),
         "addon_latest": latest,
@@ -98,23 +105,41 @@ def _settings(snap: Path) -> dict:
         "network_policy_mode": env.get("NETWORK_POLICY_ENFORCING_MODE"),
         "nodeagent_enable_network_policy": (netpol.lower() == "true") if netpol is not None else None,
         "external_snat": flag("AWS_VPC_K8S_CNI_EXTERNALSNAT"),
+        "randomize_snat": env.get("AWS_VPC_K8S_CNI_RANDOMIZESNAT")
+        or None,  # prng (--random-fully, default since 1.7.0), hashrandom (--random, default 1.4.0-1.6.x), none; None = unset. Kept as written: the CNI parser is case-sensitive and treats any other spelling as unset
         "env": {k: v for k, v in env.items() if k.startswith(("WARM", "MINIMUM", "ENABLE", "AWS_VPC", "NETWORK", "DISABLE", "ANNOTATE", "MAX_ENI"))},
         "eniconfigs": len(objects(snap, "eniconfigs.crd.k8s.amazonaws.com")),
     }
 
 
-def _private_routes(snap: Path) -> dict:
+def _private_routes(snap: Path, node_subnets: set[str] | None = None, exclude_cidrs: list[str] | None = None) -> dict:
     """Routes of the cluster VPC whose target is another private network: VPC peering (pcx-), transit gateway (tgw-) or Cloud WAN core network,
-    virtual private gateway / VPN (vgw-), Outposts local gateway (lgw-). These are the destinations where the external SNAT default matters: a pod
-    reaching them is seen as the node IP. Not counted: local, internet and egress-only gateways, NAT gateways, gateway endpoints (AWS services),
-    carrier gateways, and routes through an instance or ENI (a NAT or firewall appliance; the destination alone does not say whether it is private).
-    Blackhole routes (target deleted) move no traffic and are ignored. `collected` is false when the describe-route-tables step did not run (daily
-    mode, no permission) or returned no table at all, which only happens when the VPC filter was wrong; the check then skips instead of passing."""
+    virtual private gateway / VPN (vgw-), Outposts local gateway (lgw-), and a NAT or firewall appliance reached through an instance or network interface
+    when the destination is a private (RFC 1918) block. Not counted: local, internet and egress-only gateways, NAT gateways, gateway endpoints (AWS services),
+    carrier gateways. Blackhole routes (target deleted) move no traffic and are ignored.
+    Only the route tables that serve the node subnets count (explicit association, or the main table for subnets without one): a peering route in a
+    database-subnet table that no node uses carries no pod traffic. Without the node subnets (older snapshot) every table of the VPC counts.
+    `excluded` lists the destinations that fall inside AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS, the CNI's own exemption from SNAT; `destinations` keeps the rest.
+    `collected` is false when the describe-route-tables step did not run or returned no table."""
     d = load_json(snap / "aws" / "describe-route-tables.json")
     tables = (d or {}).get("RouteTables") or []
+    empty = {"collected": False, "peering": 0, "transit_gateway": 0, "vpn": 0, "local_gateway": 0, "appliance": 0, "destinations": [], "excluded": [], "scoped_to_node_subnets": False}
     if not tables:
-        return {"collected": False, "peering": 0, "transit_gateway": 0, "vpn": 0, "local_gateway": 0, "destinations": []}
-    peering, tgw, vpn, lgw, dests = 0, 0, 0, 0, []
+        return empty
+    scoped = False
+    if node_subnets:
+        explicit = {a.get("SubnetId") for t in tables for a in t.get("Associations") or [] if a.get("SubnetId")}
+        main = [t for t in tables if any(a.get("Main") for a in t.get("Associations") or [])]
+        wanted = [t for t in tables if any(a.get("SubnetId") in node_subnets for a in t.get("Associations") or [])]
+        if node_subnets - explicit:  # a node subnet without its own table uses the main table
+            wanted += main
+        if wanted:
+            tables, scoped = wanted, True
+    excl = []
+    for c in exclude_cidrs or []:
+        with contextlib.suppress(ValueError):
+            excl.append(ipaddress.ip_network(str(c).strip(), strict=False))
+    peering, tgw, vpn, lgw, appl, dests, excluded = 0, 0, 0, 0, 0, [], []
     for rt in tables:
         for r in rt.get("Routes") or []:
             if r.get("State") == "blackhole":
@@ -128,21 +153,85 @@ def _private_routes(snap: Path) -> dict:
                 vpn += 1
             elif r.get("LocalGatewayId"):
                 lgw += 1
+            elif (r.get("NetworkInterfaceId") or r.get("InstanceId")) and _is_private_cidr(r.get("DestinationCidrBlock")):
+                appl += 1
             else:
                 continue
-            if dest and dest not in dests:
+            if not dest:
+                continue
+            if _inside(dest, excl):
+                if dest not in excluded:
+                    excluded.append(dest)
+            elif dest not in dests:
                 dests.append(dest)
-    return {"collected": True, "peering": peering, "transit_gateway": tgw, "vpn": vpn, "local_gateway": lgw, "destinations": sorted(dests)}
+    return {"collected": True, "peering": peering, "transit_gateway": tgw, "vpn": vpn, "local_gateway": lgw, "appliance": appl, "destinations": sorted(dests), "excluded": sorted(excluded), "scoped_to_node_subnets": scoped}
+
+
+def _is_private_cidr(cidr: str | None) -> bool:
+    try:
+        return ipaddress.ip_network(cidr, strict=False).is_private and not str(cidr).startswith("0.0.0.0")
+    except ValueError:
+        return False
+
+
+def _inside(dest: str, nets: list) -> bool:
+    try:
+        d = ipaddress.ip_network(dest, strict=False)
+    except ValueError:
+        return False
+    return any(d.version == n.version and d.subnet_of(n) for n in nets)
+
+
+def _node_subnets(snap: Path, inv_nodes: list[dict]) -> set[str]:
+    """Subnet ids of the nodes, from the instances described in aws/ec2-instances-imds.json joined on the provider id. Empty when the snapshot has no subnet field."""
+    insts = load_json(snap / "aws" / "ec2-instances-imds.json") or []
+    by_id = {i.get("id"): i.get("subnet") for i in insts if isinstance(i, dict) and i.get("subnet")}
+    out = set()
+    for n in inv_nodes:
+        iid = str(n.get("provider_id") or "").rsplit("/", 1)[-1]
+        if by_id.get(iid):
+            out.add(by_id[iid])
+    return out
+
+
+def snat_port_mode(version: str | None, randomize_snat: str | None, external_snat: bool) -> str:
+    """How the node SNAT rule picks source ports, as far as the image version and the aws-node setting can tell.
+    - 'not-applicable': external SNAT is on, there is no SNAT rule.
+    - 'sequential': AWS_VPC_K8S_CNI_RANDOMIZESNAT=none, or a CNI below 1.4.0, which had no randomization at all.
+    - 'random': iptables --random (hashrandom), the default from 1.4.0 to 1.6.x. AWS replaced it as the default in 1.7.0.
+    - 'random-fully': iptables --random-fully (prng), the default since 1.7.0. The CNI falls back to --random when the node's iptables
+      lacks --random-fully, which the image version cannot show; the node-side verify command settles it.
+    - 'unknown': the image carries no version."""
+    if external_snat:
+        return "not-applicable"
+    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", str(version or ""))
+    ver = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+    value = randomize_snat or None  # exact match only: the CNI's typeOfSNAT() compares the raw string and falls back to the version default otherwise
+    if value == "none":
+        return "sequential"
+    if value in ("hashrandom", "prng"):
+        if ver is None:
+            return "unknown"
+        if ver < (1, 4, 0):
+            return "sequential"  # the setting did not exist yet
+        return "random-fully" if value == "prng" else "random"
+    if ver is None:  # unset or unrecognised value: the default depends on the version
+        return "unknown"
+    if ver < (1, 4, 0):
+        return "sequential"
+    return "random-fully" if ver >= (1, 7, 0) else "random"
 
 
 def analyze(snap: Path, inv: dict | None) -> dict:
     inv = inv or {}
     st = _settings(snap)
-    st["private_routes"] = _private_routes(snap)
+    inv_nodes = (inv.get("nodes") or {}).get("nodes") or []
+    excl = [c for c in str((st.get("env") or {}).get("AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS") or "").split(",") if c.strip()]
+    st["exclude_snat_cidrs"] = excl
+    st["private_routes"] = _private_routes(snap, _node_subnets(snap, inv_nodes), excl)
     if not st.get("present"):
         return {"present": False}
     prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
-    inv_nodes = (inv.get("nodes") or {}).get("nodes") or []
     # instance type network limits
     limits: dict[str, dict] = {}
     for f in (snap / "aws").glob("instance-type-*.json") if (snap / "aws").is_dir() else []:
@@ -290,6 +379,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             "max_pods_rule": "normal when max-pods <= IP limit + 2 (allowance for hostNetwork pods)",
             "external_snat": st["external_snat"],
             "private_routes": st["private_routes"],
+            "randomize_snat": st["randomize_snat"],
+            "cni_version": st["version"],
+            "snat_port_mode": snat_port_mode(st["version"], st["randomize_snat"], st["external_snat"]),
         },
         # Present only when the full run collected the VPC route tables, so vpccni.external-snat-off-with-private-routes is skipped as "not collected" otherwise instead of passing on no data.
         "snat": (
@@ -299,7 +391,11 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "transit_gateway_routes": st["private_routes"]["transit_gateway"],
                 "vpn_routes": st["private_routes"]["vpn"],
                 "local_gateway_routes": st["private_routes"]["local_gateway"],
+                "appliance_routes": st["private_routes"]["appliance"],
                 "private_destinations": st["private_routes"]["destinations"],
+                "excluded_destinations": st["private_routes"]["excluded"],
+                "exclude_snat_cidrs": excl,
+                "scoped_to_node_subnets": st["private_routes"]["scoped_to_node_subnets"],
             }
             if st["private_routes"]["collected"]
             else None

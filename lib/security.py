@@ -287,16 +287,9 @@ def _secrets(snap: Path, prod: set, platform: str | None) -> dict:
     }
 
 
-def _networkpolicy(snap: Path, prod: set, platform: str | None, k3s: dict | None) -> dict:
-    nps = objects(snap, "networkpolicies.networking.k8s.io")
-    by_ns: dict[str, list] = defaultdict(list)
-    default_deny = set()
-    for n in nps:
-        ns = n["metadata"]["namespace"]
-        sp = n.get("spec") or {}
-        by_ns[ns].append(n["metadata"]["name"])
-        if not (sp.get("podSelector") or {}).get("matchLabels") and not (sp.get("podSelector") or {}).get("matchExpressions") and "Ingress" in (sp.get("policyTypes") or ["Ingress"]) and not sp.get("ingress"):
-            default_deny.add(ns)
+def netpol_enforced(snap: Path, platform: str | None, k3s: dict | None, nps: list | None = None) -> tuple[bool | None, str | None]:
+    """Does the CNI enforce NetworkPolicy objects? EKS: the VPC CNI node agent's --enable-network-policy or ENABLE_NETWORK_POLICY; k3s: the built-in kube-router unless
+    --disable-network-policy; elsewhere unknown (Calico and Cilium do, plain flannel does not). Shared with the ingress-nginx webhook mitigation in lib/traffic.py."""
     enforced, how = None, None
     if platform == "eks":
         enforced = False
@@ -324,6 +317,20 @@ def _networkpolicy(snap: Path, prod: set, platform: str | None, k3s: dict | None
         how = "k3s built-in kube-router network policy controller" + (" (disabled via --disable-network-policy)" if not enforced else "")
     else:
         how = "verify that the CNI implements NetworkPolicy (Calico and Cilium do; plain flannel does not)"
+    return enforced, how
+
+
+def _networkpolicy(snap: Path, prod: set, platform: str | None, k3s: dict | None) -> dict:
+    nps = objects(snap, "networkpolicies.networking.k8s.io")
+    by_ns: dict[str, list] = defaultdict(list)
+    default_deny = set()
+    for n in nps:
+        ns = n["metadata"]["namespace"]
+        sp = n.get("spec") or {}
+        by_ns[ns].append(n["metadata"]["name"])
+        if not (sp.get("podSelector") or {}).get("matchLabels") and not (sp.get("podSelector") or {}).get("matchExpressions") and "Ingress" in (sp.get("policyTypes") or ["Ingress"]) and not sp.get("ingress"):
+            default_deny.add(ns)
+    enforced, how = netpol_enforced(snap, platform, k3s, nps)
     return {
         "policies": len(nps),
         "namespaces_with_policy": sorted(by_ns),

@@ -79,14 +79,34 @@ def test_file_mount_is_refresh_only_and_subpath_is_not(tmp_path):
     assert out["restart_needed"] and not out["refresh_only"]
 
 
-def test_immutable_and_unchanged_and_not_running_are_ignored(tmp_path):
-    _write(tmp_path, "configmaps", [_cm("prod", "app-cfg", ["2026-10-05T00:00:00Z"], immutable=True), _cm("prod", "old-cfg", ["2026-09-01T00:00:00Z"])])
+def test_unchanged_and_not_running_are_ignored_and_a_recreated_immutable_counts(tmp_path):
+    # an immutable ConfigMap cannot be edited: one that exists since before the pod started is not a change, one created after it (deleted and recreated) is
+    old_imm = _cm("prod", "imm-old", ["2026-09-01T00:00:00Z"], immutable=True)
+    old_imm["metadata"]["creationTimestamp"] = "2026-09-01T00:00:00Z"
+    new_imm = _cm("prod", "app-cfg", ["2026-10-05T00:00:00Z"], immutable=True)
+    new_imm["metadata"]["creationTimestamp"] = "2026-10-05T00:00:00Z"
+    _write(tmp_path, "configmaps", [new_imm, old_imm, _cm("prod", "old-cfg", ["2026-09-01T00:00:00Z"])])
     pending = _pod("prod", "p-1", "2026-10-01T00:00:00Z", ENV_SPEC)
     pending["status"]["phase"] = "Pending"
     old_spec = {"containers": [{"name": "app", "envFrom": [{"configMapRef": {"name": "old-cfg"}}]}]}
-    _write(tmp_path, "pods", [pending, _pod("prod", "app-1", "2026-10-01T00:00:00Z", ENV_SPEC), _pod("prod", "old-1", "2026-10-01T00:00:00Z", old_spec)])
+    imm_spec = {"containers": [{"name": "app", "envFrom": [{"configMapRef": {"name": "imm-old"}}]}]}
+    _write(tmp_path, "pods", [pending, _pod("prod", "app-1", "2026-10-01T00:00:00Z", ENV_SPEC), _pod("prod", "old-1", "2026-10-01T00:00:00Z", old_spec), _pod("prod", "imm-1", "2026-10-01T00:00:00Z", imm_spec)])
     out = hygiene._config_changes(hygiene._Ctx(tmp_path, {}))
-    assert out["pods_checked"] == 2 and out["stale"] == []
+    assert out["pods_checked"] == 3
+    assert [(r["configmap"], r["changed_at"][:10]) for r in out["stale"]] == [("app-cfg", "2026-10-05")]  # the recreation time is the change time
+
+
+def test_oldest_reader_decides_when_only_a_sidecar_restarted(tmp_path):
+    _write(tmp_path, "configmaps", [_cm("prod", "app-cfg", ["2026-10-05T00:00:00Z"])])
+    spec = {"containers": [{"name": "app", "envFrom": [{"configMapRef": {"name": "app-cfg"}}]}, {"name": "sidecar", "envFrom": [{"configMapRef": {"name": "app-cfg"}}]}]}
+    pod = _pod("prod", "app-1", "2026-10-01T00:00:00Z", spec)
+    pod["status"]["containerStatuses"] = [
+        {"name": "app", "state": {"running": {"startedAt": "2026-10-01T00:00:00Z"}}},
+        {"name": "sidecar", "state": {"running": {"startedAt": "2026-10-06T00:00:00Z"}}},
+    ]
+    _write(tmp_path, "pods", [pod])
+    out = hygiene._config_changes(hygiene._Ctx(tmp_path, {}))
+    assert [r["configmap"] for r in out["stale"]] == ["app-cfg"]  # the app container still runs on the old value
 
 
 def test_system_root_ca_configmap_is_ignored(tmp_path):
