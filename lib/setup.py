@@ -93,6 +93,7 @@ def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None
     else:
         info = kube.context_info(context, kubeconfig)
         cluster.update(info)
+        _p(f"  auth: {kube.auth_summary(info)}")
         ver, _r = kube.kubectl_json(["version"], context=context, timeout=20, id="setup.version", log=log, kubeconfig=kubeconfig)
         cluster["server_version"] = ((ver or {}).get("serverVersion") or {}).get("gitVersion")
         nodes, r2 = kube.kubectl_json(["get", "nodes"], context=context, timeout=30, id="setup.get-nodes", log=log, kubeconfig=kubeconfig)

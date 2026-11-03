@@ -56,6 +56,27 @@ def kubectl_json(args: list[str], *, context: str | None, timeout: float = 60, *
         return None, r
 
 
+EXEC_ENV_KEPT = {"AWS_PROFILE", "AWS_REGION"}  # the exec env values context_info keeps; every other value is replaced by REDACTED
+REDACTED = "<redacted>"
+
+
+def auth_summary(info: dict) -> str:
+    """One line for setup section 2 saying how the context authenticates: which external command runs, with its arguments, and which env names it gets (never the values)."""
+    auth = info.get("auth") or {}
+    t = auth.get("type")
+    if t == "exec":
+        cmd = " ".join([str(auth.get("command") or "?"), *(str(a) for a in (auth.get("args") or []))])
+        if len(cmd) > 80:
+            cmd = cmd[:77] + "..."
+        env = ", ".join(sorted(k for k in (auth.get("env") or {}) if k)) or "none"
+        return f"exec {cmd}, env {env}"
+    if t == "client-cert":
+        return "client certificate"
+    if t == "token":
+        return "token"
+    return "unknown (no exec, token or client certificate in the kubeconfig user)"
+
+
 def context_info(context: str | None, kubeconfig: str | None = None) -> dict:
     """Read the server address, cluster name and auth method of a context from kubeconfig. Primary evidence for EKS detection.
 
@@ -80,7 +101,9 @@ def context_info(context: str | None, kubeconfig: str | None = None) -> dict:
         u = users[0].get("user") or {}
         ex = u.get("exec")
         if ex:
-            env = {e.get("name"): e.get("value") for e in (ex.get("env") or []) if isinstance(e, dict)}
+            # Only the names of the exec env are kept, plus the two values kubegap reads. Anything else a user put there (a tenant id,
+            # a token for a custom auth plugin) must not land in setup.json, a second copy on disk that kubegap owns.
+            env = {e["name"]: (e.get("value") if e["name"] in EXEC_ENV_KEPT else (REDACTED if "value" in e else None)) for e in (ex.get("env") or []) if isinstance(e, dict) and e.get("name")}
             info["auth"] = {"type": "exec", "command": ex.get("command"), "args": ex.get("args") or [], "env": env}
         elif u.get("token") or u.get("client-certificate-data") or u.get("client-certificate"):
             info["auth"] = {"type": "token" if u.get("token") else "client-cert"}
@@ -97,6 +120,8 @@ def context_info(context: str | None, kubeconfig: str | None = None) -> dict:
             eks.setdefault("name", a[a.index("--cluster-name") + 1])
         if "--region" in a:
             eks.setdefault("region", a[a.index("--region") + 1])
+        if (auth.get("env") or {}).get("AWS_REGION"):  # aws eks get-token honours AWS_REGION; without this, setup section 4 ran aws with no --region
+            eks.setdefault("region", auth["env"]["AWS_REGION"])
         prof = (auth.get("env") or {}).get("AWS_PROFILE")
         if "--profile" in a:
             prof = a[a.index("--profile") + 1]
