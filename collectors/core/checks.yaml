@@ -16981,7 +16981,8 @@
           prod: true
           bound_services: ["prod-a/mysql", "prod-b/postgresql"]
           sg_exposure: "allow-list"
-          allowed_sources: { "3306": 4, "5432": 4, "6379": 1, "7687": 4 }
+          allowed_sources: { "3306": 4, "3307": 4, "5432": 4, "6379": 1, "7687": 4 }
+          widest_prefix: { "3306": 32, "3307": 32, "5432": 32, "6379": 32, "7687": 32 }
           open_ports: []
           note: "NLB created outside Kubernetes; 2 TargetGroupBindings bind it to prod-a/mysql, prod-b/postgresql. DB port on an external address, limited by the security group to listed addresses"
       # the security groups could not be read: fail, with "not read" in the evidence
