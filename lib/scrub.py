@@ -12,6 +12,9 @@ credential is not written to disk at all. Masking after the fact only catches sh
   without the values. Two annotations carry a copy of the whole object, `data` included: kubectl's
   `kubectl.kubernetes.io/last-applied-configuration` (plain JSON) and the k3s helm-controller's `objectset.rio.cattle.io/applied`
   (gzip, base64). Their values are replaced by length and shape too; the keys stay, so "applied with kubectl" remains visible.
+  A gzip copy is expanded up to GZIP_MAX_BYTES (8 MiB) and inspected no further beyond that: etcd caps an object at about 1.5 MiB, but
+  gzip expands up to about a thousand times, so one crafted annotation could otherwise ask for a gigabyte. The annotation is replaced by
+  length and shape either way, so nothing of it reaches the snapshot.
   Component detection in lib/discover runs on the in-memory objects before this scrub.
 
 The three writers of kubectl JSON go through `scrub_or_error`: lib/discover for the kinds it fetches, lib/collect dump-all for the rest, and
@@ -27,6 +30,7 @@ import re
 from . import shell
 
 SECRET_KINDS = {"Secret", "SecretList"}
+GZIP_MAX_BYTES = 8 * 1024 * 1024  # how far a gzip+base64 applied copy is expanded for inspection
 CONFIGMAP_KINDS = {"ConfigMap"}
 MARK = "kubegap_scrub"
 
@@ -144,12 +148,17 @@ def _secret_like_in_applied(value) -> list[str]:
     """Secret-like keys in the `data` of an applied-object copy (plain JSON, or gzip+base64 as the k3s helm-controller writes it). Values are inspected, never returned."""
     import base64
     import gzip
+    import io
     import json
 
     text = str(value)
     if text.startswith("H4sI"):
         try:
-            text = gzip.decompress(base64.b64decode(text)).decode("utf-8", "replace")
+            with gzip.GzipFile(fileobj=io.BytesIO(base64.b64decode(text))) as gz:
+                raw = gz.read(GZIP_MAX_BYTES + 1)
+            if len(raw) > GZIP_MAX_BYTES:  # too large to inspect; the caller still replaces the annotation by length and shape
+                return []
+            text = raw.decode("utf-8", "replace")
         except Exception:
             return []
     try:

@@ -7,7 +7,7 @@ import pytest
 
 from lib import collect
 from lib import http as khttp
-from lib.runlog import RunLog
+from lib.runlog import RunLog, read_runlog
 
 
 class _Server:
@@ -151,3 +151,135 @@ def test_no_warning_for_a_loopback_url(tmp_path, monkeypatch):
 
     assert "token sent over plain http" not in (tmp_path / "run.log").read_text()
     assert not [ln for ln in lines if "warning:" in ln]
+
+
+# ---------- response size cap (#91) ----------
+
+
+class _BigServer:
+    """Streams `size` bytes of x for every path, in chunks, so the client has to stop reading on its own."""
+
+    def __init__(self, size: int, status: int = 200):
+        server = self
+
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(status)
+                self.send_header("Content-Type", "text/plain")
+                self.send_header("Content-Length", str(server.size))
+                self.end_headers()
+                left = server.size
+                try:
+                    while left > 0:
+                        n = min(left, 65536)
+                        self.wfile.write(b"x" * n)
+                        left -= n
+                except OSError:  # the client stops reading at its cap and closes; macOS may report EPROTOTYPE rather than EPIPE
+                    pass
+
+            def log_message(self, *a):
+                pass
+
+        self.size = size
+        self.httpd = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        self.port = self.httpd.server_address[1]
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+
+    def close(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
+def test_a_reply_over_the_cap_is_refused_with_an_empty_body():
+    s = _BigServer(3 * 1024 * 1024)
+    try:
+        r = khttp.get(f"http://127.0.0.1:{s.port}/big", max_bytes=1024 * 1024)
+        assert r.ok is False and r.status == 200 and r.body == ""
+        assert r.error == "response larger than 1 MiB"
+    finally:
+        s.close()
+
+
+def test_a_reply_exactly_at_the_cap_is_accepted():
+    s = _BigServer(1000)
+    try:
+        r = khttp.get(f"http://127.0.0.1:{s.port}/ok", max_bytes=1000)
+        assert r.ok and len(r.body) == 1000
+        r = khttp.get(f"http://127.0.0.1:{s.port}/ok", max_bytes=999)
+        assert r.ok is False and r.error == "response larger than 999 bytes" and r.body == ""
+    finally:
+        s.close()
+
+
+def test_an_error_body_is_capped_too():
+    s = _BigServer(5000, status=500)
+    try:
+        r = khttp.get(f"http://127.0.0.1:{s.port}/err", max_bytes=100)
+        assert r.status == 500 and r.error == "HTTP 500" and r.body == ""
+        r = khttp.get(f"http://127.0.0.1:{s.port}/err", max_bytes=10000)
+        assert r.status == 500 and len(r.body) == 5000
+    finally:
+        s.close()
+
+
+def test_default_cap_is_64_mib():
+    assert khttp.HTTP_MAX_BYTES == 64 * 1024 * 1024
+    assert khttp._size_error(khttp.HTTP_MAX_BYTES) == "response larger than 64 MiB"
+
+
+class _CutServer:
+    """Advertises Content-Length 3000 and closes after 1000 bytes, as a store that died mid-reply would."""
+
+    def __init__(self):
+        class Handler(http.server.BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200)
+                self.send_header("Content-Length", "3000")
+                self.end_headers()
+                self.wfile.write(b"y" * 1000)
+                self.wfile.flush()
+                self.connection.close()
+
+            def log_message(self, *a):
+                pass
+
+        self.httpd = http.server.HTTPServer(("127.0.0.1", 0), Handler)
+        self.port = self.httpd.server_address[1]
+        self.thread = threading.Thread(target=self.httpd.serve_forever, daemon=True)
+        self.thread.start()
+
+    def close(self):
+        self.httpd.shutdown()
+        self.httpd.server_close()
+
+
+def test_a_reply_the_server_cut_short_is_not_a_success():
+    s = _CutServer()
+    try:
+        r = khttp.get(f"http://127.0.0.1:{s.port}/cut", max_bytes=10_000)
+        assert r.ok is False and r.body == "" and r.status is None
+        assert r.error.startswith("incomplete response:") and "2000 more expected" in r.error
+    finally:
+        s.close()
+
+
+def test_for_each_file_items_record_their_error_and_a_runlog_line(tmp_path, monkeypatch):
+    stores, log = _stores("http://127.0.0.1:3000", tmp_path)
+    monkeypatch.setattr(khttp, "get", lambda url, params=None, timeout=15, headers=None: khttp.HttpResult(url, 200, "", error="response larger than 64 MiB") if url.endswith("/big") else khttp.HttpResult(url, 200, "{}"))
+    (tmp_path / "grafana").mkdir()
+    (tmp_path / "grafana" / "dashboards.json").write_text('[{"uid": "ok1"}, {"uid": "big"}]')
+    st = {
+        "id": "dashboards-json",
+        "type": "http",
+        "store": "grafana",
+        "path": "/api/dashboards/uid/{item.uid}",
+        "for_each_file": {"path": "grafana/dashboards.json", "key": "uid"},
+        "out": "grafana/dashboards/{item_safe}.json",
+        "auth": "grafana_api_token",
+    }
+    res = collect._run_http_step(st, "dashboards-json", "grafana", stores.cfg, tmp_path, log, stores, 5, None)
+    assert res["ok"] is True and res["runs"] == 2
+    recs = [x for x in read_runlog(tmp_path / "run.log") if x.get("kind") == "command"]
+    assert [(x["id"], x["code"], x["error"]) for x in recs] == [("grafana.dashboards-json.ok1", 0, None), ("grafana.dashboards-json.big", 200, "response larger than 64 MiB")]
+    assert (tmp_path / "grafana" / "dashboards" / "ok1.json").is_file() and not (tmp_path / "grafana" / "dashboards" / "big.json").exists()

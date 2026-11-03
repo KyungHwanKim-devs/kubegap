@@ -177,3 +177,38 @@ def test_secret_copy_annotation_is_dropped_in_the_defensive_path():
     sec["metadata"]["annotations"] = {"kubectl.kubernetes.io/last-applied-configuration": json.dumps({"kind": "Secret", "data": {"password": "aHVudGVyMg=="}})}
     out = scrub.scrub_objects(sec)
     assert "aHVudGVyMg==" not in json.dumps(out) and out["metadata"]["annotations"]["kubectl.kubernetes.io/last-applied-configuration"]["len"] > 0
+
+
+def test_gzip_applied_copy_beyond_the_cap_is_not_inspected_but_still_replaced(monkeypatch):
+    """A 20 MiB document gzips to about 20 KB; the scrubber must stop expanding at GZIP_MAX_BYTES and still drop the annotation (#91)."""
+    import base64
+    import gzip
+
+    monkeypatch.setattr(scrub, "GZIP_MAX_BYTES", 1024 * 1024)
+    big = json.dumps({"kind": "ConfigMap", "data": {"API_TOKEN": "tok-0123456789abcdef", "pad": "0" * (20 * 1024 * 1024)}}).encode()
+    packed = base64.b64encode(gzip.compress(big)).decode()
+    assert len(packed) < 100_000 and packed.startswith("H4sI")
+    reads = []
+    orig = gzip.GzipFile.read
+
+    def spy(self, size=-1):
+        out = orig(self, size)
+        reads.append((size, len(out)))
+        return out
+
+    monkeypatch.setattr(gzip.GzipFile, "read", spy)
+    assert scrub._secret_like_in_applied(packed) == []
+    assert reads == [(1024 * 1024 + 1, 1024 * 1024 + 1)], "asked for cap+1 bytes, got cap+1, and expanded nothing more"
+    raw = {"kind": "ConfigMap", "metadata": {"name": "c", "namespace": "n", "annotations": {"objectset.rio.cattle.io/applied": packed}}, "data": {"a": "b"}}
+    cm = scrub.scrub_configmap(raw)
+    assert cm["metadata"]["annotations"]["objectset.rio.cattle.io/applied"] == {"len": len(packed), "shape": "word"}
+    assert "tok-0123456789abcdef" not in json.dumps(cm)
+
+
+def test_gzip_applied_copy_under_the_cap_is_inspected():
+    import base64
+    import gzip
+
+    doc = json.dumps({"kind": "ConfigMap", "data": {"API_TOKEN": "tok-0123456789abcdef"}}).encode()
+    packed = base64.b64encode(gzip.compress(doc)).decode()
+    assert scrub._secret_like_in_applied(packed) == ["API_TOKEN"]
