@@ -28,7 +28,7 @@ Rules for this file:
 
 **Cause.** {{problem_1_cause}} <!-- why it came to this. When not certain, start with "Most likely," -->
 
-**Action.** {{problem_1_action}} <!-- in order ①②③; what to change, the expected effect, and the effort as plain words at the end of the sentence, such as "Takes 30 minutes." A manifest fragment or exact command where possible. -->
+**Action.** {{problem_1_action}} <!-- in order ①②③; what to change, the expected effect, and the effort as an estimate that reads as one at the end of the sentence, such as "Expect about 30 minutes." or "Expect an hour or two.", never a bare "Takes 30 minutes." A manifest fragment or exact command where possible. -->
 
 **Why this happens.**
 - Principle: {{problem_1_theory}} <!-- the principle behind it in one or two sentences (how the mechanism works, which operating rule it breaks: e.g. CPU limits are a ceiling enforced per 100 ms CFS period; HPA scales on request, not limit). No analogies. -->
