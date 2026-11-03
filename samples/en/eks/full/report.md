@@ -12,11 +12,11 @@ This is the EKS cluster `my-cluster` in us-east-1, audited through the kube cont
 **Cause.** The databases run on the default gp3 StorageClass, and no backup layer was added after they were deployed. The EBS CSI add-on ships the snapshot sidecar. The `snapshot-controller` add-on, which provides the CRD the sidecar needs, was never installed.
 
 **Action.**
-- ① Create one DLM policy that snapshots, daily, every volume tagged with a prod namespace, and keeps 14 snapshots. From tonight on there will be a copy of every database volume. Takes 1 hour.
-- ② Patch the seven prod database PVs to `Retain`, so a deleted claim leaves its volume behind. Run `kubectl patch pv <pv-name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'` once for each. Takes 10 minutes.
-- ③ Add a nightly logical dump for each database to S3 from a CronJob, using mysqldump, pg_dump or `neo4j-admin database dump`. Then restore one dump into a scratch namespace to prove the path works. A DLM snapshot is a crash-consistent block copy, and a dump is what lets you restore single tables. Takes half a day.
-- ④ Install the `snapshot-controller` EKS add-on and one VolumeSnapshotClass. That stops the sidecar errors and makes CSI snapshots possible. Takes 30 minutes.
-- ⑤ After that, make an encrypted, expandable gp3 class the default. Move the volumes to encrypted copies during a restore test. The manifest is in report-details.md, section 4, Storage. Takes a day.
+- ① Create one DLM policy that snapshots, daily, every volume tagged with a prod namespace, and keeps 14 snapshots. From tonight on there will be a copy of every database volume. Expect about 1 hour.
+- ② Patch the seven prod database PVs to `Retain`, so a deleted claim leaves its volume behind. Run `kubectl patch pv <pv-name> -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'` once for each. Expect about 10 minutes.
+- ③ Add a nightly logical dump for each database to S3 from a CronJob, using mysqldump, pg_dump or `neo4j-admin database dump`. Then restore one dump into a scratch namespace to prove the path works. A DLM snapshot is a crash-consistent block copy, and a dump is what lets you restore single tables. Expect half a day.
+- ④ Install the `snapshot-controller` EKS add-on and one VolumeSnapshotClass. That stops the sidecar errors and makes CSI snapshots possible. Expect about 30 minutes.
+- ⑤ After that, make an encrypted, expandable gp3 class the default. Move the volumes to encrypted copies during a restore test. The manifest is in report-details.md, section 4, Storage. Expect a day.
 
 ```json
 { "PolicyType": "EBS_SNAPSHOT_MANAGEMENT", "ResourceTypes": ["VOLUME"],
@@ -53,11 +53,11 @@ None of this raised an alert. Only app-m image inference and LoRA training have 
 **Cause.** Most likely, the image deployed on 2026-11-02 needs more memory at start than its 768 Mi limit. KRR's 607 MB recommendation comes from the 14 days before that image. The alert rules are the kube-prometheus-stack defaults plus the app-m team's own rules. Nobody wrote rules on the ALB metrics the account already collects. The health-check path was left at `/` on apps that redirect or return 404 there. The snapshot cannot tell whether 20 seconds is normal for api.v1.example-b.ai. Its pods use 0.013 cores at the p95, so the time is spent waiting, most likely on image generation outside the pod.
 
 **Action.**
-- ① Give app-q-ai a 1Gi memory request, a 1536Mi limit and two replicas, and add a PDB with `minAvailable: 1`. The next OOM will not take the service down, and the next rollout will not hit the limit at start. Takes 15 minutes.
-- ② Add the OOM rule below and route it to `slack-sre`. Takes 20 minutes.
-- ③ For every public prod host, alert when the 5xx ratio stays above 1% for 5 minutes, and when the p95 stays above 3 seconds for 10 minutes. Until a CloudWatch exporter feeds Prometheus, CloudWatch alarms on `HTTPCode_Target_5XX_Count` and `TargetResponseTime` per target group do the same job. Takes half a day.
-- ④ Set `alb.ingress.kubernetes.io/healthcheck-path` on the four prod ingresses to each app's health endpoint. Where the app redirects, set `success-codes: "200-399"`. Takes 20 minutes.
-- ⑤ Set `kubeControllerManager.enabled`, `kubeScheduler.enabled` and `kubeEtcd.enabled` to `false` in the chart values. The two permanent alerts disappear. Takes 10 minutes.
+- ① Give app-q-ai a 1Gi memory request, a 1536Mi limit and two replicas, and add a PDB with `minAvailable: 1`. The next OOM will not take the service down, and the next rollout will not hit the limit at start. Expect about 15 minutes.
+- ② Add the OOM rule below and route it to `slack-sre`. Expect about 20 minutes.
+- ③ For every public prod host, alert when the 5xx ratio stays above 1% for 5 minutes, and when the p95 stays above 3 seconds for 10 minutes. Until a CloudWatch exporter feeds Prometheus, CloudWatch alarms on `HTTPCode_Target_5XX_Count` and `TargetResponseTime` per target group do the same job. Expect half a day.
+- ④ Set `alb.ingress.kubernetes.io/healthcheck-path` on the four prod ingresses to each app's health endpoint. Where the app redirects, set `success-codes: "200-399"`. Expect about 20 minutes.
+- ⑤ Set `kubeControllerManager.enabled`, `kubeScheduler.enabled` and `kubeEtcd.enabled` to `false` in the chart values. The two permanent alerts disappear. Expect about 10 minutes.
 - ⑥ Decide with the app-m team whether 20 seconds is the expected time for api.v1.example-b.ai. If it is, record it as that host's latency objective and alert on that number.
 
 ```yaml
@@ -93,11 +93,11 @@ Evidence checks: `resources.oomkilled.prod-app-q/deploy/app-q-ai:ai`, `resources
 **Cause.** A few services request hundreds of times the CPU they use. The scheduler therefore sees the app nodes as full, and every scale-up needs a new node. Nothing spreads replicas across nodes or zones, so the scheduler puts them wherever the requests fit. The do-not-disrupt annotation sits in the Deployment template, so every new app-m-admin pod carries it again. The `default` NodePool allows spot and on-demand, and Karpenter chooses spot whenever both are allowed.
 
 **Action.**
-- ① Lower the CPU request of app-p-backend, app-l-backend and app-l-embedding-server from 500m to 100m. This frees 2.0 cores and takes the two app nodes to about 59% and 50% requested. KEDA workers can then start without a new node. Takes 30 minutes. Leave the requests of app-l-neo4j and the other databases as they are.
-- ② Add hostname and zone topologySpreadConstraints to the shared prod chart for Deployments with two or more replicas. The fragment is in report-details.md, section 4, Resilience. Takes 1 to 2 hours through Argo CD.
-- ③ After ① and ②, remove `karpenter.sh/do-not-disrupt` from the prod app-m-admin template. Karpenter then replaces the expired node, which also starts it on a fresh disk. Takes 10 minutes.
-- ④ app-p-backend runs one replica with the Recreate strategy, and its spec changed 13 times in seven days. Each change was an outage. If the app can run two copies, switch to 2 replicas and RollingUpdate with `maxSurge: 1`, `maxUnavailable: 0`. Takes 20 minutes.
-- ⑤ Keep at least one replica of each prod service on on-demand capacity. One way is a small on-demand NodePool that carries the `workload-type=app` label, combined with the zone spread from ②. Takes half a day.
+- ① Lower the CPU request of app-p-backend, app-l-backend and app-l-embedding-server from 500m to 100m. This frees 2.0 cores and takes the two app nodes to about 59% and 50% requested. KEDA workers can then start without a new node. Expect about 30 minutes. Leave the requests of app-l-neo4j and the other databases as they are.
+- ② Add hostname and zone topologySpreadConstraints to the shared prod chart for Deployments with two or more replicas. The fragment is in report-details.md, section 4, Resilience. Expect about 1 to 2 hours through Argo CD.
+- ③ After ① and ②, remove `karpenter.sh/do-not-disrupt` from the prod app-m-admin template. Karpenter then replaces the expired node, which also starts it on a fresh disk. Expect about 10 minutes.
+- ④ app-p-backend runs one replica with the Recreate strategy, and its spec changed 13 times in seven days. Each change was an outage. If the app can run two copies, switch to 2 replicas and RollingUpdate with `maxSurge: 1`, `maxUnavailable: 0`. Expect about 20 minutes.
+- ⑤ Keep at least one replica of each prod service on on-demand capacity. One way is a small on-demand NodePool that carries the `workload-type=app` label, combined with the zone spread from ②. Expect half a day.
 
 ```yaml
 # prod app-m chart, admin Deployment
@@ -126,11 +126,11 @@ Evidence checks: `resilience.prod-concentration.node-1-139`, `resilience.n-plus-
 **Cause.** Most likely, the Kafka listener was opened for the on-premise consumers. The alert rules expect 16 members in the `on-premise` consumer group. Argo CD and the API endpoint still run with their installation defaults. Network policy enforcement is an opt-in setting of the VPC CNI add-on, and it was never turned on.
 
 **Action.**
-- ① Set `loadBalancerSourceRanges` on `middleware/kafka-controller-0-external` to the egress addresses of the on-premise consumers. Confirm that the external listener uses SASL over TLS, and check afterwards that `kafka_consumergroup_members{consumergroup="on-premise"}` stays at 16. Takes 30 minutes.
-- ② Turn on SSO in Argo CD through Dex or OIDC. Set `admin.enabled: "false"` and `policy.default: role:readonly`, and move the applications into one AppProject per team. Takes half a day.
-- ③ Restrict the EKS public endpoint to the office and CI addresses, or make it private. Takes 30 minutes.
-- ④ Enable network policy in the VPC CNI add-on configuration with `{"enableNetworkPolicy": "true"}`. The three existing policies start blocking traffic at that moment, so read them first. Takes 1 hour.
-- ⑤ Set the IMDS hop limit to 1 in the EC2NodeClass, so pods cannot reach the node's credentials. Six service accounts already use IRSA. Takes 20 minutes and applies to new nodes.
+- ① Set `loadBalancerSourceRanges` on `middleware/kafka-controller-0-external` to the egress addresses of the on-premise consumers. Confirm that the external listener uses SASL over TLS, and check afterwards that `kafka_consumergroup_members{consumergroup="on-premise"}` stays at 16. Expect about 30 minutes.
+- ② Turn on SSO in Argo CD through Dex or OIDC. Set `admin.enabled: "false"` and `policy.default: role:readonly`, and move the applications into one AppProject per team. Expect half a day.
+- ③ Restrict the EKS public endpoint to the office and CI addresses, or make it private. Expect about 30 minutes.
+- ④ Enable network policy in the VPC CNI add-on configuration with `{"enableNetworkPolicy": "true"}`. The three existing policies start blocking traffic at that moment, so read them first. Expect about 1 hour.
+- ⑤ Set the IMDS hop limit to 1 in the EC2NodeClass, so pods cannot reach the node's credentials. Six service accounts already use IRSA. Expect about 20 minutes and applies to new nodes.
 
 ```yaml
 # middleware/kafka-controller-0-external
@@ -163,10 +163,10 @@ Four managed add-ons are behind as well.
 **Cause.** The cluster was built in December 2025 with the defaults of that time, and nobody has touched the platform layer since. Karpenter, the node image family and the add-ons are still at the versions they were installed with.
 
 **Action.**
-- ① Upgrade Karpenter from 0.37 to 1.x following the v1 migration guide. The NodePool and EC2NodeClass APIs move from v1beta1 to v1. Takes 2 to 3 hours, including a dry run on the dev applications.
-- ② Change the EC2NodeClass to AL2023 with a pinned alias, IMDS hop limit 1 and an encrypted 100Gi root volume. Drift then replaces the six AL2 nodes one at a time. Do this after ① and ② of problem 3, so that pods spread as they move. Takes half a day.
-- ③ Upgrade the four add-ons, enable prefix delegation in VPC CNI, and refresh the managed node group AMI. Takes 2 hours.
-- ④ Upgrade EKS from 1.32 to 1.33 to 1.34, one minor version at a time, and dev first. Takes a day per minor version.
+- ① Upgrade Karpenter from 0.37 to 1.x following the v1 migration guide. The NodePool and EC2NodeClass APIs move from v1beta1 to v1. Expect about 2 to 3 hours, including a dry run on the dev applications.
+- ② Change the EC2NodeClass to AL2023 with a pinned alias, IMDS hop limit 1 and an encrypted 100Gi root volume. Drift then replaces the six AL2 nodes one at a time. Do this after ① and ② of problem 3, so that pods spread as they move. Expect half a day.
+- ③ Upgrade the four add-ons, enable prefix delegation in VPC CNI, and refresh the managed node group AMI. Expect about 2 hours.
+- ④ Upgrade EKS from 1.32 to 1.33 to 1.34, one minor version at a time, and dev first. Expect a day per minor version.
 
 ```yaml
 # EC2NodeClass default, after Karpenter v1

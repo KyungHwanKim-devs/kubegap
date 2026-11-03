@@ -4217,10 +4217,13 @@
   rule:
     expr: "k8s_eol(inv['cluster'].get('server_version')) is not None and days_until(k8s_eol(inv['cluster'].get('server_version'))) < 0"
     warn_expr: "k8s_eol(inv['cluster'].get('server_version')) is not None and days_until(k8s_eol(inv['cluster'].get('server_version'))) < 90"
-  evidence: "f\"server {inv['cluster'].get('server_version')}, end of support {eol_badge(inv['cluster'].get('server_version'))}\""
+  evidence: "f\"server {inv['cluster'].get('server_version')}: {eol_badge(inv['cluster'].get('server_version'))}\""
   severity_default: high
   symptom_linked: false
-  why: An unsupported minor version gets no security patches. On EKS extended support billing starts; on k3s and kubeadm the upgrade path gets longer (no skipping more than one minor).
+  why: >
+    An unsupported minor version gets no security patches. On EKS extended support billing starts; on k3s and kubeadm the upgrade path gets longer (no skipping more than one minor).
+    Two different dates end support for one minor and the evidence names which it uses. Upstream end of life is the day the Kubernetes project stops patching the minor, from rubric/k8s-versions.yaml.
+    EKS end of standard support is the day AWS moves the version to extended support billing, from describe-cluster-versions, and it comes a few weeks after the upstream date. On EKS the check judges by the EKS date and shows both.
   cases:
     - { who: ZenML 2025, url: https://status.zenml.io/incidents/bnrlb8tck3v0 }
   suggest: Upgrade one minor at a time. First check the removed APIs with Pluto or kubent.
@@ -14284,7 +14287,7 @@
   severity_default: medium
   symptom_linked: true
   why: >
-    Most outages are triggered by a change (Google SRE Book ch. 8; Cloudflare incident reports in general). The code only gathers the material: workloads and namespaces changed within 24 hours (recent_changes), objects changed and new findings versus the previous snapshot (diff), last termination times of restarts and OOMs, ingress 5xx and p95, first and last times of Warning events.
+    Most outages are triggered by a change (Google SRE Book ch. 1, Change Management; Cloudflare incident reports in general). The code only gathers the material: workloads and namespaces changed within 24 hours (recent_changes), objects changed and new findings versus the previous snapshot (diff), last termination times of restarts and OOMs, ingress 5xx and p95, first and last times of Warning events.
     The LLM asks whether restarts, 5xx or Unhealthy began on that workload (or that ingress) within ±30 minutes of a change. If they overlap, write "Y started after change X — rollback candidate"; if the material is instant values and times cannot be matched, write "correlation not verifiable (range query needed)". If nothing overlaps, finish in one line. Do not assert.
   suggest: "If they overlap, pin down the change with kubectl rollout history or Argo CD history for that workload, roll it back and watch whether the metrics recover. If it recurs: canary (hygiene.no-progressive-delivery) and a GitOps diff gate."
   verify:

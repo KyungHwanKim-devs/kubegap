@@ -22,8 +22,8 @@ Order of work: analyse → write the fragments (small files) → write `report.m
 12. **`report.md` — the Top N problems.** Pick "problems", not "actions": daily 3, full 5. Choose by severity × impact × difficulty; with an SLO, by error-budget burn. In daily mode the order is: new or recurred items that still have impact now, then the persisting critical/high with the largest impact, then events that have ended. An event has ended when its latest measurement is back under the threshold (the latest 1-hour p95 of a latency finding, the current throttling ratio) or its last occurrence is before this collection window; a finding can be new in `diff.json` and ended at the same time, because a 24-hour average carries one bad hour. The latest hourly value is the current partial hour, or the newest hour that had requests when the service has been idle, so call an event ended only when that hour carries a meaningful share of the requests. An ended event that still makes the Top N says so in its title or first Problem sentence. Dozens of findings with one cause are one problem ("15 prod Deployments can only land on one node" is one problem, not 15). Each problem has six parts, in this order, each one paragraph:
     - **Problem** — what is wrong, how, and the impact on users or operations right now. Name the namespace, workload and node; no check ids here.
     - **Evidence** — the three to six numbers that carry the problem, each in its own short sentence, with the source file named after the number and never in parentheses. Everything else lives in `report-details.md`; do not pile every value into this paragraph. If a value was measured while collection was running, say so.
-    - **Cause** — why it came to this. When not certain, start with "Most likely," (Korean: "추정입니다.").
-    - **Action** — in order ①②③; what to change, the expected effect, the effort in minutes/hours/days; a manifest fragment or the exact command where possible.
+    - **Cause** — why it came to this. When not certain, start with "Most likely," (Korean: "추정이에요.").
+    - **Action** — in order ①②③; what to change, the expected effect, and the effort as an estimate that reads as one, at the end of the sentence: "Expect about 30 minutes.", "Expect an hour or two.", "Expect half a day." in English; "30분쯤 걸려요.", "한두 시간 걸려요.", "반나절쯤 걸려요." in Korean. Never a bare "Takes 30 minutes." or "30분 걸려요.", which read as measured; nobody timed them. A manifest fragment or the exact command where possible.
     - **Why this happens** — three short bullets, and a fourth when a check recorded a measurement that bears on the problem, see rule 12-1.
     - **Evidence checks** — the finding ids, on one line. This is the only place ids appear in `report.md`.
 12-1. **Why this happens: principle, cases, measured when this check was written, read next.** Its purpose is that the reader understands the mechanism well enough to recognize the next instance without kubegap.
@@ -49,7 +49,7 @@ Order of work: analyse → write the fragments (small files) → write `report.m
 ## 8. Writing rules
 
 **Tone follows the report tone rules:** state the conclusion first, one idea per sentence, plain words, make the next step obvious to the reader, and use a polite conversational register. Applied to this report:
-- **No parenthetical asides.** Do not put explanations, examples, qualifiers or effort estimates in parentheses. If a term needs explaining, explain it in its own sentence, and only when a person who runs a cluster would not know it: explain "TURN server" or "CFS quota", not "Deployment", "liveness probe" or "PDB". Effort goes at the end of the action sentence as plain words: "Takes 30 minutes." Source files go after the number without parentheses: "restart count 7,876 in objects/pods.json" or as a trailing sentence "Source: objects/pods.json, events.json." Parentheses stay only inside code, ids, YAML and quoted log lines.
+- **No parenthetical asides.** Do not put explanations, examples, qualifiers or effort estimates in parentheses. If a term needs explaining, explain it in its own sentence, and only when a person who runs a cluster would not know it: explain "TURN server" or "CFS quota", not "Deployment", "liveness probe" or "PDB". Effort goes at the end of the action sentence as an estimate that reads as one: "Expect about 30 minutes." Source files go after the number without parentheses: "restart count 7,876 in objects/pods.json" or as a trailing sentence "Source: objects/pods.json, events.json." Parentheses stay only inside code, ids, YAML and quoted log lines.
 - When writing in Korean, end sentences in the polite conversational (haeyo) style, not the plain declarative (handa) style. When writing in English, use plain sentences addressed to the reader. Short table values, finding ids, commands and YAML stay as they are.
 - Conclusion first. Describe a problem in the order "what happened → what the impact is now → what to do".
 - Short sentences, one idea each. Do not chain three things with commas.
@@ -96,9 +96,10 @@ Korean is written, not translated. Think of the sentence a Korean SRE would say 
 | Numbers | 숫자 |
 | Quick fix outside the list | 목록 밖의 빠른 조치 |
 | not started / started / done | 아직 손대지 않음 / 진행 중 / 끝남 |
-| Nothing is on fire | 급한 장애는 없습니다 |
+| Nothing is on fire | 급한 장애는 없어요 |
 | first pass / final | 1차 결과 / 최종 결과 |
 | expected effect | 효과 |
+| Expect about 30 minutes. / Expect an hour or two. / Expect half a day. | 30분쯤 걸려요. / 한두 시간 걸려요. / 반나절쯤 걸려요. |
 | measured during collection | 수집 중에 측정된 값 |
 
 **Terms.** Use the word Korean Kubernetes engineers use, which is usually the English term in Korean letters or the English word itself. Never the dictionary translation.
@@ -109,17 +110,18 @@ Korean is written, not translated. Think of the sentence a Korean SRE would say 
 | requests, limits, liveness 프로브, readiness 프로브, desired, available, Ready | 요청값, 제한값, 라이브니스, 레디니스, 원함, 가용 |
 | 노드, 파드, 네임스페이스, 워크로드, 디플로이먼트 또는 Deployment, 스테이트풀셋 또는 StatefulSet | 노드 외의 번역어 |
 | 스케줄링, 스로틀링, 재시작, 이벤트, 알림, 알림 규칙 | 일정 잡기, 조절, 경보(alert 는 알림) |
-| 점검, 조치, 발견 사항 또는 문제, 임계값을 넘었습니다 | 감사, 액션, 판정, 문턱을 넘었어요 |
-| 적용됩니다, 응답합니다, 머물러 있습니다, 올라가 있는 노드 | 집행돼요, 돌려줘요, 앉아 있어요, 품은 노드 |
+| 점검, 조치, 발견 사항 또는 문제, 임계값을 넘었어요 | 감사, 액션, 판정, 문턱을 넘었어요 |
+| 적용돼요, 응답해요, 머물러 있어요, 올라가 있는 노드 | 집행돼요, 돌려줘요, 앉아 있어요, 품은 노드 |
+| 30분쯤 걸려요, 한두 시간 걸려요 | 30분 걸려요, 1시간 걸립니다 |
 
 **More terms, from real reports.** Write "크래시 로그를 보다", not "이유를 읽다". Write "desired 1, available 0", not "원함 1, 가용 0". Write "의존 서비스가 느려지면", not "의존을 만나요". A case is not a subject: "Buffer(2020) 사례에서는 … CPU 제한을 뺐어요", not "사례는 … 발견하고 제거했어요". Write "적용돼요" or "막아요", not "집행돼요". Write "CPU 를 순간적으로 몰아 쓰는 구간", not "폭주". Write "운영자", not "유저". Write "수집하던 시간대", not "수집 창". Write "원래 건너뛰게 되어 있어요", not "설계상 건너뛰어요". Write "CFS 주기", not "스케줄러 주기". Effects are a sentence, not a list after a colon: "이렇게 하면 쓸데없는 재시작이 없어지고 503 로그도 사라져요", never "기대 효과: 재시작 없음, 503 로그 사라짐". Section titles: "이번에 확인 못 한 것" for "What this run could not see", "번외로 금방 끝나는 것 하나" for "Quick fix outside the list".
 
-**Do not write.** Literal English idioms ("불타는 곳", "길이 두 갈래", "소음을 만들어요"); passive calques ("~에 의해 수행된다", "~되어진다"); "~하는 것이 가능해요"; "~에 대해" where a particle does the job; sentence-initial "그러나/하지만" chains; metaphors of any kind. Numbers keep units and the Korean counter: 파드 27개, 노드 2대, 2분 7초, 87%.
+**Do not write.** The plain declarative (handa) or the formal (hamnida) ending in any sentence of `report.md`: "~합니다", "~입니다", "~했다"; every sentence ends in the polite conversational (haeyo) form, the fixed phrases included. Literal English idioms ("불타는 곳", "길이 두 갈래", "소음을 만들어요"); passive calques ("~에 의해 수행된다", "~되어진다"); "~하는 것이 가능해요"; "~에 대해" where a particle does the job; sentence-initial "그러나/하지만" chains; metaphors of any kind. Numbers keep units and the Korean counter: 파드 27개, 노드 2대, 2분 7초, 87%.
 
 **Example of the register (problem 1 of a daily report).**
 
-> ### 1. `app-c-prod/app-c-coturn` 이 7,876번 죽었는데, 아직 아무도 크래시 로그를 안 봤습니다
-> **문제.** app-c 의 TURN 서버가 노드 `node-a` 에서 CrashLoopBackOff 상태입니다. TURN 서버는 WebRTC 통화가 NAT 를 넘도록 중계하는 서버입니다. Deployment 의 available 이 0 이라 중계가 필요한 app-c 통화는 실패합니다. 2026-10-25 이후 모든 리포트에서 1번 문제였고 조치는 아직 손대지 않았습니다.
-> **근거.** 재시작 7,876회, 13:34 이후 14회 늘었습니다. 출처는 objects/pods.json 입니다. BackOff 이벤트가 70분에 320건 더 쌓였고 전부 이 파드 하나입니다. 출처는 events.json 입니다. 마지막 종료는 14:43:21 KST, 종료 코드 255, 시작과 종료가 같은 초입니다.
-> **원인.** 추정입니다. 1초 안에 255 로 끝나니 시작 시 설정 오류나 포트 바인딩 실패일 가능성이 큽니다. 컨테이너 로그는 kubegap 수집 범위 밖이라 정확한 메시지는 모릅니다.
-> **조치.** ① 마지막 크래시 메시지를 읽습니다. `kubectl -n app-c-prod logs app-c-coturn-549854dfcb-jgp4h -c coturn --previous | tail -50`. 10분 걸립니다. ② 포트 충돌이면 `node-a` 에서 `ss -lunp | grep 3478` 로 3478 을 쓰는 프로세스를 확인합니다. 5분 걸립니다. ③ 인자를 고치고 이미지 태그를 고정하고 3478 에 tcpSocket 프로브를 붙입니다. 30분 걸립니다. 효과는 app-c 통화 복구와 시간당 약 260건의 BackOff 이벤트 중단입니다.
+> ### 1. `app-c-prod/app-c-coturn` 이 7,876번 죽었는데, 아직 아무도 크래시 로그를 안 봤어요
+> **문제.** app-c 의 TURN 서버가 노드 `node-a` 에서 CrashLoopBackOff 상태예요. TURN 서버는 WebRTC 통화가 NAT 를 넘도록 중계하는 서버예요. Deployment 의 available 이 0 이라 중계가 필요한 app-c 통화는 실패해요. 2026-10-25 이후 모든 리포트에서 1번 문제였고 조치는 아직 손대지 않았어요.
+> **근거.** 재시작 7,876회, 13:34 이후 14회 늘었어요. 출처는 objects/pods.json 이에요. BackOff 이벤트가 70분에 320건 더 쌓였고 전부 이 파드 하나예요. 출처는 events.json 이에요. 마지막 종료는 14:43:21 KST, 종료 코드 255, 시작과 종료가 같은 초예요.
+> **원인.** 추정이에요. 1초 안에 255 로 끝나니 시작 시 설정 오류나 포트 바인딩 실패일 가능성이 커요. 컨테이너 로그는 kubegap 수집 범위 밖이라 정확한 메시지는 몰라요.
+> **조치.** ① 마지막 크래시 메시지를 읽어요. `kubectl -n app-c-prod logs app-c-coturn-549854dfcb-jgp4h -c coturn --previous | tail -50`. 10분쯤 걸려요. ② 포트 충돌이면 `node-a` 에서 `ss -lunp | grep 3478` 로 3478 을 쓰는 프로세스를 확인해요. 5분쯤 걸려요. ③ 인자를 고치고 이미지 태그를 고정하고 3478 에 tcpSocket 프로브를 붙여요. 30분쯤 걸려요. 효과는 app-c 통화 복구와 시간당 약 260건의 BackOff 이벤트 중단이에요.

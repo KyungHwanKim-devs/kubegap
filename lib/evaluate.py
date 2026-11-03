@@ -292,30 +292,47 @@ class Context:
         without = [n for n in user_ns if n not in has]
         return {"with": sorted(has & set(user_ns)), "without": without, "without_prod": [n for n in without if n in self.prod_like], "total_user_ns": len(user_ns)}
 
-    def k8s_eol(self, version: str | None):
+    def k8s_support_ends(self, version: str | None) -> dict:
+        """The two dates on which support for a minor version ends, each named by its source, because they are different facts with different dates (#11):
+        `upstream`, the day the Kubernetes project stops patching the minor (rubric/k8s-versions.yaml), and on EKS `eks_standard`, the day AWS moves the version
+        to extended support billing (describe-cluster-versions endOfStandardSupportDate). `primary` is the one the platform's operator acts on: EKS standard support on EKS, upstream elsewhere."""
+        out: dict = {"minor": None, "upstream": None, "eks_standard": None, "primary": None, "primary_source": None}
         if not version:
-            return None
+            return out
         m = re.match(r"v?(\d+\.\d+)", version)
         if not m:
-            return None
-        eks = (self.inv.get("cluster") or {}).get("eks")
-        if eks:
+            return out
+        out["minor"] = m.group(1)
+        for row in self._k8s_versions:
+            if str(row.get("minor")) == m.group(1):
+                out["upstream"] = str(row.get("eol"))
+        if (self.inv.get("cluster") or {}).get("eks"):
             cv = self.aws_file("describe-cluster-versions.json")
             for v in (cv or {}).get("clusterVersions") or []:
                 if v.get("clusterVersion") == m.group(1) and v.get("endOfStandardSupportDate"):
-                    return str(v["endOfStandardSupportDate"])[:10]
-        for row in self._k8s_versions:
-            if str(row.get("minor")) == m.group(1):
-                return str(row.get("eol"))
-        return None
+                    out["eks_standard"] = str(v["endOfStandardSupportDate"])[:10]
+        if out["eks_standard"]:
+            out["primary"], out["primary_source"] = out["eks_standard"], "EKS end of standard support"
+        elif out["upstream"]:
+            out["primary"], out["primary_source"] = out["upstream"], "upstream end of life"
+        return out
+
+    def k8s_eol(self, version: str | None):
+        """The support end date the platform's operator acts on; see k8s_support_ends for which source it is."""
+        return self.k8s_support_ends(version)["primary"]
 
     def eol_badge(self, version: str | None) -> str:
-        """Human-readable end-of-support badge. Before EOL: 'D-30 (30 days left)'; after: 'D+119 (119 days past EOL)'."""
-        eol = self.k8s_eol(version)
-        d = self.days_until(eol)
-        if eol is None or d is None:
+        """The support end written with its source and the distance: 'EKS end of standard support 2026-03-23, 140 days left; upstream end of life 2026-02-28'.
+        On EKS both dates are named when they differ, since they are different events; elsewhere only the upstream date exists."""
+        ends = self.k8s_support_ends(version)
+        d = self.days_until(ends["primary"])
+        if ends["primary"] is None or d is None:
             return "end of support unknown"
-        return f"{eol} D-{d} ({d} days left)" if d >= 0 else f"{eol} D+{-d} ({-d} days past EOL)"
+        dist = f"{d} days left" if d >= 0 else f"{-d} days past"
+        text = f"{ends['primary_source']} {ends['primary']}, {dist}"
+        if ends["eks_standard"] and ends["upstream"] and ends["upstream"] != ends["eks_standard"]:
+            text += f"; upstream end of life {ends['upstream']}"
+        return text
 
     def backup_signals(self) -> dict:
         """There may be backup activity even without a backup tool: k3s etcd snapshot objects, CronJobs named backup/dump/snapshot, VolumeSnapshots."""
@@ -421,6 +438,7 @@ class Context:
             "has_service": self.has_service,
             "symptom_rule_count": self.symptom_rule_count,
             "k8s_eol": self.k8s_eol,
+            "k8s_support_ends": self.k8s_support_ends,
             "days_until": self.days_until,
             "aws_file": self.aws_file,
             "addon_latest": self.addon_latest,

@@ -11,7 +11,7 @@ This cluster is a two-node k3s installation reached through the `default` contex
 
 **Cause.** Confirmed for the mechanism: the HPA divides CPU use by the 100m request, so a short spike above 60m per pod triggers a scale-out. Each new pod burns CPU while it starts, the 500m limit throttles that startup, and the pod stays not Ready for about a minute and a half; once the spike passes the HPA scales back after its 300-second stabilization window. Likely: the spike is a real request burst, because the trigger is CPU this time and not memory as at 13:35 KST. No request, error or latency metric exists for this service, so whether users noticed cannot be read from the cluster.
 
-**Action.** ① Remove the CPU limit of container `app` and keep the 100m request. The effect is no throttling during scale-out and a faster startup, with no change to scheduling because requests stay. Takes 10 minutes through Git and Argo CD. ② Raise the readiness and liveness probe `timeoutSeconds` from 1 to 3 and give the liveness probe a path that does not share `/healthcheck` with readiness, so a slow start is not mistaken for a dead process. Takes 20 minutes. ③ Decide the HPA target with a week of data: if `hpa_desired_changes_7d` stays above 20, raise the CPU target to 80% or the request to 200m, so a short spike does not add three pods that each need 100m of N+1 headroom. Takes 30 minutes of reading. ④ Reduce requests of the 18 over-provisioned containers reported under `resources.cpu-request-overprovisioned`, but not the `app-f-api-server` request, because the HPA scales on it. Takes 1 hour.
+**Action.** ① Remove the CPU limit of container `app` and keep the 100m request. The effect is no throttling during scale-out and a faster startup, with no change to scheduling because requests stay. Expect about 10 minutes through Git and Argo CD. ② Raise the readiness and liveness probe `timeoutSeconds` from 1 to 3 and give the liveness probe a path that does not share `/healthcheck` with readiness, so a slow start is not mistaken for a dead process. Expect about 20 minutes. ③ Decide the HPA target with a week of data: if `hpa_desired_changes_7d` stays above 20, raise the CPU target to 80% or the request to 200m, so a short spike does not add three pods that each need 100m of N+1 headroom. Expect about 30 minutes of reading. ④ Reduce requests of the 18 over-provisioned containers reported under `resources.cpu-request-overprovisioned`, but not the `app-f-api-server` request, because the HPA scales on it. Expect about 1 hour.
 ```yaml
 # app-f-prod/deployment/app-f-api-server, container app
 resources:
@@ -33,11 +33,11 @@ Evidence checks: `resources.cpu-throttling.app-f-prod/deploy/app-f-api-server:ap
 
 **Cause.** Likely: a process that exits with 255 within one second fails at startup, most often a configuration error or a port bind failure. Container logs are outside kubegap's collection, so the exact message is unknown. The `:latest` tag means the binary may have changed at the node reboot of 2026-10-25 without any manifest change.
 
-**Action.** ① Read the last crash message. Takes 10 minutes.
+**Action.** ① Read the last crash message. Expect about 10 minutes.
 ```bash
 kubectl -n app-c-prod logs app-c-coturn-549854dfcb-jgp4h -c coturn --previous | tail -50
 ```
-② If it is a port conflict, find the owner of 3478 on `node-a` with `ss -lunp | grep 3478`. Takes 5 minutes. ③ Fix the arguments, pin the image tag to a digest or version, and add a tcpSocket probe on 3478. Takes 30 minutes. The effect is working app-c calls, about 260 fewer BackOff events per hour, and the two always-firing alerts KubePodCrashLooping and KubeDeploymentReplicasMismatch going quiet. ④ If it cannot be fixed today, scaling the Deployment to 0 stops the event noise; that is your decision.
+② If it is a port conflict, find the owner of 3478 on `node-a` with `ss -lunp | grep 3478`. Expect about 5 minutes. ③ Fix the arguments, pin the image tag to a digest or version, and add a tcpSocket probe on 3478. Expect about 30 minutes. The effect is working app-c calls, about 260 fewer BackOff events per hour, and the two always-firing alerts KubePodCrashLooping and KubeDeploymentReplicasMismatch going quiet. ④ If it cannot be fixed today, scaling the Deployment to 0 stops the event noise; that is your decision.
 
 **Why this happens.**
 - Principle: A restart has one of three causes: OOMKilled, a failed liveness probe, or the application exiting on its own. Exit 255 within one second with no probes is the third, so the only next step is the previous container's log. Raising limits or changing probes does not help here.
@@ -53,11 +53,11 @@ Evidence checks: `resilience.restarts-crashloop.app-c-prod/app-c-coturn-549854df
 
 **Cause.** Likely: the `full=true` health check includes repository access and sometimes exceeds the 5-second probe timeout. The coincidence with kubegap's collection suggests that any extra request on port 8084, including the metrics scrape kubegap attempts, slows the health handler, which would also explain why the proxy gets 502. This is not confirmed; a single overlap is not proof.
 
-**Action.** ① Watch whether failures cluster around scrape or sync times. Takes 15 minutes.
+**Action.** ① Watch whether failures cluster around scrape or sync times. Expect about 15 minutes.
 ```bash
 kubectl -n argocd get events --field-selector reason=Unhealthy -w
 ```
-② Raise the liveness `timeoutSeconds` to 15 and `failureThreshold` to 5 in the Argo CD Helm values or kustomize overlay. The effect is no unnecessary restart and no 503 in the repo-server log. Takes 20 minutes. ③ Check why port 8084 answers 502 through the API server proxy, with a port-forward and `curl -s localhost:8084/metrics | head`. Takes 10 minutes.
+② Raise the liveness `timeoutSeconds` to 15 and `failureThreshold` to 5 in the Argo CD Helm values or kustomize overlay. The effect is no unnecessary restart and no 503 in the repo-server log. Expect about 20 minutes. ③ Check why port 8084 answers 502 through the API server proxy, with a port-forward and `curl -s localhost:8084/metrics | head`. Expect about 10 minutes.
 
 **Why this happens.**
 - Principle: A liveness probe should answer only "is the process dead". When the path also checks dependencies, a short dependency delay makes the kubelet kill a healthy pod, and the restarted pod meets the same dependency again. Dependency checks belong in readiness, where a failure removes traffic instead of restarting.
