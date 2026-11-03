@@ -23,8 +23,15 @@ SUSPECT_LIVENESS_RE = re.compile(r"(db|database|mysql|postgres|redis|mongo|kafka
 DB_SELF_PROBE_RE = re.compile(
     r"(pg_isready|mysqladmin|mysql .*-e|redis-cli|valkey-cli|mongosh|mongo .*ping|cqlsh|nodetool|clickhouse-client|rabbitmq-diagnostics|rabbitmqctl|etcdctl endpoint|_cluster/health|minio.*health)", re.IGNORECASE
 )  # standard probes that check the DB's own response — not external dependencies (seen: 6 mysql false positives)
-DB_HINT_RE = re.compile(r"(postgres|pgsql|mysql|mariadb|mongo|redis|valkey|elastic|opensearch|kafka|rabbit|clickhouse|qdrant|milvus|minio|etcd|cassandra|neo4j|influx|timescale)", re.IGNORECASE)
-NOT_DB_RE = re.compile(r"exporter|operator|controller|proxy|ui|insight|commander|express|dashboards|agent|connect|backup|telegraf|console", re.IGNORECASE)
+DB_HINT_RE = re.compile(
+    r"(postgres|pgsql|mysql|mariadb|mongo|redis|valkey|elastic|opensearch|kafka|rabbit|clickhouse|qdrant|milvus|minio|etcd|cassandra|neo4j|influx|timescale"
+    r"|prometheus|thanos|loki|mimir|cortex|tempo|victoria|zookeeper|nats|pulsar|solr|couch|cockroach|tidb|scylla|memcache|weaviate|meili|typesense|vault)",
+    re.IGNORECASE,
+)
+# a whole name token that says the container is a helper next to a store, not the store itself; whole tokens so that quickstart does not trip ui or magento agent
+NOT_DB_TOKENS = frozenset({"exporter", "operator", "controller", "proxy", "ui", "insight", "insights", "commander", "express", "dashboards", "dashboard", "agent", "connect", "backup", "telegraf", "console", "init", "sidecar"})
+# a Helm release named after a monitoring store carries many pods that are not the store (kube-prometheus-stack-grafana, loki-stack-promtail, thanos-query): the workload name alone does not make those a store
+MONITORING_RELEASE_RE = re.compile(r"(prometheus|thanos|loki|mimir|cortex|tempo|victoria)", re.IGNORECASE)
 
 
 def image_repo(image: str | None) -> str:
@@ -32,14 +39,30 @@ def image_repo(image: str | None) -> str:
     return (image or "").split("@")[0].rsplit("/", 1)[-1].split(":")[0]
 
 
-def is_db_like(container: str | None, image: str | None, workload: str | None) -> bool:
-    """Does this container run a database, cache or message queue? Judged from the container name, the image repository name and the workload name;
-    a container whose name, image or workload says exporter, operator, controller, proxy, ui, insight, commander, express, dashboards, agent, connect, backup, telegraf or console is not one, so the metrics sidecar next to a Redis, a redis-commander UI or the MongoDB operator's agent are left out. Shared by the probe rows and the request checks in evaluate."""
+def _tokens(*names: str | None) -> set[str]:
+    return {t for n in names if n for t in re.split(r"[^a-z0-9]+", n.lower()) if t}
+
+
+def is_db_like(container: str | None, image: str | None, workload: str | None, *, stateful: bool = False) -> bool:
+    """Does this container run a data store, whose rare peaks (a backup, a compaction, a recovery replay, a cache warm-up) sit far above its 7-day p95?
+    Two signals say yes. Structural: `stateful`, the workload is a StatefulSet that mounts a PersistentVolumeClaim, which is how Kubernetes itself marks a store, whatever the image is called.
+    By name: the container name or image repository, or else the workload name, carries a known store name. A helper next to the store is left out when its own name or image says so
+    in a whole token: exporter, operator, controller, proxy, ui, insight, commander, express, dashboards, agent, connect, backup, telegraf, console, init, sidecar, metrics.
+    Shared by the probe rows and the request checks in evaluate."""
     c, repo = container or "", image_repo(image)
-    if DB_HINT_RE.search(c) and not NOT_DB_RE.search(f"{c} {repo}"):
+    if _tokens(c, repo) & NOT_DB_TOKENS:
+        return False  # the exporter next to a Redis, the MongoDB operator's agent, the init container of a Postgres
+    if stateful:
+        return True
+    if DB_HINT_RE.search(f"{c} {repo}"):
         return True  # a container named kafka running a kafka image is the broker even when the StatefulSet is called kafka-controller, as Bitnami names its KRaft nodes
-    names = f"{c} {workload or ''} {repo}"
-    return bool(DB_HINT_RE.search(names)) and not NOT_DB_RE.search(names)
+    wl = MONITORING_RELEASE_RE.sub("", workload or "")
+    return bool(DB_HINT_RE.search(wl)) and not (_tokens(workload) & NOT_DB_TOKENS)
+
+
+def mounts_pvc(spec: dict | None) -> bool:
+    """Does a pod spec, or a workload's pod template, mount a PersistentVolumeClaim?"""
+    return any(v.get("persistentVolumeClaim") for v in (spec or {}).get("volumes") or [])
 
 
 SHELLS = ("sh", "/bin/sh", "bash", "/bin/bash", "/usr/bin/bash", "ash", "/bin/ash")
@@ -125,7 +148,12 @@ class _Ctx:
         inv = inv or {}
         self.prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
         self.platform = (inv.get("cluster") or {}).get("platform")
-        self.karpenter = bool(((inv.get("components") or {}).get("karpenter") or {}).get("present")) or "karpenter" in (inv.get("components_present") or [])
+        comps = inv.get("components") or {}
+        present = set(inv.get("components_present") or [])
+        self.karpenter = bool((comps.get("karpenter") or {}).get("present")) or "karpenter" in present
+        self.cluster_autoscaler = bool((comps.get("cluster-autoscaler") or {}).get("present")) or "cluster-autoscaler" in present
+        self.autoscaler = self.karpenter or self.cluster_autoscaler  # any node autoscaler turns a lost node into minutes of waiting instead of a permanent loss
+        self.autoscaler_name = "karpenter" if self.karpenter else ("cluster-autoscaler" if self.cluster_autoscaler else None)
         self.pods = objects(snap, "pods")
         self.nodes = objects(snap, "nodes")
         self.services = objects(snap, "services")
@@ -244,6 +272,7 @@ def _probes(cx: _Ctx) -> dict:
     rows = []
     for kind, o in cx.workloads:
         ns = o["metadata"]["namespace"]
+        stateful = kind == "StatefulSet" and (bool((o.get("spec") or {}).get("volumeClaimTemplates")) or mounts_pvc(cx.tpl(o)))
         for c in cx.tpl(o).get("containers") or []:
             flags = []
             probes = {}
@@ -264,7 +293,7 @@ def _probes(cx: _Ctx) -> dict:
                     "initial_delay_s": pr.get("initialDelaySeconds", 0),
                 }
             lv, rd, st = probes["livenessProbe"], probes["readinessProbe"], probes["startupProbe"]
-            db_like = is_db_like(c.get("name"), c.get("image"), o["metadata"]["name"])
+            db_like = is_db_like(c.get("name"), c.get("image"), o["metadata"]["name"], stateful=stateful)
             self_probe = bool(lv and lv["type"] == "exec" and lv["path"] and DB_SELF_PROBE_RE.search(str(lv["path"])))
             if lv and lv["path"] and SUSPECT_LIVENESS_RE.search(str(lv["path"])) and not (db_like and self_probe):
                 flags.append(f"liveness path looks like a dependency/ready check (suspect: {lv['path']})")
@@ -532,7 +561,7 @@ def _placement(cx: _Ctx) -> dict:
                 "pool": lab.get("karpenter.sh/nodepool") or lab.get("eks.amazonaws.com/nodegroup"),
                 "nodes_total": len(cx.nodes),
                 "prod_total": prod_total,
-                "autoscaler": cx.karpenter,
+                "autoscaler": cx.autoscaler,
             }
         )
     return {
@@ -680,6 +709,48 @@ def _n_plus_one(cx: _Ctx) -> dict:
         if c > elig_cpu or m > elig_mem:
             cannot_fit.append({"namespace": ns, "pod": pod, "node": nd, "cpu": round(c, 2), "memory_gb": round(m / 1024**3, 2), "reason": "request exceeds the allocatable of every eligible node", "eligible_nodes": elig})
     on_big = [x for x in per_pod if x[2] == big["name"]]
+    # N+1 per pool of eligible nodes: pods that may only land on some nodes (nodeSelector, nodeAffinity, taints) must fit into the free room of those nodes alone;
+    # the cluster-wide sum says they fit while the labelled nodes are full. The free room of a node is its allocatable minus the requests already running there.
+    used_cpu: dict[str, float] = {}
+    used_mem: dict[str, float] = {}
+    for p in cx.pods:  # every running pod, DaemonSets included: their requests occupy the room the moving pods would need
+        if p["status"].get("phase") != "Running" or not p["spec"].get("nodeName"):
+            continue
+        nd = p["spec"]["nodeName"]
+        for cont in p["spec"].get("containers") or []:
+            r = (cont.get("resources") or {}).get("requests") or {}
+            used_cpu[nd] = used_cpu.get(nd, 0.0) + _q(r.get("cpu"))
+            used_mem[nd] = used_mem.get(nd, 0.0) + _q(r.get("memory"))
+    pools: dict[tuple, dict] = {}
+    for ns, pod, _nd, c, m in on_big:
+        spec = pod_spec_by.get((ns, pod)) or {}
+        elig = tuple(sorted(e for e in eligible_nodes(spec, [node_objs[n["name"]] for n in others if n["name"] in node_objs], ignore_node_name=True) if e != big["name"]))
+        pl = pools.setdefault(elig, {"eligible_nodes": list(elig), "pods": 0, "prod_pods": 0, "needed_cpu": 0.0, "needed_memory": 0.0})
+        pl["pods"] += 1
+        pl["prod_pods"] += 1 if ns in cx.prod else 0
+        pl["needed_cpu"] += c
+        pl["needed_memory"] += m
+    pool_rows = []
+    for elig, pl in pools.items():
+        free_cpu = sum(max(n["cpu"] - used_cpu.get(n["name"], 0.0), 0.0) for n in others if n["name"] in elig)
+        free_mem = sum(max(n["memory"] - used_mem.get(n["name"], 0.0), 0.0) for n in others if n["name"] in elig)
+        ok_pool = pl["needed_cpu"] <= free_cpu and pl["needed_memory"] <= free_mem
+        within_margin = not ok_pool and pl["needed_cpu"] <= free_cpu * 1.02 and pl["needed_memory"] <= free_mem * 1.02
+        pool_rows.append(
+            {
+                **pl,
+                "needed_cpu": round(pl["needed_cpu"], 2),
+                "needed_memory_gb": round(pl["needed_memory"] / 1024**3, 2),
+                "free_cpu": round(free_cpu, 2),
+                "free_memory_gb": round(free_mem / 1024**3, 2),
+                "ok": ok_pool or within_margin,
+                "tight": within_margin,  # fits only inside the 2% flapping margin: pass, but the report says so
+            }
+        )
+        pool_rows[-1].pop("needed_memory", None)
+    pools_ok = all(r["ok"] for r in pool_rows)
+    short = [r for r in pool_rows if not r["ok"]]
+    ok_total = req_cpu <= rest_cpu * 1.02 and req_mem <= rest_mem * 1.02
     return {
         "available": True,
         "nodes": len(nodes),
@@ -694,14 +765,20 @@ def _n_plus_one(cx: _Ctx) -> dict:
         "requests_memory_gb_total": round(req_mem / 1024**3, 1),
         "cpu_ok": req_cpu <= rest_cpu * 1.02,
         "memory_ok": req_mem <= rest_mem * 1.02,
-        "ok": req_cpu <= rest_cpu * 1.02 and req_mem <= rest_mem * 1.02,
-        "margin": 0.02,  # 2% margin: a single minute-level CronJob pod (0.01 cores) used to flip pass/fail back and forth
+        "ok": ok_total and pools_ok,
+        "total_ok": ok_total,
+        "pools": pool_rows,
+        "pools_short": [{"eligible_nodes": r["eligible_nodes"], "pods": r["pods"], "needed_cpu": r["needed_cpu"], "free_cpu": r["free_cpu"], "needed_memory_gb": r["needed_memory_gb"], "free_memory_gb": r["free_memory_gb"]} for r in short],
+        "tight": any(r["tight"] for r in pool_rows) or (ok_total and not (req_cpu <= rest_cpu and req_mem <= rest_mem)),
+        "margin": 0.02,  # 2% margin: a single minute-level CronJob pod (0.01 cores) used to flip pass/fail back and forth; inside the margin the result is ok and tight
         "pods_on_largest_node": len(on_big),
         "prod_pods_on_largest_node": sum(1 for x in on_big if x[0] in cx.prod),
         "cannot_fit_elsewhere": cannot_fit,
         "cannot_fit_prod": [f"{x['namespace']}/{x['pod']}" for x in cannot_fit if x["namespace"] in cx.prod],
         "karpenter": cx.karpenter,
-        "note": "With Karpenter, pods only fail to start until a new node comes up (measured p50 62 seconds). Without it (small k3s cluster), this is the list of pods that can never start again if one node dies",
+        "autoscaler": cx.autoscaler,
+        "autoscaler_name": cx.autoscaler_name,
+        "note": "With a node autoscaler, Karpenter or cluster-autoscaler, pods only fail to start until a new node comes up (Karpenter measured p50 62 seconds). Without one, this is the list of pods that can never start again if one node dies. pools_short lists the groups of pods whose eligible nodes alone have no room for them",
     }
 
 

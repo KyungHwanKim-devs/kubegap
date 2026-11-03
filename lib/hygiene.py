@@ -759,6 +759,11 @@ def _config_changes(cx: _Ctx) -> dict | None:
             continue
         with_time += 1
         dc = _data_change(md)
+        if c.get("immutable"):
+            # an immutable ConfigMap cannot be edited; the only change is delete and recreate under the same name, and then the creation time is the change time
+            created = _ts(md.get("creationTimestamp"))
+            if created:
+                dc = (created, (dc[1] if dc else None) or "recreated")
         if dc:
             changed[(md.get("namespace"), md.get("name"))] = {"changed_at": dc[0], "changed_by": dc[1], "immutable": bool(c.get("immutable"))}
     if not with_time:
@@ -780,10 +785,10 @@ def _config_changes(cx: _Ctx) -> dict | None:
                 container_started[cs.get("name")] = t
         for name, ref in _cm_refs(p.get("spec") or {}).items():
             cm = changed.get((ns, name))
-            if not cm or cm["immutable"]:
+            if not cm:
                 continue
             starts = [container_started[c] for c in ref["containers"] if c in container_started]
-            started = max(starts) if starts else pod_started
+            started = min(starts) if starts else pod_started  # the oldest reader decides: a sidecar restarted after the change does not refresh the app container next to it
             if cm["changed_at"] <= started:
                 continue
             modes = ref["modes"]

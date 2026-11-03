@@ -16,7 +16,7 @@ def _write(tmp_path, routes):
 
 def test_not_collected_without_file(tmp_path):
     r = vpccni._private_routes(tmp_path)
-    assert r == {"collected": False, "peering": 0, "transit_gateway": 0, "vpn": 0, "local_gateway": 0, "destinations": []}
+    assert r == {"collected": False, "peering": 0, "transit_gateway": 0, "vpn": 0, "local_gateway": 0, "appliance": 0, "destinations": [], "excluded": [], "scoped_to_node_subnets": False}
 
 
 def test_counts_each_private_target_and_ignores_local_igw_nat(tmp_path):

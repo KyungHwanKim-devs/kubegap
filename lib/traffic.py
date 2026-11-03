@@ -175,6 +175,34 @@ def _ranges_exposure(ranges: list[str], ports: list[int]) -> dict:
     return {"sg_exposure": "open" if opened else "allow-list", "allowed_sources": {str(p): len(cidrs) for p in ports}, "widest_prefix": {str(p): widest for p in ports}, "open_ports": ports if opened else []}
 
 
+def _latest_hour(p95: dict | None, req: dict | None) -> dict:
+    """Join the hourly p95 and request series of one target group or load balancer. Returns the request-weighted p95 over the window, the newest hour that carried
+    requests with its p95 and request count, and how many hours ago that was relative to the newest request datapoint (0 when it is the latest hour)."""
+    ps = {pt["t"]: pt["v"] for pt in (p95 or {}).get("series") or []}
+    rs = [(pt["t"], pt["v"]) for pt in (req or {}).get("series") or []]
+    if not rs:
+        return {"p95_s_weighted": (p95 or {}).get("avg"), "p95_s_last_1h": (p95 or {}).get("last"), "p95_s_last_at": (p95 or {}).get("last_at"), "requests_last_1h": None, "hours_since_requests": None}
+    total = sum(v for _, v in rs)
+    weighted = round(sum(ps[t] * v for t, v in rs if t in ps) / sum(v for t, v in rs if t in ps), 4) if total and any(t in ps for t, v in rs if v) else (p95 or {}).get("avg")
+    newest = rs[0][0]
+    hours_since = None
+    last_t = last_v = last_req = None
+    for i, (t, v) in enumerate(rs):  # newest first
+        if v > 0:
+            last_t, last_req = t, v
+            last_v = ps.get(t)
+            hours_since = i
+            break
+    return {
+        "p95_s_weighted": weighted,
+        "p95_s_last_1h": last_v if last_v is not None else (p95 or {}).get("last"),
+        "p95_s_last_at": last_t or (p95 or {}).get("last_at"),
+        "requests_last_1h": last_req if last_req is not None else 0,
+        "hours_since_requests": hours_since,
+        "newest_hour": newest,
+    }
+
+
 def _alb(snap: Path, objs: _Objects) -> dict:
     d = load_json(snap / "aws" / "alb-metrics.json")
     if not d:
@@ -214,7 +242,7 @@ def _alb(snap: Path, objs: _Objects) -> dict:
                     "elb_5xx_ratio_24h": round((g("HTTPCode_ELB_5XX_Count_Sum") or 0) / req, 5) if req else None,
                     "p95_s_max_1h": g("TargetResponseTime_p95", "max"),
                     "p95_s_avg": g("TargetResponseTime_p95", "avg"),
-                    "p95_s_last_1h": g("TargetResponseTime_p95", "last"),
+                    **_latest_hour(m.get("TargetResponseTime_p95"), m.get("RequestCount_Sum")),
                     "p99_s_max_1h": g("TargetResponseTime_p99", "max"),
                     "rejected_connections_24h": g("RejectedConnectionCount_Sum") or 0,
                     "requests_peak_1h": g("RequestCount_Sum", "max"),
@@ -259,7 +287,7 @@ def _alb(snap: Path, objs: _Objects) -> dict:
             "target_5xx_ratio_24h": round((g("HTTPCode_Target_5XX_Count_Sum") or 0) / req, 5) if req else None,
             "p95_s_max_1h": g("TargetResponseTime_p95", "max"),
             "p95_s_avg": g("TargetResponseTime_p95", "avg"),
-            "p95_s_last_1h": g("TargetResponseTime_p95", "last"),
+            **_latest_hour(m.get("TargetResponseTime_p95"), m.get("RequestCount_Sum")),
             "unhealthy_max_24h": g("UnHealthyHostCount_Maximum", "max"),
             "healthy_min_24h": g("HealthyHostCount_Minimum", "min"),
             "requests_per_target_24h": g("RequestCountPerTarget_Sum"),
@@ -319,16 +347,22 @@ def _ingresses(snap: Path, objs: _Objects, alb: dict) -> list[dict]:
         if tgs:
             req = sum(t.get("requests_24h") or 0 for t in tgs)
             e5 = sum(t.get("target_5xx_24h") or 0 for t in tgs)
+            busiest = max(tgs, key=lambda t: t.get("requests_24h") or 0)  # the latest hour is read from the target group that carries the traffic
             metrics = {
                 "source": "alb-cloudwatch",
                 "window": "24h",
                 "requests": req,
+                "requests_24h_equiv": req,
                 "rps_avg": round(req / 86400, 3),
                 "errors_5xx": e5,
                 "errors_ratio": round(e5 / req, 5) if req else None,
                 "p95_s_max_1h": max((t.get("p95_s_max_1h") or 0) for t in tgs) or None,
                 "p95_s_avg": max((t.get("p95_s_avg") or 0) for t in tgs) or None,
-                "p95_s_last_1h": max((t.get("p95_s_last_1h") or 0) for t in tgs) or None,
+                "p95_s_weighted": max((t.get("p95_s_weighted") or 0) for t in tgs) or None,
+                "p95_s_last_1h": busiest.get("p95_s_last_1h"),
+                "p95_s_last_at": busiest.get("p95_s_last_at"),
+                "requests_last_1h": busiest.get("requests_last_1h"),
+                "hours_since_requests": busiest.get("hours_since_requests"),
                 "unhealthy_max_24h": max((t.get("unhealthy_max_24h") or 0) for t in tgs),
                 "unhealthy_now": sum(len(t.get("targets_unhealthy") or []) for t in tgs),
                 "target_groups": [t["name"] for t in tgs],
@@ -340,10 +374,16 @@ def _ingresses(snap: Path, objs: _Objects, alb: dict) -> list[dict]:
                 "window": "1h",
                 "rps_avg": round(rps, 3) if rps is not None else None,
                 "requests": round(rps * 3600) if rps else None,
+                "requests_24h_equiv": round(rps * 86400) if rps else None,  # the same request rate over the 24-hour window the ALB counts use, so one threshold serves both sources
                 "errors_ratio": round(nginx_5xx.get((ns, name), 0), 5),
+                "errors_5xx": round(rps * 3600 * nginx_5xx.get((ns, name), 0)) if rps else None,
                 "p95_s_avg": nginx_p95.get((ns, name)),
+                "p95_s_weighted": nginx_p95.get((ns, name)),
                 "p95_s_max_1h": nginx_p95.get((ns, name)),
                 "p95_s_last_1h": nginx_p95.get((ns, name)),
+                "p95_s_last_at": None,
+                "requests_last_1h": round(rps * 3600) if rps else None,
+                "hours_since_requests": 0 if rps else None,
             }
         ep = [objs.endpoints_ready.get((ns, s)) for s in services]
         rows.append(
@@ -645,7 +685,45 @@ def nginx_vulnerable(version: str | None) -> bool | None:
     return t < NGINX_FIXED[1]
 
 
-def _nginx(snap: Path, ingresses: list) -> dict | None:
+def _webhook_netpol(snap: Path, rows: list[dict], inv: dict | None) -> dict:
+    """Is the controller's admission webhook port closed to pods by a NetworkPolicy that the CNI enforces? A policy counts when it selects the controller pods
+        (matchLabels inside the controller's pod template labels), has Ingress in policyTypes or ingress rules, and every ingress rule that opens port 8443 (or the
+        webhook port) names a source: no rule with an empty `from`. Enforcement comes from the security summary written earlier in the same run when present,
+    read the way lib/security.py reads it: the VPC CNI node agent's flag on EKS, kube-router on k3s; a policy mitigates only when enforcement is known to be on."""
+    tpl_labels = {}
+    for stem in ("deployments", "daemonsets"):
+        for o in objects(snap, stem):
+            if any(o["metadata"]["namespace"] == r["namespace"] and o["metadata"]["name"] == r["name"] for r in rows):
+                tpl_labels[(o["metadata"]["namespace"], o["metadata"]["name"])] = (((o.get("spec") or {}).get("template") or {}).get("metadata") or {}).get("labels") or {}
+    policies = []
+    for np in objects(snap, "networkpolicies.networking.k8s.io"):
+        ns = np["metadata"]["namespace"]
+        sel = ((np.get("spec") or {}).get("podSelector") or {}).get("matchLabels") or {}
+        targets = [k for k, labels in tpl_labels.items() if k[0] == ns and all(labels.get(a) == b for a, b in sel.items())]
+        if not targets:
+            continue
+        spec = np.get("spec") or {}
+        types = spec.get("policyTypes") or (["Ingress"] if "ingress" in spec else [])
+        if "Ingress" not in types:
+            continue
+        open_to_all = False
+        for rule in spec.get("ingress") or []:
+            ports = [p.get("port") for p in rule.get("ports") or []]
+            covers_webhook = not ports or any(str(p) in ("8443", "webhook", "https-webhook") for p in ports)
+            everyone = not rule.get("from") or any(
+                set(f) == {"namespaceSelector"} and not (f.get("namespaceSelector") or {}).get("matchLabels") and not (f.get("namespaceSelector") or {}).get("matchExpressions") for f in rule.get("from") or []
+            )
+            if covers_webhook and everyone:
+                open_to_all = True  # no source, or every namespace: the webhook stays reachable from any pod
+        if not open_to_all:
+            policies.append(f"{ns}/{np['metadata']['name']}")
+    from .security import netpol_enforced
+
+    enforced, how = netpol_enforced(snap, ((inv or {}).get("cluster") or {}).get("platform"), (inv or {}).get("k3s"), policies)
+    return {"policies": policies, "enforced": enforced, "enforcement": how, "mitigated": bool(policies) and enforced is True}
+
+
+def _nginx(snap: Path, ingresses: list, inv: dict | None = None) -> dict | None:
     """The ingress-nginx controller(s): image version, replicas, and whether the admission webhook is on. None when ingress-nginx is not deployed."""
     rows = []
     for stem, kind in (("deployments", "Deployment"), ("daemonsets", "DaemonSet")):
@@ -655,7 +733,8 @@ def _nginx(snap: Path, ingresses: list) -> dict | None:
                 img = str(c.get("image") or "")
                 if "ingress-nginx/controller" not in img and "nginx-ingress-controller" not in img:
                     continue
-                m = re.search(r":v?(\d+\.\d+\.\d+)", img.split("@")[0])
+                tag = img.split("@")[0].rsplit(":", 1)[-1] if ":" in img.split("@")[0].rsplit("/", 1)[-1] else ""
+                m = re.search(r"(?<![\d.])v?(\d+\.\d+\.\d+)(?![\d])", tag)  # the version anywhere in the tag: v1.12.1, nginx-1.2.1-rancher1, 1.11.5-hardened
                 st = o.get("status") or {}
                 rows.append(
                     {
@@ -679,6 +758,7 @@ def _nginx(snap: Path, ingresses: list) -> dict | None:
                 vwc.append({"configuration": w["metadata"]["name"], "failure_policy": h.get("failurePolicy")})
     versions = [r["version"] for r in rows if r["version"]]
     oldest = min(versions, key=lambda v: _semver(v) or (0, 0, 0)) if versions else None
+    mitigated = _webhook_netpol(snap, rows, inv)
     unknown = [f"{r['namespace']}/{r['name']} ({r['image']})" for r in rows if not r["version"]]
     # A controller whose image tag carries no version (digest only, a prefixed tag the regex misses) cannot be cleared: vulnerable stays None for the whole set
     vulnerable = None if unknown else nginx_vulnerable(oldest)
@@ -690,6 +770,7 @@ def _nginx(snap: Path, ingresses: list) -> dict | None:
         "unknown_version_controllers": unknown,
         "admission_webhook": bool(vwc) or any(r["webhook_arg"] for r in rows),
         "admission_webhooks": vwc,
+        "webhook_network_policy": mitigated,
         "vulnerable": vulnerable,
         "fixed_versions": ["1.12.1", "1.11.5"],
         "retired": True,
@@ -712,7 +793,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "alb_groups": _alb_groups(ingresses),
         "ingress_metrics_source": dict(Counter(r["metrics"].get("source") or "none" for r in ingresses)),
         "alb": alb,
-        "nginx": _nginx(snap, ingresses),
+        "nginx": _nginx(snap, ingresses, inv),
         "exposure": exposure,
         "exposure_counts": dict(Counter(r["type"] for r in exposure)),
         "db_exposed": [r for r in exposure if r["db_port"] and "internal" not in str(r.get("scheme"))],

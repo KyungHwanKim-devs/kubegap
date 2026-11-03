@@ -25,7 +25,7 @@ from typing import ClassVar
 
 from . import __version__, paths, rubric
 from .config import Config
-from .resilience import is_db_like
+from .resilience import is_db_like, mounts_pvc
 from .snapshot import items, load_json
 
 SAFE_BUILTINS = {
@@ -144,13 +144,15 @@ class Context:
             return False
         if self._pods is None:
             self._pods = {(p["metadata"]["namespace"], p["metadata"]["name"]): p for p in self.objects("pods")}
-        wl = self.workload(labels).rsplit("/", 1)[-1]  # `ns/deploy/name`, `ns/deploy?/name`, `ns/pod/name`: the name never contains `/`
+        owner = self.workload(labels)  # `ns/deploy/name`, `ns/deploy?/name`, `ns/sts/name`, `ns/pod/name`: the name never contains `/`
+        wl = owner.rsplit("/", 1)[-1]
         obj = self._pods.get((ns, pod))
         if obj is None:
             return is_db_like(container, None, wl)
         spec = self.pod_spec(obj)
+        stateful = "/sts/" in owner and mounts_pvc(spec)  # a StatefulSet pod with a PersistentVolumeClaim is a store whatever its image is called
         cs = [c for c in (spec.get("containers") or []) + (spec.get("initContainers") or []) if not container or c.get("name") == container]
-        return bool(cs) and all(is_db_like(c.get("name"), c.get("image"), wl) for c in cs)
+        return bool(cs) and all(is_db_like(c.get("name"), c.get("image"), wl, stateful=stateful) for c in cs)
 
     TRANSIENT_KINDS: ClassVar[tuple[str, ...]] = ("job", "cronjob", "cronjob?", "runner", "ephemeralrunner", "autoscalingrunnerset")
 
@@ -287,9 +289,22 @@ class Context:
     def backup_signals(self) -> dict:
         """There may be backup activity even without a backup tool: k3s etcd snapshot objects, CronJobs named backup/dump/snapshot, VolumeSnapshots."""
         etcd = self.objects("etcdsnapshotfiles.k3s.cattle.io")
-        cron = [f"{c['metadata']['namespace']}/{c['metadata']['name']}" for c in self.objects("cronjobs.batch") if re.search(r"backup|dump|snapshot|archive", c["metadata"]["name"], re.IGNORECASE)]
+        cron, stale = [], []
+        for c in self.objects("cronjobs.batch"):
+            if not re.search(r"backup|dump|snapshot|archive", c["metadata"]["name"], re.IGNORECASE):
+                continue
+            name = f"{c['metadata']['namespace']}/{c['metadata']['name']}"
+            last = self.days_until((c.get("status") or {}).get("lastSuccessfulTime"))
+            created = self.days_until(c["metadata"].get("creationTimestamp"))
+            # a CronJob is a backup signal only while it produces copies: not suspended and succeeded within 7 days, or created in the last 2 days and not yet due
+            if (c.get("spec") or {}).get("suspend"):
+                stale.append(f"{name} (suspended)")
+            elif (last is not None and last >= -7) or (last is None and created is not None and created >= -2):
+                cron.append(name)
+            else:
+                stale.append(f"{name} (last success {-last} days ago)" if last is not None else f"{name} (never succeeded)")
         vs = self.objects("volumesnapshots.snapshot.storage.k8s.io")
-        return {"etcd_snapshots": len(etcd), "backup_cronjobs": cron, "volume_snapshots": len(vs), "any": bool(etcd or cron or vs)}
+        return {"etcd_snapshots": len(etcd), "backup_cronjobs": cron, "stale_backup_cronjobs": stale, "volume_snapshots": len(vs), "any": bool(etcd or cron or vs)}
 
     def serves_traffic(self, obj: dict) -> bool:
         """Is this a target for readiness/preStop checks: replicas not 0, has a container port, and a Service points at it."""

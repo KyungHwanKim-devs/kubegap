@@ -2117,7 +2117,7 @@
   each: observability.rules
   cluster_level: true
   rule:
-    expr: "item.get('alerting', 0) > 0 and item['by_class'].get('symptom', 0) + item['by_class'].get('app', 0) == 0"  # rules on the app's own metrics (success rate, latency) count as symptom rules; counting them as 0 produced a false critical fail on a real cluster
+    expr: "item.get('alerting', 0) > 0 and item['by_class'].get('symptom', 0) + item['by_class'].get('app', 0) == 0"  # app = rules on the app's own metrics that look at errors, latency, success or lag; app-cause = the app's other metrics, not counted
     warn_expr: "item.get('alerting', 0) > 0 and (item['by_class'].get('symptom', 0) + item['by_class'].get('app', 0)) / max(item.get('alerting', 1), 1) < 0.15"
   target: "'cluster'"
   evidence: "f\"{item['alerting']} alert rules: symptom {item['by_class'].get('symptom', 0)}, cause {item['by_class'].get('cause', 0)}, app metrics (assumed symptom) {item['by_class'].get('app', 0)}. Symptom ratio {item.get('symptom_ratio')}. Symptom rules: {item['symptom_rules'][:8]}\""
@@ -2946,7 +2946,7 @@
     # no tool (Velero, k8up), but signals of backup activity lower this to warn. Signals = k3s etcd snapshot objects, CronJobs named backup/dump/snapshot, VolumeSnapshots.
     # code cannot tell whether those copies leave the node, so the LLM judges from the CronJob destination storage.
     warn_expr: "backup_signals()['any']"
-  evidence: "f\"no backup tool (family backup). Alternative signals: etcd snapshots {backup_signals()['etcd_snapshots']}, backup-like CronJobs {backup_signals()['backup_cronjobs']}, VolumeSnapshots {backup_signals()['volume_snapshots']}. If signals exist, the LLM checks whether copies leave the node\""
+  evidence: "f\"no backup tool (family backup). Alternative signals: etcd snapshots {backup_signals()['etcd_snapshots']}, backup-like CronJobs that ran in the last 7 days {backup_signals()['backup_cronjobs']}, VolumeSnapshots {backup_signals()['volume_snapshots']}{'; backup-like CronJobs that are suspended or have not succeeded in 7 days, not counted: ' + str(backup_signals()['stale_backup_cronjobs']) if backup_signals()['stale_backup_cronjobs'] else ''}. If signals exist, the LLM checks whether copies leave the node\""
   severity_default: critical
   symptom_linked: false
   why: There is no way to recover cluster state (objects) and PV data. Deleting a namespace by mistake or a broken etcd or PV is the end. A CronJob dump without a tool is often "a backup kept on the same node disk", which disappears with the original when the node disk dies.
@@ -2999,6 +2999,40 @@
             - metadata:
                 namespace: "prod-a"
                 name: "pg-backup"
+              status:
+                lastSuccessfulTime: "2026-10-28T02:00:00Z"
+          etcdsnapshotfiles.k3s.cattle.io: []
+          volumesnapshots.snapshot.storage.k8s.io: []
+      # a backup CronJob that is suspended, or last succeeded months ago, is not a backup: fail
+      - expect: "fail"
+        inventory:
+          families_present:
+            - "metrics-store"
+            - "logs-store"
+            - "alert-router"
+            - "event-retention"
+            - "secrets-manager"
+            - "slo"
+            - "certificates"
+            - "node-autoscaler"
+            - "kube-state-metrics"
+            - "node-exporter"
+          components_present: []
+        objects:
+          cronjobs.batch:
+            - metadata:
+                namespace: "prod-a"
+                name: "pg-backup"
+              spec:
+                suspend: true
+              status:
+                lastSuccessfulTime: "2026-10-28T02:00:00Z"
+            - metadata:
+                namespace: "prod-a"
+                name: "mysql-dump"
+                creationTimestamp: "2026-01-10T00:00:00Z"
+              status:
+                lastSuccessfulTime: "2026-07-01T02:00:00Z"
           etcdsnapshotfiles.k3s.cattle.io: []
           volumesnapshots.snapshot.storage.k8s.io: []
       - expect: "pass"
@@ -15277,10 +15311,10 @@
   each: resilience.n_plus_one
   cluster_level: true
   rule:
-    expr: "item.get('available') and not item['ok'] and not item['karpenter']"
-    warn_expr: "item.get('available') and not item['ok']"
+    expr: "item.get('available') and not item['ok'] and not item.get('autoscaler', item.get('karpenter'))"
+    warn_expr: "item.get('available') and (not item['ok'] or item.get('tight'))"  # ok covers the cluster-wide sum and every pool of pods bound to a subset of nodes; tight = fits only inside the 2% margin
   target: "'cluster'"
-  evidence: "f\"Allocatable without the largest node {item['largest_node']} ({item['largest_node_cpu']} cores, {item['largest_node_memory_gb']}GB): CPU {item['allocatable_cpu_without_largest']} cores vs total requests {item['requests_cpu_total']} ({'OK' if item['cpu_ok'] else 'short'}), memory {item['allocatable_memory_gb_without_largest']}GB vs {item['requests_memory_gb_total']}GB ({'OK' if item['memory_ok'] else 'short'}). Pods on that node {item['pods_on_largest_node']} (prod {item['prod_pods_on_largest_node']}). Pods that fit on no other node {item['cannot_fit_elsewhere']}. Node autoscaler {'present (delay until a new node)' if item['karpenter'] else 'absent (permanent)'}\""
+  evidence: "f\"Allocatable without the largest node {item['largest_node']} ({item['largest_node_cpu']} cores, {item['largest_node_memory_gb']}GB): CPU {item['allocatable_cpu_without_largest']} cores vs total requests {item['requests_cpu_total']} ({'OK' if item['cpu_ok'] else 'short'}), memory {item['allocatable_memory_gb_without_largest']}GB vs {item['requests_memory_gb_total']}GB ({'OK' if item['memory_ok'] else 'short'}). Pods on that node {item['pods_on_largest_node']} (prod {item['prod_pods_on_largest_node']}). Pods that fit on no other node {item['cannot_fit_elsewhere']}.{' Pools short of room: ' + '; '.join(str(p['pods']) + ' pods limited to ' + (', '.join(p['eligible_nodes']) or 'no other node') + ' need ' + str(p['needed_cpu']) + ' cores and ' + str(p['needed_memory_gb']) + ' GB, free there ' + str(p['free_cpu']) + ' cores and ' + str(p['free_memory_gb']) + ' GB' for p in item.get('pools_short') or []) + '.' if item.get('pools_short') else ''}{' Fits only inside the 2% margin.' if item.get('tight') and not item.get('pools_short') else ''} Node autoscaler {(item.get('autoscaler_name') or 'present') + ' (delay until a new node)' if item.get('autoscaler', item.get('karpenter')) else 'absent (permanent)'}\""
   severity_default: critical
   symptom_linked: true
   why: >
@@ -15317,6 +15351,7 @@
           cannot_fit_elsewhere: []
           cannot_fit_prod: []
           karpenter: false
+          autoscaler: false
           note: "n"
       - expect: "warn"
         item:
@@ -15339,6 +15374,7 @@
           cannot_fit_elsewhere: []
           cannot_fit_prod: []
           karpenter: true
+          autoscaler: true
           note: "n"
       - expect: "pass"
         item:
@@ -15361,6 +15397,7 @@
           cannot_fit_elsewhere: []
           cannot_fit_prod: []
           karpenter: true
+          autoscaler: true
           note: "n"
       - expect: "pass"
         item:
@@ -15895,15 +15932,16 @@
   type: summary
   each: traffic.ingresses
   rule:
-    expr: "(item['metrics'].get('errors_ratio') or 0) >= 0.01 and (item['metrics'].get('requests') or 0) >= 100"
-    warn_expr: "((item['metrics'].get('errors_ratio') or 0) >= 0.001 and (item['metrics'].get('requests') or 0) >= 100) or (item['metrics'].get('errors_ratio') or 0) >= 0.05"
+    expr: "(item['metrics'].get('errors_ratio') or 0) >= 0.01 and ((item['metrics'].get('requests_24h_equiv') if item['metrics'].get('requests_24h_equiv') is not None else item['metrics'].get('requests') or 0) >= 100 or (item['metrics'].get('errors_5xx') or 0) >= 10)"
+    warn_expr: "((item['metrics'].get('errors_ratio') or 0) >= 0.001 and (item['metrics'].get('requests_24h_equiv') if item['metrics'].get('requests_24h_equiv') is not None else item['metrics'].get('requests') or 0) >= 100) or (item['metrics'].get('errors_ratio') or 0) >= 0.05"
   target: "item['target']"
-  evidence: "f\"{item['hosts'][:2]}: {item['metrics'].get('window')} 5xx {item['metrics'].get('errors_5xx')} of {item['metrics'].get('requests')} requests = {(item['metrics'].get('errors_ratio') or 0)*100:.2f}%{' (under 100 requests: warn only)' if item['metrics'].get('requests') is not None and item['metrics'].get('requests') < 100 else ''} (source {item['metrics'].get('source')}), p95 max {item['metrics'].get('p95_s_max_1h')}s\""
+  evidence: "f\"{item['hosts'][:2]}: {item['metrics'].get('window')} 5xx {item['metrics'].get('errors_5xx')} of {item['metrics'].get('requests')} requests = {(item['metrics'].get('errors_ratio') or 0)*100:.2f}%{' (under 100 requests a day and under 10 errors: warn only)' if (item['metrics'].get('requests_24h_equiv') if item['metrics'].get('requests_24h_equiv') is not None else item['metrics'].get('requests') or 0) < 100 and (item['metrics'].get('errors_5xx') or 0) < 10 else ''} (source {item['metrics'].get('source')}), p95 max {item['metrics'].get('p95_s_max_1h')}s\""
   severity_default: medium  # lowered because warns (0.1-1%) all landed as high. Fails above 1% are raised by the LLM based on traffic volume
   symptom_linked: true
   why: >
     5xx is the user-facing symptom itself (page on symptoms). Above 1% a 99% SLO is already broken, and even 0.1% is dozens of failures a day at a few thousand requests.
-    On EKS the source is the ALB's HTTPCode_Target_5XX_Count (5xx produced by targets); on a small k3s cluster it is ingress-nginx metrics. Under 100 requests one error moves the ratio by a percent or more, so a fail needs 100 requests; below that the check warns from 5%, because a host that answers a quarter of its few requests with 5xx is still broken for those users.
+    On EKS the source is the ALB's HTTPCode_Target_5XX_Count, the 5xx the targets produced; the 502, 503 and 504 the ALB itself answers when a target resets, is unhealthy or times out carry no target-group dimension in CloudWatch and are counted on the load balancer row, not per host. On a small k3s cluster the source is ingress-nginx metrics over one hour, scaled to a day so the same 100-request line serves both sources.
+    The verdict rests on the ratio and on the evidence behind it: a fail needs the ratio over 1% and either 100 requests a day or 10 errors, so 60 errors in 99 requests fail while 1 error in 4 does not; below that the check warns from 5%, because a host that answers a quarter of its few requests with 5xx is still broken for those users.
   suggest: "Line up the backend's logs, restarts, OOM (resources.oomkilled) and readiness (traffic.pod-not-ready) over the same time window. Turn one 5xx-ratio alert into an SLO (observability.no-slo)."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name HTTPCode_Target_5XX_Count --dimensions Name=LoadBalancer,Value=<dim> Name=TargetGroup,Value=<dim> --statistics Sum --period 3600 --start-time <24h ago> --end-time <now>"
@@ -16191,16 +16229,17 @@
   type: summary
   each: traffic.ingresses
   rule:
-    expr: "(item['metrics'].get('p95_s_avg') or 0) >= 2.0 and (item['metrics'].get('requests') or 0) >= 100"
-    warn_expr: "(item['metrics'].get('p95_s_avg') or 0) >= 1.0"
+    expr: "(item['metrics'].get('p95_s_weighted') if item['metrics'].get('p95_s_weighted') is not None else item['metrics'].get('p95_s_avg') or 0) >= 2.0 and (item['metrics'].get('requests_24h_equiv') if item['metrics'].get('requests_24h_equiv') is not None else item['metrics'].get('requests') or 0) >= 100"
+    warn_expr: "(item['metrics'].get('p95_s_weighted') if item['metrics'].get('p95_s_weighted') is not None else item['metrics'].get('p95_s_avg') or 0) >= 1.0"
   target: "item['target']"
-  evidence: "f\"{item['hosts'][:2]}: p95 avg {item['metrics'].get('p95_s_avg')}s, 1h max {item['metrics'].get('p95_s_max_1h')}s, latest 1h {item['metrics'].get('p95_s_last_1h')}s, {item['metrics'].get('requests')} requests/{item['metrics'].get('window')}{' (under 100 requests: warn only)' if item['metrics'].get('requests') is not None and item['metrics'].get('requests') < 100 else ''} (source {item['metrics'].get('source')})\""
+  evidence: "f\"{item['hosts'][:2]}: p95 request-weighted {item['metrics'].get('p95_s_weighted')}s, hourly average {item['metrics'].get('p95_s_avg')}s, 1h max {item['metrics'].get('p95_s_max_1h')}s, latest hour with requests {item['metrics'].get('p95_s_last_1h')}s on {item['metrics'].get('requests_last_1h')} requests{' at ' + str(item['metrics'].get('p95_s_last_at'))[:16] if item['metrics'].get('p95_s_last_at') else ''}{', ' + str(item['metrics'].get('hours_since_requests')) + ' hours before the newest hour, no requests since' if (item['metrics'].get('hours_since_requests') or 0) > 0 else ''}, {item['metrics'].get('requests')} requests/{item['metrics'].get('window')}{' (under 100 requests a day: warn only)' if item['metrics'].get('requests_24h_equiv') is not None and item['metrics'].get('requests_24h_equiv') < 100 else ''} (source {item['metrics'].get('source')})\""
   severity_default: medium
   symptom_linked: true
   why: >
     p95 response time is the latency signal of the four golden signals. ALB TargetResponseTime runs from the LB sending the request to the target until the first byte back, so it is app time without the network. An API above 1s feels slow to users; at 2s timeouts and retries begin.
-    ALB gives a p95 over 1-hour statistics, so bursts inside the hour are hidden (check the 1-hour maximum alongside). With the ALB source the average is over the hourly p95 values of the window, so one bad hour can carry it over the threshold while the service is fine now; the latest 1-hour value says whether the slowness is still going on. That value is the current partial hour, or the newest hour that had requests when the service has been idle, so read it together with the request count. With the ingress-nginx source the three values are one 1-hour measurement. A daily report ranks a finding whose latest hour is back under the threshold as an ended event.
-    Under 100 requests in the window the p95 rests on a handful of requests, so the check only warns there; a fail needs 100 requests. It never passes a slow host for being quiet: a 34 s p95 on 77 requests is 77 people who waited.
+    ALB gives a p95 per hour, so bursts inside the hour are hidden (check the 1-hour maximum alongside). The check judges the request-weighted p95 of the window: each hour's p95 weighted by that hour's requests, so a busy slow hour counts for what it was and an idle hour with two requests does not. The plain hourly average is shown next to it.
+    CloudWatch writes no latency datapoint for an hour without requests, so "latest" is the newest hour that carried requests, with its request count and time; when that hour is older than the newest hour the evidence says how many hours ago and that no requests came since, and a daily report must not call such an event ended. With the ingress-nginx source the values are one 1-hour measurement.
+    Under 100 requests a day the p95 rests on a handful of requests, so the check only warns there; a fail needs 100 requests a day, counted over 24 hours for the ALB and scaled from the 1-hour rate for ingress-nginx. It never passes a slow host for being quiet: a 34 s p95 on 77 requests is 77 people who waited.
   suggest: "Identify slow endpoints (app metrics, logs), check DB query and external call timeouts, and CPU limit throttling (resources.cpu-throttling)."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name TargetResponseTime --dimensions Name=LoadBalancer,Value=<dim> Name=TargetGroup,Value=<dim> --extended-statistics p95 --period 300 --start-time <1h ago> --end-time <now>"
@@ -17082,10 +17121,10 @@
   each: traffic.nginx
   cluster_level: true
   rule:
-    expr: "item.get('present') and item['vulnerable'] is True and item['admission_webhook']"
-    warn_expr: "item.get('present') and item['vulnerable'] is not False"  # None = version unknown from the image: not cleared, so warn
+    expr: "item.get('present') and item['vulnerable'] is True and item['admission_webhook'] and not (item.get('webhook_network_policy') or {}).get('mitigated')"
+    warn_expr: "item.get('present') and item['vulnerable'] is not False"  # None = version unknown from the image: not cleared, so warn; a NetworkPolicy that closes the webhook port to pods also leaves a warn
   target: "'cluster'"
-  evidence: "f\"ingress-nginx {item['version'] or 'version unknown'} ({', '.join(c['kind'] + ' ' + c['namespace'] + '/' + c['name'] for c in item['controllers'])}){'; no version in the image tag of ' + ', '.join(item['unknown_version_controllers']) if item['unknown_version_controllers'] else ''}; fixed in {' and '.join(item['fixed_versions'])}; admission webhook {'on' if item['admission_webhook'] else 'off'}{', failurePolicy ' + str(item['admission_webhooks'][0]['failure_policy']) if item['admission_webhooks'] else ''}\""
+  evidence: "f\"ingress-nginx {item['version'] or 'version unknown'} ({', '.join(c['kind'] + ' ' + c['namespace'] + '/' + c['name'] for c in item['controllers'])}){'; no version in the image tag of ' + ', '.join(item['unknown_version_controllers']) if item['unknown_version_controllers'] else ''}; fixed in {' and '.join(item['fixed_versions'])}; admission webhook {'on' if item['admission_webhook'] else 'off'}{', failurePolicy ' + str(item['admission_webhooks'][0]['failure_policy']) if item['admission_webhooks'] else ''}{'; webhook port closed to pods by NetworkPolicy ' + ', '.join((item.get('webhook_network_policy') or {}).get('policies') or []) if (item.get('webhook_network_policy') or {}).get('mitigated') else ''}\""
   severity_default: high
   symptom_linked: false
   why: >

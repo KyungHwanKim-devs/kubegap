@@ -225,13 +225,17 @@ def collect(snap: Path, out_rel: str, *, profile: str | None, region: str | None
             if not kind:
                 continue
             vals = [float(v) for v in mr.get("Values") or []]
+            stamps = [str(t) for t in mr.get("Timestamps") or []]
             stat = key.rsplit("_", 1)[1]
             agg = {"points": len(vals), "status": mr.get("StatusCode")}
             if vals:
                 agg["sum"] = round(sum(vals), 3)
                 agg["max"] = round(max(vals), 4)
                 agg["min"] = round(min(vals), 4)
-                agg["last"] = round(vals[0], 4)  # newest first (default TimestampDescending)
+                agg["last"] = round(vals[0], 4)  # newest datapoint that exists (default TimestampDescending); CloudWatch writes none for an hour without requests
+                agg["last_at"] = stamps[0] if stamps else None
+                # the hourly series, newest first, so the summary can weight p95 by that hour's requests and tell "no traffic since" from "recovered"
+                agg["series"] = [{"t": t, "v": round(v, 4)} for t, v in zip(stamps, vals, strict=False)] if stamps else None
                 if stat in ("p95", "p99", "Average"):
                     agg["avg"] = round(sum(vals) / len(vals), 4)
             metrics[kind].setdefault(dim, {})[key] = agg
