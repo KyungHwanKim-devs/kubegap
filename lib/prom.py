@@ -64,7 +64,6 @@ class Prometheus:
     def run_file(self, path: Path, out_dir: Path, log: RunLog | None = None, collector: str | None = None, timeout: float = 30, echo=None) -> dict:
         """Read metrics.yaml and run/save each query. Returns a summary (series count per query, failures)."""
         items = yamlite.load_file(path) or []
-        out_dir.mkdir(parents=True, exist_ok=True)
         summary = {"ok": 0, "failed": 0, "queries": {}}
         now = _dt.datetime.now().astimezone().isoformat(timespec="seconds")
 

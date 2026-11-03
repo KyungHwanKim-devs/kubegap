@@ -532,7 +532,6 @@ def remove_component_logs(snap: Path, summary: dict | None = None) -> int:
         "karpenter_logs": {k: karp.get(k) for k in KARPENTER_LOG_KEYS if isinstance(karp, dict) and k in karp},
     }
     shutil.rmtree(d)
-    d.mkdir(parents=True, exist_ok=True)
     write_private(d / COMPONENT_LOGS_AGGREGATE, json.dumps(agg, ensure_ascii=False, indent=1, default=str))
     write_private(d / COMPONENT_LOGS_MARKER, COMPONENT_LOGS_MARKER_TEXT)
     return len(files)

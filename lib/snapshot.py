@@ -6,7 +6,7 @@ The missing input shows up as an "error"/"note" field in the module's own output
 
 Every file under a snapshot or context folder is written through `write_private` and nothing else: it writes a temporary file next to the target,
 syncs it and renames it over the target, so a reader sees the old file or the new one and never a truncated one, and the file is readable by
-its owner only. `tests/test_snapshot_write.py` asserts that no other module in `lib/` writes text files.
+its owner only; missing folders on the way are created owner-only as well (`paths.ensure_private_dir`). `tests/test_snapshot_write.py` asserts that no other module in `lib/` writes text files.
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from . import paths
+
 
 def write_private(path: Path, text: str, *, mode: int = 0o600) -> None:
     """Write `text` to `path` atomically with owner-only permissions. Creates missing parent folders.
@@ -26,7 +28,7 @@ def write_private(path: Path, text: str, *, mode: int = 0o600) -> None:
     in one rename. On any error the temporary file is removed and the error re-raised; `path` keeps whatever it held before.
     """
     path = Path(path)
-    path.parent.mkdir(parents=True, exist_ok=True)
+    paths.ensure_private_dir(path.parent)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
     try:
         try:

@@ -32,7 +32,7 @@ import traceback
 from pathlib import Path
 
 from . import evaluate as _ev
-from . import rubric
+from . import paths, rubric
 from .snapshot import write_private
 
 BASE_INV = {
@@ -59,8 +59,8 @@ def _set_path(d: dict, path: str, value):
 
 
 def _build_snapshot(root: Path, check: dict, case: dict, profile_name: str):
-    (root / "objects").mkdir(parents=True, exist_ok=True)
-    (root / "metrics").mkdir(exist_ok=True)
+    paths.ensure_private_dir(root / "objects")
+    paths.ensure_private_dir(root / "metrics")
     inv = json.loads(json.dumps(BASE_INV))
     inv["cluster"]["platform"] = "k3s" if profile_name == "lab" else "eks"
     inv["profile"]["name"] = profile_name
@@ -68,7 +68,6 @@ def _build_snapshot(root: Path, check: dict, case: dict, profile_name: str):
         inv[k] = v
     summary: dict = json.loads(json.dumps(case.get("summary") or {}))
     for name, body in (case.get("aws") or {}).items():
-        (root / "aws").mkdir(exist_ok=True)
         write_private(root / "aws" / name, json.dumps(body))
     if check["type"] == "summary":
         item = case.get("item")

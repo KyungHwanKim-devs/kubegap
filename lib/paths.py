@@ -7,9 +7,13 @@ from the same machine, and "compare with the last run" must only compare the sam
 
 from __future__ import annotations
 
+import contextlib
 import datetime as _dt
 import os
 import re
+import stat
+import sys
+import threading
 from pathlib import Path
 
 # Even when scripts/kubegap is invoked through a symlink (~/.claude/skills/kubegap), resolve() finds the real repo location.
@@ -28,6 +32,50 @@ LEGACY_SNAPSHOTS_ROOT = ROOT / "snapshots"
 DEFAULT_CONFIG = (USER_DIR / "config.yaml") if (USER_DIR / "config.yaml").is_file() or not (ROOT / "config.yaml").is_file() else ROOT / "config.yaml"
 
 _TS_FMT = "%Y-%m-%dT%H-%M-%S"
+
+_warned_open_dirs: set[Path] = set()
+_warn_lock = threading.Lock()
+
+
+def ensure_private_dir(path: Path, base: Path | None = None) -> Path:
+    """Create `path` and its missing parents readable by the owner only (mode 0700) and return it.
+
+    Every missing component is created one by one with 0700: `Path.mkdir(mode=..., parents=True)` would give the mode to the last folder
+    only and leave the parents at the umask default. Components that already exist are never chmod-ed, the user owns that decision; instead,
+    each existing component below `base` (USER_DIR by default) that other users can read gets one warning on stderr per process. A path
+    outside `base` is created the same way but nothing above it is inspected, so a snapshots root under /tmp does not warn about /tmp.
+    """
+    path = Path(path)
+    base = Path(base) if base is not None else USER_DIR
+    try:
+        rel = path.resolve().relative_to(base.resolve())
+        chain = [base, *(base / p for p in (Path(*rel.parts[: i + 1]) for i in range(len(rel.parts))))]
+    except ValueError:
+        try:  # a symlink inside base (snapshots -> a shared disk) resolves outside it; the unresolved spelling still tells which folders to inspect
+            rel = path.relative_to(base)
+            chain = [base, *(base / p for p in (Path(*rel.parts[: i + 1]) for i in range(len(rel.parts))))]
+        except ValueError:
+            chain = [path]
+            while not chain[0].parent.exists() and chain[0].parent != chain[0]:
+                chain.insert(0, chain[0].parent)
+    for d in chain:
+        if d.is_dir():
+            mode = stat.S_IMODE(d.stat().st_mode)
+            if mode & 0o077:
+                key = d.resolve()
+                with _warn_lock:
+                    first = key not in _warned_open_dirs
+                    _warned_open_dirs.add(key)
+                if first:
+                    print(f"kubegap: warning: {d} is readable by other users (mode {mode:04o}); chmod 700 it if that is not intended", file=sys.stderr)
+            continue
+        with contextlib.suppress(FileExistsError):  # another thread created it in between
+            d.mkdir(mode=0o700)
+        if not d.is_dir():
+            raise FileExistsError(f"{d} exists and is not a directory")
+    return path
+
+
 _TS_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}$")
 
 
@@ -73,14 +121,16 @@ def new_snapshot_dir(context: str, root: Path | None = None, now: _dt.datetime |
     """Create a new snapshot folder and return its path. Called twice in the same second, it appends `-2`, `-3`."""
     now = now or _dt.datetime.now()
     base = context_root(context, root)
+    ensure_private_dir(base, base=root or snapshots_root())
     stamp = now.strftime(_TS_FMT)
-    path = base / stamp
     n = 1
-    while path.exists():
-        n += 1
-        path = base / f"{stamp}-{n}"
-    path.mkdir(parents=True, exist_ok=False)
-    return path
+    while True:  # the final mkdir is the claim on the name: two runs started in the same second get different folders
+        path = base / (stamp if n == 1 else f"{stamp}-{n}")
+        try:
+            path.mkdir(mode=0o700)
+            return path
+        except FileExistsError:
+            n += 1
 
 
 def list_snapshots(context: str, root: Path | None = None) -> list[Path]:

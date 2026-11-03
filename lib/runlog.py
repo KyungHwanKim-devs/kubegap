@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import os
 import sys
 import threading
 from pathlib import Path
 from typing import Any
+
+from . import paths
 
 
 def _now() -> str:
@@ -24,14 +27,16 @@ class RunLog:
         self.echo = echo
         self._lock = threading.Lock()  # collectors run in parallel threads; each JSON line must land whole
         if path is not None:
-            path.parent.mkdir(parents=True, exist_ok=True)
+            paths.ensure_private_dir(path.parent)
 
     def write(self, kind: str, **fields: Any) -> None:
         rec = {"t": _now(), "kind": kind, **fields}
         line = json.dumps(rec, ensure_ascii=False, default=str)
         with self._lock:
             if self.path is not None:
-                with self.path.open("a", encoding="utf-8") as f:
+                with os.fdopen(
+                    os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o600), "a", encoding="utf-8"
+                ) as f:  # appended line by line, not through write_private, so the mode is set at every open: setup deletes and recreates setup.log
                     f.write(line + "\n")
             if self.echo:
                 print(line, file=sys.stderr)

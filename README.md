@@ -166,7 +166,7 @@ kubegap itself sends nothing anywhere. Everything it collects is written to `~/.
 
 ## Configuration (optional)
 
-kubegap works without a config file. To pin a context, set an AWS profile, point at Prometheus/Grafana, give SSH addresses, or suppress checks and override thresholds, copy [`config.example.yaml`](config.example.yaml) to `~/.kubegap/config.yaml`. Collected data and reports accumulate under `~/.kubegap/snapshots/<context>/<timestamp>/`, and every run is diffed against the previous one.
+kubegap works without a config file. To pin a context, set an AWS profile, point at Prometheus/Grafana, give SSH addresses, or suppress checks and override thresholds, copy [`config.example.yaml`](config.example.yaml) to `~/.kubegap/config.yaml`. Collected data and reports accumulate under `~/.kubegap/snapshots/<context>/<timestamp>/`, and every run is diffed against the previous one. Snapshot folders and files are created readable by your user only; a folder that was already there and is open to other users gets one warning per run and is left as it is. The config file is one you create yourself and may hold `grafana_api_token`, so `chmod 600` it.
 
 ## How it works
 

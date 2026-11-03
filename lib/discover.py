@@ -350,7 +350,6 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
         objs[kind] = data
         echo(f"  {kind:<28} {len(items(data)) if data is not None else 'failed: ' + failures[kind]}")
     # Component detection below reads ConfigMap bodies (configmap_data_regex rules), so the objects are written only after that, scrubbed: ConfigMap values and Secret data never reach objects/ (lib/scrub.py).
-    (snap / "objects").mkdir(parents=True, exist_ok=True)
 
     def write_objects() -> None:
         for kind, data in objs.items():

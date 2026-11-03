@@ -58,7 +58,6 @@ def run_query(group: str, query: str, hours: float, *, profile: str | None, regi
 def run_file(path: Path, out_dir: Path, *, cluster: str, profile: str | None, region: str | None, log: RunLog | None = None, collector: str | None = None, echo=None, default_hours: float = 24.0) -> dict:
     """Run and save every query in cwlogs.yaml. Entries: id, why, query, hours (optional), limit (optional)."""
     items = yamlite.load_file(path) or []
-    out_dir.mkdir(parents=True, exist_ok=True)
     group = log_group_for(cluster)
     summary = {"ok": 0, "failed": 0, "queries": {}, "log_group": group}
     now = _dt.datetime.now().astimezone().isoformat(timespec="seconds")
