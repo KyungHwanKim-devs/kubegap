@@ -99,10 +99,11 @@ def _write_calls(source: str, filename: str) -> list[str]:
 
 
 def test_no_other_module_writes_files():
-    """Every file write in lib/ and scripts/kubegap goes through write_private. Exceptions: run.log is appended line by line (runlog.py); tool binaries are installed with write_bytes (tools.py)."""
+    """Every file write in lib/ and scripts/kubegap goes through write_private or write_private_bytes. The one exception: run.log is appended line by line (runlog.py).
+    Tool binaries went through Path.write_bytes in tools.py until #88; they are placed with write_private_bytes now."""
     offenders = []
     for f in [*sorted(ROOT.glob("lib/*.py")), ROOT / "scripts" / "kubegap"]:
-        if f.name in ("snapshot.py", "runlog.py", "tools.py"):
+        if f.name in ("snapshot.py", "runlog.py"):
             continue
         offenders += _write_calls(f.read_text(encoding="utf-8"), str(f.relative_to(ROOT)))
     assert offenders == []
@@ -129,11 +130,24 @@ def test_write_call_scanner_catches_the_known_forms():
     assert sorted(int(x.split(":")[1]) for x in found) == [1, 2, 3, 4, 5, 10, 11, 12], found
 
 
-def test_tools_only_writes_binaries_and_runlog_only_appends():
-    tools = _write_calls((ROOT / "lib" / "tools.py").read_text(encoding="utf-8"), "lib/tools.py")
-    assert tools and all("write_bytes" in x for x in tools), tools
+def test_runlog_only_appends():
     runlog = _write_calls((ROOT / "lib" / "runlog.py").read_text(encoding="utf-8"), "lib/runlog.py")
     assert runlog and all("'a'" in x for x in runlog), runlog
+
+
+def test_write_private_bytes_is_atomic_and_can_place_an_executable(tmp_path, monkeypatch):
+    p = tmp_path / "bin" / "tool"
+    snapshot.write_private_bytes(p, b"\x7fELF\x00binary", mode=0o700)
+    assert p.read_bytes() == b"\x7fELF\x00binary" and stat.S_IMODE(p.stat().st_mode) == 0o700
+    assert [x.name for x in p.parent.iterdir()] == ["tool"]
+
+    def boom(fd):
+        raise OSError("fsync failed")
+
+    monkeypatch.setattr(snapshot.os, "fsync", boom)
+    with pytest.raises(OSError, match="fsync failed"):
+        snapshot.write_private_bytes(p, b"new")
+    assert p.read_bytes() == b"\x7fELF\x00binary" and [x.name for x in p.parent.iterdir()] == ["tool"]
 
 
 def test_remove_stale_temp_removes_only_temp_files(tmp_path):

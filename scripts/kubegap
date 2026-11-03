@@ -48,6 +48,10 @@ def cmd_setup(args) -> int:
     from lib import setup as _setup
     from lib.config import load_config
 
+    if args.check_tool_updates is not None:
+        if args.install_ssm_document:
+            print("kubegap setup: --install-ssm-document is ignored with --check-tool-updates, which does nothing but print", file=sys.stderr)
+        return _setup.check_tool_updates([n.strip() for n in args.check_tool_updates.split(",") if n.strip()] or None)
     cfg = load_config(args.config)
     for w in cfg.warnings:
         print(f"kubegap: warning: {w}", file=sys.stderr)
@@ -501,9 +505,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("setup", parents=[common], help="check dependency tools (check only by default) and access to the context, Prometheus, Loki, Alertmanager, Grafana and AWS")
     g = s.add_mutually_exclusive_group()
-    g.add_argument("--install", action="store_true", help="install every missing tool (brew, then GitHub release, then dedicated venv)")
+    g.add_argument("--install", action="store_true", help="install every missing tool (brew, then the pinned release binary with its sha256 verified, then dedicated venv)")
     g.add_argument("--install-only", metavar="NAME,NAME", help="install only the named tools")
     g.add_argument("--no-install", action="store_true", help="check only, even if install_tools is always in config.yaml")
+    g.add_argument(
+        "--check-tool-updates",
+        nargs="?",
+        const="",
+        metavar="NAME,NAME",
+        help="print the pinned download version of each tool (or of the named ones) next to the publisher's newest, with the sha256 entry for a new pin; installs nothing and does nothing else",
+    )
     s.add_argument(
         "--install-ssm-document",
         action="store_true",

@@ -23,6 +23,30 @@ def _p(msg: str = "") -> None:
     print(msg, flush=True)
 
 
+def check_tool_updates(only: list[str] | None = None) -> int:
+    """`kubegap setup --check-tool-updates`: for each tool the download path can install, the pinned version against what the publisher calls
+    newest, and for a pin that is behind, the `sha256` entry of the newest version so the pin PR is a copy. Prints only; installs nothing.
+    Exit 0 when every pin is current, 1 when one is behind or could not be checked. Bumping a pin is one PR per tool: `version` and `sha256`
+    in `lib/tools.py` plus a `CHANGELOG.md` line."""
+    _p("== pinned tool versions (download path; brew installs are not pinned)")
+    rows = tools.check_updates(only)
+    behind = 0
+    for r in rows:
+        if r["error"]:
+            _p(f"  {r['name']:<9} pinned {r['pinned']:<10} could not check: {r['error'][:200]}")
+            behind += 1
+        elif r["behind"]:
+            _p(f"  {r['name']:<9} pinned {r['pinned']:<10} newest {r['latest']:<10} BEHIND")
+            _p(f'      "version": "{r["latest"]}",')
+            _p('      "sha256": {' + ", ".join(f'"{k}": "{v}"' for k, v in (r["sha256"] or {}).items()) + "},")
+            behind += 1
+        else:
+            _p(f"  {r['name']:<9} pinned {r['pinned']:<10} newest {r['latest']:<10} current")
+    _p("")
+    _p(f"{behind} of {len(rows)} pins behind or unchecked. A pin is bumped in lib/tools.py (download.version and download.sha256), one PR per tool, with a CHANGELOG.md line." if behind else "Every pin is current.")
+    return 1 if behind else 0
+
+
 def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None, install: bool | list[str] = False, install_ssm_document: bool = False, snapshots_root: Path | None = None, verbose: bool = False) -> tuple[int, dict]:
     """install=False: check only (default). True: install everything missing. List of names: install only those. install_ssm_document=True uploads the kubegap-node-read SSM document when it is missing or outdated (EKS). Both policies are decided by the caller (scripts/kubegap) from config and arguments."""
     started = _dt.datetime.now().astimezone()
@@ -64,7 +88,11 @@ def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None
         _p(f"  - installing {t['name']}: {tools.install_plan(tool)} ...")
         res = tools.install_tool(tool, log=log)
         installs.append(res)
-        _p(f"    {'done (' + str(res.get('method')) + ')' if res['ok'] else 'failed: ' + str(res['error'])[:300]}")
+        if res["ok"] and res.get("checksum") == "verified":
+            how = "against the publisher's checksum file" if res.get("sha256_from") == "publisher" else "against a digest computed from the asset when it was pinned; the publisher ships no checksum file"
+            _p(f"    installed {t['name']} {res.get('version')}, checksum verified {how} ({res.get('method')})")
+        else:
+            _p(f"    {'done (' + str(res.get('method')) + ')' if res['ok'] else 'failed: ' + str(res['error'])[:300]}")
     if wanted:
         status = tools.check_tools()
     result["tools"] = status
