@@ -35,7 +35,7 @@ def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None
     ctx_dir = paths.context_root(context, snapshots_root) if context else None
     log = RunLog((ctx_dir / "setup.log") if ctx_dir else None, echo=verbose)
     if ctx_dir:
-        ctx_dir.mkdir(parents=True, exist_ok=True)
+        paths.ensure_private_dir(ctx_dir, base=snapshots_root or paths.snapshots_root())
         if (ctx_dir / "setup.log").exists():
             (ctx_dir / "setup.log").unlink()
     log.stage("setup", "start", context=context)

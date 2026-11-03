@@ -376,7 +376,7 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
             echo(f"    skipped: tool {tool} missing (setup --install-only {tool})")
         return {"ok": False, "skipped": f"tool {tool} missing", "tool_missing": tool}
     out = snap / st["out"]
-    out.parent.mkdir(parents=True, exist_ok=True)
+    paths.ensure_private_dir(out.parent)  # the tool writes the file itself, so the folder must exist before it runs
     ph = {"context": context or "", "kubeconfig": kubeconfig or "", "out": str(out)}
     # Next minor of the cluster server version (target for Pluto/kubent). v1.32.13-eks -> v1.33.0 / 1.33
     import re as _re
@@ -427,7 +427,6 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
             extra = {f"item.{k}": v for k, v in it.items() if isinstance(v, (str, int, float))}
             extra["item_safe"] = safe
             out_i = snap / str(st["out"]).replace("{item_safe}", safe)
-            out_i.parent.mkdir(parents=True, exist_ok=True)
             r = _shell.run(build(extra), timeout=timeout, id=f"{name}.{sid}.{safe}", log=log, collector=name, out_path=out_i)
             runs[safe] = {"ok": r.ok and out_i.is_file(), "error": None if r.ok else (r.error or r.stderr.strip()[-160:])}
         if echo:
@@ -574,7 +573,6 @@ def _run_component_logs_step(st: dict, sid: str, name: str, inv: dict, context: 
             continue
         selector = ",".join(f"{k}={v}" for k, v in sel.items())
         out = snap / "logs" / "pods" / comp / f"{ns}_{wl}.log"
-        out.parent.mkdir(parents=True, exist_ok=True)
         args = ["logs", "-n", ns, "-l", selector, "--all-containers", "--prefix", "--timestamps", f"--since={since}", f"--tail={tail_ds if kind == 'daemonsets' else tail}", "--max-log-requests", "40", "--ignore-errors"]
         r = kube.kubectl(args, context=context, timeout=timeout, id=f"{name}.{sid}.{comp}.{ns}/{wl}", log=log, out_path=out, kubeconfig=kubeconfig, collector=name)
         lines = r.stdout.count("\n") if r.ok else 0
@@ -694,7 +692,6 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
         for p in plist:
             pname = p["metadata"]["name"]
             out = snap / st["out"] / f"{pname}.prom"
-            out.parent.mkdir(parents=True, exist_ok=True)
             if context in ctx.state.proxy_blocked and node_ok:
                 # The pod proxy already timed out in this context (EKS node SG). Go straight to node curl instead of waiting 20-30 s again per pod (on a real EKS run, 11 proxy waits took a large share of an 817 s collection)
                 rr = _Blocked()
