@@ -95,11 +95,15 @@ def test_open_security_group_and_allow_list_are_told_apart(tmp_path):
     kafka = rows["loadbalancer/middleware/kafka-external"]
     assert kafka["sg_exposure"] == "open"
     assert kafka["allowed_sources"] == {"9094": 1, "443": 1}
+    assert kafka["widest_prefix"] == {"9094": 0, "443": 0}
     assert kafka["open_ports"] == [443, 9094]
     assert kafka["note"] == "DB port open to the internet by the security group"
     db = rows["nlb/db-shared"]
     assert db["sg_exposure"] == "allow-list"
     assert db["allowed_sources"] == {"3306": 2, "3307": 2}  # judged on the listener ports, not the target group port
+    assert db["widest_prefix"] == {"3306": 32, "3307": 32}
+    assert all("cidrs" not in r for lb in out["alb"]["lbs"] for r in lb["inbound_rules"])  # prefix lengths only in the summary
+    assert out["alb"]["lbs"][1]["inbound_rules"][0]["cidr_prefixes"] == [32, 32]
     assert db["target_group_ports"] == [3306]
     assert db["ports"] == [3306, 3307]  # the listener ports, which the security group filters
     assert "203.0.113" not in json.dumps(db)  # counts only, never the addresses
@@ -170,6 +174,32 @@ def test_describe_load_balancers_failure_is_not_read(tmp_path):
     assert rows["loadbalancer/middleware/kafka-external"]["sg_exposure"] == "not-read"
 
 
+def test_service_source_ranges_judge_an_nlb_without_groups(tmp_path):
+    _snapshot(tmp_path)
+    d = json.loads((tmp_path / "aws" / "alb-metrics.json").read_text())
+    d["lbs"][0]["security_groups"] = []
+    (tmp_path / "aws" / "alb-metrics.json").write_text(json.dumps(d))
+    svc = json.loads((tmp_path / "objects" / "services.json").read_text())
+    svc["items"][0]["spec"]["loadBalancerSourceRanges"] = ["203.0.113.0/24"]
+    (tmp_path / "objects" / "services.json").write_text(json.dumps(svc))
+    rows, _ = _rows(tmp_path)
+    kafka = rows["loadbalancer/middleware/kafka-external"]
+    assert kafka["sg_exposure"] == "allow-list"
+    assert kafka["widest_prefix"] == {"9094": 24, "443": 24}
+    assert "Service's sourceRanges" in kafka["note"] and "node groups are not read" in kafka["note"]
+
+
+def test_eks_without_alb_metrics_is_not_read(tmp_path):
+    _snapshot(tmp_path)
+    (tmp_path / "aws" / "alb-metrics.json").unlink()
+    out = traffic.analyze(tmp_path, {"namespaces": {"prod_like": ["prod-a"]}, "cluster": {"platform": "eks"}})
+    rows = {r["target"]: r for r in out["exposure"]}
+    assert rows["loadbalancer/middleware/kafka-external"]["sg_exposure"] == "not-read"
+    out = traffic.analyze(tmp_path, {"namespaces": {"prod_like": ["prod-a"]}, "cluster": {"platform": "k3s"}})
+    rows = {r["target"]: r for r in out["exposure"]}
+    assert rows["loadbalancer/middleware/kafka-external"]["sg_exposure"] is None
+
+
 def test_listener_parsing():
     from lib.albmetrics import _listener, _tg_name
 
@@ -192,10 +222,20 @@ def test_listener_parsing():
 
 def test_sg_exposure_rules():
     lb = {"security_groups": ["sg"], "security_groups_read": True, "inbound_rules": [{"protocol": "-1", "from_port": None, "to_port": None, "cidrs": ["10.0.0.0/8"], "cidrs_v6": [], "prefix_lists": [], "security_groups": ["sg-a", "sg-b"]}]}
-    assert sg_exposure(lb, [5432]) == {"sg_exposure": "allow-list", "allowed_sources": {"5432": 3}, "open_ports": []}  # one CIDR and two referenced groups
+    assert sg_exposure(lb, [5432]) == {"sg_exposure": "allow-list", "allowed_sources": {"5432": 3}, "widest_prefix": {"5432": None}, "open_ports": []}  # one CIDR and two referenced groups hide the width
     lb["inbound_rules"].append({"protocol": "tcp", "from_port": 5432, "to_port": 5432, "cidrs": [], "cidrs_v6": ["::/0"], "prefix_lists": [], "security_groups": []})
     assert sg_exposure(lb, [5432])["sg_exposure"] == "open"
-    assert sg_exposure(None, [5432]) == {"sg_exposure": None, "allowed_sources": {}, "open_ports": []}
+    assert sg_exposure(None, [5432]) == {"sg_exposure": None, "allowed_sources": {}, "widest_prefix": {}, "open_ports": []}
+    assert sg_exposure(lb, [])["sg_exposure"] is None and sg_exposure(lb, [None])["sg_exposure"] is None  # nothing to judge is not "blocked"
+    # a /8 is an allow-list with the width shown; two halves of the address space are open
+    wide = {"security_groups": ["sg"], "security_groups_read": True, "inbound_rules": [{"protocol": "tcp", "from_port": 3306, "to_port": 3306, "cidrs": ["10.0.0.0/8"], "cidrs_v6": [], "prefix_lists": [], "security_groups": []}]}
+    assert sg_exposure(wide, [3306]) == {"sg_exposure": "allow-list", "allowed_sources": {"3306": 1}, "widest_prefix": {"3306": 8}, "open_ports": []}
+    halves = {
+        "security_groups": ["sg"],
+        "security_groups_read": True,
+        "inbound_rules": [{"protocol": "tcp", "from_port": 3306, "to_port": 3306, "cidrs": ["0.0.0.0/1", "128.0.0.0/1"], "cidrs_v6": [], "prefix_lists": [], "security_groups": []}],
+    }
+    assert sg_exposure(halves, [3306])["sg_exposure"] == "open"
     # a UDP rule on the port opens nothing; no covering rule at all is blocked; one open port among allow-listed ones makes the row open
     udp = {"security_groups": ["sg"], "security_groups_read": True, "inbound_rules": [{"protocol": "udp", "from_port": 3306, "to_port": 3306, "cidrs": ["0.0.0.0/0"], "cidrs_v6": [], "prefix_lists": [], "security_groups": []}]}
     assert sg_exposure(udp, [3306])["sg_exposure"] == "blocked"
@@ -207,4 +247,4 @@ def test_sg_exposure_rules():
             {"protocol": "tcp", "from_port": 5432, "to_port": 5432, "cidrs": ["0.0.0.0/0"], "cidrs_v6": [], "prefix_lists": [], "security_groups": []},
         ],
     }
-    assert sg_exposure(mixed, [3306, 5432]) == {"sg_exposure": "open", "allowed_sources": {"3306": 1, "5432": 1}, "open_ports": [5432]}
+    assert sg_exposure(mixed, [3306, 5432]) == {"sg_exposure": "open", "allowed_sources": {"3306": 1, "5432": 1}, "widest_prefix": {"3306": 32, "5432": 0}, "open_ports": [5432]}

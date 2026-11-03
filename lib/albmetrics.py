@@ -191,7 +191,8 @@ def collect(snap: Path, out_rel: str, *, profile: str | None, region: str | None
     out["security_groups"] = {}
     out["security_groups_read"] = False
     if sg_ids:
-        sgs, r = _aws.aws_json(["ec2", "describe-security-groups", "--group-ids", *sg_ids], id=f"{collector}.alb.describe-security-groups", timeout=60, **kw)
+        # a filter instead of --group-ids: an id that no longer exists or belongs to another account is skipped instead of failing the whole call
+        sgs, r = _aws.aws_json(["ec2", "describe-security-groups", "--filters", f"Name=group-id,Values={','.join(sg_ids)}"], id=f"{collector}.alb.describe-security-groups", timeout=60, **kw)
         if sgs is None:
             errors.append(f"describe-security-groups: {r.error or r.stderr.strip()[-200:]}")
         else:

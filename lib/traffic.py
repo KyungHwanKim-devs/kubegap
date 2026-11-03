@@ -10,6 +10,7 @@ lb_services, pod_skew (traffic skew between pods of a workload), readiness (24h 
 from __future__ import annotations
 
 import contextlib
+import ipaddress
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -53,6 +54,7 @@ class _Objects:
     def __init__(self, snap: Path, inv: dict | None):
         self.snap = snap
         self.prod = set(((inv or {}).get("namespaces") or {}).get("prod_like") or [])
+        self.platform = ((inv or {}).get("cluster") or {}).get("platform")
         self.services = {(s["metadata"]["namespace"], s["metadata"]["name"]): s for s in objects(snap, "services")}
         self.workloads = []
         for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet")):
@@ -98,6 +100,26 @@ class _Objects:
 OPEN_CIDRS = ("0.0.0.0/0", "::/0")
 
 
+def _prefix_len(cidr: str) -> int:
+    try:
+        return ipaddress.ip_network(cidr, strict=False).prefixlen
+    except ValueError:
+        return 0
+
+
+def _covers_everything(cidrs: set[str]) -> bool:
+    """True when the CIDRs together cover the whole IPv4 or IPv6 space, 0.0.0.0/0 itself or a pair such as 0.0.0.0/1 and 128.0.0.0/1."""
+    nets = []
+    for c in cidrs:
+        with contextlib.suppress(ValueError):
+            nets.append(ipaddress.ip_network(c, strict=False))
+    for version in (4, 6):
+        same = [n for n in nets if n.version == version]
+        if same and any(n.prefixlen == 0 for n in ipaddress.collapse_addresses(same)):
+            return True
+    return False
+
+
 def _rule_covers(rule: dict, port: int) -> bool:
     """TCP and all-protocol rules only: the listeners this check judges are TCP, so a UDP rule on the same port opens nothing."""
     if rule.get("protocol") == "-1":
@@ -109,31 +131,47 @@ def _rule_covers(rule: dict, port: int) -> bool:
 
 
 def sg_exposure(lb: dict | None, ports: list[int]) -> dict:
-    """What the load balancer's security groups let in on these listener ports, as counts, never the addresses themselves.
-    `open`: some port is reachable from 0.0.0.0/0 or ::/0. `allow-list`: every reachable port is limited to listed CIDRs, prefix lists or security groups.
-    `blocked`: no inbound rule covers any of the ports. `no-security-group`: the load balancer has none, so nothing filters it (an NLB without groups passes everything).
-    `not-read`: the groups could not be described. `allowed_sources` counts the distinct sources per port, CIDRs, prefix lists and referenced security groups alike; `open_ports` lists the ports open to everyone.
-    Pass only the ports that matter for the verdict: for a database exposure, the database ports, so an open 443 next to an allow-listed 5432 does not make the row open."""
-    if not lb:
-        return {"sg_exposure": None, "allowed_sources": {}, "open_ports": []}
+    """What the load balancer's security groups let in on these listener ports, as counts and prefix lengths, never the addresses themselves.
+    `open`: some port is reachable from everywhere, through 0.0.0.0/0, ::/0 or CIDRs that together cover the whole space. `allow-list`: every reachable port is limited to listed CIDRs,
+    prefix lists or security groups. `blocked`: no inbound rule covers any of the ports. `no-security-group`: the load balancer has none, so only the targets' groups filter it.
+    `not-read`: the groups could not be described. `allowed_sources` counts the distinct sources per port, CIDRs, prefix lists and referenced security groups alike; `widest_prefix` is the
+    shortest prefix length among the port's CIDRs, so /32 means single addresses and /8 a whole block, and None when a prefix list or a security group reference hides the width; `open_ports` lists the ports open to everyone.
+    Pass only the ports that matter for the verdict: for a database exposure, the database ports, so an open 443 next to an allow-listed 5432 does not make the row open. No port at all is None, not applicable."""
+    empty = {"allowed_sources": {}, "widest_prefix": {}, "open_ports": []}
+    ports = [p for p in ports if isinstance(p, int)]
+    if not lb or not ports:
+        return {"sg_exposure": None, **empty}
     if not lb.get("security_groups"):
-        return {"sg_exposure": "no-security-group", "allowed_sources": {}, "open_ports": []}
+        return {"sg_exposure": "no-security-group", **empty}
     if not lb.get("security_groups_read"):
-        return {"sg_exposure": "not-read", "allowed_sources": {}, "open_ports": []}
+        return {"sg_exposure": "not-read", **empty}
     allowed: dict[str, int] = {}
+    widest: dict[str, int | None] = {}
     open_ports: list[int] = []
     for port in ports:
-        if not isinstance(port, int):
-            continue
-        sources: set[str] = set()
-        for r in lb.get("inbound_rules") or []:
+        cidrs: set[str] = set()
+        hidden = 0
+        for r in lb.get("_inbound_rules") or lb.get("inbound_rules") or []:
             if _rule_covers(r, port):
-                sources |= set(r.get("cidrs") or []) | set(r.get("cidrs_v6") or []) | {f"prefix-list {p}" for p in r.get("prefix_lists") or []} | {f"sg:{g}" for g in r.get("security_groups") or []}
-        if sources & set(OPEN_CIDRS):
+                cidrs |= set(r.get("cidrs") or []) | set(r.get("cidrs_v6") or [])
+                hidden += len(r.get("prefix_lists") or []) + len(r.get("security_groups") or [])
+        if cidrs & set(OPEN_CIDRS) or _covers_everything(cidrs):
             open_ports.append(port)
-        allowed[str(port)] = len(sources)
+        allowed[str(port)] = len(cidrs) + hidden
+        widest[str(port)] = None if hidden else (min((_prefix_len(c) for c in cidrs), default=None))
     state = "open" if open_ports else ("allow-list" if any(allowed.values()) else "blocked")
-    return {"sg_exposure": state, "allowed_sources": allowed, "open_ports": sorted(open_ports)}
+    return {"sg_exposure": state, "allowed_sources": allowed, "widest_prefix": widest, "open_ports": sorted(open_ports)}
+
+
+def _ranges_exposure(ranges: list[str], ports: list[int]) -> dict:
+    """The same shape from a Service's loadBalancerSourceRanges, for a load balancer that has no security group of its own: the controller writes those ranges into the node groups, which the check does not read."""
+    cidrs = {str(c) for c in ranges if c}
+    ports = [p for p in ports if isinstance(p, int)]
+    if not cidrs or not ports:
+        return {}
+    opened = bool(cidrs & set(OPEN_CIDRS)) or _covers_everything(cidrs)
+    widest = min((_prefix_len(c) for c in cidrs), default=None)
+    return {"sg_exposure": "open" if opened else "allow-list", "allowed_sources": {str(p): len(cidrs) for p in ports}, "widest_prefix": {str(p): widest for p in ports}, "open_ports": ports if opened else []}
 
 
 def _alb(snap: Path, objs: _Objects) -> dict:
@@ -152,7 +190,15 @@ def _alb(snap: Path, objs: _Objects) -> dict:
         row["security_groups"] = lb.get("security_groups") or []
         row["listeners"] = lb.get("listeners") or []
         sgmap = d.get("security_groups") or {}
-        row["inbound_rules"] = [r for g in row["security_groups"] for r in (sgmap.get(g) or {}).get("inbound") or []]
+        row["_inbound_rules"] = [r for g in row["security_groups"] for r in (sgmap.get(g) or {}).get("inbound") or []]  # with the addresses; dropped before the summary is written
+        row["inbound_rules"] = [
+            {
+                **{k: r.get(k) for k in ("protocol", "from_port", "to_port", "prefix_lists", "security_groups")},
+                "cidr_prefixes": sorted(_prefix_len(c) for c in r.get("cidrs") or []),
+                "cidr_v6_prefixes": sorted(_prefix_len(c) for c in r.get("cidrs_v6") or []),
+            }
+            for r in row["_inbound_rules"]
+        ]
         row["security_groups_read"] = (bool(d.get("security_groups_read")) and all(g in sgmap for g in row["security_groups"])) if row["security_groups"] else None
         if lb.get("type") == "application":
             req = g("RequestCount_Sum") or 0
@@ -373,9 +419,16 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
         lb_row = next((lb_dns[a] for a in addrs if a in lb_dns), None) if t == "LoadBalancer" else None
         judged = [p for p, tp in zip(ports, tports, strict=False) if isinstance(p, int) and (not db or p in DB_PORTS or (isinstance(tp, int) and tp in DB_PORTS))]
         sg = sg_exposure(lb_row, judged)
-        if t == "LoadBalancer" and lb_row is None and alb.get("available"):
-            # the Service's address is among no described load balancer: another account, a stale status, or alb-metrics older than the Service. When no load balancer was described at all, the groups were simply not read.
-            sg["sg_exposure"] = "unmatched" if alb.get("lbs") else "not-read"
+        sg_from_ranges = False
+        if t == "LoadBalancer" and lb_row is None and judged:
+            if alb.get("lbs"):
+                sg["sg_exposure"] = "unmatched"  # the Service's address is among no described load balancer: another account, a stale status, or alb-metrics older than the Service
+            elif alb.get("available") or objs.platform == "eks":
+                sg["sg_exposure"] = "not-read"  # nothing was described: the call failed, or the file is missing on an EKS run
+        if sg.get("sg_exposure") == "no-security-group" and sp.get("loadBalancerSourceRanges"):
+            # an NLB without groups of its own: the controller wrote the Service's sourceRanges into the node groups, which are not read; the ranges are the best statement of the AWS-layer control
+            sg = {**sg, **_ranges_exposure(sp.get("loadBalancerSourceRanges") or [], judged)}
+            sg_from_ranges = True
         rows.append(
             {
                 "type": t.lower(),
@@ -395,7 +448,7 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
                 "external_traffic_policy": sp.get("externalTrafficPolicy"),
                 "source_ranges": sp.get("loadBalancerSourceRanges"),
                 **sg,
-                "note": _db_note(db, scheme, sg["sg_exposure"]),
+                "note": _db_note(db, scheme, sg["sg_exposure"], from_ranges=sg_from_ranges),
             }
         )
     # LBs created outside Kubernetes (no TGB) also go in the exposure list (e.g. a shared DB NLB)
@@ -443,9 +496,14 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
     return rows
 
 
-def _db_note(db: bool, scheme, sg_state: str | None) -> str | None:
+def _db_note(db: bool, scheme, sg_state: str | None, *, from_ranges: bool = False) -> str | None:
     if not (db and scheme and "internal" not in str(scheme)):
         return None
+    if from_ranges:
+        return {
+            "open": "DB port open to the internet by the Service's sourceRanges; the load balancer has no security group of its own",
+            "allow-list": "DB port on an external address, limited by the Service's sourceRanges; the load balancer has no security group of its own and the node groups are not read",
+        }.get(sg_state)
     return {
         "open": "DB port open to the internet by the security group",
         "no-security-group": "DB port on an external address with no security group on the load balancer; only the targets' security groups filter it, which this check does not read",
@@ -642,6 +700,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     alb = _alb(snap, objs)
     ingresses = _ingresses(snap, objs, alb)
     exposure = _exposure(snap, objs, ingresses, alb)
+    for lb in alb.get("lbs") or []:
+        lb.pop("_inbound_rules", None)  # the addresses stay in aws/alb-metrics.json
     lb_services = [r for r in exposure if r["type"] == "loadbalancer"]
     return {
         "ingresses": ingresses,

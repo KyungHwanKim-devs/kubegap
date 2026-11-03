@@ -16901,11 +16901,12 @@
   symptom_linked: false
   why: >
     If ports like 5432, 3306, 6379, 27017 or 9092 are open on an internet-facing LB or a NodePort, which listens on every node interface, a single password is all that stands in the way.
-    On AWS the security groups of the load balancer decide who can connect, so the check reads their inbound TCP rules against the listener ports: a database port reachable from 0.0.0.0/0 or ::/0 is open and fails;
+    On AWS the security groups of the load balancer decide who can connect, so the check reads their inbound TCP rules against the listener ports: a database port reachable from everywhere, through 0.0.0.0/0, ::/0 or CIDRs that together cover the whole space, is open and fails;
     a load balancer without security groups of its own fails too, since only the targets' groups filter it and the check does not read those; rules that could not be read, or a Service whose address matches no described load balancer, fail with that said in the evidence, since the Service definition alone cannot clear it.
     Only the database ports decide: an open 443 next to an allow-listed 5432 does not make the row open.
-    When every reachable database port is limited to listed addresses, prefix lists or other security groups the check warns: the data is not open to the internet, but an internet-facing load balancer in front of a database still relies on that list being right, and an internal scheme or a VPN is the safer shape.
-    When no inbound rule covers the ports at all the listener is unreachable and the check passes. A NodePort has no security group of its own in this check and fails as before. The tool never connects to the ports.
+    When every reachable database port is limited to listed addresses, prefix lists or other security groups the check warns and the evidence says how many sources and how wide the widest is, /32 for single addresses, /8 for a whole block: the data is not open to the internet, but an internet-facing load balancer in front of a database still relies on that list being right, and an internal scheme or a VPN is the safer shape.
+    A load balancer without groups of its own whose Service sets loadBalancerSourceRanges is judged by those ranges, since the controller writes them into the node groups, which the check does not read.
+    When no inbound rule covers the ports at all the listener is unreachable and the check passes. Only Service LoadBalancers, NodePorts and NLBs built outside the cluster are judged here; an ALB or HTTP proxy in front of a database is not. A NodePort has no security group of its own in this check and fails as before. The tool never connects to the ports.
   measured: >
     Measured on a real EKS cluster: an internet-facing NLB created outside Kubernetes forwarded ten listeners, 3306 to 3311, 5432, 5433, 6379 and 7687, to MySQL, Postgres, Redis and Neo4j; nine hand-made TargetGroupBindings bound nine of its ten target groups to database Services. Its security group allowed at most four /32 addresses per port and one on the Redis port, while the Kafka 9094 NLB next to it allowed 0.0.0.0/0. Before the rules were read both failed as open. The listener ports differed from the target group ports, so the rules are matched on the listeners. On a k3s cluster: 4 DBs opened via NodePort.
   suggest: "Change the NLB scheme to internal or narrow the security group to office/VPN ranges. NodePort DBs: ClusterIP + port-forward, or an interface reachable only over Tailscale. An allow-listed NLB: review the list and prefer an internal scheme reached through the VPN."
@@ -16958,6 +16959,7 @@
           source_ranges: null
           sg_exposure: "open"
           allowed_sources: { "9094": 1, "443": 1 }
+          widest_prefix: { "9094": 0, "443": 0 }
           open_ports: [443, 9094]
           note: "DB port open to the internet by the security group"
       # NLB built outside the cluster whose security group allows four office addresses per database port: warn, not fail (#73)
@@ -17064,6 +17066,7 @@
           bound_services: ["prod-a/mysql", "prod-a/postgresql"]
           sg_exposure: "open"
           allowed_sources: { "3306": 2, "5432": 1 }
+          widest_prefix: { "3306": 32, "5432": 0 }
           open_ports: [5432]
           note: "NLB created outside Kubernetes; 2 TargetGroupBindings bind it to prod-a/mysql, prod-a/postgresql. DB port open to the internet by the security group"
       - expect: "none"
