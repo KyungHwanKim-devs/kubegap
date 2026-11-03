@@ -348,11 +348,14 @@ def _run_http_step(st: dict, sid: str, name: str, cfg: Config, snap: Path, log: 
             for k, v in it.items():
                 if isinstance(v, (str, int, float)):
                     path_i = path_i.replace("{item." + k + "}", str(v))
+            t_i = _t.monotonic()
             r = _http.get(base.rstrip("/") + path_i, params=params, timeout=timeout, headers=headers)
             out_i = snap / str(st["out"]).replace("{item_safe}", safe)
             if r.ok:
                 write_private(out_i, r.body)
-            runs[safe] = {"ok": r.ok, "status": getattr(r, "status", None)}
+            err_i = None if r.ok else (r.error or f"HTTP {r.status}")
+            runs[safe] = {"ok": r.ok, "status": getattr(r, "status", None), "error": err_i}
+            log.command(id=f"{name}.{sid}.{safe}", cmd=["http", kind, path_i], code=0 if r.ok else (r.status or 1), seconds=_t.monotonic() - t_i, out_path=str(out_i.relative_to(snap)) if r.ok else None, error=err_i, collector=name)
         if echo:
             echo(f"    {sum(1 for x in runs.values() if x['ok'])}/{len(runs)} items saved ({str(st['out']).rsplit('/', 1)[0]})")
         return {"ok": any(x["ok"] for x in runs.values()) if runs else False, "runs": len(runs), "seconds": round(_t.monotonic() - t0, 1)}
