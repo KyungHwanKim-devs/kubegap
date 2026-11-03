@@ -33,6 +33,7 @@ from pathlib import Path
 
 from . import evaluate as _ev
 from . import rubric
+from .snapshot import write_private
 
 BASE_INV = {
     "context": "selftest",
@@ -68,7 +69,7 @@ def _build_snapshot(root: Path, check: dict, case: dict, profile_name: str):
     summary: dict = json.loads(json.dumps(case.get("summary") or {}))
     for name, body in (case.get("aws") or {}).items():
         (root / "aws").mkdir(exist_ok=True)
-        (root / "aws" / name).write_text(json.dumps(body), encoding="utf-8")
+        write_private(root / "aws" / name, json.dumps(body))
     if check["type"] == "summary":
         item = case.get("item")
         if item is None and case.get("expect") == "none":
@@ -76,11 +77,11 @@ def _build_snapshot(root: Path, check: dict, case: dict, profile_name: str):
         else:
             _set_path(summary, check["each"], item if check.get("cluster_level") else [item])
     for qid, series in (case.get("metric") or {}).items():
-        (root / "metrics" / f"{qid}.json").write_text(json.dumps({"id": qid, "ok": True, "resultType": "vector", "result": [{"metric": s.get("labels") or {}, "value": [0, str(s.get("value"))]} for s in series]}), encoding="utf-8")
+        write_private(root / "metrics" / f"{qid}.json", json.dumps({"id": qid, "ok": True, "resultType": "vector", "result": [{"metric": s.get("labels") or {}, "value": [0, str(s.get("value"))]} for s in series]}))
     for stem, items in (case.get("objects") or {}).items():
-        (root / "objects" / f"{stem}.json").write_text(json.dumps({"items": items}), encoding="utf-8")
-    (root / "inventory.json").write_text(json.dumps(inv), encoding="utf-8")
-    (root / "summary.json").write_text(json.dumps(summary), encoding="utf-8")
+        write_private(root / "objects" / f"{stem}.json", json.dumps({"items": items}))
+    write_private(root / "inventory.json", json.dumps(inv))
+    write_private(root / "summary.json", json.dumps(summary))
     return inv, summary
 
 

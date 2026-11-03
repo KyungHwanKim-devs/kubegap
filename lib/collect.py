@@ -25,6 +25,7 @@ from .config import Config
 from .portfwd import PortForward
 from .prom import Prometheus
 from .runlog import RunLog
+from .snapshot import remove_stale_temp, write_private
 
 SECRET_KINDS = {"Secret", "SecretList"}
 NON_WORKLOAD_COMPONENTS = {"ecr", "eks-managed-addons", "k3s", "rke2"}  # registry and platform names are not pods and not log collection targets (app pod logs once ended up under the "ecr" component)
@@ -114,7 +115,7 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
             summary["failed"][full] = r.error or r.stderr.strip()[-200:]
             continue
         _scrub(data)
-        (snap / "objects" / f"{file_stem}.json").write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        write_private(snap / "objects" / f"{file_stem}.json", json.dumps(data, ensure_ascii=False))
         n = len(data.get("items", []) or [])
         summary["kinds"] += 1
         summary["items"] += n
@@ -345,8 +346,7 @@ def _run_http_step(st: dict, sid: str, name: str, cfg: Config, snap: Path, log: 
             r = _http.get(base.rstrip("/") + path_i, params=params, timeout=timeout, headers=headers)
             out_i = snap / str(st["out"]).replace("{item_safe}", safe)
             if r.ok:
-                out_i.parent.mkdir(parents=True, exist_ok=True)
-                out_i.write_text(r.body, encoding="utf-8")
+                write_private(out_i, r.body)
             runs[safe] = {"ok": r.ok, "status": getattr(r, "status", None)}
         if echo:
             echo(f"    {sum(1 for x in runs.values() if x['ok'])}/{len(runs)} items saved ({str(st['out']).rsplit('/', 1)[0]})")
@@ -354,8 +354,7 @@ def _run_http_step(st: dict, sid: str, name: str, cfg: Config, snap: Path, log: 
     r = _http.get(base.rstrip("/") + st["path"], params=params, timeout=timeout, headers=headers)
     out = snap / st["out"]
     if r.ok:
-        out.parent.mkdir(parents=True, exist_ok=True)
-        out.write_text(r.body, encoding="utf-8")
+        write_private(out, r.body)
     log.command(
         id=f"{name}.{sid}", cmd=["http", kind, st["path"]], code=0 if r.ok else (r.status or 1), seconds=_t.monotonic() - t0, out_path=st["out"] if r.ok else None, error=None if r.ok else (r.error or f"HTTP {r.status}"), collector=name
     )
@@ -496,8 +495,7 @@ def _run_node_step(st: dict, sid: str, name: str, inv: dict, cfg: Config, snap: 
             r.stdout += "\n### truncated\n"
         out = snap / str(st["out"]).format(node=node)
         if r.ok or r.stdout:
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text(r.stdout, encoding="utf-8")
+            write_private(out, r.stdout)
         lines = r.stdout.count("\n")
         rec = {"ok": r.ok, "lines": lines, "out": str(out.relative_to(snap)) if (r.ok or r.stdout) else None, "error": r.error}
         return node, rec, f"    {node}: {'saved ' + rec['out'] + f' ({lines} lines)' if rec['out'] else 'failed: ' + str(r.error)[:120]}"
@@ -649,7 +647,7 @@ def _step_kubectl(ctx: StepContext, st: dict) -> dict:
         try:
             data = json.loads(out.read_text(encoding="utf-8"))
             _scrub(data)
-            out.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            write_private(out, json.dumps(data, ensure_ascii=False))
             n = len(data.get("items", []) or []) if isinstance(data, dict) else None
         except json.JSONDecodeError:
             n = None
@@ -710,7 +708,7 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
                 try:
                     _keep = re.compile(st["keep"]) if st.get("keep") else None
                     _lines = [ln for ln in out.read_text(encoding="utf-8", errors="replace").splitlines() if ln and not ln.startswith("#") and "_bucket{" not in ln and (_keep is None or _keep.search(ln))]
-                    out.write_text("\n".join(_lines) + ("\n" if _lines else ""), encoding="utf-8")
+                    write_private(out, "\n".join(_lines) + ("\n" if _lines else ""))
                 except (OSError, re.error):
                     pass
             if not rr.ok and node_ok:
@@ -727,7 +725,7 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
                         nd, nodecommands.pod_metrics_cmd(pip, st["port"], st.get("path", "/metrics"), st.get("keep")), timeout=30, id=f"{name}.{sid}.{pname}.node", collector=name, step=f"{name}/{sid}", params={"podIp": pip}
                     )
                     if nr.ok and nr.stdout.strip():
-                        out.write_text(nr.stdout, encoding="utf-8")
+                        write_private(out, nr.stdout)
                         rr = nr
                         via = f"node:{nd}"
                         break
@@ -936,14 +934,15 @@ def progress_line(finished: int, total: int, elapsed: float, last: tuple[str, fl
 
 def _write_incomplete(snap: Path, line: str) -> None:
     """INCOMPLETE marks a collection that has not finished; its text is the latest progress line so a waiting session can read how far the run is."""
-    (snap / "INCOMPLETE").write_text(line + "\nIf this file remains, the snapshot was interrupted.\n", encoding="utf-8")
+    write_private(snap / "INCOMPLETE", line + "\nIf this file remains, the snapshot was interrupted.\n")
 
 
 def collect(context: str, cfg: Config, inv: dict, snap: Path, log: RunLog, *, kubeconfig: str | None = None, only: list[str] | None = None, mode: str = paths.DEFAULT_MODE, echo=print) -> dict:
     if mode not in paths.MODES:
         raise ValueError(f"unknown collection mode {mode!r} (expected one of {', '.join(paths.MODES)})")
     log.stage("collect", "start", mode=mode)
-    (snap / "MODE").write_text(mode + "\n", encoding="utf-8")  # read back by paths.snapshot_mode: latest/previous selection stays within one mode
+    remove_stale_temp(snap)
+    write_private(snap / "MODE", mode + "\n")  # read back by paths.snapshot_mode: latest/previous selection stays within one mode
     enabled = inv.get("collectors_enabled") or ["core"]
     if only:
         enabled = [c for c in enabled if c in only]
@@ -1007,7 +1006,7 @@ def collect(context: str, cfg: Config, inv: dict, snap: Path, log: RunLog, *, ku
         "skipped": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("skipped") and not st.get("mode_skipped")],
         "seconds_total": round(_time.monotonic() - t_start, 1),
     }
-    (snap / "collect-result.json").write_text(json.dumps(results, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+    write_private(snap / "collect-result.json", json.dumps(results, ensure_ascii=False, indent=1, default=str))
     with contextlib.suppress(OSError):
         (snap / "INCOMPLETE").unlink()
     log.stage("collect", "end", collectors=len(results) - 1)

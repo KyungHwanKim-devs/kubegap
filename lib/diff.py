@@ -18,12 +18,13 @@ import contextlib
 import csv
 import datetime as _dt
 import hashlib
+import io
 import json
 from collections import Counter
 from pathlib import Path
 
 from . import __version__, paths
-from .snapshot import items, load_json
+from .snapshot import items, load_json, write_private
 
 COUNT_ONLY_KINDS = {
     "pods",
@@ -323,7 +324,7 @@ def diff(a: Path, b: Path, write: bool = True) -> dict:
         "metrics": diff_metrics(a, b),
     }
     if write:
-        (b / "diff.json").write_text(json.dumps(d, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        write_private(b / "diff.json", json.dumps(d, ensure_ascii=False, indent=1, default=str))
     return d
 
 
@@ -400,10 +401,11 @@ def append_history(snap: Path) -> Path | None:
             rows = [r for r in csv.DictReader(f) if r.get("snapshot") != snap.name]
     rows.append({k: ("" if row.get(k) is None else row.get(k)) for k in HISTORY_COLUMNS})
     rows.sort(key=lambda r: r["snapshot"])
-    with path.open("w", encoding="utf-8", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=HISTORY_COLUMNS)
-        w.writeheader()
-        w.writerows(rows)
+    buf = io.StringIO()
+    w = csv.DictWriter(buf, fieldnames=HISTORY_COLUMNS, lineterminator="\r\n")
+    w.writeheader()
+    w.writerows(rows)
+    write_private(path, buf.getvalue())
     return path
 
 

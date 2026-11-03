@@ -32,7 +32,7 @@ from pathlib import Path
 
 from . import aws as _aws
 from .runlog import RunLog
-from .snapshot import load_json
+from .snapshot import load_json, write_private
 
 
 def _items(doc, items_path: str) -> list:
@@ -103,9 +103,8 @@ def collect(snap: Path, st: dict, *, profile: str | None, region: str | None, lo
         end = _dt.datetime.now(_dt.UTC).replace(microsecond=0)
         start = end - _dt.timedelta(hours=hours)
         tmp = snap / "aws" / f"_mdq_{re.sub(r'[^a-z0-9]+', '_', st.get('id', 'cw'))}.json"
-        tmp.parent.mkdir(parents=True, exist_ok=True)
         for i in range(0, len(queries), 100):
-            tmp.write_text(json.dumps(queries[i : i + 100]), encoding="utf-8")
+            write_private(tmp, json.dumps(queries[i : i + 100]))
             res, r = _aws.aws_json(
                 ["cloudwatch", "get-metric-data", "--metric-data-queries", f"file://{tmp}", "--start-time", start.strftime("%Y-%m-%dT%H:%M:%SZ"), "--end-time", end.strftime("%Y-%m-%dT%H:%M:%SZ")],
                 id=f"{collector}.{st.get('id', 'cw')}.get-metric-data",
@@ -128,9 +127,7 @@ def collect(snap: Path, st: dict, *, profile: str | None, region: str | None, lo
                 errors.append(f"get-metric-data message: {m}")
         with contextlib.suppress(OSError):
             tmp.unlink()
-    p = snap / out_rel
-    p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_text(json.dumps(out, ensure_ascii=False, default=str), encoding="utf-8")
+    write_private(snap / out_rel, json.dumps(out, ensure_ascii=False, default=str))
     if echo:
         echo(f"    saved {out_rel} (items {len(meta)}, queries {len(queries)}, errors {len(errors)})")
     return {"ok": not errors or bool(out["items"]), "items": len(meta), "queries": len(queries), "errors": errors[:5]}

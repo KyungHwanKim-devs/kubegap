@@ -16,6 +16,7 @@ from . import __version__, aws, kube, monitoring, nodecommands, paths, tools
 from . import discover as _discover
 from .config import Config
 from .runlog import RunLog
+from .snapshot import write_private
 
 
 def _p(msg: str = "") -> None:
@@ -187,7 +188,7 @@ def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None
     result["ready"] = ok
     result["finished"] = _dt.datetime.now().astimezone().isoformat(timespec="seconds")
     if ctx_dir:
-        (ctx_dir / "setup.json").write_text(json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding="utf-8")
+        write_private(ctx_dir / "setup.json", json.dumps(result, ensure_ascii=False, indent=2, default=str))
         result["path"] = str(ctx_dir / "setup.json")
     log.stage("setup", "end", ready=ok)
     _p("")

@@ -26,7 +26,7 @@ from typing import ClassVar
 from . import __version__, paths, rubric
 from .config import Config
 from .resilience import is_db_like, mounts_pvc
-from .snapshot import items, load_json
+from .snapshot import items, load_json, write_private
 
 SAFE_BUILTINS = {
     "len": len,
@@ -1035,7 +1035,7 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
         "llm_checks": [f for f in findings if f["status"] == "llm"],
         "check_results": results,
     }
-    (snap / "findings-draft.json").write_text(json.dumps(out, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+    write_private(snap / "findings-draft.json", json.dumps(out, ensure_ascii=False, indent=1, default=str))
     if echo:
         bs = out["checks"]["by_status"]
         echo(

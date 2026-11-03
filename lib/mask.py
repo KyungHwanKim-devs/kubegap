@@ -90,10 +90,13 @@ def mask_text(text: str, account_ids: list[str] | None = None, ips: bool = False
 
 
 def mask_file(path, account_ids: list[str] | None = None, ips: bool = False, write: bool = True) -> MaskResult:
+    import stat
     from pathlib import Path
+
+    from .snapshot import write_private
 
     p = Path(path)
     r = mask_text(p.read_text(encoding="utf-8"), account_ids, ips)
     if write and r.total:
-        p.write_text(r.text, encoding="utf-8")
+        write_private(p, r.text, mode=stat.S_IMODE(p.stat().st_mode))  # the report is the user's file; keep its permissions, only make the rewrite atomic
     return r

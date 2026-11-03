@@ -16,6 +16,7 @@ from pathlib import Path
 from . import aws as _aws
 from . import yamlite
 from .runlog import RunLog
+from .snapshot import write_private
 
 TERMINAL = {"Complete", "Failed", "Cancelled", "Timeout", "Unknown"}
 
@@ -67,7 +68,7 @@ def run_file(path: Path, out_dir: Path, *, cluster: str, profile: str | None, re
         hours = float(it.get("hours", default_hours))
         res = run_query(group, q, hours, profile=profile, region=region, limit=it.get("limit"))
         rec = {"id": qid, "why": it.get("why"), "query": q, "hours": hours, "log_group": group, "taken_at": now, **res}
-        (out_dir / f"{qid}.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1, default=str), encoding="utf-8")
+        write_private(out_dir / f"{qid}.json", json.dumps(rec, ensure_ascii=False, indent=1, default=str))
         summary["queries"][qid] = {"ok": res["ok"], "rows": len(res["rows"]), "status": res["status"], "error": res.get("error"), "scanned_bytes": (res.get("statistics") or {}).get("bytesScanned")}
         summary["ok" if res["ok"] else "failed"] += 1
         if log is not None:
