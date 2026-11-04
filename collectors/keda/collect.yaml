@@ -9,6 +9,7 @@
   port: 8080
   path: /metrics
   out: metrics/pod/keda-metrics-apiserver
+  source: "names and their definitions per version: collectors/keda/pod-metrics.yaml; port 8080 and the selector are observed, not read in source"
   keep: '^(apiserver_request_total|keda_internal_metricsservice_grpc_client_(handled|started)_total|registered_metrics_total|apiserver_current_inflight_requests|process_(start_time|resident_memory_bytes))'
   timeout: 30
 - id: operator-metrics
@@ -19,5 +20,6 @@
   port: 8080
   path: /metrics
   out: metrics/pod/keda-operator
+  source: "names and their definitions per version: collectors/keda/pod-metrics.yaml; port 8080, the selector and the --enable-prometheus-metrics flag are observed, not read in source"
   keep: '^(keda_|controller_runtime_reconcile_errors_total|leader_election|process_(start_time|resident_memory_bytes))'
   timeout: 30

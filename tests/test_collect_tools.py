@@ -89,3 +89,42 @@ def test_daemonset_backend_and_its_discovery_use_the_run_kubeconfig(monkeypatch)
     monkeypatch.setattr(discover.kube, "kubectl_json", fake_json)
     out = discover._node_access("k3s", {"nodes": []}, {}, None, RunLog(None), context="ctx-x", kubeconfig="/x/kc")
     assert out["method"] == "daemonset" and calls == [(["get", "pods"], "ctx-x", "/x/kc")]
+
+
+def test_krr_config_block_is_dropped_from_the_saved_file(tmp_path, monkeypatch):
+    """krr's JSON carries its whole Config (robusta_krr/core/models/result.py:70@v1.31.1), kubeconfig path and EKS access key included (core/models/config.py:27, 47); kubegap reads none of it."""
+    import json
+
+    bindir = tmp_path / "fakebin"
+    bindir.mkdir()
+    fake = bindir / "krr"
+    doc = {
+        "scans": [],
+        "score": 0,
+        "strategy": {"name": "simple", "settings": {"history_duration": 336.0}},
+        "errors": [],
+        "clusterSummary": {},
+        "config": {"kubeconfig": "/home/me/.kube/config", "eks_access_key": "AKIAEXAMPLEEXAMPLE00", "prometheus_url": "http://127.0.0.1:9090"},
+    }
+    fake.write_text('#!/bin/sh\nfor a in "$@"; do out="$a"; done\nprintf \'%s\' \'' + json.dumps(doc).replace("'", "'\\''") + '\' > "$out"\n')
+    fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
+    step = {"id": "krr", "type": "tool", "tool": "krr", "cmd": ["krr", "simple", "-c", "{context}", "-f", "json", "--fileoutput", "{out}"], "writes_out": True, "out": "tools/krr.json"}
+    snap = tmp_path / "snap"
+    res = collect._run_tool_step(step, "krr", "core", "ctx", None, snap, RunLog(None), None, 30, None)
+    assert res["ok"], res
+    saved = json.loads((snap / "tools" / "krr.json").read_text())
+    assert "config" not in saved and saved["strategy"]["settings"]["history_duration"] == 336.0
+    assert "AKIAEXAMPLE" not in (snap / "tools" / "krr.json").read_text()
+    assert stat.S_IMODE((snap / "tools" / "krr.json").stat().st_mode) == 0o600
+
+
+def test_deprecation_tools_are_skipped_without_a_server_version(tmp_path, monkeypatch):
+    """No made-up target: pluto flags every API against the target and kubent lists every rule set whose Since is below it (pkg/printer/filter.go:12@0.7.3)."""
+    _fake_tool(tmp_path, monkeypatch)
+    step = {"id": "pluto", "type": "tool", "tool": "faketool", "cmd": ["faketool", "--target-versions", "k8s={k8s_next_minor}"], "out": "tools/pluto.json"}
+    snap = tmp_path / "snap"
+    res = collect._run_tool_step(step, "pluto", "core", "ctx", None, snap, RunLog(None), None, 30, None, inv={"cluster": {"server_version": None}})
+    assert res["ok"] is False and res["skipped"].startswith("server version unknown") and not (snap / "tools" / "pluto.json").exists()
+    res = collect._run_tool_step(step, "pluto", "core", "ctx", None, snap, RunLog(None), None, 30, None, inv={"cluster": {"server_version": "v1.32.13-eks-abc"}})
+    assert res["ok"] and '"args": "--target-versions k8s=v1.33.0"' in (snap / "tools" / "pluto.json").read_text()

@@ -1,0 +1,56 @@
+# Metric names kubegap reads from the AWS Load Balancer Controller /metrics (step alb-controller.controller-metrics, parsed by lib/albctl.py through
+# lib/podmetrics.py). Read in kubernetes-sigs/aws-load-balancer-controller at v2.7.2 and v3.6.2: the aws_api_* names and labels are the same in
+# both (v3 moved the file from pkg/aws/metrics to pkg/metrics/aws). The controller_runtime_*, workqueue_*, rest_client_* and leader_election_* names
+# come from controller-runtime (v0.14.6 at v2.7.2, v0.24.1 at v3.6.2).
+- key: leader
+  labels: [name]
+  names:
+    - name: leader_election_master_status
+      source: "kubernetes-sigs/controller-runtime pkg/metrics/leaderelection.go:13@v0.14.6 and @v0.24.1"
+- key: aws_api_call_duration
+  labels: [service, operation]
+  names:
+    - name: aws_api_call_duration_seconds
+      source: "kubernetes-sigs/aws-load-balancer-controller pkg/aws/metrics/instruments.go:41-44@v2.7.2; pkg/metrics/aws/instruments.go:51-54@v3.6.2 (histogram; _sum and _count are read)"
+- key: aws_api_call_retries
+  labels: [service, operation]
+  names:
+    - name: aws_api_call_retries
+      source: "kubernetes-sigs/aws-load-balancer-controller pkg/aws/metrics/instruments.go:46-50@v2.7.2; pkg/metrics/aws/instruments.go:56-60@v3.6.2 (histogram; _sum and _count are read)"
+- key: webhook_requests
+  labels: [webhook, code]
+  names:
+    - name: controller_runtime_webhook_requests_total
+      source: "kubernetes-sigs/controller-runtime pkg/webhook/internal/metrics/metrics.go:42@v0.14.6, :47@v0.24.1"
+- key: rest_client_requests
+  labels: [code, method, host]
+  names:
+    - name: rest_client_requests_total
+      source: "kubernetes-sigs/controller-runtime pkg/metrics/client_go_adapter.go:97@v0.14.6, :34@v0.24.1"
+- key: reconcile_total
+  labels: [controller, result]
+  names:
+    - name: controller_runtime_reconcile_total
+      source: "kubernetes-sigs/controller-runtime pkg/internal/controller/metrics/metrics.go:30@v0.14.6, :32@v0.24.1"
+- key: reconcile_errors
+  labels: [controller]
+  names:
+    - name: controller_runtime_reconcile_errors_total
+      source: "kubernetes-sigs/controller-runtime pkg/internal/controller/metrics/metrics.go:37@v0.14.6, :39@v0.24.1"
+- key: max_concurrent_reconciles
+  names:
+    - name: controller_runtime_max_concurrent_reconciles
+      source: "kubernetes-sigs/controller-runtime pkg/internal/controller/metrics/metrics.go:53@v0.14.6, :72@v0.24.1 (collected for the raw file only)"
+- key: workqueue_depth
+  labels: [name]
+  names:
+    - name: workqueue_depth
+      source: "kubernetes-sigs/controller-runtime pkg/metrics/workqueue.go:41@v0.14.6 (label name); pkg/metrics/workqueue.go:21-22@v0.24.1 composes workqueue_depth from client-go's keys and adds a controller label"
+- key: process_start
+  names:
+    - name: process_start_time_seconds
+      source: "prometheus/client_golang prometheus/process_collector.go:99@v1.19.1"
+- key: rss
+  names:
+    - name: process_resident_memory_bytes
+      source: "prometheus/client_golang prometheus/process_collector.go:94@v1.19.1"

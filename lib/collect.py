@@ -401,8 +401,14 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     if m:
         ph["k8s_next_minor"] = f"v{m.group(1)}.{int(m.group(2)) + 1}.0"
         ph["k8s_next_minor_short"] = f"{m.group(1)}.{int(m.group(2)) + 1}"
-    else:
-        ph["k8s_next_minor"], ph["k8s_next_minor_short"] = "v1.99.0", "1.99"
+    elif any("{k8s_next_minor" in str(a) for a in st["cmd"]):
+        # No server version, no target: a made-up one (this used to be 1.99) makes pluto flag every API as removed and kubent list every rule set, and the summary
+        # would judge the rows against the same invented minor. Skipping is the honest answer; the check then skips with the step's reason.
+        reason = "server version unknown: no target minor for the deprecated-API tools"
+        log.skip(id=f"{name}.{sid}", reason=reason, collector=name)
+        if echo:
+            echo(f"    skipped: {reason}")
+        return {"ok": False, "skipped": reason}
     for store in ("prometheus", "alertmanager", "loki", "grafana"):
         if any(f"{{{store}_url}}" in str(a) for a in st["cmd"]):
             url = stores.url(store) if stores else None
@@ -448,10 +454,50 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     r = _shell.run(cmd, timeout=timeout, env=tool_env, id=f"{name}.{sid}", log=log, collector=name, out_path=None if st.get("writes_out") else out)
     if st.get("writes_out") and out.is_file():
         out.chmod(0o600)  # the tool wrote the file with its own mode (krr: 0644); every file in a snapshot is owner-only
+    if tool == "krr" and out.is_file():  # whatever the exit code: the file may be complete when krr is killed after writing it
+        # krr's JSON carries its whole Config (robusta_krr/core/models/result.py:70@v1.31.1): kubeconfig path, prometheus_url, this file's absolute path and, when someone
+        # runs it with the EKS flags, eks_access_key as plain text (core/models/config.py:47; only the *_secret_key, auth header and token fields are SecretStr and come out
+        # masked). Nothing in kubegap reads it, so it is dropped before the file is read again; strategy.settings, which the summary reads, is a separate key.
+        try:
+            doc = json.loads(out.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            doc = None
+        if isinstance(doc, dict) and "config" in doc:
+            doc.pop("config")
+            write_private(out, json.dumps(doc, ensure_ascii=False, indent=2))
     ok = r.ok and out.is_file() and out.stat().st_size > 0
+    read = None
+    error = r.error or r.stderr.strip()[-300:] or "no output"
+    if tool in ("kubent", "pluto"):
+        read = False
+        if ok:
+            try:
+                doc = json.loads(out.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                doc = None
+            stderr = _re.sub(r"\x1b\[[0-9;]*m", "", r.stderr)  # kubent's zerolog ConsoleWriter colors field names.
+            if tool == "kubent":
+                # kube-no-trouble cmd/kubent/main.go:49,56 and pkg/collector/cluster.go:119-142@0.7.3:
+                # list errors are swallowed; zero counts also mean no last-applied annotations, not proof of a read.
+                read = isinstance(doc, list) and bool(_re.search(r"Retrieved [1-9][0-9]* resources from collector[^\n]*name=Cluster\b", stderr))
+                if "Failed to initialize collector" in r.stderr or "Failed to retrieve data from collector" in r.stderr:
+                    read = False
+            else:
+                # Pluto pkg/api/output.go:58@v5.24.5 omits empty items. discovery-api/discovery_api.go:121-122
+                # logs an empty successful List at -v=2. Its :168 count is ALWAYS zero (results is never populated),
+                # even after failed discovery; neither that count nor a "Retrieving" line proves a read.
+                read = isinstance(doc, dict) and (bool(doc.get("items")) or "No annotations for ResourceVer " in stderr)
+            ok = bool(read)
+            if not ok:
+                # The tail of stderr is not the reason: kubent ends every run with its `Loaded ruleset` lines. Keep the lines that say what happened.
+                why = [ln.strip() for ln in stderr.splitlines() if any(k in ln for k in ("Failed", "Retrieved", "ERR", "error"))]
+                error = f"{tool}: API resources not confirmed read" + (f"; {'; '.join(why[-3:])[-300:]}" if why else " (no item and no successful List in its log)")
     if echo:
-        echo(f"    {'saved ' + st['out'] + f' ({out.stat().st_size // 1024} KB)' if ok else 'failed: ' + str(r.error or r.stderr.strip()[-200:] or 'no output')}")
-    return {"ok": ok, "seconds": round(r.seconds, 1) if hasattr(r, "seconds") else None, "error": None if ok else (r.error or r.stderr.strip()[-300:] or "no output")}
+        echo(f"    {'saved ' + st['out'] + f' ({out.stat().st_size // 1024} KB)' if ok else 'failed: ' + error}")
+    result = {"ok": ok, "seconds": round(r.seconds, 1) if hasattr(r, "seconds") else None, "error": None if ok else error}
+    if read is not None:
+        result["api_read"] = bool(ok and read)
+    return result
 
 
 # The node command backends that collection sends node steps to. `none` is the absence of one. The DaemonSet backend was missing from this

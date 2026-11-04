@@ -1010,7 +1010,7 @@
   severity_default: low
   symptom_linked: false
   why: >
-    When enabled the operator exposes keda_scaler_errors_total, keda_scaler_metrics_value (the value the trigger read), keda_scaler_metrics_latency and keda_internal_scale_loop_latency. When off, neither kubegap nor Grafana can see "what is the kafka lag right now" and errors are counted only from log signatures.
+    When enabled the operator exposes keda_scaler_detail_errors_total (keda_scaler_errors_total before 2.17), keda_scaler_metrics_value (the value the trigger read), keda_scaler_metrics_latency and keda_internal_scale_loop_latency. When off, neither kubegap nor Grafana can see "what is the kafka lag right now" and errors are counted only from log signatures.
   measured: >
     Measured on real clusters: false on both.
   suggest: "Helm values prometheus.operator.enabled true (+ serviceMonitor). Trigger value trends and scale loop latency then accumulate in Prometheus."

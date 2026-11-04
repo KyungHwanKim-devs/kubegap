@@ -93,6 +93,7 @@ class _Ctx:
         inv = inv or {}
         self.prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
         self.platform = (inv.get("cluster") or {}).get("platform")
+        self.server_version = (inv.get("cluster") or {}).get("server_version")
         self.workloads = []
         for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet"), ("cronjobs.batch", "CronJob")):
             for o in objects(snap, stem):
@@ -161,6 +162,13 @@ def _node_labels(cx: _Ctx) -> dict:
 
 
 def _polaris(cx: _Ctx) -> dict:
+    # source: polaris v10.2.6 pkg/validator/output.go:45-54 AuditData{PolarisOutputVersion, AuditTime, SourceType, SourceName, DisplayName, ClusterInfo, Results, Score},
+    # :95-101 ClusterInfo{Version, Nodes, Pods, Namespaces, Controllers}, :151-158 Result{Name, Namespace, Kind, Results, PodResult, CreatedTime}, :188-192 PodResult{Name, Results,
+    # ContainerResults}, :222-225 ContainerResult{Name, Results}, :104-112 ResultMessage{ID, Message, Details, Success, Severity, Category, Mutations}; pkg/config/severity.go:22-28
+    # severities ignore|warning|danger; pkg/config/checks/*.yaml categories Security (27), Reliability (13), Efficiency (4). The step runs without --only-show-failed-tests:
+    # that filter keeps a controller only when its PodResult is non-empty (output.go:180-185; schema.go:245-249 always sets one), so a controller whose only failures are
+    # controller-level checks vanished. The successes are skipped here instead. len(Results) is every audited object of every kind (controllers, Ingresses, Namespaces,
+    # bindings …) and ClusterInfo.Controllers (pkg/validator/fullaudit.go:55, GetNumberOfControllers) the audited controllers.
     d = load_json(cx.snap / "tools" / "polaris.json")
     if not d:
         return {"present": False, "note": "tools/polaris.json missing (polaris not installed or not collected yet)"}
@@ -212,6 +220,8 @@ def _polaris(cx: _Ctx) -> dict:
         "source": "tools/polaris.json",
         "score": d.get("Score"),
         "audited": len(d.get("Results") or []),
+        "with_failures": len(rows),
+        "controllers": (d.get("ClusterInfo") or {}).get("Controllers"),
         "cluster_info": d.get("ClusterInfo"),
         "version": d.get("PolarisOutputVersion"),
         "checks": checks,
@@ -225,10 +235,29 @@ def _polaris(cx: _Ctx) -> dict:
 # ---------- Deprecated API ----------
 
 
+def _minor(v) -> tuple[int, int] | None:
+    m = re.match(r"v?(\d+)\.(\d+)", str(v or ""))
+    return (int(m.group(1)), int(m.group(2))) if m else None
+
+
+def _next_minor(server_version, pluto_target: dict | None) -> str | None:
+    """The minor the two tools were asked about: the one after the server's (what collect passes as {k8s_next_minor}), else pluto's recorded k8s target."""
+    mm = _minor(server_version)
+    if mm:
+        return f"{mm[0]}.{mm[1] + 1}"
+    mm = _minor((pluto_target or {}).get("k8s"))
+    return f"{mm[0]}.{mm[1]}" if mm else None
+
+
 def _deprecated(cx: _Ctx) -> dict:
+    steps = ((load_json(cx.snap / "collect-result.json") or {}).get("core") or {}).get("steps") or {}
+    read = {f"{tool}_read": bool((steps.get(tool) or {}).get("ok") and (steps.get(tool) or {}).get("api_read")) for tool in ("pluto", "kubent")}
     items = []
+    # source: pluto v5.24.5 pkg/api/output.go:28-55 Output{name, filePath, namespace (omitempty), api, deprecated, removed, replacementAvailable}, :57-59 Instance{items (omitempty),
+    # target-versions}, pkg/api/versions.go:60-76 Version{version, kind, deprecated-in, removed-in, replacement-api, replacement-available-in, component}; deprecated and removed are
+    # judged against the target in FilterOutput (output.go:162-163). A cluster-scoped object has no namespace key.
     pl = load_json(cx.snap / "tools" / "pluto.json") or {}
-    for it in pl.get("items") or []:
+    for it in (pl.get("items") or []) if read["pluto_read"] else []:
         items.append(
             {
                 "source": "pluto",
@@ -243,20 +272,32 @@ def _deprecated(cx: _Ctx) -> dict:
                 "removed": bool(it.get("removed")),
             }
         )
+    # source: kubent 0.7.3 pkg/printer/json.go:32-40 encodes []judge.Result; pkg/judge/judge.go:3-11 Result{Name, Namespace, Kind, ApiVersion, RuleSet, ReplaceWith, Since}, Since as
+    # text with three segments, "1.21.0" (judge/version.go:12-14 wraps hashicorp go-version, which pads). Since is the minor in which the API was deprecated, not removed:
+    # pkg/rules/rego/deprecated-1-25.rego:13-33 gives PodDisruptionBudget policy/v1beta1
+    # `since: 1.21` inside the rule set "Deprecated APIs removed in 1.25", so the removal minor exists only in the RuleSet text ("Deprecated APIs to be removed in future" for the ones
+    # without a date, deprecated-future.rego:13). `-t` keeps the rows whose Since <= target or is empty (pkg/printer/filter.go:12). The rules write "<undefined>" for a missing
+    # name or namespace (deprecated-1-25.rego:7-9; rego.go:61-64 is the fallback) and "<removed>" for an API with no successor (deprecated-1-25.rego:34-37).
+    target = _next_minor(cx.server_version, pl.get("target-versions"))
     kb = load_json(cx.snap / "tools" / "kubent.json")
-    for it in kb if isinstance(kb, list) else []:
+    for it in kb if read["kubent_read"] and isinstance(kb, list) else []:
+        m = re.search(r"removed in (\d+\.\d+)", str(it.get("RuleSet") or ""))
+        removed_in = m.group(1) if m else None
+        ns = it.get("Namespace")
+        rep = it.get("ReplaceWith")
+        nm = it.get("Name")
         items.append(
             {
                 "source": "kubent",
                 "kind": it.get("Kind"),
-                "name": it.get("Name"),
-                "namespace": it.get("Namespace"),
+                "name": None if nm == "<undefined>" else nm,
+                "namespace": None if ns == "<undefined>" else ns,
                 "api": it.get("ApiVersion"),
                 "deprecated_in": it.get("Since"),
-                "removed_in": it.get("Since"),
-                "replacement": it.get("ReplaceWith"),
+                "removed_in": removed_in,
+                "replacement": None if rep == "<removed>" else rep,
                 "deprecated": True,
-                "removed": False,
+                "removed": bool(removed_in and target and _minor(removed_in) <= _minor(target)),
                 "rule": it.get("RuleSet"),
             }
         )
@@ -274,9 +315,13 @@ def _deprecated(cx: _Ctx) -> dict:
                 "last_transition": i.get("lastTransitionTime"),
             }
         )
+    for item in items:
+        item.update(read)
     return {
-        "items": items,
-        "count": len(items),
+        **read,
+        # None makes the existing evaluator skip even when there are no rows on which to test rule.needs.
+        "items": items if any(read.values()) else None,
+        "count": len(items) if any(read.values()) else None,
         "removed_next": [i for i in items if i["removed"]],
         "pluto_present": (cx.snap / "tools" / "pluto.json").is_file(),
         "kubent_present": (cx.snap / "tools" / "kubent.json").is_file(),
@@ -284,6 +329,7 @@ def _deprecated(cx: _Ctx) -> dict:
         "eks_insights": insights,
         "eks_insights_failing": [i for i in insights if i["status"] in ("ERROR", "WARNING")],
         "target": pl.get("target-versions"),
+        "target_minor": target,
     }
 
 
@@ -306,6 +352,8 @@ def _helm_missing_note(snap: Path) -> str:
 
 
 def _helm(cx: _Ctx, now: _dt.datetime) -> dict:
+    # source: helm v4.3.1 pkg/cmd/list.go:142-150 releaseElement{name, namespace, revision, updated, status, chart, app_version}, :158-181 (an empty list prints `[]`, updated is
+    # Go time.String() unless --time-format), pkg/release/common/status.go:25-41 the nine status values; identical in helm v3.22.1 cmd/helm/list.go:135-173 and pkg/release/status.go:25-41.
     d = load_json(cx.snap / "tools" / "helm-list.json")
     if d is None:
         return {"present": False, "note": _helm_missing_note(cx.snap)}

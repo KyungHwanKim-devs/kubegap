@@ -1,0 +1,96 @@
+# Metric names kubegap reads from Argo CD's /metrics (steps argocd.application-controller-metrics, repo-server-metrics, server-metrics; parsed by
+# lib/argocdctl.py through lib/podmetrics.py). Read in argoproj/argo-cd at v2.13.0, v3.2.0 and v3.6.0: every name exists in the three. Labels that 3.x
+# added (dry_run on argocd_app_sync_total and argocd_app_k8s_request_total, command on argocd_redis_request_total) are not read.
+- key: app_sync
+  labels: [phase, name, namespace, project, dest_server]
+  names:
+    - name: argocd_app_sync_total
+      source: "argoproj/argo-cd controller/metrics/metrics.go:92@v2.13.0, :74@v3.2.0, :73@v3.6.0 (descAppDefaultLabels + dest_server, phase; + dry_run since 3.x)"
+- key: app_reconcile
+  names:
+    - name: argocd_app_reconcile
+      source: "argoproj/argo-cd controller/metrics/metrics.go:118@v2.13.0, :108@v3.2.0, :107@v3.6.0 (histogram; _sum and _count collected for the raw file only)"
+- key: app_k8s_requests
+  labels: [response_code]
+  names:
+    - name: argocd_app_k8s_request_total
+      source: "argoproj/argo-cd controller/metrics/metrics.go:100@v2.13.0, :90@v3.2.0, :89@v3.6.0 (descAppDefaultLabels + server, response_code, verb, resource_kind, resource_namespace; + dry_run since 3.x)"
+- key: cluster_cache_age
+  labels: [server]
+  names:
+    - name: argocd_cluster_cache_age_seconds
+      source: "argoproj/argo-cd controller/metrics/clustercollector.go:39@v2.13.0, :45@v3.2.0, :45@v3.6.0"
+- key: cluster_api_resource_objects
+  labels: [server]
+  names:
+    - name: argocd_cluster_api_resource_objects
+      source: "argoproj/argo-cd controller/metrics/clustercollector.go:27@v2.13.0, :33@v3.2.0, :33@v3.6.0"
+- key: cluster_api_resources
+  names:
+    - name: argocd_cluster_api_resources
+      source: "argoproj/argo-cd controller/metrics/clustercollector.go:33@v2.13.0, :39@v3.2.0, :39@v3.6.0 (collected for the raw file only)"
+- key: cluster_connection_status
+  labels: [server, k8s_version]
+  names:
+    - name: argocd_cluster_connection_status
+      source: "argoproj/argo-cd controller/metrics/clustercollector.go:45@v2.13.0, :51@v3.2.0, :51@v3.6.0"
+- key: cluster_events
+  names:
+    - name: argocd_cluster_events_total
+      source: "argoproj/argo-cd controller/metrics/metrics.go:127@v2.13.0, :117@v3.2.0, :116@v3.6.0 (collected for the raw file only)"
+- key: cluster_info
+  names:
+    - name: argocd_cluster_info
+      source: "argoproj/argo-cd controller/metrics/clustercollector.go:21@v2.13.0, :27@v3.2.0, :27@v3.6.0 (collected for the raw file only)"
+- key: redis_requests
+  labels: [failed, initiator]
+  names:
+    - name: argocd_redis_request_total
+      source: "argoproj/argo-cd server/metrics/metrics.go:28@v2.13.0, :30@v3.2.0, :30@v3.6.0 (labels initiator, failed; + command since 3.x; the controller and repo-server register the same counter)"
+- key: kubectl_exec
+  names:
+    - name: argocd_kubectl_exec_total
+      source: "argoproj/argo-cd controller/metrics/metrics.go:107@v2.13.0, :97@v3.2.0, :96@v3.6.0 (collected for the raw file only)"
+- key: kubectl_exec_pending
+  names:
+    - name: argocd_kubectl_exec_pending
+      source: "argoproj/argo-cd controller/metrics/metrics.go:112@v2.13.0, :102@v3.2.0, :101@v3.6.0 (collected for the raw file only)"
+- key: git_requests
+  labels: [repo, request_type]
+  names:
+    - name: argocd_git_request_total
+      source: "argoproj/argo-cd reposerver/metrics/metrics.go:57@v2.13.0, :58@v3.2.0, :66@v3.6.0"
+- key: git_lsremote_fail
+  names:
+    - name: argocd_git_lsremote_fail_total
+      source: "argoproj/argo-cd reposerver/metrics/metrics.go:48@v2.13.0, :49@v3.2.0, :57@v3.6.0"
+- key: git_fetch_fail
+  names:
+    - name: argocd_git_fetch_fail_total
+      source: "argoproj/argo-cd reposerver/metrics/metrics.go:39@v2.13.0, :40@v3.2.0, :48@v3.6.0"
+- key: git_request_duration
+  names:
+    - name: argocd_git_request_duration_seconds
+      source: "argoproj/argo-cd reposerver/metrics/metrics.go:66@v2.13.0, :67@v3.2.0, :75@v3.6.0 (histogram; _sum and _count collected for the raw file only)"
+- key: repo_pending_requests
+  names:
+    - name: argocd_repo_pending_request_total
+      source: "argoproj/argo-cd reposerver/metrics/metrics.go:76@v2.13.0, :77@v3.2.0, :85@v3.6.0"
+- key: grpc_server_handled
+  labels: [grpc_code, grpc_method, grpc_service]
+  names:
+    - name: grpc_server_handled_total
+      source: "grpc-ecosystem/go-grpc-prometheus server_metrics.go:36-38@v1.2.0 (argo-cd go.mod at v2.13.0 and v3.6.0; labels grpc_type, grpc_service, grpc_method, grpc_code)"
+- key: info
+  labels: [version]
+  names:
+    - name: argocd_info
+      source: "argoproj/argo-cd server/metrics/metrics.go:58@v2.13.0, :67@v3.2.0, :67@v3.6.0 (collected for the raw file only)"
+- key: process_start
+  names:
+    - name: process_start_time_seconds
+      source: "prometheus/client_golang prometheus/process_collector.go:99@v1.19.1"
+- key: rss
+  names:
+    - name: process_resident_memory_bytes
+      source: "prometheus/client_golang prometheus/process_collector.go:94@v1.19.1"
