@@ -125,3 +125,63 @@ def test_render_without_fragments_and_without_diff(tmp_path):
     assert "No earlier daily snapshot to compare with." in text
     assert "no previous run of this mode" in text
     assert text.count("(not written this run)") == 4
+
+
+# ---------- cluster strings cannot change how report-details.md renders (#92) ----------
+
+
+def test_fence_is_longer_than_any_backtick_run_inside():
+    assert render._fence("plain") == "```"
+    assert render._fence("a ``` b") == "````"
+    assert render._fence("`````") == "``````"
+    assert render._fence("") == "```"
+
+
+def test_details_with_three_backticks_render_inside_a_longer_fence(tmp_path):
+    s = _snap(tmp_path, False)
+    draft = json.loads((s / "findings-draft.json").read_text())
+    draft["findings"][0]["details"] = {"sample": "x ``` \n# not a heading\n</details> after", "pod": "p-1"}
+    draft["findings"][0]["id"] = "a.b.ns/x<b>"
+    (s / "findings-draft.json").write_text(json.dumps(draft))
+    text = render.render_details(s).read_text()
+    i = text.index("````json")
+    block = text[i:]
+    assert block.splitlines()[0] == "````json" and "\n````\n" in block
+    assert "<details><summary><code>a.b.ns/x&lt;b&gt;</code></summary>" in text, "the summary id is HTML-escaped"
+    fences = [ln for ln in text.splitlines() if ln.startswith("```")]
+    assert len(fences) % 2 == 0, fences
+    for opener, closer in zip(fences[0::2], fences[1::2], strict=True):
+        assert closer == opener.rstrip("json"), (opener, closer)
+
+
+def test_cell_breaks_every_link_image_and_tag_but_keeps_placeholders():
+    assert render._cell("[x](javascript:alert(1))") == "[x] (javascript:alert(1))"
+    assert render._cell("[x](file:///etc/passwd)") == "[x] (file:///etc/passwd)"
+    assert render._cell("[x](../relative)") == "[x] (../relative)"
+    assert render._cell("[x](https://ok)") == "[x] (https://ok)", "no code path writes a link into a cell; a remote target is a beacon in viewers that fetch"
+    assert render._cell("![img](https://host/p.png)") == "! [img] (https://host/p.png)"
+    assert render._cell("![img](data:image/svg+xml;base64,AAAA)") == "! [img] (data:image/svg+xml;base64,AAAA)"
+    assert render._cell("<javascript:alert(1)>") == "< javascript:alert(1)>"
+    assert render._cell('<a href="javascript:alert(1)">x</a>') == '< a href="javascript:alert(1)">x< /a>'
+    assert render._cell("<img src=x onerror=alert(1)>") == "< img src=x onerror=alert(1)>"
+    assert render._cell("<script>alert(1)</script>") == "< script>alert(1)< /script>"
+    assert render._cell("<!-- c --> <?xml?>") == "< !-- c --> < ?xml?>"
+    assert render._cell("<https://ok>") == "< https://ok>"
+    assert render._cell("<masked> <account> <ip> <none> <unknown> <unset> <nil> <invalid> a<b>c 1 < 2 <3") == "<masked> <account> <ip> <none> <unknown> <unset> <nil> <invalid> a< b>c 1 < 2 <3"
+    assert render._cell("https://plain.example/path stays") == "https://plain.example/path stays"
+    assert render._cell("a|b\nc") == "a\\|b c"
+    assert render._cell(None) == "" and render._cell(3) == "3"
+
+
+def test_event_reason_and_failed_command_error_lines_cannot_open_a_block(tmp_path):
+    s = _snap(tmp_path, True)
+    diff = json.loads((s / "diff.json").read_text())
+    diff["events"]["changed"][0]["reason"] = "BackOff\n```\n[x]: javascript:alert(1)"
+    (s / "diff.json").write_text(json.dumps(diff))
+    summ = json.loads((s / "summary.json").read_text())
+    summ["run"] = {"commands": 5, "failed": [{"id": "core.top", "collector": "core", "error": "error from server\n```\n<script>x</script>"}]}
+    (s / "summary.json").write_text(json.dumps(summ))
+    text = render.render_details(s).read_text()
+    assert "BackOff ``` [x]: javascript:alert(1) +3" in text
+    assert "`core.top` error from server ``` < script>x< /script>" in text
+    assert not any(ln.startswith("```") for ln in text.splitlines()), "no fence opened by a cluster string (this snapshot has no details block)"

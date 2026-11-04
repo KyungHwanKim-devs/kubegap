@@ -97,7 +97,7 @@ Continue with the "Review" part of `references/analysis-procedure.md` (steps 6â€
 $KUBEGAP/scripts/kubegap render-details --context <name> --snapshot "$SNAP" --language <en|ko>   # assembles report-details.md in the chosen language; prints fragments you forgot
 $KUBEGAP/scripts/kubegap mask "$SNAP/report.md" "$SNAP/report-details.md"
 ```
-If the mask count is not 0, check where `<masked>` remains. If you edit either file afterwards, run `mask` again. Then show the user only what step 18 of the reference lists (the absolute path of `report.md` and of `report-details.md`, each on its own line and with `$SNAP` and `~` expanded, context and cluster, the numbers table with deltas, Top N titles with a one-line action each, one line on tool notes if any, one line of commands for next time).
+If the mask count is not 0, check where `<masked>` remains; a `control-chars` count means terminal control characters were removed from a cluster string and there is nothing to check. If you edit either file afterwards, run `mask` again. Then show the user only what step 18 of the reference lists (the absolute path of `report.md` and of `report-details.md`, each on its own line and with `$SNAP` and `~` expanded, context and cluster, the numbers table with deltas, Top N titles with a one-line action each, one line on tool notes if any, one line of commands for next time).
 
 ## 8. Writing rules
 
