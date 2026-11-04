@@ -3245,6 +3245,8 @@
   each: ecr.summary
   cluster_level: true
   rule:
+    needs: "not (summary.get('events') or {}).get('missing')"
+    needs_reason: "events not collected"
     expr: "(item['pull_failure_events'] or 0) >= 20"
     warn_expr: "(item['pull_failure_events'] or 0) > 0"
   target: "'cluster'"

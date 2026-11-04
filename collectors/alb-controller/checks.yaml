@@ -576,6 +576,8 @@
   each: albctl.summary
   cluster_level: true
   rule:
+    needs: "item.get('webhook_no_endpoints') is not None"
+    needs_reason: "endpointslices not read"
     expr: "item['webhook_pod_scope_fail'] or len(item['webhook_no_endpoints']) > 0"
     warn_expr: "(item['webhook_5xx'] or 0) > 0"
   target: "'cluster'"
@@ -900,8 +902,10 @@
   each: albctl.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and item['leader_found'] and (item['reconcile_errors_total'] or 0) >= 100"
-    warn_expr: "item['metrics_available'] and item['leader_found'] and (item['reconcile_errors_total'] or 0) > 0"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "item['leader_found'] and (item['reconcile_errors_total'] or 0) >= 100"
+    warn_expr: "item['leader_found'] and (item['reconcile_errors_total'] or 0) > 0"
   target: "'cluster'"
   evidence: "f\"reconcile errors since leader start {item['reconcile_errors_total']}, apiserver 429/503 responses {item['rest_client_429_503']}, max workqueue depth {item['workqueue_depth_max']}, Ingresses without an LB address {item['ingresses_without_lb']}, stale TargetGroupBindings {item['tgb_stale']}\""
   severity_default: medium
@@ -1141,7 +1145,7 @@
           traffic_target_groups_without_tgb: 1
           traffic_unhealthy_target_groups: 6
           cluster_name_arg: "my-cluster-eks"
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           version: "2.7.2"
@@ -1223,7 +1227,9 @@
   each: albctl.summary
   cluster_level: true
   rule:
-    warn_expr: "item['metrics_available'] and ((item['aws_api_retries_avg'] or 0) >= 0.1 or (item['rest_client_429_503'] or 0) >= 100)"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    warn_expr: "((item['aws_api_retries_avg'] or 0) >= 0.1 or (item['rest_client_429_503'] or 0) >= 100)"
   target: "'cluster'"
   evidence: "f\"AWS API calls since leader start {item['aws_api_calls_total']}, top {item['aws_api_top_ops'][:5] if item['aws_api_top_ops'] else None}, average retries per call {item['aws_api_retries_avg']}, slowest by average latency {item['aws_api_slow_ops_avg_s'][:3] if item['aws_api_slow_ops_avg_s'] else None}, apiserver 429/503 {item['rest_client_429_503']}\""
   severity_default: low

@@ -6,8 +6,10 @@
   each: esoctl.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and (item['api_error_ratio'] or 0) >= 0.05 and (item['api_errors'] or 0) >= 100"
-    warn_expr: "item['metrics_available'] and (item['api_errors'] or 0) > 0"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "(item['api_error_ratio'] or 0) >= 0.05 and (item['api_errors'] or 0) >= 100"
+    warn_expr: "(item['api_errors'] or 0) > 0"
   target: "'cluster'"
   evidence: "f\"provider API calls since controller start: success {item['api_success']} / errors {item['api_errors']} (ratio {item['api_error_ratio']}), sync failures {item['sync_calls_error']}/{item['sync_calls_total']}, reconcile errors {item['reconcile_errors_total']}, ExternalSecrets not Ready {item['not_ready']} (oldest refresh {item['not_ready_oldest_refresh_h']} hours ago)\""
   severity_default: medium
@@ -154,7 +156,7 @@
           sync_calls_error: 1566
           sync_calls_total: 41311
           not_ready_oldest_refresh_h: 7495.4
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           version: "0.9.13"

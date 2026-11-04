@@ -687,8 +687,10 @@
   each: flannel.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and (item['errors_1d_total'] or 0) > 0"
-    warn_expr: "item['metrics_available'] and (item['drops_1d_total'] or 0) >= 100"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "(item['errors_1d_total'] or 0) > 0"
+    warn_expr: "(item['drops_1d_total'] or 0) >= 100"
   target: "'cluster'"
   evidence: "f\"errors in 24h {item['errors_1d_total']} / drops {item['drops_1d_total']} (by node and device {item['drops_1d_by_node']}), cumulative since boot errors {item['errors_boot_total']} / drops {item['drops_boot_total']}, overlay traffic (GiB/day) {item['overlay_gib_1d']}\""
   severity_default: medium
@@ -798,7 +800,7 @@
           podcidr_max_ratio: 0.193
           podcidr_nodes: 2
           metrics_available: true
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           backend: "vxlan"

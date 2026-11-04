@@ -6,7 +6,9 @@
   each: stackhealth.alertmanager
   cluster_level: true
   rule:
-    warn_expr: "item['present'] and (item['replicas'] or 0) <= 1 and item['cluster_status'] != 'ready'"
+    needs: "item['present']"
+    needs_reason: "alertmanager not present"
+    warn_expr: "(item['replicas'] or 0) <= 1 and item['cluster_status'] != 'ready'"
   target: "item['target']"
   evidence: "f\"replicas {item['replicas']} (ready {item['ready']}), cluster {item['cluster_status']} (peers {item['cluster_peers']}), data storage {item['storage']} (silence/notification state preserved {item['data_retention']})\""
   severity_default: low
@@ -88,8 +90,10 @@
   each: stackhealth.alertmanager
   cluster_level: true
   rule:
-    expr: "item['present'] and item['reload_success'] is False"
-    warn_expr: "item['present'] and (item['invalid_alerts_1d'] or 0) > 0"
+    needs: "item['present']"
+    needs_reason: "alertmanager not present"
+    expr: "item['reload_success'] is False"
+    warn_expr: "(item['invalid_alerts_1d'] or 0) > 0"
   target: "item['target']"
   evidence: "f\"last config reload succeeded {item['reload_success']}, invalid alerts rejected in 24h {item['invalid_alerts_1d']}, version {item['version']}\""
   severity_default: high
@@ -201,7 +205,9 @@
   each: stackhealth.alertmanager
   cluster_level: true
   rule:
-    warn_expr: "item['present'] and (len(item['receivers_unused'] or []) > 0 or (item['inhibit_rules'] or 0) == 0)"
+    needs: "item['present']"
+    needs_reason: "alertmanager not present"
+    warn_expr: "(len(item['receivers_unused'] or []) > 0 or (item['inhibit_rules'] or 0) == 0)"
   target: "item['target']"
   evidence: "f\"receivers {item['receivers']}, receivers unused by routes {item['receivers_unused']}, inhibit rules {item['inhibit_rules']}, time_intervals (business hours, maintenance windows) {item['time_intervals']}\""
   severity_default: low
@@ -314,7 +320,9 @@
   each: stackhealth.alertmanager
   cluster_level: true
   rule:
-    expr: "item['present'] and item['metrics_available'] and (item['notifications_1d_total'] or 0) == 0 and ((item['received_1d'] or {}).get('firing') or 0) > 100"
+    needs: "item['present'] and item['metrics_available']"
+    needs_reason: "alertmanager not present; metrics not read"
+    expr: "(item['notifications_1d_total'] or 0) == 0 and ((item['received_1d'] or {}).get('firing') or 0) > 100"
   target: "item['target']"
   evidence: "f\"alerts received in 24h {item['received_1d']}, notifications per integration {item['notifications_1d']} (total {item['notifications_1d_total']}), active silences {item['silences_active']}\""
   severity_default: high
@@ -416,7 +424,7 @@
           replicas: 1
           ready: 1
           target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           version: "0.26.0"

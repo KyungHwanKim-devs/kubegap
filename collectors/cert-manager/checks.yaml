@@ -1579,8 +1579,10 @@
   each: certmanager.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and ((item['acme_error_ratio'] or 0) >= 0.2 and (item['acme_errors'] or 0) >= 20)"
-    warn_expr: "item['metrics_available'] and ((item['sync_errors'] or 0) >= 100 or (item['acme_errors'] or 0) > 0)"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "((item['acme_error_ratio'] or 0) >= 0.2 and (item['acme_errors'] or 0) >= 20)"
+    warn_expr: "((item['sync_errors'] or 0) >= 100 or (item['acme_errors'] or 0) > 0)"
   target: "'cluster'"
   evidence: "f\"sync calls since controller start {item['sync_calls']} / errors {item['sync_errors']}, ACME requests {item['acme_requests']} by status {item['acme_by_status']} (4xx/5xx {item['acme_errors']}, ratio {item['acme_error_ratio']}), Ready False metric {item['not_ready_metric']}\""
   severity_default: low
@@ -1787,7 +1789,7 @@
           sync_calls: 1574
           not_ready_metric: 0
           min_days_to_expiry_metric: 31.0
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           version: "1.14.4"

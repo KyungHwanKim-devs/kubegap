@@ -512,7 +512,9 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: inventory
   rule:
-    expr: "not (aws_file('dlm-lifecycle-policies.json') or {}).get('Policies') and not (aws_file('backup-plans.json') or {}).get('BackupPlansList') and aws_file('dlm-lifecycle-policies.json') is not None"
+    needs: "aws_file('dlm-lifecycle-policies.json') is not None and aws_file('backup-plans.json') is not None"
+    needs_reason: "dlm get-lifecycle-policies or backup list-backup-plans not read"
+    expr: "not (aws_file('dlm-lifecycle-policies.json') or {}).get('Policies') and not (aws_file('backup-plans.json') or {}).get('BackupPlansList')"
   evidence: "f\"dlm get-lifecycle-policies Policies {len((aws_file('dlm-lifecycle-policies.json') or {}).get('Policies') or [])}, backup list-backup-plans {len((aws_file('backup-plans.json') or {}).get('BackupPlansList') or [])}. In-cluster backup tools: {backup_signals()}\""
   severity_default: high
   symptom_linked: false
@@ -580,7 +582,7 @@
             BackupPlansList: []
         objects:
           cronjobs.batch: []
-      - expect: "pass"
+      - expect: "skip"
         inventory:
           cluster:
             platform: "eks"
@@ -609,8 +611,10 @@
   cluster_level: true
   profiles: [prod]
   rule:
-    expr: "item.get('present') and item.get('k8s_supported') is False"
-    warn_expr: "item.get('present') and item.get('k8s_supported') is None"
+    needs: "item.get('present')"
+    needs_reason: "karpenter not present"
+    expr: "item.get('k8s_supported') is False"
+    warn_expr: "item.get('k8s_supported') is None"
   target: "'cluster'"
   evidence: "f\"Karpenter {item.get('version')} supports Kubernetes up to {item.get('k8s_max_supported')}, the cluster runs {item.get('k8s_minor')}. {item.get('version_note') or ''}\""
   severity_default: high
@@ -648,7 +652,7 @@
           k8s_max_supported: "1.32"
           k8s_supported: true
           version_note: null
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: false
 
@@ -659,8 +663,10 @@
   each: eksplatform.acm
   cluster_level: true
   rule:
-    expr: "item.get('available') and (len(item.get('expired_in_use') or []) + len(item.get('expiring_14d_in_use') or []) > 0)"
-    warn_expr: "item.get('available') and (len(item.get('expiring_30d_in_use') or []) + len(item.get('not_renewable_in_use') or []) + len(item.get('imported_in_use') or []) > 0)"
+    needs: "item.get('available')"
+    needs_reason: "acm not available"
+    expr: "(len(item.get('expired_in_use') or []) + len(item.get('expiring_14d_in_use') or []) > 0)"
+    warn_expr: "(len(item.get('expiring_30d_in_use') or []) + len(item.get('not_renewable_in_use') or []) + len(item.get('imported_in_use') or []) > 0)"
   target: "'acm'"
   evidence: "f\"ACM certificates {item.get('certificates')}, in use {item.get('in_use')}, expiring within 30 days {item.get('expiring_30d_in_use')}, within 14 days {item.get('expiring_14d_in_use')}, expired but in use {item.get('expired_in_use')}, not auto-renewable (validation failed) {item.get('not_renewable_in_use')}, IMPORTED (no auto-renewal) {item.get('imported_in_use')}, nearest expiry {item.get('min_days_in_use')} days, unused expired certificates {item.get('expired_unused')}\""
   severity_default: high
@@ -745,7 +751,7 @@
           expired_unused:
             - "app-b-xl.com"
           min_days_in_use: 71.0
-      - expect: "pass"
+      - expect: "skip"
         item:
           available: false
           certificates: 12
@@ -766,8 +772,10 @@
   each: eksplatform.quotas
   cluster_level: true
   rule:
-    expr: "item.get('available') and len(item.get('near_limit') or []) > 0"
-    warn_expr: "item.get('available') and len(item.get('over_60') or []) > 0"
+    needs: "item.get('available')"
+    needs_reason: "quotas not available"
+    expr: "len(item.get('near_limit') or []) > 0"
+    warn_expr: "len(item.get('over_60') or []) > 0"
   target: "'aws-account'"
   evidence: "f\"quotas with a usage metric {item.get('with_usage')}/{item.get('quotas')}, at 80% or more {item.get('near_limit')}, at 60% or more {item.get('over_60')}, top operational quotas {item.get('watched_top')[:6]}\""
   severity_default: high
@@ -819,7 +827,7 @@
             - "['VPC count', 3.0, 5.0, 0.6]"
           max_ratio: 0.6
           max_ratio_name: "VPC count"
-      - expect: "pass"
+      - expect: "skip"
         item:
           available: false
           quotas: 65
@@ -837,8 +845,10 @@
   each: eksplatform.ebs
   cluster_level: true
   rule:
-    expr: "item.get('available') and (len(item.get('queue_high') or []) > 0 or len(item.get('burst_low') or []) > 0 or (item.get('max_iops_ratio') or 0) >= 0.9)"
-    warn_expr: "item.get('available') and ((item.get('max_queue') or 0) >= 0.5 or (item.get('max_iops_ratio') or 0) >= 0.7 or len(item.get('iops_near_limit') or []) > 0)"
+    needs: "item.get('available')"
+    needs_reason: "ebs not available"
+    expr: "(len(item.get('queue_high') or []) > 0 or len(item.get('burst_low') or []) > 0 or (item.get('max_iops_ratio') or 0) >= 0.9)"
+    warn_expr: "((item.get('max_queue') or 0) >= 0.5 or (item.get('max_iops_ratio') or 0) >= 0.7 or len(item.get('iops_near_limit') or []) > 0)"
   target: "'cluster'"
   evidence: "f\"EBS volumes {item.get('volumes')} (root {item.get('root_volumes')}): max hourly average queue length {item.get('max_queue')}, queue ≥1 {item.get('queue_high')}, busiest-hour IOPS/provisioned max {item.get('max_iops_ratio')}, IOPS at 70% or more {item.get('iops_near_limit')}, burst balance under 20% {item.get('burst_low')}\""
   severity_default: medium
@@ -916,8 +926,10 @@
   each: eksplatform.security_groups
   cluster_level: true
   rule:
-    expr: "item.get('available') and len(item.get('open_all_ports') or []) > 0"
-    warn_expr: "item.get('available') and len(item.get('open_non_https') or []) > 0"
+    needs: "item.get('available')"
+    needs_reason: "security groups not available"
+    expr: "len(item.get('open_all_ports') or []) > 0"
+    warn_expr: "len(item.get('open_non_https') or []) > 0"
   target: "'cluster-security-groups'"
   evidence: "f\"cluster security groups {item.get('groups')}, world-open (0.0.0.0/0, ::/0) inbound rules {item.get('open_to_world_count')}, of which non-443 {item.get('open_non_https')}, all ports {item.get('open_all_ports')}; endpoint public {item.get('public_endpoint')} CIDRs {item.get('public_cidrs')}\""
   severity_default: high
@@ -982,8 +994,10 @@
   each: eksplatform.nodegroups
   cluster_level: true
   rule:
-    expr: "item.get('available') and len(item.get('ami_old_180d') or []) > 0"
-    warn_expr: "item.get('available') and (len(item.get('ami_old_90d') or []) > 0 or len(item.get('unhealthy') or []) > 0)"
+    needs: "item.get('available')"
+    needs_reason: "nodegroups not available"
+    expr: "len(item.get('ami_old_180d') or []) > 0"
+    warn_expr: "(len(item.get('ami_old_90d') or []) > 0 or len(item.get('unhealthy') or []) > 0)"
   target: "'nodegroups'"
   evidence: "f\"node groups {item.get('nodegroups')}, max AMI age {item.get('max_ami_age_days')} days, over 90 days {item.get('ami_old_90d')}, over 180 days {item.get('ami_old_180d')}, health issues {item.get('unhealthy')}\""
   severity_default: medium

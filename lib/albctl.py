@@ -139,6 +139,7 @@ def analyze(snap: Path, inv: dict | None, traffic: dict | None = None) -> dict:
     # --- webhooks
     webhooks = []
     ep_ready = {}
+    eps_read = load_json(snap / "objects" / "endpointslices.discovery.k8s.io.json") is not None  # absent file: readiness unknown, no webhook is reported as endpoint-less
     for e in objects(snap, "endpointslices.discovery.k8s.io"):
         svc = (e["metadata"].get("labels") or {}).get("kubernetes.io/service-name")
         if svc:
@@ -262,7 +263,7 @@ def analyze(snap: Path, inv: dict | None, traffic: dict | None = None) -> dict:
         "webhooks": len(webhooks),
         "webhooks_fail_policy": sum(1 for w in webhooks if w["failure_policy"] == "Fail"),
         "webhook_pod_scope_fail": any(w["scopes_pods"] and w["failure_policy"] == "Fail" and not w["namespace_selector"] and not w["object_selector"] for w in webhooks),
-        "webhook_no_endpoints": [w["name"] for w in webhooks if (w["service_ready_endpoints"] or 0) == 0],
+        "webhook_no_endpoints": [w["name"] for w in webhooks if (w["service_ready_endpoints"] or 0) == 0] if eps_read else None,
         "webhook_5xx": metrics["webhook_5xx"],
         "ingress_classes": [c["name"] for c in classes],
         "ingress_class_default": any(c["default"] for c in classes),

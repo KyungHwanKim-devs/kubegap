@@ -6,8 +6,10 @@
   each: stackhealth.grafana
   cluster_level: true
   rule:
-    expr: "item['present'] and item['metrics_available'] and (item['datasource_error_max_ratio'] or 0) >= 0.1 and len(item['datasources_with_errors'] or []) > 0"
-    warn_expr: "item['present'] and item['metrics_available'] and (len(item['datasources_with_errors'] or []) > 0 or (item['api_5xx'] or 0) > 0)"
+    needs: "item['present'] and item['metrics_available']"
+    needs_reason: "grafana not present; metrics not read"
+    expr: "(item['datasource_error_max_ratio'] or 0) >= 0.1 and len(item['datasources_with_errors'] or []) > 0"
+    warn_expr: "(len(item['datasources_with_errors'] or []) > 0 or (item['api_5xx'] or 0) > 0)"
   target: "item['target']"
   evidence: "f\"responses per datasource (cumulative since start) {[(d['datasource'], d['requests'], d['by_code']) for d in (item['datasources'] or [])]}, error rate 1% or more {item['datasources_with_errors']} (max {item['datasource_error_max_ratio']}), Grafana API 5xx {item['api_5xx']}/{item['api_requests']}\""
   severity_default: medium
@@ -216,7 +218,7 @@
           replicas: 1
           ready: 1
           target: "monitoring/deployment/kube-prometheus-stack-grafana"
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           version: "10.2.3"
@@ -272,7 +274,9 @@
   each: stackhealth.grafana
   cluster_level: true
   rule:
-    warn_expr: "item['present'] and item['major'] is not None and item['major'] < 11"
+    needs: "item['present']"
+    needs_reason: "grafana not present"
+    warn_expr: "item['major'] is not None and item['major'] < 11"
   target: "item['target']"
   evidence: "f\"Grafana {item['version']} (database {item['database']}), ingress {item['ingress_hosts']}, dashboards {(item['stats'] or {}).get('totals_dashboard')}\""
   severity_default: low
@@ -441,7 +445,9 @@
   each: stackhealth.grafana
   cluster_level: true
   rule:
-    warn_expr: "item['present'] and item['metrics_available'] and ((item['alert_rule_eval_failures'] or 0) > 0 or (item['alert_notification_failures'] or 0) > 0)"
+    needs: "item['present'] and item['metrics_available']"
+    needs_reason: "grafana not present; metrics not read"
+    warn_expr: "((item['alert_rule_eval_failures'] or 0) > 0 or (item['alert_notification_failures'] or 0) > 0)"
   target: "item['target']"
   evidence: "f\"Grafana alert rules {(item['stats'] or {}).get('totals_alert_rules')}, evaluation failures {item['alert_rule_eval_failures']}, notification failures {item['alert_notification_failures']}\""
   severity_default: low
@@ -610,7 +616,9 @@
   each: stackhealth.grafana
   cluster_level: true
   rule:
-    warn_expr: "item['present'] and not item['metrics_available']"
+    needs: "item['present']"
+    needs_reason: "grafana not present"
+    warn_expr: "not item['metrics_available']"
   target: "item['target']"
   evidence: "f\"metrics/pod/grafana/ missing — pod proxy and node access both failed. /api/health says {item['database']}, version {item['version']}\""
   severity_default: low

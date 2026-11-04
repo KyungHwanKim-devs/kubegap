@@ -242,8 +242,10 @@
   each: kubeproxy.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and (item['sync_p99_max_s'] or 0) >= 5"
-    warn_expr: "item['metrics_available'] and (item['sync_p99_max_s'] or 0) >= 1"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "(item['sync_p99_max_s'] or 0) >= 5"
+    warn_expr: "(item['sync_p99_max_s'] or 0) >= 1"
   target: "'cluster'"
   evidence: "f\"sync p99 cluster-wide {item['sync_p99_s']}s, slowest node {item['sync_p99_max_node']} {item['sync_p99_max_s']}s, nat rules max {item['nat_rules_max']}, Services {item['services']}, endpoints {item['endpoints']}, mode {item['mode']}\""
   severity_default: medium
@@ -424,8 +426,10 @@
   each: kubeproxy.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and (item['rules_pending_max_s'] or 0) >= 300"
-    warn_expr: "item['metrics_available'] and (item['rules_pending_max_s'] or 0) >= 60"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "(item['rules_pending_max_s'] or 0) >= 300"
+    warn_expr: "(item['rules_pending_max_s'] or 0) >= 60"
   target: "'cluster'"
   evidence: "f\"queue time − last sync time max {item['rules_pending_max_s']}s, nodes over 60s {item['rules_pending_nodes']}, change → applied p99 {item['programming_p99_s']}s\""
   severity_default: high
@@ -606,7 +610,9 @@
   each: kubeproxy.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and (item['restore_failures_24h'] or 0) > 0"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "(item['restore_failures_24h'] or 0) > 0"
   target: "'cluster'"
   evidence: "f\"iptables-restore failures over 24 hours (full+partial) {item['restore_failures_24h']}, nodes {item['restore_failure_nodes']}\""
   severity_default: high
@@ -1150,8 +1156,10 @@
   each: kubeproxy.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and (item['ct_invalid_dropped_1h'] or 0) >= 10000"
-    warn_expr: "item['metrics_available'] and (item['ct_invalid_dropped_1h'] or 0) >= 500"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "(item['ct_invalid_dropped_1h'] or 0) >= 10000"
+    warn_expr: "(item['ct_invalid_dropped_1h'] or 0) >= 500"
   target: "'cluster'"
   evidence: "f\"conntrack INVALID drops over 1 hour {item['ct_invalid_dropped_1h']} packets (sum over nodes), services with externalTrafficPolicy Local {item['external_traffic_local']}, no-local-endpoints drops {item['no_local_endpoints_1h']}\""
   severity_default: low

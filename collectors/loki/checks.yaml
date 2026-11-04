@@ -6,8 +6,10 @@
   each: stackhealth.loki
   cluster_level: true
   rule:
-    expr: "item['present'] and (item['rss_vs_limit'] or 0) >= 0.9"
-    warn_expr: "item['present'] and ((item['rss_vs_limit'] or 0) >= 0.75 or item['oomkilled_last'])"
+    needs: "item['present']"
+    needs_reason: "loki not present"
+    expr: "(item['rss_vs_limit'] or 0) >= 0.9"
+    warn_expr: "((item['rss_vs_limit'] or 0) >= 0.75 or item['oomkilled_last'])"
   target: "item['target']"
   evidence: "f\"RSS {item['rss_mib']}MiB / limit {item['memory_limit']} = {item['rss_vs_limit']}, in-memory streams {item['memory_streams']}, last termination OOMKilled {item['oomkilled_last']}({item['oomkilled_at']}), restarts {item['restarts']}, storage {item['storage']}\""
   severity_default: medium
@@ -122,8 +124,10 @@
   each: stackhealth.loki
   cluster_level: true
   rule:
-    expr: "item['present'] and item['metrics_available'] and ((item['requests_5xx'] or 0) >= 100 or (item['panics'] or 0) > 0 or (item['wal_disk_full_failures'] or 0) > 0)"
-    warn_expr: "item['present'] and item['metrics_available'] and ((item['requests_5xx'] or 0) >= 10 or (item['requests_5xx'] or 0) / max(item.get('requests_total') or 1, 1) >= 0.001 or (item['log_error_messages'] or 0) >= 100)"  # 1 in 380k requests is noise; start at 10 requests or 0.1%
+    needs: "item['present'] and item['metrics_available']"
+    needs_reason: "loki not present; metrics not read"
+    expr: "((item['requests_5xx'] or 0) >= 100 or (item['panics'] or 0) > 0 or (item['wal_disk_full_failures'] or 0) > 0)"
+    warn_expr: "((item['requests_5xx'] or 0) >= 10 or (item['requests_5xx'] or 0) / max(item.get('requests_total') or 1, 1) >= 0.001 or (item['log_error_messages'] or 0) >= 100)"  # 1 in 380k requests is noise; start at 10 requests or 0.1%
   target: "item['target']"
   evidence: "f\"{item['requests_5xx']} 5xx out of {item['requests_total']} requests since start (by route {item['requests_5xx_by_route']}, excluding /ready 503 during startup), panics {item['panics']}, WAL disk full {item['wal_disk_full_failures']}, error log lines {item['log_error_messages']}, rejected {item['discarded_by_reason']}\""
   severity_default: medium
@@ -261,7 +265,7 @@
           replicas: 1
           ready: 1
           target: "monitoring/statefulset/loki-stack"
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           version: "2.6.1"
@@ -299,7 +303,9 @@
   each: stackhealth.loki
   cluster_level: true
   rule:
-    warn_expr: "item['present'] and item['major'] is not None and item['major'] < 3"
+    needs: "item['present']"
+    needs_reason: "loki not present"
+    warn_expr: "item['major'] is not None and item['major'] < 3"
   target: "item['target']"
   evidence: "f\"Loki {item['version']}, storage {item['storage']}, retention applied {item['retention_applied']}(compactor {item['compactor_running']})\""
   severity_default: low
@@ -383,7 +389,9 @@
   each: stackhealth.loki
   cluster_level: true
   rule:
-    warn_expr: "item['present'] and not item['metrics_available']"
+    needs: "item['present']"
+    needs_reason: "loki not present"
+    warn_expr: "not item['metrics_available']"
   target: "item['target']"
   evidence: "f\"loki/metrics.txt missing - Loki {item['version']}, ready {item['ready_endpoint']}\""
   severity_default: low

@@ -81,8 +81,10 @@
   each: local_path.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and ((item['fs_min_avail_ratio'] if item['fs_min_avail_ratio'] is not None else 1) < 0.1 or (item['fs_min_days_to_full'] is not None and item['fs_min_days_to_full'] < 14))"
-    warn_expr: "item['metrics_available'] and ((item['fs_min_avail_ratio'] if item['fs_min_avail_ratio'] is not None else 1) < 0.25 or (item['fs_min_days_to_full'] is not None and item['fs_min_days_to_full'] < 60) or item['over_capacity_count'] > 0)"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "((item['fs_min_avail_ratio'] if item['fs_min_avail_ratio'] is not None else 1) < 0.1 or (item['fs_min_days_to_full'] is not None and item['fs_min_days_to_full'] < 14))"
+    warn_expr: "((item['fs_min_avail_ratio'] if item['fs_min_avail_ratio'] is not None else 1) < 0.25 or (item['fs_min_days_to_full'] is not None and item['fs_min_days_to_full'] < 60) or item['over_capacity_count'] > 0)"
   target: "'cluster'"
   evidence: "f\"root filesystem per node {item['fs']} (avail_ratio = free ratio, volumes_gib = sum of local-path directories, days_to_full = day it fills at the 7-day trend), over-capacity PVCs {item['over_capacity_count']}, PVs {item['pv_count']} by node {item['by_node']}\""
   severity_default: high
@@ -610,7 +612,7 @@
           fs_min_days_to_full: null
           fs_nodes_low: []
           metrics_available: true
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           provisioner_ready: 1

@@ -1450,8 +1450,10 @@
   each: karpenterctl.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and (item['nodepool_usage_max'] or 0) >= 0.9"
-    warn_expr: "item['metrics_available'] and (item['nodepool_usage_max'] or 0) >= 0.75"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "(item['nodepool_usage_max'] or 0) >= 0.9"
+    warn_expr: "(item['nodepool_usage_max'] or 0) >= 0.75"
   target: "'cluster'"
   evidence: "f\"usage/limit per pool and resource {item['nodepool_usage_ratio']}, pools without limits {item['nodepools_without_limits']}\""
   severity_default: medium
@@ -1719,8 +1721,10 @@
   each: karpenterctl.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and item['cluster_state_synced'] is False"
-    warn_expr: "item['metrics_available'] and ((item['consistency_errors'] or 0) > 0 or (item['reconcile_errors_total'] or 0) > 0)"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "item['cluster_state_synced'] is False"
+    warn_expr: "((item['consistency_errors'] or 0) > 0 or (item['reconcile_errors_total'] or 0) > 0)"
   target: "'cluster'"
   evidence: "f\"cluster state synced {item['cluster_state_synced']}, consistency errors {item['consistency_errors']}, reconcile errors {item['reconcile_errors']}, pod startup average {item['pods_startup_avg_s']}s ({item['pods_startup_count']} pods), node termination average {item['node_termination_avg_s']}s\""
   severity_default: medium

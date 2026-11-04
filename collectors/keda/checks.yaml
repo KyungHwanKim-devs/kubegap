@@ -787,8 +787,10 @@
   each: kedactl.summary
   cluster_level: true
   rule:
-    expr: "item['api_metrics_available'] and ((item['api_grpc_non_ok'] or 0) >= 1000 or (item['api_requests_non_2xx'] or 0) >= 1000 or (item['api_requests_non_2xx'] or 0) / max(sum((item.get('api_requests_by_code') or {}).values()), 1) >= 0.01)"
-    warn_expr: "item['api_metrics_available'] and ((item['api_requests_non_2xx'] or 0) >= 100 or (item['api_grpc_non_ok'] or 0) >= 100 or (item['api_requests_non_2xx'] or 0) / max(sum((item.get('api_requests_by_code') or {}).values()), 1) >= 0.001)"  # 18 of 1.1M (0.002%) is noise — from 100 requests or 0.1%
+    needs: "item['api_metrics_available']"
+    needs_reason: "api metrics not read"
+    expr: "((item['api_grpc_non_ok'] or 0) >= 1000 or (item['api_requests_non_2xx'] or 0) >= 1000 or (item['api_requests_non_2xx'] or 0) / max(sum((item.get('api_requests_by_code') or {}).values()), 1) >= 0.01)"
+    warn_expr: "((item['api_requests_non_2xx'] or 0) >= 100 or (item['api_grpc_non_ok'] or 0) >= 100 or (item['api_requests_non_2xx'] or 0) / max(sum((item.get('api_requests_by_code') or {}).values()), 1) >= 0.001)"  # 18 of 1.1M (0.002%) is noise — from 100 requests or 0.1%
   target: "'cluster'"
   evidence: "f\"request codes since metrics-apiserver start {item['api_requests_by_code']}, non-2xx/3xx responses {item['api_requests_non_2xx']}, operator gRPC GetMetrics failures {item['api_grpc_non_ok']}, scaler errors in logs (24h) {item['scaler_errors_24h_logs']}\""
   severity_default: medium
@@ -947,7 +949,7 @@
           operator_metrics_present: false
           scaler_errors_total: 0
           scaler_errors_24h_logs: 0
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           version: "2.17.2"

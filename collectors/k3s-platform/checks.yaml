@@ -1598,7 +1598,9 @@
   each: k3s.nodes
   profiles: [lab]
   rule:
-    warn_expr: "item.get('collected') and item.get('smartctl') is False"
+    needs: "item.get('collected')"
+    needs_reason: "nodes not collected"
+    warn_expr: "item.get('smartctl') is False"
   target: "item['node']"
   evidence: "f\"smartctl missing. Disks {(item.get('disks') or {}).get('devices')}\""
   severity_default: low
@@ -1744,7 +1746,7 @@
             x86_pkg_temp: 45.0
           thermal_max_c: 45.0
           gaps: []
-      - expect: "pass"
+      - expect: "skip"
         item:
           node: "node-b"
           role: "server"

@@ -321,6 +321,11 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w(f"- Not collected in {mode} mode {len(nc)}: " + (", ".join(f"`{r['id']}`" for r in nc) if nc else "none"))
     sk = [r for r in results if r.get("status") in ("skip", "error")]
     w(f"- Skipped or errored {len(sk)}: " + (", ".join(f"`{r['id']}` ({r.get('status')}: {r.get('reason')})" for r in sk) if sk else "none"))
+    part = [r for r in results if r.get("status") == "done" and r.get("skipped_reason")]
+    w(
+        f"- Judged in part {len(part)} (some targets lacked what the rule needs; those are not judged, not passed): "
+        + (", ".join(f"`{r['id']}` ({(r.get('counts') or {}).get('skipped')} not judged: {r['skipped_reason']})" for r in part) if part else "none")
+    )
     w("")
 
     # ---- 7. appendix

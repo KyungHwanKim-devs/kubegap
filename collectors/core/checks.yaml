@@ -4215,8 +4215,10 @@
   type: inventory
   cluster_level: true
   rule:
-    expr: "k8s_eol(inv['cluster'].get('server_version')) is not None and days_until(k8s_eol(inv['cluster'].get('server_version'))) < 0"
-    warn_expr: "k8s_eol(inv['cluster'].get('server_version')) is not None and days_until(k8s_eol(inv['cluster'].get('server_version'))) < 90"
+    needs: "k8s_eol(inv['cluster'].get('server_version')) is not None"
+    needs_reason: "server version not read, or its minor is not in rubric/k8s-versions.yaml"
+    expr: "days_until(k8s_eol(inv['cluster'].get('server_version'))) < 0"
+    warn_expr: "days_until(k8s_eol(inv['cluster'].get('server_version'))) < 90"
   evidence: "f\"server {inv['cluster'].get('server_version')}: {eol_badge(inv['cluster'].get('server_version'))}\""
   severity_default: high
   symptom_linked: false
@@ -4262,6 +4264,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['kernel']['counts'].get('oom_node', 0) >= 1"
   target: "item['node']"
   evidence: "f\"kernel log ({item['kernel']['window']}) 'Out of memory: Kill' {item['kernel']['counts'].get('oom_node')} times, system process victims (kubelet, containerd, k3s) {item['kernel']['counts'].get('oom_system_victim', 0)}, cgroup OOM (container) {item['kernel']['counts'].get('oom_cgroup', 0)}. Samples: {[s[:120] for s in item['kernel']['samples'] if 'Out of memory' in s][:3]}\""
@@ -4489,6 +4493,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['kernel']['counts'].get('lockup', 0) >= 1"
   target: "item['node']"
   evidence: "f\"kernel log ({item['kernel']['window']}) lockup/hung task/rcu stall {item['kernel']['counts'].get('lockup')} times. Samples: {[s[:140] for s in item['kernel']['samples'] if any(k in s for k in ('lockup','hung_task','blocked for','rcu'))][:3]}\""
@@ -4710,6 +4716,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['kernel']['counts'].get('io_error', 0) + item['kernel']['counts'].get('fs_error', 0) >= 1"
   target: "item['node']"
   evidence: "f\"kernel log ({item['kernel']['window']}) I/O errors {item['kernel']['counts'].get('io_error')}, filesystem errors {item['kernel']['counts'].get('fs_error')}. Samples: {[s[:140] for s in item['kernel']['samples'] if any(k in s for k in ('I/O error','EXT4','XFS','nvme','read-only','Read-only'))][:3]}\""
@@ -4930,6 +4938,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['kernel']['counts'].get('nic', 0) >= 3"
     warn_expr: "item['kernel']['counts'].get('nic', 0) >= 1"
   target: "item['node']"
@@ -5250,6 +5260,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['kernel']['counts'].get('conntrack_full', 0) >= 1"
   target: "item['node']"
   evidence: "f\"kernel log ({item['kernel']['window']}) 'nf_conntrack: table full, dropping packet' {item['kernel']['counts'].get('conntrack_full')} times. Current {item['sysctl']['values'].get('net.netfilter.nf_conntrack_count')}/{item['sysctl']['values'].get('net.netfilter.nf_conntrack_max')}\""
@@ -5471,6 +5483,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['kernel']['counts'].get('bug', 0) >= 1 and item['kernel']['counts'].get('bug', 0) > item['kernel']['counts'].get('oom_cgroup', 0)"
     warn_expr: "item['kernel']['counts'].get('net_pressure', 0) + item['kernel']['counts'].get('mem_pressure', 0) + item['kernel']['counts'].get('clock', 0) >= 1"
   target: "item['node']"
@@ -5793,6 +5807,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['cgroup']['version'] == 'v1'"
   target: "item['node']"
   evidence: "f\"/sys/fs/cgroup filesystem {item['cgroup']['fs']} (cgroup v1). OS {item['meta']['os']}, kernel {item['meta']['kernel']}\""
@@ -6011,6 +6027,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "any(i.startswith('net.ipv4.ip_forward') for i in item['sysctl']['issues'])"
     warn_expr: "len(item['sysctl']['issues']) > 0"
   target: "item['node']"
@@ -6334,7 +6352,9 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
-    expr: "item['cri'].get('available') and len(item['cri'].get('not_ready') or []) > 0"
+    needs: "item.get('collected', True) and item['cri'].get('available')"
+    needs_reason: "node not read, or cri not read"
+    expr: "len(item['cri'].get('not_ready') or []) > 0"
   target: "item['node']"
   evidence: "f\"crictl info conditions {item['cri'].get('conditions')}, CNI status {item['cri'].get('cni_error') or 'OK'}\""
   severity_default: critical
@@ -6553,6 +6573,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "(item['cri'].get('states') or {}).get('Exited', 0) >= 100"
     warn_expr: "(item['cri'].get('states') or {}).get('Exited', 0) >= 30"
   target: "item['node']"
@@ -6962,6 +6984,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['service_restarts_max'] >= 10"
     warn_expr: "item['service_restarts_max'] >= 3"
   target: "item['node']"
@@ -7284,6 +7308,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['updates']['reboot_required'] and item['meta']['uptime_days'] >= 180"
     warn_expr: "item['updates']['reboot_required'] or item['meta']['uptime_days'] >= 365"
   target: "item['node']"
@@ -7701,6 +7727,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "(item['updates'].get('security_updates') or 0) >= 20"
     warn_expr: "(item['updates'].get('security_updates') or 0) >= 1"
   target: "item['node']"
@@ -8021,7 +8049,9 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
-    expr: "item['kubelet'].get('available') and item['kubelet'].get('reserved_missing')"
+    needs: "item.get('collected', True) and item['kubelet'].get('available')"
+    needs_reason: "node not read, or kubelet not read"
+    expr: "item['kubelet'].get('reserved_missing')"
   target: "item['node']"
   evidence: "f\"configz kubeReserved {item['kubelet'].get('kube_reserved')}, systemReserved {item['kubelet'].get('system_reserved')}, enforceNodeAllocatable {item['kubelet'].get('enforce_node_allocatable')}, maxPods {item['kubelet'].get('max_pods')}. Node memory {item['meta']['mem_total_gb']}GB\""
   severity_default: medium
@@ -8232,7 +8262,7 @@
             image_gc_high: 85
           permission_gaps: []
           truncated: false
-      - expect: "pass"
+      - expect: "skip"
         item:
           node: "node-1"
           roles:
@@ -8340,8 +8370,10 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
-    expr: "item['kubelet'].get('available') and item['kubelet'].get('eviction_hard_empty')"
-    warn_expr: "item['kubelet'].get('available') and item['kubelet'].get('eviction_memory_missing')"
+    needs: "item.get('collected', True) and item['kubelet'].get('available')"
+    needs_reason: "node not read, or kubelet not read"
+    expr: "item['kubelet'].get('eviction_hard_empty')"
+    warn_expr: "item['kubelet'].get('eviction_memory_missing')"
   target: "item['node']"
   evidence: "f\"configz evictionHard {item['kubelet'].get('eviction_hard')}, evictionSoft {item['kubelet'].get('eviction_soft')}, imageGC {item['kubelet'].get('image_gc_low')}~{item['kubelet'].get('image_gc_high')}%\""
   severity_default: medium
@@ -8659,6 +8691,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['time'].get('synchronized') is False"
   target: "item['node']"
   evidence: "f\"timedatectl synchronized={item['time'].get('synchronized')}, NTP {item['time'].get('ntp')}, chrony {item['time'].get('chrony')}\""
@@ -8976,6 +9010,8 @@
   profiles: [prod, lab]
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['meta']['zombies'] >= 50"
     warn_expr: "item['meta']['zombies'] >= 10"
   target: "item['node']"
@@ -9454,8 +9490,10 @@
   cluster_level: true
   profiles: [prod, lab]
   rule:
-    expr: "item.get('available') and (len(item.get('nodes_all_missing') or []) > 0 or (item.get('gap_ratio') or 0) > 0.5)"
-    warn_expr: "item.get('available') and (item.get('gap_ratio') or 0) > 0.2"
+    needs: "item.get('available')"
+    needs_reason: "coverage not available"
+    expr: "(len(item.get('nodes_all_missing') or []) > 0 or (item.get('gap_ratio') or 0) > 0.5)"
+    warn_expr: "(item.get('gap_ratio') or 0) > 0.2"
   target: "'cluster'"
   evidence: "f\"Of {item.get('running_pods_over_1h')} pods Running for over 1h, {item.get('pods_without_logs_1h')} are absent from Loki pod labels (ratio {item.get('gap_ratio')}). Nodes with every pod missing: {item.get('nodes_all_missing')}. By namespace: {item.get('by_namespace_missing')}\""
   severity_default: medium
@@ -9497,7 +9535,7 @@
           gap_ratio: 0.3
           nodes_all_missing: []
           by_namespace_missing: {}
-      - expect: "pass"
+      - expect: "skip"
         item:
           available: false
 
@@ -9509,7 +9547,9 @@
   cluster_level: true
   profiles: [prod, lab]
   rule:
-    expr: "item.get('present') and item.get('ready') is False"
+    needs: "item.get('present')"
+    needs_reason: "loki not present"
+    expr: "item.get('ready') is False"
   target: "'cluster'"
   evidence: "f\"Loki {item.get('version')} /ready response is not ready. Pods {item.get('pods')}\""
   severity_default: high
@@ -9556,7 +9596,7 @@
               storage: "emptyDir"
           self_metrics:
             rss_mb: 200
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: false
 
@@ -10932,8 +10972,10 @@
   each: security.aws
   cluster_level: true
   rule:
-    expr: "item.get('applicable') and any(x.get('tokens') != 'required' for x in (item.get('imds_hop_limit_gt1') or []))"  # only IMDSv1 allowed (tokens optional) fails -- hop 2 + tokens required is the EKS managed node group default, so warn
-    warn_expr: "item.get('applicable') and len(item.get('imds_hop_limit_gt1') or []) > 0"
+    needs: "item.get('applicable')"
+    needs_reason: "aws not applicable"
+    expr: "any(x.get('tokens') != 'required' for x in (item.get('imds_hop_limit_gt1') or []))"  # only IMDSv1 allowed (tokens optional) fails -- hop 2 + tokens required is the EKS managed node group default, so warn
+    warn_expr: "len(item.get('imds_hop_limit_gt1') or []) > 0"
   target: "'cluster'"
   evidence: "f\"Of {item.get('instances')} instances, {len(item.get('imds_hop_limit_gt1') or [])} with IMDS hop limit > 1 or tokens optional: {item.get('imds_by_setting')}. Examples {[(i['name'], i['type'], i['hop_limit'], i['tokens']) for i in (item.get('imds_hop_limit_gt1') or [])[:4]]}. EC2NodeClass metadataOptions {item.get('ec2nodeclass_metadata')}. IRSA SAs {len(item.get('irsa_service_accounts') or [])}, Pod Identity {item.get('pod_identity_associations')}\""
   severity_default: high
@@ -10980,7 +11022,7 @@
           pod_identity_associations: 0
           oidc_provider: true
           instances_source: "aws/ec2-instances-imds.json"
-      - expect: "pass"
+      - expect: "skip"
         item:
           applicable: false
 
@@ -10993,8 +11035,10 @@
   cluster_level: true
   requires_tool: polaris
   rule:
-    expr: "item.get('present') and len(item.get('danger_workloads_prod') or []) > 0"
-    warn_expr: "item.get('present') and len(item.get('danger_workloads') or []) > 0"
+    needs: "item.get('present')"
+    needs_reason: "polaris not present"
+    expr: "len(item.get('danger_workloads_prod') or []) > 0"
+    warn_expr: "len(item.get('danger_workloads') or []) > 0"
   target: "'cluster'"
   evidence: "f\"Polaris score {item.get('score')}. Security danger workloads {len(item.get('danger_workloads') or [])} (prod {len(item.get('danger_workloads_prod') or [])}): per check {item.get('danger_check_counts')}. prod list {(item.get('danger_workloads_prod') or [])[:12]}\""
   severity_default: medium
@@ -11036,7 +11080,7 @@
           danger_workloads: []
           danger_workloads_prod: []
           danger_check_counts: {}
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: false
 
@@ -11519,7 +11563,9 @@
   each: storage.ebs
   cluster_level: true
   rule:
-    expr: "item.get('available') and len(item.get('unattached') or []) > 0"
+    needs: "item.get('available')"
+    needs_reason: "ebs not available"
+    expr: "len(item.get('unattached') or []) > 0"
   target: "'cluster'"
   evidence: "f\"{len(item.get('unattached') or [])} volumes in available state, {item.get('unattached_gb')}GB, about ${item.get('unattached_monthly_usd_est')}/month: {[(v['id'], v['size_gb'], v['type'], v['age_days'], v['name']) for v in (item.get('unattached') or [])[:8]]}\""
   severity_default: medium
@@ -11578,7 +11624,7 @@
           snapshot_descriptions: {}
           snapshot_latest: "x"
           snapshotted_volumes: 12
-      - expect: "pass"
+      - expect: "skip"
         item:
           available: false
 
@@ -11589,7 +11635,9 @@
   each: storage.ebs
   cluster_level: true
   rule:
-    warn_expr: "item.get('available') and len(item.get('gp2') or []) > 0"
+    needs: "item.get('available')"
+    needs_reason: "ebs not available"
+    warn_expr: "len(item.get('gp2') or []) > 0"
   target: "'cluster'"
   evidence: "f\"{len(item.get('gp2') or [])} gp2 volumes: {[(v['id'], v['size_gb'], v['namespace'], v['pvc']) for v in (item.get('gp2') or [])[:8]]}. All {item.get('by_type')}\""
   severity_default: low
@@ -11656,7 +11704,9 @@
   each: storage.ebs
   cluster_level: true
   rule:
-    warn_expr: "item.get('available') and len(item.get('unencrypted') or []) > 0"
+    needs: "item.get('available')"
+    needs_reason: "ebs not available"
+    warn_expr: "len(item.get('unencrypted') or []) > 0"
   target: "'cluster'"
   evidence: "f\"{len(item.get('unencrypted') or [])} of {item.get('volumes')} volumes unencrypted: {(item.get('unencrypted') or [])[:8]}\""
   severity_default: medium
@@ -14239,7 +14289,9 @@
   type: summary
   each: nodeos.nodes
   rule:
-    warn_expr: "(item.get('kubelet') or {}).get('available') and ((item['kubelet'].get('kube_api_qps') or 0) <= 5) and ((item['kubelet'].get('max_pods') or 0) >= 60)"
+    needs: "item.get('collected', True) and (item.get('kubelet') or {}).get('available')"
+    needs_reason: "node not read, or kubelet not read"
+    warn_expr: "((item['kubelet'].get('kube_api_qps') or 0) <= 5) and ((item['kubelet'].get('max_pods') or 0) >= 60)"
   target: "item['node']"
   evidence: "f\"Node {item['node']}: kubeAPIQPS {(item.get('kubelet') or {}).get('kube_api_qps')}, kubeAPIBurst {(item.get('kubelet') or {}).get('kube_api_burst')}, maxPods {(item.get('kubelet') or {}).get('max_pods')}\""
   severity_default: low
@@ -14273,7 +14325,7 @@
             kube_api_qps: 50
             kube_api_burst: 100
             max_pods: 110
-      - expect: "pass"
+      - expect: "skip"
         item:
           node: "node-a"
           kubelet:
@@ -15343,8 +15395,10 @@
   each: resilience.n_plus_one
   cluster_level: true
   rule:
-    expr: "item.get('available') and not item['ok'] and not item.get('autoscaler', item.get('karpenter'))"
-    warn_expr: "item.get('available') and (not item['ok'] or item.get('tight'))"  # ok covers the cluster-wide sum and every pool of pods bound to a subset of nodes; tight = fits only inside the 2% margin
+    needs: "item.get('available')"
+    needs_reason: "n plus one not available"
+    expr: "not item['ok'] and not item.get('autoscaler', item.get('karpenter'))"
+    warn_expr: "(not item['ok'] or item.get('tight'))"  # ok covers the cluster-wide sum and every pool of pods bound to a subset of nodes; tight = fits only inside the 2% margin
   target: "'cluster'"
   evidence: "f\"Allocatable without the largest node {item['largest_node']} ({item['largest_node_cpu']} cores, {item['largest_node_memory_gb']}GB): CPU {item['allocatable_cpu_without_largest']} cores vs total requests {item['requests_cpu_total']} ({'OK' if item['cpu_ok'] else 'short'}), memory {item['allocatable_memory_gb_without_largest']}GB vs {item['requests_memory_gb_total']}GB ({'OK' if item['memory_ok'] else 'short'}). Pods on that node {item['pods_on_largest_node']} (prod {item['prod_pods_on_largest_node']}). Pods that fit on no other node {item['cannot_fit_elsewhere']}.{' Pools short of room: ' + '; '.join(str(p['pods']) + ' pods limited to ' + (', '.join(p['eligible_nodes']) or 'no other node') + ' need ' + str(p['needed_cpu']) + ' cores and ' + str(p['needed_memory_gb']) + ' GB, free there ' + str(p['free_cpu']) + ' cores and ' + str(p['free_memory_gb']) + ' GB' for p in item.get('pools_short') or []) + '.' if item.get('pools_short') else ''}{' Fits only inside the 2% margin.' if item.get('tight') and not item.get('pools_short') else ''} Node autoscaler {(item.get('autoscaler_name') or 'present') + ' (delay until a new node)' if item.get('autoscaler', item.get('karpenter')) else 'absent (permanent)'}\""
   severity_default: critical
@@ -15431,7 +15485,7 @@
           karpenter: true
           autoscaler: true
           note: "n"
-      - expect: "pass"
+      - expect: "skip"
         item:
           available: false
 
@@ -17153,8 +17207,10 @@
   each: traffic.nginx
   cluster_level: true
   rule:
-    expr: "item.get('present') and item['vulnerable'] is True and item['admission_webhook'] and not (item.get('webhook_network_policy') or {}).get('mitigated')"
-    warn_expr: "item.get('present') and item['vulnerable'] is not False"  # None = version unknown from the image: not cleared, so warn; a NetworkPolicy that closes the webhook port to pods also leaves a warn
+    needs: "item.get('present')"
+    needs_reason: "nginx not present"
+    expr: "item['vulnerable'] is True and item['admission_webhook'] and not (item.get('webhook_network_policy') or {}).get('mitigated')"
+    warn_expr: "item['vulnerable'] is not False"  # None = version unknown from the image: not cleared, so warn; a NetworkPolicy that closes the webhook port to pods also leaves a warn
   target: "'cluster'"
   evidence: "f\"ingress-nginx {item['version'] or 'version unknown'} ({', '.join(c['kind'] + ' ' + c['namespace'] + '/' + c['name'] for c in item['controllers'])}){'; no version in the image tag of ' + ', '.join(item['unknown_version_controllers']) if item['unknown_version_controllers'] else ''}; fixed in {' and '.join(item['fixed_versions'])}; admission webhook {'on' if item['admission_webhook'] else 'off'}{', failurePolicy ' + str(item['admission_webhooks'][0]['failure_policy']) if item['admission_webhooks'] else ''}{'; webhook port closed to pods by NetworkPolicy ' + ', '.join((item.get('webhook_network_policy') or {}).get('policies') or []) if (item.get('webhook_network_policy') or {}).get('mitigated') else ''}\""
   severity_default: high
@@ -17231,7 +17287,9 @@
   each: traffic.nginx
   cluster_level: true
   rule:
-    warn_expr: "item.get('present') and item['retired']"
+    needs: "item.get('present')"
+    needs_reason: "nginx not present"
+    warn_expr: "item['retired']"
   target: "'cluster'"
   evidence: "f\"ingress-nginx {item['version'] or 'version unknown'} ({', '.join(c['kind'] + ' ' + c['namespace'] + '/' + c['name'] for c in item['controllers'])}); {item['retired_note']}; admission webhook {'on' if item['admission_webhook'] else 'off'}\""
   severity_default: medium
@@ -18848,7 +18906,9 @@
   each: scaling.karpenter
   cluster_level: true
   rule:
-    expr: "item.get('present') and (item.get('spot_nodeclaims') or 0) > 0 and not item.get('interruption_queue')"
+    needs: "item.get('present')"
+    needs_reason: "karpenter not present"
+    expr: "(item.get('spot_nodeclaims') or 0) > 0 and not item.get('interruption_queue')"
   target: "'cluster'"
   evidence: "f\"Spot NodeClaims {item.get('spot_nodeclaims')} / total {item.get('nodeclaim_count')}, INTERRUPTION_QUEUE {item.get('interruption_queue')}\""
   severity_default: high
@@ -18881,7 +18941,7 @@
           launch_failures_24h: {}
           nodeclaims_launched_24h: 2
           disruptions_24h: {}
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: false
 
@@ -22830,6 +22890,8 @@
   type: summary
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "item['runtimes']['docker_and_containerd'] and (item['runtimes']['docker_mb'] or 0) >= 20000"
     warn_expr: "item['runtimes']['docker_and_containerd']"
   target: "item['node']"
@@ -22908,6 +22970,8 @@
   type: summary
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     expr: "(item['writable_layer_max_mb'] or 0) >= 5000"
     warn_expr: "(item['writable_layer_max_mb'] or 0) >= 1000"
   target: "item['node']"
@@ -23024,6 +23088,8 @@
   type: summary
   each: nodeos.nodes
   rule:
+    needs: "item.get('collected', True)"
+    needs_reason: "node not read"
     warn_expr: "bool(((item.get('cri') or {}).get('images_over_3gb')) or [])"
   target: "item['node']"
   evidence: "f\"Node {item['node']}: images of 3 GiB or more {len((item.get('cri') or {}).get('images_over_3gb') or [])} — {', '.join(((item.get('cri') or {}).get('images_over_3gb') or [])[:3])} (largest {(item.get('cri') or {}).get('largest_image_mb')} MiB)\""
@@ -23144,7 +23210,9 @@
   each: observability.grafana.dashboards_json
   cluster_level: true
   rule:
-    warn_expr: "item.get('available') and (item.get('alert_metrics') or 0) > 0 and (item.get('alert_metrics_without_panel_count') or 0) / max(item.get('alert_metrics') or 1, 1) >= 0.3"
+    needs: "item.get('available')"
+    needs_reason: "dashboards json not available"
+    warn_expr: "(item.get('alert_metrics') or 0) > 0 and (item.get('alert_metrics_without_panel_count') or 0) / max(item.get('alert_metrics') or 1, 1) >= 0.3"
   target: "'grafana'"
   evidence: "f\"{item.get('read')} dashboards ({item.get('panel_metrics')} panel metrics) — {item.get('alert_metrics_without_panel_count')} of {item.get('alert_metrics')} alert-rule metrics have no panel: {', '.join((item.get('alert_metrics_without_panel') or [])[:6])}\" if item.get('available') else 'no dashboard JSON (grafana_api_token required)'"
   severity_default: low
@@ -23178,7 +23246,7 @@
           alert_metrics_without_panel_count: 2
           alert_metrics_without_panel:
             - "x_total"
-      - expect: "pass"
+      - expect: "skip"
         item:
           available: false
 

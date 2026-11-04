@@ -7,8 +7,10 @@
   cluster_level: true
   profiles: [lab]
   rule:
-    expr: "item.get('present') and ((item.get('free') or 0) <= 1 or len(item.get('pending') or []) > 0)"
-    warn_expr: "item.get('present') and (item.get('free') or 0) <= 3"
+    needs: "item.get('present')"
+    needs_reason: "pools not present"
+    expr: "((item.get('free') or 0) <= 1 or len(item.get('pending') or []) > 0)"
+    warn_expr: "(item.get('free') or 0) <= 3"
   target: "'cluster'"
   evidence: "f\"pools {[(p['name'], p['addresses'], p['size']) for p in item.get('pools') or []]}, used {item.get('used')}/{item.get('total_ips')}, free {item.get('free')}, Pending Services {[(s['namespace'], s['name']) for s in item.get('pending') or []]}\""
   severity_default: medium
@@ -70,7 +72,7 @@
           used: 1
           free: 9
           pending: []
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: false
 - id: traffic.metallb-l2-leader-concentration
@@ -459,8 +461,10 @@
   each: metallb.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and len(item['config_stale_pods']) > 0"
-    warn_expr: "item['metrics_available'] and (item['update_errors_total'] or 0) > 0"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "len(item['config_stale_pods']) > 0"
+    warn_expr: "(item['update_errors_total'] or 0) > 0"
   target: "'cluster'"
   evidence: "f\"speakers with stale/unloaded config {item['config_stale_pods']}, k8s client update errors {item['update_errors_total']}, ARP requests/responses {item['arp_requests_total']}/{item['arp_responses_total']}, gratuitous ARP {item['gratuitous_total']}, BGP sessions up {item['bgp_sessions_up']}/{item['bgp_sessions']}\""
   severity_default: high
@@ -599,7 +603,7 @@
             - "l2advertisementvalidationwebhook.metallb.io"
           webhooks: 6
           metrics_available: true
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           mode: "layer2"

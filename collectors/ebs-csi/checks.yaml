@@ -6,8 +6,10 @@
   each: ebscsi.summary
   cluster_level: true
   rule:
-    expr: "item['controller_present'] and ((item['controller_ready'] or 0) < (item['controller_replicas'] or 0) or (item['controller_replicas'] or 0) < 2)"
-    warn_expr: "item['controller_present'] and item['controller_all_same_node']"
+    needs: "item['controller_present']"
+    needs_reason: "controller not present"
+    expr: "((item['controller_ready'] or 0) < (item['controller_replicas'] or 0) or (item['controller_replicas'] or 0) < 2)"
+    warn_expr: "item['controller_all_same_node']"
   target: "'cluster'"
   evidence: "f\"ebs-csi-controller replicas {item['controller_replicas']} / ready {item['controller_ready']}, all on one node {item['controller_all_same_node']}, node plugin {item['node_ready']}/{item['node_desired']}, version {item['version']} (add-on {item['addon_version']}, latest {item['addon_latest']})\""
   severity_default: high
@@ -237,7 +239,9 @@
   each: ebscsi.summary
   cluster_level: true
   rule:
-    expr: "item['controller_present'] and not item['has_dedicated_role']"
+    needs: "item['controller_present']"
+    needs_reason: "controller not present"
+    expr: "not item['has_dedicated_role']"
   target: "'cluster'"
   evidence: "f\"ServiceAccount ebs-csi-controller-sa: IRSA role {item['irsa_role']}, Pod Identity {item['pod_identity']}, add-on serviceAccountRoleArn present {item['has_dedicated_role']}\""
   severity_default: medium
@@ -723,8 +727,10 @@
   each: ebscsi.summary
   cluster_level: true
   rule:
-    expr: "item['kubelet_metrics_available'] and ((item['node_ops_errors_24h'] or 0) >= 10 or (item['storage_ops_failures_24h'] or 0) >= 10)"
-    warn_expr: "item['kubelet_metrics_available'] and ((item['node_ops_errors_24h'] or 0) > 0 or (item['storage_ops_failures_24h'] or 0) > 0 or (item['events_failures_24h'] or 0) > 0)"
+    needs: "item['kubelet_metrics_available']"
+    needs_reason: "kubelet metrics not read"
+    expr: "((item['node_ops_errors_24h'] or 0) >= 10 or (item['storage_ops_failures_24h'] or 0) >= 10)"
+    warn_expr: "((item['node_ops_errors_24h'] or 0) > 0 or (item['storage_ops_failures_24h'] or 0) > 0 or (item['events_failures_24h'] or 0) > 0)"
   target: "'cluster'"
   evidence: "f\"CSI gRPC failures in 24h {item['node_ops_errors_24h']} ({item['node_ops_errors_detail']}), kubelet volume operation failures {item['storage_ops_failures_24h']}, volume-related Warning events {item['events_24h']}\""
   severity_default: medium
@@ -898,7 +904,7 @@
           events_24h: {}
           events_failures_24h: 0
           fs_group_policy: "ReadWriteOnceWithFSType"
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           version: "1.37.0"
@@ -1240,7 +1246,9 @@
   each: ebscsi.summary
   cluster_level: true
   rule:
-    warn_expr: "item['controller_present'] and not item['controller_metrics_enabled']"
+    needs: "item['controller_present']"
+    needs_reason: "controller not present"
+    warn_expr: "not item['controller_metrics_enabled']"
   target: "'cluster'"
   evidence: "f\"aws_ebs_csi_* series {0 if not item['controller_metrics_enabled'] else 'present'}, add-on {item['addon_version']}. When enabled, shows EC2 API errors {item['api_errors_24h']} / throttles {item['api_throttles_24h']}\""
   severity_default: low
@@ -1364,7 +1372,9 @@
   each: ebscsi.summary
   cluster_level: true
   rule:
-    warn_expr: "item['controller_present'] and item['sidecar_timeouts'] is not None and any((v in (None, '15s', '60s')) for v in item['sidecar_timeouts'].values()) and (item['stage_p99_s'] or 0) >= 30"
+    needs: "item['controller_present']"
+    needs_reason: "controller not present"
+    warn_expr: "item['sidecar_timeouts'] is not None and any((v in (None, '15s', '60s')) for v in item['sidecar_timeouts'].values()) and (item['stage_p99_s'] or 0) >= 30"
   target: "'cluster'"
   evidence: "f\"sidecar --timeout {item['sidecar_timeouts']}, batching {item['batching']}, Stage p99 {item['stage_p99_s']}s\""
   severity_default: low
