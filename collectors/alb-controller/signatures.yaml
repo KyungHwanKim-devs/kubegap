@@ -1,16 +1,37 @@
-# AWS Load Balancer Controller log signatures. The first edition lived in signatures/catalog.yaml and was moved into this collector. Field descriptions are in the header of catalog.yaml.
+# Group A corrected signature entries (#129): alb-controller, ebs-csi (+ catalog ebs-csi.snapshot-crd-missing), vpc-cni, karpenter, catalog external-dns.change-failed.
+# Every phrase was read in source at the EKS version and the newest release (plus the boundary tags named in references/sources.md); `source:` names the logging call at each version.
+# ---------------- alb-controller (collectors/alb-controller/signatures.yaml) ----------------
+# `failed to reconcile` was dropped: the controller never logs it (v2.7.2: 0 hits; v3.6.2 has only the Event message "Failed to reconcile due to %v" of the Global Accelerator controller,
+# and controller-runtime logs Events at V(1) only, pkg/internal/recorder/recorder.go:103@v0.14.6, :116@v0.24.1). Reconcile failures reach the log as controller-runtime's "Reconciler error".
 - id: alb-controller.reconcile-error
   name: ALB Controller reconcile error
   component: alb-controller
   area: traffic
   severity: medium
   sources: ["logs/pods/alb-controller/*.log"]
-  pattern: 'Reconciler error|failed to reconcile|"level":"error"'
-  meaning: The ALB/NLB configuration of an Ingress or Service was not applied to AWS. New routing and certificates do not take effect.
+  pattern: 'Reconciler error|"level":"error"'
+  meaning: The ALB/NLB configuration of an Ingress or Service was not applied to AWS. New routing and certificates do not take effect. The line is controller-runtime's "Reconciler error" (the controller's own error text is in the "error" field) or any other error-level line of the controller.
   cause: IAM permissions, missing subnet tags (kubernetes.io/role/elb), security group limits, wrong certificate ARN.
   verify: "kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --since=24h | grep -i error | head"
   warn_at: 1
   fail_at: 50
+  source:
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:329@v0.14.6"
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:494@v0.24.1"
+    - "kubernetes-sigs/controller-runtime pkg/log/zap/zap.go:86@v0.14.6"
+    - "kubernetes-sigs/controller-runtime pkg/log/zap/zap.go:86@v0.24.1"
+    - "kubernetes-sigs/aws-load-balancer-controller main.go:224@v2.7.2"
+    - "kubernetes-sigs/aws-load-balancer-controller main.go:633@v3.6.2"
+    - "kubernetes-sigs/aws-load-balancer-controller pkg/runtime/reconcile.go:10@v2.7.2"
+    - "kubernetes-sigs/aws-load-balancer-controller pkg/runtime/reconcile.go:12@v3.6.2"
+    - "uber-go/zap config.go:108@v1.24.0"
+    - "uber-go/zap config.go:134@v1.28.0"
+    - "uber-go/zap zapcore/level.go:122@v1.24.0"
+    - "uber-go/zap zapcore/level.go:122@v1.28.0"
+    - "go-logr/zapr zapr.go:263@v1.2.3"
+    - "go-logr/zapr zapr.go:254@v1.3.0"
+# The three codes are AWS response text; the controller does not spell them (only AccessDeniedException is compared for a metric, pkg/metrics/aws/collector.go:78@v3.6.2).
+# They reach the log inside the "error" field of "Reconciler error": SDK v1 renders "<code>: <message>", SDK v2 "api error <code>: <message>".
 - id: alb-controller.access-denied
   name: ALB Controller IAM permission denied
   component: alb-controller
@@ -18,19 +39,39 @@
   severity: high
   sources: ["logs/pods/alb-controller/*.log"]
   pattern: 'AccessDenied|UnauthorizedOperation|is not authorized to perform'
-  meaning: The controller lacks permission to call the ELB, EC2 or WAF APIs. All load balancer creation and updates stop.
+  meaning: The controller lacks permission to call the ELB, EC2 or WAF APIs. All load balancer creation and updates stop. The code is the AWS response text relayed in the "error" field of the "Reconciler error" line.
   cause: IRSA role policy written for an older controller version, missing policy.
   verify: "kubectl describe sa -n kube-system aws-load-balancer-controller | grep role-arn"
+  source:
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:329@v0.14.6"
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:494@v0.24.1"
+    - "kubernetes-sigs/aws-load-balancer-controller pkg/runtime/reconcile.go:10@v2.7.2"
+    - "kubernetes-sigs/aws-load-balancer-controller pkg/runtime/reconcile.go:12@v3.6.2"
+    - "kubernetes-sigs/aws-load-balancer-controller pkg/metrics/aws/collector.go:78@v3.6.2"
+    - "aws/aws-sdk-go aws/awserr/types.go:13@v1.50.8"
+    - "aws/smithy-go errors.go:37,60@v1.27.1"
+# `unable to resolve.*certificate` and `certificate.*not found` were dropped: no version prints them (grep -i over both trees: 0 hits). The controller's own text is
+# "no certificate found for host: %s"; CertificateNotFound is the ELBv2 error code relayed in the "error" field of "Reconciler error".
 - id: alb-controller.certificate
   name: ALB certificate resolution failed
   component: alb-controller
   area: traffic
   severity: high
   sources: ["logs/pods/alb-controller/*.log"]
-  pattern: 'no certificate found|unable to resolve.*certificate|certificate.*not found|CertificateNotFound'
-  meaning: The ACM certificate for the HTTPS listener cannot be found, so the Ingress does not work.
+  pattern: 'no certificate found for host|CertificateNotFound'
+  meaning: The ACM certificate for the HTTPS listener cannot be found, so the Ingress does not work. "no certificate found for host" is the controller's certificate discovery error; CertificateNotFound is the ELBv2 error code. Both appear in the "error" field of the "Reconciler error" line.
   cause: No ACM certificate matching the hostname (wrong region), typo in the annotation ARN.
   verify: "aws acm list-certificates --query 'CertificateSummaryList[].DomainName'"
+  source:
+    - "kubernetes-sigs/aws-load-balancer-controller pkg/ingress/cert_discovery.go:89@v2.7.2"
+    - "kubernetes-sigs/aws-load-balancer-controller pkg/certs/cert_discovery.go:92@v3.6.2"
+    - "kubernetes-sigs/aws-load-balancer-controller pkg/ingress/model_build_listener.go:181@v2.7.2"
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:329@v0.14.6"
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:494@v0.24.1"
+    - "aws/aws-sdk-go aws/awserr/types.go:13@v1.50.8"
+    - "aws/smithy-go errors.go:37,60@v1.27.1"
+# The controller sets no SDK logging mode (pkg/aws/cloud.go has no LogLevel/ClientLogMode at either tag), so a throttle that the SDK retries successfully is never logged;
+# only a request that fails after the retries reaches the "error" field of "Reconciler error". Rate exceeded is the EC2/ELB message text of these codes.
 - id: alb-controller.throttled
   name: ALB Controller API throttling
   component: alb-controller
@@ -38,8 +79,15 @@
   severity: medium
   sources: ["logs/pods/alb-controller/*.log"]
   pattern: 'Throttling|Rate exceeded|RequestLimitExceeded'
-  meaning: The ELB API limit is being hit and reconciliation is delayed.
+  meaning: The ELB API limit is being hit and reconciliation is delayed. The line appears only when a request still fails after the SDK's retries, so a count here means sustained throttling, and a count of zero does not mean there was none.
   cause: Many Ingresses and TargetGroupBindings with a short reconcile interval.
   verify: "kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller --since=1h | grep -c Throttling"
   warn_at: 5
   fail_at: 200
+  source:
+    - "aws/aws-sdk-go aws/request/retryer.go:87,89@v1.50.8"
+    - "aws/aws-sdk-go-v2 aws/retry/standard.go:61,68@v1.41.12"
+    - "aws/aws-sdk-go aws/awserr/types.go:13@v1.50.8"
+    - "aws/smithy-go errors.go:37,60@v1.27.1"
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:329@v0.14.6"
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:494@v0.24.1"
