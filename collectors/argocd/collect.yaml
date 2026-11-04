@@ -7,9 +7,10 @@
   namespace: argocd
   selector: app.kubernetes.io/name=argocd-application-controller
   port: 8082
+  discover: { kind: [statefulset, deployment], name: "*/*argocd-application-controller", port_names: [metrics] }   # a StatefulSet in the manifests, a Deployment with controller.dynamicClusterDistribution
   path: /metrics
   out: metrics/pod/argocd-application-controller
-  source: "names and their definitions per version: collectors/argocd/pod-metrics.yaml; port 8082 and the selector are observed, not read in source"
+  source: "names and their definitions per version: collectors/argocd/pod-metrics.yaml. Port 8082 is DefaultPortArgoCDMetrics (argoproj/argo-cd common/common.go:77@v3.6.0; flag --metrics-port, cmd/argocd-application-controller/commands/argocd_application_controller.go:265@v3.6.0), the static StatefulSet's container port (manifests/base/application-controller/argocd-application-controller-statefulset.yaml:405@v3.6.0) and the chart's controller.containerPorts.metrics named metrics (argoproj/argo-helm charts/argo-cd/values.yaml:951-953@argo-cd-10.12.0, templates/argocd-application-controller/statefulset.yaml:69,375-376); the pod label app.kubernetes.io/name=argocd-application-controller is the manifests' (statefulset.yaml:5-7@v3.6.0) and the chart's with its default nameOverride argocd (templates/_common.tpl:65-73@argo-cd-10.12.0); namespace argocd is the getting-started convention (docs/getting_started.md:15-16@v3.6.0)"
   # Lines are filtered because of the SSM output limit (24,000 characters). argocd_app_info is replaced by the Application objects, and for k8s request counts only the error-code (4xx, 5xx) lines are kept.
   keep: '^(argocd_app_(sync_total|reconcile_(sum|count))|argocd_app_k8s_request_total\{.*response_code="[45][0-9][0-9]"|argocd_cluster_(cache_age_seconds|api_resource_objects|api_resources|connection_status|events_total|info)|argocd_redis_request_total|argocd_kubectl_exec_(total|pending)|process_(start_time|resident_memory_bytes))'
   timeout: 30
@@ -18,9 +19,10 @@
   namespace: argocd
   selector: app.kubernetes.io/name=argocd-repo-server
   port: 8084
+  discover: { kind: deployment, name: "*/*argocd-repo-server", port_names: [metrics] }
   path: /metrics
   out: metrics/pod/argocd-repo-server
-  source: "names and their definitions per version: collectors/argocd/pod-metrics.yaml; port 8084 and the selector are observed, not read in source"
+  source: "names and their definitions per version: collectors/argocd/pod-metrics.yaml. Port 8084 is DefaultPortRepoServerMetrics (argoproj/argo-cd common/common.go:79@v3.6.0; cmd/argocd-repo-server/commands/argocd_repo_server.go:258@v3.6.0), the static Deployment's container port (manifests/base/repo-server/argocd-repo-server-deployment.yaml:318@v3.6.0) and the chart's repoServer.containerPorts.metrics (argoproj/argo-helm charts/argo-cd/values.yaml:3332-3336@argo-cd-10.12.0, templates/argocd-repo-server/deployment.yaml:83,389-390); the pod label is the manifests' (argocd-repo-server-deployment.yaml:5,7@v3.6.0)"
   keep: '^(argocd_git_(request_total|lsremote_fail_total|fetch_fail_total|request_duration_seconds_(sum|count))|argocd_repo_pending_request_total|argocd_redis_request_total|process_(start_time|resident_memory_bytes))'
   timeout: 30
 - id: server-metrics
@@ -28,9 +30,10 @@
   namespace: argocd
   selector: app.kubernetes.io/name=argocd-server
   port: 8083
+  discover: { kind: deployment, name: "*/*argocd-server", port_names: [metrics] }
   path: /metrics
   out: metrics/pod/argocd-server
-  source: "names and their definitions per version: collectors/argocd/pod-metrics.yaml; port 8083 and the selector are observed, not read in source"
+  source: "names and their definitions per version: collectors/argocd/pod-metrics.yaml. Port 8083 is DefaultPortArgoCDAPIServerMetrics (argoproj/argo-cd common/common.go:78@v3.6.0; cmd/argocd-server/commands/argocd_server.go:327@v3.6.0; 8080 is the API port), the static Deployment's container port (manifests/base/server/argocd-server-deployment.yaml:448@v3.6.0) and the chart's server.containerPorts.metrics (argoproj/argo-helm charts/argo-cd/values.yaml:2420-2424@argo-cd-10.12.0, templates/argocd-server/deployment.yaml:78,428-429); the pod label is the manifests' (argocd-server-deployment.yaml:5,7@v3.6.0)"
   # gRPC has more than 170 code×method combinations, so only non-zero lines are kept.
   keep: '^(grpc_server_handled_total\{.*\} [1-9]|argocd_redis_request_total|argocd_info|process_(start_time|resident_memory_bytes))'
   timeout: 30

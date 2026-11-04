@@ -176,6 +176,8 @@ class NodeAccess:
         p = {"step": [step], "executionTimeout": [str(int(max(timeout, 30)))]}
         if params.get("podIp"):
             p["podIp"] = [str(params["podIp"])]
+        if params.get("port"):
+            p["port"] = [str(int(params["port"]))]  # the discovered metrics port; the document's allowedPattern keeps it to digits (#136)
         d, r = _aws.aws_json(
             [
                 "ssm",

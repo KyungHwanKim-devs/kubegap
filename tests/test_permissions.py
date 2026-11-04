@@ -90,7 +90,7 @@ def test_raw_paths_in_lib_are_the_pod_proxy_only():
         for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
             if '"--raw"' in line:
                 raws.append(f"{f.name}:{n}: {line.strip()}")
-    assert len(raws) == 1 and "/api/v1/namespaces/{ns}/pods/{pname}:{st['port']}/proxy" in raws[0], raws
+    assert len(raws) == 1 and "/api/v1/namespaces/{ns}/pods/{pname}:{port}/proxy" in raws[0], raws  # the port is the discovered one (#136), still only the pod proxy
 
 
 def test_tool_steps_do_not_read_helm_release_secrets():

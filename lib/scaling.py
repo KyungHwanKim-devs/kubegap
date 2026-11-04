@@ -235,12 +235,32 @@ def _metrics_api(snap: Path, keda_present: bool) -> dict:
 # ---------- Karpenter ----------
 
 
-def _load_compat() -> dict:
-    """rubric/karpenter-compat.yaml: Karpenter minor -> highest supported Kubernetes minor. Raises on a missing or malformed file; the caller records the error."""
+def _load_compat() -> list[dict]:
+    """rubric/karpenter-compat.yaml: the Kubernetes minors each Karpenter version supports, read from Karpenter's own generated table (cited per row).
+    Raises on a missing or malformed file; the caller records the error."""
     from . import paths, yamlite
 
     rows = yamlite.load_file(paths.ROOT / "rubric" / "karpenter-compat.yaml") or []
-    return {str(r["karpenter"]): str(r["max_k8s"]) for r in rows if isinstance(r, dict)}
+    return [{"karpenter": str(r["karpenter"]), "min_k8s": str(r.get("min_k8s") or ""), "max_k8s": str(r["max_k8s"])} for r in rows if isinstance(r, dict)]
+
+
+def compat_row(rows: list[dict], kver: str | None) -> dict | None:
+    """The row for an installed Karpenter version: a row names a minor ("1.4", every 1.4.x) or a patch ("1.0.5", that patch and the later ones of its
+    minor); of the rows of the installed minor, the one with the highest version not above the installed one applies, so "1.0.4" reads the "1.0" row
+    and "1.0.6" the "1.0.5" row (Karpenter 1.0.5 extended support to Kubernetes 1.31: compatibility.yaml:57-59@v1.15.1). None when the minor is not in the table."""
+    mm = versions.major_minor(kver)
+    tv = versions.triple(kver) or ((*mm, 0) if mm else None)
+    if not mm:
+        return None
+    best = None
+    for r in rows:
+        rmm = versions.major_minor(r["karpenter"])
+        if rmm != mm:
+            continue
+        rt = versions.triple(r["karpenter"]) or (*rmm, 0)
+        if rt <= tv and (best is None or rt > best[0]):
+            best = (rt, r)
+    return best[1] if best else None
 
 
 def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
@@ -403,13 +423,16 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
     try:
         compat = _load_compat()
     except Exception as e:  # a malformed table must show up in the report's tool notes instead of silently disabling the version check
-        compat, compat_error = {}, f"{type(e).__name__}: {e}"
-    kmm = ".".join(kver.split(".")[:2]) if kver else None
-    max_k8s = compat.get(kmm) if kmm else None
+        compat, compat_error = [], f"{type(e).__name__}: {e}"
+    kmm = versions.minor_text(kver) if kver else None
+    row = compat_row(compat, kver) if kver else None
+    max_k8s = row["max_k8s"] if row else None
+    min_k8s = (row.get("min_k8s") or None) if row else None
 
     supported = None
     if max_k8s and k8s_minor:
-        supported = versions.major_minor(k8s_minor) <= versions.major_minor(max_k8s)
+        # Both ends of the table are judged: the table's minK8sVersion is as much a boundary as its max (a 1.x Karpenter on a 1.24 cluster is outside it)
+        supported = versions.major_minor(k8s_minor) <= versions.major_minor(max_k8s) and (not min_k8s or versions.major_minor(k8s_minor) >= versions.major_minor(min_k8s))
     out = {
         "present": True,
         "interruption_queue": iq,
@@ -418,6 +441,8 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
         "version": kver,
         "k8s_minor": k8s_minor,
         "k8s_max_supported": max_k8s,
+        "k8s_min_supported": min_k8s,
+        "compat_row": row["karpenter"] if row else None,
         "k8s_supported": supported,
         "version_note": None if supported is not None else ("could not read Karpenter version" if not kver else f"{kmm} not in compatibility table (rubric/karpenter-compat.yaml)"),
         "nodeclaim_count": len(claim_rows),

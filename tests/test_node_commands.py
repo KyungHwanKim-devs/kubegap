@@ -33,16 +33,17 @@ def test_every_node_command_is_a_document_step():
 
 
 def test_document_has_no_free_text_parameter():
-    """The only parameters are the step name (fixed list), podIp (IPv4 only) and executionTimeout (digits). A free string parameter would let a key run arbitrary commands again."""
+    """The only parameters are the step name (fixed list), podIp (IPv4 only), port (digits, #136) and executionTimeout (digits). A free string parameter would let a key run arbitrary commands again."""
     doc = yamlite.load_file(nodecommands.DOCUMENT_PATH)
     params = doc["parameters"]
-    assert set(params) == {"step", "podIp", "executionTimeout"}
+    assert set(params) == {"step", "podIp", "port", "executionTimeout"}
+    assert params["port"]["allowedPattern"] == nodecommands.PORT_PATTERN and re.fullmatch(params["port"]["allowedPattern"], "9402") and not re.fullmatch(params["port"]["allowedPattern"], "80;id")
     assert params["step"].get("allowedValues") and "allowedPattern" not in params["step"]
     assert params["podIp"]["allowedPattern"] == nodecommands.IPV4_PATTERN
     assert re.fullmatch(params["podIp"]["allowedPattern"], "10.0.12.34") and not re.fullmatch(params["podIp"]["allowedPattern"], "10.0.0.1; rm -rf /")
     assert re.fullmatch(params["executionTimeout"]["allowedPattern"], "600") and not re.fullmatch(params["executionTimeout"]["allowedPattern"], "60; id")
     script = doc["mainSteps"][0]["inputs"]["runCommand"][0]
-    assert set(re.findall(r"\{\{ *([A-Za-z]+) *\}\}", script)) <= {"step", "podIp"}
+    assert set(re.findall(r"\{\{ *([A-Za-z]+) *\}\}", script)) <= {"step", "podIp", "port"}
     assert doc["mainSteps"][0]["inputs"]["timeoutSeconds"] == "{{ executionTimeout }}"
 
 

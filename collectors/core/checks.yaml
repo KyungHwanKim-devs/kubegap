@@ -3077,6 +3077,7 @@
           volumesnapshots.snapshot.storage.k8s.io: []
       - expect: "warn"
         inventory:
+          today: "2026-10-30"   # pins the 7-day window; without it the case failed on 2026-11-05 when the fixture's last success fell out of it
           families_present:
             - "metrics-store"
             - "logs-store"

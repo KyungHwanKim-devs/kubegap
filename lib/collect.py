@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import aws as _aws
-from . import kube, mask, nodecommands, paths, scrub, versions, yamlite
+from . import components, kube, mask, nodecommands, paths, podmetrics, scrub, versions, yamlite
 from .config import Config
 from .portfwd import PortForward
 from .prom import Prometheus
@@ -599,7 +599,6 @@ def _run_component_logs_step(st: dict, sid: str, name: str, inv: dict, context: 
     """Fetch workload pod logs of detected components (components_present) with kubectl logs into logs/pods/<component>/<ns>_<workload>.log.
     User application logs are not fetched (that is Loki's job). Capped tail lines per pod, 24 hours."""
     from .components import COMPONENTS
-    from .discover import _match_name
 
     kinds = ("daemonsets", "deployments", "statefulsets")
     objs = {}
@@ -630,7 +629,7 @@ def _run_component_logs_step(st: dict, sid: str, name: str, inv: dict, context: 
                         imgs = [c.get("image", "") for c in ((o.get("spec", {}).get("template", {}).get("spec", {}) or {}).get("containers") or [])]
                         hit = any(pat in i for i in imgs)
                     else:
-                        hit = _match_name(pat, m["namespace"], m["name"])
+                        hit = components.match_name(pat, m["namespace"], m["name"])
                     if hit and (m["namespace"], m["name"]) not in seen:
                         seen.add((m["namespace"], m["name"]))
                         targets.append((comp, k, m["namespace"], m["name"], o))
@@ -742,12 +741,19 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
     """Read /metrics through the pod proxy (read-only GET, for components Prometheus does not scrape — e.g. the MetalLB speaker). <out>/<pod>.prom per pod"""
     sid, timeout = st["id"], float(st.get("timeout", 60))
     name, snap, inv, context, node_access = ctx.name, ctx.snap, ctx.inv, ctx.context, ctx.node_access
-    sel = st["selector"]
-    ns = st["namespace"]
+    # Where to read: found at discovery among the cluster's workloads, set in config.yaml, or the step's default (lib/podmetrics.discover_targets, #136).
+    # An inventory from before #136 has no targets: every field is then the step's default, as before.
+    tgt = (inv.get("pod_metrics_targets") or {}).get(f"{name}.{sid}") or podmetrics.default_target(st)
+    sel, ns, port = tgt["selector"], tgt["namespace"], int(tgt["port"])
+    where = f"{ns} / {sel} / port {port} ({', '.join(f'{k} {v}' for k, v in tgt['source'].items())}{', ' + tgt['workload'] if tgt.get('workload') else ''})"
+    if tgt.get("skip"):
+        if ctx.echo:
+            ctx.echo(f"    skipped: {tgt['skip']}")
+        return ctx.skip(sid, tgt["skip"], {"ok": True, "skipped": True, "pods": {}, "target": tgt, "note": tgt["skip"]})
     r = kube.kubectl(["get", "pods", "-n", ns, "-l", sel, "-o", "json"], context=context, timeout=timeout, id=f"{name}.{sid}.list", log=ctx.log, kubeconfig=ctx.kubeconfig, collector=name)
     runs: dict = {}
     if not r.ok:
-        res = {"ok": False, "pods": {}, "error": r.error or r.stderr.strip()[-200:]}
+        res = {"ok": False, "pods": {}, "target": tgt, "error": r.error or r.stderr.strip()[-200:]}
     else:
         try:
             plist = json.loads(r.stdout).get("items") or []
@@ -757,7 +763,7 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
         if skip_arg and plist and all(any(skip_arg in str(a) for c in ((p.get("spec") or {}).get("containers") or []) for a in (c.get("args") or [])) for p in plist):
             if ctx.echo:
                 ctx.echo(f"    skipped: {skip_arg} (metrics disabled, expected)")
-            return ctx.skip(sid, f"container arg {skip_arg}", {"ok": True, "skipped": True, "pods": {}, "note": f"container arg {skip_arg} — no metrics is expected"})
+            return ctx.skip(sid, f"container arg {skip_arg}", {"ok": True, "skipped": True, "pods": {}, "target": tgt, "note": f"container arg {skip_arg} — no metrics is expected"})
         node_ok = ctx.node_backend_ok()
         for p in plist:
             pname = p["metadata"]["name"]
@@ -776,7 +782,7 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
                 rr = _Blocked()
             else:
                 rr = kube.kubectl(
-                    ["get", "--raw", f"/api/v1/namespaces/{ns}/pods/{pname}:{st['port']}/proxy{st.get('path', '/metrics')}"],
+                    ["get", "--raw", f"/api/v1/namespaces/{ns}/pods/{pname}:{port}/proxy{st.get('path', '/metrics')}"],
                     context=context,
                     timeout=min(timeout, 20),
                     id=f"{name}.{sid}.{pname}",
@@ -809,7 +815,7 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
                     # Because of the SSM 24,000-character output cap, histogram buckets (_bucket) and comments are filtered on the node (the ALB controller leader was truncated with buckets included). _sum and _count remain
                     # The curl text comes from lib/nodecommands (same source as COMMANDS.md and the SSM document); on SSM only the step name and podIp are sent. `keep` narrows chatty controllers to the metric names the checks need.
                     nr = node_access.na.run_on_node(
-                        nd, nodecommands.pod_metrics_cmd(pip, st["port"], st.get("path", "/metrics"), st.get("keep")), timeout=30, id=f"{name}.{sid}.{pname}.node", collector=name, step=f"{name}/{sid}", params={"podIp": pip}
+                        nd, nodecommands.pod_metrics_cmd(pip, port, st.get("path", "/metrics"), st.get("keep")), timeout=30, id=f"{name}.{sid}.{pname}.node", collector=name, step=f"{name}/{sid}", params={"podIp": pip, "port": port}
                     )
                     if nr.ok and nr.stdout.strip():
                         write_private(out, nr.stdout)
@@ -825,7 +831,13 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
             }
             if skipped:
                 runs[pname]["skipped"] = skipped
-        res = {"ok": any(x["ok"] for x in runs.values()) if runs else False, "pods": runs, "error": None if runs else f"no {sel} pods in {ns}"}
+        # No pod behind the target is said with the target and where it came from, so a wrong namespace or selector is readable in the step result (#136)
+        res = {
+            "ok": any(x["ok"] for x in runs.values()) if runs else False,
+            "pods": runs,
+            "target": tgt,
+            "error": None if runs else f"no pods match {where}; set components.<name>.namespace/selector/metrics_port in config.yaml if the component lives elsewhere",
+        }
         if runs and all(x.get("skipped") for x in runs.values()):
             res["skipped"] = "; ".join(f"{k}: {v['skipped']}" for k, v in runs.items())  # every pod skipped: the step says why in section 7-1 instead of counting as a failure
     if ctx.echo:

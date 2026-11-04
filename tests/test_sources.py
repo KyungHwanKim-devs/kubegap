@@ -12,7 +12,7 @@ from lib import paths, signatures, yamlite
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "references" / "sources.md"
-CITATION = re.compile(r"[\w./-]+\.(?:go|py|rego|toml|yaml|txt|pdf):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+")
+CITATION = re.compile(r"(?:[\w./-]+\.(?:go|py|rego|toml|yaml|yml|txt|pdf|md|adoc|tpl|json|ini|sh)|(?:[\w./-]+/)?(?:Makefile(?:\.common)?|Dockerfile)):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+")
 KUBEGAP_LOCATION = re.compile(r"`(lib/[\w/]+\.py)(?::(\w+))?`|step `([\w.-]+)`|check `([\w.-]+)`|`([A-Za-z_]\w*)`")
 
 
@@ -540,3 +540,43 @@ def test_every_version_a_query_cites_is_named_in_sources():
     assert len(tags) >= 60
     missing = sorted(t for t in tags if t not in text)
     assert not missing, (missing, "name the version in the PromQL section of references/sources.md")
+
+
+# ---------- the two version data files (#130) ----------
+
+
+def test_every_k8s_version_row_cites_the_release_schedule():
+    from lib import rubric
+
+    rows = rubric.load_k8s_versions()
+    assert len(rows) >= 9
+    for r in rows:
+        assert CITATION.search(str(r.get("source") or "")), (r.get("minor"), "cite data/releases/eol.yaml or schedule.yaml of kubernetes/website")
+        assert re.fullmatch(r"\d+\.\d+", str(r["minor"])) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(r["eol"])), r
+
+
+def test_every_karpenter_compat_row_cites_the_generated_matrix_and_names_both_bounds():
+    from lib import scaling
+
+    rows = yamlite.load_file(ROOT / "rubric" / "karpenter-compat.yaml")
+    assert len(rows) >= 17
+    for r in rows:
+        assert CITATION.search(str(r.get("source") or "")), (r.get("karpenter"), "cite hack/docs/compatibilitymatrix_gen/compatibility.yaml")
+        assert re.fullmatch(r"\d+\.\d+", str(r["min_k8s"])) and re.fullmatch(r"\d+\.\d+", str(r["max_k8s"])), r
+    compat = scaling._load_compat()
+    assert scaling.compat_row(compat, "1.4.2")["max_k8s"] == "1.32"  # the table said 1.33 until #130
+    assert scaling.compat_row(compat, "1.0.4")["max_k8s"] == "1.30" and scaling.compat_row(compat, "1.0.5")["max_k8s"] == "1.31" and scaling.compat_row(compat, "1.0.9")["max_k8s"] == "1.31"
+    assert scaling.compat_row(compat, "1.14.0")["max_k8s"] == "1.36" and scaling.compat_row(compat, "1.15.1") is None and scaling.compat_row(compat, None) is None
+
+
+# ---------- component detection rules (#130) ----------
+
+
+def test_every_component_rule_entry_cites_the_chart_or_manifest():
+    from lib.components import COMPONENTS, EVIDENCE_KEYS
+
+    assert set(EVIDENCE_KEYS) <= {"daemonset", "deployment", "statefulset", "cronjob", "crd", "namespace", "storageclass_provisioner", "node_annotation", "node_version_contains", "configmap_data_regex", "image", "aws_addons"}
+    for comp in COMPONENTS:
+        for e in comp["any"]:
+            src = str(e.get("source") or "")
+            assert CITATION.search(src) or src.startswith("unverified"), (comp["name"], e)

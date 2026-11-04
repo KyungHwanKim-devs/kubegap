@@ -23,11 +23,11 @@ the `type: kubectl` steps through `json_scrubber`, which lib/shell applies befor
 
 from __future__ import annotations
 
-import fnmatch
 import json
 import re
 
 from . import shell
+from .components import match_name
 
 SECRET_KINDS = {"Secret", "SecretList"}
 GZIP_MAX_BYTES = 8 * 1024 * 1024  # how far a gzip+base64 applied copy is expanded for inspection
@@ -61,7 +61,7 @@ _URL_RE = re.compile(r"^[a-z][a-z0-9+.-]*://", re.IGNORECASE)
 def _keys_for(table: list[tuple[str, str, tuple[str, ...]]], ns: str, name: str) -> set[str]:
     out: set[str] = set()
     for pns, pname, keys in table:
-        if fnmatch.fnmatchcase(ns, pns) and fnmatch.fnmatchcase(name, pname):
+        if match_name(f"{pns}/{pname}", ns, name):
             out |= set(keys)
     return out
 

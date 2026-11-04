@@ -30,14 +30,13 @@ platform is wired in at these points and nowhere else:
 from __future__ import annotations
 
 import datetime as _dt
-import fnmatch
 import json
 import re
 from pathlib import Path
 
-from . import __version__, aws, kube, monitoring, paths, scrub
+from . import __version__, aws, kube, monitoring, paths, podmetrics, scrub
 from . import rubric as _rubric
-from .components import COMPONENTS
+from .components import COMPONENTS, match_name
 from .config import Config
 from .runlog import RunLog
 from .snapshot import items, write_private
@@ -50,6 +49,7 @@ OBJECT_KINDS = {  # the minimum set of kinds inventory needs. collect fetches mo
     "daemonsets": ["get", "daemonsets", "-A"],
     "deployments": ["get", "deployments", "-A"],
     "statefulsets": ["get", "statefulsets", "-A"],
+    "cronjobs": ["get", "cronjobs", "-A"],  # the descheduler chart's default install is a CronJob (#130)
     "services": ["get", "services", "-A"],
     "pods": ["get", "pods", "-A"],
     "configmaps": [
@@ -61,23 +61,20 @@ OBJECT_KINDS = {  # the minimum set of kinds inventory needs. collect fetches mo
 }
 
 
-def _match_name(pattern: str, ns: str, name: str) -> bool:
-    pns, _, pname = pattern.partition("/")
-    return fnmatch.fnmatchcase(ns, pns) and fnmatch.fnmatchcase(name, pname)
-
-
 class _Facts:
     """Index extracted from the objects, used to match detection rules."""
 
     def __init__(self, objs: dict, aws_addons: list | None):
         self.workloads: dict[str, list[tuple[str, str]]] = {}
         self.images: set[str] = set()
-        for kind in ("daemonsets", "deployments", "statefulsets"):
+        for kind in ("daemonsets", "deployments", "statefulsets", "cronjobs"):
             lst = []
             for o in items(objs.get(kind)):
                 m = o["metadata"]
                 lst.append((m["namespace"], m["name"]))
-                for c in o.get("spec", {}).get("template", {}).get("spec", {}).get("containers", []) or []:
+                spec = o.get("spec") or {}
+                pod = ((spec.get("jobTemplate") or {}).get("spec") or {}).get("template") if kind == "cronjobs" else spec.get("template")
+                for c in ((pod or {}).get("spec") or {}).get("containers") or []:
                     if c.get("image"):
                         self.images.add(c["image"])
             self.workloads[kind[:-1]] = lst
@@ -98,9 +95,9 @@ class _Facts:
 
     def evidence(self, rule: dict) -> str | None:
         for key, val in rule.items():
-            if key in ("daemonset", "deployment", "statefulset"):
+            if key in ("daemonset", "deployment", "statefulset", "cronjob"):
                 for ns, name in self.workloads.get(key, []):
-                    if _match_name(val, ns, name):
+                    if match_name(val, ns, name):
                         return f"{key} {ns}/{name}"
             elif key == "crd" and val in self.crds:
                 return f"crd {val}"
@@ -431,6 +428,9 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
         "taken_at": taken.isoformat(timespec="seconds"),
         "cluster": {"platform": platform, "platform_reasons": platform_reasons, "server_version": server_version, "server": ctx_info.get("server"), "cluster_name": ctx_info.get("cluster_name"), "eks": eks_facts},
         "profile": profile,
+        # The namespace, selector and port each pod-metrics step will read, found in the workloads just fetched (or set in config.yaml, or the step's default);
+        # collectors run concurrently, so the step cannot wait for the core object dump (#136)
+        "pod_metrics_targets": podmetrics.discover_targets(objs, cfg),
         "node_access": node_access,
         "nodes": nodes,
         "namespaces": {"count": len(ns_names), "names": ns_names, "prod_like": [n for n in ns_names if re.search(r"(^|-)prod($|-)|production", n)], "dev_like": [n for n in ns_names if re.search(r"(^|-)(dev|staging|stage|test)($|-)", n)]},

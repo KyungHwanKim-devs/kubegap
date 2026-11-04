@@ -72,3 +72,35 @@ def test_summarize_keep_component_logs(tmp_path):
     assert s["logs"]["component_logs_removed"] is False
     assert list((snap / "logs" / "pods").rglob("*.log"))
     assert not summarize.component_logs_removed(snap)
+
+
+def test_logs_step_finds_the_workloads_of_present_components_with_the_shared_matcher(tmp_path, monkeypatch):
+    """The step matches the detection rules' name patterns against the object dump through lib.components.match_name (the one matcher since #136; until then it
+    imported a private one from lib.discover inside the function, which no test ran, and the k3s full run of 2026-11-05 crashed on the stale import)."""
+    import json
+
+    from lib import collect, shell
+    from lib.runlog import RunLog
+
+    (tmp_path / "objects").mkdir()
+    dep = {
+        "metadata": {"namespace": "gitops", "name": "argo-cd-argocd-server"},
+        "spec": {"selector": {"matchLabels": {"app.kubernetes.io/name": "argocd-server"}}, "template": {"spec": {"containers": [{"image": "quay.io/argoproj/argocd:v3.6.0"}]}}},
+    }
+    (tmp_path / "objects" / "deployments.json").write_text(json.dumps({"items": [dep]}))
+    for k in ("daemonsets", "statefulsets"):
+        (tmp_path / "objects" / f"{k}.json").write_text(json.dumps({"items": []}))
+    calls = []
+
+    def fake_kubectl(args, **kw):
+        calls.append(args)
+        out = kw.get("out_path")
+        if out:
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text("line\n")
+        return shell.Result(cmd=["kubectl"], code=0, stdout="line\n")
+
+    monkeypatch.setattr(collect.kube, "kubectl", fake_kubectl)
+    res = collect._run_component_logs_step({"id": "component-logs", "type": "component-logs"}, "component-logs", "core", {"components_present": ["argocd"]}, None, None, tmp_path, RunLog(None), 10, None)
+    assert res["targets"] == 1 and res["components"]["argocd"]["gitops/argo-cd-argocd-server"]["ok"] is True
+    assert calls[0][:5] == ["logs", "-n", "gitops", "-l", "app.kubernetes.io/name=argocd-server"]

@@ -8,7 +8,7 @@ has no read-only mode, so "read-only" has to be made visible and enforced on top
   probes in lib/node.py). `scripts/kubegap node-commands --markdown` writes it; tests/test_node_commands.py fails when it is stale.
 - `deploy/permissions/ssm-document.yaml` is an SSM Command document with the same commands embedded. The IAM policy allows
   `ssm:SendCommand` on that document only, so a key with the policy can run these commands and nothing else. `step` picks the
-  command by name from a fixed list; the only free value is `podIp`, limited to an IPv4 address. `scripts/kubegap node-commands
+  command by name from a fixed list; the free values are `podIp`, limited to an IPv4 address, and `port`, limited to digits. `scripts/kubegap node-commands
   --ssm-document` writes it, and lib/node.py compares the sha256 of this file with the document in the account before sending.
 
 The two files come from one walk over the collectors, so they cannot disagree with each other or with what collect.py sends.
@@ -21,12 +21,13 @@ import ipaddress
 import json
 import re
 
-from . import paths, yamlite
+from . import paths
 
 DOCUMENT_NAME = "kubegap-node-read"
 DOCUMENT_PATH = paths.ROOT / "deploy" / "permissions" / "ssm-document.yaml"
 COMMANDS_MD_PATH = paths.ROOT / "deploy" / "node-access" / "COMMANDS.md"
 SUDOERS_PATH = paths.ROOT / "deploy" / "node-access" / "kubegap-sudoers"
+PORT_PATTERN = r"^[0-9]{1,5}$"  # the pod-metrics port (#136): digits only, like executionTimeout
 IPV4_PATTERN = r"^[0-9]{1,3}(\.[0-9]{1,3}){3}$"
 # The ranges a pod address can be in: RFC 1918 and the RFC 6598 shared address space (EKS custom networking commonly gives pods a secondary VPC
 # CIDR from 100.64.0.0/10; the ipaddress module does not count it as private). An explicit list rather than `is_private`, whose table differs
@@ -88,46 +89,45 @@ def node_commands() -> list[dict]:
         {"step": "probe", "kind": "builtin", "collector": "lib/node.py", "id": "probe", "text": PROBE_CMD, "note": "access check: `kubegap nodes`, setup and discover"},
         {"step": "capabilities", "kind": "builtin", "collector": "lib/node.py", "id": "capabilities", "text": CAPABILITY_SCRIPT, "note": "which privileged reads work on the node (SSH backend: `kubegap nodes`)"},
     ]
-    for folder in sorted(p for p in paths.COLLECTORS_DIR.iterdir() if (p / "collect.yaml").is_file()):
-        steps = yamlite.load_file(folder / "collect.yaml") or []
-        for st in steps:
-            if not isinstance(st, dict) or "id" not in st:
-                continue
-            key = f"{folder.name}/{st['id']}"
-            if st.get("type") == "node":
-                if st.get("script"):
-                    text = (folder / str(st["script"])).read_text(encoding="utf-8")
-                    out.append(
-                        {
-                            "step": key,
-                            "kind": "script",
-                            "collector": folder.name,
-                            "id": st["id"],
-                            "text": text,
-                            "file": f"collectors/{folder.name}/{st['script']}",
-                            "nodes": st.get("nodes", "all"),
-                            "requires": st.get("requires"),
-                            "out": st.get("out"),
-                        }
-                    )
-                else:
-                    out.append({"step": key, "kind": "cmd", "collector": folder.name, "id": st["id"], "text": normalize_cmd(st["cmd"]), "nodes": st.get("nodes", "all"), "requires": st.get("requires"), "out": st.get("out")})
-            elif st.get("type") == "pod-metrics":
-                port, path, keep = st["port"], st.get("path", "/metrics"), st.get("keep")
+    for folder_name, st in paths.collect_steps():
+        folder = paths.COLLECTORS_DIR / folder_name
+        if "id" not in st:
+            continue
+        key = f"{folder.name}/{st['id']}"
+        if st.get("type") == "node":
+            if st.get("script"):
+                text = (folder / str(st["script"])).read_text(encoding="utf-8")
                 out.append(
                     {
                         "step": key,
-                        "kind": "pod-metrics",
+                        "kind": "script",
                         "collector": folder.name,
                         "id": st["id"],
-                        "text": pod_metrics_cmd("<podIp>", port, path, keep),
-                        "port": port,
-                        "path": path,
-                        "keep": keep,
-                        "namespace": st.get("namespace"),
-                        "selector": st.get("selector"),
+                        "text": text,
+                        "file": f"collectors/{folder.name}/{st['script']}",
+                        "nodes": st.get("nodes", "all"),
+                        "requires": st.get("requires"),
+                        "out": st.get("out"),
                     }
                 )
+            else:
+                out.append({"step": key, "kind": "cmd", "collector": folder.name, "id": st["id"], "text": normalize_cmd(st["cmd"]), "nodes": st.get("nodes", "all"), "requires": st.get("requires"), "out": st.get("out")})
+        elif st.get("type") == "pod-metrics":
+            port, path, keep = st["port"], st.get("path", "/metrics"), st.get("keep")
+            out.append(
+                {
+                    "step": key,
+                    "kind": "pod-metrics",
+                    "collector": folder.name,
+                    "id": st["id"],
+                    "text": pod_metrics_cmd("<podIp>", port, path, keep),
+                    "port": port,
+                    "path": path,
+                    "keep": keep,
+                    "namespace": st.get("namespace"),
+                    "selector": st.get("selector"),
+                }
+            )
     return out
 
 
@@ -203,13 +203,13 @@ def render_markdown(cmds: list[dict] | None = None) -> str:
     L.append("## Pod metrics fallback (`type: pod-metrics`)")
     L.append("")
     L.append(
-        "These steps first read `/metrics` through the apiserver pod proxy. When the proxy is blocked by the node security group, kubegap runs the curl below from inside a node (the pod network is reachable from any node). `<podIp>` is the pod's IP from `kubectl get pod`; port, path and the metric filter are fixed per step. Only Running pods with an IPv4 address in 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or 100.64.0.0/10 are curled: a pod in another phase, or one whose address is loopback, link-local, multicast, reserved, outside those ranges or IPv6, is skipped with the reason recorded."
+        "These steps first read `/metrics` through the apiserver pod proxy. When the proxy is blocked by the node security group, kubegap runs the curl below from inside a node (the pod network is reachable from any node). `<podIp>` is the pod's IP from `kubectl get pod`; path and the metric filter are fixed per step. The port, the namespace and the selector in the table are the step's defaults: at discovery kubegap looks for the component's workload (`discover:` in the step, matched against the fetched Deployments, DaemonSets and StatefulSets) and takes its namespace, its pod selector and its container port named for metrics, and `components.<name>.{namespace, selector, metrics_port}` in config.yaml overrides both (lib/podmetrics.discover_targets, #136); the SSM document takes the port as a digits-only parameter. Only Running pods with an IPv4 address in 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or 100.64.0.0/10 are curled: a pod in another phase, or one whose address is loopback, link-local, multicast, reserved, outside those ranges or IPv6, is skipped with the reason recorded."
     )
     L.append("")
     L.append("| Step | Port | Path | Pods |")
     L.append("|---|---|---|---|")
     for c in pm:
-        L.append(f"| `{c['step']}` | {c['port']} | `{c['path']}` | `{c.get('namespace') or '-'}` / `{c.get('selector') or '-'}` |")
+        L.append(f"| `{c['step']}` | {c['port']} | `{c['path']}` | `{c.get('namespace') or '-'}` / `{c.get('selector') or '-'}` |")  # the step's defaults; discovery may change them, see the note above
     L.append("")
     for c in pm:
         L.append(f"### `{c['step']}`")
@@ -236,7 +236,7 @@ def _anchor(s: str) -> str:
 
 
 def render_ssm_document(cmds: list[dict] | None = None) -> str:
-    """SSM Command document (schema 2.2, one aws:runShellScript step). `step` is restricted to the list; `podIp` to an IPv4 address; `executionTimeout` to digits. The embedded shell dispatches with `case`."""
+    """SSM Command document (schema 2.2, one aws:runShellScript step). `step` is restricted to the list; `podIp` to an IPv4 address; `port` and `executionTimeout` to digits. The embedded shell dispatches with `case`."""
     cmds = cmds if cmds is not None else node_commands()
     for c in cmds:
         if "{{" in c["text"]:
@@ -246,7 +246,7 @@ def render_ssm_document(cmds: list[dict] | None = None) -> str:
     for c in cmds:
         body.append(f"{c['step']})")
         if c["kind"] == "pod-metrics":
-            text = pod_metrics_cmd("{{ podIp }}", c["port"], c["path"], c["keep"])
+            text = pod_metrics_cmd("{{ podIp }}", "{{ port }}", c["path"], c["keep"])
         else:
             text = c["text"].rstrip("\n")
         body += ["  " + ln if ln else "" for ln in text.split("\n")]
@@ -264,7 +264,7 @@ def render_ssm_document(cmds: list[dict] | None = None) -> str:
         f"#   aws ssm update-document-default-version --name {DOCUMENT_NAME} --document-version <new version>",
         "# `kubegap setup --install-ssm-document` runs these for you with the current AWS credentials.",
         'schemaVersion: "2.2"',
-        f"description: kubegap read-only node inspection. step selects one of {len(steps)} fixed read commands; podIp is the only free value. Generated from the kubegap repository, do not edit by hand.",
+        f"description: kubegap read-only node inspection. step selects one of {len(steps)} fixed read commands; podIp (an IPv4 address) and port (digits) are the only free values. Generated from the kubegap repository, do not edit by hand.",
         "parameters:",
         "  step:",
         "    type: String",
@@ -278,6 +278,11 @@ def render_ssm_document(cmds: list[dict] | None = None) -> str:
         "    description: Pod IP for the pod-metrics curl steps. Ignored by the other steps.",
         "    default: 127.0.0.1",
         f"    allowedPattern: '{IPV4_PATTERN}'",
+        "  port:",
+        "    type: String",
+        "    description: Metrics port for the pod-metrics curl steps, found at discovery from the component's container port (lib/podmetrics.discover_targets). Ignored by the other steps.",
+        "    default: '0'",
+        f"    allowedPattern: '{PORT_PATTERN}'",
         "  executionTimeout:",
         "    type: String",
         "    description: Seconds before the command is stopped.",
