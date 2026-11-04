@@ -576,7 +576,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--json", action="store_true", help="machine-readable list")
     s.set_defaults(func=cmd_node_commands)
 
-    s = sub.add_parser("mask", help="mask tokens, passwords, keys and AWS account ids in report files (SKILL.md calls this right before saving)")
+    s = sub.add_parser("mask", help="mask tokens, passwords, keys and AWS account ids in report files and strip terminal control characters (SKILL.md calls this right before saving)")
     s.add_argument("files", nargs="+", help="files to mask (edited in place)")
     s.add_argument("--ips", action="store_true", help="also mask private IPv4 addresses as <ip>")
     s.add_argument("--account", action="append", help="additional AWS account id (12 digits) to mask. Repeatable")

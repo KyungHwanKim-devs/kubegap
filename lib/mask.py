@@ -9,6 +9,10 @@ What is masked:
 - base64 runs of 40 or more characters (certificate/key data)
 - AWS account ids: the 12 digits inside ARNs and every known account id (from inventory) → <account>
 - (optional, --ips) private IPv4 → <ip>. Off by default: an IP needed for a finding may be written individually, and not dumping the full list is a rule of the LLM procedure (SKILL.md).
+- terminal control characters, first of all: ANSI CSI and OSC escape sequences (colours, cursor moves, `\x1b[2J`, OSC 8 hyperlinks), the other two-byte
+  ESC sequences, and every C0 and C1 control character except newline and tab. Report strings come from pod names, annotations, events and log lines,
+  and a terminal that `cat`s the report would interpret them. Removed before the credential patterns so an escape sequence cannot split a token in two.
+  Unicode above U+009F is left alone, bidi overrides and zero-width characters included: they change how text reads, not what a terminal executes.
 """
 
 from __future__ import annotations
@@ -18,6 +22,9 @@ from dataclasses import dataclass, field
 
 MASK = "<masked>"
 
+# CSI `ESC [ params intermediates final` (7- and 8-bit), OSC `ESC ] ... BEL|ST` (an unterminated one ends at its line, never beyond), any other escape
+# `ESC intermediates final` (ESC c, ESC ( B, ESC =; a DCS/APC introducer goes and its payload stays as text), then lone C0 (minus \n and \t), DEL and C1 bytes
+_CONTROL = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x9b[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b\n]*(?:\x07|\x1b\\)?|\x1b[ -/]*[0-~]|[\x00-\x08\x0b-\x1f\x7f\x80-\x9f]")
 _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("pem", re.compile(r"-----BEGIN [A-Z ]+-----.*?-----END [A-Z ]+-----", re.DOTALL)),
     ("bearer", re.compile(r"(?i)\bBearer\s+[A-Za-z0-9\-._~+/]+=*")),
@@ -57,6 +64,8 @@ def mask_text(text: str, account_ids: list[str] | None = None, ips: bool = False
         if n:
             counts[name] = counts.get(name, 0) + n
 
+    text, n = _CONTROL.subn("", text)
+    bump("control-chars", n)
     for name, pat in _PATTERNS:
         if name in ("authorization", "kv-secret", "aws-secret-key"):
             text, n = pat.subn(lambda m: m.group(1) + MASK, text)

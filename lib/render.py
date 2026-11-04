@@ -19,7 +19,9 @@ English because it comes from the check definitions. Masking (`scripts/kubegap m
 
 from __future__ import annotations
 
+import html
 import json
+import re
 from pathlib import Path
 
 from . import __version__, paths
@@ -91,9 +93,26 @@ def _evidence(f: dict, limit: int) -> str:
     return ev[:limit] + (f" known issue {tag}" if tag else "")
 
 
+# `<masked>`, `<account>`, `<ip>` are what lib/mask.py writes into log samples; `<none>`, `<unknown>`, `<unset>`, `<nil>`, `<invalid>` are what kubectl prints for an empty value. Any other `<` that starts a tag or an autolink gets a space after it
+_TAG_START = re.compile(r"<(?!(?:masked|account|ip|none|unknown|unset|nil|invalid)>)(?=[A-Za-z/!?])")
+
+
 def _cell(v) -> str:
+    """A table cell from a cluster string. No code path writes Markdown in a cell, so every piece of syntax that could make the cell live in a viewer is
+    broken: pipes and newlines (the table itself), `[x](target)` links and `![x](target)` images whatever the target (javascript:, file:, data:, a
+    remote image a viewer would fetch), and `<` starting a tag or an autolink (`<a href=…>`, `<script>`, `<javascript:…>`). A bare https://… stays
+    plain text, which GFM viewers autolink on their own; the placeholders that mask.py and kubectl write in angle brackets are kept as they are."""
     s = str(v if v is not None else "")
-    return s.replace("|", "\\|").replace("\n", " ")
+    s = s.replace("|", "\\|").replace("\n", " ")
+    s = s.replace("](", "] (").replace("![", "! [")
+    return _TAG_START.sub("< ", s)
+
+
+def _fence(text: str) -> str:
+    """The backtick run that opens and closes a code block around `text`: one longer than the longest run inside it, at least three, so a pod
+    name, annotation or log sample holding three backticks cannot close the block early and turn the rest of the file into Markdown."""
+    longest = max((len(m.group(0)) for m in re.finditer(r"`+", text)), default=0)
+    return "`" * max(3, longest + 1)
 
 
 def _table(headers: list[str], rows: list[list]) -> str:
@@ -234,7 +253,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
             + (": " + ", ".join(f"`{c.get('kind')}/{c.get('name')}` {','.join(c.get('changed_fields') or [])}" for c in (ob.get("changed") or [])[:12]) if ob.get("changed") else "")
         )
         evc = [e for e in ((diff.get("events") or {}).get("changed") or []) if e.get("type") == "Warning"]
-        w("- **Warning events**: " + (", ".join(f"{e.get('reason')} {e.get('delta'):+d} ({(e.get('objects_top_after') or [''])[0]})" for e in evc[:10]) if evc else "no change"))
+        w("- **Warning events**: " + (", ".join(f"{_cell(e.get('reason'))} {e.get('delta'):+d} ({_cell((e.get('objects_top_after') or [''])[0])})" for e in evc[:10]) if evc else "no change"))
         crit = df.get("criteria_changes") or {}
         n_crit = sum(len(v) for k, v in crit.items() if isinstance(v, list))  # rule_unknown_checks counts too: the section then explains the rule_known marks
         if n_crit:
@@ -327,7 +346,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w("")
     w(
         f"{run.get('commands') or '?'} commands, {sm.get('seconds_total')} s. Failed commands (run.log): {len(run.get('failed') or [])}"
-        + (": " + "; ".join(f"`{f.get('id')}` {str(f.get('error') or '')[:120]}" for f in (run.get("failed") or [])[:20]) if run.get("failed") else "")
+        + (": " + "; ".join(f"`{f.get('id')}` {_cell(str(f.get('error') or '')[:120])}" for f in (run.get("failed") or [])[:20]) if run.get("failed") else "")
     )
     w("")
     w(L("### 7-2. Checks evaluated"))
@@ -366,11 +385,13 @@ def render_details(snap: Path, language: str = "en") -> Path:
     for f in fw:
         if f.get("details") is None:
             continue
-        w(f"<details><summary><code>{f['id']}</code></summary>")
+        body = json.dumps(f["details"], ensure_ascii=False, indent=1, default=str)
+        fence = _fence(body)
+        w(f"<details><summary><code>{html.escape(str(f['id']))}</code></summary>")
         w("")
-        w("```json")
-        w(json.dumps(f["details"], ensure_ascii=False, indent=1, default=str))
-        w("```")
+        w(fence + "json")
+        w(body)
+        w(fence)
         w("")
         w("</details>")
     w("")

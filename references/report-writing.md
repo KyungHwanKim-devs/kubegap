@@ -43,7 +43,7 @@ Order of work: analyse → write the fragments (small files) → write `report.m
     ```bash
     $KUBEGAP/scripts/kubegap mask "$SNAP/report.md" "$SNAP/report-details.md"
     ```
-    If the reported count is not 0, check where `<masked>` remains. If you edit either file afterwards for any reason, run `mask` again. Internal IPs only individually where a finding needs them, never as a list; AWS account ids become `<account>`; Secret values appear nowhere, in no file, not even key names with values.
+    If the reported count is not 0, check where `<masked>` remains; a `control-chars` count means terminal control characters were removed from a cluster string and there is nothing to check. If you edit either file afterwards for any reason, run `mask` again. Internal IPs only individually where a finding needs them, never as a list; AWS account ids become `<account>`; Secret values appear nowhere, in no file, not even key names with values.
 18. **What to show the user.** In the conversation, first the two report files as absolute paths, `report.md` on one line and `report-details.md` on the next, written out in full: no `$SNAP`, no `~`, no "in the snapshot folder". A reader copies the line into `open` or `cat`, so a path that still holds a variable or starts with `~` has to be resolved by hand. Then which context and cluster, the numbers table with deltas, and the title plus a one-line action for each Top N problem. Do not repeat the report body. One line on tool notes if any were written. One line with commands usable next time (`/kubegap explain <id>`, `/kubegap --snapshot <date>`, `/kubegap full` when in daily mode, `scripts/kubegap prune --keep-daily N --keep-full M` to remove old snapshots).
 
 ## 8. Writing rules
