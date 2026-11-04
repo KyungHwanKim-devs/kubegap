@@ -12088,6 +12088,20 @@
           replacement: "networking.k8s.io/v1"
           deprecated: true
           removed: false
+      - expect: "fail"
+        item:
+          pluto_read: false
+          kubent_read: true
+          source: "kubent"
+          kind: "PodSecurityPolicy"
+          name: "restricted"
+          namespace: ""
+          api: "policy/v1beta1"
+          deprecated_in: "1.21"
+          removed_in: "1.25"
+          replacement: ""
+          deprecated: true
+          removed: true
       - expect: "skip"
         item:
           pluto_read: false

@@ -5,7 +5,7 @@ compatibility: "Tested with Claude Code and Codex; usable in any Agent Skills ho
 metadata:
   version: "0.1.2"
   author: KyungHwanKim-devs
-  rubric_version: "0.1.69"
+  rubric_version: "0.1.70"
 ---
 
 # /kubegap — cluster operations gap audit

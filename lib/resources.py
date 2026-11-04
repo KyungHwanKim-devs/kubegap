@@ -38,6 +38,12 @@ def _cores(c):
 
 
 def analyze_krr(snap: Path) -> dict:
+    # source: krr v1.31.1 robusta_krr/formatters/json.py:5-7 (`-f json` is Result.json()), core/models/result.py:62-70 Result{scans, score, resources, description, strategy{name, settings},
+    # errors, clusterSummary, config}, :25-28 ResourceScan{object, recommended, severity}, :14-22 Recommendation{value, severity} under requests/limits plus info;
+    # core/models/objects.py:48-60 K8sObjectData{cluster, name, container, pods[{name, deleted}], hpa, namespace, kind, allocations{requests, limits, info}, warnings, labels, annotations};
+    # core/models/allocations.py:23 a value is a float, "?" or null; core/models/severity.py:17-21 UNKNOWN|GOOD|OK|WARNING|CRITICAL, :95-130 the thresholds (CPU |diff| >= 0.5 cores
+    # CRITICAL, >= 0.25 WARNING, >= 0.1 OK; memory >= 500 MiB CRITICAL, >= 250 WARNING, >= 100 OK; limits and requests alike); result.py:90-101 score; strategies/simple.py:28-98
+    # (cpu_percentile 95, memory_buffer_percentage 15, history_duration in hours, 336 by default).
     j = load_json(snap / "tools" / "krr.json")
     if not j:
         return {"present": False, "note": "tools/krr.json missing (krr tool absent or collection skipped). Report section 6: tool missing"}
