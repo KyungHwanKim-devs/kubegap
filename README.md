@@ -75,6 +75,7 @@ Supported platforms: macOS on Apple Silicon and Intel, Linux on amd64 and arm64,
 | Checks | 407 minus the ones that need full-only inputs; those are reported as "not collected", not as findings | all 407 |
 | Report | `report.md`: the 3 problems, each with evidence, cause, action and cases; what changed since the previous daily run; what the run could not see. `report-details.md`: every table | `report.md`: the same shape with 5 problems. `report-details.md`: the 12-area detail and the full first-pass list as well |
 | Compared with | the previous daily snapshot | the previous full snapshot |
+| Permissions used | Kubernetes `get` and `list` on the resources in the ClusterRole; `pods/log` for the component logs; port-forward to Prometheus, Alertmanager, Loki and Grafana; the Grafana API with `grafana_api_token` when one is set; on EKS the AWS Describe and List calls of discovery and setup (`eks`, `ecr:DescribeRepositories`, `ssm:DescribeInstanceInformation`, `ssm:DescribeDocument`, `sts`, `logs:DescribeLogGroups`) and the eleven daily AWS steps (`nodegroup`, `subnets`, `ssm-instances`, `cluster-security-groups`, `alb-metrics`, `ec2-volumes`, `ec2-volumes-available`, `ec2-addresses`, `ec2-nat-gateways`, `acm-certificates`, `instance-type-network`; `alb-metrics` is `elasticloadbalancing:Describe*`, `ec2:DescribeSecurityGroups` and `cloudwatch:GetMetricData`); and, when a node backend exists, the node-side curl of the pod-metrics fallback, which on EKS is an SSM `send-command` of the pinned document plus `ssm:GetCommandInvocation` to read its output | everything on the left plus the node scripts (SSM, SSH or the DaemonSet), `nodes/proxy` for the kubelet configuration, CloudWatch Logs Insights (`logs:StartQuery`, `GetQueryResults`, `StopQuery`) and the quota and EBS `GetMetricData` queries, `helm list` (reads Helm's release Secrets, metadata only), cost and pricing, ECR, service quotas, and the external tools krr, polaris, pluto and kubent. Every grant with the step and checks behind it: [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) |
 
 Set `mode: full` in `~/.kubegap/config.yaml` to make full the default. Daily and full snapshots live side by side under the same context folder and are never compared with each other.
 
@@ -159,6 +160,24 @@ kubegap **never changes the cluster.** It makes read calls only. Secret values a
 - Every command that reaches a node, on any backend: [`deploy/node-access/COMMANDS.md`](deploy/node-access/COMMANDS.md). It is generated from the collector definitions and a test keeps it current.
 - Nodes reached over SSH (k3s, bare metal): [`deploy/node-access/README.md`](deploy/node-access/README.md) — one line to join the log-reading groups, optionally a sudoers file allowing read-only commands. Without it, only those node checks are skipped as "no node access".
 - Nodes with neither SSM nor SSH (GKE, AKS, kubeadm): apply [`deploy/node-access/daemonset.yaml`](deploy/node-access/daemonset.yaml) and kubegap reads nodes through `kubectl exec` into that pod. It runs privileged; you can delete it after the audit. The exec needs one more permission, `get` and `create` on `pods/exec` in the `kubegap` namespace: [`deploy/permissions/role-daemonset-exec.yaml`](deploy/permissions/role-daemonset-exec.yaml), applied after the DaemonSet because that file creates the namespace. It opens a shell in that pod and writes nothing to the cluster.
+
+Every rule of the ClusterRole and every action of the IAM policy, with the collection step that calls it, the mode, the checks that need it and what a run loses without it: [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md).
+
+## Run with the least access
+
+For a first run before security approval, or on a cluster where you may read only what you can justify line by line:
+
+```yaml
+# ~/.kubegap/config.yaml
+mode: daily          # no node scripts, no CloudWatch, no cost, no ECR, no external tools
+node_access: none    # no SSM send-command, no SSH, no DaemonSet exec
+install_tools: never # nothing is installed on this machine
+# no grafana_api_token: the Grafana datasource and dashboard lists are not read
+```
+
+Give the kubeconfig a dedicated user bound to the shipped ClusterRole (`deploy/permissions/clusterrole.yaml`, `get` and `list` only, no Secrets), and on EKS an IAM policy with the `KubegapReadOnly` statement of `deploy/permissions/iam-policy.json` only, without the two `ssm:SendCommand` statements. If the four stores are reachable by URL, set `prometheus_url`, `alertmanager_url`, `loki_url` and `grafana_url` and drop the `pods/portforward` rule as well.
+
+What that run cannot see, reported as "not collected" or "skipped" (a few checks still evaluate on empty input and pass with nothing to judge; [#114](https://github.com/KyungHwanKim-devs/kubegap/issues/114) turns them into skips, and the failed step in section 7-1 is the signal meanwhile): the 26 `node.*` checks that read the node scripts and kubelet configuration (the 10 that read Prometheus node metrics keep running), the two Helm checks (`hygiene.helm-release-not-deployed`, `hygiene.helm-release-stale`), the six control-plane log checks on EKS (`controlplane.scheduler-unschedulable`, `webhook-call-failures`, `controller-error-repeat`, `apiserver-slow-traces`, `authenticator-failures`, `etcd-slow`), the cost, ECR, service-quota and EBS-metric checks, the krr, polaris, pluto and kubent results, and the node-side fallback for the `/metrics` of components Prometheus does not scrape (their `*.metrics-unreadable` check warns when the API server proxy is blocked). The Grafana datasource and dashboard lists read "no auth"; the `grafana.*` checks judge from Grafana's own metrics and keep running. Per permission: [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md).
 
 ## What leaves your machine
 
