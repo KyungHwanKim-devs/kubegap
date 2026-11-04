@@ -291,8 +291,10 @@ QUERY_FAMILIES = re.compile(
     r"\b(node_[A-Za-z0-9_]+|kube_[A-Za-z0-9_]+|kubelet_[A-Za-z0-9_]+|container_[A-Za-z0-9_]+|apiserver_[A-Za-z0-9_]+|coredns_[A-Za-z0-9_]+|kubeproxy_[A-Za-z0-9_]+"
     r"|aws_ebs_csi_[A-Za-z0-9_]+|cloudprovider_aws_[A-Za-z0-9_]+|csi_operations_seconds_[a-z]+|storage_operation_duration_seconds_[a-z]+|rest_client_requests_total)\b"
 )
-# a `{__name__=~"<pattern>"}` selector reads every name the pattern matches; the entries name each of them and the test matches them against the pattern
+# a `{__name__=~"<pattern>"}` selector reads every name the pattern matches; the entries are expected to name each of them, which the test cannot enumerate,
+# so it requires at least one entry the pattern matches on every selector that spells a cited family (a `.+` or `http_.*` selector reads no cited family)
 NAME_SELECTOR = re.compile(r'__name__=~"([^"]+)"')
+FAMILY_PREFIX = re.compile(r"(?<![A-Za-z0-9_])(node_|kube_|kubelet_|container_|apiserver_|coredns_|kubeproxy_|aws_ebs_csi|cloudprovider_aws|csi_operations_seconds|storage_operation_duration_seconds|rest_client_requests)")
 # '<name>: <owner>/<repo> <file>:<line>@<tag>' then more citations and notes; or 'label <what>: ...' for a label the scrape configuration sets
 QUERY_CITATION = re.compile(r"^(?:[A-Za-z_:][A-Za-z0-9_:]*|label [^:]+): [\w.-]+/[\w.-]+ \S+?:\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*@[\w.+-]+")
 # Names an exporter removed, renamed or leaves off by default, with the source that says so. A query reading one is empty on every default install and nothing tells
@@ -315,13 +317,30 @@ def _queries():
 
 def _query_names(query: str) -> tuple[set[str], list[str]]:
     """The names a query reads outside its `__name__` selectors, and the patterns of those selectors."""
-    # a selector such as {__name__=~"http_.*"} reads no cited family; one whose pattern spells a family name does
-    patterns = [pat for pat in NAME_SELECTOR.findall(query) if QUERY_FAMILIES.search(re.sub(r"[()|?]", "", pat))]
+    patterns = [pat for pat in NAME_SELECTOR.findall(query) if FAMILY_PREFIX.search(pat)]
     rest = NAME_SELECTOR.sub("", query)
     names = set(QUERY_FAMILIES.findall(rest))
     if re.search(r"\bup\{", rest):
         names.add("up")
     return names, patterns
+
+
+@pytest.mark.parametrize(
+    ("query", "names", "patterns"),
+    [
+        ('count({__name__=~"aws_ebs_csi_.*"})', set(), ["aws_ebs_csi_.*"]),
+        ('count({__name__=~"(aws_ebs_csi|cloudprovider_aws)_api_request_duration_seconds_count"})', set(), ["(aws_ebs_csi|cloudprovider_aws)_api_request_duration_seconds_count"]),
+        ('sum({__name__=~"apiserver_.*"})', set(), ["apiserver_.*"]),
+        ('sum(increase({__name__=~"kubeproxy_sync_proxy_rules_iptables_.*restore_failures_total"}[24h]))', set(), ["kubeproxy_sync_proxy_rules_iptables_.*restore_failures_total"]),
+        ('topk(20, count by (__name__) ({__name__=~".+"}))', set(), []),
+        ('count by (namespace) ({__name__=~"http_requests_total|grpc_server_handled_total"})', set(), []),
+        ('count(up{job=~".*coredns.*"} == 1)', {"up"}, []),
+        ('node_network_up{device=~"flannel.*"}', {"node_network_up"}, []),
+        ('sum(rate(apiserver_request_total{job="apiserver",code="401"}[1h]))', {"apiserver_request_total"}, []),
+    ],
+)
+def test_query_names_recognize_the_cited_families_and_their_selectors(query, names, patterns):
+    assert _query_names(query) == (names, patterns)
 
 
 def test_every_query_of_the_read_families_cites_each_name():
@@ -339,7 +358,7 @@ def test_every_query_of_the_read_families_cites_each_name():
             subjects.add(str(e).split(":", 1)[0])
         assert names <= subjects, (area, it["id"], sorted(names - subjects), "every name the query reads has an entry")
         for pat in patterns:
-            assert any(re.fullmatch(pat, s) for s in subjects), (area, it["id"], pat, "a __name__ selector needs an entry per name it matches")
+            assert any(re.fullmatch(pat, s) for s in subjects), (area, it["id"], pat, "a __name__ selector that spells a cited family needs an entry the pattern matches")
     assert seen >= 125
 
 
