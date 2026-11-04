@@ -372,9 +372,17 @@ def _run_http_step(st: dict, sid: str, name: str, cfg: Config, snap: Path, log: 
 
 
 def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfig: str | None, snap: Path, log: RunLog, stores: Stores | None, timeout: float, echo, inv: dict | None = None) -> dict:
-    """Run an external CLI (KRR, Polaris, Pluto, etc.) locally. Placeholders in cmd: {context} {kubeconfig} {out} (absolute path) {prometheus_url} etc. {<store>_url}.
-    tool: executable name (PATH or .tools/bin). If missing, the step is skipped and becomes input for the report's "tool missing" section. If a store URL is needed but there is no connection, the step is skipped."""
+    """Run an external CLI (KRR, Polaris, Pluto, etc.) locally. Placeholders in cmd: {context} {out} (absolute path) {prometheus_url} etc. {<store>_url}.
+    tool: executable name (PATH or .tools/bin). If missing, the step is skipped and becomes input for the report's "tool missing" section. If a store URL is needed but there is no connection, the step is skipped.
+    The kubeconfig the run was given reaches every tool as the KUBECONFIG environment variable, so a command names the context only and a context that lives outside
+    ~/.kube/config still resolves (#104). Checked in the sources of the pinned versions, not assumed: polaris v10.2.6 has no kubeconfig flag and calls controller-runtime
+    GetConfigWithContext (pkg/kube/resources.go:249), whose loader reads KUBECONFIG (controller-runtime v0.25.2 pkg/client/config/config.go:123); pluto v5.24.5 goes through the
+    same call (pkg/kube/kube.go:88); kubent 0.7.3 defaults its --kubeconfig flag to os.Getenv(KUBECONFIG) (pkg/config/config.go:50); helm v4.3.1 reads it in pkg/cli/environment.go:101;
+    krr v1.31.1 passes kubeconfig=None to kubernetes-python load_kube_config (core/integrations/kubernetes/__init__.py:185), whose default location is the KUBECONFIG value
+    (kubernetes/config/kube_config.py:48). A future tool that reads only a flag would need the flag in its cmd; none of the five does."""
     from . import shell as _shell
+
+    tool_env = {"KUBECONFIG": kubeconfig} if kubeconfig else None
 
     tool = st.get("tool") or st["cmd"][0]
     path = _shell.which(tool)
@@ -385,7 +393,7 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
         return {"ok": False, "skipped": f"tool {tool} missing", "tool_missing": tool}
     out = snap / st["out"]
     paths.ensure_private_dir(out.parent)  # the tool writes the file itself, so the folder must exist before it runs
-    ph = {"context": context or "", "kubeconfig": kubeconfig or "", "out": str(out)}
+    ph = {"context": context or "", "out": str(out)}
     # Next minor of the cluster server version (target for Pluto/kubent). v1.32.13-eks -> v1.33.0 / 1.33
     import re as _re
 
@@ -411,11 +419,7 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
             a = str(a)
             for k, v in {**ph, **extra}.items():
                 a = a.replace("{" + k + "}", str(v))
-            if a == "" and "{kubeconfig}" in str(st["cmd"]):
-                continue
             cmd_.append(a)
-        if not kubeconfig:  # if the value of the --kubeconfig {kubeconfig} pair is empty, drop the option too
-            cmd_ = [a for i, a in enumerate(cmd_) if not (a in ("--kubeconfig", "-k") and (i + 1 >= len(cmd_) or cmd_[i + 1] == ""))]
         cmd_[0] = path
         return cmd_
 
@@ -435,13 +439,13 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
             extra = {f"item.{k}": v for k, v in it.items() if isinstance(v, (str, int, float))}
             extra["item_safe"] = safe
             out_i = snap / str(st["out"]).replace("{item_safe}", safe)
-            r = _shell.run(build(extra), timeout=timeout, id=f"{name}.{sid}.{safe}", log=log, collector=name, out_path=out_i)
+            r = _shell.run(build(extra), timeout=timeout, env=tool_env, id=f"{name}.{sid}.{safe}", log=log, collector=name, out_path=out_i)
             runs[safe] = {"ok": r.ok and out_i.is_file(), "error": None if r.ok else (r.error or r.stderr.strip()[-160:])}
         if echo:
             echo(f"    {sum(1 for x in runs.values() if x['ok'])}/{len(runs)} items saved ({str(st['out']).rsplit('/', 1)[0]})")
         return {"ok": any(x["ok"] for x in runs.values()) if runs else False, "runs": len(runs), "failed": sum(1 for x in runs.values() if not x["ok"]), "detail": runs}
     cmd = build({})
-    r = _shell.run(cmd, timeout=timeout, id=f"{name}.{sid}", log=log, collector=name, out_path=None if st.get("writes_out") else out)
+    r = _shell.run(cmd, timeout=timeout, env=tool_env, id=f"{name}.{sid}", log=log, collector=name, out_path=None if st.get("writes_out") else out)
     if st.get("writes_out") and out.is_file():
         out.chmod(0o600)  # the tool wrote the file with its own mode (krr: 0644); every file in a snapshot is owner-only
     ok = r.ok and out.is_file() and out.stat().st_size > 0
@@ -458,10 +462,10 @@ NODE_BACKENDS = ("ssh", "ssm", "daemonset")
 class NodeRunner:
     """For node command steps. Builds the NodeAccess and the capabilities table once and reuses them."""
 
-    def __init__(self, inv: dict, cfg: Config, log: RunLog):
+    def __init__(self, inv: dict, cfg: Config, log: RunLog, kubeconfig: str | None = None):
         from .node import NodeAccess
 
-        self.na = NodeAccess(inv, cfg, log)
+        self.na = NodeAccess(inv, cfg, log, kubeconfig=kubeconfig)
         self._caps: dict | None = None
         self.nodes = {n["name"]: n for n in (inv.get("nodes") or {}).get("nodes", [])}
 
@@ -985,7 +989,7 @@ def collect(context: str, cfg: Config, inv: dict, snap: Path, log: RunLog, *, ku
     if prom is None:
         echo("  Could not connect to Prometheus; all PromQL steps are skipped")
     stores = Stores(context, cfg, inv, kubeconfig, log)
-    node_runner = NodeRunner(inv, cfg, log)
+    node_runner = NodeRunner(inv, cfg, log, kubeconfig=kubeconfig)
     state = CollectState()
     print_lock = threading.Lock()
 

@@ -74,7 +74,8 @@ def ssh_hand_command(ssh_cfg: dict, host: str) -> str:
 
 
 class NodeAccess:
-    def __init__(self, inv: dict, cfg: Config, log: RunLog | None = None):
+    def __init__(self, inv: dict, cfg: Config, log: RunLog | None = None, kubeconfig: str | None = None):
+        self.kubeconfig = kubeconfig  # the DaemonSet backend's kubectl calls (list the node-reader pods, exec) use the run's file, like every other kubectl call (#104)
         self.inv, self.cfg, self.log = inv, cfg, log
         na = inv.get("node_access") or {}
         self.method = cfg.get("node_access") or na.get("method") or "none"
@@ -131,7 +132,7 @@ class NodeAccess:
     @cached_property
     def _ds_pods(self) -> dict[str, str]:
         """node name -> Running kubegap-node-reader pod name. Listed once per NodeAccess instance (only when the daemonset backend is used)."""
-        d, _ = _kube.kubectl_json(["get", "pods", "-n", self.DS_NAMESPACE, "-l", self.DS_LABEL, "-o", "json"], context=self.inv.get("context") or self.cfg.get("context"), timeout=30)
+        d, _ = _kube.kubectl_json(["get", "pods", "-n", self.DS_NAMESPACE, "-l", self.DS_LABEL, "-o", "json"], context=self.inv.get("context") or self.cfg.get("context"), timeout=30, kubeconfig=self.kubeconfig)
         return {p_["spec"].get("nodeName"): p_["metadata"]["name"] for p_ in ((d or {}).get("items") or []) if (p_.get("status") or {}).get("phase") == "Running"}
 
     def _ds_pod(self, node: str) -> str | None:
@@ -143,7 +144,7 @@ class NodeAccess:
         pod = self._ds_pod(node)
         if not pod:
             return NodeResult(node, "daemonset", False, error="no Running kubegap-node-reader pod on this node")
-        r = _kube.kubectl(["exec", "-n", self.DS_NAMESPACE, pod, "--", "chroot", "/host", "/bin/sh", "-c", cmd], context=self.inv.get("context") or self.cfg.get("context"), timeout=timeout + 15)
+        r = _kube.kubectl(["exec", "-n", self.DS_NAMESPACE, pod, "--", "chroot", "/host", "/bin/sh", "-c", cmd], context=self.inv.get("context") or self.cfg.get("context"), timeout=timeout + 15, kubeconfig=self.kubeconfig)
         return NodeResult(node, "daemonset", r.ok, stdout=r.stdout, stderr=r.stderr, error=None if r.ok else (r.error or r.stderr.strip()[-300:]), seconds=round(time.monotonic() - t0, 1), detail={"pod": pod})
 
     # ---------- SSM ----------
