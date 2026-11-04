@@ -78,7 +78,7 @@ Caution: if `diff` gets a single positional argument, it is read as A (the earli
 
 From here on it is **reading and judgment**, not Bash. Everything is a file under `$SNAP/`. **Read `references/analysis-procedure.md` now and follow it fully** before opening any snapshot file — it is mandatory, not optional. It holds the reading order (`inventory.json` → `findings-draft.json` → `summary.json` → the previous snapshot and report → `diff.json`), the list of summary.json sections and the pointers to the file-shape references (`references/snapshot-files.md`, `references/summary-shape.md`). Extract only the needed parts of JSON with `python3 -I - <<'EOF' … EOF` (the files are several MB).
 
-Scope follows the arguments from section 0: `--namespace <ns>` narrows steps 2, 3 and 5 of the reading order to that namespace plus cluster-level items; `quick` to `recent_changes` of `summary.json` cross-checked against `diff.json`; `focus <area>` to that area's checks and related summary; `explain <finding-id>` reads one finding to the end and writes only the explanation (not a full report). The exact definitions are in the reference.
+Scope follows the arguments from section 0: `--namespace <ns>` narrows steps 2, 3 and 5 of the reading order to that namespace plus cluster-level items; `focus <area>` to that area's checks and related summary; `explain <finding-id>` reads one finding to the end and writes only the explanation (not a full report). The exact definitions are in the reference.
 
 ## 6. Analysis — review
 

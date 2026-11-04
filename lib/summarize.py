@@ -372,7 +372,7 @@ def summarize_webhooks(snap: Path) -> dict:
 
 
 def summarize_recent_changes(snap: Path, hours: int = 24) -> dict:
-    """`quick` scope: workloads changed in the last N hours. Defined by the status.conditions lastUpdateTime of Deployments, StatefulSets and DaemonSets
+    """`recent_changes` of summary.json, read in every mode: workloads changed in the last N hours. Defined by the status.conditions lastUpdateTime of Deployments, StatefulSets and DaemonSets
     (the Progressing condition is refreshed on every rollout), or by the targets of ScalingReplicaSet/SuccessfulCreate events. generation is recorded too."""
     odir = snap / "objects"
     since = _dt.datetime.now(_dt.UTC) - _dt.timedelta(hours=hours)

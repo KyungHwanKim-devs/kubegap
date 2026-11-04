@@ -16,7 +16,7 @@ This file is step 5 and step 6 of `SKILL.md`. Read it fully before opening any s
 
 ### Scope modifiers
 
-With `--namespace <ns>`, in steps 2, 3 and 5 look only at that namespace's items plus cluster-level items (nodes, platform, absence). With `quick`, look only at the namespaces and workloads in `recent_changes` of `summary.json` (Deployments, StatefulSets and DaemonSets whose status.conditions were updated within the last 24 hours, and the targets of ScalingReplicaSet and SuccessfulCreate events), cross-checked against the change list in `diff.json`. With `focus <area>`, only that area's checks and related summary. With `explain <finding-id>`, read that one finding's `source` file, related objects, metrics and events to the end and write only the explanation (not a full report).
+With `--namespace <ns>`, in steps 2, 3 and 5 look only at that namespace's items plus cluster-level items (nodes, platform, absence). In both modes, `recent_changes` of `summary.json` (Deployments, StatefulSets and DaemonSets whose status.conditions were updated within the last 24 hours, and the targets of ScalingReplicaSet and SuccessfulCreate events) is step 3 material, cross-checked against the change list in `diff.json`; it is not a mode of its own. With `focus <area>`, only that area's checks and related summary. With `explain <finding-id>`, read that one finding's `source` file, related objects, metrics and events to the end and write only the explanation (not a full report).
 
 ## 6. Review
 
