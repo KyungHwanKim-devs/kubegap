@@ -13,6 +13,9 @@ What is masked:
   DCS, SOS, PM, APC, each with its payload up to ST), the other ESC sequences, and every C0 and C1 control character except newline and tab. Report strings come from pod names, annotations, events and log lines,
   and a terminal that `cat`s the report would interpret them. Removed before the credential patterns so an escape sequence cannot split a token in two.
   Unicode above U+009F is left alone, bidi overrides and zero-width characters included: they change how text reads, not what a terminal executes.
+  The cost of reading the 8-bit introducers as ECMA-48 does: a line that carries U+0090, U+0098, U+009D, U+009E or U+009F as text (double-encoded
+  Windows-1252, where `Ÿ` is 0x9F) loses its tail from that character, as a terminal would; masking runs on report text and 240-character log
+  samples, never on the snapshot files, so what is lost is one line of a report or one sample.
 """
 
 from __future__ import annotations
@@ -25,7 +28,8 @@ MASK = "<masked>"
 # ECMA-48 5th edition (references/sources.md, #128): a control sequence is CSI (ESC [ or 0x9B) + parameter bytes 0x30-0x3F + intermediate bytes 0x20-0x2F
 # + one final byte 0x40-0x7E (§5.4, §8.3.16); a control string is OSC/DCS/SOS/PM/APC (ESC ] P X ^ _ or 0x9D 0x90 0x98 0x9E 0x9F) up to ST (ESC \ or 0x9C; §5.6,
 # §8.3.143), and OSC also up to BEL, which terminals accept although the standard does not name it; an unterminated string ends at its line, never beyond.
-# Then any other escape sequence, ESC + intermediates + one final byte 0x30-0x7E (ESC c, ESC ( B, ESC =; §8.3.48), then lone C0 (minus \n and \t), DEL and C1 bytes.
+# Then any other escape sequence, ESC + intermediate bytes 0x20-0x2F + one final byte 0x30-0x7E (ESC c, ESC ( B, ESC =; ECMA-48 §8.3.48 defers the structure to ECMA-35 §13.1),
+# then lone C0 (minus \n and \t), DEL and C1 bytes.
 # Until #128 a string that ended with the 8-bit ST, or that opened with an 8-bit introducer, was cut at the wrong place: the OSC pattern knew BEL and ESC \ only,
 # so `ESC ] 8;;url 0x9C name` lost `name` with the link, and the DCS/APC payload was left in the text.
 _CONTROL = re.compile(

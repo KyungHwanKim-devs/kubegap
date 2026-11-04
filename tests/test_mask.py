@@ -23,6 +23,8 @@ def test_every_kind_of_control_sequence_is_removed_but_newline_and_tab_stay():
         "a \x1bPq#0;2;0;0;0#0~~\x1b\\ b": "a  b",  # DCS (sixel) with its payload up to ST, 7-bit
         "a \x90payload\x9c b\x9fapc\x1b\\c\x1b_x\x1b\\d\x1b^pm\x1b\\e\x1bXsos\x9cf": "a  bcdef",  # DCS, APC, PM, SOS in both widths
         "a \x1b_unterminated apc\nnext line": "a \nnext line",  # a control string without ST ends at its line
+        "a\x98sos\x9cb\x9epm\x9cc": "abc",  # 8-bit SOS and PM introducers
+        "a\x9d0;t\x07b\x9d0;t\x1b\\c": "abc",  # 8-bit OSC ended by BEL and by the 7-bit ST
         "a\x1b]0;unterminated\nsecond line stays\nmore": "a\nsecond line stays\nmore",  # ... and never past it: the next lines stay
         "\x1bc\x1b(B\x1b=": "",  # RIS and the other Fe/Fs escapes are two bytes each
         "\x9b31m\x9b0mred": "red",  # 8-bit CSI

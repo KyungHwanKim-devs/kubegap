@@ -334,13 +334,17 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w(L("### 7-1. Collectors and steps run"))
     w("")
     rows = []
-    failed_steps: list[tuple[str, str]] = []  # the one list of failed steps: the Failed column, the count below it and the header row all read it (#132)
+    # The one list of failed steps is `_summary.failed`, written by lib/collect.py (ok false and not skipped); the header row reads it through
+    # summary.collection.failed_steps, and the Failed column and the count below it read it here, so no second copy of the predicate exists (#132).
+    sm = cr.get("_summary") or {}
+    failed_ids = [str(x) for x in sm.get("failed") or []]
+    failed_steps: list[tuple[str, str]] = []
     for name, c in cr.items():
         if name.startswith("_") or not isinstance(c, dict):
             continue
         steps = c.get("steps") or {}
-        failed = [sid for sid, st in steps.items() if isinstance(st, dict) and st.get("ok") is False and not st.get("skipped")]
-        failed_steps += [(f"{name}.{sid}", str(steps[sid].get("error") or "")) for sid in failed]
+        failed = [fid[len(name) + 1 :] for fid in failed_ids if fid.startswith(name + ".")]
+        failed_steps += [(f"{name}.{sid}", str((steps.get(sid) or {}).get("error") or "")) for sid in failed]
         skipped = [f"{sid} ({st.get('skipped')})" for sid, st in steps.items() if isinstance(st, dict) and st.get("skipped")]
         rows.append([name, len(steps), ", ".join(failed) or "", "; ".join(skipped) or (c.get("skipped") or "")])
     w(_table(["Collector", "Steps", "Failed", "Skipped (reason)"], rows))
@@ -348,7 +352,6 @@ def render_details(snap: Path, language: str = "en") -> Path:
     if npk:
         w("")
         w(f"Kinds the ClusterRole does not grant ({len(npk)}; a check that needs one of them is skipped, not passed): " + ", ".join(f"`{k}`" for k in npk))
-    sm = cr.get("_summary") or {}
     run = summary.get("run") or {}
     w("")
     # Until #132 this line counted run.log exit codes while the table above read collect-result.json, and the two disagreed for a tool that exits 0 without
@@ -360,6 +363,16 @@ def render_details(snap: Path, language: str = "en") -> Path:
     if inside:
         w("")
         w(f"Commands that failed inside a step that still succeeded (run.log): {len(inside)}: " + "; ".join(f"`{f.get('id')}` {_cell(str(f.get('error') or '')[:120])}" for f in inside[:20]))
+    # How much of the API the deprecated-API tools saw: Lists the server answered and Lists it refused or did not serve (#132). Both tools swallow a forbidden List.
+    dep = (summary.get("hygiene") or {}).get("deprecated") or {}
+    seen = [
+        f"{tool} {dep[f'{tool}_lists_ok']} of {dep[f'{tool}_lists_ok'] + dep[f'{tool}_lists_failed']} Lists answered ({dep[f'{tool}_lists_failed']} refused or not served)"
+        for tool in ("kubent", "pluto")
+        if isinstance(dep.get(f"{tool}_lists_ok"), int) and isinstance(dep.get(f"{tool}_lists_failed"), int)
+    ]
+    if seen:
+        w("")
+        w("Deprecated-API tools: " + "; ".join(seen) + ".")
     w("")
     w(L("### 7-2. Checks evaluated"))
     w("")
