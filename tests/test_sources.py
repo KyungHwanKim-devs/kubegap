@@ -282,3 +282,65 @@ def test_one_upstream_outage_is_one_finding(tmp_path):
     assert not errors
     counts = {r["id"]: r["count"] for r in logs.scan(tmp_path, sigs)["signatures"]}
     assert counts.get("coredns.upstream-timeout") == 500 and counts.get("coredns.servfail") == 2
+
+
+# ---------- PromQL queries (#121): every query that reads a node-exporter, cAdvisor, kubelet or kube-state-metrics name cites each name ----------
+
+QUERY_FAMILIES = re.compile(r"\b(node_[A-Za-z0-9_]+|kube_[A-Za-z0-9_]+|kubelet_[A-Za-z0-9_]+|container_[A-Za-z0-9_]+)\b")
+# '<name>: <owner>/<repo> <file>:<line>@<tag>' then more citations and notes; or 'label <what>: ...' for a label the scrape configuration sets
+QUERY_CITATION = re.compile(r"^(?:[A-Za-z_:][A-Za-z0-9_:]*|label [^:]+): [\w.-]+/[\w.-]+ \S+?:\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*@[\w.+-]+")
+# Names an exporter removed or leaves off by default, with the source that says so. A query reading one is empty on every default install and nothing tells
+# "the situation did not occur" from "the series does not exist". node_processes_state may come back behind a `needs` that reads the collector state
+# once a check needs it; today nothing does.
+GONE = {
+    "kube_endpoint_address_not_ready": 'kube-state-metrics 2.14.0 removed it (internal/store/endpoint.go:148@v2.13.0, absent @v2.14.0); read kube_endpoint_address{ready="false"}',
+    "node_processes_state": "the node-exporter processes collector is off by default (collector/processes_linux.go:46@v1.7.0, :45@v1.10.2, :44@v1.12.1)",
+}
+
+
+def _queries():
+    for f in sorted((ROOT / "collectors").glob("*/metrics.yaml")):
+        for it in yamlite.load_file(f) or []:
+            yield f.parent.name, it
+
+
+def test_every_query_of_the_read_families_cites_each_name():
+    seen = 0
+    for area, it in _queries():
+        names = set(QUERY_FAMILIES.findall(str(it["query"])))
+        if not names:
+            continue
+        seen += 1
+        src = it.get("source")
+        assert isinstance(src, list) and src, (area, it["id"], "a query reading node_, container_, kubelet_ or kube_ series needs a source: list, one entry per name")
+        subjects = set()
+        for e in src:
+            assert QUERY_CITATION.match(str(e)), (area, it["id"], e, "an entry reads '<name>: <owner>/<repo> <file>:<line>@<tag> ...'")
+            subjects.add(str(e).split(":", 1)[0])
+        assert names <= subjects, (area, it["id"], sorted(names - subjects), "every name the query reads has an entry")
+    assert seen >= 80
+
+
+def test_no_query_reads_a_name_the_exporter_removed_or_leaves_off():
+    for area, it in _queries():
+        for name in QUERY_FAMILIES.findall(str(it["query"])):
+            assert name not in GONE, (area, it["id"], name, GONE.get(name))
+
+
+def test_endpoint_address_counts_collapse_the_per_port_series():
+    """Since kube-state-metrics 2.14.0 kube_endpoint_address has one series per address and port (internal/store/endpoint.go:136-153@v2.14.0); a plain
+    count would give addresses times ports for a Service with more than one port, and before 2.14.0 the same expression counts one series per address."""
+    qs = {it["id"]: " ".join(str(it["query"]).split()) for _, it in _queries()}
+    for qid, ready in (("endpoint_ready_addresses", "true"), ("endpoint_not_ready_addresses", "false")):
+        assert f'count by (namespace, endpoint) (count by (namespace, endpoint, ip) (kube_endpoint_address{{ready="{ready}"}}))' in qs[qid], qid
+
+
+def test_every_version_a_query_cites_is_named_in_sources():
+    text = SOURCES.read_text(encoding="utf-8")
+    tags = set()
+    for _, it in _queries():
+        for e in it.get("source") or []:
+            tags |= set(re.findall(r"@([\w.+-]+)", str(e)))
+    assert len(tags) >= 15
+    missing = sorted(t for t in tags if t not in text)
+    assert not missing, (missing, "name the version in the PromQL section of references/sources.md")

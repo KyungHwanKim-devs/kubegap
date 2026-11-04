@@ -1,89 +1,158 @@
 # core PromQL list (the basic queries plus supporting ones). Output metrics/<id>.json.
-# Each item: id, query, why (for humans), limit (topk cap, optional). Queries are instant queries.
-# Metric names were verified on real clusters running kube-prometheus-stack, kube-state-metrics 2.x and node-exporter.
+# Each item: id, query, why (for humans), limit (topk cap, optional), source (see below). Queries are instant queries.
+# source: one entry per metric name the query reads, `<name>: <owner>/<repo> <file>:<line>@<tag>, :<line>@<tag>, ... (labels, default state)`, read in that
+# project's source, plus one entry per label that the scrape configuration sets rather than the exporter (instance, node on kubelet series, the pod labels on
+# cAdvisor series). Versions read (#121): node-exporter v1.7.0, v1.10.2, v1.12.1; kube-state-metrics v2.10.1, v2.11.0 to v2.16.0 (endpoint.go), v2.17.0, v2.20.0;
+# kubelet v1.32.13, v1.33.5, v1.37.2; cAdvisor v0.51.0, v0.52.1, v0.53.0, lib v0.60.5. Every cited name exists with the labels the query filters on at every
+# version read unless its entry says otherwise. tests/test_sources.py requires the list on every query that reads a node_, container_, kubelet_ or kube_ name.
+# The apiserver, CoreDNS, kube-proxy, Flannel, EBS CSI (#122) and Prometheus, Alertmanager, Loki, Promtail, Fluent Bit, Grafana (#123) names are not read yet.
 - id: cpu_throttle_ratio_5m
   why: CFS throttling ratio: the share of 100ms periods in which a container with a limit was stalled. Above 0.25 latency spikes (Buffer and Omio postmortems). The usual formula aggregates by (namespace, pod); here it is split down to container, because telling sidecars from app containers is what says which limit to fix. The first-pass evaluation judges this per container as is
   query: >
     topk(200, sum by (namespace, pod, container) (rate(container_cpu_cfs_throttled_periods_total{container!=""}[5m]))
       / sum by (namespace, pod, container) (rate(container_cpu_cfs_periods_total{container!=""}[5m])) > 0.01)
+  source:
+    - "container_cpu_cfs_throttled_periods_total: google/cadvisor metrics/prometheus.go:203@v0.51.0, :208@v0.52.1, :208@v0.53.0, lib/metrics/prometheus.go:225@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "container_cpu_cfs_periods_total: google/cadvisor metrics/prometheus.go:191@v0.51.0, :196@v0.52.1, :196@v0.53.0, lib/metrics/prometheus.go:210@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: cpu_throttle_ratio_24h
   why: The same ratio over 24 hours, weighted by the periods each hour ran. The 5-minute value says "now", this one says "through the day"; resources.cpu-throttling fails only on this one and warns on a 5-minute spike alone
   query: >
     topk(500, sum by (namespace, pod, container) (increase(container_cpu_cfs_throttled_periods_total{container!=""}[24h]))
       / sum by (namespace, pod, container) (increase(container_cpu_cfs_periods_total{container!=""}[24h])) > 0.001)
+  source:
+    - "container_cpu_cfs_throttled_periods_total: google/cadvisor metrics/prometheus.go:203@v0.51.0, :208@v0.52.1, :208@v0.53.0, lib/metrics/prometheus.go:225@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "container_cpu_cfs_periods_total: google/cadvisor metrics/prometheus.go:191@v0.51.0, :196@v0.52.1, :196@v0.53.0, lib/metrics/prometheus.go:210@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: oomkilled_last_terminated
   why: Containers whose last termination reason was OOMKilled. Memory limit too small or a leak
   query: kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+  source:
+    - "kube_pod_container_status_last_terminated_reason: kubernetes/kube-state-metrics internal/store/pod.go:327@v2.10.1, :330@v2.17.0, :339@v2.20.0 (labels container, reason :337@v2.10.1, :340@v2.17.0, :349@v2.20.0, a series only while the container has a last terminated state; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: oom_events_7d
   why: How many times a container was OOM-killed in 7 days (increase of cAdvisor container_oom_events_total). "Last termination reason" shows only one event; this is the frequency
   # For runtimes where the cAdvisor counter is empty (cgroup v1 etc.), also count 7-day restarts of containers whose last termination reason is OOMKilled
   query: >
     (sum by (namespace, pod, container) (increase(container_oom_events_total{container!="", container!="POD"}[7d])) > 0)
       or (sum by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total[7d])) and on (namespace, pod, container) (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1))
+  source:
+    - "container_oom_events_total: google/cadvisor metrics/prometheus.go:1740@v0.51.0, :1745@v0.52.1, :1745@v0.53.0, lib/metrics/prometheus.go:2088@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_container_status_restarts_total: kubernetes/kube-state-metrics internal/store/pod.go:403@v2.10.1, :432@v2.17.0, :441@v2.20.0 (label container :412@v2.10.1, :441@v2.17.0, :450@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_container_status_last_terminated_reason: kubernetes/kube-state-metrics internal/store/pod.go:327@v2.10.1, :330@v2.17.0, :339@v2.20.0 (labels container, reason :337@v2.10.1, :340@v2.17.0, :349@v2.20.0, a series only while the container has a last terminated state; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: oom_pods_7d
   why: Every container that ended with OOMKilled at any time in 7 days and restarted in the window, including pods a rollout has since replaced, with the 7-day restart increase of that pod; a pod whose last OOM is older than the window keeps the reason label but has no restart in it and is left out. resources.oomkilled-repeated counts a workload's OOM history from this, not from the pods alive at collection time
   query: >
     (sum by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total[7d])) > 0.5)
       and on (namespace, pod, container) (max_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[7d]) == 1)
+  source:
+    - "kube_pod_container_status_restarts_total: kubernetes/kube-state-metrics internal/store/pod.go:403@v2.10.1, :432@v2.17.0, :441@v2.20.0 (label container :412@v2.10.1, :441@v2.17.0, :450@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_container_status_last_terminated_reason: kubernetes/kube-state-metrics internal/store/pod.go:327@v2.10.1, :330@v2.17.0, :339@v2.20.0 (labels container, reason :337@v2.10.1, :340@v2.17.0, :349@v2.20.0, a series only while the container has a last terminated state; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: pod_info_7d
   why: uid, node and owner of the pods in oom_pods_7d, replaced ones included. The kernel's oom-kill line names the pod by uid, and this is how a uid of a pod that no longer exists is mapped back to its workload
   query: >
     last_over_time(kube_pod_info[7d])
       and on (namespace, pod) (max_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[7d]) == 1)
+  source:
+    - "kube_pod_info: kubernetes/kube-state-metrics internal/store/pod.go:604@v2.10.1, :633@v2.17.0, :642@v2.20.0 (labels host_ip, pod_ip, node, created_by_kind, created_by_name, priority_class, host_network :623@v2.10.1, :652@v2.17.0, :661@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_container_status_last_terminated_reason: kubernetes/kube-state-metrics internal/store/pod.go:327@v2.10.1, :330@v2.17.0, :339@v2.20.0 (labels container, reason :337@v2.10.1, :340@v2.17.0, :349@v2.20.0, a series only while the container has a last terminated state; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: nodes_seen_1d
   why: Every node-exporter instance seen in the last 24 hours with its node name and the time of its last sample. A node here but not in inventory.json left the cluster within the window; its remaining series are not judged by the node checks and the summary lists it under nodes.gone_24h
   query: last_over_time(timestamp(node_uname_info)[1d:1m])   # timestamp() of each sample, then the last one in the day: the time the node was last scraped. timestamp(last_over_time(...)) would return the evaluation time
+  source:
+    - "node_uname_info: prometheus/node_exporter collector/uname.go:26@v1.7.0, :27@v1.10.2, :25@v1.12.1 (label nodename :33@v1.7.0, :34@v1.10.2, :32@v1.12.1; uname collector, on by default: collector/uname.go:52@v1.7.0, :53@v1.10.2, :51@v1.12.1)"
 - id: restarts_24h
   why: Top restart counts over 24h. A combined signal of CrashLoop, OOM and probe failures
   query: topk(50, sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total[24h])) > 0)
+  source:
+    - "kube_pod_container_status_restarts_total: kubernetes/kube-state-metrics internal/store/pod.go:403@v2.10.1, :432@v2.17.0, :441@v2.20.0 (label container :412@v2.10.1, :441@v2.17.0, :450@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: restarts_7d
   why: Top restart counts over 7d. Intermittent restarts do not show in a 24h window
   query: topk(50, sum by (namespace, pod) (increase(kube_pod_container_status_restarts_total[7d])) > 0)
+  source:
+    - "kube_pod_container_status_restarts_total: kubernetes/kube-state-metrics internal/store/pod.go:403@v2.10.1, :432@v2.17.0, :441@v2.20.0 (label container :412@v2.10.1, :441@v2.17.0, :450@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: qos_class_counts
   why: Pod count per QoS class. BestEffort pods in production die first under node pressure
   query: sum by (qos_class) (kube_pod_status_qos_class == 1)
+  source:
+    - "kube_pod_status_qos_class: kubernetes/kube-state-metrics internal/store/pod.go:1431@v2.10.1, :1465@v2.17.0, :1630@v2.20.0 (label qos_class :1458@v2.10.1, :1492@v2.17.0, :1657@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: besteffort_pods
   why: List of BestEffort pods (neither request nor limit). Those in production namespaces are evaluated in the first pass
   query: kube_pod_status_qos_class{qos_class="BestEffort"} == 1
+  source:
+    - "kube_pod_status_qos_class: kubernetes/kube-state-metrics internal/store/pod.go:1431@v2.10.1, :1465@v2.17.0, :1630@v2.20.0 (label qos_class :1458@v2.10.1, :1492@v2.17.0, :1657@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: node_cpu_request_ratio
   why: Sum of CPU requests / allocatable per node. Near 1 nothing more can be scheduled; a large gap from actual usage means over-requesting
   query: >
     sum by (node) (kube_pod_container_resource_requests{resource="cpu"} * on (namespace, pod) group_left() max by (namespace, pod) (kube_pod_status_phase{phase="Running"}))
       / sum by (node) (kube_node_status_allocatable{resource="cpu"})
+  source:
+    - "kube_pod_container_resource_requests: kubernetes/kube-state-metrics internal/store/pod.go:231@v2.10.1, :234@v2.17.0, :243@v2.20.0 (labels container, node, resource, unit :282@v2.10.1, :285@v2.17.0, :294@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_status_phase: kubernetes/kube-state-metrics internal/store/pod.go:1305@v2.10.1, :1339@v2.17.0, :1504@v2.20.0 (label phase :1334@v2.10.1, :1368@v2.17.0, :1533@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_node_status_allocatable: kubernetes/kube-state-metrics internal/store/node.go:284@v2.10.1, :309@v2.17.0, :338@v2.20.0 (labels resource, unit :356@v2.10.1, :381@v2.17.0, :410@v2.20.0, resource cpu in cores, memory in bytes, pods as an integer; default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
 - id: node_memory_request_ratio
   why: Sum of memory requests / allocatable per node
   query: >
     sum by (node) (kube_pod_container_resource_requests{resource="memory"} * on (namespace, pod) group_left() max by (namespace, pod) (kube_pod_status_phase{phase="Running"}))
       / sum by (node) (kube_node_status_allocatable{resource="memory"})
+  source:
+    - "kube_pod_container_resource_requests: kubernetes/kube-state-metrics internal/store/pod.go:231@v2.10.1, :234@v2.17.0, :243@v2.20.0 (labels container, node, resource, unit :282@v2.10.1, :285@v2.17.0, :294@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_status_phase: kubernetes/kube-state-metrics internal/store/pod.go:1305@v2.10.1, :1339@v2.17.0, :1504@v2.20.0 (label phase :1334@v2.10.1, :1368@v2.17.0, :1533@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_node_status_allocatable: kubernetes/kube-state-metrics internal/store/node.go:284@v2.10.1, :309@v2.17.0, :338@v2.20.0 (labels resource, unit :356@v2.10.1, :381@v2.17.0, :410@v2.20.0, resource cpu in cores, memory in bytes, pods as an integer; default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
 - id: node_cpu_usage_ratio_5m
   why: Actual CPU usage / allocatable per node. Next to the request ratio it shows over- and under-requesting
   query: >
     sum by (node) (rate(container_cpu_usage_seconds_total{container!="",id!="/"}[5m]) * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
       / sum by (node) (kube_node_status_allocatable{resource="cpu"})
+  source:
+    - "container_cpu_usage_seconds_total: google/cadvisor metrics/prometheus.go:164@v0.51.0, :169@v0.52.1, :169@v0.53.0, lib/metrics/prometheus.go:180@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_info: kubernetes/kube-state-metrics internal/store/pod.go:604@v2.10.1, :633@v2.17.0, :642@v2.20.0 (labels host_ip, pod_ip, node, created_by_kind, created_by_name, priority_class, host_network :623@v2.10.1, :652@v2.17.0, :661@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_node_status_allocatable: kubernetes/kube-state-metrics internal/store/node.go:284@v2.10.1, :309@v2.17.0, :338@v2.20.0 (labels resource, unit :356@v2.10.1, :381@v2.17.0, :410@v2.20.0, resource cpu in cores, memory in bytes, pods as an integer; default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: node_memory_usage_ratio
   why: Actual memory working set / allocatable per node
   query: >
     sum by (node) (container_memory_working_set_bytes{container!="",id!="/"} * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
       / sum by (node) (kube_node_status_allocatable{resource="memory"})
+  source:
+    - "container_memory_working_set_bytes: google/cadvisor metrics/prometheus.go:434@v0.51.0, :439@v0.52.1, :439@v0.53.0, lib/metrics/prometheus.go:531@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_info: kubernetes/kube-state-metrics internal/store/pod.go:604@v2.10.1, :633@v2.17.0, :642@v2.20.0 (labels host_ip, pod_ip, node, created_by_kind, created_by_name, priority_class, host_network :623@v2.10.1, :652@v2.17.0, :661@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_node_status_allocatable: kubernetes/kube-state-metrics internal/store/node.go:284@v2.10.1, :309@v2.17.0, :338@v2.20.0 (labels resource, unit :356@v2.10.1, :381@v2.17.0, :410@v2.20.0, resource cpu in cores, memory in bytes, pods as an integer; default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: conntrack_ratio
   why: Node conntrack table usage. Above 0.8 new connections are silently dropped
   query: node_nf_conntrack_entries / node_nf_conntrack_entries_limit
+  source:
+    - "node_nf_conntrack_entries: prometheus/node_exporter collector/conntrack_linux.go:63@v1.7.0, :62@v1.10.2, :49@v1.12.1 (conntrack collector, on by default: collector/conntrack_linux.go:56@v1.7.0, :55@v1.10.2, :44@v1.12.1)"
+    - "node_nf_conntrack_entries_limit: prometheus/node_exporter collector/conntrack_linux.go:68@v1.7.0, :67@v1.10.2, :54@v1.12.1 (conntrack collector, on by default: collector/conntrack_linux.go:56@v1.7.0, :55@v1.10.2, :44@v1.12.1)"
 - id: disk_usage_ratio
   why: Node filesystem usage (root, container data). From 0.85 the kubelet starts image GC and eviction
   query: >
     max by (instance, mountpoint) (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660", mountpoint!~"/boot.*|/run.*|/snap.*"}
       / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660", mountpoint!~"/boot.*|/run.*|/snap.*"})
+  source:
+    - "node_filesystem_avail_bytes: prometheus/node_exporter collector/filesystem_common.go:129@v1.7.0, :117@v1.10.2, :115@v1.12.1 (labels device, mountpoint, fstype collector/filesystem_common.go:63@v1.7.0; :70@v1.10.2 and :68@v1.12.1 add device_error; filesystem collector, on by default: collector/filesystem_common.go:87@v1.7.0, :97@v1.10.2, :95@v1.12.1)"
+    - "node_filesystem_size_bytes: prometheus/node_exporter collector/filesystem_common.go:117@v1.7.0, :105@v1.10.2, :103@v1.12.1 (labels device, mountpoint, fstype collector/filesystem_common.go:63@v1.7.0; :70@v1.10.2 and :68@v1.12.1 add device_error; filesystem collector, on by default: collector/filesystem_common.go:87@v1.7.0, :97@v1.10.2, :95@v1.12.1)"
+    - "label instance: prometheus/prometheus scrape/target.go:507-510@v2.49.1, :519-522@v3.7.3 (Prometheus sets instance to the scrape target address when the target has none, so on node-exporter series it is <node IP>:9100, which lib/evaluate.py and the summaries map to the node by IP; a scrape config that relabels instance changes this)"
 - id: inode_usage_ratio
   why: inode usage. Disk space left but no files can be created. A sign of log file explosion
   query: >
     max by (instance, mountpoint) (1 - node_filesystem_files_free{fstype!~"tmpfs|overlay|squashfs|iso9660", mountpoint!~"/boot.*|/run.*|/snap.*"}
       / node_filesystem_files{fstype!~"tmpfs|overlay|squashfs|iso9660", mountpoint!~"/boot.*|/run.*|/snap.*"})
+  source:
+    - "node_filesystem_files_free: prometheus/node_exporter collector/filesystem_common.go:141@v1.7.0, :129@v1.10.2, :127@v1.12.1 (labels device, mountpoint, fstype collector/filesystem_common.go:63@v1.7.0; :70@v1.10.2 and :68@v1.12.1 add device_error; filesystem collector, on by default: collector/filesystem_common.go:87@v1.7.0, :97@v1.10.2, :95@v1.12.1)"
+    - "node_filesystem_files: prometheus/node_exporter collector/filesystem_common.go:135@v1.7.0, :123@v1.10.2, :121@v1.12.1 (labels device, mountpoint, fstype collector/filesystem_common.go:63@v1.7.0; :70@v1.10.2 and :68@v1.12.1 add device_error; filesystem collector, on by default: collector/filesystem_common.go:87@v1.7.0, :97@v1.10.2, :95@v1.12.1)"
+    - "label instance: prometheus/prometheus scrape/target.go:507-510@v2.49.1, :519-522@v3.7.3 (Prometheus sets instance to the scrape target address when the target has none, so on node-exporter series it is <node IP>:9100, which lib/evaluate.py and the summaries map to the node by IP; a scrape config that relabels instance changes this)"
 - id: ntp_offset_seconds
   why: Clock offset (seconds). Above 0.1 TLS, tokens and distributed log timestamps drift
   query: abs(node_timex_offset_seconds)
+  source:
+    - "node_timex_offset_seconds: prometheus/node_exporter collector/timex.go:74@v1.7.0, :76@v1.10.2, :75@v1.12.1 (timex collector, on by default: collector/timex.go:65@v1.7.0, :67@v1.10.2, :66@v1.12.1)"
 - id: ntp_sync_status
   why: Clock sync status (1 = synced). At 0 check chrony or systemd-timesyncd
   query: node_timex_sync_status
+  source:
+    - "node_timex_sync_status: prometheus/node_exporter collector/timex.go:154@v1.7.0, :156@v1.10.2, :155@v1.12.1 (timex collector, on by default: collector/timex.go:65@v1.7.0, :67@v1.10.2, :66@v1.12.1)"
 - id: targets_down
   why: Failed scrape targets (up==0). What Prometheus cannot see, no metric check can see
   query: up == 0
@@ -91,33 +160,57 @@
   why: HPAs whose current replicas sit at maxReplicas. They cannot grow further, so scaling is effectively off
   query: >
     kube_horizontalpodautoscaler_status_current_replicas >= on (namespace, horizontalpodautoscaler) kube_horizontalpodautoscaler_spec_max_replicas
+  source:
+    - "kube_horizontalpodautoscaler_status_current_replicas: kubernetes/kube-state-metrics internal/store/horizontalpodautoscaler.go:303@v2.10.1, :305@v2.17.0, :335@v2.20.0 (default labels namespace, horizontalpodautoscaler internal/store/horizontalpodautoscaler.go:51@v2.10.1, :51@v2.17.0, :51@v2.20.0)"
+    - "kube_horizontalpodautoscaler_spec_max_replicas: kubernetes/kube-state-metrics internal/store/horizontalpodautoscaler.go:147@v2.10.1, :149@v2.17.0, :151@v2.20.0 (default labels namespace, horizontalpodautoscaler internal/store/horizontalpodautoscaler.go:51@v2.10.1, :51@v2.17.0, :51@v2.20.0)"
 - id: hpa_min_max
   why: min/max/current per HPA. min==max makes the HPA meaningless; a too-small max blocks at traffic peaks
   query: >
     label_replace(kube_horizontalpodautoscaler_spec_min_replicas, "kind", "min", "", "")
       or label_replace(kube_horizontalpodautoscaler_spec_max_replicas, "kind", "max", "", "")
       or label_replace(kube_horizontalpodautoscaler_status_current_replicas, "kind", "current", "", "")
+  source:
+    - "kube_horizontalpodautoscaler_spec_min_replicas: kubernetes/kube-state-metrics internal/store/horizontalpodautoscaler.go:166@v2.10.1, :168@v2.17.0, :170@v2.20.0 (default labels namespace, horizontalpodautoscaler internal/store/horizontalpodautoscaler.go:51@v2.10.1, :51@v2.17.0, :51@v2.20.0)"
+    - "kube_horizontalpodautoscaler_spec_max_replicas: kubernetes/kube-state-metrics internal/store/horizontalpodautoscaler.go:147@v2.10.1, :149@v2.17.0, :151@v2.20.0 (default labels namespace, horizontalpodautoscaler internal/store/horizontalpodautoscaler.go:51@v2.10.1, :51@v2.17.0, :51@v2.20.0)"
+    - "kube_horizontalpodautoscaler_status_current_replicas: kubernetes/kube-state-metrics internal/store/horizontalpodautoscaler.go:303@v2.10.1, :305@v2.17.0, :335@v2.20.0 (default labels namespace, horizontalpodautoscaler internal/store/horizontalpodautoscaler.go:51@v2.10.1, :51@v2.17.0, :51@v2.20.0)"
 - id: endpoint_ready_addresses
-  why: Ready endpoint count per Service. The first pass finds Services with a selector that are missing here (= 0 endpoints)
-  query: count by (namespace, endpoint) (kube_endpoint_address{ready="true"})
+  # Since kube-state-metrics 2.14.0 kube_endpoint_address has one series per address and port (internal/store/endpoint.go:136-153@v2.14.0), so the inner count collapses the ports; before 2.14.0 it is one per address.
+  why: Ready address count per Endpoints object (distinct addresses). No check reads it; lib/traffic.py counts ready addresses from the Endpoints objects. Raw evidence next to endpoint_not_ready_addresses
+  query: count by (namespace, endpoint) (count by (namespace, endpoint, ip) (kube_endpoint_address{ready="true"}))
+  source:
+    - "kube_endpoint_address: kubernetes/kube-state-metrics internal/store/endpoint.go:168@v2.10.1, :168@v2.13.0, :127@v2.14.0, :127@v2.17.0, :127@v2.20.0 (label ready is true for the subset's ready addresses and false for its notReadyAddresses :176-188@v2.10.1, :134-153@v2.14.0; label ip at every version read; since 2.14.0 there is one series per address and port, :136-153@v2.14.0, with port_protocol, port_number, port_name, so an address count has to count distinct ip, and a subset without ports has no series at all while 2.10.1 to 2.13.0 emit one per address; default labels namespace, endpoint internal/store/endpoint.go:40@v2.10.1, :40@v2.14.0, :40@v2.17.0, :40@v2.20.0)"
 - id: pods_waiting_reason
   why: Waiting reasons such as CrashLoopBackOff, ImagePullBackOff, CreateContainerConfigError
   query: kube_pod_container_status_waiting_reason{reason!="ContainerCreating"} == 1
+  source:
+    - "kube_pod_container_status_waiting_reason: kubernetes/kube-state-metrics internal/store/pod.go:528@v2.10.1, :557@v2.17.0, :566@v2.20.0 (labels container, reason :539@v2.10.1, :568@v2.17.0, :577@v2.20.0, a series only while the container is waiting; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: pods_pending
   why: Pending pods. A sign of unschedulability (resources, taints, affinity, PVC)
   query: kube_pod_status_phase{phase="Pending"} == 1
+  source:
+    - "kube_pod_status_phase: kubernetes/kube-state-metrics internal/store/pod.go:1305@v2.10.1, :1339@v2.17.0, :1504@v2.20.0 (label phase :1334@v2.10.1, :1368@v2.17.0, :1533@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: secrets_meta
   why: Secret count per namespace (kube_secret_info). Secret values are never fetched; only metadata via metrics
   query: count by (namespace) (kube_secret_info)
+  source:
+    - "kube_secret_info: kubernetes/kube-state-metrics internal/store/secret.go:45@v2.10.1, :46@v2.17.0, :46@v2.20.0 (default labels namespace, secret internal/store/secret.go:39@v2.10.1, :40@v2.17.0, :40@v2.20.0)"
 - id: kubelet_running_pods
   why: Pods run by the kubelet per node vs the node pod limit (allocatable pods)
   query: kubelet_running_pods / on (node) group_left() label_replace(kube_node_status_allocatable{resource="pods"}, "node", "$1", "node", "(.*)")
+  source:
+    - "kubelet_running_pods: kubernetes/kubernetes pkg/kubelet/metrics/metrics.go:67,601@v1.32.13, :67,609@v1.33.5, :70,704@v1.37.2 (subsystem kubelet pkg/kubelet/metrics/metrics.go:34@v1.32.13, :34@v1.33.5, :36@v1.37.2)"
+    - "kube_node_status_allocatable: kubernetes/kube-state-metrics internal/store/node.go:284@v2.10.1, :309@v2.17.0, :338@v2.20.0 (labels resource, unit :356@v2.10.1, :381@v2.17.0, :410@v2.20.0, resource cpu in cores, memory in bytes, pods as an integer; default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
+    - "label node on kubelet_* series: prometheus-operator/prometheus-operator pkg/prometheus/promcfg.go:1310-1314@v0.71.0, :2000-2004@v0.86.2 (for every ServiceMonitor target the operator relabels __meta_kubernetes_endpoint_address_target_kind;name = Node;<name> into node), the meta labels come from Prometheus's endpoints discovery, prometheus/prometheus discovery/kubernetes/endpoints.go:254,285-287@v2.49.1, :331,366-368@v3.7.3 (set from the address's targetRef), and pkg/kubelet/controller.go:155@v0.71.0, :290,303@v0.86.2 (the kubelet Endpoints the operator writes carry targetRef kind Node); the two operator versions are what kube-prometheus-stack 56.0.0 and 79.5.0 pin, prometheus-community/helm-charts charts/kube-prometheus-stack/Chart.yaml:27@kube-prometheus-stack-56.0.0, :36@kube-prometheus-stack-79.5.0; a scrape configuration that does not set node leaves the on (node) match with nothing to match, so the query is empty"
 - id: pdb_disruptions_allowed
   why: Allowed disruptions per PDB. At 0 drains and upgrades are blocked by that PDB
   query: kube_poddisruptionbudget_status_pod_disruptions_allowed
+  source:
+    - "kube_poddisruptionbudget_status_pod_disruptions_allowed: kubernetes/kube-state-metrics internal/store/poddisruptionbudget.go:141@v2.10.1, :141@v2.17.0, :141@v2.20.0 (default labels namespace, poddisruptionbudget internal/store/poddisruptionbudget.go:35@v2.10.1, :35@v2.17.0, :35@v2.20.0)"
 - id: node_boot_time
   why: Node boot time. Tracks recent reboots and node replacements
   query: node_boot_time_seconds
+  source:
+    - "node_boot_time_seconds: prometheus/node_exporter collector/stat_linux.go:70@v1.7.0, :70@v1.10.2, :55@v1.12.1 (stat collector, on by default: collector/stat_linux.go:43@v1.7.0, :43@v1.10.2, :35@v1.12.1)"
 - id: prometheus_tsdb_head_series
   why: Active series count. The first indicator of a cardinality explosion
   query: prometheus_tsdb_head_series
@@ -129,34 +222,52 @@
   why: Share of the last 15 days the current replicas sat at max. Near 1 the HPA has been capped
   query: >
     avg_over_time((kube_horizontalpodautoscaler_status_current_replicas == bool on (namespace, horizontalpodautoscaler) kube_horizontalpodautoscaler_spec_max_replicas)[15d:5m])
+  source:
+    - "kube_horizontalpodautoscaler_status_current_replicas: kubernetes/kube-state-metrics internal/store/horizontalpodautoscaler.go:303@v2.10.1, :305@v2.17.0, :335@v2.20.0 (default labels namespace, horizontalpodautoscaler internal/store/horizontalpodautoscaler.go:51@v2.10.1, :51@v2.17.0, :51@v2.20.0)"
+    - "kube_horizontalpodautoscaler_spec_max_replicas: kubernetes/kube-state-metrics internal/store/horizontalpodautoscaler.go:147@v2.10.1, :149@v2.17.0, :151@v2.20.0 (default labels namespace, horizontalpodautoscaler internal/store/horizontalpodautoscaler.go:51@v2.10.1, :51@v2.17.0, :51@v2.20.0)"
 - id: cardinality_top_metrics
   why: Top 20 metric names by series count. Hundreds of thousands means a Prometheus memory blow-up
   query: topk(20, count by (__name__) ({__name__=~".+"}))
 - id: node_memory_available_ratio
   why: Node MemAvailable / MemTotal. The real headroom including usage outside containers (kernel, cache, host processes)
   query: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes
+  source:
+    - "node_memory_MemAvailable_bytes: prometheus/node_exporter collector/meminfo.go:63@v1.7.0, :52@v1.10.2, :50@v1.12.1 (builds node_memory_<key>; the key is the /proc/meminfo field plus _bytes: collector/meminfo_linux.go:60-67@v1.7.0, MemAvailable_bytes :122@v1.10.2, :121@v1.12.1; meminfo collector, on by default: collector/meminfo.go:38@v1.7.0, :32@v1.10.2, :30@v1.12.1)"
+    - "node_memory_MemTotal_bytes: prometheus/node_exporter collector/meminfo.go:63@v1.7.0, :52@v1.10.2, :50@v1.12.1 (builds node_memory_<key>; the key is the /proc/meminfo field plus _bytes: collector/meminfo_linux.go:60-67@v1.7.0, MemTotal_bytes :128@v1.10.2, :127@v1.12.1; meminfo collector, on by default: collector/meminfo.go:38@v1.7.0, :32@v1.10.2, :30@v1.12.1)"
 - id: node_swap_total_bytes
   why: Swap size. If not 0, check the kubelet settings (failSwapOn, swapBehavior)
   query: node_memory_SwapTotal_bytes
-- id: zombie_processes
-  why: Zombie process count. No series when the node-exporter processes collector is off (that itself is recorded)
-  query: node_processes_state{state="Z"}
+  source:
+    - "node_memory_SwapTotal_bytes: prometheus/node_exporter collector/meminfo.go:63@v1.7.0, :52@v1.10.2, :50@v1.12.1 (builds node_memory_<key>; the key is the /proc/meminfo field plus _bytes: collector/meminfo_linux.go:60-67@v1.7.0, SwapTotal_bytes :167@v1.10.2, :166@v1.12.1; meminfo collector, on by default: collector/meminfo.go:38@v1.7.0, :32@v1.10.2, :30@v1.12.1)"
 - id: node_network_errors_1d
   why: RX/TX errors on physical NICs over 24h (per node and device, virtual interfaces excluded). Non-zero means NIC, driver, cable or ENA trouble
   query: >
     topk(20, sum by (instance, device) (increase(node_network_receive_errs_total{device!~"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|tailscale.*|br-.*|kube-.*"}[1d])
       + increase(node_network_transmit_errs_total{device!~"lo|veth.*|cali.*|flannel.*|cni.*|docker.*|tailscale.*|br-.*|kube-.*"}[1d])) > 0)
+  source:
+    - "node_network_receive_errs_total: prometheus/node_exporter collector/netdev_linux.go:112,168@v1.7.0, :113,169@v1.10.2, :112,168@v1.12.1 (reader key receive_errors; legacy() renames it to receive_errs at collector/netdev_common.go:194-195@v1.7.0, :209-210@v1.10.2, :211-212@v1.12.1 unless --collector.netdev.enable-detailed-metrics is set, :39,118-120@v1.7.0, :38,123-125@v1.10.2, :36,121-123@v1.12.1; collector/netdev_common.go:102@v1.7.0, :101@v1.10.2, :99@v1.12.1 builds node_network_<key>_total from the per-device counter map; netdev collector, on by default: collector/netdev_common.go:53@v1.7.0, :52@v1.10.2, :50@v1.12.1)"
+    - "node_network_transmit_errs_total: prometheus/node_exporter collector/netdev_linux.go:113,176@v1.7.0, :114,177@v1.10.2, :113,176@v1.12.1 (reader key transmit_errors; legacy() renames it to transmit_errs at collector/netdev_common.go:209-210@v1.7.0, :224-225@v1.10.2, :226-227@v1.12.1 unless --collector.netdev.enable-detailed-metrics is set, :39,118-120@v1.7.0, :38,123-125@v1.10.2, :36,121-123@v1.12.1; collector/netdev_common.go:102@v1.7.0, :101@v1.10.2, :99@v1.12.1 builds node_network_<key>_total from the per-device counter map; netdev collector, on by default: collector/netdev_common.go:53@v1.7.0, :52@v1.10.2, :50@v1.12.1)"
+    - "label instance: prometheus/prometheus scrape/target.go:507-510@v2.49.1, :519-522@v3.7.3 (Prometheus sets instance to the scrape target address when the target has none, so on node-exporter series it is <node IP>:9100, which lib/evaluate.py and the summaries map to the node by IP; a scrape config that relabels instance changes this)"
 - id: node_tcp_timewait
   why: TIME_WAIT socket count per node. The early signal before SNAT source ports (about 28,000 by default) are exhausted by a flood of short connections (Prezi case)
   query: node_sockstat_TCP_tw
+  source:
+    - "node_sockstat_TCP_tw: prometheus/node_exporter collector/sockstat_linux.go:136,171-174@v1.7.0, :135,170-173@v1.10.2, :134,169-172@v1.12.1 (name = protocol TCP, an underscore and the pair name tw; sockstat collector, on by default: collector/sockstat_linux.go:42@v1.7.0, :41@v1.10.2, :40@v1.12.1)"
 - id: kubelet_pleg_p99_1h
   why: kubelet PLEG (pod lifecycle relist) p99 latency per node (1h). Above 3s the node goes NotReady with "PLEG is not healthy"
   query: histogram_quantile(0.99, sum by (le, node) (rate(kubelet_pleg_relist_duration_seconds_bucket[1h])))
+  source:
+    - "kubelet_pleg_relist_duration_seconds_bucket: kubernetes/kubernetes pkg/kubelet/metrics/metrics.go:50,322@v1.32.13, :50,330@v1.33.5, :52,414@v1.37.2 (histogram PLEGRelistDuration, so _bucket with le; subsystem kubelet pkg/kubelet/metrics/metrics.go:34@v1.32.13, :34@v1.33.5, :36@v1.37.2)"
+    - "label node on kubelet_* series: prometheus-operator/prometheus-operator pkg/prometheus/promcfg.go:1310-1314@v0.71.0, :2000-2004@v0.86.2 (for every ServiceMonitor target the operator relabels __meta_kubernetes_endpoint_address_target_kind;name = Node;<name> into node), the meta labels come from Prometheus's endpoints discovery, prometheus/prometheus discovery/kubernetes/endpoints.go:254,285-287@v2.49.1, :331,366-368@v3.7.3 (set from the address's targetRef), and pkg/kubelet/controller.go:155@v0.71.0, :290,303@v0.86.2 (the kubelet Endpoints the operator writes carry targetRef kind Node); the two operator versions are what kube-prometheus-stack 56.0.0 and 79.5.0 pin, prometheus-community/helm-charts charts/kube-prometheus-stack/Chart.yaml:27@kube-prometheus-stack-56.0.0, :36@kube-prometheus-stack-79.5.0; a scrape configuration that does not set node leaves the on (node) match with nothing to match, so the query is empty"
 - id: node_network_errors_5m
   why: NIC receive errors and transmit drops. Non-zero means driver, MTU or overlay trouble
   query: >
     (sum by (instance, device) (rate(node_network_receive_errs_total{device!~"lo|veth.*|cali.*|flannel.*|cni.*|docker.*"}[5m]))
       + sum by (instance, device) (rate(node_network_transmit_drop_total{device!~"lo|veth.*|cali.*|flannel.*|cni.*|docker.*"}[5m]))) > 0
+  source:
+    - "node_network_receive_errs_total: prometheus/node_exporter collector/netdev_linux.go:112,168@v1.7.0, :113,169@v1.10.2, :112,168@v1.12.1 (reader key receive_errors; legacy() renames it to receive_errs at collector/netdev_common.go:194-195@v1.7.0, :209-210@v1.10.2, :211-212@v1.12.1 unless --collector.netdev.enable-detailed-metrics is set, :39,118-120@v1.7.0, :38,123-125@v1.10.2, :36,121-123@v1.12.1; collector/netdev_common.go:102@v1.7.0, :101@v1.10.2, :99@v1.12.1 builds node_network_<key>_total from the per-device counter map; netdev collector, on by default: collector/netdev_common.go:53@v1.7.0, :52@v1.10.2, :50@v1.12.1)"
+    - "node_network_transmit_drop_total: prometheus/node_exporter collector/netdev_linux.go:115,177@v1.7.0, :116,178@v1.10.2, :115,177@v1.12.1 (reader key transmit_dropped; legacy() renames it to transmit_drop at collector/netdev_common.go:212-213@v1.7.0, :227-228@v1.10.2, :229-230@v1.12.1 unless --collector.netdev.enable-detailed-metrics is set, :39,118-120@v1.7.0, :38,123-125@v1.10.2, :36,121-123@v1.12.1; collector/netdev_common.go:102@v1.7.0, :101@v1.10.2, :99@v1.12.1 builds node_network_<key>_total from the per-device counter map; netdev collector, on by default: collector/netdev_common.go:53@v1.7.0, :52@v1.10.2, :50@v1.12.1)"
+    - "label instance: prometheus/prometheus scrape/target.go:507-510@v2.49.1, :519-522@v3.7.3 (Prometheus sets instance to the scrape target address when the target has none, so on node-exporter series it is <node IP>:9100, which lib/evaluate.py and the summaries map to the node by IP; a scrape config that relabels instance changes this)"
 # --- apiserver metrics. EKS exposes apiserver /metrics too. On k3s the apiserver lives inside the k3s process and kube-prometheus-stack scrapes it
 - id: apiserver_429_rate
   why: Requests per second the apiserver rejected with 429 (Too Many Requests). Client QPS floods or Priority and Fairness (APF) limits
@@ -173,6 +284,8 @@
 - id: apiserver_watch_per_node
   why: Open WATCHes per node. Scaling with node count is normal (a few each for kubelet, kube-proxy, CNI). Hundreds means a controller or agent is spawning informers freely
   query: sum(apiserver_longrunning_requests{verb="WATCH"}) / count(kube_node_info)
+  source:
+    - "kube_node_info: kubernetes/kube-state-metrics internal/store/node.go:110@v2.10.1, :134@v2.17.0, :135@v2.20.0 (default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
 - id: apiserver_401_rate_1h
   why: 1h average 401s (authentication failures) per second. A client retrying with an expired token or a wrong kubeconfig
   query: sum(rate(apiserver_request_total{code="401"}[1h]))
@@ -213,68 +326,123 @@
     topk(300, quantile_over_time(0.95, (sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
       / on (namespace, pod, container) (kube_pod_container_resource_requests{resource="cpu"} >= 0.1)
       and on (namespace, pod) (time() - kube_pod_created > 86400))
+  source:
+    - "container_cpu_usage_seconds_total: google/cadvisor metrics/prometheus.go:164@v0.51.0, :169@v0.52.1, :169@v0.53.0, lib/metrics/prometheus.go:180@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_container_resource_requests: kubernetes/kube-state-metrics internal/store/pod.go:231@v2.10.1, :234@v2.17.0, :243@v2.20.0 (labels container, node, resource, unit :282@v2.10.1, :285@v2.17.0, :294@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_created: kubernetes/kube-state-metrics internal/store/pod.go:554@v2.10.1, :583@v2.17.0, :592@v2.20.0 (default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: cpu_limit_p95_ratio_7d
   why: Container 7-day CPU p95 usage / limit. Above 0.9 it hits the limit and throttling becomes routine (a leading indicator for cpu-throttling)
   query: >
     topk(300, quantile_over_time(0.95, (sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
       / on (namespace, pod, container) (kube_pod_container_resource_limits{resource="cpu"} > 0)
       and on (namespace, pod) (time() - kube_pod_created > 86400))
+  source:
+    - "container_cpu_usage_seconds_total: google/cadvisor metrics/prometheus.go:164@v0.51.0, :169@v0.52.1, :169@v0.53.0, lib/metrics/prometheus.go:180@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_container_resource_limits: kubernetes/kube-state-metrics internal/store/pod.go:167@v2.10.1, :170@v2.17.0, :179@v2.20.0 (labels container, node, resource, unit :219@v2.10.1, :222@v2.17.0, :231@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_created: kubernetes/kube-state-metrics internal/store/pod.go:554@v2.10.1, :583@v2.17.0, :592@v2.20.0 (default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: memory_request_p95_ratio_7d
   why: Container 7-day memory working set p95 / request. Below 0.3 is over-allocation; only requests >= 256Mi and pods older than 1 day
   query: >
     topk(300, quantile_over_time(0.95, (max by (namespace, pod, container) (container_memory_working_set_bytes{container!="",container!="POD"}))[7d:15m])
       / on (namespace, pod, container) (kube_pod_container_resource_requests{resource="memory"} >= 268435456)
       and on (namespace, pod) (time() - kube_pod_created > 86400))
+  source:
+    - "container_memory_working_set_bytes: google/cadvisor metrics/prometheus.go:434@v0.51.0, :439@v0.52.1, :439@v0.53.0, lib/metrics/prometheus.go:531@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_container_resource_requests: kubernetes/kube-state-metrics internal/store/pod.go:231@v2.10.1, :234@v2.17.0, :243@v2.20.0 (labels container, node, resource, unit :282@v2.10.1, :285@v2.17.0, :294@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_created: kubernetes/kube-state-metrics internal/store/pod.go:554@v2.10.1, :583@v2.17.0, :592@v2.20.0 (default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: memory_limit_p95_ratio_7d
   why: Container 7-day memory p95 / limit. Above 0.9 is on the verge of OOMKilled
   query: >
     topk(300, quantile_over_time(0.95, (max by (namespace, pod, container) (container_memory_working_set_bytes{container!="",container!="POD"}))[7d:15m])
       / on (namespace, pod, container) (kube_pod_container_resource_limits{resource="memory"} > 0)
       and on (namespace, pod) (time() - kube_pod_created > 86400))
+  source:
+    - "container_memory_working_set_bytes: google/cadvisor metrics/prometheus.go:434@v0.51.0, :439@v0.52.1, :439@v0.53.0, lib/metrics/prometheus.go:531@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_container_resource_limits: kubernetes/kube-state-metrics internal/store/pod.go:167@v2.10.1, :170@v2.17.0, :179@v2.20.0 (labels container, node, resource, unit :219@v2.10.1, :222@v2.17.0, :231@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_created: kubernetes/kube-state-metrics internal/store/pod.go:554@v2.10.1, :583@v2.17.0, :592@v2.20.0 (default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: cpu_p95_7d_cores
   why: Container 7-day CPU p95 absolute value (cores). Evidence number for the ratio checks
   query: >
     topk(300, quantile_over_time(0.95, (sum by (namespace, pod, container) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
       and on (namespace, pod, container) (kube_pod_container_resource_requests{resource="cpu"} > 0))
+  source:
+    - "container_cpu_usage_seconds_total: google/cadvisor metrics/prometheus.go:164@v0.51.0, :169@v0.52.1, :169@v0.53.0, lib/metrics/prometheus.go:180@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_container_resource_requests: kubernetes/kube-state-metrics internal/store/pod.go:231@v2.10.1, :234@v2.17.0, :243@v2.20.0 (labels container, node, resource, unit :282@v2.10.1, :285@v2.17.0, :294@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: memory_p95_7d_bytes
   why: Container 7-day memory working set p95 absolute value (bytes). Evidence number for the ratio checks
   query: >
     topk(300, quantile_over_time(0.95, (max by (namespace, pod, container) (container_memory_working_set_bytes{container!="",container!="POD"}))[7d:15m])
       and on (namespace, pod, container) (kube_pod_container_resource_requests{resource="memory"} > 0))
+  source:
+    - "container_memory_working_set_bytes: google/cadvisor metrics/prometheus.go:434@v0.51.0, :439@v0.52.1, :439@v0.53.0, lib/metrics/prometheus.go:531@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_container_resource_requests: kubernetes/kube-state-metrics internal/store/pod.go:231@v2.10.1, :234@v2.17.0, :243@v2.20.0 (labels container, node, resource, unit :282@v2.10.1, :285@v2.17.0, :294@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: container_cpu_request_cores
   why: Current container CPU request (cores). Evidence for the ratio checks
   query: max by (namespace, pod, container) (kube_pod_container_resource_requests{resource="cpu"})
+  source:
+    - "kube_pod_container_resource_requests: kubernetes/kube-state-metrics internal/store/pod.go:231@v2.10.1, :234@v2.17.0, :243@v2.20.0 (labels container, node, resource, unit :282@v2.10.1, :285@v2.17.0, :294@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: container_memory_request_bytes
   why: Current container memory request (bytes). Evidence for the ratio checks
   query: max by (namespace, pod, container) (kube_pod_container_resource_requests{resource="memory"})
+  source:
+    - "kube_pod_container_resource_requests: kubernetes/kube-state-metrics internal/store/pod.go:231@v2.10.1, :234@v2.17.0, :243@v2.20.0 (labels container, node, resource, unit :282@v2.10.1, :285@v2.17.0, :294@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: node_cpu_usage_ratio_p95_7d
   why: Node 7-day CPU usage p95 / allocatable. Used instead of the 5-minute instant value to judge the request gap (current nodes only)
   query: >
     quantile_over_time(0.95, (sum by (node) (rate(container_cpu_usage_seconds_total{container!="",id!="/"}[5m]) * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
       / sum by (node) (kube_node_status_allocatable{resource="cpu"}))[7d:15m]) and on (node) max by (node) (kube_node_info)
+  source:
+    - "container_cpu_usage_seconds_total: google/cadvisor metrics/prometheus.go:164@v0.51.0, :169@v0.52.1, :169@v0.53.0, lib/metrics/prometheus.go:180@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_info: kubernetes/kube-state-metrics internal/store/pod.go:604@v2.10.1, :633@v2.17.0, :642@v2.20.0 (labels host_ip, pod_ip, node, created_by_kind, created_by_name, priority_class, host_network :623@v2.10.1, :652@v2.17.0, :661@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_node_status_allocatable: kubernetes/kube-state-metrics internal/store/node.go:284@v2.10.1, :309@v2.17.0, :338@v2.20.0 (labels resource, unit :356@v2.10.1, :381@v2.17.0, :410@v2.20.0, resource cpu in cores, memory in bytes, pods as an integer; default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
+    - "kube_node_info: kubernetes/kube-state-metrics internal/store/node.go:110@v2.10.1, :134@v2.17.0, :135@v2.20.0 (default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: node_memory_usage_ratio_p95_7d
   why: Node 7-day memory working set p95 / allocatable (current nodes only)
   query: >
     quantile_over_time(0.95, (sum by (node) (container_memory_working_set_bytes{container!="",id!="/"} * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
       / sum by (node) (kube_node_status_allocatable{resource="memory"}))[7d:15m]) and on (node) max by (node) (kube_node_info)
+  source:
+    - "container_memory_working_set_bytes: google/cadvisor metrics/prometheus.go:434@v0.51.0, :439@v0.52.1, :439@v0.53.0, lib/metrics/prometheus.go:531@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_info: kubernetes/kube-state-metrics internal/store/pod.go:604@v2.10.1, :633@v2.17.0, :642@v2.20.0 (labels host_ip, pod_ip, node, created_by_kind, created_by_name, priority_class, host_network :623@v2.10.1, :652@v2.17.0, :661@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_node_status_allocatable: kubernetes/kube-state-metrics internal/store/node.go:284@v2.10.1, :309@v2.17.0, :338@v2.20.0 (labels resource, unit :356@v2.10.1, :381@v2.17.0, :410@v2.20.0, resource cpu in cores, memory in bytes, pods as an integer; default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
+    - "kube_node_info: kubernetes/kube-state-metrics internal/store/node.go:110@v2.10.1, :134@v2.17.0, :135@v2.20.0 (default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: large_request_containers
   why: Containers whose CPU or memory request exceeds half the median node allocatable. Workloads that defeat bin packing and make Karpenter launch big nodes. The median rather than the smallest node is used because a 1-core smallest node would flag every 0.5-core request
   query: >
     (max by (namespace, pod, container) (kube_pod_container_resource_requests{resource="cpu"}) / scalar(quantile(0.5, kube_node_status_allocatable{resource="cpu"})) > 0.5)
       or (max by (namespace, pod, container) (kube_pod_container_resource_requests{resource="memory"}) / scalar(quantile(0.5, kube_node_status_allocatable{resource="memory"})) > 0.5)
+  source:
+    - "kube_pod_container_resource_requests: kubernetes/kube-state-metrics internal/store/pod.go:231@v2.10.1, :234@v2.17.0, :243@v2.20.0 (labels container, node, resource, unit :282@v2.10.1, :285@v2.17.0, :294@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_node_status_allocatable: kubernetes/kube-state-metrics internal/store/node.go:284@v2.10.1, :309@v2.17.0, :338@v2.20.0 (labels resource, unit :356@v2.10.1, :381@v2.17.0, :410@v2.20.0, resource cpu in cores, memory in bytes, pods as an integer; default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
 
 # ---------- Scaling ----------
 - id: hpa_at_min_ratio_15d
   why: Share of the last 15 days the current replicas sat at min. Above 0.99 with max > min the HPA never moved (wrong target or over-requesting)
   query: >
     avg_over_time((kube_horizontalpodautoscaler_status_current_replicas == bool on (namespace, horizontalpodautoscaler) kube_horizontalpodautoscaler_spec_min_replicas)[15d:5m])
+  source:
+    - "kube_horizontalpodautoscaler_status_current_replicas: kubernetes/kube-state-metrics internal/store/horizontalpodautoscaler.go:303@v2.10.1, :305@v2.17.0, :335@v2.20.0 (default labels namespace, horizontalpodautoscaler internal/store/horizontalpodautoscaler.go:51@v2.10.1, :51@v2.17.0, :51@v2.20.0)"
+    - "kube_horizontalpodautoscaler_spec_min_replicas: kubernetes/kube-state-metrics internal/store/horizontalpodautoscaler.go:166@v2.10.1, :168@v2.17.0, :170@v2.20.0 (default labels namespace, horizontalpodautoscaler internal/store/horizontalpodautoscaler.go:51@v2.10.1, :51@v2.17.0, :51@v2.20.0)"
 - id: hpa_desired_changes_7d
   why: How often desired replicas changed in 7 days. Dozens means flapping (up and down in short cycles). Happens without behavior stabilization
   query: changes(kube_horizontalpodautoscaler_status_desired_replicas[7d])
+  source:
+    - "kube_horizontalpodautoscaler_status_desired_replicas: kubernetes/kube-state-metrics internal/store/horizontalpodautoscaler.go:322@v2.10.1, :324@v2.17.0, :354@v2.20.0 (default labels namespace, horizontalpodautoscaler internal/store/horizontalpodautoscaler.go:51@v2.10.1, :51@v2.17.0, :51@v2.20.0)"
 - id: pod_pending_seconds
   why: Seconds since creation for pods Pending right now. Only above 60s. A sign that the node autoscaler is not making room
   query: >
     (time() - kube_pod_created) * on (namespace, pod) group_left() (kube_pod_status_phase{phase="Pending"} == 1) > 60
+  source:
+    - "kube_pod_created: kubernetes/kube-state-metrics internal/store/pod.go:554@v2.10.1, :583@v2.17.0, :592@v2.20.0 (default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_status_phase: kubernetes/kube-state-metrics internal/store/pod.go:1305@v2.10.1, :1339@v2.17.0, :1504@v2.20.0 (label phase :1334@v2.10.1, :1368@v2.17.0, :1533@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: keda_scaler_errors_24h
   # keda_scaler_detail_errors_total since KEDA 2.14.0, keda_scaler_errors_total until 2.16 (removed in 2.17.0): kedacore/keda pkg/metricscollector/prommetrics.go:116@v2.14.0, :107@v2.16.0, absent @v2.17.0 (collectors/keda/pod-metrics.yaml).
   # `or` takes the newer counter's series and adds the older one's only where the newer has none, so 2.14-2.16, which emit both, are not counted twice.
@@ -285,10 +453,16 @@
 - id: pod_network_rx_bytes_1h
   why: 1h average received bytes/s per pod (above 1KB/s). Large variance between pods of one workload means keep-alive or gRPC pinning traffic to one pod. lib/traffic.py groups by workload
   query: sum by (namespace, pod) (rate(container_network_receive_bytes_total{pod!=""}[1h])) > 1000
+  source:
+    - "container_network_receive_bytes_total: google/cadvisor metrics/prometheus.go:775@v0.51.0, :780@v0.52.1, :780@v0.53.0, lib/metrics/prometheus.go:1066@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: pod_ready_ratio_24h
   why: Share of the last 24h a currently Running pod was Ready (below 0.99 only). Time it was out of the endpoints due to readiness failures. Pairs with Unhealthy events
   query: >
     avg_over_time(kube_pod_status_ready{condition="true"}[24h]) * on (namespace, pod) group_left() max by (namespace, pod) (kube_pod_status_phase{phase="Running"} == 1) < 0.99
+  source:
+    - "kube_pod_status_ready: kubernetes/kube-state-metrics internal/store/pod.go:1473@v2.10.1, :1507@v2.17.0, :1672@v2.20.0 (label condition :1487@v2.10.1, :1521@v2.17.0, :1686@v2.20.0 with the values true, false, unknown; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_status_phase: kubernetes/kube-state-metrics internal/store/pod.go:1305@v2.10.1, :1339@v2.17.0, :1504@v2.20.0 (label phase :1334@v2.10.1, :1368@v2.17.0, :1533@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: ingress_nginx_rps_1h
   why: 1h average RPS per ingress-nginx Ingress. No series when controller metrics are off (observability.golden-signals-missing)
   query: sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests[1h])) > 0
@@ -307,8 +481,11 @@
   why: CoreDNS request p99 (seconds, 1h). Near 5s is the UDP conntrack race; above 0.1s is CoreDNS overload or upstream latency
   query: histogram_quantile(0.99, sum by (le) (rate(coredns_dns_request_duration_seconds_bucket[1h])))
 - id: endpoint_not_ready_addresses
+  # kube_endpoint_address_not_ready existed until kube-state-metrics 2.13 (internal/store/endpoint.go:148@v2.13.0) and is gone since 2.14.0; the ready="false" series of kube_endpoint_address list the same addresses at every version read, except that since 2.14.0 there is one series per address and port (none for a subset without ports), so the inner count collapses the ports. The old gauge was addresses times ports too (endpoint.go:155-157@v2.10.1).
   why: Endpoints with not-ready addresses behind a Service (pods failing readiness are out of traffic)
-  query: sum by (namespace, endpoint) (kube_endpoint_address_not_ready) > 0
+  query: count by (namespace, endpoint) (count by (namespace, endpoint, ip) (kube_endpoint_address{ready="false"}))
+  source:
+    - "kube_endpoint_address: kubernetes/kube-state-metrics internal/store/endpoint.go:168@v2.10.1, :168@v2.13.0, :127@v2.14.0, :127@v2.17.0, :127@v2.20.0 (label ready is true for the subset's ready addresses and false for its notReadyAddresses :176-188@v2.10.1, :134-153@v2.14.0; label ip at every version read; since 2.14.0 there is one series per address and port, :136-153@v2.14.0, with port_protocol, port_number, port_name, so an address count has to count distinct ip, and a subset without ports has no series at all while 2.10.1 to 2.13.0 emit one per address; default labels namespace, endpoint internal/store/endpoint.go:40@v2.10.1, :40@v2.14.0, :40@v2.17.0, :40@v2.20.0)"
 
 # ---------- Structure and hygiene ----------
 - id: apiserver_requested_deprecated_apis
@@ -317,58 +494,103 @@
 - id: secrets_by_name
   why: Secret names and namespaces (kube_secret_info, no values). For finding Secrets nobody references (orphans)
   query: kube_secret_info
+  source:
+    - "kube_secret_info: kubernetes/kube-state-metrics internal/store/secret.go:45@v2.10.1, :46@v2.17.0, :46@v2.20.0 (default labels namespace, secret internal/store/secret.go:39@v2.10.1, :40@v2.17.0, :40@v2.20.0)"
 - id: secret_types
   why: Secret type (kube_secret_type). service-account-token and helm release Secrets are excluded from the orphan check
   query: kube_secret_type
+  source:
+    - "kube_secret_type: kubernetes/kube-state-metrics internal/store/secret.go:61@v2.10.1, :62@v2.17.0, :62@v2.20.0 (label type :70@v2.10.1, :71@v2.17.0, :71@v2.20.0; default labels namespace, secret internal/store/secret.go:39@v2.10.1, :40@v2.17.0, :40@v2.20.0)"
 
 # ---------- Storage. The kubelet only reports mounted PVCs (local-path volumes only partially) ----------
 - id: pvc_usage_ratio
   why: PVC usage (kubelet_volume_stats). Above 0.85 a database is about to fail writes
   query: kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes
+  source:
+    - "kubelet_volume_stats_used_bytes: kubernetes/kubernetes pkg/kubelet/metrics/collectors/volume_stats.go:42-45@v1.32.13, :42-45@v1.33.5, :42-45@v1.37.2 (labels namespace, persistentvolumeclaim; key pkg/kubelet/metrics/metrics.go:62@v1.32.13, :62@v1.33.5, :65@v1.37.2; subsystem kubelet pkg/kubelet/metrics/metrics.go:34@v1.32.13, :34@v1.33.5, :36@v1.37.2)"
+    - "kubelet_volume_stats_capacity_bytes: kubernetes/kubernetes pkg/kubelet/metrics/collectors/volume_stats.go:30-33@v1.32.13, :30-33@v1.33.5, :30-33@v1.37.2 (labels namespace, persistentvolumeclaim; key pkg/kubelet/metrics/metrics.go:60@v1.32.13, :60@v1.33.5, :63@v1.37.2; subsystem kubelet pkg/kubelet/metrics/metrics.go:34@v1.32.13, :34@v1.33.5, :36@v1.37.2)"
 - id: pvc_inode_ratio
   why: PVC inode usage. Volumes with many small files (cache, logs) run out of inodes before space
   query: kubelet_volume_stats_inodes_used / kubelet_volume_stats_inodes
+  source:
+    - "kubelet_volume_stats_inodes_used: kubernetes/kubernetes pkg/kubelet/metrics/collectors/volume_stats.go:60-63@v1.32.13, :60-63@v1.33.5, :60-63@v1.37.2 (labels namespace, persistentvolumeclaim; key pkg/kubelet/metrics/metrics.go:65@v1.32.13, :65@v1.33.5, :68@v1.37.2; subsystem kubelet pkg/kubelet/metrics/metrics.go:34@v1.32.13, :34@v1.33.5, :36@v1.37.2)"
+    - "kubelet_volume_stats_inodes: kubernetes/kubernetes pkg/kubelet/metrics/collectors/volume_stats.go:48-51@v1.32.13, :48-51@v1.33.5, :48-51@v1.37.2 (labels namespace, persistentvolumeclaim; key pkg/kubelet/metrics/metrics.go:63@v1.32.13, :63@v1.33.5, :66@v1.37.2; subsystem kubelet pkg/kubelet/metrics/metrics.go:34@v1.32.13, :34@v1.33.5, :36@v1.37.2)"
 - id: pvc_capacity_bytes
   why: PVC capacity (bytes). Evidence number for the usage check
   query: kubelet_volume_stats_capacity_bytes
+  source:
+    - "kubelet_volume_stats_capacity_bytes: kubernetes/kubernetes pkg/kubelet/metrics/collectors/volume_stats.go:30-33@v1.32.13, :30-33@v1.33.5, :30-33@v1.37.2 (labels namespace, persistentvolumeclaim; key pkg/kubelet/metrics/metrics.go:60@v1.32.13, :60@v1.33.5, :63@v1.37.2; subsystem kubelet pkg/kubelet/metrics/metrics.go:34@v1.32.13, :34@v1.33.5, :36@v1.37.2)"
 - id: pvc_available_bytes
   why: PVC bytes remaining. Together with the growth rate, for the "full in N days" estimate
   query: kubelet_volume_stats_available_bytes
+  source:
+    - "kubelet_volume_stats_available_bytes: kubernetes/kubernetes pkg/kubelet/metrics/collectors/volume_stats.go:36-39@v1.32.13, :36-39@v1.33.5, :36-39@v1.37.2 (labels namespace, persistentvolumeclaim; key pkg/kubelet/metrics/metrics.go:61@v1.32.13, :61@v1.33.5, :64@v1.37.2; subsystem kubelet pkg/kubelet/metrics/metrics.go:34@v1.32.13, :34@v1.33.5, :36@v1.37.2)"
 - id: pvc_growth_bytes_per_day_7d
   why: Daily growth in bytes from a 7-day linear regression (deriv). Negative means shrinking
   query: deriv(kubelet_volume_stats_used_bytes[7d]) * 86400
+  source:
+    - "kubelet_volume_stats_used_bytes: kubernetes/kubernetes pkg/kubelet/metrics/collectors/volume_stats.go:42-45@v1.32.13, :42-45@v1.33.5, :42-45@v1.37.2 (labels namespace, persistentvolumeclaim; key pkg/kubelet/metrics/metrics.go:62@v1.32.13, :62@v1.33.5, :65@v1.37.2; subsystem kubelet pkg/kubelet/metrics/metrics.go:34@v1.32.13, :34@v1.33.5, :36@v1.37.2)"
 - id: node_pvc_pods_count
   why: Pods using a PVC per node (≈ attached volumes). Compared with the CSINode attach limit
   query: count by (node) (kube_pod_spec_volumes_persistentvolumeclaims_info * on (namespace, pod) group_left(node) kube_pod_info)
+  source:
+    - "kube_pod_spec_volumes_persistentvolumeclaims_info: kubernetes/kube-state-metrics internal/store/pod.go:1227@v2.10.1, :1261@v2.17.0, :1414@v2.20.0 (labels volume, persistentvolumeclaim :1238@v2.10.1, :1272@v2.17.0; :1425@v2.20.0 adds ephemeral; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_pod_info: kubernetes/kube-state-metrics internal/store/pod.go:604@v2.10.1, :633@v2.17.0, :642@v2.20.0 (labels host_ip, pod_ip, node, created_by_kind, created_by_name, priority_class, host_network :623@v2.10.1, :652@v2.17.0, :661@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 # --- Multi-tenancy. Namespace = tenant unit ---
 - id: namespace_cpu_p95_7d
   why: Namespace (tenant) 7-day CPU p95 (cores). Baseline for comparing tenant usage and noisy-neighbour candidates
   query: >
     quantile_over_time(0.95, (sum by (namespace) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
+  source:
+    - "container_cpu_usage_seconds_total: google/cadvisor metrics/prometheus.go:164@v0.51.0, :169@v0.52.1, :169@v0.53.0, lib/metrics/prometheus.go:180@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: namespace_cpu_max_7d
   why: Namespace 7-day CPU max (15-minute samples). A large multiple of p95 means a bursty tenant (CI runners, batch)
   query: >
     max_over_time((sum by (namespace) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
+  source:
+    - "container_cpu_usage_seconds_total: google/cadvisor metrics/prometheus.go:164@v0.51.0, :169@v0.52.1, :169@v0.53.0, lib/metrics/prometheus.go:180@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: namespace_cpu_median_7d
   why: Namespace 7-day CPU median. The denominator of the burst multiple (max/median)
   query: >
     quantile_over_time(0.5, (sum by (namespace) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m])))[7d:15m])
+  source:
+    - "container_cpu_usage_seconds_total: google/cadvisor metrics/prometheus.go:164@v0.51.0, :169@v0.52.1, :169@v0.53.0, lib/metrics/prometheus.go:180@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: namespace_memory_p95_7d_bytes
   why: Namespace 7-day memory working set p95 (bytes). How much a tenant without a quota actually uses
   query: >
     quantile_over_time(0.95, (sum by (namespace) (container_memory_working_set_bytes{container!="",container!="POD"}))[7d:15m])
+  source:
+    - "container_memory_working_set_bytes: google/cadvisor metrics/prometheus.go:434@v0.51.0, :439@v0.52.1, :439@v0.53.0, lib/metrics/prometheus.go:531@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: namespace_node_cpu_share_p95_7d
   why: Per node, what share of allocatable CPU each namespace uses (7-day p95). When one tenant dominates a node, the other tenants on it get squeezed
   query: >
     quantile_over_time(0.95, (sum by (namespace, node) (rate(container_cpu_usage_seconds_total{container!="",container!="POD"}[5m]) * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
       / on (node) group_left() sum by (node) (kube_node_status_allocatable{resource="cpu"}))[7d:15m])
+  source:
+    - "container_cpu_usage_seconds_total: google/cadvisor metrics/prometheus.go:164@v0.51.0, :169@v0.52.1, :169@v0.53.0, lib/metrics/prometheus.go:180@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_info: kubernetes/kube-state-metrics internal/store/pod.go:604@v2.10.1, :633@v2.17.0, :642@v2.20.0 (labels host_ip, pod_ip, node, created_by_kind, created_by_name, priority_class, host_network :623@v2.10.1, :652@v2.17.0, :661@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_node_status_allocatable: kubernetes/kube-state-metrics internal/store/node.go:284@v2.10.1, :309@v2.17.0, :338@v2.20.0 (labels resource, unit :356@v2.10.1, :381@v2.17.0, :410@v2.20.0, resource cpu in cores, memory in bytes, pods as an integer; default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: node_cpu_saturated_minutes_7d
   why: Minutes the node CPU usage exceeded 90% of allocatable (7d, 5-minute samples). At 0 a noisy neighbour had no room to do real harm
   query: >
     sum_over_time(((sum by (node) (rate(container_cpu_usage_seconds_total{container!="",id!="/"}[5m]) * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
       / sum by (node) (kube_node_status_allocatable{resource="cpu"})) > bool 0.9)[7d:5m]) * 5
+  source:
+    - "container_cpu_usage_seconds_total: google/cadvisor metrics/prometheus.go:164@v0.51.0, :169@v0.52.1, :169@v0.53.0, lib/metrics/prometheus.go:180@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_info: kubernetes/kube-state-metrics internal/store/pod.go:604@v2.10.1, :633@v2.17.0, :642@v2.20.0 (labels host_ip, pod_ip, node, created_by_kind, created_by_name, priority_class, host_network :623@v2.10.1, :652@v2.17.0, :661@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "kube_node_status_allocatable: kubernetes/kube-state-metrics internal/store/node.go:284@v2.10.1, :309@v2.17.0, :338@v2.20.0 (labels resource, unit :356@v2.10.1, :381@v2.17.0, :410@v2.20.0, resource cpu in cores, memory in bytes, pods as an integer; default label node internal/store/node.go:42@v2.10.1, :42@v2.17.0, :42@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: namespace_cpu_throttled_ratio_7d
   why: 7-day CPU throttled-period ratio per namespace. A production tenant throttled on a shared node has either a low limit or a neighbour eating CPU
   query: >
     sum by (namespace) (increase(container_cpu_cfs_throttled_periods_total{container!="",container!="POD"}[7d]))
       / sum by (namespace) (increase(container_cpu_cfs_periods_total{container!="",container!="POD"}[7d])) > 0
+  source:
+    - "container_cpu_cfs_throttled_periods_total: google/cadvisor metrics/prometheus.go:203@v0.51.0, :208@v0.52.1, :208@v0.53.0, lib/metrics/prometheus.go:225@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "container_cpu_cfs_periods_total: google/cadvisor metrics/prometheus.go:191@v0.51.0, :196@v0.52.1, :196@v0.53.0, lib/metrics/prometheus.go:210@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"

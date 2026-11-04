@@ -56,12 +56,21 @@
   why: Prometheus container RSS ÷ memory limit. Above 0.85 the next compaction or large query gets OOMKilled
   query: >
     max by (pod) (container_memory_working_set_bytes{container="prometheus"}) / on (pod) group_left() max by (pod) (kube_pod_container_resource_limits{container="prometheus",resource="memory"})
+  source:
+    - "container_memory_working_set_bytes: google/cadvisor metrics/prometheus.go:434@v0.51.0, :439@v0.52.1, :439@v0.53.0, lib/metrics/prometheus.go:531@v0.60.5 (the versions kubernetes/kubernetes go.mod pins: :38@v1.32.13 v0.51.0, :35@v1.33.5 v0.52.1, :32@v1.37.2 lib v0.60.5; served by the kubelet at /metrics/cadvisor pkg/kubelet/server/server.go:98@v1.32.13, :102@v1.33.5, :112@v1.37.2)"
+    - "kube_pod_container_resource_limits: kubernetes/kube-state-metrics internal/store/pod.go:167@v2.10.1, :170@v2.17.0, :179@v2.20.0 (labels container, node, resource, unit :219@v2.10.1, :222@v2.17.0, :231@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
+    - "label container, pod, namespace, id on container_* series: kubernetes/kubernetes pkg/kubelet/server/server.go:1162,1189-1194@v1.32.13, :1199,1226-1231@v1.33.5, :1462,1489-1494@v1.37.2 (the kubelet's container label function, not cAdvisor, sets pod, namespace and container from the pod the cgroup belongs to; id is cAdvisor's LabelID, google/cadvisor metrics/prometheus.go:1789@v0.51.0, :1842@v0.52.1, lib/metrics/prometheus.go:2205@v0.60.5; the kubelet serves these names because it includes the CPU, memory, network and OOM metric sets, pkg/kubelet/cadvisor/cadvisor_linux.go:85-93@v1.32.13, :87-95@v1.33.5, :94-100@v1.37.2, and cAdvisor emits each name inside the matching includedMetrics.Has block, google/cadvisor metrics/prometheus.go:137,371,772,1738@v0.51.0, :142,376,777,1743@v0.52.1, :142,376,777,1743@v0.53.0, lib/metrics/prometheus.go:147,444,1063,2086@v0.60.5)"
 - id: prom_oomkilled
   why: Whether the Prometheus container's last termination reason was OOMKilled (kube-state-metrics)
   query: kube_pod_container_status_last_terminated_reason{container="prometheus",reason="OOMKilled"}
+  source:
+    - "kube_pod_container_status_last_terminated_reason: kubernetes/kube-state-metrics internal/store/pod.go:327@v2.10.1, :330@v2.17.0, :339@v2.20.0 (labels container, reason :337@v2.10.1, :340@v2.17.0, :349@v2.20.0, a series only while the container has a last terminated state; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: prom_pvc_used_ratio
   why: Prometheus data PVC usage ratio (kubelet volume stats — not available for local volumes such as local-path)
   query: max by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{persistentvolumeclaim=~".*prometheus.*"} / kubelet_volume_stats_capacity_bytes)
+  source:
+    - "kubelet_volume_stats_used_bytes: kubernetes/kubernetes pkg/kubelet/metrics/collectors/volume_stats.go:42-45@v1.32.13, :42-45@v1.33.5, :42-45@v1.37.2 (labels namespace, persistentvolumeclaim; key pkg/kubelet/metrics/metrics.go:62@v1.32.13, :62@v1.33.5, :65@v1.37.2; subsystem kubelet pkg/kubelet/metrics/metrics.go:34@v1.32.13, :34@v1.33.5, :36@v1.37.2)"
+    - "kubelet_volume_stats_capacity_bytes: kubernetes/kubernetes pkg/kubelet/metrics/collectors/volume_stats.go:30-33@v1.32.13, :30-33@v1.33.5, :30-33@v1.37.2 (labels namespace, persistentvolumeclaim; key pkg/kubelet/metrics/metrics.go:60@v1.32.13, :60@v1.33.5, :63@v1.37.2; subsystem kubelet pkg/kubelet/metrics/metrics.go:34@v1.32.13, :34@v1.33.5, :36@v1.37.2)"
 - id: prom_retention_days
   why: Configured retention (seconds → days). With retention.size at 0 only time is enforced, so the disk can fill first
   query: max(prometheus_tsdb_retention_limit_seconds) / 86400
@@ -119,6 +128,10 @@
 - id: monitoring_restarts_7d
   why: Restarts per pod in the monitoring namespace over 7d (instability of the stack itself)
   query: sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace="monitoring"}[7d])) > 0.5
+  source:
+    - "kube_pod_container_status_restarts_total: kubernetes/kube-state-metrics internal/store/pod.go:403@v2.10.1, :432@v2.17.0, :441@v2.20.0 (label container :412@v2.10.1, :441@v2.17.0, :450@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: monitoring_oomkilled
   why: Containers in the monitoring namespace whose last termination reason was OOMKilled
   query: kube_pod_container_status_last_terminated_reason{namespace="monitoring",reason="OOMKilled"}
+  source:
+    - "kube_pod_container_status_last_terminated_reason: kubernetes/kube-state-metrics internal/store/pod.go:327@v2.10.1, :330@v2.17.0, :339@v2.20.0 (labels container, reason :337@v2.10.1, :340@v2.17.0, :349@v2.20.0, a series only while the container has a last terminated state; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
