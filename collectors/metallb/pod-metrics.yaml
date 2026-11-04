@@ -1,0 +1,58 @@
+# Metric names kubegap reads from the MetalLB speaker /metrics (step metallb.metallb-speaker-metrics, parsed by lib/metallbctl.py and lib/k3s.py through
+# lib/podmetrics.py). Read in metallb/metallb at v0.14.5, v0.15.2 and v0.16.1: every name and label exists unchanged in the three.
+- key: speaker_announced
+  labels: [service, protocol, node, ip]
+  names:
+    - name: metallb_speaker_announced
+      source: "metallb/metallb speaker/main.go:48-52@v0.14.5, :52-53@v0.15.2, :56-57@v0.16.1"
+- key: k8s_client_config_loaded
+  names:
+    - name: metallb_k8s_client_config_loaded_bool
+      source: "metallb/metallb internal/k8s/controllers/stats.go:22@v0.14.5, :25@v0.16.1"
+- key: k8s_client_config_stale
+  names:
+    - name: metallb_k8s_client_config_stale_bool
+      source: "metallb/metallb internal/k8s/controllers/stats.go:29@v0.14.5, :32@v0.16.1"
+- key: k8s_client_update_errors
+  names:
+    - name: metallb_k8s_client_update_errors_total
+      source: "metallb/metallb internal/k8s/controllers/stats.go:15@v0.14.5, :18@v0.16.1"
+- key: k8s_client_updates
+  names:
+    - name: metallb_k8s_client_updates_total
+      source: "metallb/metallb internal/k8s/controllers/stats.go:8@v0.14.5, :11@v0.16.1"
+- key: layer2_gratuitous_sent
+  labels: [ip]
+  names:
+    - name: metallb_layer2_gratuitous_sent
+      source: "metallb/metallb internal/layer2/stats.go:26@v0.14.5, :29@v0.16.1"
+- key: layer2_requests_received
+  labels: [ip]
+  names:
+    - name: metallb_layer2_requests_received
+      source: "metallb/metallb internal/layer2/stats.go:8@v0.14.5, :11@v0.16.1"
+- key: layer2_responses_sent
+  labels: [ip]
+  names:
+    - name: metallb_layer2_responses_sent
+      source: "metallb/metallb internal/layer2/stats.go:17@v0.14.5, :20@v0.16.1"
+- key: bgp_session_up
+  names:
+    - name: metallb_bgp_session_up
+      source: "metallb/metallb internal/bgp/metrics/metrics.go:15@v0.14.5 and @v0.16.1 (registered by internal/bgp/native/stats.go:13@v0.14.5, :14@v0.16.1)"
+- key: bgp_updates
+  names:
+    - name: metallb_bgp_updates_total
+      source: "metallb/metallb internal/bgp/metrics/metrics.go:20@v0.14.5 and @v0.16.1 (collected for the raw file only)"
+- key: allocator
+  names:
+    - name: metallb_allocator_addresses_in_use_total
+      source: "metallb/metallb internal/allocator/stats.go:40@v0.14.5, :43@v0.16.1 (the keep prefix metallb_allocator_ also collects addresses_total, ipv4/ipv6 twins and services_allocated_total, :16-64; raw file only)"
+- key: process_start
+  names:
+    - name: process_start_time_seconds
+      source: "prometheus/client_golang prometheus/process_collector.go:99@v1.19.1 (collected for the raw file only)"
+- key: rss
+  names:
+    - name: process_resident_memory_bytes
+      source: "prometheus/client_golang prometheus/process_collector.go:94@v1.19.1 (collected for the raw file only)"

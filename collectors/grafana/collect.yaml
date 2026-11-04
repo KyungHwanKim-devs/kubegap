@@ -37,5 +37,6 @@
   port: 3000
   path: /metrics
   out: metrics/pod/grafana
-  keep: '^(grafana_(build_info|datasource_request_total|api_response_status_total|alerting_(active_alerts|rule_evaluation_failures_total|notification_failed_total|active_configurations)|stat_totals_(dashboard|datasource|users|active_users|alert_rules)|stat_active_users|db_datasource_query_by_id_total|plugin_build_info)|process_(start_time|resident_memory_bytes))'
+  keep: '^(grafana_(build_info|datasource_request_total|api_response_status_total|alerting_(active_alerts|rule_evaluation_failures_total|notification_failed_total|active_configurations)|stat_totals_(dashboard|datasource|alert_rules)|stat_total_users|stat_active_users|db_datasource_query_by_id_total|plugin_build_info)|process_(start_time|resident_memory_bytes))'
+  source: "names and their definitions per version: collectors/grafana/pod-metrics.yaml; port 3000 is Grafana's default http_port (conf/defaults.ini), observed here, not read in source for this issue"
   timeout: 30

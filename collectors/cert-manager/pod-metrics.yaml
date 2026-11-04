@@ -1,0 +1,45 @@
+# Metric names kubegap reads from cert-manager's controller /metrics (step cert-manager.controller-metrics, parsed by lib/certmanager.py through
+# lib/podmetrics.py). Read in cert-manager/cert-manager at v1.14.4 and v1.21.3: every name exists in both. v1.21 moved the certificate_* gauges
+# from pkg/metrics/metrics.go into a collector (internal/collectors/certificate_collector.go) and renamed the ACME request label path to action;
+# kubegap reads only status from that counter.
+- key: certificate_expiration
+  labels: [name, namespace]
+  names:
+    - name: certmanager_certificate_expiration_timestamp_seconds
+      source: "cert-manager/cert-manager pkg/metrics/metrics.go:104@v1.14.4; internal/collectors/certificate_collector.go:33@v1.21.3 (labels name, namespace, issuer_name, issuer_kind, issuer_group)"
+- key: certificate_renewal
+  names:
+    - name: certmanager_certificate_renewal_timestamp_seconds
+      source: "cert-manager/cert-manager pkg/metrics/metrics.go:113@v1.14.4; internal/collectors/certificate_collector.go:34@v1.21.3 (collected for the raw file only)"
+- key: certificate_ready
+  labels: [condition, name, namespace]
+  names:
+    - name: certmanager_certificate_ready_status
+      source: "cert-manager/cert-manager pkg/metrics/metrics.go:122@v1.14.4; internal/collectors/certificate_collector.go:30@v1.21.3 (labels name, namespace, condition, issuer_name, issuer_kind, issuer_group)"
+- key: acme_requests
+  labels: [status]
+  names:
+    - name: certmanager_http_acme_client_request_count
+      source: "cert-manager/cert-manager pkg/metrics/metrics.go:133@v1.14.4 (labels scheme, host, path, method, status), :114@v1.21.3 (path became action)"
+- key: controller_sync_errors
+  labels: [controller]
+  names:
+    - name: certmanager_controller_sync_error_count
+      source: "cert-manager/cert-manager pkg/metrics/metrics.go:180@v1.14.4, :189@v1.21.3"
+- key: controller_sync_calls
+  labels: [controller]
+  names:
+    - name: certmanager_controller_sync_call_count
+      source: "cert-manager/cert-manager pkg/metrics/metrics.go:171@v1.14.4, :179@v1.21.3"
+- key: clock_time
+  names:
+    - name: certmanager_clock_time_seconds
+      source: "cert-manager/cert-manager pkg/metrics/metrics.go:74@v1.14.4, :80@v1.21.3 (collected for the raw file only; the _gauge twin is :93 and :100)"
+- key: process_start
+  names:
+    - name: process_start_time_seconds
+      source: "prometheus/client_golang prometheus/process_collector.go:99@v1.19.1 (collected for the raw file only)"
+- key: rss
+  names:
+    - name: process_resident_memory_bytes
+      source: "prometheus/client_golang prometheus/process_collector.go:94@v1.19.1 (collected for the raw file only)"

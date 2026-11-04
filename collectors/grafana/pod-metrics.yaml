@@ -1,0 +1,70 @@
+# Metric names kubegap reads from Grafana's own /metrics (step grafana.self-metrics, parsed by lib/stackhealth.py through lib/podmetrics.py).
+# Read in grafana/grafana at v10.2.3, v12.2.1 and v13.3.0; every name below exists unchanged in the three. grafana_stat_total_users is singular
+# (pkg/infra/metrics/metrics.go:465@v10.2.3): the plural spelling kubegap used until #120 never existed.
+- key: build_info
+  labels: [version]
+  names:
+    - name: grafana_build_info
+      source: "grafana/grafana pkg/infra/metrics/metrics.go:623@v10.2.3, :671@v12.2.1, :701@v13.3.0 (labels version, revision, branch, goversion, edition)"
+- key: datasource_requests
+  labels: [datasource, datasource_type, code]
+  names:
+    - name: grafana_datasource_request_total
+      source: "grafana/grafana pkg/infra/httpclient/httpclientprovider/datasource_metrics_middleware.go:15-21@v10.2.3, :16-22@v12.2.1 and @v13.3.0 (label secure_socks_ds_proxy_enabled added in 12.x); a counter vector has no series before the first request"
+- key: api_responses
+  labels: [code]
+  names:
+    - name: grafana_api_response_status_total
+      source: "grafana/grafana pkg/infra/metrics/metrics.go:231@v10.2.3, :267@v12.2.1, :276@v13.3.0"
+- key: alerting_active_alerts
+  names:
+    - name: grafana_alerting_active_alerts
+      source: "grafana/grafana pkg/infra/metrics/metrics.go:435@v10.2.3, :453@v12.2.1, :448@v13.3.0 (collected for the raw file only)"
+- key: alerting_rule_evaluation_failures
+  names:
+    - name: grafana_alerting_rule_evaluation_failures_total
+      source: "grafana/grafana pkg/services/ngalert/metrics/scheduler.go:58@v10.2.3, :64@v12.2.1 (Namespace grafana, Subsystem alerting)"
+- key: alerting_notification_failed
+  names:
+    - name: grafana_alerting_notification_failed_total
+      source: "grafana/grafana pkg/infra/metrics/metrics.go:349@v10.2.3, :385@v12.2.1, :380@v13.3.0"
+- key: alerting_active_configurations
+  names:
+    - name: grafana_alerting_active_configurations
+      source: "grafana/grafana pkg/services/ngalert/metrics/multi_org_alertmanager.go:35-38@v10.2.3 and @v12.2.1, :50-53@v13.3.0 (collected for the raw file only)"
+- key: stat_totals_dashboard
+  names:
+    - name: grafana_stat_totals_dashboard
+      source: "grafana/grafana pkg/infra/metrics/metrics.go:453@v10.2.3, :483@v12.2.1, :478@v13.3.0"
+- key: stat_totals_datasource
+  names:
+    - name: grafana_stat_totals_datasource
+      source: "grafana/grafana pkg/infra/metrics/metrics.go:531@v10.2.3, :561@v12.2.1, :556@v13.3.0 (label plugin_id)"
+- key: stat_total_users
+  names:
+    - name: grafana_stat_total_users
+      source: "grafana/grafana pkg/infra/metrics/metrics.go:465@v10.2.3, :495@v12.2.1, :490@v13.3.0"
+- key: stat_active_users
+  names:
+    - name: grafana_stat_active_users
+      source: "grafana/grafana pkg/infra/metrics/metrics.go:477@v10.2.3, :507@v12.2.1, :502@v13.3.0"
+- key: stat_totals_alert_rules
+  names:
+    - name: grafana_stat_totals_alert_rules
+      source: "grafana/grafana pkg/infra/metrics/metrics.go:555@v10.2.3, :591@v12.2.1, :598@v13.3.0"
+- key: db_datasource_query_by_id
+  names:
+    - name: grafana_db_datasource_query_by_id_total
+      source: "grafana/grafana pkg/infra/metrics/metrics.go:373@v10.2.3, :391@v12.2.1, :386@v13.3.0 (collected for the raw file only)"
+- key: plugin_build_info
+  names:
+    - name: grafana_plugin_build_info
+      source: "grafana/grafana pkg/infra/metrics/metrics.go:537@v10.2.3, :567@v12.2.1, :562@v13.3.0 (collected for the raw file only)"
+- key: rss
+  names:
+    - name: process_resident_memory_bytes
+      source: "prometheus/client_golang prometheus/process_collector.go:94@v1.19.1"
+- key: process_start
+  names:
+    - name: process_start_time_seconds
+      source: "prometheus/client_golang prometheus/process_collector.go:99@v1.19.1 (collected for the raw file only)"

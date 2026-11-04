@@ -9,5 +9,6 @@
   port: 7472
   path: /metrics
   out: metrics/pod/metallb-speaker
+  source: "names and their definitions per version: collectors/metallb/pod-metrics.yaml; port 7472 and the selector are observed, not read in source"
   timeout: 30
   keep: '^(metallb_(speaker_announced|k8s_client_(config_loaded_bool|config_stale_bool|update_errors_total|updates_total)|layer2_(gratuitous_sent|requests_received|responses_sent)|bgp_session_up|bgp_updates_total|allocator_)|process_(start_time|resident_memory_bytes))'

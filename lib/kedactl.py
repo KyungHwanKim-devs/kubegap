@@ -13,6 +13,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from . import podmetrics as _pm
 from .promtext import parse as _parse_prom
 from .snapshot import load_json, objects
 
@@ -182,11 +183,21 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
     for f in [x for x in sorted(d2.glob("*.prom")) if x.stat().st_size > 0] if d2.is_dir() else []:
         pm = _parse_prom(f.read_text(encoding="utf-8", errors="replace"))
         keda_names = sorted({n for n in list(pm["single"]) + list(pm["labeled"]) if n.startswith("keda_")})
+        # keda_scaler_detail_errors_total since 2.14 (keda_scaler_errors_total before 2.17): one spelling is read, never both (collectors/keda/pod-metrics.yaml)
         errs = {}
-        for labels, v in pm["labeled"].get("keda_scaler_errors_total", []) + pm["labeled"].get("keda_scaler_errors", []):
+        for labels, v in _pm.labeled(pm, "keda", "scaler_errors"):
             k = f"{labels.get('namespace')}/{labels.get('scaledObject')}/{labels.get('scaler')}"
             errs[k] = errs.get(k, 0) + int(v)
-        op_pods[f.stem] = {"keda_metric_names": keda_names[:20], "keda_metrics_present": bool(keda_names), "scaler_errors": errs, "scaler_errors_total": sum(errs.values())}
+        so_errs = {f"{labels.get('namespace')}/{labels.get('scaledObject')}": int(v) for labels, v in _pm.labeled(pm, "keda", "scaled_object_errors")}
+        op_pods[f.stem] = {
+            "keda_metric_names": keda_names[:20],
+            "keda_metrics_present": bool(keda_names),
+            "names": _pm.found(pm, "keda"),
+            "scaler_errors": errs,
+            "scaler_errors_total": sum(errs.values()),
+            "scaled_object_errors": so_errs,
+            "scaled_object_errors_total": sum(so_errs.values()),
+        }
     sk = (scaling or {}).get("keda") or {}
     summary = {
         "present": True,
@@ -223,6 +234,8 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
         "api_requests_by_code": {k: v for p in api_pods.values() for k, v in p["requests_by_code"].items()},
         "operator_metrics_present": any(p["keda_metrics_present"] for p in op_pods.values()),
         "scaler_errors_total": sum(p["scaler_errors_total"] for p in op_pods.values()) if op_pods else None,
+        "scaled_object_errors_total": sum(p["scaled_object_errors_total"] for p in op_pods.values()) if op_pods else None,
+        "operator_metrics_names": next((p["names"] for p in op_pods.values()), None),
         "scaler_errors_24h_logs": sum((x.get("scaler_errors_24h") or 0) for x in (sk.get("scaledobjects") or [])) if sk else None,
     }
     return {

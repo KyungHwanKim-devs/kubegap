@@ -9,5 +9,6 @@
   port: 8080
   path: /metrics
   out: metrics/pod/external-secrets
+  source: "names and their definitions per version: collectors/external-secrets/pod-metrics.yaml; port 8080 and the selector are observed, not read in source"
   keep: '^(externalsecret_(sync_calls_total|sync_calls_error|provider_api_calls_count)|clustersecretstore_status_condition|secretstore_status_condition|controller_runtime_reconcile_(errors_total|total)|controller_runtime_reconcile_time_seconds_(sum|count)|process_(start_time|resident_memory_bytes))'
   timeout: 30
