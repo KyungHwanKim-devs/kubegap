@@ -153,6 +153,8 @@ def test_every_table_name_passes_its_step_keep_filter():
     """A name the table says kubegap reads must survive the collection filter, with and without labels, as a plain value or a histogram _sum/_count."""
     for area, entries in podmetrics.tables().items():
         steps = [s for s in yamlite.load_file(ROOT / "collectors" / area / "collect.yaml") if s.get("type") == "pod-metrics"]
+        if not steps:
+            continue  # the area's /metrics text is saved whole by an http step (Loki), nothing is filtered
         keeps = [collect._metrics_filter(s.get("keep")) for s in steps]
         for e in entries:
             labels = ",".join(f'{k}="404"' for k in (e.get("labels") or [])) or 'grpc_code="OK"'

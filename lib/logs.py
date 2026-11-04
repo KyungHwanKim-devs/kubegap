@@ -20,8 +20,10 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from . import paths
+from . import podmetrics as _pm
 from .controlplane import _normalize_msg, workload_of
 from .mask import mask_text
+from .promtext import parse as _parse_prom
 from .signatures import Signature
 from .signatures import load as load_signatures
 from .snapshot import COMPONENT_LOGS_DIR, component_logs_aggregate, component_logs_removed, load_json
@@ -234,20 +236,6 @@ def _vector(d) -> dict[str, float]:
     return out
 
 
-def _parse_prom_text(text: str, names: set[str]) -> dict[str, list[tuple[dict, float]]]:
-    out: dict[str, list] = defaultdict(list)
-    for line in text.splitlines():
-        if not line or line.startswith("#"):
-            continue
-        m = re.match(r"^([a-zA-Z_:][a-zA-Z0-9_:]*)(\{[^}]*\})?\s+(\S+)", line)
-        if not m or m.group(1) not in names:
-            continue
-        labels = dict(re.findall(r'([a-zA-Z_][a-zA-Z0-9_]*)="([^"]*)"', m.group(2) or ""))
-        with contextlib.suppress(ValueError):
-            out[m.group(1)].append((labels, float(m.group(3))))
-    return out
-
-
 def analyze_loki(snap: Path, inv: dict) -> dict:
     store = (inv.get("stores") or {}).get("loki") or {}
     ldir = snap / "loki"
@@ -348,30 +336,20 @@ def analyze_loki(snap: Path, inv: dict) -> dict:
     # Loki's own metrics (/metrics scraped once: counters accumulate since process start)
     mtxt = ldir / "metrics.txt"
     if mtxt.is_file():
-        names = {
-            "loki_discarded_samples_total",
-            "loki_ingester_memory_streams",
-            "loki_panic_total",
-            "loki_distributor_lines_received_total",
-            "loki_ingester_chunks_flushed_total",
-            "loki_ingester_chunks_stored_total",
-            "process_resident_memory_bytes",
-            "process_start_time_seconds",
-            "loki_request_duration_seconds_count",
-        }
-        m = _parse_prom_text(mtxt.read_text(encoding="utf-8", errors="replace"), names)
+        # Loki names go through collectors/loki/pod-metrics.yaml (per-version spellings); the process_* names are client_golang's and have one spelling
+        m = _parse_prom(mtxt.read_text(encoding="utf-8", errors="replace"))
         disc: Counter = Counter()
-        for labels, v in m.get("loki_discarded_samples_total", []):
+        for labels, v in _pm.labeled(m, "loki", "discarded_samples"):
             disc[labels.get("reason", "?")] += v
-        err5xx = sum(v for labels, v in m.get("loki_request_duration_seconds_count", []) if str(labels.get("status_code", "")).startswith("5"))
-        start = next((v for _, v in m.get("process_start_time_seconds", [])), None)
+        err5xx = sum(v for labels, v in _pm.labeled(m, "loki", "request_duration_count") if str(labels.get("status_code", "")).startswith("5"))
+        start = m["single"].get("process_start_time_seconds")
         out["self_metrics"] = {
             "discarded_samples_since_start": {k: int(v) for k, v in disc.items() if v},
-            "streams_in_memory": int(sum(v for _, v in m.get("loki_ingester_memory_streams", []))),
-            "panics": int(sum(v for _, v in m.get("loki_panic_total", []))),
-            "lines_received_since_start": int(sum(v for _, v in m.get("loki_distributor_lines_received_total", []))),
+            "streams_in_memory": int(_pm.single(m, "loki", "memory_streams", 0)),
+            "panics": int(_pm.single(m, "loki", "panics", 0)),
+            "lines_received_since_start": int(_pm.single(m, "loki", "lines_received", 0)),
             "requests_5xx_since_start": int(err5xx),
-            "rss_mb": round(sum(v for _, v in m.get("process_resident_memory_bytes", [])) / 1024**2),
+            "rss_mb": round((m["single"].get("process_resident_memory_bytes") or 0) / 1024**2),
             "process_uptime_h": round((now.timestamp() - start) / 3600, 1) if start else None,
         }
     # Loki pod restarts and last termination reason (OOMKilled is common)

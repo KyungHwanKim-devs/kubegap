@@ -158,6 +158,8 @@
 - id: targets_down
   why: Failed scrape targets (up==0). What Prometheus cannot see, no metric check can see
   query: up == 0
+  source:
+    - "up: prometheus/prometheus scrape/scrape.go:1726,1746@v2.49.1, :2055,2131@v3.7.3, :2232,2308@v3.15.1 (written by Prometheus for every scrape target, 1 when the scrape succeeded and 0 when it failed; it carries the target's job and instance labels, never an exporter label)"
 - id: hpa_at_max
   why: HPAs whose current replicas sit at maxReplicas. They cannot grow further, so scaling is effectively off
   query: >
@@ -216,9 +218,13 @@
 - id: prometheus_tsdb_head_series
   why: Active series count. The first indicator of a cardinality explosion
   query: prometheus_tsdb_head_series
+  source:
+    - "prometheus_tsdb_head_series: prometheus/prometheus tsdb/head.go:367@v2.49.1, :409@v3.7.3, :472@v3.15.1 (gauge without labels, one per Prometheus process)"
 - id: prometheus_scrape_samples_top
   why: Top targets by samples per scrape. Finding the cardinality culprit
   query: topk(20, scrape_samples_scraped)
+  source:
+    - "scrape_samples_scraped: prometheus/prometheus scrape/scrape.go:1728,1752@v2.49.1, :2071,2137@v3.7.3, :2248,2314@v3.15.1 (written by Prometheus after every scrape with the target's job and instance labels)"
 # --- Additional queries ---
 - id: hpa_at_max_ratio_15d
   why: Share of the last 15 days the current replicas sat at max. Near 1 the HPA has been capped
@@ -349,15 +355,23 @@
 - id: fluentbit_output_errors_1h
   why: Errors from fluent-bit outputs (ES, Loki, CloudWatch) in 1h. Logs are not being written to the store
   query: sum by (name) (increase(fluentbit_output_errors_total[1h])) > 0
+  source:
+    - "fluentbit_output_errors_total: fluent/fluent-bit src/flb_output.c:1141-1144@v3.0.4, :1651-1654@v5.1.5 (cmetrics counter, namespace fluentbit, subsystem output, label name = the output instance name, set to 0 at creation)"
 - id: fluentbit_retries_failed_1h
   why: Chunks dropped after retries also failed. Those logs are a permanent gap
   query: sum by (name) (increase(fluentbit_output_retries_failed_total[1h])) > 0
+  source:
+    - "fluentbit_output_retries_failed_total: fluent/fluent-bit src/flb_output.c:1156-1161@v3.0.4, :1666-1671@v5.1.5 (label name; batches abandoned after the retry limit)"
 - id: fluentbit_input_records_1h
   why: Log records read in 1h. 0 means the agent has stopped
   query: sum(increase(fluentbit_input_records_total[1h]))
+  source:
+    - "fluentbit_input_records_total: fluent/fluent-bit src/flb_input.c:968-970@v3.0.4, :1622-1624@v5.1.5 (cmetrics counter, namespace fluentbit, subsystem input, label name = the input instance name; served under the HTTP server's /api/v2/metrics/prometheus path src/http_server/api/v2/metrics.c:253@v3.0.4, :125@v5.1.5 only with the HTTP server on, which is off by default src/flb_config.c:251@v3.0.4, :354@v5.1.5)"
 - id: fluentbit_dropped_records_1h
   why: Records dropped at the output stage
   query: sum by (name) (increase(fluentbit_output_dropped_records_total[1h])) > 0
+  source:
+    - "fluentbit_output_dropped_records_total: fluent/fluent-bit src/flb_output.c:1166-1169@v3.0.4, :1676-1679@v5.1.5 (label name)"
 
 # ---------- 7-day p95 vs request/limit (measuring the gap between requests and actual usage) ----------
 # The subquery [7d:15m] samples 7 days at 15-minute steps (672 points). Takes roughly 2-12 seconds on clusters with ~150k series. Pods younger than a day (kube_pod_created) are excluded.
@@ -485,10 +499,11 @@
     - "kube_pod_created: kubernetes/kube-state-metrics internal/store/pod.go:554@v2.10.1, :583@v2.17.0, :592@v2.20.0 (default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
     - "kube_pod_status_phase: kubernetes/kube-state-metrics internal/store/pod.go:1305@v2.10.1, :1339@v2.17.0, :1504@v2.20.0 (label phase :1334@v2.10.1, :1368@v2.17.0, :1533@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
 - id: keda_scaler_errors_24h
-  # keda_scaler_detail_errors_total since KEDA 2.14.0, keda_scaler_errors_total until 2.16 (removed in 2.17.0): kedacore/keda pkg/metricscollector/prommetrics.go:116@v2.14.0, :107@v2.16.0, absent @v2.17.0 (collectors/keda/pod-metrics.yaml).
-  # `or` takes the newer counter's series and adds the older one's only where the newer has none, so 2.14-2.16, which emit both, are not counted twice.
-  why: KEDA scaler (trigger) failures reading external metrics (24h). No series when KEDA is not scraped by Prometheus
-  query: sum by (namespace, scaledObject) (increase(keda_scaler_detail_errors_total[24h]) > 0) or sum by (namespace, scaledObject) (increase(keda_scaler_errors_total[24h]) > 0)
+  # keda_scaler_detail_errors_total exists since KEDA 2.14.0 with namespace and scaledObject; the older keda_scaler_errors_total (gone in 2.17.0) is a total with no labels at any version, so the `or` branch that read it could never name a ScaledObject and, on 2.14 to 2.16, added one unattributable row.
+  why: KEDA scaler (trigger) failures reading external metrics per ScaledObject (24h), KEDA 2.14.0 and later. No series when KEDA is not scraped by Prometheus or older than 2.14
+  query: sum by (namespace, scaledObject) (increase(keda_scaler_detail_errors_total[24h]) > 0)
+  source:
+    - "keda_scaler_detail_errors_total: kedacore/keda pkg/metricscollector/prommetrics.go:116@v2.14.0, :116@v2.16.0, :84@v2.17.2, :85@v2.21.0 (labels namespace, metric, scaledObject, scaler, triggerIndex, type; since 2.14.0; collectors/keda/pod-metrics.yaml)"
 
 # ---------- Traffic ----------
 - id: pod_network_rx_bytes_1h
@@ -507,14 +522,20 @@
 - id: ingress_nginx_rps_1h
   why: 1h average RPS per ingress-nginx Ingress. No series when controller metrics are off (observability.golden-signals-missing)
   query: sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests[1h])) > 0
+  source:
+    - "nginx_ingress_controller_requests: kubernetes/ingress-nginx internal/ingress/metric/collectors/socket.go:244@controller-v1.14.0, :244@controller-v1.15.1 (namespace internal/ingress/metric/collectors/main.go:20; labels status, method, path, namespace, ingress, service, canary socket.go:89-99, and host when enabled :133; Prometheus stores the exporter's namespace as exported_namespace because the target carries its own and honor_labels is off, prometheus/prometheus scrape/scrape.go:592,605@v2.49.1, :716,729@v3.7.3, :690,703@v3.15.1)"
 - id: ingress_nginx_5xx_ratio_1h
   why: 1h 5xx ratio per ingress-nginx Ingress
   query: >
     sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests{status=~"5.."}[1h]))
       / sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests[1h]))
+  source:
+    - "nginx_ingress_controller_requests: kubernetes/ingress-nginx internal/ingress/metric/collectors/socket.go:244@controller-v1.14.0, :244@controller-v1.15.1 (namespace internal/ingress/metric/collectors/main.go:20; labels status, method, path, namespace, ingress, service, canary socket.go:89-99, and host when enabled :133; Prometheus stores the exporter's namespace as exported_namespace because the target carries its own and honor_labels is off, prometheus/prometheus scrape/scrape.go:592,605@v2.49.1, :716,729@v3.7.3, :690,703@v3.15.1)"
 - id: ingress_nginx_p95_1h
   why: 1h p95 response time per ingress-nginx Ingress (seconds)
   query: histogram_quantile(0.95, sum by (le, exported_namespace, ingress) (rate(nginx_ingress_controller_request_duration_seconds_bucket[1h])))
+  source:
+    - "nginx_ingress_controller_request_duration_seconds_bucket: kubernetes/ingress-nginx internal/ingress/metric/collectors/socket.go:199@controller-v1.14.0, :199@controller-v1.15.1 (the histogram's _bucket series, labels status, method, path, namespace, ingress, service, canary socket.go:89-99, host when enabled :133, and le; namespace internal/ingress/metric/collectors/main.go:20; the exporter's namespace arrives as exported_namespace, prometheus/prometheus scrape/scrape.go:592,605@v2.49.1, :716,729@v3.7.3, :690,703@v3.15.1)"
 - id: coredns_servfail_ratio_1h
   # A rate of a series that never existed is empty, so without `or vector(0)` a cluster that never answered SERVFAIL had no ratio at all instead of 0; the result is still empty when there are no CoreDNS metrics (empty denominator).
   why: CoreDNS SERVFAIL ratio (1h). Upstream or plugin trouble. Above 0.01 applications see DNS delays and failures

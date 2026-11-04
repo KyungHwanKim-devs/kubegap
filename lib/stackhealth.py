@@ -100,6 +100,33 @@ def _parse_mem(s) -> float | None:
     return round(n * mult / 1024**2)
 
 
+_DUR = re.compile(r"(\d+)(ms|s|m|h|d|w|y)")
+_DUR_S = {"ms": 0.001, "s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800, "y": 31536000}
+
+
+def _duration_s(text: str | None) -> float | None:
+    """A Prometheus duration string ("30s", "1m30s") in seconds; None when empty or not a duration."""
+    parts = _DUR.findall(text or "")
+    return sum(int(n) * _DUR_S[u] for n, u in parts) if parts and "".join(n + u for n, u in parts) == (text or "") else None
+
+
+def _scrape_targets(snap: Path) -> dict:
+    """Per job, the shortest scrapeInterval of its active targets, and the targets whose last scrape failed with 'sample limit exceeded'
+    (the text Prometheus puts in lastError, scrape/target.go:316@v2.49.1, :364@v3.15.1). Reads prometheus/targets.json; empty when it is missing."""
+    active = ((load_json(snap / "prometheus" / "targets.json") or {}).get("data") or {}).get("activeTargets") or []
+    intervals: dict[str, float] = {}
+    limited = []
+    for t in active:
+        labels = t.get("labels") or {}
+        job = labels.get("job")
+        iv = _duration_s(t.get("scrapeInterval"))
+        if job and iv:
+            intervals[job] = min(intervals[job], iv) if job in intervals else iv
+        if "sample limit exceeded" in (t.get("lastError") or ""):
+            limited.append({"job": job, "instance": labels.get("instance")})
+    return {"job_intervals": intervals, "sample_limit_targets": limited}
+
+
 def _pod_last_oom(snap: Path, name_prefix: str) -> dict:
     out = {"oomkilled": False, "restarts": 0, "finished_at": None}
     for p in objects(snap, "pods"):
@@ -136,10 +163,16 @@ def _prometheus(snap: Path, inv: dict) -> dict:
     pvc_ratio = max([_v(r) or 0 for r in pvc_rows], default=None) if pvc_rows else None
     retention_days = _scalar(snap, "prom_retention_days")
     oldest_days = _scalar(snap, "prom_oldest_sample_days")
-    interval = _scalar(snap, "prom_scrape_interval_s") or 30.0
-    slow = [{"job": r["metric"].get("job"), "seconds": round(_v(r) or 0, 2)} for r in _rows(snap, "prom_scrape_slow_jobs")]
-    slow_jobs = [s for s in slow if s["seconds"] >= interval * 0.5]
-    limit_exceeded = {r["metric"].get("job"): round(_v(r) or 0) for r in _rows(snap, "prom_sample_limit_exceeded_1h")}
+    # Each job is judged against its own scrape interval (prometheus/targets.json). The query gives the longest configured interval, not the most
+    # common one (one series per interval), so it is only the fallback when targets.json is missing.
+    targets = _scrape_targets(snap)
+    fallback_interval = _scalar(snap, "prom_scrape_interval_s") or 30.0
+    job_intervals = targets["job_intervals"]
+    interval = Counter(job_intervals.values()).most_common(1)[0][0] if job_intervals else fallback_interval
+    slow = [{"job": r["metric"].get("job"), "seconds": round(_v(r) or 0, 2), "interval": job_intervals.get(r["metric"].get("job"), fallback_interval)} for r in _rows(snap, "prom_scrape_slow_jobs")]
+    slow_jobs = [s for s in slow if s["seconds"] >= s["interval"] * 0.5]
+    # The counter has no target label (one Counter per Prometheus), so the total is a number and the targets come from targets.json
+    limit_exceeded = round(_scalar(snap, "prom_sample_limit_exceeded_1h") or 0)
     notif_errors = {r["metric"].get("alertmanager"): round(_v(r) or 0) for r in _rows(snap, "prom_notifications_errors_1d")}
     rule_ratio = [{"group": (r["metric"].get("rule_group") or "").split(";")[-1], "ratio": round(_v(r) or 0, 3)} for r in _rows(snap, "prom_rule_eval_ratio_top")]
     restarts = {r["metric"].get("pod"): round(_v(r) or 0) for r in _rows(snap, "monitoring_restarts_7d")}
@@ -183,6 +216,7 @@ def _prometheus(snap: Path, inv: dict) -> dict:
         "slow_scrape_jobs": slow_jobs,
         "scrape_top": slow[:5],
         "sample_limit_exceeded_1h": limit_exceeded,
+        "sample_limit_targets": targets["sample_limit_targets"],
         "notifications_dropped_1d": round(_scalar(snap, "prom_notifications_dropped_1d") or 0),
         "notifications_errors_1d": notif_errors,
         "rule_eval_ratio_top": rule_ratio,
@@ -336,17 +370,18 @@ def _loki(snap: Path, inv: dict) -> dict:
     out.update({"oomkilled_last": oom["oomkilled"], "oomkilled_at": oom["finished_at"], "restarts": oom["restarts"]})
     if pm is None:
         return out
+    # every Loki name goes through collectors/loki/pod-metrics.yaml: Loki 3.0 renamed the retention-run timestamp (loki_boltdb_shipper_ -> loki_compactor_)
     req5xx: Counter = Counter()
     req_total = 0
-    for labels, v in pm["labeled"].get("loki_request_duration_seconds_count", []):
+    for labels, v in _pm.labeled(pm, "loki", "request_duration_count"):
         req_total += int(v)
         if str(labels.get("status_code", "")).startswith("5") and labels.get("route") != "ready":  # /ready 503 during startup is normal
             req5xx[labels.get("route")] += int(v)
-    discarded = {labels.get("reason"): int(v) for labels, v in pm["labeled"].get("loki_discarded_samples_total", []) if v > 0}
+    discarded = {labels.get("reason"): int(v) for labels, v in _pm.labeled(pm, "loki", "discarded_samples") if v > 0}
     rss = pm["single"].get("process_resident_memory_bytes")
     lim = wl.get("memory_limit_mib")
-    retention_last = pm["single"].get("loki_boltdb_shipper_apply_retention_last_successful_run_timestamp_seconds")
-    log_err = sum(int(v) for labels, v in pm["labeled"].get("loki_log_messages_total", []) if labels.get("level") == "error")
+    retention_last = _pm.single(pm, "loki", "retention_last_run")
+    log_err = sum(int(v) for labels, v in _pm.labeled(pm, "loki", "log_messages") if labels.get("level") == "error")
     out.update(
         {
             "requests_total": req_total,
@@ -354,16 +389,17 @@ def _loki(snap: Path, inv: dict) -> dict:
             "requests_5xx_by_route": dict(req5xx),
             "discarded_by_reason": discarded,
             "discarded_total": sum(discarded.values()),
-            "wal_disk_full_failures": int(pm["single"].get("loki_ingester_wal_disk_full_failures_total", 0)),
-            "panics": int(pm["single"].get("loki_panic_total", 0)),
+            "wal_disk_full_failures": int(_pm.single(pm, "loki", "wal_disk_full_failures", 0)),
+            "panics": int(_pm.single(pm, "loki", "panics", 0)),
             "log_error_messages": log_err,
             "rss_mib": _mib(rss),
             "rss_vs_limit": round(rss / (lim * 1024**2), 3) if rss and lim else None,
-            "memory_streams": sum(int(v) for _, v in pm["labeled"].get("loki_ingester_memory_streams", [])) or pm["single"].get("loki_ingester_memory_streams"),
+            "memory_streams": int(_pm.single(pm, "loki", "memory_streams")) if _pm.present(pm, "loki", "memory_streams") else None,
             "retention_applied": None if retention_last is None else retention_last > 0,
-            "compactor_running": pm["single"].get("loki_boltdb_shipper_compactor_running"),
-            "lines_received": sum(int(v) for _, v in pm["labeled"].get("loki_distributor_lines_received_total", [])),
-            "bytes_received": sum(int(v) for _, v in pm["labeled"].get("loki_distributor_bytes_received_total", [])),
+            "compactor_running": _pm.single(pm, "loki", "compactor_running"),
+            "lines_received": int(_pm.single(pm, "loki", "lines_received", 0)),
+            "bytes_received": int(_pm.single(pm, "loki", "bytes_received", 0)),
+            "metrics_found": _pm.found(pm, "loki"),
         }
     )
     return out
@@ -401,6 +437,7 @@ PROM_KEYS = [
     "slow_scrape_jobs",
     "scrape_top",
     "sample_limit_exceeded_1h",
+    "sample_limit_targets",
     "notifications_dropped_1d",
     "notifications_errors_1d",
     "rule_eval_ratio_top",
@@ -489,6 +526,7 @@ LOKI_KEYS = [
     "compactor_running",
     "lines_received",
     "bytes_received",
+    "metrics_found",
     "replicas",
     "ready",
     "target",

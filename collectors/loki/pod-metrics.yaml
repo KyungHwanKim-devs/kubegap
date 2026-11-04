@@ -1,0 +1,57 @@
+# Metric names kubegap reads from Loki's own /metrics (step loki.metrics, the text saved as loki/metrics.txt and parsed by lib/stackhealth.py and
+# lib/logs.py through lib/podmetrics.py). Read in grafana/loki at v2.6.1, v2.9.2, v3.0.0 and v3.7.9 (#123). Loki 3.0.0 moved the retention run
+# timestamp from the boltdb-shipper namespace to loki_compactor; every other name is the same in the four. The request histogram comes from the
+# server library Loki embeds (weaveworks/common up to 2.9, grafana/dskit since 3.0) under the namespace loki.
+- key: request_duration_count
+  labels: [method, route, status_code, ws]
+  names:
+    - name: loki_request_duration_seconds_count
+      source: "weaveworks/common server/server.go:258-262@e3b70df0f08b (grafana/loki go.mod:95@v2.6.1), :321-328@334485600903 (go.mod:97@v2.9.2), grafana/dskit server/metrics.go:41-48@ea101a3b86eb (go.mod:53@v3.0.0), :57-64@8d1c6d34bb5a (go.mod:55@v3.7.9); namespace loki grafana/loki pkg/loki/loki.go:91@v2.6.1, :113@v2.9.2, :121@v3.0.0, :145@v3.7.9"
+- key: discarded_samples
+  labels: [reason, tenant]
+  names:
+    - name: loki_discarded_samples_total
+      source: "grafana/loki pkg/validation/validate.go:103@v2.6.1, :114@v2.9.2, :119@v3.0.0, :131@v3.7.9 (labels reason, tenant :106@v2.6.1, :117@v2.9.2, :122@v3.0.0, plus retention_hours, policy, format :134@v3.7.9; a reason has a series only after its first rejection)"
+- key: wal_disk_full_failures
+  names:
+    - name: loki_ingester_wal_disk_full_failures_total
+      source: "grafana/loki pkg/ingester/metrics.go:83@v2.6.1, :86@v2.9.2, :89@v3.0.0, :96@v3.7.9 (counter without labels)"
+- key: panics
+  names:
+    - name: loki_panic_total
+      source: "grafana/loki pkg/util/server/recovery.go:21@v2.6.1, :21@v2.9.2, :25@v3.0.0, :25@v3.7.9 (counter without labels)"
+- key: log_messages
+  labels: [level]
+  names:
+    - name: loki_internal_log_messages_total
+      since: "2.7.0"
+      source: "grafana/loki pkg/util/log/log.go:83@v2.7.0, :83@v2.8.0, :136@v2.9.2, :131@v3.0.0, :138@v3.7.9 (label level; absent at v2.6.1)"
+    - name: loki_log_messages_total
+      source: "grafana/loki pkg/util/log/log.go:56@v2.6.1, :131@v2.9.2, :126@v3.0.0, :133@v3.7.9 (label level; marked DEPRECATED in favour of loki_internal_log_messages_total since 2.7.0 :79@v2.7.0, still emitted at v3.7.9)"
+- key: memory_streams
+  labels: [tenant]
+  names:
+    - name: loki_ingester_memory_streams
+      source: "grafana/loki pkg/ingester/instance.go:48@v2.6.1, :60@v2.9.2, :68@v3.0.0, :68@v3.7.9 (gauge, label tenant)"
+- key: compactor_running
+  names:
+    - name: loki_boltdb_shipper_compactor_running
+      source: "grafana/loki pkg/storage/stores/shipper/compactor/metrics.go:44-45@v2.6.1, pkg/storage/stores/indexshipper/compactor/metrics.go:44-45@v2.8.0, :44-45@v2.9.2, pkg/compactor/metrics.go:57-58@v3.0.0, :57-58@v3.7.9 (gauge; kept the boltdb-shipper namespace through 3.x)"
+- key: retention_last_run
+  names:
+    - name: loki_compactor_apply_retention_last_successful_run_timestamp_seconds
+      since: "3.0.0"
+      source: "grafana/loki pkg/compactor/metrics.go:52-53@v3.0.0, :52-53@v3.7.9 (gauge; namespace loki_compactor)"
+    - name: loki_boltdb_shipper_apply_retention_last_successful_run_timestamp_seconds
+      before: "3.0.0"
+      source: "grafana/loki pkg/storage/stores/shipper/compactor/metrics.go:39-40@v2.6.1, pkg/storage/stores/indexshipper/compactor/metrics.go:39-40@v2.8.0, :39-40@v2.9.2 (gauge; namespace loki_boltdb_shipper; absent at v3.0.0)"
+- key: lines_received
+  labels: [tenant]
+  names:
+    - name: loki_distributor_lines_received_total
+      source: "grafana/loki pkg/loghttp/push/push.go:40@v2.6.1, :45@v2.9.2, :51@v3.0.0, :57@v3.7.9 (label tenant :42@v2.6.1, :47@v2.9.2, :53@v3.0.0, plus is_internal_stream, policy, format :59@v3.7.9)"
+- key: bytes_received
+  labels: [tenant, retention_hours]
+  names:
+    - name: loki_distributor_bytes_received_total
+      source: "grafana/loki pkg/loghttp/push/push.go:35@v2.6.1, :35@v2.9.2, :40@v3.0.0, :46@v3.7.9 (labels tenant, retention_hours :37@v2.6.1, :37@v2.9.2, :42@v3.0.0, plus is_internal_stream, policy, format :48@v3.7.9)"

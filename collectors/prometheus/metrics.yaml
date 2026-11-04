@@ -2,21 +2,33 @@
 - id: alerts_fired_15d
   why: Alert names that were firing at least once in 15 days. Compared with the rule list this yields "alerts that never fired"
   query: count by (alertname) (count_over_time(ALERTS{alertstate="firing"}[15d]))
+  source:
+    - "ALERTS: prometheus/prometheus rules/alerting.go:41,232-234@v2.49.1, :41,236-238@v3.7.3, :41,244-246@v3.15.1 (written by every alerting rule evaluation for each pending or firing alert, value 1, labels alertname, alertstate = pending or firing :46 at every version, and the alert's own labels)"
 - id: alerts_firing_samples_7d
   why: Top alerts by samples observed firing over 7 days (fatigue). At a 30s evaluation interval one day is 2,880; 20,160 means firing for all 7 days
   query: topk(20, sum by (alertname) (count_over_time(ALERTS{alertstate="firing"}[7d])))
+  source:
+    - "ALERTS: prometheus/prometheus rules/alerting.go:41,232-234@v2.49.1, :41,236-238@v3.7.3, :41,244-246@v3.15.1 (written by every alerting rule evaluation for each pending or firing alert, value 1, labels alertname, alertstate = pending or firing :46 at every version, and the alert's own labels)"
 - id: alerts_firing_now
   why: Alerts firing right now (name, severity, namespace)
   query: ALERTS{alertstate="firing"}
+  source:
+    - "ALERTS: prometheus/prometheus rules/alerting.go:41,232-234@v2.49.1, :41,236-238@v3.7.3, :41,244-246@v3.15.1 (written by every alerting rule evaluation for each pending or firing alert, value 1, labels alertname, alertstate = pending or firing :46 at every version, and the alert's own labels)"
 - id: alerts_pending_now
   why: Alerts currently pending (waiting on `for`)
   query: ALERTS{alertstate="pending"}
+  source:
+    - "ALERTS: prometheus/prometheus rules/alerting.go:41,232-234@v2.49.1, :41,236-238@v3.7.3, :41,244-246@v3.15.1 (written by every alerting rule evaluation for each pending or firing alert, value 1, labels alertname, alertstate = pending or firing :46 at every version, and the alert's own labels)"
 - id: rule_evaluation_failures
   why: Rule groups whose evaluation failed (syntax, missing metric). A failing rule is a rule that never fires
   query: sum by (rule_group) (increase(prometheus_rule_evaluation_failures_total[1h])) > 0
+  source:
+    - "prometheus_rule_evaluation_failures_total: prometheus/prometheus rules/group.go:804@v2.49.1, :972@v3.7.3, :1016@v3.15.1 (label rule_group = <rule file>;<group name>; one series per loaded rule group from start; namespace prometheus rules/group.go:743@v2.49.1, :909@v3.7.3, :932@v3.15.1)"
 - id: rule_group_duration_top
   why: Slowest rule groups. If evaluation exceeds the interval, alerts are late or skipped
   query: topk(10, prometheus_rule_group_last_duration_seconds)
+  source:
+    - "prometheus_rule_group_last_duration_seconds: prometheus/prometheus rules/group.go:828@v2.49.1, :996@v3.7.3, :1040@v3.15.1 (gauge; label rule_group = <rule file>;<group name>; one series per loaded rule group from start; namespace prometheus rules/group.go:743@v2.49.1, :909@v3.7.3, :932@v3.15.1)"
 - id: http_metric_namespaces
   why: Namespaces with application-level HTTP/gRPC server metrics (the latency, traffic and error inputs of the 4 golden signals). Without them you depend on ingress/ALB metrics
   query: >
@@ -29,29 +41,49 @@
   why: Ingress controller request metrics (ingress-nginx, Traefik). Per-ingress latency, traffic and errors without app metrics. EKS ALB goes through CloudWatch instead
   query: >
     count by (exported_namespace, ingress, namespace, service) ({__name__=~"nginx_ingress_controller_requests|traefik_service_requests_total|traefik_entrypoint_requests_total"})
+  source:
+    - "traefik_entrypoint_requests_total: traefik/traefik pkg/metrics/prometheus.go:35,149@v3.3.2, pkg/observability/metrics/prometheus.go:35,147@v3.7.17 (labels code, method, protocol, entrypoint)"
+    - "nginx_ingress_controller_requests: kubernetes/ingress-nginx internal/ingress/metric/collectors/socket.go:244@controller-v1.14.0, :244@controller-v1.15.1 (namespace internal/ingress/metric/collectors/main.go:20; labels status, method, path, namespace, ingress, service, canary socket.go:89-99, and host when enabled :133; Prometheus stores the exporter's namespace as exported_namespace because the target carries its own and honor_labels is off, prometheus/prometheus scrape/scrape.go:592,605@v2.49.1, :716,729@v3.7.3, :690,703@v3.15.1)"
+    - "traefik_service_requests_total: traefik/traefik pkg/metrics/prometheus.go:51,224@v3.3.2, pkg/observability/metrics/prometheus.go:51,222@v3.7.17 (labels code, method, protocol, service; v3.3.2 is the appVersion of the chart k3s v1.33.5+k3s1 bundles, traefik/traefik-helm-chart traefik/Chart.yaml:7@v34.2.0, k3s-io/k3s manifests/traefik.yaml:16@v1.33.5+k3s1)"
 - id: alertmanager_notifications_failed_1d
   why: Notifications Alertmanager failed to deliver to receivers (24h). Anything above 0 means alerts are being lost
   query: sum by (integration) (increase(alertmanager_notifications_failed_total[1d])) > 0
+  source:
+    - "alertmanager_notifications_failed_total: prometheus/alertmanager notify/notify.go:263@v0.26.0, :286@v0.29.0, notify/metrics.go:50@v0.34.2 (labels integration and reason notify/notify.go:265@v0.26.0, :288@v0.29.0, notify/metrics.go:52@v0.34.2; a series per integration and reason, the reasons initialized at 0 with the integration)"
 - id: alertmanager_alerts_by_state
   why: Alerts held by Alertmanager (active, suppressed). A large suppressed count means silences/inhibitions are swallowing a lot
   query: sum by (state) (alertmanager_alerts)
+  source:
+    - "alertmanager_alerts: prometheus/alertmanager provider/mem/mem.go:72@v0.26.0, :72@v0.29.0 (one GaugeFunc per state with ConstLabels state :74, states active, suppressed, unprocessed), dispatch/metric.go:59-69@v0.34.2 (a collector with the label state, plus group_key behind a feature flag)"
 - id: prometheus_storage_bytes
   why: TSDB disk usage plus WAL. Compare with the PVC size
   query: prometheus_tsdb_storage_blocks_bytes + prometheus_tsdb_wal_storage_size_bytes
+  source:
+    - "prometheus_tsdb_storage_blocks_bytes: prometheus/prometheus tsdb/db.go:322@v2.49.1, :374@v3.7.3, :463@v3.15.1 (gauge without labels: the bytes of the persisted blocks)"
+    - "prometheus_tsdb_wal_storage_size_bytes: prometheus/prometheus tsdb/wlog/wlog.go:262@v2.49.1, :267@v3.7.3, :267@v3.15.1 (Name storage_size_bytes registered under the prefix prometheus_tsdb_wal_ tsdb/wlog/wlog.go:326,330@v2.49.1, :321,325@v3.7.3, :321,325@v3.15.1; gauge without labels)"
 - id: prometheus_remote_write_failed_1h
   why: Failed remote-write samples (when configured). The path to long-term storage is broken
   query: sum by (url) (increase(prometheus_remote_storage_samples_failed_total[1h])) > 0
+  source:
+    - "prometheus_remote_storage_samples_failed_total: prometheus/prometheus storage/remote/queue_manager.go:130@v2.49.1, :141@v3.7.3, :144@v3.15.1 (ConstLabels remote_name and url per remote-write queue :94-97@v2.49.1, :105-108@v3.7.3, :108-111@v3.15.1, constants storage/remote/storage.go:40-41@v2.49.1, :41-42@v3.7.3, :41-42@v3.15.1; no series without a remote_write configuration)"
 - id: scrape_targets_down_by_job
   why: Targets with up==0 per job. A ServiceMonitor exists but the scrape fails
   query: count by (job) (up == 0)
+  source:
+    - "up: prometheus/prometheus scrape/scrape.go:1726,1746@v2.49.1, :2055,2131@v3.7.3, :2232,2308@v3.15.1 (written by Prometheus for every scrape target, 1 when the scrape succeeded and 0 when it failed; it carries the target's job and instance labels, never an exporter label)"
+    - "label job on up and scrape series: prometheus-operator/prometheus-operator pkg/prometheus/promcfg.go:1373-1376@v0.71.0, :2063-2066@v0.86.2 (job is the value of the Service label a ServiceMonitor's jobLabel names, else the Service name; Prometheus sets it from the scrape config's job_name otherwise)"
 - id: alerts_firing_stale_days
   why: Alerts continuously active (pending or firing) for more than 3 days, and for how many days. Nobody is acting on them
   query: (time() - ALERTS_FOR_STATE{alertname!="Watchdog"}) / 86400 > 3
+  source:
+    - "ALERTS_FOR_STATE: prometheus/prometheus rules/alerting.go:43,245-253@v2.49.1, :43,250-259@v3.7.3, :43,258-267@v3.15.1 (written for each pending or firing alert with the value of its ActiveAt in seconds :462@v2.49.1, :520@v3.7.3, :541@v3.15.1; labels alertname and the alert's own labels, no alertstate)"
 
 # ---- Prometheus and Alertmanager self health (read by lib/stackhealth.py)
 - id: prom_head_series
   why: Active series in memory. Above 1M, memory and rule evaluation both slow down (a small cluster is typically 100-200k)
   query: max(prometheus_tsdb_head_series)
+  source:
+    - "prometheus_tsdb_head_series: prometheus/prometheus tsdb/head.go:367@v2.49.1, :409@v3.7.3, :472@v3.15.1 (gauge without labels, one per Prometheus process)"
 - id: prom_rss_vs_limit
   why: Prometheus container RSS ÷ memory limit. Above 0.85 the next compaction or large query gets OOMKilled
   query: >
@@ -74,60 +106,99 @@
 - id: prom_retention_days
   why: Configured retention (seconds → days). With retention.size at 0 only time is enforced, so the disk can fill first
   query: max(prometheus_tsdb_retention_limit_seconds) / 86400
+  source:
+    - "prometheus_tsdb_retention_limit_seconds: prometheus/prometheus tsdb/db.go:330@v2.49.1, :382@v3.7.3, :475@v3.15.1 (gauge: the configured time retention in seconds; 15d when neither a time nor a size retention is set cmd/prometheus/main.go:542-543@v2.49.1, :720-721@v3.7.3, :753-754@v3.15.1, and 0 when only a size is set)"
 - id: prom_oldest_sample_days
   why: Age in days of the oldest sample actually left in the TSDB. Much shorter than retention means data was cut by disk shortage or a reinstall
   query: (time() - max(prometheus_tsdb_lowest_timestamp_seconds)) / 86400
+  source:
+    - "prometheus_tsdb_lowest_timestamp_seconds: prometheus/prometheus cmd/prometheus/main.go:1200-1209@v2.49.1, :1457-1466@v3.7.3, :1676-1685@v3.15.1 (GaugeFunc: the MinTime of the oldest persisted block, or of the head while no block exists yet, in seconds)"
 - id: prom_scrape_slow_jobs
   why: Max scrape duration per job (seconds). Above half the scrape interval (usually 30s) the target is slow or its response too large
   query: topk(10, max by (job) (scrape_duration_seconds))
+  source:
+    - "scrape_duration_seconds: prometheus/prometheus scrape/scrape.go:1727,1749@v2.49.1, :2063,2134@v3.7.3, :2240,2311@v3.15.1 (written by Prometheus after every scrape with the target's job and instance labels)"
+    - "label job on up and scrape series: prometheus-operator/prometheus-operator pkg/prometheus/promcfg.go:1373-1376@v0.71.0, :2063-2066@v0.86.2 (job is the value of the Service label a ServiceMonitor's jobLabel names, else the Service name; Prometheus sets it from the scrape config's job_name otherwise)"
 - id: prom_scrape_interval_s
-  why: Most common scrape interval (seconds). The denominator for the slow-scrape judgement
+  # One series per distinct interval, so this is the longest configured interval, not the most common one. lib/stackhealth.py judges each job against its own scrapeInterval from prometheus/targets.json and uses this value only when that file is missing.
+  why: Longest scrape interval in use (seconds): the median interval length of the longest configured interval. Fallback denominator for the slow-scrape judgement when prometheus/targets.json is missing
   query: max(prometheus_target_interval_length_seconds{quantile="0.5"})
+  source:
+    - "prometheus_target_interval_length_seconds: prometheus/prometheus scrape/metrics.go:173@v2.49.1, :182@v3.7.3, :197@v3.15.1 (SummaryVec with the label interval :177@v2.49.1, :186@v3.7.3, :201@v3.15.1, one series set per distinct scrape interval in the configuration, quantiles 0.01, 0.05, 0.5, 0.9, 0.99; no target or job label of its own)"
 - id: prom_sample_limit_exceeded_1h
-  why: Scrapes dropped entirely for exceeding sampleLimit (per job, 1h). That target has no metrics at all
-  query: sum by (job) (increase(prometheus_target_scrapes_exceeded_sample_limit_total[1h])) > 0
+  # The counter has no target label (see its source entry): a `sum by (job)` grouped it by the Prometheus's own job and named Prometheus as the job that exceeded the limit. lib/stackhealth.py names the targets from prometheus/targets.json (lastError).
+  why: Scrapes dropped entirely for exceeding sampleLimit over 1h, summed over every target. Which targets are failing on it comes from prometheus/targets.json
+  query: sum(increase(prometheus_target_scrapes_exceeded_sample_limit_total[1h]))
+  source:
+    - "prometheus_target_scrapes_exceeded_sample_limit_total: prometheus/prometheus scrape/metrics.go:181@v2.49.1, :190@v3.7.3, :216@v3.15.1 (plain Counter without labels, one per Prometheus process over every target, incremented scrape/scrape.go:1645@v2.49.1, :1910@v3.7.3, :2067@v3.15.1 when a scrape is failed with 'sample limit exceeded' scrape/target.go:316@v2.49.1, :322@v3.7.3, :364@v3.15.1; which target it was is in that target's lastError)"
 - id: prom_notifications_dropped_1d
   why: Alerts dropped from the Prometheus → Alertmanager queue overflow (24h). Anything above 0 means alerts were lost
   query: sum(increase(prometheus_notifications_dropped_total[1d]))
+  source:
+    - "prometheus_notifications_dropped_total: prometheus/prometheus notifier/notifier.go:173@v2.49.1, notifier/metric.go:58@v3.7.3, :76@v3.15.1 (plain Counter without labels up to v3.9.1 notifier/metric.go:80@v3.9.1, CounterVec with the label alertmanager since v3.10.0 :76@v3.10.0 initialized per Alertmanager notifier/sendloop.go:57@v3.15.1; the sum is the same at every version)"
 - id: prom_notifications_errors_1d
   why: Alerts that failed to send to Alertmanager (24h, per Alertmanager address)
   query: sum by (alertmanager) (increase(prometheus_notifications_errors_total[1d])) > 0
+  source:
+    - "prometheus_notifications_errors_total: prometheus/prometheus notifier/notifier.go:157@v2.49.1, notifier/metric.go:42@v3.7.3, :60@v3.15.1 (CounterVec with the label alertmanager = the Alertmanager push URL; a series per configured Alertmanager initialized at 0 notifier/notifier.go:694-696@v2.49.1, notifier/alertmanagerset.go:101-103@v3.7.3, notifier/sendloop.go:58@v3.15.1)"
 - id: prom_rule_eval_ratio_top
   why: Top rule groups by evaluation duration ÷ interval. Near 1, evaluations fall behind and alerts are late or skipped
   query: topk(5, prometheus_rule_group_last_duration_seconds / prometheus_rule_group_interval_seconds)
+  source:
+    - "prometheus_rule_group_last_duration_seconds: prometheus/prometheus rules/group.go:828@v2.49.1, :996@v3.7.3, :1040@v3.15.1 (gauge; label rule_group = <rule file>;<group name>; one series per loaded rule group from start; namespace prometheus rules/group.go:743@v2.49.1, :909@v3.7.3, :932@v3.15.1)"
+    - "prometheus_rule_group_interval_seconds: prometheus/prometheus rules/group.go:812@v2.49.1, :980@v3.7.3, :1024@v3.15.1 (gauge; label rule_group = <rule file>;<group name>; one series per loaded rule group from start; namespace prometheus rules/group.go:743@v2.49.1, :909@v3.7.3, :932@v3.15.1)"
 - id: prom_rule_iterations_missed_1d
   why: Rule evaluations skipped for overrunning the interval (24h)
   query: sum(increase(prometheus_rule_group_iterations_missed_total[1d]))
+  source:
+    - "prometheus_rule_group_iterations_missed_total: prometheus/prometheus rules/group.go:780@v2.49.1, :948@v3.7.3, :992@v3.15.1 (label rule_group = <rule file>;<group name>; one series per loaded rule group from start; namespace prometheus rules/group.go:743@v2.49.1, :909@v3.7.3, :932@v3.15.1)"
 - id: prom_compactions_failed_7d
   why: TSDB compaction failures (7d). The first sign of disk shortage or corruption
   query: sum(increase(prometheus_tsdb_compactions_failed_total[7d]))
+  source:
+    - "prometheus_tsdb_compactions_failed_total: prometheus/prometheus tsdb/db.go:295@v2.49.1, :344@v3.7.3, :433@v3.15.1 (counter without labels)"
 - id: prom_wal_corruptions
   why: Cumulative WAL corruptions
   query: max(prometheus_tsdb_wal_corruptions_total)
+  source:
+    - "prometheus_tsdb_wal_corruptions_total: prometheus/prometheus tsdb/head.go:405@v2.49.1, :453@v3.7.3, :532@v3.15.1 (counter without labels, registered by the head)"
 - id: prom_reload_ok
   why: Whether the last config reload succeeded (0 means new rules/scrape config were not applied and the old config is still running)
   query: min(prometheus_config_last_reload_successful)
-- id: prom_replicas
-  why: Number of Prometheus instances (by up)
-  query: count(up{job=~".*prometheus$"} == 1)
   source:
-    - "up: prometheus/prometheus scrape/scrape.go:1726,1746@v2.49.1, :2055,2131@v3.7.3 (written by Prometheus for every scrape target, 1 when the scrape succeeded and 0 when it failed; it carries the target's job and instance labels, never an exporter label)"
-    - "label job on these up series: prometheus-operator/prometheus-operator pkg/prometheus/promcfg.go:1373-1376@v0.71.0, :2063-2066@v0.86.2 (job is the value of the Service label a ServiceMonitor's jobLabel names, else the Service name; which label kube-prometheus-stack sets on the Prometheus and Alertmanager Services is read with the other Prometheus-stack names in #123)"
+    - "prometheus_config_last_reload_successful: prometheus/prometheus cmd/prometheus/main.go:85@v2.49.1, :128@v3.7.3, :135@v3.15.1 (gauge 1 or 0 without labels)"
+- id: prom_replicas
+  # One series per Prometheus process. `count(up{job=~".*prometheus$"} == 1)` counted scrape targets, and kube-prometheus-stack scrapes two ports of each Prometheus pod under the one job (web and reloader-web), so a single replica read as 2.
+  why: Number of Prometheus instances whose own metrics are scraped (one prometheus_build_info series each)
+  query: count(prometheus_build_info)
+  source:
+    - "prometheus_build_info: prometheus/common version/info.go:40-44@v0.45.0 (go.mod@v2.49.1), prometheus/client_golang prometheus/collectors/version/version.go:26-30@v1.23.2 (go.mod@v3.7.3), :39-59@v1.24.1 (go.mod@v3.15.1) (gauge 1 with labels version, revision, branch, goversion, goos, goarch, tags, registered once per Prometheus process prometheus/prometheus cmd/prometheus/main.go:101@v2.49.1, :148@v3.7.3, :155@v3.15.1, so there is one series per Prometheus process per scrape job that reads it: a Prometheus scraped by two jobs, or one that federates or receives remote write from another Prometheus, counts more, and one that does not scrape itself has none; the config-reloader sidecar registers only the Go and process collectors prometheus-operator/prometheus-operator cmd/prometheus-config-reloader/main.go:139-143@v0.71.0)"
+    - "label job on these self series: prometheus-community/helm-charts charts/kube-prometheus-stack/templates/prometheus/servicemonitor.yaml:15-19@kube-prometheus-stack-56.0.0, :15-19@kube-prometheus-stack-79.5.0, :18-22@kube-prometheus-stack-92.17.1 (the ServiceMonitor names no jobLabel and selects the Service labelled self-monitor: "true", so job is that Service's name, <fullname>-prometheus charts/kube-prometheus-stack/templates/prometheus/service.yaml:6,10@kube-prometheus-stack-56.0.0, :6,10@kube-prometheus-stack-79.5.0, :6,10@kube-prometheus-stack-92.17.1, charts/kube-prometheus-stack/templates/_helpers.tpl:14-24@kube-prometheus-stack-56.0.0, :14-24@kube-prometheus-stack-79.5.0, :14-24@kube-prometheus-stack-92.17.1, the release name when it contains the chart name; the operator's rule prometheus-operator/prometheus-operator pkg/prometheus/promcfg.go:1373-1376@v0.71.0, :2063-2066@v0.86.2; it scrapes two ports of that Service under the one job, the web port and reloader-web, prometheus-community/helm-charts charts/kube-prometheus-stack/templates/prometheus/servicemonitor.yaml:24,44@kube-prometheus-stack-56.0.0, :24,44@kube-prometheus-stack-79.5.0, :27,47@kube-prometheus-stack-92.17.1, so an up count per job counts targets, not instances; the Alertmanager ServiceMonitor is built the same way, charts/kube-prometheus-stack/templates/alertmanager/servicemonitor.yaml:24,48@kube-prometheus-stack-56.0.0, :24,48@kube-prometheus-stack-79.5.0, :27,51@kube-prometheus-stack-92.17.1, job <fullname>-alertmanager)"
 - id: am_reload_ok
   why: Whether the last Alertmanager config reload succeeded
   query: min(alertmanager_config_last_reload_successful)
+  source:
+    - "alertmanager_config_last_reload_successful: prometheus/alertmanager config/coordinator.go:62@v0.26.0, :61@v0.29.0, :63@v0.34.2 (gauge 1 or 0 without labels)"
 - id: am_cluster_members
   why: Alertmanager cluster member count (absent when not HA)
   query: max(alertmanager_cluster_members)
+  source:
+    - "alertmanager_cluster_members: prometheus/alertmanager cluster/delegate.go:78@v0.26.0, :77@v0.29.0, :79@v0.34.2 (registered by the cluster delegate, which exists only when --cluster.listen-address is not empty cmd/alertmanager/main.go:260-261@v0.26.0, :242-243@v0.29.0, app/app.go:214-215@v0.34.2; the prometheus-operator passes an empty address for a single replica unless forceEnableClusterMode is set prometheus-operator/prometheus-operator pkg/alertmanager/statefulset.go:245-246@v0.71.0, :254-255@v0.86.2, :295-296@v0.94.2, so the series is absent there)"
 - id: am_invalid_alerts_1d
   why: Invalid alerts rejected by Alertmanager (24h)
   query: sum(increase(alertmanager_alerts_invalid_total[1d]))
+  source:
+    - "alertmanager_alerts_invalid_total: prometheus/alertmanager api/metrics/metrics.go:33@v0.26.0, :34@v0.29.0, :40@v0.34.2 (plain Counter with the ConstLabel version: the API version, v1 or v2, at 0.26.0 :35@v0.26.0, the literal v2 since the v1 API went :36@v0.29.0, :42@v0.34.2)"
 - id: am_notifications_1d
   why: Notifications sent per receiver integration (slack, email, ...) in 24h. Non-zero ones are the channels actually in use
   query: sum by (integration) (increase(alertmanager_notifications_total[1d])) > 0
+  source:
+    - "alertmanager_notifications_total: prometheus/alertmanager notify/notify.go:258@v0.26.0, :281@v0.29.0, notify/metrics.go:45@v0.34.2 (label integration notify/notify.go:260@v0.26.0, :272@v0.29.0, notify/metrics.go:36@v0.34.2, plus receiver_name behind a feature flag since 0.29.0; a series per configured integration initialized at 0 notify/notify.go:296@v0.26.0, :372@v0.29.0, notify/metrics.go:131@v0.34.2)"
 - id: am_received_1d
   why: Alerts Alertmanager received in 24h (firing, resolved). Many firing and no resolved means alerts that never stop
   query: sum by (status) (increase(alertmanager_alerts_received_total[1d]))
+  source:
+    - "alertmanager_alerts_received_total: prometheus/alertmanager api/metrics/metrics.go:28@v0.26.0, :29@v0.29.0, :35@v0.34.2 (label status firing or resolved :31@v0.26.0, :32@v0.29.0, :38@v0.34.2; ConstLabel version v1 or v2 at 0.26.0, v2 only since 0.29.0)"
 - id: monitoring_restarts_7d
   why: Restarts per pod in the monitoring namespace over 7d (instability of the stack itself)
   query: sum by (pod) (increase(kube_pod_container_status_restarts_total{namespace="monitoring"}[7d])) > 0.5
