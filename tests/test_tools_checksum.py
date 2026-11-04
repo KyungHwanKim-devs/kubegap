@@ -364,3 +364,79 @@ def test_every_real_install_result_reports_its_digest_provenance(monkeypatch):
         if not d or not tools._download_applicable(t):
             continue
         assert (d.get("checksums") is None) == (t.name in ("kubent", "aws")), t.name
+
+
+# What the archive readers do with a hostile member name (#128): the facts are cited in references/sources.md, the tests pin them on the running interpreter.
+def _tgz_members(members: list[tuple[str, bytes | None]]) -> bytes:
+    """A tar.gz with the members in order; a `None` payload makes a symbolic link to `../outside`."""
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode="w:gz") as tf:
+        for name, data in members:
+            info = tarfile.TarInfo(name)
+            if data is None:
+                info.type = tarfile.SYMTYPE
+                info.linkname = "../outside"
+                tf.addfile(info)
+            else:
+                info.size = len(data)
+                tf.addfile(info, io.BytesIO(data))
+    return buf.getvalue()
+
+
+def _zip_members(members: list[tuple[str, bytes | None]]) -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        for name, data in members:
+            if data is None:
+                zi = zipfile.ZipInfo(name)
+                zi.external_attr = (stat.S_IFLNK | 0o777) << 16
+                zf.writestr(zi, "../outside")
+            else:
+                zf.writestr(name, data)
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize("packer, ext", [(_tgz_members, ".tar.gz"), (_zip_members, ".zip")])
+def test_a_member_named_with_dotdot_is_read_as_content_and_written_to_the_target_only(tmp_path, packer, ext):
+    """`extractfile`/`read` never write a path: the member's bytes land at kubegap's own target, nothing appears outside it
+    (tarfile.py:2485@v3.11.18, :2633@v3.14.10; zipfile.py:1564@v3.11.18, zipfile/__init__.py:1712@v3.14.10)."""
+    target = shell.TOOLS_BIN / "t"
+    err = tools._place_binary(packer([("../../escape/t", b"evil"), ("t-1.0/t", BLOB)]), "t" + ext, "t", target)
+    assert err is None and target.read_bytes() == b"evil"  # the first regular member with that basename wins; the archive's digest was checked before this point
+    assert not (tmp_path / "escape").exists() and not (shell.TOOLS_DIR / "escape").exists() and not (shell.TOOLS_DIR.parent / "escape").exists()
+    assert [p.name for p in shell.TOOLS_BIN.iterdir()] == ["t"] and not target.is_symlink()
+
+
+def test_a_symbolic_link_member_is_never_chosen_from_a_tar(tmp_path):
+    """TarInfo.isfile() is false for a link (tarfile.py:1666@v3.11.18, :1739@v3.14.10), so a link named like the binary is skipped and a tar with only the link has no executable."""
+    target = shell.TOOLS_BIN / "t"
+    assert tools._place_binary(_tgz_members([("t-1.0/t", None)]), "t.tar.gz", "t", target) == "no t executable inside t.tar.gz"
+    assert not target.exists()
+    assert tools._place_binary(_tgz_members([("t-1.0/t", None), ("bin/t", BLOB)]), "t.tar.gz", "t", target) is None
+    assert target.read_bytes() == BLOB and not target.is_symlink()
+
+
+def test_a_symbolic_link_member_of_a_zip_is_read_as_its_link_text(tmp_path):
+    """zipfile has no link type on read: the entry's bytes are the link text, and that is what would be placed; the pinned digest is what prevents it."""
+    target = shell.TOOLS_BIN / "t"
+    assert tools._place_binary(_zip_members([("t-1.0/t", None)]), "t.zip", "t", target) is None
+    assert target.read_bytes() == b"../outside" and not target.is_symlink()
+
+
+def test_aws_zip_extraction_stays_inside_the_work_folder_and_makes_no_link(tmp_path, monkeypatch):
+    """`extractall` drops the root and every `..` part of a member name and writes regular files only (zipfile.py:1758,1775-1781@v3.11.18; zipfile/__init__.py:1918,1935-1941@v3.14.10)."""
+    seen = {}
+
+    def fake_run(cmd, timeout, id, log=None):
+        work = shell.TOOLS_DIR / "aws-cli-src"
+        seen["escape_outside"] = (shell.TOOLS_DIR / "escape.txt").exists() or (tmp_path / "escape.txt").exists() or Path("/escape.txt").exists()
+        seen["escape_inside"] = (work / "escape.txt").read_text() if (work / "escape.txt").is_file() else None
+        seen["abs_inside"] = (work / "tmp" / "abs.txt").is_file()
+        seen["link"] = (work / "aws" / "dist" / "link").is_symlink()
+        seen["link_text"] = (work / "aws" / "dist" / "link").read_text()
+        return type("R", (), {"ok": True, "error": None, "stderr": ""})()
+
+    monkeypatch.setattr(shell, "run", fake_run)
+    blob = _zip_members([("../../escape.txt", b"out"), ("/tmp/abs.txt", b"abs"), ("aws/install", b"#!/bin/sh\n"), ("aws/dist/aws", b"bin"), ("aws/dist/link", None)])
+    assert tools._aws_install(blob) == {"ok": True}
+    assert seen == {"escape_outside": False, "escape_inside": "out", "abs_inside": True, "link": False, "link_text": "../outside"}

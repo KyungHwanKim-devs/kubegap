@@ -72,7 +72,7 @@ The key shape of the summary file, moved here from SKILL.md section 5. One secti
 
 `karpenterctl.summary.metrics_names` maps each key of `collectors/karpenter/pod-metrics.yaml` to the spelling the leader pod exposed (`null` when absent) and `metrics_version_floor` is the oldest release those spellings can come from; `interruption_actions`, `consistency_errors` and `nodes_disrupted_total` are `null` when the running release no longer emits them (Karpenter 1.0 and later; decided by the spellings present or the controller image version), `nodeclaims_terminated_by_reason` is `null` on 1.x (the counter lost its reason label), and `nodeclaims_disrupted_by_reason` and `disruption_actions` carry the running release's vocabulary (0.x `consolidation`/`drift`/`expiration`, 1.x `underutilized`/`drifted`/`empty`). `kedactl.summary.scaled_object_errors_total` and `operator_metrics_names` are the same for the KEDA operator.
 
-`hygiene.deprecated.pluto_read` and `kubent_read` require a successful collection step with `api_read` in `collect-result.json`: the tool's log shows at least one List that succeeded (pluto: a non-empty `items` or an empty List logged at `-v=2`; kubent: a positive Cluster count). Both tools swallow a forbidden List, so the flag never means the whole API was read. Only confirmed tools contribute items; each item carries both flags for `rule.needs`. When neither tool confirms a read, `items` and `count` are `null`, so even a zero-target check skips. Empty output alone, including old snapshots without read evidence, is not a clean scan.
+`hygiene.deprecated.pluto_read` and `kubent_read` require a successful collection step with `api_read` in `collect-result.json`: the tool's log shows at least one List that succeeded. Since #132 the evidence is the count of `Retrieving` lines minus `Failed to retrieve` lines (pluto at `-v=2`, kubent at `--log-level=debug`), carried as `pluto_lists_ok`/`pluto_lists_failed` and `kubent_lists_ok`/`kubent_lists_failed` (`null` in a snapshot taken before the counts existed); a non-empty pluto `items`, pluto's empty-List line and kubent's positive Cluster count still count as evidence for a log without List lines. kubent's Cluster count is the number of objects with a last-applied-configuration annotation, so 0 after a full read is normal on a cluster managed by Helm or server-side apply. Both tools swallow a forbidden List, so the flag never means the whole API was read. Only confirmed tools contribute items; each item carries both flags for `rule.needs`. When neither tool confirms a read, `items` and `count` are `null`, so even a zero-target check skips. Empty output alone, including old snapshots without read evidence, is not a clean scan.
 
 ## resilience
 
@@ -158,7 +158,7 @@ The key shape of the summary file, moved here from SKILL.md section 5. One secti
 
 ## run
 
-`run{commands, failed[], skipped[], seconds_total, by_collector}`.
+`run{commands, failed[], skipped[], seconds_total, by_collector}` (from run.log: `failed` is the commands that exited non-zero, timed out or could not run; a step that failed after its command exited 0, such as kubent or pluto with no confirmed read, is in `collection.failed_steps` and not here, and the report reads `collection.failed_steps`, #132).
 
 ## eksplatform
 

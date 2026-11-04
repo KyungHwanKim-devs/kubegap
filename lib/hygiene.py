@@ -243,6 +243,8 @@ def _next_minor(server_version, pluto_target: dict | None) -> str | None:
 def _deprecated(cx: _Ctx) -> dict:
     steps = ((load_json(cx.snap / "collect-result.json") or {}).get("core") or {}).get("steps") or {}
     read = {f"{tool}_read": bool((steps.get(tool) or {}).get("ok") and (steps.get(tool) or {}).get("api_read")) for tool in ("pluto", "kubent")}
+    # How much of the API each tool saw: successful and failed Lists counted from its log by lib/collect.py (#132); None for a snapshot taken before the counts existed.
+    lists = {f"{tool}_lists_{k}": (steps.get(tool) or {}).get(f"lists_{k}") for tool in ("pluto", "kubent") for k in ("ok", "failed")}
     items = []
     # source: pluto v5.24.5 pkg/api/output.go:28-55 Output{name, filePath, namespace (omitempty), api, deprecated, removed, replacementAvailable}, :57-59 Instance{items (omitempty),
     # target-versions}, pkg/api/versions.go:60-76 Version{version, kind, deprecated-in, removed-in, replacement-api, replacement-available-in, component}; deprecated and removed are
@@ -310,6 +312,7 @@ def _deprecated(cx: _Ctx) -> dict:
         item.update(read)
     return {
         **read,
+        **lists,
         # None makes the existing evaluator skip even when there are no rows on which to test rule.needs.
         "items": items if any(read.values()) else None,
         "count": len(items) if any(read.values()) else None,
