@@ -1,16 +1,29 @@
 # CoreDNS log signatures. The first edition lived in signatures/catalog.yaml and was moved into this collector. Field descriptions are in the header of catalog.yaml.
+# Every phrase below was read in the CoreDNS source at v1.11.3 (EKS add-on v1.11.3-eksbuild.1), v1.12.3 (k3s v1.33.5+k3s1 manifests/coredns.yaml) and v1.15.0 (newest release);
+# `source:` names the logging call at each version and references/sources.md records what each signature relies on (#129).
+# All four hold for the default text log format only: CoreDNS v1.15.0 added -log-format json (coremain/run.go:33@v1.15.0), which moves the plugin name into a "plugin" field (plugin/pkg/log/json.go:105@v1.15.0), so "plugin/<name>: " is no longer in the line.
 - id: coredns.servfail
   name: CoreDNS SERVFAIL responses
   component: coredns
   area: traffic
   severity: medium
   sources: ["logs/pods/coredns/*.log"]
-  pattern: ' SERVFAIL '
+  pattern: ' SERVFAIL |plugin/errors: 2 '
   meaning: DNS queries are failing. Apps see "no such host" or timeouts.
   cause: Upstream (VPC resolver, external DNS) not responding, forward configuration, conntrack drops.
-  verify: "kubectl logs -n kube-system -l k8s-app=kube-dns --since=1h | grep -c SERVFAIL"
+  verify: "kubectl logs -n kube-system -l k8s-app=kube-dns --since=1h | grep -cE ' SERVFAIL |plugin/errors: 2 '"
   warn_at: 20
   fail_at: 500
+  source:
+    - "coredns/coredns plugin/errors/errors.go:97@v1.11.3"
+    - "coredns/coredns plugin/errors/errors.go:97@v1.12.3"
+    - "coredns/coredns plugin/errors/errors.go:118@v1.15.0"
+    - "coredns/coredns plugin/forward/forward.go:202@v1.11.3"
+    - "coredns/coredns plugin/forward/forward.go:223@v1.12.3"
+    - "coredns/coredns plugin/forward/forward.go:294@v1.15.0"
+    - "coredns/coredns plugin/pkg/replacer/replacer.go:67@v1.11.3"
+    - "coredns/coredns plugin/pkg/replacer/replacer.go:67@v1.12.3"
+    - "coredns/coredns plugin/pkg/replacer/replacer.go:67@v1.15.0"
 - id: coredns.upstream-timeout
   name: CoreDNS upstream i/o timeout
   component: coredns
@@ -23,6 +36,19 @@
   verify: "kubectl logs -n kube-system -l k8s-app=kube-dns --since=1h | grep -c 'i/o timeout'"
   warn_at: 10
   fail_at: 200
+  source:
+    - "coredns/coredns plugin/errors/errors.go:97@v1.11.3"
+    - "coredns/coredns plugin/errors/errors.go:97@v1.12.3"
+    - "coredns/coredns plugin/errors/errors.go:118@v1.15.0"
+    - "coredns/coredns plugin/forward/forward.go:202@v1.11.3"
+    - "coredns/coredns plugin/forward/forward.go:223@v1.12.3"
+    - "coredns/coredns plugin/forward/forward.go:294@v1.15.0"
+    - "golang/go src/internal/poll/fd.go:60@go1.21.0"
+    - "golang/go src/internal/poll/fd.go:60@go1.26.0"
+    - "golang/go src/net/net.go:469@go1.21.0"
+    - "golang/go src/net/net.go:501@go1.26.0"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1458@go1.21.0"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1456@go1.26.0"
 - id: coredns.loop
   name: CoreDNS forwarding loop
   component: coredns
@@ -33,6 +59,13 @@
   meaning: CoreDNS sends queries to itself. The pod CrashLoops and cluster DNS stops.
   cause: Node /etc/resolv.conf points at 127.0.0.53 (systemd-resolved). Common with k3s on Ubuntu.
   verify: "kubectl logs -n kube-system -l k8s-app=kube-dns | grep -i loop"
+  source:
+    - "coredns/coredns plugin/loop/loop.go:53@v1.11.3"
+    - "coredns/coredns plugin/loop/loop.go:53@v1.12.3"
+    - "coredns/coredns plugin/loop/loop.go:52@v1.15.0"
+    - "coredns/coredns plugin/pkg/log/plugin.go:15@v1.11.3"
+    - "coredns/coredns plugin/pkg/log/plugin.go:15@v1.12.3"
+    - "coredns/coredns plugin/pkg/log/plugin.go:16@v1.15.0"
 - id: coredns.reload-failed
   name: CoreDNS Corefile reload failed
   component: coredns
@@ -45,3 +78,13 @@
   verify: "kubectl get cm -n kube-system coredns -o yaml"
   warn_at: 1
   fail_at: 1
+  source:
+    - "coredns/coredns plugin/reload/reload.go:97@v1.11.3"
+    - "coredns/coredns plugin/reload/reload.go:111@v1.11.3"
+    - "coredns/coredns plugin/reload/reload.go:97@v1.12.3"
+    - "coredns/coredns plugin/reload/reload.go:111@v1.12.3"
+    - "coredns/coredns plugin/reload/reload.go:116@v1.15.0"
+    - "coredns/coredns plugin/reload/reload.go:134@v1.15.0"
+    - "coredns/caddy caddyfile/dispenser.go:229@v1.1.1"
+    - "coredns/caddy caddyfile/dispenser.go:238@8de985351a98"
+    - "coredns/caddy caddyfile/dispenser.go:238@v1.1.4"
