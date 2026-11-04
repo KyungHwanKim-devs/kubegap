@@ -72,3 +72,16 @@ def test_iam_policy_allows_only_the_document():
     inst = [st for st in send if any("instance/" in r for r in ([st["Resource"]] if isinstance(st["Resource"], str) else st["Resource"]))]
     assert inst and all("Condition" in st for st in inst), "the instance statement must carry the cluster tag condition"
     assert "ssm:DescribeDocument" in pol["Statement"][0]["Action"]
+
+
+def test_node_reader_daemonset_image_is_pinned_by_index_digest():
+    """The node-reader pod is privileged with the host root mounted, so a moved tag must not change what runs: the image carries the digest of the
+    multi-architecture index. yamlite reads one document at a time, so the file is split on its `---` line and the DaemonSet document is loaded."""
+    text = (ROOT / "deploy" / "node-access" / "daemonset.yaml").read_text(encoding="utf-8")
+    docs = [yamlite.load(part) for part in re.split(r"^---$", text, flags=re.MULTILINE) if part.strip()]
+    assert [d["kind"] for d in docs] == ["Namespace", "DaemonSet"]
+    containers = docs[1]["spec"]["template"]["spec"]["containers"]
+    assert len(containers) == 1
+    image = containers[0]["image"]
+    assert re.fullmatch(r"public\.ecr\.aws/docker/library/busybox:1\.36@sha256:[0-9a-f]{64}", image), image
+    assert "crane digest public.ecr.aws/docker/library/busybox:1.36" in text, "the bump command stays next to the pin"

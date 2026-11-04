@@ -33,7 +33,14 @@ spec:
       priorityClassName: system-node-critical
       containers:
         - name: reader
-          image: public.ecr.aws/docker/library/busybox:1.36
+          # Pinned by the digest of the multi-architecture image index behind the tag (not one platform's manifest, so amd64 and arm64 nodes
+          # pull the same content). This pod is privileged with the host root mounted, so a moved tag must not be able to change what runs.
+          # The same index is docker.io/library/busybox:1.36. To bump the digest: run one of these and replace the digest below (the registry's
+          # Docker-Content-Digest header is the index digest when the Accept header asks for the index). To move the tag as well, change it
+          # here, in the command and in tests/test_node_commands.py, which pins the tag too.
+          #   curl -sI -H "Authorization: Bearer $(curl -s 'https://public.ecr.aws/token/?scope=repository:docker/library/busybox:pull' | jq -r .token)" -H 'Accept: application/vnd.oci.image.index.v1+json' https://public.ecr.aws/v2/docker/library/busybox/manifests/1.36 | grep -i docker-content-digest
+          #   crane digest public.ecr.aws/docker/library/busybox:1.36
+          image: public.ecr.aws/docker/library/busybox:1.36@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
           command: ["sh", "-c", "sleep infinity"]
           securityContext:
             privileged: true
