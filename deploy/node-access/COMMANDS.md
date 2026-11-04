@@ -256,7 +256,7 @@ S end
 One line from `collectors/eks-platform/collect.yaml`.
 
 ```sh
-journalctl -u kubelet --since -24h -o short-iso --no-pager -q 2>/dev/null | grep -E ' [EW][0-9]{4} [0-9:.]+ ' | tail -n 3000
+journalctl -u kubelet --since -24h -o short-iso --no-pager -q 2>/dev/null | grep -E ' [EW][0-9]{4} [0-9:.]+ ' | tail -n 3000; journalctl -u kubelet --since -24h -o short-iso --no-pager -q 2>/dev/null | grep -E '"(Eviction manager: |Container runtime network not ready)' | tail -n 200
 ```
 
 ### `eks-platform/containerd-journal`
@@ -272,7 +272,7 @@ journalctl -u containerd --since -24h -o short-iso --no-pager -q 2>/dev/null | g
 One line from `collectors/k3s-platform/collect.yaml`.
 
 ```sh
-journalctl -u k3s -u k3s-agent --since -24h --no-pager -q -o short-iso 2>/dev/null | sed -E 's/^[^ ]+ [^ ]+ k3s(-agent)?\[[0-9]+\]: //' | grep -E '^[EW][0-9]{4}|"level":"(warn|error|fatal)"|level=(warning|error|fatal)' | tail -n 3000
+journalctl -u k3s -u k3s-agent --since -24h --no-pager -q -o short-iso 2>/dev/null | sed -E 's/^[^ ]+ [^ ]+ k3s(-agent)?\[[0-9]+\]: //' | grep -E '^[EW][0-9]{4}|"level":"(warn|error|fatal)"|level=(warning|error|fatal)' | tail -n 3000; journalctl -u k3s -u k3s-agent --since -24h --no-pager -q -o short-iso 2>/dev/null | sed -E 's/^[^ ]+ [^ ]+ k3s(-agent)?\[[0-9]+\]: //' | grep -E '"(Eviction manager: |Container runtime network not ready)' | tail -n 200
 ```
 
 ### `k3s-platform/k3s-journal-stats`
@@ -280,7 +280,7 @@ journalctl -u k3s -u k3s-agent --since -24h --no-pager -q -o short-iso 2>/dev/nu
 One line from `collectors/k3s-platform/collect.yaml`.
 
 ```sh
-journalctl -u k3s -u k3s-agent --since -24h --no-pager -q 2>/dev/null | sed -E 's/^[A-Z][a-z]{2} [0-9 ]+[0-9:]+ [a-z0-9]+ k3s(-agent)?\[[0-9]+\]: //' | sed -E 's/^([EIWF])[0-9]{4} [0-9:.]+ +[0-9]+ ([a-zA-Z_]+\.go):[0-9]+\].*/klog \1 \2/; s/^\{"level":"([a-z]+)".*/etcd-json \1/; s/^time="[^"]+" level=([a-z]+).*/logrus \1/' | cut -c1-60 | sort | uniq -c | sort -rn | head -40
+journalctl -u k3s -u k3s-agent --since -24h --no-pager -q 2>/dev/null | sed -E 's/^[A-Z][a-z]{2} [0-9 ]+[0-9:]+ [^ ]+ k3s(-agent)?\[[0-9]+\]: //' | sed -E 's/^([EIWF])[0-9]{4} [0-9:.]+ +[0-9]+ ([^ ]+\.go):[0-9]+\].*/klog \1 \2/; s/^\{"level":"([a-z]+)".*/etcd-json \1/; s/^time="[^"]+" level=([a-z]+).*/logrus \1/' | cut -c1-60 | sort | uniq -c | sort -rn | head -40
 ```
 
 ### `k3s-platform/k3s-scheduler-unschedulable`
