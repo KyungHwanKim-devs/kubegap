@@ -616,14 +616,14 @@
     expr: "item.get('k8s_supported') is False"
     warn_expr: "item.get('k8s_supported') is None"
   target: "'cluster'"
-  evidence: "f\"Karpenter {item.get('version')} supports Kubernetes up to {item.get('k8s_max_supported')}, the cluster runs {item.get('k8s_minor')}. {item.get('version_note') or ''}\""
+  evidence: "f\"Karpenter {item.get('version')} supports Kubernetes {item.get('k8s_min_supported') or '?'} to {item.get('k8s_max_supported')} (table row {item.get('compat_row')}), the cluster runs {item.get('k8s_minor')}. {item.get('version_note') or ''}\""
   severity_default: high
   symptom_linked: false
   why: >
     Karpenter 1.x compares the cluster version against its own support table at startup and in the nodeclass.status controller; outside the table it stops resolving AMIs, so new nodes fail to launch or launch only with old AMIs. The log signature (karpenter.version-unsupported) is one line a day and stays at warn, so this check compares the versions directly.
   measured: >
     Measured on a real EKS cluster: Karpenter 0.37.0 (max 1.30) on a 1.32 cluster.
-  suggest: "Upgrade Karpenter in step with EKS (0.37 → 1.0 → 1.1 → ... one minor at a time, including CRD migrations). The compatibility table is rubric/karpenter-compat.yaml."
+  suggest: "Upgrade Karpenter in step with EKS (0.37 → 1.0 → 1.1 → ... one minor at a time, including CRD migrations). The compatibility table is rubric/karpenter-compat.yaml, read from Karpenter's generated compatibility matrix; add a row when a new Karpenter minor ships."
   verify:
     - "helm list -n karpenter ; kubectl version --short"
   test:
@@ -649,8 +649,20 @@
           present: true
           version: "1.2.1"
           k8s_minor: "1.32"
+          k8s_min_supported: "1.25"
           k8s_max_supported: "1.32"
+          compat_row: "1.2"
           k8s_supported: true
+          version_note: null
+      - expect: "fail"   # below the table's minimum: a 1.x Karpenter on a cluster older than its minK8sVersion is outside the matrix too
+        item:
+          present: true
+          version: "1.5.0"
+          k8s_minor: "1.24"
+          k8s_min_supported: "1.26"
+          k8s_max_supported: "1.33"
+          compat_row: "1.5"
+          k8s_supported: false
           version_note: null
       - expect: "skip"
         item:
