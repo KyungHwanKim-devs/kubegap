@@ -22,7 +22,7 @@ from pathlib import Path
 from . import paths
 from . import podmetrics as _pm
 from .controlplane import _normalize_msg, workload_of
-from .mask import mask_text
+from .mask import mask_text, strip_control
 from .promtext import parse as _parse_prom
 from .signatures import Signature
 from .signatures import load as load_signatures
@@ -31,25 +31,56 @@ from .snapshot import COMPONENT_LOGS_DIR, component_logs_aggregate, component_lo
 ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})")
 KLOG_TS_RE = re.compile(r"\b[IWEF](\d{2})(\d{2}) (\d{2}:\d{2}:\d{2})")
 PREFIX_RE = re.compile(r"^\[pod/([^/\]]+)/([^\]]+)\] ")
-ERROR_RE = re.compile(r'(?i)\b(error|fatal|panic|exception|failed|failure)\b|"level":"(error|fatal)"|level=(error|fatal)|^\[?[^\]]*\]? ?\S* ?E\d{4} ')
-NOT_ERROR_RE = re.compile(
-    r"level=info|\"level\":\"info\"|level=debug|\"level\":\"debug\"|\"severity\":\"(info|debug|notice)\"|\"level\":\"(warn|warning)\"|errors=0|error=nil|error=<nil>|\"error\":\"\"|error: null|RegistrationStatus", re.IGNORECASE
+# The line formats these two regexes know, with the source of each format in references/sources.md (#129): klog text (`E1104 … file.go:12] "msg" err="…"`,
+# also behind the journal prefix `<host> kubelet[<pid>]: `), logfmt `level=` (go-kit: Prometheus 2.x, Loki, promtail, Alertmanager ≤0.27; slog: Prometheus 3.x,
+# Alertmanager ≥0.28, spelled `INFO`/`ERROR`; logrus text, spelled `warning`), JSON `"level":` (zap, logrus JSON, go-kit JSON, zerolog; Karpenter spells
+# `INFO`/`ERROR`), Elasticsearch 7 `"level": "INFO"` with a space and ECS `"log.level"`, actions-runner-controller `"severity"`, zap console (KEDA,
+# actions-runner-controller text: tab-separated `\tINFO\t`), fluent-bit `[ warn]`/`[error]` (width-5 label), nginx error log `[crit] 31#31: ` (emerg,
+# alert and crit are above error), zerolog console ` ERR ` (Traefik 3 default). klog JSON (`--logging-format=json`) has no level key and is not told apart.
+ERROR_RE = re.compile(
+    r'(?i)\b(error|fatal|panic|exception|failed|failure)\b|"(level|log\.level)":\s*"(error|fatal|critical)"|level=(error|fatal)|^\[?[^\]]*\]? ?\S* ?E\d{4} '
+    r"|(?-i: ERR |\[(emerg|alert|crit)\] \d+#\d+: )"
 )
-# JSON logs whose level/severity field is info are not errors even when the body contains "failed" (seen: actions-runner-controller "severity":"info" lines and ebs-csi NotifyRegistrationStatus were caught as unclassified errors).
+NOT_ERROR_RE = re.compile(
+    r'level=(info|debug|warn|warning)|"(level|log\.level)":\s*"(info|debug|warn|warning)"|"severity":"(info|debug|notice)"|\[ ?(info|debug|warn)\]|\t(INFO|DEBUG|WARN)\t'
+    r'|errors=0|error=nil|error=<nil>|"error":""|error: null|RegistrationStatus',
+    re.IGNORECASE,
+)
+# Lines whose level is info, debug or warn in any of the formats above are not errors even when the body contains "failed" (seen: actions-runner-controller
+# "severity":"info" lines and ebs-csi NotifyRegistrationStatus were caught as unclassified errors; before #129 only the JSON spelling was excluded, so a
+# KEDA `\tINFO\t`, Elasticsearch `"level": "INFO"`, logfmt `level=warn` or fluent-bit `[ warn]` line with a "failed" word counted as an error).
 BOOT_WINDOW_S = 300  # 300 seconds after node creation or reboot. Was 120, but after a small k3s cluster node reboot the first kubelet line came 140 seconds later, so it was raised. kubelet/containerd lines within this window after node creation are boot ordering (PLEG, network not ready before CNI init) and are excluded from signatures.
-ISO_TZ_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?")
+ISO_TZ_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:[.,]\d+)?(Z|[+-]\d{2}:?\d{2})?")
+# Any timestamp a component writes into its own line: ISO 8601 (logfmt `ts=`/`time=`, logrus `time="…"`, zap `"ts"`/`"time"`, Grafana `t=`, ECS `"@timestamp"`,
+# Elasticsearch 7 `"timestamp": "…,123Z"`) or the `2026/11/05 00:05:48` form of nginx and fluent-bit (milliseconds from fluent-bit 4.1.0).
+TS_ANY_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?|\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,9})?")
 MAX_FILE_BYTES = 30 * 1024 * 1024
 
 
 def _ts_of(line: str) -> str | None:
-    m = ISO_RE.search(line)
+    """The first timestamp in the line as written (ISO 8601 with its fraction and offset when present, so `_parse_iso` keeps a `+09:00` line 9 hours apart
+    from a `Z` one), else a klog header `E1104 15:10:15` completed with the current year (no offset: read as UTC, and by `scan` once more as node-local time)."""
+    m = ISO_TZ_RE.search(line)
     if m:
-        return m.group(1)
+        return m.group(0)
     m = KLOG_TS_RE.search(line)
     if m:
-        y = _dt.date.today().year
+        today = _dt.date.today()
+        y = today.year - 1 if (int(m.group(1)), int(m.group(2))) > (today.month, today.day) else today.year  # a January scan reads December lines as last year's
         return f"{y}-{m.group(1)}-{m.group(2)}T{m.group(3)}"
     return None
+
+
+def _utc_str(ts: str | None, assume_tz: _dt.tzinfo | None = None) -> str | None:
+    """`ts` from `_ts_of` as `YYYY-MM-DDTHH:MM:SSZ` in UTC, so first/last compare across pods whose containerd wrote local-time offsets. A timestamp without an
+    offset (a klog header in the k3s journal) is read in `assume_tz` (the node-local zone `scan` takes from the snapshot's `taken_at`), else as UTC. None when unreadable."""
+    t = _parse_iso(ts)
+    if t is None:
+        return None
+    m = ISO_TZ_RE.search(ts or "")
+    if assume_tz is not None and not (m and m.group(2)):
+        t = t.replace(tzinfo=assume_tz)
+    return t.astimezone(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _parse_iso(s: str | None) -> _dt.datetime | None:
@@ -107,6 +138,33 @@ def _strip_prefix(line: str) -> tuple[str, str | None]:
     return line.strip(), pod
 
 
+def any_regex(sigs: list[Signature]) -> re.Pattern:
+    """One regex that matches a line when any of `sigs` would: the pre-filter of `scan`. A pattern that starts with the global `(?i)` becomes a scoped
+    `(?i:…)` group, since Python refuses a global flag anywhere but at the start of the whole expression (the first case-insensitive patterns came with #129)."""
+    parts = [f"(?i:{s.pattern[4:]})" if s.pattern.startswith("(?i)") else f"(?:{s.pattern})" for s in sigs]
+    return re.compile("|".join(parts))
+
+
+def match_line(line: str, sigs: list[Signature]) -> set[str]:
+    """The ids of `sigs` that count `line`: every signature whose pattern matches, except that a `component: any` signature yields to a component signature
+    on the same line (seen: metallb.speaker-error and common.context-deadline double-counted 533 times). `scan` and tests/test_signature_lines.py use it."""
+    hit = {s.id for s in sigs if s.regex.search(line)}
+    by_id = {s.id: s for s in sigs}
+    if any(by_id[h].component != "any" for h in hit):
+        hit = {h for h in hit if by_id[h].component != "any"}
+    return hit
+
+
+def normalize_unclassified(line: str) -> str:
+    """The key under which an error line that matched no signature is counted: the kubectl and journal prefixes off, every timestamp the component wrote
+    replaced by `<ts>` (otherwise identical errors one second apart never collapse), then `_normalize_msg` (klog header off, numbers, ids and addresses blanked)."""
+    body, _pod = _strip_prefix(line)
+    body = TS_ANY_RE.sub("<ts>", body)
+    body = re.sub(r'"(@?timestamp|ts|time|start time|end time)":\s*"[^"]*"', r'"\1":"<ts>"', body)  # time fields in JSON logs that TS_ANY_RE does not spell
+    body = re.sub(r'"(ts|time)":\s*\d+(\.\d+)?', r'"\1":<ts>', body)  # zap EpochTimeEncoder (external-secrets `--zap-time-encoding=epoch`): seconds as a float
+    return _normalize_msg(body)[:140]
+
+
 def scan(snap: Path, sigs: list[Signature]) -> dict:
     """Scan the text logs under logs/ once and produce signature matches and unclassified errors."""
     ldir = snap / "logs"
@@ -135,7 +193,7 @@ def scan(snap: Path, sigs: list[Signature]) -> dict:
         if not applicable:
             continue
         scanned.append(rel)
-        any_re = re.compile("|".join(f"(?:{s.pattern})" for s in applicable))
+        any_re = any_regex(applicable)
         parts = rel.split("/")
         component = parts[2] if rel.startswith("logs/pods/") and len(parts) > 3 else ("node:" + parts[2] if rel.startswith("logs/node/") and len(parts) > 3 else rel)
         node_boot_until = boot_until.get(parts[2]) if rel.startswith("logs/node/") and len(parts) > 3 else None
@@ -146,9 +204,11 @@ def scan(snap: Path, sigs: list[Signature]) -> dict:
         for line in data.splitlines():
             if not line.strip():
                 continue
+            line = strip_control(line)[0]  # Traefik's default console format colours the level and message (zerolog console.go:374-384@v1.33.0); the patterns read the text
             lines_total += 1
             matched = False
             if any_re.search(line):
+                matched_ids = match_line(line, applicable)
                 if node_boot_until is not None:
                     ts_txt = _ts_of(line)
                     lt = _parse_iso(ts_txt)
@@ -163,16 +223,13 @@ def scan(snap: Path, sigs: list[Signature]) -> dict:
                                 matched = True
                         if matched:
                             continue
-                component_matched = any(s.regex.search(line) for s in applicable if s.component != "any")
                 for s in applicable:
-                    if s.component == "any" and component_matched:
-                        continue  # a line consumed by a component signature is not counted again under common.* (seen: metallb.speaker-error and common.context-deadline double-counted 533 times)
-                    if s.regex.search(line):
+                    if s.id in matched_ids:
                         matched = True
                         h = hits[s.id]
                         h["count"] += 1
                         h["files"][rel] += 1
-                        ts = _ts_of(line)
+                        ts = _utc_str(_ts_of(line), local_tz)
                         if ts:
                             h["first"] = min(h["first"], ts) if h["first"] else ts
                             h["last"] = max(h["last"], ts) if h["last"] else ts
@@ -180,10 +237,7 @@ def scan(snap: Path, sigs: list[Signature]) -> dict:
                             h["samples"].append(mask_text(line[:240]).text)  # the raw log is deleted after summarize; these samples are what survives, so they are masked
             if not matched and ERROR_RE.search(line) and not NOT_ERROR_RE.search(line):
                 error_lines += 1
-                body, _pod = _strip_prefix(line)
-                body = re.sub(r'"(ts|time|start time|timestamp|end time)":\s*"[^"]*"', r'"\1":"<ts>"', body)  # time fields in JSON logs
-                body = re.sub(r"\[\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}\]", "[<ts>]", body)  # fluent-bit [2026/10/25 00:05:48]
-                key = f"{component} | {_normalize_msg(body)[:140]}"
+                key = f"{component} | {normalize_unclassified(line)}"
                 unclassified[key] += 1
                 uncl_files[key][rel] += 1
                 uncl_sample.setdefault(key, mask_text(line[:240]).text)

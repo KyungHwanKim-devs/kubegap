@@ -1,14 +1,37 @@
-# EBS CSI log signatures. The first edition lived in signatures/catalog.yaml and was moved into this collector. Field descriptions are in the header of catalog.yaml.
+# ---------------- ebs-csi (collectors/ebs-csi/signatures.yaml) ----------------
+# `AttachVolume.Attach failed` and `Multi-Attach error` were dropped: they are kube-controller-manager/kubelet strings (kubernetes pkg/volume/util/operationexecutor/operation_generator.go:289,
+# pkg/controller/volume/attachdetach/reconciler/reconciler.go:392,397,433@v1.32.13) and pod Events (FailedAttachVolume, in lib/events.py TRACKED); they never appear in an ebs-csi container.
+# What the ebs-csi pod prints: the csi-attacher sidecar's "Error processing" err="failed to attach: rpc error: code = ... desc = Could not attach volume ..." (V(2); the manifest runs --v=2),
+# carrying the EC2 code, and until v1.53.0 the driver's own "Error from AWS API" err="api error <code>: ..." (unconditional klog.ErrorS; V(3) from v1.54.0, below the default --v=2).
 - id: ebs-csi.attach-failed
   name: EBS volume attach failed
   component: ebs-csi
   area: storage
   severity: high
   sources: ["logs/pods/ebs-csi/*.log"]
-  pattern: 'AttachVolume\.Attach failed|rpc error.*(attach|Attach)|VolumeInUse|Multi-Attach error|timed out waiting for volume|AttachmentLimitExceeded'
-  meaning: A pod using a PVC is moving to another node but the volume does not follow, so it is stuck in ContainerCreating.
+  pattern: 'failed to attach: rpc error|VolumeInUse|AttachmentLimitExceeded|timed out waiting for volume to create'
+  meaning: A pod using a PVC is moving to another node but the volume does not follow, so it is stuck in ContainerCreating. The line is the csi-attacher sidecar's "Error processing" with the driver's gRPC error (printed at --v=2, the manifest default); VolumeInUse and AttachmentLimitExceeded are the EC2 codes inside it (the driver also logs them itself up to v1.53.x). "timed out waiting for volume to create" is the driver's CreateVolume timeout, not an attach.
   cause: Detach from the old node did not happen (node terminated abnormally), instance volume attach limit (28 on Nitro), AZ mismatch.
   verify: "kubectl get volumeattachments; aws ec2 describe-volumes --filters Name=status,Values=in-use --query 'Volumes[].Attachments[].{id:VolumeId,inst:InstanceId,state:State}'"
+  source:
+    - "kubernetes-csi/external-attacher pkg/controller/csi_handler.go:243,270@v4.7.0"
+    - "kubernetes-csi/external-attacher pkg/controller/csi_handler.go:246,273@v4.13.0"
+    - "kubernetes-sigs/aws-ebs-csi-driver deploy/kubernetes/base/controller.yaml:173@v1.37.0"
+    - "kubernetes-sigs/aws-ebs-csi-driver deploy/kubernetes/base/controller.yaml:183@v1.67.2"
+    - "grpc/grpc-go internal/status/status.go:202@v1.68.0"
+    - "grpc/grpc-go internal/status/status.go:202@v1.84.0"
+    - "kubernetes-sigs/aws-ebs-csi-driver pkg/driver/controller.go:342,417@v1.37.0"
+    - "kubernetes-sigs/aws-ebs-csi-driver pkg/driver/controller.go:419,502,504@v1.67.2"
+    - "kubernetes-sigs/aws-ebs-csi-driver pkg/cloud/cloud.go:683,957@v1.37.0"
+    - "kubernetes-sigs/aws-ebs-csi-driver pkg/cloud/cloud.go:880,1326,1328,2588@v1.67.2"
+    - "kubernetes-sigs/aws-ebs-csi-driver pkg/cloud/handlers.go:76@v1.37.0"
+    - "kubernetes-sigs/aws-ebs-csi-driver pkg/cloud/handlers.go:86@v1.53.0"
+    - "kubernetes-sigs/aws-ebs-csi-driver pkg/cloud/handlers.go:86@v1.54.0"
+    - "kubernetes-sigs/aws-ebs-csi-driver pkg/cloud/handlers.go:84@v1.67.2"
+    - "aws/smithy-go errors.go:37@v1.22.0"
+    - "aws/smithy-go errors.go:37@v1.28.5"
+# The driver logs throttle codes only at klog.V(4) ("Throttle error from AWS API"); the manifest runs --v=2, so a throttle that the SDK retries successfully leaves no line.
+# Only a request that fails after the retries carries the code into a sidecar's error line. The metric cloudprovider_aws_api_throttled_requests_total (aws_ebs_csi_api_request_throttles_total from v1.67) counts every throttle.
 - id: ebs-csi.throttled
   name: EBS CSI EC2 API throttling
   component: ebs-csi
@@ -16,8 +39,18 @@
   severity: medium
   sources: ["logs/pods/ebs-csi/*.log"]
   pattern: 'RequestLimitExceeded|Throttling|Rate exceeded'
-  meaning: Volume creation and attach slow down. StatefulSet rollouts take longer.
+  meaning: Volume creation and attach slow down. StatefulSet rollouts take longer. The line appears only when an EC2 request still fails after the SDK's retries (the driver logs retried throttles at --v=4 only), so a count here means sustained throttling; the metric aws_ebs_csi_api_request_throttles_total counts every throttle.
   cause: Many volumes and frequent polling.
   verify: "kubectl logs -n kube-system -l app.kubernetes.io/name=aws-ebs-csi-driver --since=1h | grep -c RequestLimitExceeded"
   warn_at: 5
   fail_at: 200
+  source:
+    - "kubernetes-sigs/aws-ebs-csi-driver pkg/cloud/handlers.go:42,74@v1.37.0"
+    - "kubernetes-sigs/aws-ebs-csi-driver pkg/cloud/handlers.go:41,82@v1.67.2"
+    - "kubernetes-sigs/aws-ebs-csi-driver pkg/metrics/constants.go:21@v1.67.2"
+    - "kubernetes-sigs/aws-ebs-csi-driver deploy/kubernetes/base/controller.yaml:75@v1.37.0"
+    - "kubernetes-sigs/aws-ebs-csi-driver deploy/kubernetes/base/controller.yaml:75@v1.67.2"
+    - "aws/aws-sdk-go-v2 aws/retry/standard.go:61,68@v1.32.4"
+    - "aws/aws-sdk-go-v2 aws/retry/standard.go:70,77@v1.47.3"
+    - "aws/smithy-go errors.go:37@v1.22.0"
+    - "aws/smithy-go errors.go:37@v1.28.5"

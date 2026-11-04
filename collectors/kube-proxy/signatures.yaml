@@ -1,11 +1,19 @@
-# kube-proxy log signatures (moved here from signatures/catalog.yaml). On k3s the kube-proxy log is mixed into the k3s journal (logs/node/<node>/k3s-errors-24h.log), so it is listed in sources too.
+# "Failed to sync IPVS" is not printed (the IPVS proxier says "Failed to sync service" / "Failed to sync endpoint for service"); the redundant "iptables-restore.*(failed|error)" was dropped.
 - id: kube-proxy.iptables-restore-failed
   name: kube-proxy iptables-restore failed
   component: kube-proxy
   area: traffic
   severity: high
   sources: ["logs/pods/kube-proxy/*.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'Failed to execute iptables-restore|iptables-restore.*(failed|error)|Failed to (sync|list) IPVS'
-  meaning: Service rules are not being updated, so traffic does not reach new pods or new Services.
+  pattern: 'Failed to execute iptables-restore|Failed to sync (service|endpoint for service)|Failed to list IPVS destinations'
+  meaning: Service rules are not being updated, so traffic does not reach new pods or new Services. All three are klog E lines (V0) of the iptables and IPVS proxiers; on k3s they are in the k3s journal.
   cause: iptables lock contention (another CNI or security agent), rule count explosion, kernel modules.
   verify: "kubectl logs -n kube-system -l k8s-app=kube-proxy --since=1h | grep -i iptables-restore"
+  source:
+    - "kubernetes/kubernetes pkg/proxy/iptables/proxier.go:468,495,1562,1564@v1.32.13"
+    - "kubernetes/kubernetes pkg/proxy/ipvs/proxier.go:1106,1109,1443,1445,1841@v1.32.13"
+    - "kubernetes/kubernetes pkg/proxy/iptables/proxier.go:455,482,1551,1553@v1.33.5"
+    - "kubernetes/kubernetes pkg/proxy/ipvs/proxier.go:1094,1097,1431,1433,1829@v1.33.5"
+    - "kubernetes/kubernetes pkg/proxy/iptables/proxier.go:1388,1390@v1.37.2"
+    - "kubernetes/kubernetes pkg/proxy/iptables/cleanup.go:89,116@v1.37.2"
+    - "kubernetes/kubernetes pkg/proxy/ipvs/proxier.go:855,858,1192,1194,1588@v1.37.2"

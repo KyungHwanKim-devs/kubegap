@@ -1,35 +1,123 @@
-# Argo CD log signatures. The first edition lived in signatures/catalog.yaml and was moved into this collector. Field descriptions are in the header of catalog.yaml.
+# Group G: Argo CD, External Secrets Operator, KEDA, cert-manager (+ catalog cert-manager.orphan-tls-secret). Every phrase was read in the source at the versions
+# named in references/sources.md (#129): Argo CD v2.13.0 (EKS), v3.2.0 (k3s), v3.6.1; ESO v0.9.13 (EKS), v2.1.0 (k3s), v2.14.0; KEDA v2.17.2 (EKS), v2.19.0 (k3s), v2.21.0;
+# cert-manager v1.14.4 (k3s), v1.21.3. `source:` names the logging call (or the library format string) at each version.
+# Argo CD prints logrus text (`time="…" level=error msg="…"`) up to v2.14.x and logrus JSON (`{"level":"error","msg":"…","time":"…"}`) from v3.0.0 by default
+# (util/log/logrus.go:45@v2.14.0 vs :48@v3.0.0); the argo-helm chart still sets global.logging.format: text, so both forms exist and every level-based alternative spells both.
 - id: argocd.sync-failed
   name: Argo CD sync failed
   component: argocd
   area: hygiene
   severity: medium
   sources: ["logs/pods/argocd/*.log"]
-  pattern: 'sync failed|ComparisonError|Failed to load live state|error synchronizing|failed to sync|one or more objects failed to apply|level=error.*(sync|apply)'
-  meaning: Git and the cluster differ and Argo CD cannot reconcile them. Deployments have stopped or manual changes are not being reverted.
+  # `sync failed` was never printed (only `waitSync failed: timed out`, capital S). `ComparisonError`, `Failed to load live state`, `error synchronizing cache state` and
+  # `failed to sync cluster <host>` are Application condition texts (controller/state.go, controller/cache/cache.go), never log lines; the error line on that path is
+  # gitops-engine's `Failed to sync cluster`. The failed-sync message reaches the log twice at info: gitops-engine `Updating operation state. phase: Running -> Failed,
+  # message: '' -> 'one or more objects failed to apply, …'` and the audit line `Sync operation to <rev> failed: <message>` (reason=OperationCompleted).
+  pattern: 'one or more objects failed to apply|Sync operation to \S+ failed:|Failed to sync cluster|Failed to initiate auto-sync to|(level=error|"level":"error").*(sync|apply)'
+  meaning: Git and the cluster differ and Argo CD cannot reconcile them. Deployments have stopped or manual changes are not being reverted. The lines are the controller's info-level operation-state and audit lines on a failed sync, gitops-engine's error line when the cluster cache cannot sync, and any error-level controller line about a sync or apply (text or JSON format). Comparison errors (ComparisonError) are only in the Application conditions, not in the log; the verify command reads them.
   cause: Manifest errors (missing CRD, field mismatch), RBAC, resource hook failures, repository unreachable.
   verify: "kubectl get applications -A -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status | grep -v Synced"
   warn_at: 1
   fail_at: 50
+  source:
+    - "argoproj/gitops-engine pkg/sync/sync_context.go:411,541,592,921@bd7681ae3f8b"
+    - "argoproj/gitops-engine pkg/sync/sync_context.go:456,595,732,1068@b89b0871b414"
+    - "argoproj/argo-cd gitops-engine/pkg/sync/sync_context.go:553,709,716,938,953,964,1293@v3.6.1"
+    - "argoproj/argo-cd controller/sync.go:309@v3.2.0"
+    - "argoproj/argo-cd controller/appcontroller.go:1502,1512,1514@v2.13.0"
+    - "argoproj/argo-cd controller/appcontroller.go:1579,1589,1591@v3.2.0"
+    - "argoproj/argo-cd controller/appcontroller.go:1847,1863,1865@v3.6.1"
+    - "argoproj/argo-cd util/argo/audit_logger.go:90@v2.13.0"
+    - "argoproj/argo-cd util/argo/audit_logger.go:90@v3.2.0"
+    - "argoproj/argo-cd util/argo/audit_logger.go:105@v3.6.1"
+    - "argoproj/gitops-engine pkg/cache/cluster.go:921@bd7681ae3f8b"
+    - "argoproj/gitops-engine pkg/cache/cluster.go:978@b89b0871b414"
+    - "argoproj/argo-cd gitops-engine/pkg/cache/cluster.go:1137@v3.6.1"
+    - "argoproj/argo-cd controller/appcontroller.go:2053@v2.13.0"
+    - "argoproj/argo-cd controller/appcontroller.go:2237@v3.2.0"
+    - "argoproj/argo-cd controller/appcontroller.go:2764@v3.6.1"
+    - "argoproj/argo-cd util/log/logrus.go:45@v2.13.0"
+    - "argoproj/argo-cd util/log/logrus.go:45@v2.14.0"
+    - "argoproj/argo-cd util/log/logrus.go:48@v3.0.0"
+    - "argoproj/argo-cd util/log/logrus.go:48@v3.2.0"
+    - "argoproj/argo-cd util/log/logrus.go:48@v3.6.1"
+    - "sirupsen/logrus formatter.go:8,9@v1.9.3"
+    - "sirupsen/logrus logrus.go:70@v1.9.3"
+    - "sirupsen/logrus text_formatter.go:212,324@v1.9.3"
+    - "sirupsen/logrus json_formatter.go:96@v1.9.3"
+    - "sirupsen/logrus formatter.go:21,22@v1.10.2"
+    - "sirupsen/logrus logrus.go:29@v1.10.2"
+    - "sirupsen/logrus text_formatter.go:231,315@v1.10.2"
+    - "sirupsen/logrus json_formatter.go:105@v1.10.2"
 - id: argocd.repo-access
   name: Argo CD repository access failed
   component: argocd
   area: hygiene
   severity: medium
   sources: ["logs/pods/argocd/*.log"]
-  pattern: 'repository not accessible|authentication required|failed to get git client|Unable to resolve.*revision|rpc error: code = Unknown desc = .*(git|helm)'
-  meaning: The Git or Helm repository cannot be read, so new commits are not deployed.
+  # `repository not accessible` is an InvalidSpecError condition (util/argo/argo.go), never logged. `Unable to resolve` is lowercase in source. The repo-server's own
+  # status errors use codes.Internal, so `code = Unknown` alone missed them; the `rpc error:` prefix exists only where a client (controller, argocd-server) prints the
+  # status error. `authentication required` is go-git's text on HTTP 401 (ls-remote path); the git CLI prints `fatal: Authentication failed for '<url>'`, carried in the CmdError text.
+  pattern: 'failed to get git client for repo|unable to resolve git revision|unable to resolve ''[^'']*'' to a commit SHA|failed to list refs|authentication required|Authentication failed for|rpc error: code = (Unknown|Internal) desc = .*(git|helm)'
+  meaning: The Git or Helm repository cannot be read, so new commits are not deployed. The lines are the repo-server's failed-RPC lines (go-grpc-middleware, level error, the error in the error= or grpc.error field) and the controller's or API server's error lines that carry the repo-server status error.
   cause: Expired token or SSH key, changed repository URL, rate limit.
   verify: "argocd repo list; kubectl logs -n argocd deploy/argocd-repo-server --since=1h | grep -i auth"
+  source:
+    - "argoproj/argo-cd reposerver/repository/repository.go:505,757,2609,2693,2785@v2.13.0"
+    - "argoproj/argo-cd reposerver/repository/repository.go:576,828,2869,2951,3043@v3.2.0"
+    - "argoproj/argo-cd reposerver/repository/repository.go:624,914,3320,3392,3457@v3.6.1"
+    - "argoproj/argo-cd util/git/client.go:627,682@v2.13.0"
+    - "argoproj/argo-cd util/git/client.go:706,761@v3.2.0"
+    - "argoproj/argo-cd util/git/client.go:968,1026@v3.6.1"
+    - "go-git/go-git plumbing/transport/common.go:34@v5.12.0"
+    - "go-git/go-git plumbing/transport/http/common.go:433@v5.12.0"
+    - "go-git/go-git plumbing/transport/common.go:35@v5.14.0"
+    - "go-git/go-git plumbing/transport/http/common.go:434@v5.14.0"
+    - "go-git/go-git plumbing/transport/common.go:35@v5.19.2"
+    - "go-git/go-git plumbing/transport/http/common.go:584@v5.19.2"
+    - "git/git remote-curl.c:511@v2.43.0"
+    - "argoproj/pkg exec/exec.go:31,33@d56162821bd1"
+    - "argoproj/argo-cd util/exec/exec.go:111,113@v3.2.0"
+    - "argoproj/argo-cd util/exec/exec.go:112,114@v3.6.1"
+    - "grpc/grpc-go internal/status/status.go:169@v1.66.2"
+    - "grpc/grpc-go internal/status/status.go:202@v1.75.1"
+    - "grpc/grpc-go internal/status/status.go:202@v1.84.0"
+    - "grpc-ecosystem/go-grpc-middleware logging/logrus/server_interceptors.go:44,47@v1.4.0"
+    - "grpc-ecosystem/go-grpc-middleware logging/logrus/options.go:113,137@v1.4.0"
+    - "grpc-ecosystem/go-grpc-middleware interceptors/logging/interceptors.go:42,51@v2.3.2"
+    - "grpc-ecosystem/go-grpc-middleware interceptors/logging/options.go:117@v2.3.2"
+    - "argoproj/argo-cd reposerver/server.go:80@v2.13.0"
+    - "argoproj/argo-cd reposerver/server.go:74@v3.2.0"
+    - "argoproj/argo-cd reposerver/server.go:101@v3.6.1"
+    - "argoproj/argo-cd util/grpc/logging.go:93@v3.2.0"
+    - "argoproj/argo-cd util/argo/argo.go:399@v2.13.0"
+    - "argoproj/argo-cd util/argo/argo.go:428@v3.2.0"
+    - "argoproj/argo-cd util/argo/argo.go:513@v3.6.1"
 - id: argocd.rate-limit
   name: Argo CD hit the Git hosting rate limit
   component: argocd
   area: hygiene
   severity: low
   sources: ["logs/pods/argocd/*.log"]
-  pattern: 'too many requests|rate limit|secondary rate limit|status(=| )429'
-  meaning: Polling is too frequent and GitHub refuses requests. Syncs are delayed.
+  # `rate limit` alone matched the start-up info line `Using default workqueue rate limiter config` (controller/appcontroller.go:183@v2.13.0, :189@v3.2.0, :201@v3.6.1).
+  # `too many requests` and `status 429` are printed by nothing: git prints `RPC failed; HTTP 429 curl 22 The requested URL returned error: 429`, go-github prints
+  # `API rate limit of N still exceeded until …` / `API secondary rate limit exceeded until …`; GitHub's own `API rate limit exceeded` body is server side (unverified).
+  pattern: 'rate limit (exceeded|of \d+ still exceeded)|secondary rate limit|HTTP 429|returned error: 429'
+  meaning: Polling is too frequent and the Git host refuses requests. Syncs are delayed. The lines are the applicationset controller's error line that carries the go-github error text (GitHub generators) and the repo-server's failed-RPC line that carries git's stderr on an HTTP 429.
   cause: Many apps with a short polling interval (default 3 minutes), no webhook configured.
   verify: "kubectl get cm -n argocd argocd-cm -o jsonpath='{.data.timeout\\.reconciliation}'"
   warn_at: 5
   fail_at: 200
+  source:
+    - "google/go-github github/github.go:978,1006,1126,1180,1294@v63.0.0"
+    - "google/go-github github/github.go:1079,1107,1228,1282,1431@v69.2.0"
+    - "git/git remote-curl.c:846@v2.43.0"
+    - "git/git http.c:1732@v2.43.0"
+    - "argoproj/pkg exec/exec.go:31,33@d56162821bd1"
+    - "argoproj/argo-cd util/exec/exec.go:111,113@v3.2.0"
+    - "argoproj/argo-cd util/exec/exec.go:112,114@v3.6.1"
+    - "argoproj/argo-cd applicationset/controllers/applicationset_controller.go:181@v3.2.0"
+    - "argoproj/argo-cd applicationset/controllers/applicationset_controller.go:201@v3.6.1"
+    - "argoproj/argo-cd controller/appcontroller.go:183@v2.13.0"
+    - "argoproj/argo-cd controller/appcontroller.go:189@v3.2.0"
+    - "argoproj/argo-cd controller/appcontroller.go:201@v3.6.1"

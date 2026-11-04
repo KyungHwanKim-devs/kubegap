@@ -1,23 +1,71 @@
-# External Secrets Operator log signatures. The first edition lived in signatures/catalog.yaml and was moved into this collector. Field descriptions are in the header of catalog.yaml.
+# External Secrets Operator prints controller-runtime zap JSON (`"level":"error"`, epoch `ts`) at every version. `markAsFailed` logged `could not get secret data from
+# provider` / `could not update Secret` up to v0.10.0 (pkg/controllers/externalsecret/externalsecret_controller.go:357@v0.10.0); from v0.11.0 (:577) it only sets the
+# condition and the event, and the only log line is controller-runtime's `"msg":"Reconciler error"` with the provider or apiserver error in `"error"`.
 - id: external-secrets.provider-error
   name: External Secrets cannot fetch a value from the secret store
   component: external-secrets
   area: security
   severity: high
   sources: ["logs/pods/external-secrets/*.log"]
-  pattern: 'could not get secret data from provider|could not fetch|SecretSyncedError|AccessDenied|ExpiredToken|Unable to assume role|unable to (create|get) session|ResourceNotFoundException|AccessDeniedException'
-  meaning: The ExternalSecret has SecretSynced=False. New pods use the old Secret, or there is no Secret at all and they fail to start.
+  # `SecretSyncedError` is a condition reason, never logged. `AccessDenied`, `ExpiredToken`, `ResourceNotFoundException`, `AccessDeniedException` are AWS codes that only
+  # reach the `"error"` field of the Reconciler error line (which matches anyway); `Unable to assume role` and `unable to get session` exist nowhere; `could not fetch`
+  # names a missing auth Secret and is also inside that field.
+  pattern: '"msg":"Reconciler error"(?!.*Operation cannot be fulfilled).*"controller":"externalsecret"|"controller":"externalsecret"(?!.*Operation cannot be fulfilled).*"msg":"Reconciler error"|could not get secret data from provider|unable to create session|Secret does not exist'
+  meaning: The ExternalSecret has SecretSynced=False. New pods use the old Secret, or there is no Secret at all and they fail to start. The line is controller-runtime's Reconciler error for the externalsecret controller (every version; the provider error is in its "error" field), plus the operator's own `could not get secret data from provider` line that only versions up to 0.10.0 print. Both signatures of this collector count the Reconciler error line; this one adds the AWS session and missing-secret texts.
   cause: IRSA role permissions, secret renamed or deleted, region mismatch, expired token.
   verify: "kubectl get externalsecrets -A | grep -v SecretSynced"
+  source:
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:329@v0.17.1"
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:495@v0.23.1"
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:497@v0.25.2"
+    - "kubernetes-sigs/controller-runtime pkg/builder/controller.go:339@v0.17.1"
+    - "kubernetes-sigs/controller-runtime pkg/builder/controller.go:387@v0.23.1"
+    - "kubernetes-sigs/controller-runtime pkg/builder/controller.go:387@v0.25.2"
+    - "external-secrets/external-secrets pkg/controllers/externalsecret/externalsecret_controller.go:64,209,210,333,632@v0.9.13"
+    - "external-secrets/external-secrets pkg/controllers/externalsecret/externalsecret_controller.go:357@v0.10.0"
+    - "external-secrets/external-secrets pkg/controllers/externalsecret/externalsecret_controller.go:577@v0.11.0"
+    - "external-secrets/external-secrets pkg/controllers/externalsecret/externalsecret_controller.go:84,401,402,802,1271@v2.1.0"
+    - "external-secrets/external-secrets pkg/controllers/externalsecret/externalsecret_controller.go:86,417,418,800,1424@v2.14.0"
+    - "external-secrets/external-secrets pkg/provider/aws/provider.go:46,166@v0.9.13"
+    - "external-secrets/external-secrets providers/v1/aws/provider.go:49,176@v2.1.0"
+    - "external-secrets/external-secrets providers/v1/aws/provider.go:54,203@v2.14.0"
+    - "external-secrets/external-secrets apis/externalsecrets/v1beta1/provider.go:103@v0.9.13"
+    - "external-secrets/external-secrets apis/externalsecrets/v1/provider.go:110@v2.1.0"
+    - "external-secrets/external-secrets apis/externalsecrets/v1/provider.go:110@v2.14.0"
+    - "external-secrets/external-secrets cmd/root.go:131,135,267,268@v0.9.13"
+    - "external-secrets/external-secrets cmd/controller/certcontroller.go:178,182@v2.1.0"
+    - "external-secrets/external-secrets cmd/controller/root.go:127,357,358@v2.1.0"
+    - "external-secrets/external-secrets cmd/controller/root.go:137,372,373@v2.14.0"
+    - "kubernetes-sigs/controller-runtime pkg/log/zap/zap.go:176,191@v0.17.1"
+    - "kubernetes-sigs/controller-runtime pkg/log/zap/zap.go:176,191@v0.23.1"
+    - "kubernetes-sigs/controller-runtime pkg/log/zap/zap.go:176,191@v0.25.2"
+    - "uber-go/zap config.go:126,127,131,134,135@v1.26.0"
+    - "uber-go/zap config.go:126,127,131,134,135@v1.27.0"
+    - "uber-go/zap config.go:126,127,131,134,135@v1.28.0"
 - id: external-secrets.update-failed
   name: External Secrets cannot update the Secret
   component: external-secrets
   area: security
   severity: medium
   sources: ["logs/pods/external-secrets/*.log"]
-  pattern: 'could not update Secret|error patching|could not create Secret|Operation cannot be fulfilled'
-  meaning: The value was fetched but cannot be written to the cluster Secret.
+  # `could not update Secret` is logged only up to v0.10.0 (v2.x spells it `could not update secret` in the condition only); `error patching` and `could not create Secret`
+  # are printed by nothing (v0.9.x says `unable to patch status`); `Operation cannot be fulfilled` is apimachinery's conflict text, inside the Reconciler error field when the
+  # Secret update conflicts (status conflicts are requeued at V(1) in v2.x).
+  pattern: 'could not update Secret|unable to patch status|Operation cannot be fulfilled'
+  meaning: The value was fetched but cannot be written to the cluster Secret. From 0.11.0 the operator logs nothing of its own for this stage; the apiserver's error text reaches controller-runtime's Reconciler error line (counted by external-secrets.provider-error, which takes every reconcile failure), and only a write conflict is told apart there by apimachinery's `Operation cannot be fulfilled`. The operator's own `could not update Secret` and `unable to patch status` lines exist up to 0.10.0 only.
   cause: Another controller manages the same Secret (ownership conflict), RBAC.
   verify: "kubectl describe externalsecret -n <ns> <name>"
   warn_at: 1
   fail_at: 50
+  source:
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:329@v0.17.1"
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:495@v0.23.1"
+    - "kubernetes-sigs/controller-runtime pkg/internal/controller/controller.go:497@v0.25.2"
+    - "external-secrets/external-secrets pkg/controllers/externalsecret/externalsecret_controller.go:59,60,194,307,308,333@v0.9.13"
+    - "external-secrets/external-secrets pkg/controllers/externalsecret/externalsecret_controller.go:357@v0.10.0"
+    - "external-secrets/external-secrets pkg/controllers/externalsecret/externalsecret_controller.go:577@v0.11.0"
+    - "external-secrets/external-secrets pkg/controllers/externalsecret/externalsecret_controller.go:87,378,379,602,603,802@v2.1.0"
+    - "external-secrets/external-secrets pkg/controllers/externalsecret/externalsecret_controller.go:89,394,395,582,583,800@v2.14.0"
+    - "kubernetes/apimachinery pkg/api/errors/errors.go:241@v0.29.1"
+    - "kubernetes/apimachinery pkg/api/errors/errors.go:242@v0.35.0"
+    - "kubernetes/apimachinery pkg/api/errors/errors.go:242@v0.37.1"

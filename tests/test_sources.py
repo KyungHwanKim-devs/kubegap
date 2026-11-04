@@ -12,7 +12,7 @@ from lib import paths, signatures, yamlite
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "references" / "sources.md"
-CITATION = re.compile(r"(?:[\w./-]+\.(?:go|py|rego|toml|yaml|yml|txt|pdf|md|adoc|tpl|json|ini|sh)|(?:[\w./-]+/)?(?:Makefile(?:\.common)?|Dockerfile)):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+")
+CITATION = re.compile(r"(?:[\w./-]+\.(?:go|py|rego|toml|yaml|yml|txt|pdf|md|adoc|tpl|json|ini|sh|c|h|java|properties|gradle)|(?:[\w./-]+/)?(?:Makefile(?:\.common)?|Dockerfile)):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+")
 KUBEGAP_LOCATION = re.compile(r"`(lib/[\w/]+\.py)(?::(\w+))?`|step `([\w.-]+)`|check `([\w.-]+)`|`([A-Za-z_]\w*)`")
 
 
@@ -169,31 +169,8 @@ def test_the_literal_test_catches_a_tuple_typo(tmp_path, monkeypatch):
 
 # ---------- log signatures (#129): collectors/*/signatures.yaml carry a source: list per signature ----------
 
-# Collectors whose signatures have not been read in source yet (#129): each leaves this list in the pull request that reads its phrases. A new
-# collectors/<name>/signatures.yaml is covered by default, so a signature without `source:` fails CI unless its collector is listed here.
-NOT_YET_READ = [
-    "alb-controller",
-    "alertmanager",
-    "argocd",
-    "cert-manager",
-    "core",
-    "ebs-csi",
-    "ecr",
-    "eks-platform",
-    "external-secrets",
-    "flannel",
-    "grafana",
-    "k3s-platform",
-    "karpenter",
-    "keda",
-    "kube-proxy",
-    "local-path-provisioner",
-    "loki",
-    "metallb",
-    "prometheus",
-    "vpc-cni",
-]
-COVERED = sorted(p.parent.name for p in (ROOT / "collectors").glob("*/signatures.yaml") if p.parent.name not in NOT_YET_READ)
+# Every signature file is covered: signatures/catalog.yaml and each collectors/<name>/signatures.yaml (an empty list is fine; an entry without `source:` is not).
+SIG_FILES = sorted([paths.SIGNATURES_DIR / "catalog.yaml", *paths.COLLECTORS_DIR.glob("*/signatures.yaml")], key=lambda p: p.parent.name + "/" + p.name)
 SIG_CITATION = re.compile(r"^[\w.-]+/[\w.-]+ \S+:\d+(,\d+)*@\S+$")
 
 
@@ -202,22 +179,18 @@ def _entries(name: str) -> list[dict]:
 
 
 def _all_files():
-    yield paths.SIGNATURES_DIR / "catalog.yaml"
-    yield from sorted(paths.COLLECTORS_DIR.glob("*/signatures.yaml"))
+    yield from SIG_FILES
 
 
-def test_the_not_yet_read_list_names_only_collectors_that_exist():
-    have = {p.parent.name for p in (ROOT / "collectors").glob("*/signatures.yaml")}
-    assert set(NOT_YET_READ) <= have, sorted(set(NOT_YET_READ) - have)
-    assert "coredns" in COVERED
+def _label(f) -> str:
+    return "catalog" if f.parent == paths.SIGNATURES_DIR else f.parent.name
 
 
-@pytest.mark.parametrize("name", COVERED)
-def test_covered_signatures_name_their_source(name):
-    items = _entries(name)
-    assert items, f"{name}: no signatures"
+@pytest.mark.parametrize("f", SIG_FILES, ids=_label)
+def test_every_signature_names_its_source(f):
+    items = yamlite.load_file(f) or []
     missing = [it["id"] for it in items if not it.get("source")]
-    assert not missing, f"{name}: signatures without source: {missing} (read the logging call in source, see references/sources.md)"
+    assert not missing, f"{_label(f)}: signatures without source: {missing} (read the logging call in source, see references/sources.md)"
 
 
 def test_every_source_entry_is_a_citation():
@@ -234,11 +207,11 @@ def test_every_source_entry_is_a_citation():
     assert not bad, "source entries must read '<owner>/<repo> <path>:<line>@<tag>':\n" + "\n".join(bad)
 
 
-def test_covered_collectors_are_documented():
+def test_every_signature_is_documented():
     text = (paths.ROOT / "references" / "sources.md").read_text(encoding="utf-8")
-    for name in COVERED:
-        for it in _entries(name):
-            assert f"`{it['id']}`" in text, f"{it['id']} has a source key but no row in references/sources.md"
+    for f in SIG_FILES:
+        for it in yamlite.load_file(f) or []:
+            assert f"`{it['id']}`" in text, f"{it['id']} has no row in references/sources.md"
 
 
 # ---------- CoreDNS lines built from the cited format strings ----------

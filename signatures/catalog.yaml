@@ -2,7 +2,7 @@
 # Fields: id (<component>.<name>), name, component, area (one of the 12 areas), severity (critical|high|medium|low), sources (glob list relative to the snapshot),
 #        pattern (regex, case sensitive; use (?i) to ignore case), meaning (what it means), cause (usual causes), verify (command to confirm), warn_at (default 1), fail_at (default 10).
 # source: list of "<owner>/<repo> <path>:<line>@<tag>" naming the component's logging call at each version the pattern was read at (references/sources.md, #129). Not the same as sources, which lists snapshot files.
-#        tests/test_sources.py requires it on the signatures of the collectors listed there.
+#        tests/test_sources.py requires it on every signature of this file and of every collectors/*/signatures.yaml, and tests/test_signature_lines.py matches each pattern against lines built from the cited format strings.
 # The summary (lib/logs.py) scans the files in sources once and writes count, first/last timestamp and 5 sample lines per signature to summary.logs.signatures;
 # the evaluation (type: signature checks) emits a finding: fail when count >= fail_at, warn when >= warn_at. Finding id = logs.signatures.<signature id>.
 # Error lines matching no signature are normalized and the top 30 patterns go to summary.logs.unclassified_errors (candidates for new signatures).
@@ -10,6 +10,13 @@
 #            logs/node/<node>/kubelet-24h.log and containerd-24h.log (EKS SSM journalctl), logs/node/<node>/k3s-errors-24h.log (the single k3s process: kubelet, apiserver, flannel included).
 
 # ---------------- kubelet ----------------
+# Group K (issue #129): kubelet, containerd, metrics-server, flannel, k3s and the common.* signatures from signatures/catalog.yaml, plus kube-proxy.iptables-restore-failed
+# from collectors/kube-proxy/signatures.yaml. Every phrase was read in the component source at the versions named in references/sources.md (kubernetes v1.32.13 /
+# v1.33.5 / v1.37.2, containerd v1.7.29 / v2.1.5 / k3s v2.1.4-k3s1 / v2.4.2, k3s v1.33.5+k3s1 / v1.37.2+k3s1, flannel v0.27.0 / v0.28.10, metrics-server v0.8.0 / v0.9.1,
+# Go go1.24.13 / go1.24.6 / go1.26.10). `source:` names the logging call at each version.
+# The two journal collectors keep klog E/W lines, logrus/zap warn+error+fatal lines and, since kubegap 0.1.78, the klog I lines "Eviction manager: ",
+# "Container runtime network not ready" and "Probe failed"; every other I line never reaches logs/node/*/kubelet-24h.log or k3s-errors-24h.log.
+# kubelet.system-oom was removed: both of its phrases are the SystemOOM Event (reason and message), which the events summary (lib/events.py TRACKED: SystemOOM, OOMKilling) already covers.
 - id: kubelet.pleg-not-healthy
   name: kubelet PLEG not healthy
   component: kubelet
@@ -17,39 +24,57 @@
   severity: high
   sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
   pattern: 'PLEG is not healthy'
-  meaning: The kubelet could not get pod status from the container runtime within 3 minutes, so the node goes NotReady.
+  meaning: The kubelet could not get pod status from the container runtime within 3 minutes, so the node goes NotReady. The text is the err value of the E line "Skipping pod synchronization" (klog V0 at every version read).
   cause: Node CPU or disk I/O overload, containerd latency, too many pods or containers.
   verify: "journalctl -u kubelet --since -24h | grep PLEG; crictl ps -a | wc -l"
+  source:
+    - "kubernetes/kubernetes pkg/kubelet/runtime.go:128@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/runtime.go:128@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/runtime.go:133@v1.37.2"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:816,2406@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:870,2460@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:903,2697@v1.37.2"
+    - "kubernetes/kubernetes pkg/kubelet/pleg/generic.go:191@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/pleg/generic.go:191@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/pleg/generic.go:244@v1.37.2"
+# The source spells it "Eviction manager:" and prints the first three phrases with InfoS (I lines), which the journal collectors keep since kubegap 0.1.78.
+# "Evicted pod" and "evicting pod" were dropped: the kubelet never prints them (kubectl drain stdout only); the Evicted reason is in the events summary.
 - id: kubelet.eviction
   name: kubelet evicted pods under node pressure
   component: kubelet
   area: node
   severity: medium
   sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'eviction manager: (must evict|attempting to reclaim|pods ranked for eviction)|Evicted pod|evicting pod'
-  meaning: Memory, disk or inodes fell below evictionHard and the kubelet killed pods. Those pods remain in Evicted state.
+  pattern: 'Eviction manager: (must evict|attempting to reclaim|pods ranked for eviction|pod failed to evict)'
+  meaning: Memory, disk or inodes fell below evictionHard and the kubelet killed pods. Those pods remain in Evicted state. The first three phrases are klog I lines (kept by the collectors since kubegap 0.1.78), "pod failed to evict" is an E line; all four print at klog V0 at every version read.
   cause: emptyDir or logs filling the node disk, memory of pods without limits, sluggish image GC.
   verify: "kubectl get pods -A --field-selector status.phase=Failed | grep Evicted; df -h /var/lib/kubelet"
+  source:
+    - "kubernetes/kubernetes pkg/kubelet/eviction/eviction_manager.go:376,387,405,625@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/eviction/eviction_manager.go:376,387,405,627@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/eviction/eviction_manager.go:389,400,418,656@v1.37.2"
+# "failed to garbage collect required amount of images" was lowercase in the catalog; the source says "Failed to ..." up to v1.34 and from v1.35 the err text is
+# "Insufficient free disk space ... Failed to free sufficient space by deleting unused images ...". ImageGCFailed (Event reason) was dropped: the events summary covers it.
 - id: kubelet.image-gc-failed
   name: Image garbage collection failed
   component: kubelet
   area: node
   severity: medium
   sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'Image garbage collection failed|failed to garbage collect required amount of images|ImageGCFailed'
-  meaning: imagefs is above the threshold (85% by default) but there are not enough removable images. Disk-pressure eviction is imminent.
+  pattern: 'Image garbage collection failed|Failed to garbage collect required amount of images|Failed to free sufficient space by deleting unused images'
+  meaning: imagefs is above the threshold (85% by default) but there are not enough removable images. Disk-pressure eviction is imminent. The E line is "Image garbage collection failed once/multiple times in a row"; its err value reads "Failed to garbage collect required amount of images" up to kubernetes 1.34 and "Insufficient free disk space ... Failed to free sufficient space by deleting unused images" from 1.35.
   cause: Only in-use images remain, or images are too large. Exited containers are holding on to images.
   verify: "crictl imagefsinfo; crictl images | wc -l"
-- id: kubelet.system-oom
-  name: kubelet detected SystemOOM
-  component: kubelet
-  area: node
-  severity: high
-  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'SystemOOM|System OOM encountered'
-  meaning: The whole node ran out of memory and the kernel OOM killer fired (different from a container OOMKilled).
-  cause: No kubeReserved/systemReserved, pods without limits, no evictionHard memory.available.
-  verify: "journalctl -k --since -24h | grep -E 'Out of memory|oom-kill'"
+  source:
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:1551,1555@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:1596,1600@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:1750,1754@v1.37.2"
+    - "kubernetes/kubernetes pkg/kubelet/images/image_gc_manager.go:390@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/images/image_gc_manager.go:400@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/images/image_gc_manager.go:401@v1.34.13"
+    - "kubernetes/kubernetes pkg/kubelet/images/image_gc_manager.go:408,413@v1.35.10"
+    - "kubernetes/kubernetes pkg/kubelet/images/image_gc_manager.go:408,413@v1.37.2"
+# All three phrases are on one kubelet line, ErrorS up to v1.35 and logger.Info (I line) from v1.36; the collectors keep that I line since kubegap 0.1.78.
 - id: kubelet.runtime-network-not-ready
   name: Container runtime network not ready (CNI)
   component: kubelet
@@ -57,19 +82,51 @@
   severity: high
   sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
   pattern: 'Container runtime network not ready|NetworkPluginNotReady|cni plugin not initialized'
-  meaning: No CNI config, so new pods are stuck in ContainerCreating. The node is NotReady.
+  meaning: No CNI config, so new pods are stuck in ContainerCreating. The node is NotReady. One kubelet line carries all three phrases (the containerd CRI reason and the go-cni error are in its networkReady value); it is an E line up to kubernetes 1.35 and an I line from 1.36 (kept by the collectors since kubegap 0.1.78), and drops to V(4) while the runtime is not yet expected to be ready after boot.
   cause: The aws-node or flannel pod is not running on that node, /etc/cni/net.d is empty.
   verify: "crictl info | jq .status; ls /etc/cni/net.d"
+  source:
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:2996,2998,3002@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:3111,3113,3117@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:3129,3135@v1.35.10"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:3256,3262@v1.36.6"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:3337,3339,3343@v1.37.2"
+    - "kubernetes/kubernetes pkg/kubelet/container/runtime.go:627@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/container/runtime.go:642@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/container/runtime.go:680@v1.37.2"
+    - "containerd/containerd pkg/cri/server/status.go:32,52@v1.7.29"
+    - "containerd/containerd internal/cri/server/status.go:34,54@v2.1.5"
+    - "k3s-io/containerd internal/cri/server/status.go:34,54@v2.1.4-k3s1"
+    - "containerd/containerd internal/cri/server/status.go:34,54@v2.4.2"
+    - "containerd/go-cni errors.go:24@v1.1.9"
+    - "containerd/go-cni errors.go:24@v1.1.12"
+    - "containerd/go-cni errors.go:24@v1.1.14"
+# FailedMount (Event reason) was dropped: the events summary covers it, and the kubelet logs it only through the V(3) "Event occurred" line.
 - id: kubelet.volume-mount-failed
   name: Volume attach/mount failed
   component: kubelet
   area: storage
   severity: medium
   sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'Unable to attach or mount volumes|MountVolume\.(SetUp|MountDevice|WaitForAttach) failed|FailedMount'
-  meaning: The pod cannot attach its volume and stays in ContainerCreating.
+  pattern: 'Unable to attach or mount volumes|MountVolume\.(SetUp|MountDevice|WaitForAttach) failed'
+  meaning: The pod cannot attach its volume and stays in ContainerCreating. "Unable to attach or mount volumes for pod; skipping pod" is an E line; "MountVolume.SetUp failed for volume ..." is the text of the unstructured E lines the volume operation executor writes after each failed attempt.
   cause: EBS attach limit, volume still attached to another node (Multi-Attach), PVC Pending, missing ConfigMap/Secret.
   verify: "kubectl describe pod -n <ns> <pod> | grep -A5 Events"
+  source:
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:2005@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:2050@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet.go:2239@v1.37.2"
+    - "kubernetes/kubernetes pkg/volume/util/operationexecutor/operation_generator.go:482,521,553,605@v1.32.13"
+    - "kubernetes/kubernetes pkg/volume/util/operationexecutor/operation_generator.go:482,521,553,606@v1.33.5"
+    - "kubernetes/kubernetes pkg/volume/util/operationexecutor/operation_generator.go:484,523,556,611@v1.37.2"
+    - "kubernetes/kubernetes pkg/volume/util/operationexecutor/operation_executor.go:321,322@v1.32.13"
+    - "kubernetes/kubernetes pkg/volume/util/operationexecutor/operation_executor.go:321,322@v1.33.5"
+    - "kubernetes/kubernetes pkg/volume/util/operationexecutor/operation_executor.go:327,328@v1.37.2"
+    - "kubernetes/kubernetes pkg/volume/util/nestedpendingoperations/nestedpendingoperations.go:329,348@v1.32.13"
+    - "kubernetes/kubernetes pkg/volume/util/nestedpendingoperations/nestedpendingoperations.go:329,348@v1.33.5"
+    - "kubernetes/kubernetes pkg/volume/util/nestedpendingoperations/nestedpendingoperations.go:329,348@v1.37.2"
+    - "kubernetes/kubernetes pkg/util/goroutinemap/exponentialbackoff/exponential_backoff.go:72,73@v1.32.13"
+    - "kubernetes/kubernetes pkg/util/goroutinemap/exponentialbackoff/exponential_backoff.go:72,73@v1.37.2"
 - id: kubelet.orphaned-pod
   name: Orphaned pod directories
   component: kubelet
@@ -77,36 +134,43 @@
   severity: low
   sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
   pattern: 'orphaned pod .* found, but'
-  meaning: Directories of pods unknown to the apiserver remain under /var/lib/kubelet/pods and the kubelet cannot remove them. They eat disk and fill the log.
+  meaning: Directories of pods unknown to the apiserver remain under /var/lib/kubelet/pods and the kubelet cannot remove them. They eat disk and fill the log. The text is the err value of the E line "Failed cleaning up orphaned pod directories" (the pod UID inside it is quoted as \"uid\" by klog).
   cause: Volume unmount failure (subPath, CSI), deletion during a kubelet restart.
   verify: "ls /var/lib/kubelet/pods | wc -l"
   warn_at: 20
   fail_at: 500
-- id: kubelet.probe-failed
-  name: Repeated readiness/liveness probe failures
-  component: kubelet
-  area: resilience
-  severity: low
-  sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: '(Readiness|Liveness|Startup) probe failed|prober.go.*failed'
-  meaning: Many probe failures mean frequent restarts and endpoint removals. Check the samples for which pods.
-  cause: Slow app startup with a short initialDelay, a dependency down, CPU throttling.
-  verify: "kubectl get events -A --field-selector reason=Unhealthy"
-  warn_at: 50
-  fail_at: 500
+  source:
+    - "kubernetes/kubernetes pkg/kubelet/kubelet_volumes.go:127,133,143,150,161,225,245@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet_volumes.go:127,133,143,150,161,225,245@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet_volumes.go:125,131,141,148,159,223,243@v1.37.2"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet_pods.go:1234@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet_pods.go:1240@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/kubelet_pods.go:1333@v1.37.2"
+# klog quotes the err value, so the line reads failed to \"StartContainer\"; the pattern now expects the backslashes.
 - id: kubelet.pod-sync-error
   name: Repeated pod sync errors
   component: kubelet
   area: resilience
   severity: low
   sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'Error syncing pod|failed to "StartContainer"|CreateContainerConfigError|CreateContainerError'
-  meaning: The kubelet cannot bring the pod to its desired state. The samples name the pod and reason.
+  pattern: 'Error syncing pod|failed to \\"StartContainer\\"|CreateContainerConfigError|CreateContainerError'
+  meaning: The kubelet cannot bring the pod to its desired state. The samples name the pod and reason. The E line is "Error syncing pod, skipping"; the other three phrases are inside its err value.
   cause: CrashLoopBackOff back-off, missing image, missing ConfigMap/Secret key, runtime errors.
   verify: "kubectl get pods -A | grep -vE 'Running|Completed'"
   warn_at: 50
   fail_at: 1000
-
+  source:
+    - "kubernetes/kubernetes pkg/kubelet/pod_workers.go:1301@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/pod_workers.go:1301@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/pod_workers.go:1338@v1.37.2"
+    - "kubernetes/kubernetes pkg/kubelet/container/sync_result.go:129@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/container/sync_result.go:133@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/container/sync_result.go:181@v1.37.2"
+    - "kubernetes/kubernetes pkg/kubelet/kuberuntime/kuberuntime_container.go:66,70@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/kuberuntime/kuberuntime_container.go:68,72@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/kuberuntime/kuberuntime_container.go:69,73@v1.37.2"
+    - "kubernetes/klog internal/serialize/keyvalues.go:256@v2.130.1"
+    - "kubernetes/klog internal/serialize/keyvalues.go:276@v2.140.0"
 # ---------------- containerd ----------------
 - id: containerd.no-space
   name: containerd out of disk space
@@ -115,43 +179,111 @@
   severity: high
   sources: ["logs/node/*/containerd-24h.log", "logs/node/*/k3s-errors-24h.log"]
   pattern: 'no space left on device'
-  meaning: Image pulls and container creation fail. The node is effectively unusable.
+  meaning: Image pulls and container creation fail. The node is effectively unusable. The text is Go's ENOSPC message, relayed inside the error= value of containerd's warning/error lines and the err= value of kubelet E lines.
   cause: Images, logs or emptyDir filling the node disk.
   verify: "df -h /var/lib/containerd /var/lib/rancher; crictl imagefsinfo"
+  source:
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1385@go1.24.13"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1385@go1.24.6"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1385@go1.26.10"
+# The registry status error reads "unexpected status from <METHOD> request to <url>: <status>" for every method (containerd 1.7 also had "unexpected status code"); "from HEAD request" covered only HEAD.
 - id: containerd.image-pull-failed
   name: Image pull failed
   component: containerd
   area: resilience
   severity: medium
   sources: ["logs/node/*/containerd-24h.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'failed to pull (and unpack )?image|PullImage .* failed|failed to resolve reference|unexpected status (from HEAD request|code).*(401|403|404|429)'
-  meaning: The image cannot be pulled from the registry and the pod stays in ImagePullBackOff.
+  pattern: 'failed to pull (and unpack )?image|PullImage .* failed|failed to resolve reference|unexpected status (from \w+ request|code)[^"]*\b(401|403|404|429)\b'
+  meaning: The image cannot be pulled from the registry and the pod stays in ImagePullBackOff. containerd writes level=error msg="PullImage \"<ref>\" failed" with the CRI error in error=; the kubelet relays the same text in its W line "Failed to pull image" (E from kubernetes 1.37) and in "Error syncing pod" err values, which is where the k3s journal shows it.
   cause: Missing tag, expired registry credentials (ECR token, imagePullSecret), rate limiting (Docker Hub 429), network.
   verify: "kubectl get events -A --field-selector reason=Failed | grep -i pull"
+  source:
+    - "containerd/containerd pkg/cri/sbserver/image_pull.go:188,191@v1.7.29"
+    - "containerd/containerd pkg/cri/sbserver/helpers.go:265@v1.7.29"
+    - "containerd/containerd pkg/cri/instrument/instrumented_service.go:986,1006@v1.7.29"
+    - "containerd/containerd pull.go:183@v1.7.29"
+    - "containerd/containerd remotes/docker/fetcher.go:284,286@v1.7.29"
+    - "containerd/containerd remotes/errors/errors.go:36@v1.7.29"
+    - "containerd/containerd internal/cri/server/images/image_pull.go:280,283,323@v2.1.5"
+    - "containerd/containerd internal/cri/server/podsandbox/sandbox_run.go:328@v2.1.5"
+    - "containerd/containerd internal/cri/instrument/instrumented_service.go:354@v2.1.5"
+    - "containerd/containerd client/pull.go:188@v2.1.5"
+    - "containerd/containerd core/remotes/errors/errors.go:43@v2.1.5"
+    - "k3s-io/containerd internal/cri/server/images/image_pull.go:295,335@v2.1.4-k3s1"
+    - "k3s-io/containerd internal/cri/instrument/instrumented_service.go:356@v2.1.4-k3s1"
+    - "k3s-io/containerd client/pull.go:188@v2.1.4-k3s1"
+    - "k3s-io/containerd core/remotes/errors/errors.go:43@v2.1.4-k3s1"
+    - "containerd/containerd internal/cri/server/images/image_pull.go:290,293,345@v2.4.2"
+    - "containerd/containerd internal/cri/server/sandbox_run.go:434@v2.4.2"
+    - "containerd/containerd internal/cri/instrument/instrumented_service.go:358@v2.4.2"
+    - "containerd/containerd client/pull.go:202@v2.4.2"
+    - "containerd/containerd core/remotes/errors/errors.go:43@v2.4.2"
+    - "kubernetes/kubernetes pkg/kubelet/images/image_manager.go:127,128,181@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/images/image_manager.go:157,158,292@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/images/image_manager.go:139,147,369@v1.37.2"
+# FailedCreatePodSandBox (Event reason) was dropped for the kubelet E line "CreatePodSandbox for pod failed", which carries the containerd error into the k3s journal.
 - id: containerd.sandbox-failed
   name: Pod sandbox creation failed
   component: containerd
   area: resilience
   severity: medium
   sources: ["logs/node/*/containerd-24h.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'RunPodSandbox .* failed|failed to (setup network for|create containerd task|reserve sandbox name|start sandbox)|FailedCreatePodSandBox'
-  meaning: The pod network namespace or pause container cannot be created. Most often the CNI cannot hand out an IP.
+  pattern: 'RunPodSandbox .* failed|CreatePodSandbox for pod failed|failed to (setup network for|create containerd task|reserve sandbox name|start sandbox)'
+  meaning: The pod network namespace or pause container cannot be created. Most often the CNI cannot hand out an IP. containerd writes level=error msg="RunPodSandbox for &PodSandboxMetadata{...} failed, error" with the cause in error=; the kubelet writes the E line "CreatePodSandbox for pod failed" with the same cause in err=.
   cause: aws-node IP exhaustion, CNI plugin errors, runtime resource shortage.
   verify: "kubectl get events -A --field-selector reason=FailedCreatePodSandBox"
+  source:
+    - "containerd/containerd pkg/cri/instrument/instrumented_service.go:125,141@v1.7.29"
+    - "containerd/containerd pkg/cri/sbserver/sandbox_run.go:75,207,246@v1.7.29"
+    - "containerd/containerd pkg/cri/sbserver/container_start.go:130@v1.7.29"
+    - "containerd/containerd pkg/cri/sbserver/podsandbox/sandbox_run.go:223,259@v1.7.29"
+    - "containerd/containerd internal/cri/instrument/instrumented_service.go:73@v2.1.5"
+    - "containerd/containerd internal/cri/server/sandbox_run.go:81,262,293@v2.1.5"
+    - "containerd/containerd internal/cri/server/container_start.go:219@v2.1.5"
+    - "containerd/containerd internal/cri/server/podsandbox/sandbox_run.go:244,279@v2.1.5"
+    - "k3s-io/containerd internal/cri/instrument/instrumented_service.go:75@v2.1.4-k3s1"
+    - "k3s-io/containerd internal/cri/server/sandbox_run.go:81,262,293@v2.1.4-k3s1"
+    - "k3s-io/containerd internal/cri/server/container_start.go:219@v2.1.4-k3s1"
+    - "k3s-io/containerd internal/cri/server/podsandbox/sandbox_run.go:244,279@v2.1.4-k3s1"
+    - "containerd/containerd internal/cri/instrument/instrumented_service.go:77@v2.4.2"
+    - "containerd/containerd internal/cri/server/sandbox_run.go:86,267,319@v2.4.2"
+    - "containerd/containerd internal/cri/server/container_start.go:148@v2.4.2"
+    - "containerd/containerd internal/cri/server/podsandbox/sandbox_run.go:260,301@v2.4.2"
+    - "kubernetes/kubernetes pkg/kubelet/kuberuntime/kuberuntime_manager.go:1237@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/kuberuntime/kuberuntime_manager.go:1252@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/kuberuntime/kuberuntime_manager.go:1747@v1.37.2"
+# "shim reaped" (runtime v1, Info, gone in 2.x) and "ttrpc: closed.*shim" (the words come in the other order and containerd suppresses ErrClosed) were dropped.
 - id: containerd.shim-error
   name: containerd shim crashed
   component: containerd
   area: node
   severity: medium
   sources: ["logs/node/*/containerd-24h.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'shim disconnected|shim reaped|failed to delete task|ttrpc: closed.*shim'
-  meaning: The shim wrapping the container process died. The container state may be left as Unknown.
+  pattern: 'shim disconnected|failed to delete task|shim.*ttrpc: closed'
+  meaning: The shim wrapping the container process died. The container state may be left as Unknown. "cleaning up after shim disconnected" is level=warning only up to containerd 2.1.0 (1.7.x, 2.0.x); from 2.1.1 it is level=info and not collected, so on those versions only "failed to clean up after shim disconnected" (warning) and "failed to delete task" (level=error from 2.2.0, otherwise inside CRI error= values) are visible.
   cause: OOM (including the shim), runtime bugs, node reboot.
   verify: "crictl ps -a | grep -i unknown"
   warn_at: 5
   fail_at: 50
-
+  source:
+    - "containerd/containerd runtime/v2/shim.go:153,156,459@v1.7.29"
+    - "containerd/containerd runtime/v2/manager.go:512@v1.7.29"
+    - "containerd/containerd core/runtime/v2/shim.go:141@v2.1.0"
+    - "containerd/containerd core/runtime/v2/shim.go:141@v2.1.1"
+    - "containerd/containerd core/runtime/v2/shim.go:141,144,530@v2.1.5"
+    - "containerd/containerd core/runtime/v2/task_manager.go:243@v2.1.5"
+    - "k3s-io/containerd core/runtime/v2/shim.go:141,144,530@v2.1.4-k3s1"
+    - "k3s-io/containerd core/runtime/v2/task_manager.go:241@v2.1.4-k3s1"
+    - "containerd/containerd core/runtime/v2/shim.go:529@v2.1.9"
+    - "containerd/containerd core/runtime/v2/shim.go:530@v2.2.0"
+    - "containerd/containerd core/runtime/v2/shim.go:150,153,649@v2.4.2"
+    - "containerd/containerd core/runtime/v2/task_manager.go:329,340@v2.4.2"
+    - "containerd/ttrpc errors.go:32@v1.2.7"
+    - "containerd/ttrpc errors.go:32@v1.2.9"
 # ---------------- external-dns ----------------
+# ---------------- external-dns (signatures/catalog.yaml) ----------------
+# InvalidChangeBatch, AccessDenied and Throttling are Route 53 response codes relayed in the %v of "Failure in zone"; v0.24.0 catches ThrottlingException on ListHostedZones
+# and logs it at level=info with lowercase "throttling" (aws.go:414), which this pattern does not count.
 - id: external-dns.change-failed
   name: external-dns record change failed
   component: external-dns
@@ -159,107 +291,223 @@
   severity: medium
   sources: ["logs/pods/external-dns/*.log"]
   pattern: 'Failure in zone|failed to submit all changes|InvalidChangeBatch|AccessDenied|Throttling|level=error'
-  meaning: DNS records for Ingresses and Services are not created or updated.
+  meaning: DNS records for Ingresses and Services are not created or updated. "Failure in zone ... when submitting change batch" carries the Route 53 error code; "failed to submit all changes" sums the failed zones.
   cause: Route53 permissions, record conflict with another owner (txt owner id), record count limit.
   verify: "kubectl logs -n <ns> deploy/external-dns --since=1h | grep level=error"
   warn_at: 1
   fail_at: 50
-
+  source:
+    - "kubernetes-sigs/external-dns provider/aws/aws.go:587,633@v0.14.0"
+    - "kubernetes-sigs/external-dns provider/aws/aws.go:414,778,824@v0.24.0"
+    - "kubernetes-sigs/external-dns pkg/apis/externaldns/types.go:317,319@v0.14.0"
+    - "kubernetes-sigs/external-dns pkg/apis/externaldns/types.go:320,321@v0.24.0"
+    - "kubernetes-sigs/external-dns main.go:93@v0.14.0"
+    - "kubernetes-sigs/external-dns controller/execute.go:219@v0.24.0"
+    - "sirupsen/logrus text_formatter.go:150@v1.9.3"
+    - "sirupsen/logrus text_formatter.go:182@v1.10.2"
+    - "sirupsen/logrus logrus.go:69@v1.9.3"
+    - "sirupsen/logrus logrus.go:29@v1.10.2"
+    - "aws/aws-sdk-go aws/request/retryer.go:87@v1.44.311"
+    - "aws/aws-sdk-go aws/awserr/types.go:13@v1.44.311"
+    - "aws/aws-sdk-go-v2 service/route53/types/errors.go:711@v1.70.4"
+    - "aws/smithy-go errors.go:37,60@v1.28.5"
 # ---------------- metrics-server ----------------
+# "unable to fully scrape metrics" and "no metrics known for" exist in neither version read and were dropped.
 - id: metrics-server.scrape-failed
   name: metrics-server cannot scrape node kubelets
   component: metrics-server
   area: scaling
   severity: medium
   sources: ["logs/pods/metrics-server/*.log"]
-  pattern: 'unable to fully scrape metrics|Failed to scrape node|no metrics known for|x509|certificate'
-  meaning: The CPU/memory metrics HPAs use are missing or stale. HPAs stall at "unknown".
+  pattern: 'Failed to scrape node|x509|certificate'
+  meaning: The CPU/memory metrics HPAs use are missing or stale. HPAs stall at "unknown". "Failed to scrape node" is the E line (klog V0) with the kubelet client error in err=; x509 and certificate match Go's TLS verification errors inside that value.
   cause: kubelet serving certificate verification failure (environments needing --kubelet-insecure-tls), network policy, node NotReady.
   verify: "kubectl top nodes; kubectl get apiservice v1beta1.metrics.k8s.io"
   warn_at: 5
   fail_at: 100
-
+  source:
+    - "kubernetes-sigs/metrics-server pkg/scraper/scraper.go:147,149@v0.8.0"
+    - "kubernetes-sigs/metrics-server pkg/scraper/scraper.go:147,149@v0.9.1"
+    - "golang/go src/crypto/x509/verify.go:79,152@go1.24.6"
+    - "golang/go src/crypto/x509/verify.go:79,159@go1.26.10"
 # ---------------- Prometheus ----------------
+# "rule evaluation failed" and "Error evaluating rule" are printed by no version; the only line is the Warn "Evaluating rule failed".
 - id: prometheus.rule-eval-failed
   name: Prometheus rule evaluation failed
   component: prometheus
   area: observability
   severity: medium
   sources: ["logs/pods/prometheus/*.log"]
-  pattern: 'Evaluating rule failed|rule evaluation failed|Error evaluating rule'
-  meaning: That alert rule will never fire. It creates the illusion that an alert exists.
+  pattern: 'Evaluating rule failed'
+  meaning: That alert rule will never fire. It creates the illusion that an alert exists. The line is the Warn "Evaluating rule failed" rule=... err=... that the rule manager writes at the default log level.
   cause: PromQL errors, functions over a missing metric, label mismatch.
   verify: "kubectl logs -n monitoring prometheus-<name>-0 -c prometheus --since=24h | grep -i 'Evaluating rule failed' | head"
+  source:
+    - "prometheus/prometheus rules/group.go:462@v2.49.1"
+    - "prometheus/prometheus rules/group.go:543@v3.7.3"
+    - "prometheus/prometheus rules/group.go:548@v3.15.1"
+# `corruption` alone also matched the startup Warn "This filesystem is not supported and may lead to data corruption and data loss" (unsupported data-dir filesystem); it is now anchored to the corruption texts.
 - id: prometheus.wal-corrupt
   name: Prometheus WAL/block corruption
   component: prometheus
   area: observability
   severity: critical
   sources: ["logs/pods/prometheus/*.log"]
-  pattern: 'WAL.*corrupt|corruption|invalid (block|chunk)|repair'
-  meaning: Storage is corrupted; some data is lost or startup keeps failing.
+  pattern: 'WAL.*corrupt|corruption (in|repair|detected)|invalid (block|chunk)|attempting repair'
+  meaning: Storage is corrupted; some data is lost or startup keeps failing. The lines are "Encountered WAL read error, attempting repair" (Warn) with err="corruption in segment ...", "Starting corruption repair" (Warn) and "Successfully repaired WAL" (Info); one corruption prints two or three of them.
   cause: Disk full, abnormal termination (OOM), emptyDir or an unreliable disk.
   verify: "kubectl logs -n monitoring prometheus-<name>-0 -c prometheus --previous | grep -i corrupt"
+  source:
+    - "prometheus/prometheus tsdb/wal.go:250@v2.49.1"
+    - "prometheus/prometheus tsdb/db.go:916,920@v2.49.1"
+    - "prometheus/prometheus tsdb/db.go:1019,1023@v3.7.3"
+    - "prometheus/prometheus tsdb/db.go:1219,1223@v3.15.1"
+    - "prometheus/prometheus tsdb/wlog/wlog.go:116,424@v2.49.1"
+    - "prometheus/prometheus tsdb/wlog/wlog.go:116,413@v3.7.3"
+    - "prometheus/prometheus tsdb/wlog/wlog.go:116,413@v3.15.1"
+    - "prometheus/prometheus tsdb/chunks/head_chunks.go:111,355@v2.49.1"
+    - "prometheus/prometheus tsdb/chunks/head_chunks.go:110,358@v3.7.3"
+    - "prometheus/prometheus tsdb/chunks/head_chunks.go:111,366@v3.15.1"
+    - "prometheus/prometheus tsdb/chunks/chunks.go:621@v2.49.1"
+    - "prometheus/prometheus tsdb/chunks/chunks.go:643@v3.7.3"
+    - "prometheus/prometheus tsdb/chunks/chunks.go:632@v3.15.1"
+    - "prometheus/prometheus tsdb/db.go:669@v2.49.1"
+    - "prometheus/prometheus tsdb/db.go:746@v3.7.3"
+    - "prometheus/prometheus tsdb/db.go:877@v3.15.1"
+    - "prometheus/prometheus tsdb/repair.go:53@v2.49.1"
+    - "prometheus/prometheus tsdb/repair.go:50@v3.7.3"
+    - "prometheus/prometheus tsdb/repair.go:50@v3.15.1"
+    - "prometheus/prometheus tsdb/head.go:921@v2.49.1"
+    - "prometheus/prometheus tsdb/head.go:993@v3.7.3"
+    - "prometheus/prometheus tsdb/head.go:1113@v3.15.1"
+    - "prometheus/prometheus cmd/prometheus/main.go:1058@v2.49.1"
+    - "prometheus/prometheus cmd/prometheus/main.go:1312@v3.7.3"
+    - "prometheus/prometheus cmd/prometheus/main.go:1518@v3.15.1"
+# "low disk space" and "out of disk" are printed by no version; ENOSPC reaches the log as the err= value of the failing write.
 - id: prometheus.low-disk
   name: Prometheus out of disk
   component: prometheus
   area: observability
   severity: critical
   sources: ["logs/pods/prometheus/*.log"]
-  pattern: 'no space left on device|low disk space|out of disk'
-  meaning: New samples cannot be written. All metrics and alerts stop.
+  pattern: 'no space left on device'
+  meaning: New samples cannot be written. All metrics and alerts stop. The text is the Go ENOSPC error inside err= of the failing write ("Scrape commit failed", WAL or compaction errors).
   cause: PVC size < retention × ingest volume, retention.size not set.
   verify: "kubectl exec -n monitoring prometheus-<name>-0 -c prometheus -- df -h /prometheus"
+  source:
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1385@go1.26.10"
+    - "prometheus/prometheus scrape/scrape.go:1225@v2.49.1"
+    - "prometheus/prometheus scrape/scrape.go:1427@v3.7.3"
+    - "prometheus/prometheus scrape/scrape.go:1528@v3.15.1"
+# Per-target scrape failures ("Scrape failed" err=...) are Debug-only at every version, and the old err="..." alternatives were anchored to values that carry a Get "url": prefix; both never matched. Target health comes from prometheus/targets.json.
 - id: prometheus.scrape-error
-  name: Prometheus scrape errors
+  name: Prometheus scrape commit/append errors
   component: prometheus
   area: observability
   severity: low
   sources: ["logs/pods/prometheus/*.log"]
-  pattern: 'err="(context deadline exceeded|connection refused|server returned HTTP status 5\d\d)"|scrape.*error'
-  meaning: Some targets could not be scraped. Those workloads have holes in their metrics.
-  cause: Target down, short scrape_timeout, network policy.
+  pattern: 'msg="(Scrape commit failed|Append failed|Appending scrape report failed)"'
+  meaning: A scrape could not be committed or its stale markers could not be appended (storage error, sample limit). Per-target failures (target down, timeout, 5xx) are logged at Debug only, so they never appear here; target health is read from prometheus/targets.json (stack health).
+  cause: Storage errors (disk full, WAL), sample limit, a target that disappeared mid-scrape.
   verify: "curl -s localhost:9090/api/v1/targets | jq '.data.activeTargets[] | select(.health!=\"up\") | .labels.job'"
   warn_at: 50
   fail_at: 1000
+  source:
+    - "prometheus/prometheus scrape/scrape.go:1225,1231,1241,1295@v2.49.1"
+    - "prometheus/prometheus scrape/scrape.go:1427,1433,1443,1502@v3.7.3"
+    - "prometheus/prometheus scrape/scrape.go:1528,1541,1551,1629@v3.15.1"
+    - "prometheus/prometheus scrape/scrape.go:1274@v2.49.1"
+    - "prometheus/prometheus scrape/scrape.go:1476@v3.7.3"
+    - "prometheus/prometheus scrape/scrape.go:1594@v3.15.1"
+    - "prometheus/common promlog/flag/flag.go:40@v0.45.0"
+    - "prometheus/common promslog/flag/flag.go:47@v0.71.0"
+# For scraped samples the per-series lines are Debug-only ("Out of order sample", capitalised); the default level prints the Warn summaries "Error on ingesting ..." num_dropped=N. The lower-case phrases match the remote-write receiver's Error line err="out of order sample".
 - id: prometheus.out-of-order
   name: Prometheus out-of-order samples
   component: prometheus
   area: observability
   severity: low
   sources: ["logs/pods/prometheus/*.log"]
-  pattern: 'out of order sample|out of bounds|duplicate sample for timestamp'
-  meaning: Samples arrived out of time order for the same series and were dropped. It can also mean two or more targets with identical labels are being scraped.
+  pattern: 'Error on ingesting (out-of-order (samples|result from rule evaluation)|samples with different value but same timestamp|samples that are too old or are too far into the future)|out of order sample|out of bounds|duplicate sample for timestamp'
+  meaning: Samples arrived out of time order for the same series and were dropped. It can also mean two or more targets with identical labels are being scraped. The scrape path prints one Warn summary per scrape ("Error on ingesting ..." num_dropped=N); the per-series text appears only at Debug or, as err="out of order sample", when Prometheus is a remote-write receiver.
   cause: Duplicate ServiceMonitors, two Prometheus instances writing to the same remote write, clock skew.
   verify: "kubectl get servicemonitors -A | wc -l"
   warn_at: 50
   fail_at: 5000
+  source:
+    - "prometheus/prometheus scrape/scrape.go:1655,1658,1661@v2.49.1"
+    - "prometheus/prometheus scrape/scrape.go:1920,1923,1926@v3.7.3"
+    - "prometheus/prometheus scrape/scrape.go:2077,2080,2083@v3.15.1"
+    - "prometheus/prometheus rules/group.go:528@v2.49.1"
+    - "prometheus/prometheus rules/group.go:610@v3.7.3"
+    - "prometheus/prometheus rules/group.go:633@v3.15.1"
+    - "prometheus/prometheus storage/interface.go:34,36,40@v2.49.1"
+    - "prometheus/prometheus storage/interface.go:34,36,40@v3.7.3"
+    - "prometheus/prometheus storage/interface.go:34,36,40@v3.15.1"
+    - "prometheus/prometheus storage/remote/write_handler.go:132@v2.49.1"
+    - "prometheus/prometheus storage/remote/write_handler.go:328@v3.7.3"
+    - "prometheus/prometheus storage/remote/write_handler.go:230@v3.15.1"
+    - "prometheus/prometheus scrape/scrape.go:1695,1700,1705@v2.49.1"
+    - "prometheus/prometheus scrape/scrape.go:2024,2029,2034@v3.7.3"
+    - "prometheus/prometheus scrape/scrape.go:2182,2187,2192@v3.15.1"
 
 # ---------------- Alertmanager ----------------
+# "Error on notify" is printed by no version; "failed to send" is the Debug-only cluster channel line. "Notify attempt failed, will retry later" (Warn) is printed per retry before the final Error.
 - id: alertmanager.notify-failed
   name: Alertmanager notification failed
   component: alertmanager
   area: observability
   severity: high
   sources: ["logs/pods/alertmanager/*.log"]
-  pattern: 'Notify for alerts failed|Error on notify|notify retry canceled|failed to send'
-  meaning: The alert fired but never reached Slack, Discord or PagerDuty. Nobody knows.
+  pattern: 'Notify for alerts failed|Notify attempt failed|notify retry canceled'
+  meaning: The alert fired but never reached Slack, Discord or PagerDuty. Nobody knows. "Notify attempt failed, will retry later" (Warn) is printed per retry; "Notify for alerts failed" (Error) once the retries are exhausted, with err="...notify retry canceled after N attempts".
   cause: Expired or changed webhook URL, network egress policy, rate limiting on the receiver side.
   verify: "kubectl logs -n monitoring alertmanager-<name>-0 --since=24h | grep -i 'notify' | tail"
+  source:
+    - "prometheus/alertmanager dispatch/dispatch.go:352@v0.26.0"
+    - "prometheus/alertmanager dispatch/dispatch.go:363@v0.29.0"
+    - "prometheus/alertmanager dispatch/dispatch.go:589@v0.34.2"
+    - "prometheus/alertmanager notify/notify.go:745@v0.26.0"
+    - "prometheus/alertmanager notify/notify.go:868@v0.29.0"
+    - "prometheus/alertmanager notify/retry_stage.go:165@v0.34.2"
+    - "prometheus/alertmanager notify/notify.go:728,741,765@v0.26.0"
+    - "prometheus/alertmanager notify/notify.go:846,863,895@v0.29.0"
+    - "prometheus/alertmanager notify/retry_stage.go:143,160@v0.34.2"
+# memberlist's own "[ERR] memberlist: ..." lines are routed to Debug at every version (logWriter at v0.26.0, slog.NewLogLogger(..., LevelDebug) from v0.28.0), so runtime gossip failures are not in the default log; only the startup join and advertise-address lines are. `gossip.*(error|failed)` matched only through the err= text of "unable to join gossip mesh", now spelled out.
 - id: alertmanager.cluster-error
   name: Alertmanager cluster (gossip) errors
   component: alertmanager
   area: observability
   severity: medium
   sources: ["logs/pods/alertmanager/*.log"]
-  pattern: 'failed to join cluster|gossip.*(error|failed)|cluster.*unreachable'
-  meaning: Deduplication and silence sync between replicas is broken, so alerts are duplicated or silences apply on one side only.
+  pattern: 'failed to join cluster|unable to (join|initialize) gossip mesh|cluster.*unreachable'
+  meaning: Deduplication and silence sync between replicas is broken, so alerts are duplicated or silences apply on one side only. Only the startup lines are observable ("failed to join cluster", "unable to join gossip mesh", "this node will be unreachable in the cluster"); memberlist's runtime gossip errors are logged at Debug only, so a healthy log does not prove the cluster is healthy. alertmanager_cluster_members and alertmanager_cluster_failed_peers are the runtime signal.
   cause: Headless Service or port 9094 policy, replica restart order.
-  verify: "kubectl logs -n monitoring alertmanager-<name>-0 --since=1h | grep -i gossip"
+  verify: "kubectl logs -n monitoring alertmanager-<name>-0 --since=1h | grep -iE 'join cluster|gossip mesh|unreachable'"
   warn_at: 5
   fail_at: 100
+  source:
+    - "prometheus/alertmanager cluster/cluster.go:263@v0.26.0"
+    - "prometheus/alertmanager cluster/cluster.go:262@v0.29.0"
+    - "prometheus/alertmanager cluster/cluster.go:271@v0.34.2"
+    - "prometheus/alertmanager cmd/alertmanager/main.go:278,348@v0.26.0"
+    - "prometheus/alertmanager cmd/alertmanager/main.go:260,334@v0.29.0"
+    - "prometheus/alertmanager app/app.go:234,354@v0.34.2"
+    - "prometheus/alertmanager cmd/alertmanager/main.go:207@v0.34.2"
+    - "prometheus/alertmanager cluster/cluster.go:182@v0.26.0"
+    - "prometheus/alertmanager cluster/cluster.go:181@v0.29.0"
+    - "prometheus/alertmanager cluster/cluster.go:188@v0.34.2"
+    - "prometheus/alertmanager cmd/alertmanager/main.go:262@v0.26.0"
+    - "prometheus/alertmanager cmd/alertmanager/main.go:244@v0.29.0"
+    - "prometheus/alertmanager cluster/cluster.go:228,340@v0.26.0"
+    - "prometheus/alertmanager cluster/cluster.go:227@v0.29.0"
+    - "prometheus/alertmanager cluster/cluster.go:236@v0.34.2"
+    - "hashicorp/memberlist memberlist.go:283@v0.5.0"
+    - "hashicorp/memberlist memberlist.go:286@v0.6.0"
+    - "hashicorp/go-multierror format.go:16@v1.1.1"
 
 # ---------------- Grafana ----------------
+# Every match is the Info retry line "Database locked, sleeping then retrying" error="database is locked"; a transient lock is retried up to five times, so warn_at was raised from 1 to 20.
 - id: grafana.db-locked
   name: Grafana SQLite locked
   component: grafana
@@ -267,79 +515,187 @@
   severity: medium
   sources: ["logs/pods/grafana/*.log"]
   pattern: 'database is locked|database table is locked'
-  meaning: Dashboard saves and logins fail intermittently. Happens when two or more replicas share one SQLite database.
+  meaning: Dashboard saves and logins stall and are retried. The line is the Info "Database locked, sleeping then retrying" error="database is locked" (v13 prints "database is locked (5) (SQLITE_BUSY)"); each retry is one line, so a count near warn_at is contention, not data loss. Happens when two or more replicas share one SQLite database or the volume is slow.
   cause: SQLite with replicas>1, a slow PV.
   verify: "kubectl get deploy -n monitoring -l app.kubernetes.io/name=grafana -o jsonpath='{.items[*].spec.replicas}'"
-  warn_at: 1
-  fail_at: 20
+  warn_at: 20
+  fail_at: 200
+  source:
+    - "mattn/go-sqlite3 sqlite3-binding.c:172288,172289@v1.14.16"
+    - "mattn/go-sqlite3 sqlite3-binding.c:179751,179752@v1.14.22"
+    - "cznic/sqlite lib/sqlite_g_0000000000000003.go:10059@v1.58.0"
+    - "cznic/sqlite conn.go:869@v1.58.0"
+    - "grafana/grafana pkg/services/sqlstore/transactions.go:74@v10.2.3"
+    - "grafana/grafana pkg/services/sqlstore/session.go:96@v10.2.3"
+    - "grafana/grafana pkg/services/sqlstore/transactions.go:72@v12.2.1"
+    - "grafana/grafana pkg/services/sqlstore/session.go:88@v12.2.1"
+    - "grafana/grafana pkg/services/sqlstore/transactions.go:94@v13.3.0"
+    - "grafana/grafana pkg/services/sqlstore/session.go:88@v13.3.0"
+    - "grafana/grafana pkg/util/sqlite/go.mod:5@v13.3.0"
+# The logger alternative is logfmt-only; the JSON twin covers [log] format = json. "failed to sync dashboard" is printed by no version.
 - id: grafana.provisioning-error
   name: Grafana provisioning (dashboards, datasources) errors
   component: grafana
   area: observability
   severity: medium
   sources: ["logs/pods/grafana/*.log"]
-  pattern: 'logger=provisioning.*level=(error|warn)|failed to (load|save|sync) dashboard|Failed to provision'  # level=error.*(datasource|dashboard) was removed: it matched infra.usagestats "Failed to read all Amazon Prometheus data sources" (false positive)
-  meaning: Some dashboards or datasources provisioned via ConfigMap do not show up.
+  pattern: 'logger=provisioning.*level=(error|warn)|"logger":"provisioning[^"]*".*"level":"(error|warn)"|failed to (load|save) dashboard|Failed to provision'  # level=error.*(datasource|dashboard) was removed: it matched infra.usagestats "Failed to read all Amazon Prometheus data sources" (false positive)
+  meaning: Some dashboards or datasources provisioned via ConfigMap do not show up. The loggers are provisioning, provisioning.dashboard, provisioning.datasources, provisioning.plugins, provisioning.alerting (provisioning.notifiers at v10); the lines are "failed to save dashboard", "failed to load dashboard from " and "Failed to provision ..." (Error) and "Failed to provision config" (Warn).
   cause: JSON syntax, duplicate uid, datasource name mismatch.
   verify: "kubectl logs -n monitoring deploy/<grafana> --since=24h | grep -i provisioning | head"
   warn_at: 1
   fail_at: 50
+  source:
+    - "grafana/grafana pkg/services/provisioning/provisioning.go:114,153,159,165,171,181@v10.2.3"
+    - "grafana/grafana pkg/services/provisioning/provisioning.go:130,195,201,207,228@v12.2.1"
+    - "grafana/grafana pkg/services/provisioning/provisioning.go:120,146,151,156,169,227@v13.3.0"
+    - "grafana/grafana pkg/services/provisioning/dashboards/dashboard.go:43,73@v10.2.3"
+    - "grafana/grafana pkg/services/provisioning/dashboards/dashboard.go:48,94@v12.2.1"
+    - "grafana/grafana pkg/services/provisioning/dashboards/dashboard.go:50,106@v13.3.0"
+    - "grafana/grafana pkg/services/provisioning/dashboards/file_reader.go:152,181,234@v10.2.3"
+    - "grafana/grafana pkg/services/provisioning/dashboards/file_reader.go:162,192,245@v12.2.1"
+    - "grafana/grafana pkg/services/provisioning/dashboards/file_reader.go:232,277,333@v13.3.0"
+    - "grafana/grafana pkg/services/provisioning/datasources/datasources.go:38@v10.2.3"
+    - "grafana/grafana pkg/services/provisioning/datasources/datasources.go:39@v12.2.1"
+    - "grafana/grafana pkg/services/provisioning/datasources/datasources.go:37@v13.3.0"
+    - "grafana/grafana pkg/services/provisioning/plugins/plugin_provisioner.go:16@v10.2.3"
+    - "grafana/grafana pkg/services/provisioning/plugins/plugin_provisioner.go:16@v12.2.1"
+    - "grafana/grafana pkg/services/provisioning/plugins/plugin_provisioner.go:22@v13.3.0"
+    - "grafana/grafana pkg/services/provisioning/alerting/provisioner.go:24@v10.2.3"
+    - "grafana/grafana pkg/services/provisioning/alerting/provisioner.go:25@v12.2.1"
+    - "grafana/grafana pkg/services/provisioning/alerting/provisioner.go:25@v13.3.0"
+    - "grafana/grafana pkg/infra/log/log.go:165,187,200,379@v10.2.3"
+    - "grafana/grafana pkg/infra/log/log.go:182,204,217,398@v12.2.1"
+    - "grafana/grafana pkg/infra/log/log.go:182,204,217,398@v13.3.0"
+# "Invalid username or password" and "Invalid credentials" are HTTP public messages, never logged; the logged API-key text is "[api-key.invalid] API key is invalid".
 - id: grafana.auth-failed
   name: Repeated Grafana login failures
   component: grafana
   area: security
   severity: low
   sources: ["logs/pods/grafana/*.log"]
-  pattern: 'Invalid username or password|Failed to authenticate|invalid API key|Invalid credentials'
-  meaning: Many wrong passwords may mean a publicly exposed Grafana is being brute-forced.
+  pattern: 'Failed to authenticate|API key is invalid|invalid API key'
+  meaning: Many wrong passwords may mean a publicly exposed Grafana is being brute-forced. The line is the Info "Failed to authenticate request" client=auth.client.form error="[password-auth.failed] failed to authenticate identity: ..." (Unauthorized errors log at Info); API-key failures carry "[api-key.invalid] API key is invalid".
   cause: Internet exposure plus default accounts, automation using an expired API key.
   verify: "kubectl get ingress -A | grep -i grafana"
   warn_at: 20
   fail_at: 500
+  source:
+    - "grafana/grafana pkg/services/authn/authnimpl/service.go:230,364@v10.2.3"
+    - "grafana/grafana pkg/services/authn/authnimpl/service.go:156,472@v12.2.1"
+    - "grafana/grafana pkg/services/authn/authnimpl/service.go:157,486@v13.3.0"
+    - "grafana/grafana pkg/util/errutil/status.go:129@v10.2.3"
+    - "grafana/grafana pkg/apimachinery/errutil/status.go:139@v12.2.1"
+    - "grafana/grafana pkg/apimachinery/errutil/status.go:139@v13.3.0"
+    - "grafana/grafana pkg/util/errutil/errors.go:365@v10.2.3"
+    - "grafana/grafana pkg/apimachinery/errutil/errors.go:384@v12.2.1"
+    - "grafana/grafana pkg/apimachinery/errutil/errors.go:384@v13.3.0"
+    - "grafana/grafana pkg/services/authn/clients/password.go:16,63@v10.2.3"
+    - "grafana/grafana pkg/services/authn/clients/password.go:18,77@v12.2.1"
+    - "grafana/grafana pkg/services/authn/clients/password.go:18,82@v13.3.0"
+    - "grafana/grafana pkg/services/authn/clients/api_key.go:22,53@v10.2.3"
+    - "grafana/grafana pkg/services/authn/clients/api_key.go:24,64@v12.2.1"
+    - "grafana/grafana pkg/services/authn/clients/api_key.go:25,65@v13.3.0"
+    - "grafana/grafana pkg/services/apikey/model.go:14@v10.2.3"
+    - "grafana/grafana pkg/services/apikey/model.go:13@v12.2.1"
+    - "grafana/grafana pkg/services/apikey/model.go:13@v13.3.0"
 
 # ---------------- Loki ----------------
+# Loki logs its own 429/400 push responses at Debug only; every match at the default level is promtail's "error sending batch, will retry" (Warn) / "final error sending batch" (Error) line carrying the first line of Loki's response body. Loki v3.6.0 lower-cased the texts, hence (?i). "too many outstanding requests" (query path) is answered to Grafana and never logged here.
 - id: loki.rate-limited
   name: Loki ingestion rate limited
   component: loki
   area: observability
   severity: medium
   sources: ["logs/pods/loki/*.log", "logs/pods/promtail/*.log"]
-  pattern: 'Ingestion rate limit exceeded|Per stream rate limit exceeded|rate limit|too many outstanding requests|429 Too Many Requests|server returned HTTP status 429'
-  meaning: Some logs are being dropped. During an incident the most verbose logs are dropped first.
+  pattern: '(?i)ingestion rate limit exceeded|per stream rate limit exceeded|dropping batch due to rate limiting|429 Too Many Requests|server returned HTTP status 429'
+  meaning: Some logs are being dropped. During an incident the most verbose logs are dropped first. The lines are promtail's, with Loki's 429 body ("ingestion rate limit exceeded for user ..." or "Per stream rate limit exceeded ...") inside error=; Loki itself logs the rejection at Debug only, so a silent Loki log is not evidence.
   cause: Small limits_config.ingestion_rate_mb (default 4MB/s), a pod flooding logs.
   verify: "kubectl logs -n monitoring -l app=promtail --since=1h | grep -c 429"
+  source:
+    - "grafana/loki pkg/validation/validate.go:23,63@v2.6.1"
+    - "grafana/loki pkg/validation/validate.go:23,74@v2.9.2"
+    - "grafana/loki pkg/validation/validate.go:26@v3.5.0"
+    - "grafana/loki pkg/validation/validate.go:30@v3.6.0"
+    - "grafana/loki pkg/validation/validate.go:30,91@v3.7.9"
+    - "grafana/loki pkg/ingester/stream.go:327@v2.6.1"
+    - "grafana/loki pkg/ingester/stream.go:255@v2.9.2"
+    - "grafana/loki pkg/ingester/stream.go:278@v3.7.9"
+    - "grafana/loki clients/pkg/promtail/client/client.go:369,380,415@v2.6.1"
+    - "grafana/loki clients/pkg/promtail/client/client.go:401,419,430,482@v2.9.2"
+    - "grafana/loki clients/pkg/promtail/client/client.go:401,419,430,481@v3.7.9"
+    - "golang/go src/net/http/status.go:179@go1.26.10"
+    - "grafana/loki pkg/distributor/http.go:67@v2.6.1"
+    - "grafana/loki pkg/distributor/http.go:70@v2.9.2"
+    - "grafana/loki pkg/distributor/http.go:166@v3.7.9"
+# "per-user streams limit ..." is the limiter's text, replaced by StreamLimitErrorMsg before the ingester answers; it never reaches a log. Loki v3.6.0 lower-cased the text.
 - id: loki.stream-limit
   name: Loki active stream limit exceeded
   component: loki
   area: observability
   severity: medium
   sources: ["logs/pods/loki/*.log", "logs/pods/promtail/*.log"]
-  pattern: 'Maximum active stream limit exceeded|per-user streams limit|streams limit exceeded'
-  meaning: Too many label combinations (streams), so new streams are rejected. High-cardinality labels (pod name, request id) are the cause.
+  pattern: '(?i)maximum active stream limit exceeded'
+  meaning: Too many label combinations (streams), so new streams are rejected. High-cardinality labels (pod name, request id) are the cause. The text is Loki's 429 body inside promtail's "error sending batch" error=; Loki logs it at Debug only.
   cause: promtail attaching dynamic labels, the max_streams_per_user default (10000).
   verify: "curl -s localhost:3100/metrics | grep loki_ingester_memory_streams"
+  source:
+    - "grafana/loki pkg/validation/validate.go:30@v2.6.1"
+    - "grafana/loki pkg/validation/validate.go:30@v2.9.2"
+    - "grafana/loki pkg/validation/validate.go:33@v3.5.0"
+    - "grafana/loki pkg/validation/validate.go:37@v3.6.0"
+    - "grafana/loki pkg/validation/validate.go:37@v3.7.9"
+    - "grafana/loki pkg/ingester/instance.go:238@v2.6.1"
+    - "grafana/loki pkg/ingester/instance.go:275@v2.9.2"
+    - "grafana/loki pkg/ingester/instance.go:383@v3.7.9"
+    - "grafana/loki clients/pkg/promtail/client/client.go:369,380,415@v2.6.1"
+    - "grafana/loki clients/pkg/promtail/client/client.go:419,430,482@v2.9.2"
+    - "grafana/loki clients/pkg/promtail/client/client.go:419,430,481@v3.7.9"
+# Loki's text for a future timestamp is "has timestamp too new", not "too far in the future".
 - id: loki.out-of-order
   name: Loki out-of-order or too-old entries
   component: loki
   area: observability
   severity: low
   sources: ["logs/pods/loki/*.log", "logs/pods/promtail/*.log"]
-  pattern: 'entry (too far behind|out of order)|timestamp too old|too far in the future|entry with timestamp.*ignored'
-  meaning: Logs with skewed timestamps are dropped. Node clocks or delayed resends.
+  pattern: 'entry (too far behind|out of order)|timestamp too old|timestamp too new|entry with timestamp.*ignored'
+  meaning: Logs with skewed timestamps are dropped. Node clocks or delayed resends. The texts are Loki's 400 body ("entry with timestamp ... ignored, reason: 'entry too far behind ...'", "has timestamp too old", "has timestamp too new") inside promtail's "final error sending batch" error= (400 is not retried); Loki logs them at Debug only.
   cause: Node NTP, resends after a backed-up promtail queue, the reject_old_samples setting.
   verify: "timedatectl status; kubectl logs -n monitoring -l app=promtail --since=1h | grep -c 'too far behind'"
   warn_at: 10
   fail_at: 1000
+  source:
+    - "grafana/loki pkg/chunkenc/interface.go:20,21@v2.6.1"
+    - "grafana/loki pkg/chunkenc/interface.go:20,40@v2.9.2"
+    - "grafana/loki pkg/chunkenc/interface.go:20,44@v3.7.9"
+    - "grafana/loki pkg/validation/validate.go:38,41@v2.6.1"
+    - "grafana/loki pkg/validation/validate.go:47,50@v2.9.2"
+    - "grafana/loki pkg/validation/validate.go:54,57@v3.7.9"
+    - "grafana/loki pkg/distributor/validator.go:75,81@v2.6.1"
+    - "grafana/loki pkg/distributor/validator.go:76,83@v2.9.2"
+    - "grafana/loki pkg/distributor/validator.go:106,112@v3.7.9"
+    - "grafana/loki pkg/ingester/stream.go:327@v2.6.1"
+    - "grafana/loki pkg/ingester/stream.go:255@v2.9.2"
+    - "grafana/loki pkg/ingester/stream.go:278@v3.7.9"
+    - "grafana/loki clients/pkg/promtail/client/client.go:380,415@v2.6.1"
+    - "grafana/loki clients/pkg/promtail/client/client.go:430,482@v2.9.2"
+    - "grafana/loki clients/pkg/promtail/client/client.go:430,481@v3.7.9"
+# "flush failed" and "error flushing" are printed by no version.
 - id: loki.flush-failed
   name: Loki chunk flush failed
   component: loki
   area: observability
   severity: high
   sources: ["logs/pods/loki/*.log"]
-  pattern: 'failed to flush|flush failed|error flushing|no space left on device'
-  meaning: Logs buffered in memory cannot be written to storage. A restart loses them.
+  pattern: 'failed to flush|no space left on device'
+  meaning: Logs buffered in memory cannot be written to storage. A restart loses them. The line is the ingester's Error "failed to flush" (v2.6.1 "failed to flush user") err="failed to flush chunks: ...".
   cause: Disk or S3 permissions/capacity, emptyDir storage.
   verify: "kubectl logs -n monitoring loki-0 --since=24h | grep -i flush | tail"
+  source:
+    - "grafana/loki pkg/ingester/flush.go:146@v2.6.1"
+    - "grafana/loki pkg/ingester/flush.go:143,174@v2.9.2"
+    - "grafana/loki pkg/ingester/flush.go:240,262,312@v3.7.9"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1385@go1.26.10"
 - id: loki.panic
   name: Loki panic
   component: loki
@@ -350,6 +706,9 @@
   meaning: The Loki process died. Logs between restarts are lost.
   cause: OOM from a large query, bugs, a corrupted index.
   verify: "kubectl get pods -n monitoring -l app=loki -o jsonpath='{.items[*].status.containerStatuses[*].lastState}'"
+  source:
+    - "golang/go src/runtime/panic.go:747,1224,1248@go1.26.10"
+    - "golang/go src/runtime/error.go:92,103,185@go1.26.10"
 
 # ---------------- promtail ----------------
 - id: promtail.send-failed
@@ -359,11 +718,18 @@
   severity: medium
   sources: ["logs/pods/promtail/*.log"]
   pattern: 'error sending batch|server returned HTTP status 5\d\d|final error sending batch|connection refused|context deadline exceeded'
-  meaning: Logs are not reaching Loki. Once dropped after retries, that window is a permanent gap.
+  meaning: Logs are not reaching Loki. Once dropped after retries, that window is a permanent gap. "error sending batch, will retry" (Warn) is one line per retry; "final error sending batch" (Error) is the drop.
   cause: Loki down or OOM, network policy, a changed Loki address.
   verify: "kubectl logs -n monitoring -l app=promtail --since=1h | grep -c 'error sending batch'"
   warn_at: 5
   fail_at: 200
+  source:
+    - "grafana/loki clients/pkg/promtail/client/client.go:369,380,415@v2.6.1"
+    - "grafana/loki clients/pkg/promtail/client/client.go:419,430,482@v2.9.2"
+    - "grafana/loki clients/pkg/promtail/client/client.go:419,430,481@v3.7.9"
+    - "golang/go src/net/http/status.go:185@go1.26.10"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1466@go1.26.10"
+    - "golang/go src/context/context.go:175@go1.26.10"
 - id: promtail.too-many-open-files
   name: promtail too many open files
   component: promtail
@@ -371,101 +737,225 @@
   severity: high
   sources: ["logs/pods/promtail/*.log"]
   pattern: 'too many open files'
-  meaning: The node inotify limit was hit, so log files of new pods cannot be opened. Logs of new pods on that node are not collected.
+  meaning: The node inotify instance limit was hit, so log files of new pods cannot be opened. Logs of new pods on that node are not collected. The text is the Go EMFILE error inside error= of "error adding directory to watcher", "failed to start tailer" or the tail library's "Error in Watcher Error channel" line.
   cause: fs.inotify.max_user_instances default 128 (node.sysctl-tuning), a node with many pods.
   verify: "sysctl fs.inotify.max_user_instances; kubectl logs -n monitoring -l app=promtail --since=24h | grep -c 'too many open files'"
+  source:
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1381@go1.26.10"
+    - "grafana/loki clients/pkg/promtail/targets/file/filetargetmanager.go:158@v2.6.1"
+    - "grafana/loki clients/pkg/promtail/targets/file/filetargetmanager.go:158@v2.9.2"
+    - "grafana/loki clients/pkg/promtail/targets/file/filetargetmanager.go:170@v3.7.9"
+    - "grafana/loki clients/pkg/promtail/targets/file/filetarget.go:321@v2.6.1"
+    - "grafana/loki clients/pkg/promtail/targets/file/filetarget.go:371@v2.9.2"
+    - "grafana/loki clients/pkg/promtail/targets/file/filetarget.go:426@v3.7.9"
+    - "grafana/loki vendor/github.com/hpcloud/tail/watch/inotify_tracker.go:243@v2.6.1"
+    - "grafana/loki vendor/github.com/grafana/tail/watch/inotify_tracker.go:243@v2.9.2"
+    - "grafana/loki vendor/github.com/grafana/tail/watch/inotify_tracker.go:243@v3.7.9"
+    - "grafana/loki pkg/util/log.go:30@v2.6.1"
+    - "grafana/loki pkg/util/log.go:30@v2.9.2"
+    - "grafana/loki pkg/util/log.go:30@v3.7.9"
+# The bare "failed to tail file" also matched the Info line error="file is a directory" that every directory matched by a glob produces.
 - id: promtail.tail-failed
   name: promtail failed to tail a log file
   component: promtail
   area: observability
   severity: low
   sources: ["logs/pods/promtail/*.log"]
-  pattern: 'failed to tail file|no such file or directory|error reading|permission denied'
-  meaning: A specific pod log file cannot be read. Usually a transient message right after a pod disappears, but repeated permission denied means a collection gap.
+  pattern: 'failed to tail file, stat failed|failed to start tailer|no such file or directory|error reading|permission denied'
+  meaning: A specific pod log file cannot be read. Usually a transient message right after a pod disappears, but repeated permission denied means a collection gap. The lines are "failed to tail file, stat failed", "failed to start tailer" and "tail routine: error reading line" (all Error).
   cause: Pod termination race, hostPath mount permissions, a changed log path.
   verify: "kubectl logs -n monitoring -l app=promtail --since=1h | grep -i 'permission denied' | head"
   warn_at: 20
   fail_at: 500
+  source:
+    - "grafana/loki clients/pkg/promtail/targets/file/filetarget.go:307,313,321@v2.6.1"
+    - "grafana/loki clients/pkg/promtail/targets/file/filetarget.go:342,348,371@v2.9.2"
+    - "grafana/loki clients/pkg/promtail/targets/file/filetarget.go:383,389,426@v3.7.9"
+    - "grafana/loki clients/pkg/promtail/targets/file/tailer.go:165@v2.6.1"
+    - "grafana/loki clients/pkg/promtail/targets/file/tailer.go:169@v2.9.2"
+    - "grafana/loki clients/pkg/promtail/targets/file/tailer.go:170@v3.7.9"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1359,1370@go1.26.10"
 
 # ---------------- fluent-bit ----------------
+# `flush chunk .* (failed|retry)` matched the Info line "[engine] flush chunk '...' succeeded at retry N" (every successful retry counted as a failure); the Warn line is matched by "failed to flush chunk".
 - id: fluent-bit.flush-failed
   name: fluent-bit chunk flush failed
   component: fluent-bit
   area: observability
   severity: medium
   sources: ["logs/pods/fluent-bit/*.log"]
-  pattern: 'failed to flush chunk|flush chunk .* (failed|retry)|could not flush|HTTP status=(4|5)\d\d'
-  meaning: Logs are not being written to the output (Elasticsearch, Loki, CloudWatch) and are retrying. Past the retry limit they are dropped.
+  pattern: 'failed to flush chunk|could not flush|HTTP status=(4|5)\d\d'
+  meaning: Logs are not being written to the output (Elasticsearch, Loki, CloudWatch) and are retrying. Past the retry limit they are dropped. The lines are "[ warn] [engine] failed to flush chunk '...', retry in N seconds" (one per retry) and the output plugin's "[error] ... HTTP status=NNN URI=..." or "could not flush records to host:port"; the HTTP response body follows on its own lines.
   cause: Output target down or rejecting (ES disk watermark, mapping conflict), authentication, network.
   verify: "kubectl logs -n <ns> -l app.kubernetes.io/name=fluent-bit --since=1h | grep -c 'failed to flush'"
   warn_at: 10
   fail_at: 500
+  source:
+    - "fluent/fluent-bit src/flb_engine.c:310,423@v3.0.4"
+    - "fluent/fluent-bit src/flb_engine.c:679,822@v5.1.5"
+    - "fluent/fluent-bit plugins/out_loki/loki.c:1665,1672,1677,1696@v3.0.4"
+    - "fluent/fluent-bit plugins/out_loki/loki.c:2026,2056,2061,2080@v5.1.5"
+    - "fluent/fluent-bit plugins/out_es/es.c:907,911@v3.0.4"
+    - "fluent/fluent-bit plugins/out_es/es.c:1564,1568,1761,1765@v5.1.5"
+    - "fluent/fluent-bit plugins/out_opensearch/opensearch.c:974,978@v3.0.4"
+    - "fluent/fluent-bit plugins/out_opensearch/opensearch.c:1210,1214@v5.1.5"
+# fluent-bit prints errno texts through glibc strerror_r, which capitalises ("Connection refused"); "could not connect" is a Debug line of flb_network.c.
 - id: fluent-bit.upstream-down
   name: fluent-bit cannot connect to its output
   component: fluent-bit
   area: observability
   severity: medium
   sources: ["logs/pods/fluent-bit/*.log"]
-  pattern: 'no upstream connections available|upstream connection initialization error|connection refused|connection timed out|could not connect|broken connection'
-  meaning: The connection to the output target itself fails. Logs pile up in the memory/file buffer and are eventually dropped.
+  pattern: 'no upstream connections available|upstream connection initialization error|[Cc]onnection refused|[Cc]onnection timed out|connection #\d+ to \S+ timed out|broken connection'
+  meaning: The connection to the output target itself fails. Logs pile up in the memory/file buffer and are eventually dropped. The lines are "[error] [output:...] no upstream connections available", "[error] [src/flb_...c:NNN errno=111] Connection refused" (glibc wording), "[upstream] connection #N to host:port timed out after N seconds" and "[http_client] broken connection to host:port ?".
   cause: Elasticsearch or Loki down, changed Service name/port, network policy.
   verify: "kubectl get svc -A | grep -iE 'elastic|opensearch|loki'"
   warn_at: 5
   fail_at: 200
+  source:
+    - "fluent/fluent-bit plugins/out_loki/loki.c:1577@v3.0.4"
+    - "fluent/fluent-bit plugins/out_loki/loki.c:1934@v5.1.5"
+    - "fluent/fluent-bit plugins/out_forward/forward.c:1575@v3.0.4"
+    - "fluent/fluent-bit plugins/in_kubernetes_events/kubernetes_events.c:672@v3.0.4"
+    - "fluent/fluent-bit plugins/in_kubernetes_events/kubernetes_events.c:878@v5.1.5"
+    - "fluent/fluent-bit src/flb_log.c:678@v3.0.4"
+    - "fluent/fluent-bit src/flb_log.c:1326@v5.1.5"
+    - "fluent/fluent-bit include/fluent-bit/flb_log.h:232@v3.0.4"
+    - "bminor/glibc sysdeps/gnu/errlist.c:686,696@glibc-2.31"
+    - "bminor/glibc sysdeps/gnu/errlist.h:416,422@glibc-2.41"
+    - "fluent/fluent-bit dockerfiles/Dockerfile:20@v3.0.4"
+    - "fluent/fluent-bit dockerfiles/Dockerfile:22@v5.1.5"
+    - "fluent/fluent-bit src/flb_upstream.c:920@v3.0.4"
+    - "fluent/fluent-bit src/flb_upstream.c:1086@v5.1.5"
+    - "fluent/fluent-bit src/flb_http_client.c:1348@v3.0.4"
+    - "fluent/fluent-bit src/flb_http_client.c:2100@v5.1.5"
+    - "fluent/fluent-bit src/flb_network.c:1419,1437@v3.0.4"
+    - "fluent/fluent-bit src/flb_network.c:1517,1535@v5.1.5"
+# "storage.backlog" (with a dot), "input chunk ... full", "exceeds Mem_Buf_Limit" and "backpressure" are printed by no version; "mem buf overlimit" also matched the Info resume line, so the pattern is anchored to the paused Warn line.
 - id: fluent-bit.backpressure
   name: fluent-bit buffer full (backpressure)
   component: fluent-bit
   area: observability
   severity: high
   sources: ["logs/pods/fluent-bit/*.log"]
-  pattern: 'storage\.backlog|input chunk.*full|paused|backpressure|exceeds Mem_Buf_Limit|mem buf overlimit'
-  meaning: Input is paused. Logs from that window are not collected.
+  pattern: '\[input\] \S+ paused \(|\[storage backlog\] (could not|chunk .* evicted)'
+  meaning: Input is paused. Logs from that window are not collected. The line is "[ warn] [input] tail.0 paused (mem buf overlimit)" or "(storage buf overlimit N/M)" (v5 also "(rate gate limit exceeded)"); the matching "[ info] [input] tail.0 resume (...)" line is not counted.
   cause: Buffer filled because the output is slow or dead, small Mem_Buf_Limit, storage.type filesystem not set.
   verify: "kubectl logs -n <ns> -l app.kubernetes.io/name=fluent-bit --since=1h | grep -iE 'paused|backlog'"
+  source:
+    - "fluent/fluent-bit src/flb_input_chunk.c:1259,1289,1316@v3.0.4"
+    - "fluent/fluent-bit src/flb_input_chunk.c:3067,3092,3125@v5.1.5"
+    - "fluent/fluent-bit src/flb_input.c:2740@v5.1.5"
+    - "fluent/fluent-bit plugins/in_storage_backlog/sb.c:292,299@v3.0.4"
+    - "fluent/fluent-bit plugins/in_storage_backlog/sb.c:320,328,557@v5.1.5"
+# glibc spells EMFILE "Too many open files"; "inotify_add_watch" is never printed, the failing call prints "[plugins/in_tail/tail_fs_inotify.c:NNN errno=NN] ..." (errno 28 "No space left on device" when max_user_watches is hit).
 - id: fluent-bit.too-many-open-files
   name: fluent-bit too many open files
   component: fluent-bit
   area: observability
   severity: high
   sources: ["logs/pods/fluent-bit/*.log"]
-  pattern: 'too many open files|inotify_add_watch|cannot (open|watch)'
-  meaning: The inotify limit prevents opening new pod log files.
+  pattern: '[Tt]oo many open files|tail_fs_inotify\.c:\d+ errno=(24|28)\]|cannot open '
+  meaning: The inotify limit prevents opening new pod log files. The lines are "[error] [plugins/in_tail/tail_fs_inotify.c:NNN errno=24] Too many open files" (instances) or "errno=28] No space left on device" (watches) and "[error] [input:tail:tail.0] cannot open /var/log/...".
   cause: fs.inotify.max_user_instances / max_user_watches defaults (node.sysctl-tuning).
   verify: "sysctl fs.inotify"
+  source:
+    - "bminor/glibc sysdeps/gnu/errlist.c:265,318@glibc-2.31"
+    - "bminor/glibc sysdeps/gnu/errlist.h:157,190@glibc-2.41"
+    - "fluent/fluent-bit plugins/in_tail/tail_fs_inotify.c:143,147@v3.0.4"
+    - "fluent/fluent-bit plugins/in_tail/tail_fs_inotify.c:144,148@v5.1.5"
+    - "fluent/fluent-bit src/flb_log.c:678@v3.0.4"
+    - "fluent/fluent-bit src/flb_log.c:1326@v5.1.5"
+    - "fluent/fluent-bit plugins/in_tail/tail_file.c:953@v3.0.4"
+    - "fluent/fluent-bit plugins/in_tail/tail_file.c:1445@v5.1.5"
 
 # ---------------- Elasticsearch / OpenSearch ----------------
+# The block texts are the REST response (ClusterBlockException "blocked by: [TOO_MANY_REQUESTS/12/disk usage exceeded ...]"); the server logs the block only at Debug, so they appear in fluent-bit's log (HTTP status=429 ... response: body, or "error: Output" with trace_error). "FORBIDDEN/12/index read-only / allow delete (api)" is the pre-7.4 wording of block 12; since 7.4 block 12 is TOO_MANY_REQUESTS with "disk usage exceeded flood-stage watermark".
 - id: elasticsearch.read-only-flood
   name: Elasticsearch indices read-only (disk flood stage)
   component: elasticsearch-opensearch
   area: observability
   severity: critical
-  sources: ["logs/pods/elasticsearch-opensearch/*.log"]
-  pattern: 'flood stage disk watermark|cluster_block_exception|FORBIDDEN/12/index read-only|TOO_MANY_REQUESTS/12/disk usage exceeded'
-  meaning: Disk went past 95% and all indices became read-only. No more logs come in. Even after freeing disk the block must be lifted by hand (automatic on 7.4+).
+  sources: ["logs/pods/elasticsearch-opensearch/*.log", "logs/pods/fluent-bit/*.log"]
+  pattern: 'flood stage disk watermark|cluster_block_exception|TOO_MANY_REQUESTS/12/disk usage exceeded'
+  meaning: Disk went past 95% and all indices became read-only. No more logs come in. Even after freeing disk the block must be lifted by hand (automatic on 7.4+). The server line is the Warn "flood stage disk watermark [95%] exceeded on ..."; "cluster_block_exception" and "TOO_MANY_REQUESTS/12/disk usage exceeded flood-stage watermark" are the response body that fluent-bit prints after "HTTP status=429".
   cause: No retention (ILM), a small PV.
   verify: "curl -s <es>/_cluster/allocation/explain; curl -s <es>/_cat/allocation?v"
+  source:
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/routing/allocation/DiskThresholdMonitor.java:171@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/routing/allocation/DiskThresholdMonitor.java:194,218@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/routing/allocation/DiskThresholdMonitor.java:204,227@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/cluster/routing/allocation/DiskThresholdMonitor.java:229@3.9.0"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/ElasticsearchException.java:659,829@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/ElasticsearchException.java:803,1403@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/ElasticsearchException.java:882,1479@v9.5.6"
+    - "opensearch-project/OpenSearch libs/core/src/main/java/org/opensearch/OpenSearchException.java:724@3.9.0"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/block/ClusterBlockException.java:79,82@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/block/ClusterBlockException.java:75@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/block/ClusterBlockException.java:75@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/cluster/block/ClusterBlockException.java:99,102@3.9.0"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/metadata/IndexMetadata.java:99@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/metadata/IndexMetadata.java:132@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/metadata/IndexMetadata.java:135@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/cluster/metadata/IndexMetadata.java:151@3.9.0"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/action/support/master/TransportMasterNodeAction.java:143@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/action/support/master/TransportMasterNodeAction.java:193@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/action/support/master/TransportMasterNodeAction.java:276@v9.5.6"
+    - "fluent/fluent-bit plugins/out_es/es.c:907,936@v3.0.4"
+    - "fluent/fluent-bit plugins/out_es/es.c:1564,1651,1761@v5.1.5"
+# The watermark is printed as a percentage ("[90%]") when the setting is relative; an absolute setting prints bytes ("[10gb]") and the 8.x max_headroom prints "[max_headroom=150gb]", so the bracket content is no longer restricted to digits.
 - id: elasticsearch.disk-watermark
   name: Elasticsearch disk watermark warning
   component: elasticsearch-opensearch
   area: observability
   severity: high
   sources: ["logs/pods/elasticsearch-opensearch/*.log"]
-  pattern: '(high|low) disk watermark \[\d+%\] exceeded'
-  meaning: Disk passed 85% (low) or 90% (high), so shard allocation stops or shards are relocated. The stage before flood stage.
+  pattern: '(high|low) disk watermark \[[^\]]+\] exceeded'
+  meaning: Disk passed 85% (low) or 90% (high), so shard allocation stops or shards are relocated. The stage before flood stage. "low disk watermark [85%] exceeded on ..." is Info, "high disk watermark [90%] exceeded on ..." is Warn; the "no longer exceeded" lines do not count.
   cause: No retention policy, growing index size.
   verify: "curl -s <es>/_cat/allocation?v"
   warn_at: 1
   fail_at: 20
+  source:
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/routing/allocation/DiskThresholdMonitor.java:219,275,280@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/routing/allocation/DiskThresholdMonitor.java:270,345@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/routing/allocation/DiskThresholdMonitor.java:278,353@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/cluster/routing/allocation/DiskThresholdMonitor.java:279,351,360@3.9.0"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/routing/allocation/DiskThresholdSettings.java:325,331,337@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/common/Strings.java:680@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/routing/allocation/DiskThresholdSettings.java:560,580,591,602@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/routing/allocation/DiskThresholdSettings.java:548,568,579,590@v9.5.6"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/common/unit/RelativeByteSizeValue.java:106@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/common/unit/RelativeByteSizeValue.java:106@v9.5.6"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/common/unit/RatioValue.java:76@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/common/unit/RatioValue.java:76@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/cluster/routing/allocation/DiskThresholdSettings.java:488,494,500@3.9.0"
+# "Data too large" is a Debug line in the server; the message is the 429 response body, which fluent-bit prints after "HTTP status=429" (or in "error: Output" with trace_error).
 - id: elasticsearch.circuit-breaker
   name: Elasticsearch circuit breaker
   component: elasticsearch-opensearch
   area: observability
   severity: high
-  sources: ["logs/pods/elasticsearch-opensearch/*.log"]
+  sources: ["logs/pods/elasticsearch-opensearch/*.log", "logs/pods/fluent-bit/*.log"]
   pattern: 'circuit_breaking_exception|CircuitBreakingException|Data too large'
-  meaning: Requests were rejected for lack of heap. Searches and indexing fail.
+  meaning: Requests were rejected for lack of heap. Searches and indexing fail. The server logs "[parent] Data too large, data for [...]" at Debug only; at the default level the text is visible in the response body that fluent-bit prints ("circuit_breaking_exception", "Data too large") or inside a stack trace in the server log.
   cause: Heap (default 1GB) too small for the data and shard count, large aggregation queries.
   verify: "curl -s <es>/_nodes/stats/breaker | jq '.nodes[].breakers.parent'"
+  source:
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/ElasticsearchException.java:659,975@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/ElasticsearchException.java:803,1794@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/ElasticsearchException.java:882,1875@v9.5.6"
+    - "opensearch-project/OpenSearch libs/core/src/main/java/org/opensearch/OpenSearchException.java:148,724@3.9.0"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/indices/breaker/HierarchyCircuitBreakerService.java:318,345@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/indices/breaker/HierarchyCircuitBreakerService.java:432,447@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/indices/breaker/HierarchyCircuitBreakerService.java:433,448@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/indices/breaker/HierarchyCircuitBreakerService.java:432@3.9.0"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/common/breaker/ChildMemoryCircuitBreaker.java:71,75@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/common/breaker/ChildMemoryCircuitBreaker.java:78,91@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/common/breaker/ChildMemoryCircuitBreaker.java:79,93@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/common/breaker/ChildMemoryCircuitBreaker.java:90,103@3.9.0"
+    - "fluent/fluent-bit plugins/out_es/es.c:907,936@v3.0.4"
+    - "fluent/fluent-bit plugins/out_es/es.c:1564,1651,1761@v5.1.5"
 - id: elasticsearch.oom
   name: Elasticsearch OutOfMemoryError
   component: elasticsearch-opensearch
@@ -473,43 +963,100 @@
   severity: critical
   sources: ["logs/pods/elasticsearch-opensearch/*.log"]
   pattern: 'OutOfMemoryError|java\.lang\.OutOfMemory'
-  meaning: The JVM heap blew up and the node died.
+  meaning: The JVM heap blew up and the node died. The uncaught-exception handler logs "fatal error in thread [...], exiting" with the java.lang.OutOfMemoryError stack trace.
   cause: Heap settings not matching the container limit (ES_JAVA_OPTS), too many shards.
   verify: "kubectl get pods -n <ns> -l app=elasticsearch -o jsonpath='{.items[*].status.containerStatuses[*].lastState}'"
+  source:
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/bootstrap/ElasticsearchUncaughtExceptionHandler.java:44@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/bootstrap/ElasticsearchUncaughtExceptionHandler.java:31@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/bootstrap/ElasticsearchUncaughtExceptionHandler.java:31@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/bootstrap/OpenSearchUncaughtExceptionHandler.java:61,83@3.9.0"
+# OpenSearch renamed the role: it prints "cluster-manager not discovered" and throws ClusterManagerNotDiscoveredException. "not enough master nodes" is the 7.x Zen discovery line, removed in 8.0.
 - id: elasticsearch.master-not-discovered
   name: Elasticsearch master not discovered
   component: elasticsearch-opensearch
   area: observability
   severity: critical
   sources: ["logs/pods/elasticsearch-opensearch/*.log"]
-  pattern: 'master not discovered|not enough master nodes|MasterNotDiscoveredException'
-  meaning: The cluster has not formed, so every request fails.
+  pattern: '(master|cluster-manager) not discovered|not enough master nodes|(MasterNotDiscovered|ClusterManagerNotDiscovered)Exception'
+  meaning: The cluster has not formed, so every request fails. The line is the Warn "master not discovered yet ..." / "master not discovered or elected yet, an election requires ..." (OpenSearch "cluster-manager not discovered ...") repeated every 10 seconds while the cluster is unformed; "not enough master nodes" is the 7.x Zen discovery line.
   cause: Discovery settings (seed_hosts, initial_master_nodes), fewer nodes than quorum, network.
   verify: "curl -s <es>/_cluster/health"
+  source:
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/coordination/ClusterFormationFailureHelper.java:103,159,177,185,207@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/coordination/ClusterFormationFailureHelper.java:130,300,319,330,349@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/cluster/coordination/ClusterFormationFailureHelper.java:135,367,386,397,411@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/cluster/coordination/ClusterFormationFailureHelper.java:132,210,228,239,268@3.9.0"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/discovery/zen/ZenDiscovery.java:851@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/action/support/master/TransportMasterNodeAction.java:208@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/action/support/master/TransportMasterNodeAction.java:288@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/action/support/master/TransportMasterNodeAction.java:371@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/action/admin/cluster/health/TransportClusterHealthAction.java:284@3.9.0"
+# The server logs a rejected bulk item at Debug/Trace only ("failed to execute bulk item"); the texts are the 429 / bulk-item response, visible in fluent-bit's log (bulk items only with trace_error on). OpenSearch's exception is OpenSearchRejectedExecutionException, REST name open_search_rejected_execution_exception.
 - id: elasticsearch.bulk-rejected
   name: Elasticsearch bulk rejections
   component: elasticsearch-opensearch
   area: observability
   severity: medium
-  sources: ["logs/pods/elasticsearch-opensearch/*.log"]
-  pattern: 'rejected execution|es_rejected_execution_exception|failed to execute bulk'
-  meaning: The write thread pool queue overflowed and some logs are rejected. fluent-bit retries and then drops them.
+  sources: ["logs/pods/elasticsearch-opensearch/*.log", "logs/pods/fluent-bit/*.log"]
+  pattern: 'rejected execution of|(es|open_search)_rejected_execution_exception'
+  meaning: The write thread pool queue overflowed and some logs are rejected. fluent-bit retries and then drops them. The server logs the rejection at Debug only; at the default level the text ("rejected execution of ... on EsThreadPoolExecutor", "es_rejected_execution_exception") is in the response body that fluent-bit prints, for bulk items only when trace_error is on. _cat/thread_pool rejected is the reliable count.
   cause: Many shards or an indexing flood, slow disk I/O.
   verify: "curl -s '<es>/_cat/thread_pool/write?v&h=node_name,active,queue,rejected'"
   warn_at: 5
   fail_at: 200
-
+  source:
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/common/util/concurrent/EsAbortPolicy.java:48@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/common/util/concurrent/EsRejectedExecutionHandler.java:48@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/common/util/concurrent/EsRejectedExecutionHandler.java:48@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/common/util/concurrent/OpenSearchAbortPolicy.java:67@3.9.0"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/index/IndexingPressure.java:67,98@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/index/IndexingPressure.java:261@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/index/IndexingPressure.java:276@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/index/IndexingPressure.java:108,152@3.9.0"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/ElasticsearchException.java:659@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/ElasticsearchException.java:803@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/ElasticsearchException.java:882@v9.5.6"
+    - "opensearch-project/OpenSearch libs/core/src/main/java/org/opensearch/OpenSearchException.java:724@3.9.0"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/action/bulk/TransportShardBulkAction.java:360@v7.10.2"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/action/bulk/TransportShardBulkAction.java:521@v8.19.24"
+    - "elastic/elasticsearch server/src/main/java/org/elasticsearch/action/bulk/TransportShardBulkAction.java:651@v9.5.6"
+    - "opensearch-project/OpenSearch server/src/main/java/org/opensearch/action/bulk/TransportShardBulkAction.java:766@3.9.0"
+    - "fluent/fluent-bit plugins/out_es/es.c:936@v3.0.4"
+    - "fluent/fluent-bit plugins/out_es/es.c:1651@v5.1.5"
+# ingress-nginx, Traefik and MetalLB log signatures (signatures/catalog.yaml group N, #129). Field descriptions are in the header of catalog.yaml.
+# ingress-nginx phrases were read at controller-v1.14.0 (k3s image) and controller-v1.15.1 (last release before the archive); the nginx core strings in nginx/nginx
+# release-1.27.1 (images/nginx/rootfs/build.sh:21 NGINX_VERSION=1.27.1 at both tags) and the errno texts in musl 1.2.5 (Alpine 3.22/3.23, the image base).
+# The controller pod log is three layouts in one stream: klog text, the nginx access log (stdout) and the nginx error log (stderr, rootfs/Dockerfile:84-85).
+# Traefik phrases were read at v3.3.2, v3.3.6 (k3s v1.33.5+k3s1 image), v3.7.15 (k3s v1.37.2+k3s1 image) and v3.7.17 (newest); MetalLB at v0.14.5 (k3s cluster), v0.15.3, v0.16.2 (newest).
+# `source:` names the logging call at each version and references/sources.md records what each signature relies on.
 # ---------------- ingress-nginx ----------------
+# `nginx: [emerg]` (the `nginx -t` form, ngx_log.c:207) is a subset of `[emerg]` (the error-log form, ngx_log.c:77,112); one alternative covers both.
 - id: ingress-nginx.emerg
   name: nginx [emerg] configuration error
   component: ingress-nginx
   area: traffic
   severity: critical
   sources: ["logs/pods/ingress-nginx/*.log"]
-  pattern: 'nginx: \[emerg\]|\[emerg\]'
-  meaning: The config reload failed and the old config keeps running. New Ingresses are not applied.
+  pattern: '\[emerg\]'
+  meaning: The config reload failed and the old config keeps running. New Ingresses are not applied. The line is either the nginx master's error log (`YYYY/MM/DD HH:MM:SS [emerg] pid#tid:`) or the `nginx -t` output that the controller prints inside its "Unexpected failure reloading the backend" error (`nginx: [emerg] ...`).
   cause: Annotation snippet errors, duplicate server_name, certificate files.
   verify: "kubectl exec -n ingress-nginx deploy/<controller> -- nginx -t"
+  source:
+    - "nginx/nginx src/core/ngx_log.c:77,112,207@release-1.27.1"
+    - "nginx/nginx src/core/nginx.c:378@release-1.27.1"
+    - "kubernetes/ingress-nginx images/nginx/rootfs/build.sh:21@controller-v1.14.0"
+    - "kubernetes/ingress-nginx images/nginx/rootfs/build.sh:21@controller-v1.15.1"
+    - "kubernetes/ingress-nginx rootfs/Dockerfile:85@controller-v1.14.0"
+    - "kubernetes/ingress-nginx rootfs/Dockerfile:85@controller-v1.15.1"
+    - "kubernetes/ingress-nginx rootfs/etc/nginx/template/nginx.tmpl:374@controller-v1.14.0"
+    - "kubernetes/ingress-nginx rootfs/etc/nginx/template/nginx.tmpl:374@controller-v1.15.1"
+    - "kubernetes/ingress-nginx internal/ingress/controller/util.go:146@controller-v1.14.0"
+    - "kubernetes/ingress-nginx internal/ingress/controller/util.go:146@controller-v1.15.1"
+    - "kubernetes/ingress-nginx internal/ingress/controller/nginx.go:657@controller-v1.14.0"
+    - "kubernetes/ingress-nginx internal/ingress/controller/nginx.go:657@controller-v1.15.1"
+    - "kubernetes/ingress-nginx internal/ingress/controller/controller.go:223@controller-v1.14.0"
+    - "kubernetes/ingress-nginx internal/ingress/controller/controller.go:226@controller-v1.15.1"
 - id: ingress-nginx.no-live-upstreams
   name: nginx no live upstreams
   component: ingress-nginx
@@ -517,11 +1064,18 @@
   severity: high
   sources: ["logs/pods/ingress-nginx/*.log"]
   pattern: 'no live upstreams'
-  meaning: Every endpoint of that Service is down, producing 502s.
+  meaning: Every endpoint of that Service is down, producing 502s. nginx writes the line at level error (http and stream proxies), which the default error-log-level notice includes.
   cause: All pods NotReady, a wrong selector, zero replicas during a rollout.
   verify: "kubectl get endpoints -n <ns> <service>"
   warn_at: 1
   fail_at: 20
+  source:
+    - "nginx/nginx src/http/ngx_http_upstream.c:1569@release-1.27.1"
+    - "nginx/nginx src/stream/ngx_stream_proxy_module.c:746@release-1.27.1"
+    - "kubernetes/ingress-nginx images/nginx/rootfs/build.sh:21@controller-v1.14.0"
+    - "kubernetes/ingress-nginx images/nginx/rootfs/build.sh:21@controller-v1.15.1"
+    - "kubernetes/ingress-nginx internal/ingress/controller/config/config.go:42@controller-v1.14.0"
+    - "kubernetes/ingress-nginx internal/ingress/controller/config/config.go:42@controller-v1.15.1"
 - id: ingress-nginx.upstream-errors
   name: Repeated nginx upstream connection failures
   component: ingress-nginx
@@ -534,180 +1088,412 @@
   verify: "kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --since=1h | grep -c 'upstream prematurely'"
   warn_at: 50
   fail_at: 2000
+  source:
+    - "nginx/nginx src/http/ngx_http_upstream.c:2456,3733,4224@release-1.27.1"
+    - "nginx/nginx src/http/ngx_http_upstream.c:2803,2804@release-1.27.1"
+    - "nginx/nginx src/http/ngx_http_upstream.c:3471,3676,4108,4363@release-1.27.1"
+    - "nginx/nginx src/core/ngx_connection.c:1565@release-1.27.1"
+    - "nginx/nginx src/core/ngx_log.c:304@release-1.27.1"
+    - "nginx/nginx src/http/ngx_http_request.c:3857@release-1.27.1"
+    - "nginx/nginx src/os/unix/ngx_errno.c:77,95@release-1.27.1"
+    - "musl-libc/musl src/errno/__strerror.h:33,34@v1.2.5"
+    - "kubernetes/ingress-nginx images/nginx/rootfs/build.sh:21@controller-v1.14.0"
+    - "kubernetes/ingress-nginx images/nginx/rootfs/build.sh:21@controller-v1.15.1"
+# `too many open files` (lowercase) is the Go syscall text only; nginx prints strerror(): on the Alpine/musl image EMFILE is "No file descriptors available"
+# and ENFILE "Too many open files in system", on glibc "Too many open files". The three spellings are listed.
 - id: ingress-nginx.worker-connections
   name: nginx worker_connections exhausted
   component: ingress-nginx
   area: traffic
   severity: high
   sources: ["logs/pods/ingress-nginx/*.log"]
-  pattern: 'worker_connections are not enough|too many open files'
-  meaning: The concurrent connection limit was hit and requests are refused.
+  pattern: 'worker_connections are not enough|No file descriptors available|Too many open files|too many open files'
+  meaning: The concurrent connection limit was hit and requests are refused. `worker_connections are not enough` is nginx's own limit (alert, or warn when it reuses connections); `accept4() failed (24: No file descriptors available)` is the process file-descriptor limit on the Alpine image (crit).
   cause: The max-worker-connections default (16384) or ulimit, traffic growth.
   verify: "kubectl get cm -n ingress-nginx <controller> -o yaml | grep -i worker"
+  source:
+    - "nginx/nginx src/core/ngx_connection.c:1197,1389@release-1.27.1"
+    - "nginx/nginx src/event/ngx_event.c:455@release-1.27.1"
+    - "nginx/nginx src/event/ngx_event_accept.c:85,90@release-1.27.1"
+    - "nginx/nginx src/os/unix/ngx_errno.c:77,95@release-1.27.1"
+    - "musl-libc/musl src/errno/__strerror.h:54,55@v1.2.5"
+    - "alpinelinux/aports main/musl/APKBUILD:5@3.22-stable"
+    - "alpinelinux/aports main/musl/APKBUILD:5@3.23-stable"
+    - "kubernetes/ingress-nginx images/nginx/rootfs/Dockerfile:24@controller-v1.14.0"
+    - "kubernetes/ingress-nginx images/nginx/rootfs/Dockerfile:24@controller-v1.15.1"
+    - "bminor/glibc sysdeps/gnu/errlist.h:157,164@glibc-2.41"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1381@go1.25.3"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1381@go1.26.1"
+# The first and third phrases were lowercase in the first edition; the controller prints "Ignoring ingress ..." (klog.InfoS) and "Error obtaining Service" (klog.Warningf).
 - id: ingress-nginx.invalid-ingress
   name: Ingress ignored after validation failure
   component: ingress-nginx
   area: traffic
   severity: medium
   sources: ["logs/pods/ingress-nginx/*.log"]
-  pattern: 'ignoring ingress because of error while validating|Error obtaining Endpoints|error obtaining service|Error getting SSL certificate'
-  meaning: That Ingress was not added to routing.
+  pattern: 'Ignoring ingress because of error while validating|Error obtaining Endpoints|Error obtaining Service|Error getting SSL certificate'
+  meaning: That Ingress was not added to routing. `Ignoring ingress because of error while validating ingress class` is an info line (printed at the default verbosity) for an Ingress whose IngressClass is missing or belongs to another controller; the other three are warnings for a missing Service, Endpoints or TLS Secret.
   cause: References to a missing Service or Secret, annotation errors.
   verify: "kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --since=24h | grep -i 'ignoring ingress' | head"
   warn_at: 1
   fail_at: 50
-
+  source:
+    - "kubernetes/ingress-nginx internal/ingress/controller/store/store.go:406,439@controller-v1.14.0"
+    - "kubernetes/ingress-nginx internal/ingress/controller/store/store.go:406,439@controller-v1.15.1"
+    - "kubernetes/ingress-nginx internal/ingress/controller/controller.go:1126@controller-v1.14.0"
+    - "kubernetes/ingress-nginx internal/ingress/controller/controller.go:1135@controller-v1.15.1"
+    - "kubernetes/ingress-nginx internal/ingress/controller/endpointslices.go:86@controller-v1.14.0"
+    - "kubernetes/ingress-nginx internal/ingress/controller/endpointslices.go:86@controller-v1.15.1"
+    - "kubernetes/ingress-nginx internal/ingress/controller/controller.go:1068,1142@controller-v1.14.0"
+    - "kubernetes/ingress-nginx internal/ingress/controller/controller.go:1077,1151@controller-v1.15.1"
+    - "kubernetes/ingress-nginx internal/ingress/controller/controller.go:1455,1734@controller-v1.14.0"
+    - "kubernetes/ingress-nginx internal/ingress/controller/controller.go:1468,1747@controller-v1.15.1"
+    - "kubernetes/ingress-nginx cmd/nginx/main.go:54@controller-v1.14.0"
+    - "kubernetes/ingress-nginx cmd/nginx/main.go:54@controller-v1.15.1"
+    - "kubernetes/klog internal/buffer/buffer.go:117@v2.130.1"
+    - "kubernetes/klog internal/buffer/buffer.go:117@v2.140.0"
 # ---------------- Traefik (k3s default) ----------------
+# "Error renewing certificate from LE" became "Error renewing ACME certificate" at v3.6.7; `acme.*error` matches the lego problem text "acme: error: <status>" in the
+# error field (both formats) and, in json format, any ACME-provider line with an error field; in the default common format the error field is written first.
 - id: traefik.acme-failed
   name: Traefik ACME certificate issuance failed
   component: traefik
   area: security
   severity: high
   sources: ["logs/pods/traefik/*.log"]
-  pattern: 'Unable to obtain ACME certificate|acme.*error|Error renewing certificate'
-  meaning: Automatic HTTPS certificate issuance/renewal is not working.
+  pattern: 'Unable to obtain ACME certificate|acme.*error|Error renewing (ACME )?certificate'
+  meaning: Automatic HTTPS certificate issuance/renewal is not working. The lines are zerolog error level in both log formats, so they print at the default ERROR level and the chart's INFO.
   cause: Port 80 not exposed, DNS, rate limits.
-  verify: "kubectl logs -n kube-system deploy/traefik --since=24h | grep -i acme | head"
+  verify: "kubectl logs -n kube-system deploy/traefik --since=24h | grep -iE 'acme|certificate' | head"
+  source:
+    - "traefik/traefik pkg/provider/acme/provider.go:482,517,553,612@v3.3.2"
+    - "traefik/traefik pkg/provider/acme/provider.go:482,517,553,612@v3.3.6"
+    - "traefik/traefik pkg/provider/acme/provider.go:499,534,570,629@v3.7.15"
+    - "traefik/traefik pkg/provider/acme/provider.go:499,534,570,629@v3.7.17"
+    - "traefik/traefik pkg/provider/acme/provider.go:38,902,921@v3.3.2"
+    - "traefik/traefik pkg/provider/acme/provider.go:38,902,921@v3.3.6"
+    - "traefik/traefik pkg/provider/acme/provider.go:924,943@v3.6.6"
+    - "traefik/traefik pkg/provider/acme/provider.go:924,945@v3.6.7"
+    - "traefik/traefik pkg/provider/acme/provider.go:926,949@v3.7.15"
+    - "traefik/traefik pkg/provider/acme/provider.go:42,924,947@v3.7.17"
+    - "go-acme/lego acme/errors.go:37@v4.21.0"
+    - "go-acme/lego acme/errors.go:137@v5.6.0"
+    - "rs/zerolog console.go:212,215@v1.33.0"
+    - "rs/zerolog console.go:219,222@v1.34.0"
+# `level=error` was the Traefik v2 logrus spelling; v3 prints ` ERR ` (zerolog console writer, the default `common` format, after the scanner strips the colour codes)
+# or `"level":"error"` (`--log.format=json`). `unable to (parse|create|find)` and `invalid configuration` were plugin/flushInterval texts; the provider phrases replace them.
+# "middleware X is not in the IngressRoute namespace" (through v3.6) became "invalid reference to middleware X: ..." at v3.7.0.
 - id: traefik.config-error
   name: Traefik configuration error
   component: traefik
   area: traffic
   severity: medium
   sources: ["logs/pods/traefik/*.log"]
-  pattern: 'level=error|Skipping service|unable to (parse|create|find)|invalid configuration'
-  meaning: Some routes or middlewares were not applied.
+  pattern: '"level":"error"| ERR |Skipping service|Cannot create service|Error configuring TLS|service not found|secret [^ ]+ does not exist|is not in the IngressRoute namespace|invalid reference to|Failed to create middleware keys|Cannot retrieve data'
+  meaning: Some routes or middlewares were not applied. The first two alternatives count every error-level Traefik line in json and common format; the rest are the Kubernetes Ingress and CRD provider messages for a missing Service, Endpoints, TLS Secret or Middleware (zerolog error level, printed at the default ERROR and the chart's INFO).
   cause: IngressRoute reference errors (missing Service, Middleware or TLS Secret).
-  verify: "kubectl logs -n kube-system deploy/traefik --since=24h | grep level=error | head"
+  verify: "kubectl logs -n kube-system deploy/traefik --since=24h | grep -E ' ERR |\"level\":\"error\"' | head"
   warn_at: 1
   fail_at: 50
-
+  source:
+    - "rs/zerolog globals.go:34,45,146@v1.33.0"
+    - "rs/zerolog globals.go:34,45,146@v1.34.0"
+    - "rs/zerolog console.go:451@v1.33.0"
+    - "rs/zerolog console.go:466@v1.34.0"
+    - "traefik/traefik cmd/traefik/logger.go:87@v3.3.2"
+    - "traefik/traefik cmd/traefik/logger.go:87@v3.3.6"
+    - "traefik/traefik cmd/traefik/logger.go:84@v3.7.15"
+    - "traefik/traefik cmd/traefik/logger.go:84@v3.7.17"
+    - "traefik/traefik pkg/provider/kubernetes/ingress/kubernetes.go:208,258,273,281,323,331,456,686@v3.3.2"
+    - "traefik/traefik pkg/provider/kubernetes/ingress/kubernetes.go:208,258,273,281,323,331,456,686@v3.3.6"
+    - "traefik/traefik pkg/provider/kubernetes/ingress/kubernetes.go:160,283,309,317,382,390,565,833@v3.7.15"
+    - "traefik/traefik pkg/provider/kubernetes/ingress/kubernetes.go:160,283,309,317,382,390,565,833@v3.7.17"
+    - "traefik/traefik pkg/provider/kubernetes/crd/kubernetes_http.go:47,83,105,148,176,193,411,443@v3.3.2"
+    - "traefik/traefik pkg/provider/kubernetes/crd/kubernetes_http.go:47,83,105,148,176,193,411,443@v3.3.6"
+    - "traefik/traefik pkg/provider/kubernetes/crd/kubernetes_http.go:200@v3.6.0"
+    - "traefik/traefik pkg/provider/kubernetes/crd/kubernetes_http.go:193@v3.7.0"
+    - "traefik/traefik pkg/provider/kubernetes/crd/kubernetes_http.go:50,88,127,220,573,592,751@v3.7.15"
+    - "traefik/traefik pkg/provider/kubernetes/crd/kubernetes_http.go:50,88,127,220,573,592,751@v3.7.17"
+    - "traefik/traefik pkg/provider/kubernetes/crd/kubernetes.go:201,866,1128@v3.3.2"
+    - "traefik/traefik pkg/provider/kubernetes/crd/kubernetes.go:201,867,1129@v3.3.6"
+    - "traefik/traefik pkg/provider/kubernetes/crd/kubernetes.go:186,732,1195,1464@v3.7.15"
+    - "traefik/traefik pkg/provider/kubernetes/crd/kubernetes.go:186,735,1205,1479@v3.7.17"
 # ---------------- MetalLB ----------------
+# The first edition's `IP pool exhausted`, `assignment failed`, `address pool is full` and `no matching pool` are printed by no version; `AllocationFailed` is an
+# apiserver Event (controller/service.go, the next line after the log call) that controller-runtime logs only at V(1), below the default --log-level=info.
+# The glob includes the controller pod, which is where this line is written.
 - id: metallb.pool-exhausted
   name: MetalLB IP pool exhausted
   component: metallb
   area: traffic
   severity: high
   sources: ["logs/pods/metallb/*.log"]
-  pattern: 'no available IPs|IP pool exhausted|assignment failed|address pool is full|AllocationFailed|no matching pool'
-  meaning: LoadBalancer Services stay at EXTERNAL-IP Pending.
+  pattern: 'IP allocation failed|no available IPs'
+  meaning: LoadBalancer Services stay at EXTERNAL-IP Pending. The controller logs `"msg":"IP allocation failed"` with `"error":"no available IPs"` (go-kit JSON, level error) and emits the AllocationFailed Event on the Service.
   cause: Small IPAddressPool range, one IP per Service (sharing annotation not used).
   verify: "kubectl get svc -A | grep -i pending; kubectl get ipaddresspools -A -o yaml"
+  source:
+    - "metallb/metallb controller/service.go:143,144@v0.14.5"
+    - "metallb/metallb controller/service.go:179,180@v0.15.3"
+    - "metallb/metallb controller/service.go:179,180@v0.16.2"
+    - "metallb/metallb internal/allocator/allocator.go:296,328@v0.14.5"
+    - "metallb/metallb internal/allocator/allocator.go:390,412@v0.15.3"
+    - "metallb/metallb internal/allocator/allocation.go:89@v0.15.3"
+    - "metallb/metallb internal/allocator/allocator.go:291,397,419@v0.16.2"
+    - "metallb/metallb internal/allocator/allocation.go:89@v0.16.2"
+    - "metallb/metallb internal/k8s/k8s.go:439@v0.14.5"
+    - "metallb/metallb internal/k8s/k8s.go:507@v0.15.3"
+    - "metallb/metallb internal/k8s/k8s.go:501@v0.16.2"
+    - "metallb/metallb internal/logging/logging.go:58,91,213@v0.14.5"
+    - "metallb/metallb internal/logging/logging.go:58,91,213@v0.15.3"
+    - "metallb/metallb internal/logging/logging.go:58,91,213@v0.16.2"
+    - "kubernetes-sigs/controller-runtime pkg/internal/recorder/recorder.go:104@v0.17.3"
+    - "kubernetes-sigs/controller-runtime pkg/internal/recorder/recorder.go:104@v0.22.3"
+    - "kubernetes-sigs/controller-runtime pkg/internal/recorder/recorder.go:117,129@v0.25.1"
+    - "go-logr/zapr zapr.go:192@v1.3.0"
+    - "go-kit/log json_logger.go:25@v0.2.1"
+# MetalLB has no logfmt mode (`level=error` never prints) and `failed to bind` is printed by no version. The catch-all skips `partial join` (its own signature below):
+# go-kit's JSON encoder marshals a map, so keys are sorted and "level" always precedes "msg" (json_logger.go:25). The glob includes the controller pod, so
+# controller-runtime's zap `"level":"error"` lines (webhook, manager) count here too.
 - id: metallb.speaker-error
   name: MetalLB speaker errors
   component: metallb
   area: traffic
   severity: medium
   sources: ["logs/pods/metallb/*.log"]
-  pattern: '"level":"error"|level=error|failed to (announce|send|bind)|arp.*(error|failed)'
-  meaning: ARP/BGP announcement of the external IP failed, so it is unreachable from outside.
+  pattern: '"level":"error"(?!.*"msg":"partial join")|failed to (announce|send)'
+  meaning: ARP/BGP announcement of the external IP failed, so it is unreachable from outside. `failed to announce service` (speaker), `failed to send ARP reply` (also used for NDP), `failed to send BGP update|withdraw|keepalive` are the named lines; the first alternative counts every other error-level line of the speaker and controller pods except `partial join`.
   cause: Interface selection, L2Advertisement settings, node network.
-  verify: "kubectl logs -n metallb-system -l component=speaker --since=1h | grep -i error | head"
+  verify: "kubectl logs -n metallb-system -l component=speaker --since=1h | grep '\"level\":\"error\"' | grep -v 'partial join' | head"
   warn_at: 5
   fail_at: 200
-
+  source:
+    - "metallb/metallb internal/logging/logging.go:58@v0.14.5"
+    - "metallb/metallb internal/logging/logging.go:58@v0.15.3"
+    - "metallb/metallb internal/logging/logging.go:58@v0.16.2"
+    - "go-kit/log level/level.go:235@v0.2.1"
+    - "go-kit/log json_logger.go:25@v0.2.1"
+    - "metallb/metallb speaker/main.go:392@v0.14.5"
+    - "metallb/metallb speaker/main.go:427@v0.15.3"
+    - "metallb/metallb speaker/main.go:489@v0.16.2"
+    - "metallb/metallb internal/layer2/arp.go:113@v0.14.5"
+    - "metallb/metallb internal/layer2/arp.go:113@v0.15.3"
+    - "metallb/metallb internal/layer2/arp.go:113@v0.16.2"
+    - "metallb/metallb internal/layer2/ndp.go:151@v0.14.5"
+    - "metallb/metallb internal/layer2/ndp.go:151@v0.15.3"
+    - "metallb/metallb internal/layer2/ndp.go:151@v0.16.2"
+    - "metallb/metallb internal/bgp/native/native.go:142,175,191,392@v0.14.5"
+    - "metallb/metallb internal/bgp/native/native.go:154,187,203,404@v0.15.3"
+    - "metallb/metallb internal/bgp/native/native.go:156,189,205,406@v0.16.2"
+    - "metallb/metallb internal/speakerlist/speakerlist.go:259@v0.14.5"
+    - "metallb/metallb internal/speakerlist/speakerlist.go:269@v0.15.3"
+    - "metallb/metallb internal/speakerlist/speakerlist.go:286@v0.16.2"
+    - "metallb/metallb internal/logging/logging.go:91@v0.14.5"
+    - "metallb/metallb internal/logging/logging.go:91@v0.16.2"
+    - "go.uber.org/zap config.go:127,134@v1.27.0"
+    - "go.uber.org/zap config.go:127,134@v1.28.0"
+    - "kubernetes-sigs/controller-runtime pkg/log/zap/zap.go:82@v0.17.3"
+    - "kubernetes-sigs/controller-runtime pkg/log/zap/zap.go:82@v0.25.1"
+- id: metallb.speaker-peer-unreachable
+  name: MetalLB speaker cannot reach a peer speaker
+  component: metallb
+  area: traffic
+  severity: low
+  sources: ["logs/pods/metallb/*.log"]
+  pattern: '"msg":"partial join"'
+  meaning: A speaker pod that the API server still lists is not reachable on port 7946, so the memberlist join to it times out. The speaker retries once a minute and logs this at level error each time; the speakers that are up keep announcing. It means a node is down (its speaker pod stays listed until evicted) or the memberlist port is blocked between nodes.
+  cause: Node NotReady or powered off, a firewall or NetworkPolicy blocking TCP/UDP 7946 between nodes.
+  verify: "kubectl get nodes; kubectl get pods -n metallb-system -l component=speaker -o wide; kubectl logs -n metallb-system -l component=speaker --since=1h | grep -c 'partial join'"
+  warn_at: 60
+  fail_at: 2000
+  source:
+    - "metallb/metallb internal/speakerlist/speakerlist.go:195,208,259@v0.14.5"
+    - "metallb/metallb internal/speakerlist/speakerlist.go:205,218,269@v0.15.3"
+    - "metallb/metallb internal/speakerlist/speakerlist.go:222,235,286@v0.16.2"
+    - "hashicorp/memberlist memberlist.go:286@v0.5.1"
+    - "hashicorp/memberlist memberlist.go:286@v0.6.0"
+    - "hashicorp/go-multierror format.go:16@v1.1.0"
+    - "hashicorp/go-multierror format.go:16@v1.1.1"
+    - "go-kit/log json_logger.go:25@v0.2.1"
 # ---------------- flannel (including the k3s built-in) ----------------
+# k3s does not run flannel's main.go: it wraps the backend errors as "failed to register flannel network" / "failed to create the SubnetManager" and logs them with logrus;
+# "failed to retrieve lease" and "lease expired" exist in neither flannel version and were dropped.
 - id: flannel.lease-failed
   name: flannel subnet lease failed
   component: flannel
   area: traffic
   severity: high
   sources: ["logs/pods/flannel/*.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'failed to acquire lease|Error registering network|Failed to create SubnetManager|failed to retrieve lease|lease expired'
-  meaning: The node did not get a pod CIDR, so pod networking on that node does not work.
+  pattern: 'failed to acquire lease|failed to register flannel network|failed to create the SubnetManager|Error registering network|Failed to create SubnetManager'
+  meaning: The node did not get a pod CIDR, so pod networking on that node does not work. A standalone flannel pod logs "Error registering network: failed to acquire lease: ..." (klog E); inside k3s the same failure is "flannel exited: failed to register flannel network: failed to acquire lease: ..." (logrus level=error; from k3s 1.37 "Shutdown request received: ...").
   cause: No podCIDR assigned to the node, apiserver access, cluster CIDR exhausted.
   verify: "kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'"
+  source:
+    - "flannel-io/flannel pkg/backend/vxlan/vxlan.go:216@v0.27.0"
+    - "flannel-io/flannel pkg/backend/hostgw/hostgw.go:99@v0.27.0"
+    - "flannel-io/flannel main.go:228,359@v0.27.0"
+    - "flannel-io/flannel pkg/backend/vxlan/vxlan.go:146@v0.28.10"
+    - "flannel-io/flannel pkg/backend/hostgw/hostgw.go:99@v0.28.10"
+    - "flannel-io/flannel main.go:251,384@v0.28.10"
+    - "k3s-io/k3s pkg/agent/flannel/flannel.go:67,85@v1.33.5+k3s1"
+    - "k3s-io/k3s pkg/agent/flannel/setup.go:109@v1.33.5+k3s1"
+    - "k3s-io/k3s pkg/agent/flannel/flannel.go:72,90@v1.37.2+k3s1"
+    - "k3s-io/k3s pkg/agent/flannel/setup.go:120@v1.37.2+k3s1"
+    - "k3s-io/k3s pkg/signals/signals.go:32@v1.37.2+k3s1"
+# flannel's messages start with "Error"/"Failed" (klog Errorf) and the file name is in the klog header, so the whole pattern is case-insensitive; the iptables
+# alternatives name flannel's own messages so that kube-proxy's iptables-restore errors in the same k3s journal stay with kube-proxy.iptables-restore-failed.
+# "failed to set up IPMasq" and "Failed to (add|remove) route" are not printed by any version (the source says "Failed to setup masq rules" and "Error adding/deleting route").
 - id: flannel.vxlan-error
   name: flannel vxlan/iptables errors
   component: flannel
   area: traffic
   severity: medium
   sources: ["logs/pods/flannel/*.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'vxlan.*(error|failed)|failed to set up IPMasq|iptables.*(failed|error)|Failed to (add|remove) route'
-  meaning: The inter-node pod traffic tunnel or NAT rules are broken.
+  pattern: '(?i)vxlan.*(error|failed)|failed to setup masq rules|Failed to (setup|bootstrap) IP6?Tables|Failed to ensure iptables rules|Error (adding|deleting) route'
+  meaning: The inter-node pod traffic tunnel or NAT rules are broken. The lines are flannel klog E lines ("vxlan_network.go:NNN] Error adding route to ...", "iptables.go:NNN] Failed to ensure iptables rules: ...", "Failed to setup IPTables. ...", "Failed to bootstrap IPTables: ...") and, inside k3s, the logrus error "flannel exited: failed to setup masq rules: ...". The iptables phrases are flannel's own, so kube-proxy's iptables-restore errors in the same k3s journal do not count here.
   cause: Kernel modules, interface selection (--flannel-iface), another firewall wiping the rules.
   verify: "ip -d link show flannel.1; journalctl -u k3s --since -1h | grep -i flannel"
   warn_at: 5
   fail_at: 200
-
+  source:
+    - "flannel-io/flannel pkg/backend/vxlan/vxlan_network.go:181@v0.27.0"
+    - "flannel-io/flannel pkg/backend/route_network.go:120,132,154,168@v0.27.0"
+    - "flannel-io/flannel pkg/trafficmngr/iptables/iptables.go:236,242,251,257,366,372,379,391@v0.27.0"
+    - "flannel-io/flannel main.go:402@v0.27.0"
+    - "flannel-io/flannel pkg/backend/vxlan/vxlan_network.go:107,421@v0.28.10"
+    - "flannel-io/flannel pkg/backend/route_network.go:120,132,154,168@v0.28.10"
+    - "flannel-io/flannel pkg/trafficmngr/iptables/iptables.go:237,243,252,258,367,373,380,393,417,430@v0.28.10"
+    - "flannel-io/flannel main.go:428@v0.28.10"
+    - "k3s-io/k3s pkg/agent/flannel/flannel.go:110@v1.33.5+k3s1"
+    - "k3s-io/k3s pkg/agent/flannel/flannel.go:115@v1.37.2+k3s1"
 # ---------------- k3s only ----------------
+# kine prints "Slow SQL" (Info between 1 s and 5 s, Warn from 5 s); the lowercase "slow sql" was a flag description and was dropped.
 - id: k3s.slow-sql
   name: k3s kine slow SQL
   component: k3s
   area: platform
   severity: medium
   sources: ["logs/node/*/k3s-errors-24h.log"]
-  pattern: 'slow sql|Slow SQL'
-  meaning: The SQLite datastore is slow and apiserver writes lag. A signal to move to embedded etcd or change the disk.
+  pattern: 'Slow SQL'
+  meaning: The SQLite datastore is slow and apiserver writes lag. A signal to move to embedded etcd or change the disk. kine logs queries over 1 s at logrus info and over 5 s at warning; the collector keeps only warning and above, so a count here means queries of 5 s or more.
   cause: Non-SSD disk, a bloated state.db, shared disk.
-  verify: "journalctl -u k3s --since -24h | grep -c 'slow sql'"
+  verify: "journalctl -u k3s --since -24h | grep -c 'Slow SQL'"
   warn_at: 5
   fail_at: 100
+  source:
+    - "k3s-io/kine pkg/metrics/metrics.go:43,44,59,61@v0.14.0"
+    - "k3s-io/kine pkg/metrics/metrics.go:46,64,66@v0.17.1"
+    - "k3s-io/kine pkg/metrics/metrics.go:46,64,66@v0.17.4"
+# "failed to dial" is not printed by remotedialer or k3s; in the same journal it comes from kubelet plugin sockets and the etcd client, so it was dropped.
 - id: k3s.agent-tunnel
   name: k3s agent-server tunnel lost
   component: k3s
   area: platform
   severity: medium
   sources: ["logs/node/*/k3s-errors-24h.log"]
-  pattern: 'Failed to connect to proxy|websocket: bad handshake|Remotedialer proxy error|failed to dial'
-  meaning: The agent lost its tunnel to the server; kubectl logs/exec fail on that node and it goes briefly NotReady.
+  pattern: 'Failed to connect to proxy|websocket: bad handshake|Remotedialer proxy error'
+  meaning: The agent lost its tunnel to the server; kubectl logs/exec fail on that node and it goes briefly NotReady. The lines are logrus level=error from remotedialer ("Failed to connect to proxy. ...", "Remotedialer proxy error") and k3s ("Remotedialer proxy error; reconnecting..."); "websocket: bad handshake" is gorilla/websocket's error inside their error= value.
   cause: Server restart, network outage, token mismatch.
   verify: "journalctl -u k3s-agent --since -24h | grep -i 'proxy' | tail"
   warn_at: 5
   fail_at: 200
+  source:
+    - "rancher/remotedialer client.go:23,49,54,56@e6b68fd83a6b"
+    - "rancher/remotedialer client.go:23,49,54,56@f160aa32568d"
+    - "rancher/remotedialer client.go:23,49,54,56@v0.6.1"
+    - "k3s-io/k3s pkg/agent/tunnel/tunnel.go:422@v1.33.5+k3s1"
+    - "k3s-io/k3s pkg/agent/tunnel/tunnel.go:403@v1.37.2+k3s1"
+    - "gorilla/websocket client.go:24@e064f32e3674"
+# "failed to get CA certs" was dropped: it is any failure to fetch /cacerts from the server (server down, DNS), not an expiry. k3s's own expiry check (certmonitor) only records Events (CertificateExpirationWarning).
 - id: k3s.cert-expired
   name: k3s certificate expired
   component: k3s
   area: security
   severity: critical
   sources: ["logs/node/*/k3s-errors-24h.log"]
-  pattern: 'certificate has expired|x509: certificate.*expired|failed to get CA certs'
-  meaning: Authentication between components breaks and the cluster stops. k3s renews certificates expiring within 90 days at startup, so this happens after more than a year without a restart.
+  pattern: 'certificate has expired or is not yet valid'
+  meaning: Authentication between components breaks and the cluster stops. k3s renews certificates expiring within 90 days at startup, so this happens after more than a year without a restart. The phrase is Go's x509 verification error inside any component's err=/error= value (apiserver, kubelet, k3s supervisor); k3s's own certmonitor reports expiry only as the CertificateExpirationWarning Event.
   cause: Certificates older than a year, clock skew.
   verify: "sudo k3s certificate check"
-
+  source:
+    - "golang/go src/crypto/x509/verify.go:79@go1.24.13"
+    - "golang/go src/crypto/x509/verify.go:79@go1.24.6"
+    - "golang/go src/crypto/x509/verify.go:79@go1.26.10"
+    - "k3s-io/k3s pkg/certmonitor/certmonitor.go:95,100@v1.33.5+k3s1"
+    - "k3s-io/k3s pkg/certmonitor/certmonitor.go:95,100@v1.37.2+k3s1"
 # ---------------- Common to all components ----------------
+# Go never prints "segmentation fault" (it prints "SIGSEGV: segmentation violation"); glibc/bash print "Segmentation fault".
 - id: common.panic
   name: Process panic/fatal
   component: any
   area: resilience
   severity: critical
   sources: ["logs/pods/*/*.log"]
-  pattern: '^(\S+ )?(\[[^\]]+\] )?\S* ?(panic: |fatal error: |runtime error: |goroutine \d+ \[running\]|SIGSEGV|segmentation fault)'
-  meaning: The container process terminated abnormally. Read together with the restart count.
+  pattern: '^(\S+ )?(\[[^\]]+\] )?\S* ?(panic: |fatal error: |runtime error: |goroutine \d+ \[running\]|SIGSEGV|[Ss]egmentation (fault|violation))'
+  meaning: The container process terminated abnormally. Read together with the restart count. The phrases are the Go runtime's panic, fatal error, traceback and signal banners, written to stderr without any log prefix.
   cause: Bugs, nil dereference, memory corruption.
   verify: "kubectl get pods -A --sort-by=.status.containerStatuses[0].restartCount | tail"
   warn_at: 1
   fail_at: 5
+  source:
+    - "golang/go src/runtime/panic.go:679,1096,1407@go1.24.13"
+    - "golang/go src/runtime/panic.go:679,1096,1407@go1.24.6"
+    - "golang/go src/runtime/panic.go:747,1224,1570@go1.26.10"
+    - "golang/go src/runtime/error.go:82,93@go1.24.13"
+    - "golang/go src/runtime/error.go:82,93@go1.24.6"
+    - "golang/go src/runtime/error.go:92,103@go1.26.10"
+    - "golang/go src/runtime/traceback.go:1188,1222,1231@go1.24.13"
+    - "golang/go src/runtime/traceback.go:1188,1222,1231@go1.24.6"
+    - "golang/go src/runtime/traceback.go:1210,1246,1255@go1.26.10"
+    - "golang/go src/runtime/sigtab_linux_generic.go:21@go1.24.13"
+    - "golang/go src/runtime/sigtab_linux_generic.go:21@go1.24.6"
+    - "golang/go src/runtime/sigtab_linux_generic.go:21@go1.26.10"
+    - "golang/go src/runtime/signal_unix.go:841@go1.24.13"
+    - "golang/go src/runtime/signal_unix.go:841@go1.24.6"
+    - "golang/go src/runtime/signal_unix.go:847@go1.26.10"
+# Node logs added: containerd and the k3s journal print the same Go EMFILE text (seen on the k3s containerd log as "failed to create inotify fd: too many open files").
 - id: common.too-many-open-files
   name: too many open files
   component: any
   area: node
   severity: high
-  sources: ["logs/pods/*/*.log"]
+  sources: ["logs/pods/*/*.log", "logs/node/*/kubelet-24h.log", "logs/node/*/containerd-24h.log", "logs/node/*/k3s-errors-24h.log"]
   pattern: 'too many open files'
-  meaning: A file descriptor or inotify limit was hit. Whatever the component, it behaves erratically afterwards.
+  meaning: A file descriptor or inotify limit was hit. Whatever the component, it behaves erratically afterwards. The text is Go's EMFILE message inside error values; node logs (kubelet, containerd, k3s journal) are scanned too.
   cause: ulimit, fs.inotify.max_user_instances (default 128), fd leaks.
   verify: "sysctl fs.inotify.max_user_instances fs.file-nr"
+  source:
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1381@go1.24.13"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1381@go1.24.6"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1381@go1.26.10"
 - id: common.no-space
   name: no space left on device
   component: any
   area: node
   severity: high
-  sources: ["logs/pods/*/*.log"]
+  sources: ["logs/pods/*/*.log", "logs/node/*/kubelet-24h.log", "logs/node/*/containerd-24h.log", "logs/node/*/k3s-errors-24h.log"]
   pattern: 'no space left on device'
-  meaning: The volume (or node disk) used by that container is full.
+  meaning: The volume (or node disk) used by that container is full. The text is Go's ENOSPC message inside error values; node logs are scanned too (a containerd line is counted once, under containerd.no-space).
   cause: PVC size, emptyDir, no log rotation.
   verify: "kubectl exec -n <ns> <pod> -- df -h"
+  source:
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1385@go1.24.13"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1385@go1.24.6"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1385@go1.26.10"
 - id: common.cert-expired
   name: Certificate expired (x509)
   component: any
   area: security
   severity: critical
   sources: ["logs/pods/*/*.log"]
-  pattern: 'x509: certificate has expired|certificate has expired or is not yet valid'
-  meaning: Some TLS connection fails because of an expired certificate. Webhooks, metrics or API calls break.
+  pattern: 'x509: certificate has expired or is not yet valid'
+  meaning: Some TLS connection fails because of an expired certificate. Webhooks, metrics or API calls break. The text is Go's CertificateInvalid error (reason Expired), followed by the validity window, inside the component's error value.
   cause: cert-manager renewal failure, a neglected manually issued certificate, clock skew.
   verify: "kubectl get certificates -A; kubectl get secrets -A --field-selector type=kubernetes.io/tls -o json | jq -r '.items[] | .metadata.namespace+\"/\"+.metadata.name'"
+  source:
+    - "golang/go src/crypto/x509/verify.go:79@go1.24.13"
+    - "golang/go src/crypto/x509/verify.go:79@go1.24.6"
+    - "golang/go src/crypto/x509/verify.go:79@go1.26.10"
 - id: common.connection-refused
   name: Repeated connection refused
   component: any
@@ -715,11 +1501,15 @@
   severity: low
   sources: ["logs/pods/*/*.log"]
   pattern: 'connection refused'
-  meaning: Some dependency is not listening on its port. The samples show which component tried to connect where.
+  meaning: Some dependency is not listening on its port. The samples show which component tried to connect where. The text is Go's ECONNREFUSED message inside error values.
   cause: Target pod down or restarting, Service port mismatch, network policy.
   verify: "kubectl logs -n <ns> <pod> --since=1h | grep 'connection refused' | head"
   warn_at: 50
   fail_at: 2000
+  source:
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1466@go1.24.13"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1466@go1.24.6"
+    - "golang/go src/syscall/zerrors_linux_amd64.go:1466@go1.26.10"
 - id: common.context-deadline
   name: Repeated context deadline exceeded
   component: any
@@ -727,12 +1517,18 @@
   severity: low
   sources: ["logs/pods/*/*.log"]
   pattern: 'context deadline exceeded|i/o timeout'
-  meaning: Some call timed out. A high frequency means a dependency or the apiserver is slow.
+  meaning: Some call timed out. A high frequency means a dependency or the apiserver is slow. The texts are Go's context.DeadlineExceeded and the net poller's deadline error inside error values.
   cause: apiserver latency (controlplane.*), external API latency, DNS.
   verify: "kubectl logs -n <ns> <pod> --since=1h | grep -c 'context deadline exceeded'"
   warn_at: 100
   fail_at: 5000
-
+  source:
+    - "golang/go src/context/context.go:175@go1.24.13"
+    - "golang/go src/context/context.go:175@go1.24.6"
+    - "golang/go src/context/context.go:175@go1.26.10"
+    - "golang/go src/internal/poll/fd.go:60@go1.24.13"
+    - "golang/go src/internal/poll/fd.go:60@go1.24.6"
+    - "golang/go src/internal/poll/fd.go:60@go1.26.10"
 # ---------------- Promoted from unclassified errors seen on a small k3s cluster ----------------
 - id: k3s.etcd-request-stats
   name: k3s embedded etcd slow request stats (aggregated by controlplane.etcd-slow)
@@ -741,37 +1537,70 @@
   severity: low
   sources: ["logs/node/*/k3s-errors-24h.log"]
   pattern: '"msg":"request stats"|apply request took too long|slow fdatasync'
-  meaning: etcd logged a warning for requests taking over 100ms. Aggregation and judgement are done by the controlplane.etcd-slow check; this signature counts them only to keep them out of unclassified errors.
+  meaning: etcd logged a warning for requests taking over 100ms. Aggregation and judgement are done by the controlplane.etcd-slow check; this signature counts them only to keep them out of unclassified errors. The lines are etcd's zap JSON warnings ("level":"warn") written to the k3s journal.
   cause: Disk fsync latency (disk shared with PVs and logs), large objects, CPU contention.
   verify: "journalctl -u k3s --since -24h | grep -c 'request stats'"
   warn_at: 100000
   fail_at: 1000000
+  source:
+    - "k3s-io/etcd server/etcdserver/api/v3rpc/interceptor.go:197@v3.5.21-k3s1"
+    - "k3s-io/etcd server/etcdserver/util.go:171@v3.5.21-k3s1"
+    - "k3s-io/etcd server/wal/wal.go:806@v3.5.21-k3s1"
+    - "k3s-io/etcd client/pkg/logutil/zap.go:46,54,57@v3.5.21-k3s1"
+    - "k3s-io/etcd server/etcdserver/api/v3rpc/interceptor.go:203@v3.7.1-k3s3"
+    - "k3s-io/etcd server/etcdserver/txn/util.go:94@v3.7.1-k3s3"
+    - "k3s-io/etcd server/storage/wal/wal.go:849@v3.7.1-k3s3"
+    - "k3s-io/etcd client/pkg/logutil/zap.go:46,54,57@v3.7.1-k3s3"
+    - "k3s-io/k3s pkg/etcd/etcd.go:1044,1045@v1.33.5+k3s1"
+# kubernetes 1.36 made the line structured: "Error proxying data from client to backend" err="websocket: ..."; the pattern accepts both forms.
 - id: k3s.proxy-websocket-closed
   name: k3s tunnel websocket closed abnormally (kubectl exec/logs/port-forward dropped)
   component: k3s
   area: platform
   severity: low
   sources: ["logs/node/*/k3s-errors-24h.log"]
-  pattern: 'Error proxying data from (client to backend|backend to client): websocket'
-  meaning: Records of exec/logs/port-forward connections over the apiserver-kubelet tunnel being dropped. Many are normal closes by the user. Hundreds or more mean an unstable network or a flaky port-forward client.
+  pattern: 'Error proxying data from (client to backend|backend to client)(: |" err=")websocket'
+  meaning: Records of exec/logs/port-forward connections over the apiserver-kubelet tunnel being dropped. Many are normal closes by the user. Hundreds or more mean an unstable network or a flaky port-forward client. The line is apimachinery's klog E line, unstructured up to kubernetes 1.35 and structured (err= value) from 1.36.
   cause: Client closed first (normal), unstable agent-server network, long port-forward sessions.
   verify: "journalctl -u k3s --since -24h | grep -c 'Error proxying data'"
   warn_at: 500
   fail_at: 10000
+  source:
+    - "kubernetes/kubernetes staging/src/k8s.io/apimachinery/pkg/util/proxy/upgradeaware.go:397,427,441@v1.33.5"
+    - "k3s-io/kubernetes staging/src/k8s.io/apimachinery/pkg/util/proxy/upgradeaware.go:397,427,441@v1.33.5-k3s1"
+    - "kubernetes/kubernetes staging/src/k8s.io/apimachinery/pkg/util/proxy/upgradeaware.go:427@v1.35.10"
+    - "kubernetes/kubernetes staging/src/k8s.io/apimachinery/pkg/util/proxy/upgradeaware.go:428@v1.36.6"
+    - "kubernetes/kubernetes staging/src/k8s.io/apimachinery/pkg/util/proxy/upgradeaware.go:398,428,442@v1.37.2"
+    - "k3s-io/kubernetes staging/src/k8s.io/apimachinery/pkg/util/proxy/upgradeaware.go:398,428,442@v1.37.2-k3s1"
+# "Failed to get cgroup stats" was capitalised in the catalog; the kubelet prints it lowercase inside the err value of "Failed to get system container stats".
 - id: kubelet.cadvisor-partial
   name: kubelet cAdvisor partial container stats failure
   component: kubelet
   area: node
   severity: low
   sources: ["logs/node/*/kubelet-24h.log", "logs/node/*/k3s-errors-24h.log"]
-  pattern: 'Partial failure issuing cadvisor.ContainerInfoV2|Failed to get cgroup stats'
-  meaning: The cgroup of a just-terminated container vanished before its stats could be read. Occasional is normal; many means container churn is very high.
+  pattern: 'Partial failure issuing cadvisor.ContainerInfoV2|failed to get cgroup stats for|cgroup stats not found for'
+  meaning: The cgroup of a just-terminated container vanished before its stats could be read. Occasional is normal; many means container churn is very high. "Partial failure issuing cadvisor.ContainerInfoV2" is an E line whose err value is cAdvisor's "partial failures: ..."; the other two phrases are the err value of the E line "Failed to get system container stats".
   cause: CrashLoop pods, a flood of short Jobs.
   verify: "journalctl -u kubelet --since -1h | grep -c cadvisor"
   warn_at: 100
   fail_at: 5000
-
+  source:
+    - "kubernetes/kubernetes pkg/kubelet/stats/cadvisor_stats_provider.go:522@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/stats/cadvisor_stats_provider.go:525@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/stats/cadvisor_stats_provider.go:572@v1.37.2"
+    - "kubernetes/kubernetes pkg/kubelet/stats/provider.go:119,121,135,137@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/stats/provider.go:119,121,135,137@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/stats/provider.go:122,124,139,141@v1.37.2"
+    - "kubernetes/kubernetes pkg/kubelet/server/stats/summary_sys_containers.go:51,89@v1.32.13"
+    - "kubernetes/kubernetes pkg/kubelet/server/stats/summary_sys_containers.go:51,89@v1.33.5"
+    - "kubernetes/kubernetes pkg/kubelet/server/stats/summary_sys_containers.go:52,91@v1.37.2"
+    - "google/cadvisor manager/manager.go:1413@v0.51.0"
+    - "google/cadvisor manager/manager.go:1413@v0.52.1"
+    - "google/cadvisor lib/manager/manager.go:1143@v0.60.5"
 # ---------------- Promoted from top unclassified errors seen on EKS and k3s clusters ----------------
+# (signatures/catalog.yaml) The csi-snapshotter sidecar's reflector line. client-go v0.31.0 prints two lines per failed list (a W "failed to list" line and the E "Unhandled Error" line that wraps it);
+# client-go v0.37.0 prints only the E line ("Failed to watch" err="failed to list ..."), so counts halve on newer sidecars.
 - id: ebs-csi.snapshot-crd-missing
   name: EBS CSI cannot find the VolumeSnapshot CRD (snapshot controller not installed)
   component: ebs-csi
@@ -779,20 +1608,40 @@
   severity: medium
   sources: ["logs/pods/ebs-csi/*.log"]
   pattern: 'failed to list \*v1\.VolumeSnapshot(Class|Content)?: the server could not find the requested resource'
-  meaning: external-snapshotter (CRD + snapshot-controller) is missing, so VolumeSnapshots cannot be created. Velero/CSI snapshot backups are impossible and the csi-snapshotter sidecar logs an error every minute.
+  meaning: external-snapshotter (CRD + snapshot-controller) is missing, so VolumeSnapshots cannot be created. Velero/CSI snapshot backups are impossible and the csi-snapshotter sidecar logs the reflector error on every list retry (two lines per retry with client-go 0.31, one with 0.37).
   cause: Only the EBS CSI add-on was installed, without the snapshot-controller (separate add-on or kubernetes-csi/external-snapshotter).
   verify: "kubectl get crd volumesnapshotclasses.snapshot.storage.k8s.io; kubectl get deploy -n kube-system snapshot-controller"
   warn_at: 1
   fail_at: 100
+  source:
+    - "kubernetes/client-go tools/cache/reflector.go:158,561,562@v0.31.0"
+    - "kubernetes/client-go tools/cache/reflector.go:227,747@v0.37.0"
+    - "kubernetes/apimachinery pkg/util/runtime/runtime.go:156@v0.31.0"
+    - "kubernetes/apimachinery pkg/util/runtime/runtime.go:203,228@v0.37.0"
+    - "kubernetes/apimachinery pkg/api/errors/errors.go:448@v0.31.0"
+    - "kubernetes/apimachinery pkg/api/errors/errors.go:450@v0.37.0"
+    - "kubernetes-csi/external-snapshotter cmd/csi-snapshotter/main.go:254,255@v8.1.0"
+    - "kubernetes-csi/external-snapshotter cmd/csi-snapshotter/main.go:298,299@v8.7.0"
+    - "kubernetes/klog internal/serialize/keyvalues.go:256@v2.130.1"
+    - "kubernetes/klog internal/serialize/keyvalues.go:276@v2.140.0"
 - id: cert-manager.orphan-tls-secret
   name: TLS Secret without an owning Certificate (not managed by cert-manager)
   component: cert-manager
   area: hygiene
   severity: low
   sources: ["logs/pods/cert-manager/*.log"]
-  pattern: 'unable to fetch certificate that owns the secret'
-  meaning: A TLS Secret carries cert-manager annotations but its Certificate resource is gone. An Ingress may be serving a certificate that will never renew (discovered at expiry).
+  # The cainjector indexer logs this for any Get error (source TODO "check for not found error?"), once per Secret event; `.*not found` keeps the orphan case
+  # (apimachinery NewNotFound: `<resource> "<name>" not found` in err=) and drops transient apiserver errors.
+  pattern: 'unable to fetch certificate that owns the secret.*not found'
+  meaning: A TLS Secret carries cert-manager annotations but its Certificate resource is gone. An Ingress may be serving a certificate that will never renew (discovered at expiry). The cainjector prints the line on every event of such a Secret, so the count is events, not Secrets; the verify command lists the Secrets.
   cause: Certificate deleted but Secret left behind, a namespace move, a hand-made Secret.
   verify: "kubectl get secrets -A --field-selector type=kubernetes.io/tls -o json | jq -r '.items[] | select(.metadata.annotations[\"cert-manager.io/certificate-name\"]) | .metadata.namespace+\"/\"+.metadata.name' ; kubectl get certificates -A"
   warn_at: 1
   fail_at: 1000
+  source:
+    - "cert-manager/cert-manager pkg/controller/cainjector/indexers.go:61@v1.14.4"
+    - "cert-manager/cert-manager pkg/controller/cainjector/indexers.go:67@v1.21.3"
+    - "kubernetes/apimachinery pkg/api/errors/errors.go:154@v0.29.0"
+    - "kubernetes/apimachinery pkg/api/errors/errors.go:155@v0.36.2"
+    - "kubernetes/klog klog.go:809@v2.110.1"
+    - "kubernetes/klog klog.go:848@v2.140.0"

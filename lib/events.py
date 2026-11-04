@@ -42,6 +42,10 @@ TRACKED: dict[str, tuple[str, str]] = {
     "UpdateFailed": ("Operator reconcile failure (ExternalSecret etc.)", "medium"),
     "DisruptionBlocked": ("Karpenter tried to disrupt a node (replace, consolidate) but was blocked by budgets or PDBs", "low"),
     "SystemOOM": ("Node kernel OOM", "high"),
+    # The two below were log-signature phrases until #129 found that the components only emit them as Events (MetalLB: controller/service.go:144@v0.14.5;
+    # kubelet: pkg/kubelet/kubelet.go:1553@v1.32.13 `Eventf(..., events.ImageGCFailed, ...)` through the recorder, logged only at --v=3).
+    "AllocationFailed": ("MetalLB could not assign an IP to a LoadBalancer Service (pool exhausted, no pool matches). The Service stays at EXTERNAL-IP Pending", "high"),
+    "ImageGCFailed": ("kubelet image garbage collection could not free the required disk; disk-pressure eviction is next", "medium"),
 }
 
 

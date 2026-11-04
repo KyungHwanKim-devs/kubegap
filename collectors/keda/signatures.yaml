@@ -1,13 +1,62 @@
-# KEDA log signatures (moved here from signatures/catalog.yaml). Field descriptions are in the catalog.yaml header.
+# KEDA's binary defaults to zap JSON, but every shipped install passes --zap-encoder=console --zap-time-encoding=rfc3339 --zap-log-level=info (config/manager/manager.yaml
+# and the chart), so a line is `<rfc3339>\tERROR\t<logger>\t<msg>\t{"key": "value", "error": "…"}`; the level is the uppercase second column.
 - id: keda.scaler-error
   name: KEDA scaler failed to fetch metrics
   component: keda
   area: scaling
   severity: medium
   sources: ["logs/pods/keda/*.log"]
-  pattern: 'error getting (scaler|metric)|scaler.*error|Failed to get metrics|Error getting scale decision|unauthorized|TriggerAuthentication'
-  meaning: A ScaledObject cannot read its external metric (queue length, Prometheus), so scaling stops. Without a fallback it is pinned at the current replica count.
+  # `Failed to get metrics` and `Error getting scale decision` are lowercase in source. `unauthorized` is printed only by the Datadog scaler from v2.19.0; IBM MQ and
+  # Elasticsearch say `authentication failed` / `HTTP 401`. `scaler.*error` is anchored to the console ERROR column so the V(1) lines `scaler error encountered, clearing
+  # scaler cache` and `Getting metrics and activity from scaler … scalerError` (debug only) cannot count; `TriggerAuthentication` is narrowed to the two error lines.
+  pattern: 'error getting (scaler|metric)|error getting scale decision|failed to get metrics|\tERROR\t.*scaler|[Uu]nauthorized|authentication failed|HTTP 401|Failed to get (Cluster)?TriggerAuthentication|TriggerAuthentication Not Found'
+  meaning: A ScaledObject cannot read its external metric (queue length, Prometheus), so scaling stops. Without a fallback it is pinned at the current replica count. The lines are the scale handler's ERROR lines (the scaler error is in the trailing "error" field) and the status updater's lines when the referenced TriggerAuthentication is missing.
   cause: Expired trigger authentication, external system down, query error.
   verify: "kubectl get scaledobjects -A | grep -v True"
   warn_at: 5
   fail_at: 200
+  source:
+    - "kedacore/keda pkg/scaling/scale_handler.go:481,554,747,778,781,823@v2.17.2"
+    - "kedacore/keda pkg/scaling/scale_handler.go:460,538,825,869,872,912@v2.19.0"
+    - "kedacore/keda pkg/scaling/scale_handler.go:197,679,815,1135,1194,1197,1237@v2.21.0"
+    - "kedacore/keda pkg/scalers/azure_data_explorer_scaler.go:182@v2.17.2"
+    - "kedacore/keda pkg/scalers/azure_log_analytics_scaler.go:270@v2.17.2"
+    - "kedacore/keda pkg/scalers/azure_data_explorer_scaler.go:182@v2.19.0"
+    - "kedacore/keda pkg/scalers/azure_log_analytics_scaler.go:209@v2.19.0"
+    - "kedacore/keda pkg/scalers/azure_data_explorer_scaler.go:155@v2.21.0"
+    - "kedacore/keda pkg/scalers/azure_log_analytics_scaler.go:196@v2.21.0"
+    - "kedacore/keda pkg/scalers/ibmmq_scaler.go:169@v2.17.2"
+    - "kedacore/keda pkg/scalers/ibmmq_scaler.go:159@v2.19.0"
+    - "kedacore/keda pkg/scalers/datadog_scaler.go:314@v2.19.0"
+    - "kedacore/keda pkg/scalers/ibmmq_scaler.go:158@v2.21.0"
+    - "kedacore/keda pkg/scalers/elastic_forecast_scaler.go:233@v2.21.0"
+    - "kedacore/keda pkg/scalers/datadog_scaler.go:317@v2.21.0"
+    - "kedacore/keda pkg/status/status.go:119,121@v2.17.2"
+    - "kedacore/keda pkg/status/status.go:121,123@v2.19.0"
+    - "kedacore/keda pkg/status/status.go:121,123@v2.21.0"
+    - "kedacore/keda controllers/keda/clustertriggerauthentication_controller.go:72@v2.17.2"
+    - "kedacore/keda controllers/keda/clustertriggerauthentication_controller.go:72@v2.19.0"
+    - "kedacore/keda controllers/keda/clustertriggerauthentication_controller.go:73@v2.21.0"
+    - "kedacore/keda cmd/operator/main.go:113,114,118@v2.17.2"
+    - "kedacore/keda cmd/operator/main.go:115,116,120@v2.19.0"
+    - "kedacore/keda cmd/operator/main.go:136,137,156@v2.21.0"
+    - "kedacore/keda config/manager/manager.yaml:35,36,37@v2.17.2"
+    - "kedacore/keda config/manager/manager.yaml:35,36,37@v2.19.0"
+    - "kedacore/keda config/manager/manager.yaml:35,36,37@v2.21.0"
+    - "kedacore/charts keda/templates/manager/deployment.yaml:83,84,85@v2.17.2"
+    - "kedacore/charts keda/values.yaml:380,383,386@v2.17.2"
+    - "kedacore/charts keda/templates/manager/deployment.yaml:83,84,85@v2.19.0"
+    - "kedacore/charts keda/values.yaml:411,414,417@v2.19.0"
+    - "kubernetes-sigs/controller-runtime pkg/log/zap/zap.go:178@v0.17.1"
+    - "kubernetes-sigs/controller-runtime pkg/log/zap/zap.go:178@v0.23.1"
+    - "kubernetes-sigs/controller-runtime pkg/log/zap/zap.go:178@v0.25.2"
+    - "uber-go/zap config.go:211,212@v1.26.0"
+    - "uber-go/zap zapcore/console_encoder.go:61,106@v1.26.0"
+    - "uber-go/zap config.go:211,212@v1.27.0"
+    - "uber-go/zap zapcore/console_encoder.go:61,106@v1.27.0"
+    - "uber-go/zap config.go:211,212@v1.28.0"
+    - "uber-go/zap zapcore/console_encoder.go:61,106@v1.28.0"
+    - "kedacore/keda pkg/scaling/scale_handler.go:636,756,842@v2.19.0"
+    - "kedacore/keda pkg/scaling/resolver/scale_resolvers.go:71@v2.17.2"
+    - "kedacore/keda pkg/scaling/resolver/scale_resolvers.go:86@v2.19.0"
+    - "kedacore/keda pkg/scaling/resolver/scale_resolvers.go:155@v2.21.0"

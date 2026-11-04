@@ -1,23 +1,51 @@
-# cert-manager log signatures. The first edition lived in signatures/catalog.yaml and was moved here.
+# cert-manager prints klog text (`E1103 16:09:06.220620 1 sync.go:143] "<msg>" err="…" logger="cert-manager…"`) at --v=2 (chart global.logLevel: 2); log.Error always
+# prints, log.V(logf.DebugLevel) (4) never does at that level. ACME problem documents render as `<status> urn:ietf:params:acme:error:<type>: <detail>` inside err=.
 - id: cert-manager.issue-failed
   name: Certificate issuance failed
   component: cert-manager
   area: security
   severity: high
   sources: ["logs/pods/cert-manager/*.log"]
-  pattern: 'error issuing certificate|failed to (issue|finalize|request)|urn:ietf:params:acme:error|acme.*(level=error|rateLimited|status 429)|Error getting certificate'
-  meaning: The Certificate does not become Ready. HTTPS breaks when the expiry approaches.
+  # `failed to issue`, `Error getting certificate`, `acme.*level=error` and `acme.*status 429` are printed by nothing (klog has no level=error; the ACME client prints the
+  # status first, `429 urn:ietf:params:acme:error:rateLimited: …`); `rateLimited` is covered by the URN prefix. `failed to request` only names a v1.21 DNS-01 token error.
+  pattern: 'error issuing certificate request|failed to finalize Order resource|failed to (create|retrieve the ACME) [Oo]rder|failed to update Order status due to a 4xx error|acme server fatal error|urn:ietf:params:acme:error'
+  meaning: The Certificate does not become Ready. HTTPS breaks when the expiry approaches. The lines are the certificaterequests controller's `error issuing certificate request` and the acmeorders controller's error lines on a 4xx from the ACME server; the ACME problem type (for example urn:ietf:params:acme:error:rateLimited) is in their err= field.
   cause: ACME challenge failure (DNS, HTTP01 path not exposed), Let's Encrypt rate limit (50 per week), issuer configuration.
   verify: "kubectl get certificates -A | grep -v True; kubectl get challenges -A"
+  source:
+    - "cert-manager/cert-manager pkg/controller/certificaterequests/sync.go:143@v1.14.4"
+    - "cert-manager/cert-manager pkg/controller/certificaterequests/sync.go:143@v1.21.3"
+    - "cert-manager/cert-manager pkg/controller/acmeorders/sync.go:102,184,208,248,290,544,562,573@v1.14.4"
+    - "cert-manager/cert-manager pkg/controller/acmeorders/sync.go:106,188,212,247,333,592,610,617,625@v1.21.3"
+    - "golang/crypto acme/types.go:112@v0.17.0"
+    - "cert-manager/cert-manager third_party/forked/acme/types.go:135@v1.21.3"
+    - "cert-manager/cert-manager pkg/issuer/acme/setup.go:75@v1.21.3"
+    - "cert-manager/cert-manager pkg/logs/logs.go:40,46,47,48,49,50,51@v1.14.4"
+    - "cert-manager/cert-manager pkg/logs/logs.go:38,43,44,45,46,47,48@v1.21.3"
+    - "cert-manager/cert-manager deploy/charts/cert-manager/values.yaml:46@v1.14.4"
+    - "cert-manager/cert-manager deploy/charts/cert-manager/values.yaml:71@v1.21.3"
+    - "kubernetes/klog internal/buffer/buffer.go:117,133@v2.110.1"
+    - "kubernetes/klog klog.go:809@v2.110.1"
+    - "kubernetes/klog internal/buffer/buffer.go:117@v2.140.0"
+    - "kubernetes/klog klog.go:848@v2.140.0"
+    - "kubernetes/component-base logs/api/v1/types.go:30@v0.29.0"
 - id: cert-manager.challenge-failed
   name: ACME challenge validation failed
   component: cert-manager
   area: security
   severity: medium
   sources: ["logs/pods/cert-manager/*.log"]
-  pattern: 'challenge.*(failed|error)|propagation check failed|Waiting for (HTTP-01|DNS-01) challenge'
-  meaning: Proof of domain ownership is not passing. Issuance is delayed.
+  # `propagation check failed` is printed up to v1.20.x; from v1.21.0 the propagation wait is `log.V(logf.DebugLevel).Info("challenge not ready to accept yet")` (V(4),
+  # silent at --v=2) and the Challenge status reason `Waiting for <type> challenge propagation: <err>` (status only at every version, never a log line).
+  pattern: 'propagation check failed|error (getting solver for|cleaning up|accepting) challenge|error waiting for authorization'
+  meaning: Proof of domain ownership is not passing. Issuance is delayed. Up to 1.20.x the challenge controller logs `propagation check failed` on every self-check; from 1.21.0 the propagation wait is only a V(4) line and the Challenge status reason (`Waiting for HTTP-01 challenge propagation`, read by the verify command), so only the solver, cleanup, accept and authorization errors remain in the log.
   cause: DNS record propagation delay, ingress not serving the .well-known path, firewall.
   verify: "kubectl describe challenges -A | grep -A3 Reason"
   warn_at: 5
   fail_at: 100
+  source:
+    - "cert-manager/cert-manager pkg/controller/acmechallenges/sync.go:106,114,190,191,274,282,371,379,404@v1.14.4"
+    - "cert-manager/cert-manager pkg/controller/acmechallenges/sync.go:187@v1.20.0"
+    - "cert-manager/cert-manager pkg/controller/acmechallenges/sync.go:209@v1.21.0"
+    - "cert-manager/cert-manager pkg/controller/acmechallenges/sync.go:209,361,372,461,477,502@v1.21.3"
+    - "cert-manager/cert-manager pkg/controller/acmechallenges/readiness.go:56@v1.21.3"
