@@ -334,3 +334,22 @@ def test_deprecated_one_successful_tool_keeps_findings_and_ignores_failed_output
     assert summary["count"] == 1 and summary["pluto_read"] and not summary["kubent_read"]
     assert verdict["status"] == "done" and verdict["counts"] == {"fail": 1}
     assert verdict["findings"][0]["target"] == "prod-a/ingress/web"
+
+
+def test_pluto_step_keeps_exit_code_zero_when_it_finds_something():
+    """pluto exits 2 (deprecated), 3 (removed) or 4 (no replacement) unless told not to (pkg/api/output.go:333-341@v5.24.5; cmd/root.go:353 and :167 exit with it).
+    A non-zero exit is a failed step, and a failed step contributes no read evidence, so without the three flags the check would skip exactly when
+    there is something to report. The flags do not filter the items (FilterOutput, pkg/api/output.go:159-181). Observed with the pinned binary:
+    detect-files on a networking.k8s.io/v1beta1 Ingress exits 3 without the flags and 0 with them, with the same item in both JSONs."""
+    step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == "pluto")
+    assert {"--ignore-deprecations", "--ignore-removals", "--ignore-unavailable-replacements"} <= set(step["cmd"])
+
+
+def test_pluto_findings_with_exit_three_would_be_dropped(tmp_path, monkeypatch):
+    """What the flags prevent: a pluto that writes one removed item and exits 3 is a failed step, its read evidence is not computed, and the summary
+    carries no items. The test documents the failure mode the flags exist for; it is not a behaviour to keep."""
+    doc = {"items": [{"name": "web", "namespace": "prod-a", "kind": "Ingress", "api": {"version": "networking.k8s.io/v1beta1"}, "deprecated": True, "removed": True}]}
+    result = _deprecated_tool(tmp_path, monkeypatch, "pluto", doc, "", code=3)
+    assert result["ok"] is False and result["api_read"] is False
+    summary, verdict = _deprecated_result(tmp_path)
+    assert summary["pluto_read"] is False and summary["items"] is None and verdict["status"] == "skip"

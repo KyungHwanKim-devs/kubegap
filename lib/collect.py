@@ -472,7 +472,7 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
                 read = isinstance(doc, dict) and (bool(doc.get("items")) or "No annotations for ResourceVer " in stderr)
             ok = bool(read)
             if not ok:
-                error = f"{tool}: API resources not confirmed read" + (f"; {r.stderr.strip()[-300:]}" if r.stderr.strip() else "")
+                error = f"{tool}: API resources not confirmed read" + (f"; {stderr.strip()[-300:]}" if stderr.strip() else "")
     if echo:
         echo(f"    {'saved ' + st['out'] + f' ({out.stat().st_size // 1024} KB)' if ok else 'failed: ' + error}")
     result = {"ok": ok, "seconds": round(r.seconds, 1) if hasattr(r, "seconds") else None, "error": None if ok else error}
