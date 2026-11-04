@@ -69,6 +69,18 @@ def test_every_tool_step_names_its_source():
                 assert CITATION.search(str(s.get("source") or "")), (f.name, s.get("id"), "add a source: line citing the pinned version's file:line")
 
 
+def test_every_http_step_names_its_source():
+    """#126: the 22 calls to the Prometheus, Alertmanager, Loki and Grafana APIs cite the route and the response type at the versions read."""
+    seen = 0
+    for f in (ROOT / "collectors").glob("*/collect.yaml"):
+        for s in yamlite.load_file(f) or []:
+            if s.get("type") == "http":
+                seen += 1
+                src = str(s.get("source") or "")
+                assert CITATION.search(src) or f"collectors/{f.parent.name}/pod-metrics.yaml" in src, (f.name, s.get("id"), "add a source: line citing the store's handler file:line@tag (or the pod-metrics table that carries the citations)")
+    assert seen >= 22
+
+
 # ---------- pod /metrics names (#120): collectors/<area>/pod-metrics.yaml ----------
 
 VERSION = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
@@ -331,7 +343,7 @@ def _queries():
 def _query_names(query: str) -> tuple[set[str], list[str]]:
     """The names a query reads outside its `__name__` selectors, and the patterns of those selectors."""
     patterns = [pat for pat in NAME_SELECTOR.findall(query) if FAMILY_PREFIX.search(pat)]
-    rest = NAME_SELECTOR.sub("", query)
+    rest = NAME_SELECTOR.sub("", query).replace("{apiserver_job}", "")  # the job placeholder of #140 is not a metric name
     names = set(QUERY_FAMILIES.findall(rest))
     if re.search(r"\bup\b", rest):  # `up{...}` and the bare `up == 0`
         names.add("up")
@@ -407,17 +419,17 @@ def test_every_apiserver_selector_filters_on_the_apiserver_job():
     seen = 0
     for area, it in _queries():
         q = " ".join(str(it["query"]).split())
-        for m in re.finditer(r"\bapiserver_[A-Za-z0-9_]+(\{[^}]*\})?", q):
+        for m in re.finditer(r"\bapiserver_[A-Za-z0-9_]+(\{(?:[^{}]|\{[^{}]*\})*\})?", q):
             seen += 1
-            assert m.group(1) and 'job="apiserver"' in m.group(1), (area, it["id"], m.group(0), 'every apiserver_* selector carries job="apiserver"')
+            assert m.group(1) and 'job="{apiserver_job}"' in m.group(1), (area, it["id"], m.group(0), 'every apiserver_* selector carries job="{apiserver_job}", filled per run (#140)')
     assert seen >= 13
 
 
 def test_the_stored_object_queries_read_the_old_and_the_new_name():
     """apiserver_storage_objects is deprecated since 1.34.0 and hidden from 1.37 (component-base registry.go:47-70,74-83@v1.37.2); apiserver_resource_objects exists
     since 1.34 (storage/etcd3/metrics/metrics.go:91-95@v1.34.13). lib/controlplane.py reads the new query first."""
-    assert _query_text("apiserver_storage_objects_top") == 'topk(15, apiserver_storage_objects{job="apiserver"})'
-    assert _query_text("apiserver_resource_objects_top") == 'topk(15, apiserver_resource_objects{job="apiserver"})'
+    assert _query_text("apiserver_storage_objects_top") == 'topk(15, apiserver_storage_objects{job="{apiserver_job}"})'
+    assert _query_text("apiserver_resource_objects_top") == 'topk(15, apiserver_resource_objects{job="{apiserver_job}"})'
 
 
 def test_the_no_local_endpoints_gauge_is_read_as_a_value_never_as_a_rate():

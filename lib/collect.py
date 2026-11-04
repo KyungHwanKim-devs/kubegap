@@ -829,7 +829,7 @@ def _step_promql(ctx: StepContext, st: dict) -> dict:
         if ctx.echo:
             ctx.echo("    skipped: no Prometheus connection")
         return ctx.skip(st["id"], "no Prometheus connection")
-    return ctx.prom.run_file(ctx.folder / st["file"], ctx.snap / "metrics", log=ctx.log, collector=ctx.name, timeout=float(st.get("timeout", 60)), echo=ctx.echo)
+    return ctx.prom.run_file(ctx.folder / st["file"], ctx.snap / "metrics", log=ctx.log, collector=ctx.name, timeout=float(st.get("timeout", 60)), echo=ctx.echo, vars={"apiserver_job": ctx.cfg.get("apiserver_job")})
 
 
 def _step_http(ctx: StepContext, st: dict) -> dict:

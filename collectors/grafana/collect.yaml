@@ -6,6 +6,7 @@
   path: /api/health
   out: grafana/health.json
   timeout: 30
+  source: "grafana/grafana pkg/api/http_server.go:745-762@v10.2.3, :697-700,712-736@v12.2.1, :788-792,804-828@v13.3.0 (GET /api/health without authentication: database ok or failing, and version and commit unless [auth.anonymous] hide_version is set; 13.3.0 adds an apiserver field and may answer 503 on apiserver readiness alone :792,828@v13.3.0; lib/stackhealth.py, lib/observability.py and lib/monitoring.py read database and version)"
 - id: datasources
   type: http
   store: grafana
@@ -13,6 +14,7 @@
   out: grafana/datasources.json
   auth: grafana_api_token
   timeout: 30
+  source: "grafana/grafana pkg/api/api.go:372@v10.2.3, :393@v12.2.1, :401@v13.3.0, pkg/api/datasources.go:49,62-64@v10.2.3, :42,55-57@v12.2.1, :44,57-59@v13.3.0 (GET /api/datasources needs the datasources:read permission, so a service-account token; a DataSourceListItemDTO pkg/api/dtos/datasource.go:33,37-38,42,46@v10.2.3, :35,39-40,44,48@v12.2.1, :35,39-40,44,48@v13.3.0 carries name, type, url, isDefault; lib/observability.py reads them)"
 - id: dashboards
   type: http
   store: grafana
@@ -20,6 +22,7 @@
   out: grafana/dashboards.json
   auth: grafana_api_token
   timeout: 30
+  source: "grafana/grafana pkg/api/api.go:500@v10.2.3, :501@v12.2.1, :499@v13.3.0, pkg/api/search.go:23,89@v10.2.3, :25,101@v12.2.1, :25,101@v13.3.0 (GET /api/search?type=dash-db&limit=500 needs a signed-in token and returns the dashboards it may read; a HitList of Hit with uid pkg/services/search/model/model.go:64-66,83@v10.2.3, :65-67,86@v12.2.1, :36-38,58@v13.3.0; lib/observability.py reads uid)"
 - id: dashboards-json
   # Panel JSON per dashboard (which metrics it plots) — input for "metric exists but no panel shows it". Needs the dashboards (list) step first and only runs with a token
   type: http
@@ -29,6 +32,7 @@
   out: grafana/dashboards/{item_safe}.json
   auth: grafana_api_token
   timeout: 30
+  source: "grafana/grafana pkg/api/api.go:456@v10.2.3, :454@v12.2.1, :467@v13.3.0, pkg/api/dashboard.go:81,218@v10.2.3, :95,273@v12.2.1, :69,229@v13.3.0 (GET /api/dashboards/uid/{uid}; DashboardFullWithMeta pkg/api/dtos/dashboard.go:50-52@v10.2.3, :41-43@v12.2.1, :40-42@v13.3.0 with meta and dashboard, the dashboard JSON whose panels[].targets[].expr, nested panels, and rows[].panels of the old schema lib/observability.py reads)"
 # Grafana self metrics. :3000/metrics is open without authentication. Per-datasource response codes (429, 5xx), API 5xx, alert evaluation failures, build version. Prometheus usually does not scrape Grafana (no up{job=~grafana}) → pod-metrics.
 - id: self-metrics
   type: pod-metrics

@@ -1156,8 +1156,8 @@
   each: kubeproxy.summary
   cluster_level: true
   rule:
-    needs: "item['metrics_available']"
-    needs_reason: "metrics not read"
+    needs: "item['metrics_available'] and item['ct_invalid_dropped_1h'] is not None"
+    needs_reason: "conntrack INVALID counter not served: kube-proxy 1.30, ipvs or nftables mode, no nfacct, or the proxy mode not read (summary ct_invalid_reason says which)"
     expr: "(item['ct_invalid_dropped_1h'] or 0) >= 10000"
     warn_expr: "(item['ct_invalid_dropped_1h'] or 0) >= 500"
   target: "'cluster'"
@@ -1165,7 +1165,7 @@
   severity_default: low
   symptom_linked: false
   why: >
-    kube-proxy drops packets that conntrack judges INVALID (default since 1.29). A high count points to asymmetric routing (the reply leaves via another node), conntrack expiry of long-lived connections (tcpEstablishedTimeout), or NAT overlapping with the CNI. Apps see it as intermittent connection resets.
+    kube-proxy drops packets that conntrack judges INVALID (default since 1.29). The counter exists since kube-proxy 1.31 and only in iptables mode with nfacct (pkg/proxy/metrics/metrics.go:302-303@v1.31.14, :417@v1.37.2; absent at v1.30.14), so without it the check is skipped with the reason, never passed. A high count points to asymmetric routing (the reply leaves via another node), conntrack expiry of long-lived connections (tcpEstablishedTimeout), or NAT overlapping with the CNI. Apps see it as intermittent connection resets.
   measured: >
     Measured on a real EKS cluster: 1,038 packets in one hour on a single node.
   cases:
@@ -1323,6 +1323,61 @@
           restore_failure_nodes: []
           no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 12
+          programming_p99_s: null
+          healthz_failing_nodes: []
+          node_cmd_unavailable:
+            - "ip-10-0-1-117.us-east-1.compute.internal"
+            - "ip-10-0-1-139.us-east-1.compute.internal"
+            - "ip-10-0-1-241.us-east-1.compute.internal"
+            - "ip-10-0-2-135.us-east-1.compute.internal"
+            - "ip-10-0-2-218.us-east-1.compute.internal"
+            - "ip-10-0-2-60.us-east-1.compute.internal"
+            - "ip-10-0-2-83.us-east-1.compute.internal"
+          conntrack_max_per_core: "32768"
+          rest_client_errors_total_1h: 0
+      - expect: "skip"
+        item:
+          present: true
+          embedded: false
+          platform: "eks"
+          mode: "ipvs"
+          modes_seen: []
+          mode_mismatch: false
+          metrics_bind_address: "0.0.0.0:10249"
+          metrics_loopback_only: false
+          metrics_available: true
+          metrics_source: "job=kube-proxy"
+          targets_up: 7
+          targets_down: 0
+          targets_down_nodes: []
+          nodes_total: 7
+          daemonset_desired: 7
+          daemonset_ready: 7
+          version: "1.32.0"
+          addon_version: "v1.32.0-eksbuild.2"
+          services: 105
+          endpoints: 135
+          external_traffic_local: 0
+          nat_rules_max: 5
+          nat_rules_by_node:
+            ip-10-0-1-117.us-east-1.compute.internal: 5
+            ip-10-0-1-139.us-east-1.compute.internal: 5
+            ip-10-0-1-241.us-east-1.compute.internal: 5
+            ip-10-0-2-135.us-east-1.compute.internal: 5
+            ip-10-0-2-218.us-east-1.compute.internal: 5
+            ip-10-0-2-60.us-east-1.compute.internal: 5
+            ip-10-0-2-83.us-east-1.compute.internal: 5
+          sync_p99_s: 0.1258
+          sync_p99_max_node: "ip-10-0-2-60.us-east-1.compute.internal"
+          sync_p99_max_s: 0.1274
+          rules_pending_max_s: 0
+          rules_pending_nodes: []
+          restore_failures_24h: 0
+          restore_failure_nodes: []
+          no_local_endpoint_services: 0
+          ct_invalid_dropped_1h: null
+          ct_invalid_reason: "ipvs mode: the counter is registered in iptables mode only"
+          kube_proxy_minor: 33
           programming_p99_s: null
           healthz_failing_nodes: []
           node_cmd_unavailable:
