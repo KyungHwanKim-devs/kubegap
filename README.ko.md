@@ -75,6 +75,7 @@ ln -s ~/src/kubegap ~/.agents/skills/kubegap    # Codex, 그 뒤 $kubegap
 | 점검 항목 | 407개 중 full 전용 입력이 필요한 것은 뺍니다. 뺀 것은 "미수집" 으로 적고 문제로 세지 않습니다 | 407개 전부 |
 | 리포트 | `report.md`: 문제 3개, 각각 근거·원인·조치·사례. 지난 daily 점검 이후 바뀐 것. 이번에 확인 못 한 것. `report-details.md`: 모든 표 | `report.md`: 같은 모양으로 문제 5개. `report-details.md`: 12개 영역 세부와 1차 결과 전체까지 |
 | 비교 대상 | 지난 daily 스냅샷 | 지난 full 스냅샷 |
+| 쓰는 권한 | ClusterRole 의 리소스에 Kubernetes `get`·`list`. 컴포넌트 로그의 `pods/log`. Prometheus·Alertmanager·Loki·Grafana 포트포워드. `grafana_api_token` 이 있으면 Grafana API. EKS 에서는 discover·setup 의 AWS Describe·List 호출 (`eks`, `ecr:DescribeRepositories`, `ssm:DescribeInstanceInformation`, `ssm:DescribeDocument`, `sts`, `logs:DescribeLogGroups`) 과 daily 에 도는 AWS 단계 열한 개 (`nodegroup`, `subnets`, `ssm-instances`, `cluster-security-groups`, `alb-metrics`, `ec2-volumes`, `ec2-volumes-available`, `ec2-addresses`, `ec2-nat-gateways`, `acm-certificates`, `instance-type-network`. `alb-metrics` 는 `elasticloadbalancing:Describe*`, `ec2:DescribeSecurityGroups`, `cloudwatch:GetMetricData`). 노드 백엔드가 있으면 pod-metrics 폴백의 노드 안 curl, EKS 에서는 고정된 문서의 SSM `send-command` 와 결과를 읽는 `ssm:GetCommandInvocation` | 왼쪽 전부에 더해 노드 스크립트 (SSM·SSH·DaemonSet), kubelet 설정의 `nodes/proxy`, CloudWatch Logs Insights (`logs:StartQuery`, `GetQueryResults`, `StopQuery`) 와 쿼터·EBS 의 `GetMetricData` 조회, `helm list` (Helm 릴리스 Secret 을 읽음, 메타데이터만), 비용과 가격, ECR, 서비스 쿼터, 외부 도구 krr·polaris·pluto·kubent. 권한 하나하나의 단계와 체크: [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) (영문) |
 
 `~/.kubegap/config.yaml` 에 `mode: full` 을 두면 full 이 기본값이 됩니다. daily 와 full 스냅샷은 같은 컨텍스트 폴더에 나란히 쌓이고 서로 비교하지 않습니다.
 
@@ -159,6 +160,24 @@ kubegap 은 클러스터를 읽기만 하고 **아무것도 바꾸지 않습니�
 - 어느 백엔드로든 노드에 닿는 명령 전체: [`deploy/node-access/COMMANDS.md`](deploy/node-access/COMMANDS.md). 수집기 정의에서 생성되고, 테스트가 최신인지 확인합니다.
 - SSH 로 닿는 노드, k3s 와 베어메탈: [`deploy/node-access/README.md`](deploy/node-access/README.md). 로그 읽기 그룹에 넣는 한 줄과, 선택 사항으로 읽기 전용 명령을 허용하는 sudoers 파일. 없으면 그 노드 항목만 "노드 접근 없음" 으로 건너뜁니다.
 - SSM 도 SSH 도 없는 노드, GKE, AKS, kubeadm: [`deploy/node-access/daemonset.yaml`](deploy/node-access/daemonset.yaml) 을 적용하면 그 파드에 `kubectl exec` 로 들어가 읽습니다. 특권 파드이므로 점검이 끝나면 지워도 됩니다. exec 에는 `kubegap` 네임스페이스의 `pods/exec` 에 `get` 과 `create` 권한이 더 필요합니다: [`deploy/permissions/role-daemonset-exec.yaml`](deploy/permissions/role-daemonset-exec.yaml). 네임스페이스를 만드는 DaemonSet 파일을 먼저 적용하고 그 다음에 적용합니다. 그 파드 안에서 셸을 여는 권한이고 클러스터에는 아무것도 쓰지 않습니다.
+
+ClusterRole 의 규칙과 IAM 정책의 동작 하나하나에 그것을 부르는 수집 단계, 모드, 그것이 필요한 체크, 없을 때 잃는 것을 적은 표: [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) (영문).
+
+## 최소 권한으로 돌리기
+
+보안 승인 전의 첫 실행이나, 한 줄 한 줄 근거를 대야만 읽을 수 있는 클러스터라면:
+
+```yaml
+# ~/.kubegap/config.yaml
+mode: daily          # 노드 스크립트, CloudWatch, 비용, ECR, 외부 도구 없음
+node_access: none    # SSM send-command, SSH, DaemonSet exec 없음
+install_tools: never # 이 기계에 아무것도 설치하지 않음
+# grafana_api_token 없음: Grafana 데이터소스·대시보드 목록을 읽지 않음
+```
+
+kubeconfig 에는 저장소의 ClusterRole (`deploy/permissions/clusterrole.yaml`, `get`·`list` 만, Secret 없음) 을 묶은 전용 사용자를 두고, EKS 에서는 `deploy/permissions/iam-policy.json` 의 `KubegapReadOnly` statement 만 쓰고 `ssm:SendCommand` statement 둘은 뺍니다. 스토어 넷에 URL 로 닿을 수 있으면 `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url` 을 적고 `pods/portforward` 규칙도 뺍니다.
+
+그 실행이 못 보는 것은 "미수집" 이나 "건너뜀" 으로 적힙니다 (몇 체크는 빈 입력으로 판정해 판정할 것 없이 pass 가 되는데, [#114](https://github.com/KyungHwanKim-devs/kubegap/issues/114) 가 그것을 skip 으로 바꾸고 그때까지는 7-1절의 실패 단계가 신호입니다): 노드 스크립트와 kubelet 설정을 읽는 `node.*` 체크 26개 (Prometheus 노드 메트릭을 읽는 10개는 계속 돕니다), Helm 체크 둘 (`hygiene.helm-release-not-deployed`, `hygiene.helm-release-stale`), EKS 의 컨트롤플레인 로그 체크 여섯 (`controlplane.scheduler-unschedulable`, `webhook-call-failures`, `controller-error-repeat`, `apiserver-slow-traces`, `authenticator-failures`, `etcd-slow`), 비용·ECR·서비스 쿼터·EBS 메트릭 체크, krr·polaris·pluto·kubent 결과, 그리고 Prometheus 가 긁지 않는 컴포넌트의 `/metrics` 를 노드 안에서 읽는 폴백 (API 서버 프록시가 막히면 그 컴포넌트의 `*.metrics-unreadable` 체크가 warn). Grafana 데이터소스·대시보드 목록은 "no auth" 로 적히고 `grafana.*` 체크는 Grafana 자체 메트릭으로 계속 판정합니다. 권한별 상세: [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md) (영문).
 
 ## 내 컴퓨터 밖으로 나가는 것
 
