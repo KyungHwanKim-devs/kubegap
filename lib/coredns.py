@@ -273,5 +273,6 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "pods_by_node": deployment["pods_by_node"],
         "pdb": deployment["pdb"],
         "forward_to": cfg["forward_to"],
+        "query_log": cfg.get("log"),  # the log plugin: without it only plugin-chain errors are in the pod logs (coredns.servfail), not every SERVFAIL the client got
     }
     return {"present": True, "config": cfg, "deployment": deployment, "metrics": metrics, "ndots": nd, "summary": summary}

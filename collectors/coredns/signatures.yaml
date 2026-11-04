@@ -3,15 +3,20 @@
 # `source:` names the logging call at each version and references/sources.md records what each signature relies on (#129).
 # All four hold for the default text log format only: CoreDNS v1.15.0 added -log-format json (coremain/run.go:33@v1.15.0), which moves the plugin name into a "plugin" field (plugin/pkg/log/json.go:105@v1.15.0), so "plugin/<name>: " is no longer in the line.
 - id: coredns.servfail
-  name: CoreDNS SERVFAIL responses
+  name: CoreDNS SERVFAIL from a plugin-chain error (or in the query log when the log plugin is on)
   component: coredns
   area: traffic
   severity: medium
   sources: ["logs/pods/coredns/*.log"]
-  pattern: ' SERVFAIL |plugin/errors: 2 '
-  meaning: DNS queries are failing. Apps see "no such host" or timeouts.
-  cause: Upstream (VPC resolver, external DNS) not responding, forward configuration, conntrack drops.
-  verify: "kubectl logs -n kube-system -l k8s-app=kube-dns --since=1h | grep -cE ' SERVFAIL |plugin/errors: 2 '"
+  # `plugin/errors: 2 ` is written only when the plugin chain returned an error with rcode 2 (plugin/errors/errors.go:84-97@v1.11.3). Timeouts and unreachable
+  # upstreams are the same event seen by coredns.upstream-timeout, so they are excluded here and one outage is one finding. A SERVFAIL that an upstream resolver
+  # answered (forward writes it and returns 0, nil: plugin/forward/forward.go:198-199@v1.11.3) or that the kubernetes plugin returns before its cache synced
+  # (plugin/kubernetes/handler.go:71 -> plugin/backend_lookup.go:493-501@v1.11.3, returns RcodeSuccess, nil) never reaches the errors line; only the log
+  # plugin's query log shows those, and coredns.summary.query_log says whether it is on.
+  pattern: ' SERVFAIL |plugin/errors: 2 (?!.*(?:timeout|unreachable))'
+  meaning: CoreDNS answered SERVFAIL because a plugin returned an error (every upstream down, "no healthy proxies", refused or broken forward). Apps see "no such host". Upstream timeouts and unreachable upstreams count under coredns.upstream-timeout instead. SERVFAILs answered by the upstream resolver itself, or by the kubernetes plugin before its cache synced, are not in this line; without the log plugin (coredns.summary.query_log false) they are not observable in the logs.
+  cause: Upstream (VPC resolver, external DNS) down or refusing, forward configuration, conntrack drops.
+  verify: "kubectl logs -n kube-system -l k8s-app=kube-dns --since=1h | grep -E ' SERVFAIL |plugin/errors: 2 ' | grep -vcE 'timeout|unreachable'"
   warn_at: 20
   fail_at: 500
   source:
@@ -24,6 +29,10 @@
     - "coredns/coredns plugin/pkg/replacer/replacer.go:67@v1.11.3"
     - "coredns/coredns plugin/pkg/replacer/replacer.go:67@v1.12.3"
     - "coredns/coredns plugin/pkg/replacer/replacer.go:67@v1.15.0"
+    - "coredns/coredns plugin/errors/errors.go:84@v1.11.3"
+    - "coredns/coredns plugin/forward/forward.go:198@v1.11.3"
+    - "coredns/coredns plugin/kubernetes/handler.go:71@v1.11.3"
+    - "coredns/coredns plugin/backend_lookup.go:493@v1.11.3"
 - id: coredns.upstream-timeout
   name: CoreDNS upstream i/o timeout
   component: coredns
@@ -86,5 +95,5 @@
     - "coredns/coredns plugin/reload/reload.go:116@v1.15.0"
     - "coredns/coredns plugin/reload/reload.go:134@v1.15.0"
     - "coredns/caddy caddyfile/dispenser.go:229@v1.1.1"
-    - "coredns/caddy caddyfile/dispenser.go:238@8de985351a98"
+    - "coredns/caddy caddyfile/dispenser.go:229@8de985351a98"
     - "coredns/caddy caddyfile/dispenser.go:238@v1.1.4"
