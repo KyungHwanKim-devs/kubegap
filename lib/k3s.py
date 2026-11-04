@@ -187,7 +187,7 @@ def _metallb_l2(snap: Path, lb_services: list[dict], node_names: list[str]) -> d
     )  # the step moved to the metallb collector (compatibility with older snapshots)
     for pod, r in (step.get("pods") or {}).items():
         if not r.get("ok"):
-            errors.append({"pod": pod, "node": r.get("node"), "error": (r.get("error") or "")[:160]})
+            errors.append({"pod": pod, "node": r.get("node"), "error": (r.get("error") or r.get("skipped") or "")[:160]})
     advs = []
     for a in items(load_json(snap / "objects" / "l2advertisements.metallb.io.json")):
         sp = a.get("spec") or {}

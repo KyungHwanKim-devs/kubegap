@@ -702,6 +702,15 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
         for p in plist:
             pname = p["metadata"]["name"]
             out = snap / st["out"] / f"{pname}.prom"
+            phase = (p.get("status") or {}).get("phase")
+            pip = (p.get("status") or {}).get("podIP")
+            if phase != "Running":
+                # Nothing listens in a pod that is not Running; the proxy would only time out (and mark the proxy blocked for the whole context) and the node curl would go to a stale or absent address
+                reason = f"pod not Running ({phase or 'no phase'})"
+                ctx.log.skip(id=f"{name}.{sid}.{pname}", reason=reason, collector=name)
+                runs[pname] = {"ok": False, "skipped": reason, "via": None, "node": (p.get("spec") or {}).get("nodeName"), "out": None, "error": None}
+                continue
+            ip_ok, ip_why = nodecommands.pod_ip_allowed(pip) if pip else (False, "no podIP")
             if context in ctx.state.proxy_blocked and node_ok:
                 # The pod proxy already timed out in this context (EKS node SG). Go straight to node curl instead of waiting 20-30 s again per pod (on a real EKS run, 11 proxy waits took a large share of an 817 s collection)
                 rr = _Blocked()
@@ -722,14 +731,21 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
                 if not rr.ok and (getattr(rr, "timed_out", False) or any(k in err_text for k in ("timed out", "timeout", "deadline exceeded"))) and node_ok:
                     ctx.state.proxy_blocked.add(context)
             via = "apiserver-proxy"
-            if not rr.ok and node_ok:
+            skipped = None
+            if not rr.ok and node_ok and not ip_ok:
+                # The node curl is pointed only at a pod address (nodecommands.pod_ip_allowed); loopback, link-local and the like are refused here for every backend, the SSM document's allowedPattern is the second layer.
+                # The pod counts as skipped only when the proxy was not really tried (blocked earlier or timed out); after a real proxy error (403, 5xx) it stays a failure that also names the refusal
+                refused = f"node fallback refused: {ip_why}" + (f" (podIP {pip})" if pip else "")
+                ctx.log.skip(id=f"{name}.{sid}.{pname}.node", reason=refused, collector=name)
+                if isinstance(rr, _Blocked) or getattr(rr, "timed_out", False):
+                    skipped = refused
+                else:
+                    rr.error = f"{rr.error or getattr(rr, 'stderr', '').strip()[-120:]}; {refused}"
+            elif not rr.ok and node_ok:
                 # Fallback for clusters where apiserver -> pod proxy is blocked by the node security group (timeouts seen on EKS and small k3s cluster): curl the pod IP from inside a reachable node.
                 # Try the node hosting the pod first, then (if e.g. not registered in SSM) another node — the pod network is reachable from any node.
-                pip = (p.get("status") or {}).get("podIP")
                 cand = [(p.get("spec") or {}).get("nodeName")] + [n["name"] for n in (inv.get("nodes") or {}).get("nodes", []) if n["name"] != (p.get("spec") or {}).get("nodeName")]
                 for nd in [c for c in cand if c]:
-                    if pip is None:
-                        break
                     # Because of the SSM 24,000-character output cap, histogram buckets (_bucket) and comments are filtered on the node (the ALB controller leader was truncated with buckets included). _sum and _count remain
                     # The curl text comes from lib/nodecommands (same source as COMMANDS.md and the SSM document); on SSM only the step name and podIp are sent. `keep` narrows chatty controllers to the metric names the checks need.
                     nr = node_access.na.run_on_node(
@@ -747,9 +763,14 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
                 "out": str(out.relative_to(snap)) if rr.ok else None,
                 "error": None if rr.ok else (rr.error or getattr(rr, "stderr", "").strip()[-200:]),
             }
+            if skipped:
+                runs[pname]["skipped"] = skipped
         res = {"ok": any(x["ok"] for x in runs.values()) if runs else False, "pods": runs, "error": None if runs else f"no {sel} pods in {ns}"}
+        if runs and all(x.get("skipped") for x in runs.values()):
+            res["skipped"] = "; ".join(f"{k}: {v['skipped']}" for k, v in runs.items())  # every pod skipped: the step says why in section 7-1 instead of counting as a failure
     if ctx.echo:
-        ctx.echo(f"    {sum(1 for x in runs.values() if x['ok'])} of {len(runs)} pods /metrics saved ({st['out']})")
+        n_skip = sum(1 for x in runs.values() if x.get("skipped"))
+        ctx.echo(f"    {sum(1 for x in runs.values() if x['ok'])} of {len(runs)} pods /metrics saved ({st['out']})" + (f", {n_skip} skipped: " + "; ".join(x["skipped"] for x in runs.values() if x.get("skipped")) if n_skip else ""))
     return res
 
 

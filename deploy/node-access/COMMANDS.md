@@ -434,7 +434,7 @@ curl -s -m 5 http://127.0.0.1:61678/metrics | grep -E '^awscni_' | grep -vE 'per
 
 ## Pod metrics fallback (`type: pod-metrics`)
 
-These steps first read `/metrics` through the apiserver pod proxy. When the proxy is blocked by the node security group, kubegap runs the curl below from inside a node (the pod network is reachable from any node). `<podIp>` is the pod's IP from `kubectl get pod`; port, path and the metric filter are fixed per step.
+These steps first read `/metrics` through the apiserver pod proxy. When the proxy is blocked by the node security group, kubegap runs the curl below from inside a node (the pod network is reachable from any node). `<podIp>` is the pod's IP from `kubectl get pod`; port, path and the metric filter are fixed per step. Only Running pods with an IPv4 address in 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or 100.64.0.0/10 are curled: a pod in another phase, or one whose address is loopback, link-local, multicast, reserved, outside those ranges or IPv6, is skipped with the reason recorded.
 
 | Step | Port | Path | Pods |
 |---|---|---|---|
