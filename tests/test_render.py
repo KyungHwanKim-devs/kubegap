@@ -195,9 +195,14 @@ def test_failed_steps_are_counted_from_collect_result_not_from_exit_codes(tmp_pa
     cr["core"]["steps"]["kubent"] = {"ok": False, "api_read": False, "lists_ok": 0, "lists_failed": 2, "error": "kubent: API resources not confirmed read; DBG Failed to retrieve: x"}
     (s / "collect-result.json").write_text(json.dumps(cr))
     summ = json.loads((s / "summary.json").read_text())
-    summ["run"] = {"commands": 5, "failed": []}  # what run.log says: every command exited 0
+    summ["run"] = {
+        "commands": 5,
+        "failed": [{"id": "core.top", "collector": "core", "error": "exit 1"}, {"id": "core.kubent.extra", "error": "x"}, {"id": "metallb.speaker-metrics.speaker-abc", "collector": "metallb", "error": "502 Bad Gateway"}],
+    }
     (s / "summary.json").write_text(json.dumps(summ))
     text = render.render_details(s).read_text()
     assert "| core | 4 | top, kubent | krr (not collected in daily mode) |" in text
     assert "5 commands, 60 s. Failed steps: 2: `core.top` boom; `core.kubent` kubent: API resources not confirmed read; DBG Failed to retrieve: x" in text
-    assert "run.log" not in text
+    # run.log's failures are not a second count of the same thing: the ones that belong to a failed step are not repeated, the one inside a step that succeeded is shown as such
+    assert "Commands that failed inside a step that still succeeded (run.log): 1: `metallb.speaker-metrics.speaker-abc` 502 Bad Gateway" in text
+    assert text.count("`core.top`") == 1 and "core.kubent.extra" not in text  # the failed step once, not again as a run.log command

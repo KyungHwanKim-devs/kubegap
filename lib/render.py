@@ -354,6 +354,12 @@ def render_details(snap: Path, language: str = "en") -> Path:
     # Until #132 this line counted run.log exit codes while the table above read collect-result.json, and the two disagreed for a tool that exits 0 without
     # reading the cluster (kubent, pluto): the step is failed, its command is not.
     w(f"{run.get('commands') or '?'} commands, {sm.get('seconds_total')} s. Failed steps: {len(failed_steps)}" + (": " + "; ".join(f"`{sid}` {_cell(err[:120])}" for sid, err in failed_steps[:20]) if failed_steps else ""))
+    # A command can fail inside a step that still succeeded (one pod of a per-pod metrics step, one release of `helm get values`); run.log has it and the step does not.
+    failed_ids = {sid for sid, _ in failed_steps}
+    inside = [f for f in run.get("failed") or [] if str(f.get("id")) not in failed_ids and not any(str(f.get("id")).startswith(sid + ".") for sid in failed_ids)]
+    if inside:
+        w("")
+        w(f"Commands that failed inside a step that still succeeded (run.log): {len(inside)}: " + "; ".join(f"`{f.get('id')}` {_cell(str(f.get('error') or '')[:120])}" for f in inside[:20]))
     w("")
     w(L("### 7-2. Checks evaluated"))
     w("")
