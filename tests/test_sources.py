@@ -286,11 +286,12 @@ def test_one_upstream_outage_is_one_finding(tmp_path):
 
 # ---------- PromQL queries (#121): every query that reads a node-exporter, cAdvisor, kubelet or kube-state-metrics name cites each name ----------
 
-QUERY_FAMILIES = re.compile(r"\b(node_[A-Za-z_]+|kube_[A-Za-z_]+|kubelet_[A-Za-z_]+|container_[A-Za-z_]+)\b")
+QUERY_FAMILIES = re.compile(r"\b(node_[A-Za-z0-9_]+|kube_[A-Za-z0-9_]+|kubelet_[A-Za-z0-9_]+|container_[A-Za-z0-9_]+)\b")
 # '<name>: <owner>/<repo> <file>:<line>@<tag>' then more citations and notes; or 'label <what>: ...' for a label the scrape configuration sets
 QUERY_CITATION = re.compile(r"^(?:[A-Za-z_:][A-Za-z0-9_:]*|label [^:]+): [\w.-]+/[\w.-]+ \S+?:\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*@[\w.+-]+")
 # Names an exporter removed or leaves off by default, with the source that says so. A query reading one is empty on every default install and nothing tells
-# "the situation did not occur" from "the series does not exist".
+# "the situation did not occur" from "the series does not exist". node_processes_state may come back behind a `needs` that reads the collector state
+# once a check needs it; today nothing does.
 GONE = {
     "kube_endpoint_address_not_ready": 'kube-state-metrics 2.14.0 removed it (internal/store/endpoint.go:148@v2.13.0, absent @v2.14.0); read kube_endpoint_address{ready="false"}',
     "node_processes_state": "the node-exporter processes collector is off by default (collector/processes_linux.go:46@v1.7.0, :45@v1.10.2, :44@v1.12.1)",
