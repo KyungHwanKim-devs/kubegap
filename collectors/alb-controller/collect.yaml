@@ -8,6 +8,7 @@
   port: 8080
   path: /metrics
   out: metrics/pod/alb-controller
+  source: "names and their definitions per version: collectors/alb-controller/pod-metrics.yaml; port 8080 and the selector are observed, not read in source"
   # When fetched via curl inside a node, keep only the needed metric names so the output stays under the SSM 24,000-character output limit (the leader exposes ~30 AWS API operations × histograms and gets truncated without the filter).
   keep: '^(aws_api_call_duration_seconds_(sum|count)|aws_api_call_retries_(sum|count)|controller_runtime_(reconcile|webhook_requests_total|max_concurrent)|leader_election|rest_client_requests_total|workqueue_depth|process_(resident_memory_bytes|start_time))'
   timeout: 30

@@ -489,13 +489,13 @@ curl -s -m 8 http://<podIp>:8080/metrics | grep -vE '^#|_bucket\{' | grep -E '^(
 ### `grafana/self-metrics`
 
 ```sh
-curl -s -m 8 http://<podIp>:3000/metrics | grep -vE '^#|_bucket\{' | grep -E '^(grafana_(build_info|datasource_request_total|api_response_status_total|alerting_(active_alerts|rule_evaluation_failures_total|notification_failed_total|active_configurations)|stat_totals_(dashboard|datasource|users|active_users|alert_rules)|stat_active_users|db_datasource_query_by_id_total|plugin_build_info)|process_(start_time|resident_memory_bytes))'
+curl -s -m 8 http://<podIp>:3000/metrics | grep -vE '^#|_bucket\{' | grep -E '^(grafana_(build_info|datasource_request_total|api_response_status_total|alerting_(active_alerts|rule_evaluation_failures_total|notification_failed_total|active_configurations)|stat_totals_(dashboard|datasource|alert_rules)|stat_total_users|stat_active_users|db_datasource_query_by_id_total|plugin_build_info)|process_(start_time|resident_memory_bytes))'
 ```
 
 ### `karpenter/controller-metrics`
 
 ```sh
-curl -s -m 8 http://<podIp>:8000/metrics | grep -vE '^#|_bucket\{' | grep -E '^(karpenter_(nodepool_|nodeclaims_|nodes_(created|terminated|termination_time_seconds_(sum|count))|interruption_|cloudprovider_(errors_total|duration_seconds_(sum|count))|cluster_state_synced|consistency_errors|pods_startup_time_seconds_(sum|count)|disruption_(eligible_nodes|budgets_allowed_disruptions|nodes_disrupted_total|pods_disrupted_total|actions_performed_total|queue_depth)|provisioner_scheduling_(queue_depth|duration_seconds_(sum|count))|nodes_eviction_queue_depth)|controller_runtime_reconcile_errors_total|leader_election|process_(start_time|resident_memory_bytes))'
+curl -s -m 8 http://<podIp>:8000/metrics | grep -vE '^#|_bucket\{' | grep -E '^(karpenter_(nodepools?_|nodeclaims_|nodes_(created|terminated|termination_(time|duration)_seconds_(sum|count))|interruption_|cloudprovider_(errors_total|duration_seconds_(sum|count))|cluster_state_synced|consistency_errors|pods_startup_(time|duration)_seconds_(sum|count)|pods_eviction_requests_total|disruption_(eligible_nodes|budgets_allowed_disruptions|nodes_disrupted_total|pods_disrupted_total|actions_performed_total|queue_depth)|voluntary_disruption_(eligible_nodes|decisions_total|queue_failures_total)|provisioner_scheduling_(queue_depth|duration_seconds_(sum|count))|scheduler_(queue_depth|scheduling_duration_seconds_(sum|count))|nodes_eviction_queue_depth)|controller_runtime_reconcile_errors_total|leader_election|process_(start_time|resident_memory_bytes))'
 ```
 
 ### `keda/metrics-apiserver-metrics`

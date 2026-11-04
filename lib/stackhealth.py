@@ -17,6 +17,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from . import podmetrics as _pm
 from .promtext import parse as _parse_prom
 from .snapshot import load_json, objects
 
@@ -274,9 +275,11 @@ def _grafana(snap: Path, inv: dict) -> dict:
             version = labels.get("version")
         alert_fail += int(pm["single"].get("grafana_alerting_rule_evaluation_failures_total", 0)) + sum(int(v) for _, v in pm["labeled"].get("grafana_alerting_rule_evaluation_failures_total", []))
         notif_fail += int(pm["single"].get("grafana_alerting_notification_failed_total", 0)) + sum(int(v) for _, v in pm["labeled"].get("grafana_alerting_notification_failed_total", []))
-        for k in ("grafana_stat_totals_dashboard", "grafana_stat_totals_datasource", "grafana_stat_totals_users", "grafana_stat_active_users", "grafana_stat_totals_alert_rules"):
-            if k in pm["single"]:
-                stats[k.replace("grafana_stat_", "")] = int(pm["single"][k])
+        # grafana_stat_total_users is singular in Grafana's source (collectors/grafana/pod-metrics.yaml); the plural spelling read until #120 never existed
+        for key in ("stat_totals_dashboard", "stat_totals_datasource", "stat_total_users", "stat_active_users", "stat_totals_alert_rules"):
+            name = _pm.pick(pm, "grafana", key)
+            if name is not None and name in pm["single"]:
+                stats[key.replace("stat_", "")] = int(pm["single"][name])
         rss = pm["single"].get("process_resident_memory_bytes", rss)
     ds_rows = []
     for name, c in ds.items():

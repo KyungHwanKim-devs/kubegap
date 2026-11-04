@@ -7,5 +7,6 @@
   port: 9402
   path: /metrics
   out: metrics/pod/cert-manager
+  source: "names and their definitions per version: collectors/cert-manager/pod-metrics.yaml; port 9402 and the selector are observed, not read in source"
   keep: '^(certmanager_(certificate_(expiration_timestamp_seconds|renewal_timestamp_seconds|ready_status)|http_acme_client_request_count|controller_sync_(error_count|call_count)|clock_time_seconds)|process_(start_time|resident_memory_bytes))'
   timeout: 30

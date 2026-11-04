@@ -1,0 +1,62 @@
+# Metric names kubegap reads from KEDA's /metrics (steps keda.metrics-apiserver-metrics and keda.operator-metrics, parsed by lib/kedactl.py through
+# lib/podmetrics.py). names: newest spelling first; since = first release that emits the name (inclusive), before = first that no longer does.
+# The operator's keda_scaler_errors_total and keda_scaler_errors exist through v2.16 and are gone at v2.17; keda_scaled_object_errors_total and
+# keda_scaler_detail_errors_total were added in v2.14 and are the only error counters since v2.17. Read in kedacore/keda pkg/metricscollector/prommetrics.go
+# at v2.12.0, v2.13.0, v2.14.0, v2.16.0, v2.17.2, v2.19.0 and v2.21.0 (the file was pkg/prommetrics/prommetrics.go before v2.13).
+- key: apiserver_requests
+  labels: [code, group]
+  names:
+    - name: apiserver_request_total
+      source: "kubernetes/kubernetes staging/src/k8s.io/apiserver/pkg/endpoints/metrics/metrics.go:81@v1.32.2 (keda v2.17.2 go.mod: k8s.io/apiserver v0.31.7; labels verb, group, version, resource, subresource, scope, component, code, dry_run)"
+- key: apiserver_inflight
+  names:
+    - name: apiserver_current_inflight_requests
+      source: "kubernetes/kubernetes staging/src/k8s.io/apiserver/pkg/endpoints/metrics/metrics.go:196@v1.32.2 (collected for the raw file only)"
+- key: registered_metrics
+  names:
+    - name: registered_metrics_total
+      source: "kubernetes/kubernetes staging/src/k8s.io/component-base/metrics/registry.go:42@v1.32.2"
+- key: grpc_client_handled
+  labels: [grpc_code]
+  names:
+    - name: keda_internal_metricsservice_grpc_client_handled_total
+      source: "grpc-ecosystem/go-grpc-middleware providers/prometheus/client_metrics.go:43@providers/prometheus/v1.0.1 with the namespace from kedacore/keda cmd/adapter/main.go:146@v2.17.2, :147@v2.19.0, :149@v2.21.0"
+- key: grpc_client_started
+  names:
+    - name: keda_internal_metricsservice_grpc_client_started_total
+      source: "grpc-ecosystem/go-grpc-middleware providers/prometheus/client_metrics.go:37@providers/prometheus/v1.0.1 (collected for the raw file only)"
+- key: rss
+  names:
+    - name: process_resident_memory_bytes
+      source: "prometheus/client_golang prometheus/process_collector.go:94@v1.19.1"
+- key: process_start
+  names:
+    - name: process_start_time_seconds
+      source: "prometheus/client_golang prometheus/process_collector.go:99@v1.19.1"
+- key: scaled_object_errors
+  labels: [namespace, scaledObject]
+  names:
+    - name: keda_scaled_object_errors_total
+      since: "2.14.0"
+      source: "kedacore/keda pkg/metricscollector/prommetrics.go:134@v2.14.0, :134@v2.16.0, :93@v2.17.2, :94@v2.21.0 (labels namespace, scaledObject)"
+    - name: keda_scaled_object_errors
+      before: "2.17.0"
+      source: "kedacore/keda pkg/metricscollector/prommetrics.go:91@v2.12.0, :125@v2.16.0 (gauge; labels namespace, scaledObject)"
+- key: scaler_errors
+  labels: [namespace, scaledObject, scaler]
+  names:
+    - name: keda_scaler_detail_errors_total
+      since: "2.14.0"
+      source: "kedacore/keda pkg/metricscollector/prommetrics.go:116@v2.14.0, :116@v2.16.0, :84@v2.17.2, :85@v2.21.0 (labels namespace, metric, scaledObject, scaler, triggerIndex, type)"
+    - name: keda_scaler_errors_total
+      before: "2.17.0"
+      source: "kedacore/keda pkg/metricscollector/prommetrics.go:46@v2.12.0, :107@v2.16.0; absent at v2.17.2 (labels namespace, metric, scaledObject, scaler, triggerIndex, type)"
+- key: operator_metrics_present
+  names:
+    - name: keda_build_info
+      source: "kedacore/keda pkg/metricscollector/prommetrics.go:37@v2.17.2, :38@v2.21.0 (any keda_* name proves the operator exposes metrics; this one is always there)"
+- key: operator_reconcile_errors
+  labels: [controller]
+  names:
+    - name: controller_runtime_reconcile_errors_total
+      source: "kubernetes-sigs/controller-runtime pkg/internal/controller/metrics/metrics.go:39@v0.19.7 and @v0.24.1 (keda go.mod)"

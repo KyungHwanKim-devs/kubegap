@@ -1,0 +1,216 @@
+# Metric names kubegap reads from Karpenter's /metrics (step karpenter.controller-metrics, parsed by lib/karpenterctl.py through lib/podmetrics.py).
+# names: newest spelling first. since = first release that emits the name (inclusive), before = first release that no longer does (exclusive).
+# Karpenter v1.0.0 renamed or removed most of its metrics in one step, with no release emitting both spellings: counters got a _total suffix,
+# the nodepool subsystem became nodepools, disruption became voluntary_disruption, provisioner_scheduling became scheduler, *_time_seconds
+# became *_duration_seconds; interruption actions and consistency errors have no successor. Read in kubernetes-sigs/karpenter (core) and
+# aws/karpenter-provider-aws (interruption) at v0.37.0, v1.0.0, v1.1.0 and v1.15.1. Lines are the Opts block of each definition.
+- key: leader
+  labels: [name]
+  names:
+    - name: leader_election_master_status
+      source: "kubernetes-sigs/controller-runtime pkg/metrics/leaderelection.go:13@v0.18.2 and @v0.24.1 (karpenter go.mod)"
+- key: process_start
+  names:
+    - name: process_start_time_seconds
+      source: "prometheus/client_golang prometheus/process_collector.go:99@v1.19.1"
+- key: rss
+  names:
+    - name: process_resident_memory_bytes
+      source: "prometheus/client_golang prometheus/process_collector.go:94@v1.19.1"
+- key: reconcile_errors
+  labels: [controller]
+  names:
+    - name: controller_runtime_reconcile_errors_total
+      source: "kubernetes-sigs/controller-runtime pkg/internal/controller/metrics/metrics.go:37@v0.14.6, :39@v0.24.1"
+- key: nodepool_usage
+  labels: [nodepool, resource_type]
+  names:
+    - name: karpenter_nodepools_usage
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/metrics/nodepool/controller.go:60@v1.0.0, :61@v1.15.1"
+    - name: karpenter_nodepool_usage
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/metrics/nodepool/controller.go:61@v0.37.0"
+- key: nodepool_limit
+  labels: [nodepool, resource_type]
+  names:
+    - name: karpenter_nodepools_limit
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/metrics/nodepool/controller.go:48@v1.0.0, :47@v1.15.1"
+    - name: karpenter_nodepool_limit
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/metrics/nodepool/controller.go:49@v0.37.0"
+- key: nodeclaims_created
+  labels: [reason, nodepool]
+  names:
+    - name: karpenter_nodeclaims_created_total
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:33@v1.0.0, :35@v1.15.1 (labels reason, nodepool, min_values_relaxed)"
+    - name: karpenter_nodeclaims_created
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:31@v0.37.0 (labels reason, nodepool, capacity_type)"
+- key: nodeclaims_terminated
+  labels: [reason, nodepool]
+  names:
+    - name: karpenter_nodeclaims_terminated_total
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:46@v1.0.0, :50@v1.15.1 (labels nodepool, capacity_type, zone; no reason)"
+    - name: karpenter_nodeclaims_terminated
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:44@v0.37.0 (labels reason, nodepool, capacity_type)"
+- key: nodeclaims_disrupted
+  labels: [reason, type, nodepool]
+  names:
+    - name: karpenter_nodeclaims_disrupted_total
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:58@v1.0.0, :65@v1.15.1 (labels reason, nodepool, capacity_type)"
+    - name: karpenter_nodeclaims_disrupted
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:90@v0.37.0 (labels type, nodepool)"
+- key: nodes_created
+  labels: [nodepool]
+  names:
+    - name: karpenter_nodes_created_total
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:99@v1.15.1"
+    - name: karpenter_nodes_created
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:114@v0.37.0"
+- key: nodes_terminated
+  labels: [nodepool]
+  names:
+    - name: karpenter_nodes_terminated_total
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:113@v1.15.1"
+    - name: karpenter_nodes_terminated
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:125@v0.37.0"
+- key: nodes_termination_time
+  labels: [nodepool]
+  names:
+    - name: karpenter_nodes_termination_duration_seconds
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/node/termination/metrics.go:32@v1.0.0, :34@v1.15.1 (histogram: _sum and _count are read)"
+    - name: karpenter_nodes_termination_time_seconds
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/node/termination/metrics.go:32@v0.37.0 (histogram: _sum and _count are read)"
+- key: pods_startup_time
+  names:
+    - name: karpenter_pods_startup_duration_seconds
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/metrics/pod/controller.go:67@v1.0.0, :100@v1.15.1 (histogram: _sum and _count are read)"
+    - name: karpenter_pods_startup_time_seconds
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/metrics/pod/controller.go:68@v0.37.0 (histogram: _sum and _count are read)"
+- key: interruption_received_messages
+  labels: [message_type]
+  names:
+    - name: karpenter_interruption_received_messages_total
+      since: "1.0.0"
+      source: "aws/karpenter-provider-aws pkg/controllers/interruption/metrics.go:31@v1.0.0, :62@v1.15.1"
+    - name: karpenter_interruption_received_messages
+      before: "1.0.0"
+      source: "aws/karpenter-provider-aws pkg/controllers/interruption/metrics.go:33@v0.37.0"
+- key: interruption_deleted_messages
+  names:
+    - name: karpenter_interruption_deleted_messages_total
+      since: "1.0.0"
+      source: "aws/karpenter-provider-aws pkg/controllers/interruption/metrics.go:40@v1.0.0, :73@v1.15.1"
+    - name: karpenter_interruption_deleted_messages
+      before: "1.0.0"
+      source: "aws/karpenter-provider-aws pkg/controllers/interruption/metrics.go:42@v0.37.0"
+- key: interruption_actions_performed
+  labels: [action_type]
+  names:
+    - name: karpenter_interruption_actions_performed
+      before: "1.0.0"
+      source: "aws/karpenter-provider-aws pkg/controllers/interruption/metrics.go:59@v0.37.0; absent from pkg/controllers/interruption/metrics.go@v1.0.0 and @v1.15.1 (no successor)"
+- key: cloudprovider_errors
+  labels: [controller, method, provider]
+  names:
+    - name: karpenter_cloudprovider_errors_total
+      source: "kubernetes-sigs/karpenter pkg/cloudprovider/metrics/cloudprovider.go:64@v0.37.0, :105@v1.15.1"
+- key: cloudprovider_duration
+  names:
+    - name: karpenter_cloudprovider_duration_seconds
+      source: "kubernetes-sigs/karpenter pkg/cloudprovider/metrics/cloudprovider.go:49@v0.37.0, :88@v1.15.1 (collected for the raw file only)"
+- key: cluster_state_synced
+  names:
+    - name: karpenter_cluster_state_synced
+      source: "kubernetes-sigs/karpenter pkg/controllers/state/metrics.go:41@v0.37.0, :45@v1.15.1"
+- key: consistency_errors
+  labels: [check]
+  names:
+    - name: karpenter_consistency_errors
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/nodeclaim/consistency/metrics.go:36@v0.37.0; no definition under pkg/@v1.0.0 or @v1.15.1 (removed)"
+- key: disruption_eligible_nodes
+  labels: [reason, method]
+  names:
+    - name: karpenter_voluntary_disruption_eligible_nodes
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/metrics.go:63@v1.0.0, :179@v1.15.1 (label reason)"
+    - name: karpenter_disruption_eligible_nodes
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/metrics.go:84@v0.37.0 (labels method, consolidation_type)"
+- key: disruption_budgets_allowed
+  labels: [nodepool, reason]
+  names:
+    - name: karpenter_nodepools_allowed_disruptions
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/metrics.go:81@v1.0.0, :212@v1.15.1 (labels nodepool, reason)"
+    - name: karpenter_disruption_budgets_allowed_disruptions
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/metrics.go:102@v0.37.0 (label nodepool)"
+- key: disruption_actions
+  labels: [decision, method]
+  names:
+    - name: karpenter_voluntary_disruption_decisions_total
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/metrics.go:54@v1.0.0, :146@v1.15.1 (labels decision, reason, consolidation_type)"
+    - name: karpenter_disruption_actions_performed_total
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/metrics.go:57@v0.37.0 (labels action, method, consolidation_type)"
+- key: nodes_disrupted
+  labels: [method]
+  names:
+    - name: karpenter_disruption_nodes_disrupted_total
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/metrics.go:66@v0.37.0; v1.0.0 keeps only nodeclaims_disrupted_total (pkg/metrics/metrics.go:58)"
+- key: pods_disrupted
+  names:
+    - name: karpenter_disruption_pods_disrupted_total
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/metrics.go:75@v0.37.0 (collected for the raw file only; v1.0.0 has pods_disruption_initiated_total)"
+- key: disruption_queue_depth
+  names:
+    - name: karpenter_voluntary_disruption_queue_failures_total
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/orchestration/metrics.go:38@v1.0.0, :234@v1.15.1 (collected for the raw file only)"
+    - name: karpenter_disruption_queue_depth
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/orchestration/metrics.go:56@v0.37.0 (collected for the raw file only)"
+- key: scheduling_queue_depth
+  names:
+    - name: karpenter_scheduler_queue_depth
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/provisioning/scheduling/metrics.go:50@v1.0.0, :59@v1.15.1"
+    - name: karpenter_provisioner_scheduling_queue_depth
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/provisioning/scheduling/metrics.go:49@v0.37.0"
+- key: scheduling_duration
+  names:
+    - name: karpenter_scheduler_scheduling_duration_seconds
+      since: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/provisioning/scheduling/metrics.go:45@v1.15.1 (collected for the raw file only)"
+    - name: karpenter_provisioner_scheduling_duration_seconds
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/provisioning/metrics.go:31@v0.37.0 (collected for the raw file only)"
+- key: eviction_queue_depth
+  names:
+    - name: karpenter_pods_eviction_requests_total
+      since: "1.1.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/node/termination/terminator/metrics.go:34@v1.1.0 (as nodes_eviction_requests_total), :56@v1.15.1 (collected for the raw file only)"
+    - name: karpenter_nodes_eviction_queue_depth
+      before: "1.0.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/node/termination/terminator/metrics.go:32@v0.37.0 (collected for the raw file only)"

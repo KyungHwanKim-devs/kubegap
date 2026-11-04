@@ -1,0 +1,47 @@
+# Metric names kubegap reads from the external-secrets controller /metrics (step external-secrets.controller-metrics, parsed by lib/esoctl.py through
+# lib/podmetrics.py). Read in external-secrets/external-secrets at v0.9.13, v2.1.0 and v2.14.0: every name exists in the three; 2.x moved the provider
+# counter from pkg/metrics/metrics.go to runtime/metrics/metrics.go without renaming it.
+- key: sync_calls
+  labels: [name, namespace]
+  names:
+    - name: externalsecret_sync_calls_total
+      source: "external-secrets/external-secrets pkg/controllers/externalsecret/esmetrics/esmetrics.go:42@v0.9.13, :50@v2.1.0, :52@v2.14.0"
+- key: sync_calls_error
+  labels: [name, namespace]
+  names:
+    - name: externalsecret_sync_calls_error
+      source: "external-secrets/external-secrets pkg/controllers/externalsecret/esmetrics/esmetrics.go:48@v0.9.13, :56@v2.1.0, :58@v2.14.0"
+- key: provider_api_calls
+  labels: [provider, call, status]
+  names:
+    - name: externalsecret_provider_api_calls_count
+      source: "external-secrets/external-secrets pkg/metrics/metrics.go:30@v0.9.13; runtime/metrics/metrics.go:35@v2.1.0 and @v2.14.0"
+- key: clustersecretstore_status
+  names:
+    - name: clustersecretstore_status_condition
+      source: "external-secrets/external-secrets pkg/controllers/secretstore/cssmetrics/cssmetrics.go:41@v0.9.13, :47@v2.1.0 and @v2.14.0 (collected for the raw file only)"
+- key: secretstore_status
+  names:
+    - name: secretstore_status_condition
+      source: "external-secrets/external-secrets pkg/controllers/secretstore/ssmetrics/ssmetrics.go:41@v0.9.13, :47@v2.1.0 and @v2.14.0 (collected for the raw file only)"
+- key: reconcile_errors
+  labels: [controller]
+  names:
+    - name: controller_runtime_reconcile_errors_total
+      source: "kubernetes-sigs/controller-runtime pkg/internal/controller/metrics/metrics.go:37@v0.14.6, :39@v0.24.1 (external-secrets go.mod: v0.17.1 at v0.9.13, v0.25.2 at v2.14.0)"
+- key: reconcile_total
+  names:
+    - name: controller_runtime_reconcile_total
+      source: "kubernetes-sigs/controller-runtime pkg/internal/controller/metrics/metrics.go:30@v0.14.6, :32@v0.24.1 (collected for the raw file only)"
+- key: reconcile_time
+  names:
+    - name: controller_runtime_reconcile_time_seconds
+      source: "kubernetes-sigs/controller-runtime pkg/internal/controller/metrics/metrics.go:44@v0.14.6, :60@v0.24.1 (histogram; _sum and _count collected for the raw file only)"
+- key: rss
+  names:
+    - name: process_resident_memory_bytes
+      source: "prometheus/client_golang prometheus/process_collector.go:94@v1.19.1"
+- key: process_start
+  names:
+    - name: process_start_time_seconds
+      source: "prometheus/client_golang prometheus/process_collector.go:99@v1.19.1 (collected for the raw file only)"
