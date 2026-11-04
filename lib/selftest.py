@@ -248,6 +248,12 @@ def run(check_ids: list[str] | None = None, echo=print, snapshots: list[Path] | 
                 else:
                     results["passed"].append(label)
                 continue
+            if expect == "skip":  # the case lacks what the rule needs: the evaluator must skip with a reason, never pass
+                if r.get("status") == "skip" and str(r.get("reason") or "").startswith("nothing to judge"):  # the skip must come from rule.needs, not from an item the case forgot
+                    results["passed"].append(label)
+                else:
+                    results["failed"].append({"case": label, "reason": f"expected skip, got status {r.get('status')} (counts {r.get('counts')})"})
+                continue
             if r.get("status") != "done":
                 results["failed"].append({"case": label, "reason": f"status {r.get('status')}: {r.get('reason')}"})
                 continue

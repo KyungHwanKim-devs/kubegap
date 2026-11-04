@@ -431,6 +431,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         if not path.is_file():
             reason = run.get("skipped") or run.get("error") or ("node-os step not run" if not step else "os.txt missing")
             out["not_collected"].append({"node": name, "reason": str(reason)[:200]})
+            out["nodes"].append({"node": name, "collected": False, "reason": str(reason)[:200]})  # the row stays so the node checks skip this node by name (rule.needs) instead of seeing no node at all
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
         sec = parse_sections(text)
@@ -472,6 +473,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             "kubelet_runtime": cri.get("runtime"),
         }
         rec = {
+            "collected": True,
             "node": name,
             "roles": n.get("roles") or [],
             "backend": run.get("backend") or (inv.get("node_access") or {}).get("method"),
@@ -531,8 +533,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             sysctl_vals[k][v].append(name)
     out["pod_logs"].sort(key=lambda e: -e["mb"])
     out["pod_dirs"].sort(key=lambda e: -e["mb"])
-    out["pod_logs"] = out["pod_logs"][:40]
-    out["pod_dirs"] = out["pod_dirs"][:40]
+    # the two lists hold the largest items found on the nodes that were read; when no node was read they hold nothing, which is not "nothing large": None makes the two checks skip
+    out["pod_logs"] = out["pod_logs"][:40] if out["collected"] else None
+    out["pod_dirs"] = out["pod_dirs"][:40] if out["collected"] else None
     out["cluster"] = {
         "collected": len(out["collected"]),
         "not_collected": len(out["not_collected"]),

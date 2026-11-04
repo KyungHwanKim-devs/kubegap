@@ -83,7 +83,7 @@ class NodeAccess:
         self.aws_profile = cfg.get("aws_profile") or eks.get("profile")
         self.aws_region = cfg.get("aws_region") or eks.get("region")
         self.ssm_registered = {x["node"]: x.get("instance_id") for x in na.get("ssm_registered", [])}
-        self.ssm_unregistered = {x["node"] for x in na.get("ssm_unregistered", [])}
+        self.ssm_unregistered = {x["node"] for x in na.get("ssm_unregistered") or []}
         self.ssh = cfg.get("ssh") or {}
 
     # ---------- public interface ----------

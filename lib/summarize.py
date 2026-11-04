@@ -311,7 +311,8 @@ def summarize_conditions(snap: Path) -> dict:
 def summarize_webhooks(snap: Path) -> dict:
     """Each webhook of every ValidatingWebhookConfiguration and MutatingWebhookConfiguration: failurePolicy, ready endpoint count of its service, timeout, whether it targets its own namespace."""
     odir = snap / "objects"
-    eps = {(e["metadata"]["namespace"], e["metadata"]["name"]): e for e in items(load_json(odir / "endpoints.json"))}
+    eps_doc = load_json(odir / "endpoints.json")
+    eps = {(e["metadata"]["namespace"], e["metadata"]["name"]): e for e in items(eps_doc)}
     svc_ns_of = {}
     for sv in items(load_json(odir / "services.json")):
         svc_ns_of[(sv["metadata"]["namespace"], sv["metadata"]["name"])] = True
@@ -325,7 +326,8 @@ def summarize_webhooks(snap: Path) -> dict:
                 ready = None
                 if sns and sname:
                     e = eps.get((sns, sname))
-                    ready = sum(len(ss.get("addresses") or []) for ss in ((e or {}).get("subsets") or [])) if e is not None else 0
+                    # without objects/endpoints.json (the grant missing, the step failed) nothing is known about readiness: None, not 0, so no webhook is reported as endpoint-less
+                    ready = (sum(len(ss.get("addresses") or []) for ss in ((e or {}).get("subsets") or [])) if e is not None else 0) if eps_doc is not None else None
                 rules = w.get("rules") or []
                 resources = sorted({r for rule in rules for r in (rule.get("resources") or [])})
                 ns_sel = w.get("namespaceSelector") or {}
@@ -365,7 +367,8 @@ def summarize_webhooks(snap: Path) -> dict:
         "source": "objects/*webhookconfigurations*.json + objects/endpoints.json",
         "count": len(rows),
         "webhooks": rows,
-        "no_endpoints": [r for r in rows if r["ready_endpoints"] == 0],
+        "no_endpoints": [r for r in rows if r["ready_endpoints"] == 0] if eps_doc is not None else None,  # None: endpoints were not read, operators.webhook-no-endpoints skips
+        "endpoints_read": eps_doc is not None,
         "fail_policy": sum(1 for r in rows if r["failure_policy"] == "Fail"),
         "self_lock_risk": [r for r in rows if r["self_lock_risk"]],
     }
@@ -594,7 +597,7 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
             "missing_families": inv.get("missing_families"),
             "stores": {k: ({"ok": v.get("ok"), "version": v.get("version"), "retention": v.get("retention")}) for k, v in (inv.get("stores") or {}).items()},
             "eks": ({k: inv["cluster"]["eks"].get(k) for k in ("version", "support_type", "control_plane_logging_off", "public_access_cidrs", "secrets_encryption", "addons")} if inv["cluster"].get("eks") else None),
-            "ssm_unregistered": [x["node"] for x in inv["node_access"].get("ssm_unregistered", [])],
+            "ssm_unregistered": [x["node"] for x in inv["node_access"].get("ssm_unregistered") or []],
         }
     removed = 0 if keep_component_logs else remove_component_logs(snap, s)
     if isinstance(s.get("logs"), dict):
@@ -622,7 +625,7 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
         c, w = s["conditions"], s["webhooks"]
         echo(
             f"CRD conditions: {c['count']} unhealthy of {c['scanned_objects']} objects ({c['scanned_kinds']} kinds) {dict(list(c['by_kind'].items())[:6])}; "
-            f"webhooks {w['count']} (failurePolicy Fail {w['fail_policy']}, zero endpoints {len(w['no_endpoints'])}, self-lockout risk {len(w['self_lock_risk'])})"
+            f"webhooks {w['count']} (failurePolicy Fail {w['fail_policy']}, zero endpoints {len(w['no_endpoints']) if w['no_endpoints'] is not None else 'not read'}, self-lockout risk {len(w['self_lock_risk'])})"
         )
         ob = s["observability"]
         if "error" in ob:

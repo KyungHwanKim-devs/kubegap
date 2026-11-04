@@ -573,8 +573,10 @@
   type: summary
   each: vpccni.nodes
   rule:
-    expr: "item['metrics_available'] and (item['ec2_api_errors'] or 0) >= 50"
-    warn_expr: "item['metrics_available'] and (item['ec2_api_errors'] or 0) > 0"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "(item['ec2_api_errors'] or 0) >= 50"
+    warn_expr: "(item['ec2_api_errors'] or 0) > 0"
   target: "item['node']"
   evidence: "f\"node {item['node']}: EC2 API failures {item['ec2_api_errors']} (by API {item['metrics'].get('ec2_api_errors_by_api')}), force-removed ENIs {item['metrics'].get('force_removed_enis')} / IPs {item['metrics'].get('force_removed_ips')} (cumulative since ipamd start, IMDS 404 excluded)\""
   severity_default: medium
@@ -703,7 +705,7 @@
           metrics_available: true
           prefix_delegation: false
           hypervisor: null
-      - expect: "pass"
+      - expect: "skip"
         item:
           node: "ip-10-0-1-139.us-east-1.compute.internal"
           instance_type: "r8gd.xlarge"

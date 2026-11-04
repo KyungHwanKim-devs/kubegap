@@ -3322,8 +3322,10 @@
   each: argocdctl.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and (item['cluster_connection_ok'] is False or (item['k8s_api_errors'] or 0) >= 100 or (item['git_failure_ratio'] or 0) >= 0.1)"
-    warn_expr: "item['metrics_available'] and ((item['k8s_api_errors'] or 0) > 0 or (item['git_failure_ratio'] or 0) >= 0.01 or (item['redis_failure_ratio'] or 0) >= 0.01 or (item['grpc_errors'] or 0) > 0 or (item['repo_pending_requests'] or 0) > 10)"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "(item['cluster_connection_ok'] is False or (item['k8s_api_errors'] or 0) >= 100 or (item['git_failure_ratio'] or 0) >= 0.1)"
+    warn_expr: "((item['k8s_api_errors'] or 0) > 0 or (item['git_failure_ratio'] or 0) >= 0.01 or (item['redis_failure_ratio'] or 0) >= 0.01 or (item['grpc_errors'] or 0) > 0 or (item['repo_pending_requests'] or 0) > 10)"
   target: "'cluster'"
   evidence: "f\"cluster connection {item['cluster_connection_ok']}, cache age {item['cluster_cache_age_s']}s, k8s API 5xx/429 {item['k8s_api_errors']}, git requests {item['git_requests']} / failures {item['git_failures']} ({item['git_failure_ratio']}), redis failures {item['redis_failed']}/{item['redis_total']}, repo-server pending {item['repo_pending_requests']}, gRPC errors {item['grpc_errors']} (PermissionDenied {item['grpc_permission_denied']} and Unauthenticated {item['grpc_unauthenticated']} counted separately)\""
   severity_default: medium
@@ -3743,7 +3745,7 @@
             - "repo-server"
             - "server"
           exec_enabled_flag: false
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           version: "2.13.0"
@@ -4098,9 +4100,11 @@
   each: argocdctl.summary
   cluster_level: true
   rule:
-    warn_expr: "item['present'] and not item['metrics_available']"
+    needs: "item['present']"
+    needs_reason: "argocd not present"
+    warn_expr: "not item['metrics_available'] or len(item.get('pods_unread') or []) > 0"
   target: "'cluster'"
-  evidence: "f\"no metrics under metrics/pod/argocd-*/ — Prometheus does not scrape argocd_* (no ServiceMonitor) and neither the pod proxy nor node access could read them. {item['applications']} Applications were read as objects\""
+  evidence: "f\"{'no metrics under metrics/pod/argocd-*/ — Prometheus does not scrape argocd_* (no ServiceMonitor) and neither the pod proxy nor node access could read them' if not item['metrics_available'] else 'metrics of ' + ', '.join(item.get('pods_unread') or []) + ' could not be read (the pod proxy failed and no node could reach them); the other pods answered, so the sync, Git and API figures are partial'}. {item['applications']} Applications were read as objects\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -4250,6 +4254,89 @@
           notifications_configured: false
           notifications_triggers: 0
           metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_with_namespace_or_crd: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          pods_unread:
+            - "argocd-repo-server-7c9f6f8b5d-x2k4q"
           sync_failed: 10
           sync_total: 1304
           sync_failure_ratio: 0.0077

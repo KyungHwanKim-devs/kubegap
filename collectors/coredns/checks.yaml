@@ -6,8 +6,10 @@
   each: coredns.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and (item['qps_total'] or 0) >= 5 and (item['nxdomain_ratio'] or 0) >= 0.6"
-    warn_expr: "item['metrics_available'] and (item['qps_total'] or 0) >= 5 and (item['nxdomain_ratio'] or 0) >= 0.4"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "(item['qps_total'] or 0) >= 5 and (item['nxdomain_ratio'] or 0) >= 0.6"
+    warn_expr: "(item['qps_total'] or 0) >= 5 and (item['nxdomain_ratio'] or 0) >= 0.4"
   target: "'cluster'"
   evidence: "f\"NXDOMAIN share of responses in 1h {item['nxdomain_ratio']}, queries per second {item['qps_total']}, NXDOMAIN share of queries forwarded upstream {item['forward_nxdomain_ratio']} (upstreams {item['upstreams']}), pods with default ndots (5) {item['pods_default_ndots']}, autopath {item['autopath']}, cache hit ratio {item['cache_hit_ratio']}\""
   severity_default: medium
@@ -223,7 +225,7 @@
             - "coredns"
           forward_to:
             - "/etc/resolv.conf"
-      - expect: "pass"
+      - expect: "skip"
         item:
           present: true
           version: "1.11.3"
@@ -758,8 +760,10 @@
   each: coredns.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and (item['qps_total'] or 0) >= 5 and (item['cache_hit_ratio'] or 1) < 0.3"
-    warn_expr: "item['metrics_available'] and (item['qps_total'] or 0) >= 5 and (item['cache_hit_ratio'] or 1) < 0.5"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "(item['qps_total'] or 0) >= 5 and (item['cache_hit_ratio'] or 1) < 0.3"
+    warn_expr: "(item['qps_total'] or 0) >= 5 and (item['cache_hit_ratio'] or 1) < 0.5"
   target: "'cluster'"
   evidence: "f\"cache hit ratio {item['cache_hit_ratio']} (1h), cache TTL {item['cache_ttl']}s, queries per second {item['qps_total']}, NXDOMAIN share of queries forwarded upstream {item['forward_nxdomain_ratio']}\""
   severity_default: low
@@ -925,7 +929,9 @@
   each: coredns.summary
   cluster_level: true
   rule:
-    warn_expr: "item['metrics_available'] and not item['cluster_ipv6'] and (item['qps_total'] or 0) >= 5 and (item['aaaa_ratio'] or 0) >= 0.4"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    warn_expr: "not item['cluster_ipv6'] and (item['qps_total'] or 0) >= 5 and (item['aaaa_ratio'] or 0) >= 0.4"
   target: "'cluster'"
   evidence: "f\"AAAA share of request types {item['aaaa_ratio']}, cluster IPv6 {item['cluster_ipv6']}, queries per second {item['qps_total']}. The glibc resolver always asks A and AAAA as a pair\""
   severity_default: low
@@ -1095,8 +1101,10 @@
   each: coredns.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and ((item['forward_servfail_ratio'] or 0) >= 0.2 or (item['max_concurrent_rejects_1h'] or 0) > 0)"
-    warn_expr: "item['metrics_available'] and ((item['forward_servfail_ratio'] or 0) >= 0.05 or (item['forward_healthcheck_failures_1h'] or 0) > 0 or (item['forward_servfail_1h'] or 0) > 0)"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "((item['forward_servfail_ratio'] or 0) >= 0.2 or (item['max_concurrent_rejects_1h'] or 0) > 0)"
+    warn_expr: "((item['forward_servfail_ratio'] or 0) >= 0.05 or (item['forward_healthcheck_failures_1h'] or 0) > 0 or (item['forward_servfail_1h'] or 0) > 0)"
   target: "'cluster'"
   evidence: "f\"upstreams {item['upstreams']}: SERVFAIL in 1h {item['forward_servfail_1h']} ({item['forward_servfail_ratio']}), health check failures {item['forward_healthcheck_failures_1h']}, max_concurrent rejections {item['max_concurrent_rejects_1h']}, overall SERVFAIL ratio {item['servfail_ratio']}\""
   severity_default: medium
@@ -1360,7 +1368,9 @@
   each: coredns.summary
   cluster_level: true
   rule:
-    expr: "item['metrics_available'] and ((item['panics_1h'] or 0) > 0 or (item['reload_failed_1h'] or 0) > 0)"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    expr: "((item['panics_1h'] or 0) > 0 or (item['reload_failed_1h'] or 0) > 0)"
   target: "'cluster'"
   evidence: "f\"panics in 1h {item['panics_1h']}, reload failures {item['reload_failed_1h']}, restarts total {item['restarts_total']}\""
   severity_default: high
@@ -1524,7 +1534,9 @@
   each: coredns.summary
   cluster_level: true
   rule:
-    warn_expr: "item['metrics_available'] and (item['qps_skew'] or 1) >= 3 and (item['qps_total'] or 0) >= 10"
+    needs: "item['metrics_available']"
+    needs_reason: "metrics not read"
+    warn_expr: "(item['qps_skew'] or 1) >= 3 and (item['qps_total'] or 0) >= 10"
   target: "'cluster'"
   evidence: "f\"queries per second by pod {item['qps_by_pod']}, max/min {item['qps_skew']}×\""
   severity_default: low

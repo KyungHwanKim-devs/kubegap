@@ -6,8 +6,10 @@
   each: stackhealth.prometheus
   cluster_level: true
   rule:
-    expr: "item['present'] and ((item['rss_vs_limit'] or 0) >= 0.9)"
-    warn_expr: "item['present'] and ((item['rss_vs_limit'] or 0) >= 0.75 or item['oomkilled_last'] or len(item['monitoring_oomkilled'] or []) > 0)"
+    needs: "item['present']"
+    needs_reason: "prometheus not present"
+    expr: "((item['rss_vs_limit'] or 0) >= 0.9)"
+    warn_expr: "((item['rss_vs_limit'] or 0) >= 0.75 or item['oomkilled_last'] or len(item['monitoring_oomkilled'] or []) > 0)"
   target: "item['target']"
   evidence: "f\"working set / limit {item['rss_vs_limit']} (limit {item['memory_limit']}), active series {item['head_series']}, Prometheus container last terminated OOMKilled {item['oomkilled_last']} ({item['oomkilled_at']}), restarts {item['restarts']}, OOMKilled containers in the monitoring namespace {item['monitoring_oomkilled']}, restarts over 7 days {item['monitoring_restarts_7d']}\""
   severity_default: high
@@ -449,8 +451,10 @@
   each: stackhealth.prometheus
   cluster_level: true
   rule:
-    expr: "item['present'] and ((item['pvc_used_ratio'] or 0) >= 0.85 or (item['compactions_failed_7d'] or 0) > 0 or (item['wal_corruptions'] or 0) > 0)"
-    warn_expr: "item['present'] and ((item['pvc_used_ratio'] or 0) >= 0.7 or item['retention_shortfall'] or item['storage'] == 'emptyDir' or (item['corruption_count'] or 0) > 0)"
+    needs: "item['present']"
+    needs_reason: "prometheus not present"
+    expr: "((item['pvc_used_ratio'] or 0) >= 0.85 or (item['compactions_failed_7d'] or 0) > 0 or (item['wal_corruptions'] or 0) > 0)"
+    warn_expr: "((item['pvc_used_ratio'] or 0) >= 0.7 or item['retention_shortfall'] or item['storage'] == 'emptyDir' or (item['corruption_count'] or 0) > 0)"
   target: "item['target']"
   evidence: "f\"storage {item['storage']} (PVC {item['pvc_size']}), PVC usage {item['pvc_used_ratio']}, TSDB {round((item['tsdb_bytes'] or 0)/1024**3, 1)}GiB, retention {item['retention_time']} (size cap {item['retention_size']}), actual oldest sample {item['oldest_sample_days']} days, failed compactions over 7 days {item['compactions_failed_7d']}, WAL corruptions {item['wal_corruptions']}, corruptions at startup {item['corruption_count']}\""
   severity_default: high
@@ -1001,8 +1005,10 @@
   each: stackhealth.prometheus
   cluster_level: true
   rule:
-    expr: "item['present'] and (item['head_series'] or 0) >= 2000000"
-    warn_expr: "item['present'] and ((item['head_series'] or 0) >= 1000000 or (item['top_metric_share'] or 0) >= 0.25)"
+    needs: "item['present']"
+    needs_reason: "prometheus not present"
+    expr: "(item['head_series'] or 0) >= 2000000"
+    warn_expr: "((item['head_series'] or 0) >= 1000000 or (item['top_metric_share'] or 0) >= 0.25)"
   target: "item['target']"
   evidence: "f\"active series {item['head_series']} (label pairs {item['label_pairs']}), top metrics {[(x['name'], x['series']) for x in (item['top_metrics'] or [])[:5]]}, share of the top metric {item['top_metric_share']}, histogram bucket series among the top 10 {item['top10_bucket_series']}, labels with many values {item['top_labels_by_values']}\""
   severity_default: medium
@@ -1446,8 +1452,10 @@
   each: stackhealth.prometheus
   cluster_level: true
   rule:
-    expr: "item['present'] and len(item['sample_limit_exceeded_1h'] or {}) > 0"
-    warn_expr: "item['present'] and len(item['slow_scrape_jobs'] or []) > 0"
+    needs: "item['present']"
+    needs_reason: "prometheus not present"
+    expr: "len(item['sample_limit_exceeded_1h'] or {}) > 0"
+    warn_expr: "len(item['slow_scrape_jobs'] or []) > 0"
   target: "item['target']"
   evidence: "f\"scrape interval {round(item['scrape_interval_s'] or 0)}s, jobs exceeding half the interval {item['slow_scrape_jobs']}, slowest {item['scrape_top']}, jobs exceeding sampleLimit in the last hour {item['sample_limit_exceeded_1h']}\""
   severity_default: medium
@@ -1787,8 +1795,10 @@
   each: stackhealth.prometheus
   cluster_level: true
   rule:
-    expr: "item['present'] and ((item['rule_iterations_missed_1d'] or 0) > 0 or (item['rule_eval_ratio_max'] or 0) >= 0.8)"
-    warn_expr: "item['present'] and (item['rule_eval_ratio_max'] or 0) >= 0.5"
+    needs: "item['present']"
+    needs_reason: "prometheus not present"
+    expr: "((item['rule_iterations_missed_1d'] or 0) > 0 or (item['rule_eval_ratio_max'] or 0) >= 0.8)"
+    warn_expr: "(item['rule_eval_ratio_max'] or 0) >= 0.5"
   target: "item['target']"
   evidence: "f\"top evaluation duration / interval {item['rule_eval_ratio_top']}, skipped evaluations over 24 hours {item['rule_iterations_missed_1d']}\""
   severity_default: medium
@@ -2230,8 +2240,10 @@
   each: stackhealth.prometheus
   cluster_level: true
   rule:
-    expr: "item['present'] and ((item['notifications_dropped_1d'] or 0) > 0 or item['reload_success'] is False)"
-    warn_expr: "item['present'] and len(item['notifications_errors_1d'] or {}) > 0"
+    needs: "item['present']"
+    needs_reason: "prometheus not present"
+    expr: "((item['notifications_dropped_1d'] or 0) > 0 or item['reload_success'] is False)"
+    warn_expr: "len(item['notifications_errors_1d'] or {}) > 0"
   target: "item['target']"
   evidence: "f\"notifications dropped over 24 hours {item['notifications_dropped_1d']}, send errors per Alertmanager address {item['notifications_errors_1d']}, last config reload successful {item['reload_success']} (config time {item['last_config_time']})\""
   severity_default: high
@@ -2674,7 +2686,9 @@
   each: stackhealth.prometheus
   cluster_level: true
   rule:
-    warn_expr: "item['present'] and (item['replicas'] or 0) <= 1"
+    needs: "item['present']"
+    needs_reason: "prometheus not present"
+    warn_expr: "(item['replicas'] or 0) <= 1"
   target: "item['target']"
   evidence: "f\"Prometheus StatefulSet replicas {item['replicas']} (ready {item['ready']}), restarts {item['restarts']}, started {item['start_time']}\""
   severity_default: low
@@ -2911,7 +2925,9 @@
   each: stackhealth.prometheus
   cluster_level: true
   rule:
-    warn_expr: "item['present'] and item['version'] is not None and (item['major'] or 0) < 3 and int(str(item['version']).split('.')[1]) < 53"
+    needs: "item['present']"
+    needs_reason: "prometheus not present"
+    warn_expr: "item['version'] is not None and (item['major'] or 0) < 3 and int(str(item['version']).split('.')[1]) < 53"
   target: "item['target']"
   evidence: "f\"Prometheus {item['version']} — 2.53 is the last 2.x LTS (2024-07), 3.0 was released 2024-11\""
   severity_default: low

@@ -268,7 +268,11 @@ def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log:
         region = cfg.get("aws_region") or eks.get("region")
         d, r = aws.aws_json(["ssm", "describe-instance-information", "--max-results", "50"], profile=prof, region=region, id="discover.ssm-instances", log=log)
         if d is None:
+            # the registration list is the gate for every send-command; without it no node is known to be reachable, so no command is sent
             out["ssm_error"] = r.error or r.stderr.strip()[-200:]
+            out["method"] = "none"
+            out["ssm_unregistered"] = None  # not "none unregistered": the list was not read, so eks.ssm-unregistered skips
+            out["reasons"] = [*out.get("reasons", []), f"ssm describe-instance-information failed, no node command is sent: {out['ssm_error'][:160]}"]
         else:
             online = {i["InstanceId"]: i.get("PingStatus") for i in d.get("InstanceInformationList", [])}
             for n in nodes["nodes"]:

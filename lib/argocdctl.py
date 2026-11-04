@@ -16,7 +16,7 @@ from collections import Counter
 from pathlib import Path
 
 from .promtext import parse as _parse_prom
-from .snapshot import objects
+from .snapshot import load_json, objects
 
 
 def _ver(image: str | None):
@@ -239,8 +239,12 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             if labels.get("failed") == "true":
                 redis_failed += int(v)
     # collect.yaml's keep filter keeps only 4xx/5xx k8s request lines, so without a 200 line the total is unknown.
+    # the pod-metrics steps record every pod they tried; a pod that neither the proxy nor a node could read is named here, so one answering pod does not hide another's silence
+    steps = ((load_json(snap / "collect-result.json") or {}).get("argocd") or {}).get("steps") or {}
+    pods_unread = sorted(pod for st in steps.values() if isinstance(st, dict) for pod, r in (st.get("pods") or {}).items() if isinstance(r, dict) and not r.get("ok") and not str(r.get("skipped") or "").startswith("pod not Running"))
     metrics = {
         "available": bool(ctl or repo or srv),
+        "pods_unread": pods_unread,
         "controller_pods": list(ctl),
         "repo_pods": list(repo),
         "server_pods": list(srv),
@@ -312,6 +316,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "notifications_configured": config["notifications_configured"],
         "notifications_triggers": len(config["notifications_triggers"]),
         "metrics_available": metrics["available"],
+        "pods_unread": metrics["pods_unread"],
         "sync_failed": metrics["sync_failed"],
         "sync_total": metrics["sync_total"],
         "sync_failure_ratio": round(metrics["sync_failed"] / metrics["sync_total"], 4) if metrics["sync_total"] else None,

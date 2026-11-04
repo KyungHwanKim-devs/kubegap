@@ -671,14 +671,20 @@ class _Run:
         self.counts: Counter = Counter()
         self._by_target: dict[str, dict] = {}
         self.gone_nodes: set[str] = set()
+        self.skipped_reasons: Counter = Counter()
 
     def emit(self, env: dict, default_target: str, source: str) -> None:
         check, cx = self.check, self.cx
-        st = _status(self.rule, env)
         target = str(_eval(check["target"], env)) if check.get("target") else default_target
         if _excluded(check["id"], target, cx.profile) or (cx.ns_profiles and _ns_profile_disables(check["id"], target, env, cx.ns_profiles)):
             self.counts["excluded"] += 1
             return
+        if self.rule.get("needs") and not _eval(self.rule["needs"], env):
+            # The rule says what it needs to judge (`needs`); without it the target is not judged, never passed. Counted and named in the result so the report says "N of M not judged: <reason>"
+            self.counts["skipped"] += 1
+            self.skipped_reasons[self.rule.get("needs_reason") or f"needs {self.rule['needs']}"] += 1
+            return
+        st = _status(self.rule, env)
         self.counts[st] += 1
         if st not in ("fail", "warn"):
             return
@@ -708,9 +714,14 @@ class _Run:
         self.counts["gone_node"] += 1
 
     def done(self) -> dict:
+        reasons = "; ".join(f"{r} ({n})" if n > 1 else r for r, n in self.skipped_reasons.most_common())
+        if self.counts.get("skipped") and not any(self.counts.get(k) for k in ("pass", "fail", "warn", "excluded", "gone_node")):
+            return {**self.skip(f"nothing to judge: {reasons}"), "counts": dict(self.counts)}  # every target lacked what the rule needs: the check is skipped, not passed
         out = {"status": "done", "counts": dict(self.counts), "findings": self.findings}
         if self.gone_nodes:
             out["gone_nodes"] = sorted(self.gone_nodes)
+        if self.counts.get("skipped"):
+            out["skipped_reason"] = reasons  # some targets were judged, these were not; render lists them in section 7-5
         return out
 
     @staticmethod
@@ -911,8 +922,12 @@ def _eval_inventory(cx: Context, check: dict, run: _Run) -> dict:
             rec = ItemRecorder(item) if isinstance(item, dict) else item
             run.emit({**run.base_env, "item": rec, "key": key, "prod": False}, default_target, "inventory.json:" + check["each"])
         return run.done()
-    if check["type"] == "inventory" and check["id"].startswith("eks.") and not (cx.inv.get("cluster") or {}).get("eks"):
-        return run.skip("not EKS")
+    eks = (cx.inv.get("cluster") or {}).get("eks")
+    if check["type"] == "inventory" and check["id"].startswith("eks."):
+        if not eks:
+            return run.skip("not EKS")
+        if isinstance(eks, dict) and eks.get("error"):
+            return run.skip(f"EKS facts not read (eks describe-cluster: {str(eks['error'])[:120]})")  # discover keeps name, region and the error only; a rule on those facts would judge nothing
     run.emit({**run.base_env, "prod": False}, "cluster", "inventory.json")
     return run.done()
 
@@ -994,6 +1009,8 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
             results.append(rec)
             continue
         rec.update(status=r["status"], counts=r.get("counts"), reason=r.get("reason"), thresholds=thresholds)
+        if r.get("skipped_reason"):
+            rec["skipped_reason"] = r["skipped_reason"]
         if r.get("gone_nodes"):
             rec["gone_nodes"] = r["gone_nodes"]  # node series the inventory no longer lists: left within the metric window, not judged
         for f in r["findings"]:
