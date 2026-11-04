@@ -334,11 +334,13 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w(L("### 7-1. Collectors and steps run"))
     w("")
     rows = []
+    failed_steps: list[tuple[str, str]] = []  # the one list of failed steps: the Failed column, the count below it and the header row all read it (#132)
     for name, c in cr.items():
         if name.startswith("_") or not isinstance(c, dict):
             continue
         steps = c.get("steps") or {}
         failed = [sid for sid, st in steps.items() if isinstance(st, dict) and st.get("ok") is False and not st.get("skipped")]
+        failed_steps += [(f"{name}.{sid}", str(steps[sid].get("error") or "")) for sid in failed]
         skipped = [f"{sid} ({st.get('skipped')})" for sid, st in steps.items() if isinstance(st, dict) and st.get("skipped")]
         rows.append([name, len(steps), ", ".join(failed) or "", "; ".join(skipped) or (c.get("skipped") or "")])
     w(_table(["Collector", "Steps", "Failed", "Skipped (reason)"], rows))
@@ -349,10 +351,9 @@ def render_details(snap: Path, language: str = "en") -> Path:
     sm = cr.get("_summary") or {}
     run = summary.get("run") or {}
     w("")
-    w(
-        f"{run.get('commands') or '?'} commands, {sm.get('seconds_total')} s. Failed commands (run.log): {len(run.get('failed') or [])}"
-        + (": " + "; ".join(f"`{f.get('id')}` {_cell(str(f.get('error') or '')[:120])}" for f in (run.get("failed") or [])[:20]) if run.get("failed") else "")
-    )
+    # Until #132 this line counted run.log exit codes while the table above read collect-result.json, and the two disagreed for a tool that exits 0 without
+    # reading the cluster (kubent, pluto): the step is failed, its command is not.
+    w(f"{run.get('commands') or '?'} commands, {sm.get('seconds_total')} s. Failed steps: {len(failed_steps)}" + (": " + "; ".join(f"`{sid}` {_cell(err[:120])}" for sid, err in failed_steps[:20]) if failed_steps else ""))
     w("")
     w(L("### 7-2. Checks evaluated"))
     w("")

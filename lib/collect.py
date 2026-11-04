@@ -466,33 +466,45 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     ok = r.ok and out.is_file() and out.stat().st_size > 0
     read = None
     error = r.error or r.stderr.strip()[-300:] or "no output"
+    counts: dict = {}
     if tool in ("kubent", "pluto"):
         read = False
+        stderr = mask.strip_control(r.stderr)[0]  # kubent's zerolog ConsoleWriter colours field names (SGR sequences); lib/mask knows the shapes
+        # Both tools log one line per List and one more when it failed, and swallow the failure: kubent pkg/collector/cluster.go:121,124-125@0.7.3 at --log-level=debug
+        # (the default is Info, pkg/config/config.go:38; the step passes the flag), pluto pkg/discovery-api/discovery_api.go:114,117-118@v5.24.5 at -v=2. `Retrieving` minus
+        # `Failed to retrieve` is the number of Lists that succeeded. A forbidden kind is a failed List, so the count never says the whole API was read (#132).
+        # Observed 2026-11-04 with the pinned binaries: kubent 41 started / 13 failed and pluto 126 / 7 on k3s, 41 / 13 and 111 / 10 on EKS, 0 / 0 against a context that does not exist.
+        started = len(re.findall(r"\bRetrieving ?: ", stderr))
+        counts = {"lists_failed": len(re.findall(r"\bFailed to retrieve: ", stderr))}
+        counts["lists_ok"] = max(started - counts["lists_failed"], 0)
         if ok:
             try:
                 doc = json.loads(out.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 doc = None
-            stderr = mask.strip_control(r.stderr)[0]  # kubent's zerolog ConsoleWriter colours field names (SGR sequences); lib/mask knows the shapes
             if tool == "kubent":
-                # kube-no-trouble cmd/kubent/main.go:49,56 and pkg/collector/cluster.go:119-142@0.7.3:
-                # list errors are swallowed; zero counts also mean no last-applied annotations, not proof of a read.
-                read = isinstance(doc, list) and bool(re.search(r"Retrieved [1-9][0-9]* resources from collector[^\n]*name=Cluster\b", stderr))
-                if "Failed to initialize collector" in r.stderr or "Failed to retrieve data from collector" in r.stderr:
+                # `Retrieved N resources from collector name=Cluster` (cmd/kubent/main.go:49) counts the objects that carry a last-applied-configuration annotation
+                # (cluster.go:129-130), so 0 is what a cluster managed by Helm or server-side apply prints after reading everything; a positive N is still evidence
+                # when the log carries no List lines. main.go:45,56: the collector failed to initialise or to return, whatever else the log says.
+                read = isinstance(doc, list) and (counts["lists_ok"] > 0 or bool(re.search(r"Retrieved [1-9][0-9]* resources from collector[^\n]*name=Cluster\b", stderr)))
+                if "Failed to initialize collector" in stderr or "Failed to retrieve data from collector" in stderr:
                     read = False
             else:
-                # Pluto pkg/api/output.go:58@v5.24.5 omits empty items. discovery-api/discovery_api.go:121-122
-                # logs an empty successful List at -v=2. Its :168 count is ALWAYS zero (results is never populated),
-                # even after failed discovery; neither that count nor a "Retrieving" line proves a read.
-                read = isinstance(doc, dict) and (bool(doc.get("items")) or "No annotations for ResourceVer " in stderr)
+                # Pluto pkg/api/output.go:58@v5.24.5 omits empty items. discovery-api/discovery_api.go:121-122 logs an empty successful List at -v=2 (weaker than the
+                # List count: it needs some kind to be empty). Its :168 count is ALWAYS zero (results is never populated), even after failed discovery.
+                read = isinstance(doc, dict) and (counts["lists_ok"] > 0 or bool(doc.get("items")) or "No annotations for ResourceVer " in stderr)
             ok = bool(read)
             if not ok:
                 # The tail of stderr is not the reason: kubent ends every run with its `Loaded ruleset` lines. Keep the lines that say what happened.
                 why = [ln.strip() for ln in stderr.splitlines() if any(k in ln for k in ("Failed", "Retrieved", "ERR", "error"))]
                 error = f"{tool}: API resources not confirmed read" + (f"; {'; '.join(why[-3:])[-300:]}" if why else " (no item and no successful List in its log)")
+        elif tool == "pluto" and r.stdout.strip():
+            # pluto prints the error of detect-api-resources with fmt.Println, to stdout, and exits 1 (cmd/root.go:343-346@v5.24.5); stderr holds klog's
+            # `assuming default targetVersion` lines only, so the tail of stderr would not say why. Observed: `error creating Discovery REST Client: context "x" does not exist`.
+            error = "; ".join(x for x in (r.error, r.stdout.strip()[-300:], stderr.strip()[-300:]) if x)
     if echo:
         echo(f"    {'saved ' + st['out'] + f' ({out.stat().st_size // 1024} KB)' if ok else 'failed: ' + error}")
-    result = {"ok": ok, "seconds": round(r.seconds, 1) if hasattr(r, "seconds") else None, "error": None if ok else error}
+    result = {"ok": ok, "seconds": round(r.seconds, 1) if hasattr(r, "seconds") else None, "error": None if ok else error, **counts}
     if read is not None:
         result["api_read"] = bool(ok and read)
     return result

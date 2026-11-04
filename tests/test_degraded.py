@@ -309,6 +309,81 @@ def test_deprecated_tools_read_but_no_deprecations_pass(tmp_path, monkeypatch, t
     assert verdict["status"] == "done" and verdict["findings"] == []
 
 
+KUBENT_DEBUG = "DBG Retrieving: deployments.v1.apps\nDBG Retrieving: podsecuritypolicies.v1beta1.policy\nDBG Failed to retrieve: policy/v1beta1, Resource=podsecuritypolicies: the server could not find the requested resource\nDBG Retrieving: ingresses.v1.networking.k8s.io\nINF Retrieved 0 resources from collector name=Cluster"
+PLUTO_V2 = "I1104 discovery_api.go:114] Retrieving : deployments.v1.apps\nI1104 discovery_api.go:117] Failed to retrieve: /v1, Resource=bindings the server could not find the requested resource\nI1104 discovery_api.go:114] Retrieving : ingresses.v1.networking.k8s.io"
+
+
+@pytest.mark.parametrize(
+    "tool,doc,stderr,lists",
+    [
+        ("kubent", [], KUBENT_DEBUG, (2, 1)),  # three Lists started, one failed: read, although no object carried the annotation (a Helm or server-side-apply cluster)
+        ("kubent", [], "\x1b[90m10:20PM\x1b[0m \x1b[33mDBG\x1b[0m Retrieving: deployments.v1.apps\nINF Retrieved 0 resources from collector name=Cluster", (1, 0)),  # coloured
+        ("pluto", {"target-versions": {"k8s": "v1.33.0"}}, PLUTO_V2, (1, 1)),  # no items and no empty List line, but one List succeeded
+    ],
+)
+def test_deprecated_tools_successful_lists_are_read_evidence(tmp_path, monkeypatch, tool, doc, stderr, lists):
+    """#132: `Retrieving` minus `Failed to retrieve` (kubent pkg/collector/cluster.go:121,124@0.7.3 at --log-level=debug; pluto pkg/discovery-api/discovery_api.go:114,117@v5.24.5
+    at -v=2) counts the Lists that succeeded. kubent's `Retrieved N` counts annotated objects only (cluster.go:129-130), so 0 after a full read is the normal case on a
+    cluster managed by Helm or server-side apply, and until this change every full run of such a cluster had a failed kubent step."""
+    result = _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr)
+    assert result["ok"] is True and result["api_read"] is True
+    assert (result["lists_ok"], result["lists_failed"]) == lists
+    summary, verdict = _deprecated_result(tmp_path)
+    assert summary[f"{tool}_read"] is True and (summary[f"{tool}_lists_ok"], summary[f"{tool}_lists_failed"]) == lists
+    assert verdict["status"] == "done" and verdict["findings"] == []
+
+
+def test_deprecated_tools_every_list_failed_is_not_a_read(tmp_path, monkeypatch):
+    """Two Lists started, two failed (an unreachable server reports every List as failed in kubent; pluto prints nothing): no evidence, the step fails, the check skips."""
+    result = _deprecated_tool(
+        tmp_path,
+        monkeypatch,
+        "kubent",
+        [],
+        "DBG Retrieving: a.v1\nDBG Failed to retrieve: a: dial tcp: connection refused\nDBG Retrieving: b.v1\nDBG Failed to retrieve: b: dial tcp: connection refused\nINF Retrieved 0 resources from collector name=Cluster",
+    )
+    assert result["ok"] is False and (result["lists_ok"], result["lists_failed"]) == (0, 2)
+    assert "not confirmed read" in result["error"] and "Failed to retrieve: b" in result["error"]
+    summary, verdict = _deprecated_result(tmp_path)
+    assert summary["kubent_read"] is False and summary["kubent_lists_ok"] == 0 and summary["kubent_lists_failed"] == 2 and verdict["status"] == "skip"
+
+
+def test_a_failed_list_does_not_count_the_collector_level_failure_line(tmp_path, monkeypatch):
+    """kubent's `Failed to retrieve data from collector` (cmd/kubent/main.go:45) is the collector failing, not one List; it still vetoes the read."""
+    result = _deprecated_tool(tmp_path, monkeypatch, "kubent", [], "DBG Retrieving: a.v1\nERR Failed to retrieve data from collector name=Cluster")
+    assert result["ok"] is False and (result["lists_ok"], result["lists_failed"]) == (1, 0) and result["api_read"] is False
+
+
+def test_pluto_error_printed_to_stdout_reaches_the_step_error(tmp_path, monkeypatch):
+    """pluto prints the detect-api-resources error with fmt.Println, to stdout, and exits 1 (cmd/root.go:343-346@v5.24.5); stderr has only klog's target-version lines (#132)."""
+    import os
+    import shlex
+
+    from lib import collect
+
+    bindir = tmp_path / "fakebin"
+    bindir.mkdir()
+    fake = bindir / "pluto"
+    fake.write_text(
+        "#!/bin/sh\nprintf '%s\\n' "
+        + shlex.quote('error creating Discovery REST Client: context "x" does not exist')
+        + "\nprintf '%s\\n' "
+        + shlex.quote("I1104 root.go:259] assuming default targetVersion cert-manager v1.5.3")
+        + " >&2\nexit 1\n"
+    )
+    fake.chmod(0o700)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
+    step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == "pluto")
+    result = collect._run_tool_step(step, "pluto", "core", "x", None, tmp_path, RunLog(None), None, 10, None, inv={"cluster": {"server_version": "v1.32.0"}})
+    assert result["ok"] is False and result["api_read"] is False and result["lists_ok"] == 0
+    assert result["error"].startswith('error creating Discovery REST Client: context "x" does not exist; I1104 root.go:259] assuming default targetVersion')
+
+
+def test_kubent_step_asks_for_the_debug_log_level():
+    step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == "kubent")
+    assert "--log-level=debug" in step["cmd"]
+
+
 @pytest.mark.parametrize("steps", [{}, {"kubent": {"ok": True}}, {"kubent": {"ok": False, "api_read": True}}, {"kubent": {"ok": False, "tool_missing": "kubent"}}])
 def test_deprecated_output_without_confirmed_step_does_not_pass(tmp_path, steps):
     (tmp_path / "tools").mkdir()

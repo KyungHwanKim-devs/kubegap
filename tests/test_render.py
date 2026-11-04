@@ -178,10 +178,26 @@ def test_event_reason_and_failed_command_error_lines_cannot_open_a_block(tmp_pat
     diff = json.loads((s / "diff.json").read_text())
     diff["events"]["changed"][0]["reason"] = "BackOff\n```\n[x]: javascript:alert(1)"
     (s / "diff.json").write_text(json.dumps(diff))
-    summ = json.loads((s / "summary.json").read_text())
-    summ["run"] = {"commands": 5, "failed": [{"id": "core.top", "collector": "core", "error": "error from server\n```\n<script>x</script>"}]}
-    (s / "summary.json").write_text(json.dumps(summ))
+    cr = json.loads((s / "collect-result.json").read_text())
+    cr["core"]["steps"]["top"]["error"] = "error from server\n```\n<script>x</script>"
+    (s / "collect-result.json").write_text(json.dumps(cr))
     text = render.render_details(s).read_text()
     assert "BackOff ``` [x]: javascript:alert(1) +3" in text
     assert "`core.top` error from server ``` < script>x< /script>" in text
     assert not any(ln.startswith("```") for ln in text.splitlines()), "no fence opened by a cluster string (this snapshot has no details block)"
+
+
+def test_failed_steps_are_counted_from_collect_result_not_from_exit_codes(tmp_path):
+    """#132: kubent and pluto exit 0 when their read is not confirmed, so run.log lists no failed command while collect-result.json has the failed step.
+    The header row, the Failed column and the count under the table read the same list."""
+    s = _snap(tmp_path, False)
+    cr = json.loads((s / "collect-result.json").read_text())
+    cr["core"]["steps"]["kubent"] = {"ok": False, "api_read": False, "lists_ok": 0, "lists_failed": 2, "error": "kubent: API resources not confirmed read; DBG Failed to retrieve: x"}
+    (s / "collect-result.json").write_text(json.dumps(cr))
+    summ = json.loads((s / "summary.json").read_text())
+    summ["run"] = {"commands": 5, "failed": []}  # what run.log says: every command exited 0
+    (s / "summary.json").write_text(json.dumps(summ))
+    text = render.render_details(s).read_text()
+    assert "| core | 4 | top, kubent | krr (not collected in daily mode) |" in text
+    assert "5 commands, 60 s. Failed steps: 2: `core.top` boom; `core.kubent` kubent: API resources not confirmed read; DBG Failed to retrieve: x" in text
+    assert "run.log" not in text
