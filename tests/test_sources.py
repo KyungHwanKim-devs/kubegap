@@ -12,7 +12,7 @@ from lib import paths, signatures, yamlite
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "references" / "sources.md"
-CITATION = re.compile(r"[\w./-]+\.(?:go|py|rego|toml|yaml):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+")
+CITATION = re.compile(r"[\w./-]+\.(?:go|py|rego|toml|yaml|txt|pdf):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+")
 KUBEGAP_LOCATION = re.compile(r"`(lib/[\w/]+\.py)(?::(\w+))?`|step `([\w.-]+)`|check `([\w.-]+)`|`([A-Za-z_]\w*)`")
 
 
