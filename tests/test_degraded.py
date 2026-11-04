@@ -240,3 +240,116 @@ def test_ssm_list_not_read_makes_ssm_unregistered_skip(tmp_path):
     c = next(c for c in _all_checks() if c["id"] == "eks.ssm-unregistered")
     r = evaluate.evaluate_check(c, cx, {})
     assert r["status"] == "skip" and "ssm_unregistered missing" in r["reason"]
+
+
+# The pinned binaries can exit 0 without reading the cluster (#117).
+def _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr, code=0):
+    import os
+    import shlex
+
+    from lib import collect
+
+    bindir = tmp_path / "fakebin"
+    bindir.mkdir(exist_ok=True)
+    fake = bindir / tool
+    fake.write_text(f"#!/bin/sh\nprintf '%s\\n' {shlex.quote(json.dumps(doc))}\nprintf '%s\\n' {shlex.quote(stderr)} >&2\nexit {code}\n")
+    fake.chmod(0o700)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
+    step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == tool)
+    result = collect._run_tool_step(step, tool, "core", "unreachable", None, tmp_path, RunLog(None), None, 10, None)
+    (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {tool: result}}}))
+    return result
+
+
+def _deprecated_result(tmp_path):
+    from lib import hygiene
+
+    summary = hygiene._deprecated(hygiene._Ctx(tmp_path, {}))
+    check = next(c for c in _all_checks() if c["id"] == "hygiene.deprecated-api")
+    return summary, evaluate.evaluate_check(check, _ctx(tmp_path, {"hygiene": {"deprecated": summary}}), {})
+
+
+@pytest.mark.parametrize(
+    "tool,doc,stderr",
+    [
+        ("kubent", [], 'ERR Failed to initialize collector error="context unreachable does not exist"'),
+        ("kubent", [], "INF Retrieved 0 resources from collector name=Cluster"),
+        ("kubent", [], "INF Retrieved 10 resources from collector name=Helm v3"),
+        ("kubent", [], "INF Retrieved 10 resources from collector name=Cluster\nERR Failed to initialize collector"),
+        ("pluto", {"target-versions": {"k8s": "v1.33.0"}}, ""),
+        ("pluto", {"target-versions": {}}, "Result from resources: 0"),
+        ("pluto", {"items": []}, "Retrieving : deployments.v1.apps\nFailed to retrieve: connection refused"),
+    ],
+)
+def test_deprecated_tools_exit_zero_without_reading_skip(tmp_path, monkeypatch, tool, doc, stderr):
+    result = _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr)
+    assert result["ok"] is False and result["api_read"] is False
+    assert "not confirmed read" in result["error"]
+    summary, verdict = _deprecated_result(tmp_path)
+    assert summary[f"{tool}_present"] is True  # A nonempty output file is not read evidence.
+    assert summary["pluto_read"] is False and summary["kubent_read"] is False
+    assert summary["items"] is None and summary["count"] is None
+    assert verdict["status"] == "skip" and verdict["findings"] == []
+
+
+@pytest.mark.parametrize(
+    "tool,doc,stderr",
+    [
+        ("kubent", [], "INF Retrieved 12 resources from collector name=Cluster"),
+        ("kubent", [], "\x1b[32mINF\x1b[0m Retrieved 12 resources from collector \x1b[36mname=\x1b[0mCluster"),
+        ("pluto", {"target-versions": {"k8s": "v1.33.0"}}, "I1104 discovery_api.go:122] No annotations for ResourceVer apps/v1"),
+    ],
+)
+def test_deprecated_tools_read_but_no_deprecations_pass(tmp_path, monkeypatch, tool, doc, stderr):
+    result = _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr)
+    assert result["ok"] is True and result["api_read"] is True
+    summary, verdict = _deprecated_result(tmp_path)
+    assert summary[f"{tool}_read"] is True
+    assert summary["items"] == [] and summary["count"] == 0
+    assert verdict["status"] == "done" and verdict["findings"] == []
+
+
+@pytest.mark.parametrize("steps", [{}, {"kubent": {"ok": True}}, {"kubent": {"ok": False, "api_read": True}}, {"kubent": {"ok": False, "tool_missing": "kubent"}}])
+def test_deprecated_output_without_confirmed_step_does_not_pass(tmp_path, steps):
+    (tmp_path / "tools").mkdir()
+    (tmp_path / "tools/kubent.json").write_text("[]")
+    (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": steps}}))
+    summary, verdict = _deprecated_result(tmp_path)
+    assert summary["kubent_read"] is False and verdict["status"] == "skip"
+
+
+@pytest.mark.parametrize("tool", ["pluto", "kubent"])
+def test_deprecated_read_failure_overrides_success_log(tmp_path, monkeypatch, tool):
+    result = _deprecated_tool(tmp_path, monkeypatch, tool, [], "INF Retrieved 12 resources from collector name=Cluster\nNo annotations for ResourceVer apps/v1", code=1)
+    assert result["ok"] is False and result["api_read"] is False
+    assert _deprecated_result(tmp_path)[1]["status"] == "skip"
+
+
+def test_deprecated_one_successful_tool_keeps_findings_and_ignores_failed_output(tmp_path, monkeypatch):
+    doc = {"items": [{"name": "web", "namespace": "prod-a", "kind": "Ingress", "api": {"version": "networking.k8s.io/v1beta1"}, "deprecated": True, "removed": True}]}
+    pluto = _deprecated_tool(tmp_path, monkeypatch, "pluto", doc, "")
+    kubent = _deprecated_tool(tmp_path, monkeypatch, "kubent", [{"Name": "stale"}], "ERR Failed to initialize collector")
+    (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {"pluto": pluto, "kubent": kubent}}}))
+    summary, verdict = _deprecated_result(tmp_path)
+    assert summary["count"] == 1 and summary["pluto_read"] and not summary["kubent_read"]
+    assert verdict["status"] == "done" and verdict["counts"] == {"fail": 1}
+    assert verdict["findings"][0]["target"] == "prod-a/ingress/web"
+
+
+def test_pluto_step_keeps_exit_code_zero_when_it_finds_something():
+    """pluto exits 2 (deprecated), 3 (removed) or 4 (no replacement) unless told not to (pkg/api/output.go:333-341@v5.24.5; cmd/root.go:353 and :167 exit with it).
+    lib/shell.py writes the output file only on exit 0, so without the three flags tools/pluto.json was never written when pluto found something and
+    the check passed with no pluto rows; with the read evidence of this branch it would skip instead. The flags do not filter the items (FilterOutput, pkg/api/output.go:159-181). Observed with the pinned binary:
+    detect-files on a networking.k8s.io/v1beta1 Ingress exits 3 without the flags and 0 with them, with the same item in both JSONs."""
+    step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == "pluto")
+    assert {"--ignore-deprecations", "--ignore-removals", "--ignore-unavailable-replacements"} <= set(step["cmd"])
+
+
+def test_pluto_findings_with_exit_three_would_be_dropped(tmp_path, monkeypatch):
+    """What the flags prevent: a pluto that prints one removed item and exits 3 is a failed step whose output is never saved (lib/shell.py), its read
+    evidence is not computed, and the summary carries no items. The test documents the failure mode the flags exist for; it is not a behaviour to keep."""
+    doc = {"items": [{"name": "web", "namespace": "prod-a", "kind": "Ingress", "api": {"version": "networking.k8s.io/v1beta1"}, "deprecated": True, "removed": True}]}
+    result = _deprecated_tool(tmp_path, monkeypatch, "pluto", doc, "", code=3)
+    assert result["ok"] is False and result["api_read"] is False
+    summary, verdict = _deprecated_result(tmp_path)
+    assert summary["pluto_read"] is False and summary["items"] is None and verdict["status"] == "skip"
