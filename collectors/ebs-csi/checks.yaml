@@ -71,6 +71,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -123,6 +124,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -175,6 +177,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -227,6 +230,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -303,6 +307,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -355,6 +360,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -438,6 +444,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -491,6 +498,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -543,6 +551,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -616,6 +625,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -666,6 +676,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -715,6 +726,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -794,6 +806,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -846,6 +859,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h:
@@ -899,6 +913,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -951,6 +966,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -1026,6 +1042,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -1078,6 +1095,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -1130,6 +1148,7 @@
           publish_p99_s: 40.0
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -1182,6 +1201,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -1234,6 +1254,7 @@
           publish_p99_s: 1.0
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -1250,14 +1271,14 @@
     needs_reason: "controller not present"
     warn_expr: "not item['controller_metrics_enabled']"
   target: "'cluster'"
-  evidence: "f\"aws_ebs_csi_* series {0 if not item['controller_metrics_enabled'] else 'present'}, add-on {item['addon_version']}. When enabled, shows EC2 API errors {item['api_errors_24h']} / throttles {item['api_throttles_24h']}\""
+  evidence: "f\"controller EC2 API request series {item['controller_metrics_series']}, driver {item['version']} (add-on {item['addon_version']}). When enabled, shows EC2 API errors {item['api_errors_24h']} / throttles {item['api_throttles_24h']}\""
   severity_default: low
   symptom_linked: false
   why: >
-    The controller can emit latency, error and throttle counters for every EC2 API call (aws_ebs_csi_api_request_*), but the EKS add-on default is off. When off, "is attach slow because of EC2 throttling" can only be guessed from the log signature (ebs-csi.throttled).
+    The controller can emit latency, error and throttle counters for every EC2 API call (aws_ebs_csi_api_request_* since driver v1.38.1, cloudprovider_aws_api_* before), but the metrics server only runs with --http-endpoint and the chart and add-on default (controller.enableMetrics) is off. When off, "is attach slow because of EC2 throttling" can only be guessed from the log signature (ebs-csi.throttled).
   suggest: "Add-on configurationValues: controller.enableMetrics true (+ kube-prometheus-stack picks up the ServiceMonitor by label)."
   verify:
-    - "count({__name__=~\"aws_ebs_csi_.*\"})"
+    - "count({__name__=~\"(aws_ebs_csi|cloudprovider_aws)_api_request_duration_seconds_count\"})"
   profiles: [prod]
   test:
     cases:
@@ -1308,6 +1329,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -1360,6 +1382,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: true
+          controller_metrics_series: 16
           api_errors_24h: {}
           api_throttles_24h: 0
           events_24h: {}
@@ -1432,6 +1455,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -1481,6 +1505,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}
@@ -1533,6 +1558,7 @@
           publish_p99_s: null
           storage_ops_failures_24h: 0
           controller_metrics_enabled: false
+          controller_metrics_series: 0
           api_errors_24h: {}
           api_throttles_24h: null
           events_24h: {}

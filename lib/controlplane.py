@@ -67,6 +67,18 @@ def _metric_scalar(snap: Path, qid: str) -> float | None:
         return None
 
 
+def _storage_objects_top(snap: Path) -> list[dict]:
+    """Top stored-object counts per resource. apiserver_resource_objects (group, resource) exists since Kubernetes 1.34 and replaces apiserver_storage_objects,
+    which is deprecated since 1.34.0 and hidden from 1.37; read the new query first and the old one when it is empty (before 1.34). One series per apiserver
+    instance, so keep one value per resource (the instances report the same count)."""
+    rows = _metric_rows(snap, "apiserver_resource_objects_top")
+    if rows:
+        counts = {(f"{r['metric'].get('resource')}.{r['metric']['group']}" if r["metric"].get("group") else r["metric"].get("resource")): max(_int(r["value"][1]), 0) for r in rows}
+    else:
+        counts = {r["metric"].get("resource"): max(_int(r["value"][1]), 0) for r in _metric_rows(snap, "apiserver_storage_objects_top")}
+    return sorted(({"resource": k, "count": v} for k, v in counts.items()), key=lambda x: -x["count"])[:15]
+
+
 def analyze(snap: Path, inv: dict | None) -> dict:
     inv = inv or {}
     platform = (inv.get("cluster") or {}).get("platform")
@@ -98,9 +110,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "p99_by_verb": p99,
         "p99_max": p99[0] if p99 else None,
         "watch_count": _metric_scalar(snap, "apiserver_watch_count"),
-        "storage_objects_top": sorted(({"resource": k, "count": v} for k, v in {r["metric"].get("resource"): max(_int(r["value"][1]), 0) for r in _metric_rows(snap, "apiserver_storage_objects_top")}.items()), key=lambda x: -x["count"])[
-            :15
-        ],  # one line per apiserver instance, so keep only one per resource
+        "storage_objects_top": _storage_objects_top(snap),
         "webhook_p99": webhook_p99[:10],
         "top_requests": [{"resource": r["metric"].get("resource"), "verb": r["metric"].get("verb"), "rps": round(float(r["value"][1]), 2)} for r in _metric_rows(snap, "apiserver_top_requests")],
         "inflight": {r["metric"].get("request_kind"): _int(r["value"][1]) for r in _metric_rows(snap, "apiserver_inflight")},

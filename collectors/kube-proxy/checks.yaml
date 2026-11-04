@@ -60,7 +60,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -115,7 +115,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -168,7 +168,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -221,7 +221,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -299,7 +299,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -352,7 +352,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -405,7 +405,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -482,7 +482,7 @@
             - "n1"
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -536,7 +536,7 @@
             - "n1"
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -589,7 +589,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -665,7 +665,7 @@
           restore_failures_24h: 3
           restore_failure_nodes:
             - "n1"
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -718,7 +718,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -793,7 +793,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -846,7 +846,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -899,7 +899,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -973,7 +973,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -1026,7 +1026,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes:
@@ -1082,7 +1082,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -1135,7 +1135,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -1161,7 +1161,7 @@
     expr: "(item['ct_invalid_dropped_1h'] or 0) >= 10000"
     warn_expr: "(item['ct_invalid_dropped_1h'] or 0) >= 500"
   target: "'cluster'"
-  evidence: "f\"conntrack INVALID drops over 1 hour {item['ct_invalid_dropped_1h']} packets (sum over nodes), services with externalTrafficPolicy Local {item['external_traffic_local']}, no-local-endpoints drops {item['no_local_endpoints_1h']}\""
+  evidence: "f\"conntrack INVALID drops over 1 hour {item['ct_invalid_dropped_1h']} packets (sum over nodes), services with externalTrafficPolicy Local {item['external_traffic_local']}, Services with a Local traffic policy and no endpoint on the node (max over nodes) {item['no_local_endpoint_services']}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -1215,7 +1215,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 25000
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -1268,7 +1268,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -1321,7 +1321,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 12
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -1395,7 +1395,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -1443,7 +1443,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []
@@ -1490,7 +1490,7 @@
           rules_pending_nodes: []
           restore_failures_24h: 0
           restore_failure_nodes: []
-          no_local_endpoints_1h: 0
+          no_local_endpoint_services: 0
           ct_invalid_dropped_1h: 1066
           programming_p99_s: null
           healthz_failing_nodes: []

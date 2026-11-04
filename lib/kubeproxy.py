@@ -6,7 +6,7 @@ metrics/kubeproxy_*.json, aws/describe-addon-kube-proxy.json(EKS), inventory(pla
 On k3s, kube-proxy is embedded in the k3s binary, so there is no DaemonSet or ConfigMap (embedded true) and its metrics appear mixed into the kubelet scrape instances (IP:10250, :6443) — same process, same values, so they are merged by node IP.
 
 Output: the `kubeproxy` section of summary.json: present, embedded, config (mode, metricsBindAddress, conntrack, syncPeriod, nodePortAddresses), daemonset (desired, ready, image, version, addon), scale (Service, EndpointSlice, endpoint counts),
-nodes[per node: mode, healthz, iptables rule count, sync p99, pending, last sync age, restore failures, no-local-endpoints, conntrack INVALID drops], metrics (cluster p99, programming p99, targets up/down), summary (for checks). Shape documented in SKILL.md.
+nodes[per node: mode, healthz, iptables rule count, sync p99, pending, last sync age, restore failures, Services with a Local policy and no local endpoint, conntrack INVALID drops], metrics (cluster p99, programming p99, targets up/down), summary (for checks). Shape documented in SKILL.md.
 """
 
 from __future__ import annotations
@@ -148,8 +148,20 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     put("kubeproxy_syncs_1h", "syncs_1h")
     put("kubeproxy_rules_pending_s", "rules_pending_s")
     put("kubeproxy_last_sync_age_s", "last_sync_age_s")
-    put("kubeproxy_restore_failures_24h", "restore_failures_24h")
-    put("kubeproxy_no_local_endpoints_1h", "no_local_endpoints_1h")
+    put("kubeproxy_restore_failures_24h", "restore_failures_full_24h")
+    put("kubeproxy_partial_restore_failures_24h", "restore_failures_partial_24h")
+    # two queries added here: since 1.33 each counter has a series only after its first failure (and ipvs mode registers only the full one), so one PromQL sum was empty whenever one side had no series
+    for d in per.values():
+        parts = [d[k] for k in ("restore_failures_full_24h", "restore_failures_partial_24h") if k in d]
+        if parts:
+            d["restore_failures_24h"] = sum(parts)
+    # a gauge of Services per node and traffic policy (internal, external): add the policies of one instance, keep the max over the scrape ports of one node (k3s serves the embedded proxy twice)
+    by_instance: dict[str, float] = {}
+    for lab, v in _rows(snap, "kubeproxy_no_local_endpoint_services"):
+        by_instance[lab.get("instance", "")] = by_instance.get(lab.get("instance", ""), 0.0) + v
+    for inst, v in by_instance.items():
+        d = per.setdefault(node_of(inst), {})
+        d["no_local_endpoint_services"] = max(d.get("no_local_endpoint_services", 0.0), v)
     put("kubeproxy_ct_invalid_dropped_1h", "ct_invalid_dropped_1h")
     for lab, v in _rows(snap, "kubeproxy_iptables_rules"):
         nd = node_of(lab.get("instance", ""))
@@ -188,7 +200,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "iptables_rules_total": sum(rules.values()) if rules else None,
                 "nat_rules": rules.get("nat"),
                 "restore_failures_24h": _r(d.get("restore_failures_24h"), 0),
-                "no_local_endpoints_1h": _r(d.get("no_local_endpoints_1h"), 0),
+                "no_local_endpoint_services": _r(d.get("no_local_endpoint_services"), 0),
                 "ct_invalid_dropped_1h": _r(d.get("ct_invalid_dropped_1h"), 0),
             }
         )
@@ -243,7 +255,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "rules_pending_nodes": [x["node"] for x in nodes if (x["rules_pending_s"] or 0) >= 60],
         "restore_failures_24h": sum(int(x["restore_failures_24h"] or 0) for x in nodes),
         "restore_failure_nodes": [x["node"] for x in nodes if (x["restore_failures_24h"] or 0) > 0],
-        "no_local_endpoints_1h": sum(int(x["no_local_endpoints_1h"] or 0) for x in nodes),
+        "no_local_endpoint_services": max((int(x["no_local_endpoint_services"] or 0) for x in nodes), default=0),
+        "no_local_endpoint_services_by_node": {x["node"]: int(x["no_local_endpoint_services"]) for x in nodes if (x["no_local_endpoint_services"] or 0) > 0},
         "ct_invalid_dropped_1h": sum(int(x["ct_invalid_dropped_1h"] or 0) for x in nodes),
         "programming_p99_s": metrics["programming_p99_s"],
         "healthz_failing_nodes": [x["node"] for x in nodes if x["healthz"] and x["healthz"] != "200"],

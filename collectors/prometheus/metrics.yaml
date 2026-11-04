@@ -110,6 +110,9 @@
 - id: prom_replicas
   why: Number of Prometheus instances (by up)
   query: count(up{job=~".*prometheus$"} == 1)
+  source:
+    - "up: prometheus/prometheus scrape/scrape.go:1726,1746@v2.49.1, :2055,2131@v3.7.3 (written by Prometheus for every scrape target, 1 when the scrape succeeded and 0 when it failed; it carries the target's job and instance labels, never an exporter label)"
+    - "label job on these up series: prometheus-operator/prometheus-operator pkg/prometheus/promcfg.go:1373-1376@v0.71.0, :2063-2066@v0.86.2 (job is the value of the Service label a ServiceMonitor's jobLabel names, else the Service name; which label kube-prometheus-stack sets on the Prometheus and Alertmanager Services is read with the other Prometheus-stack names in #123)"
 - id: am_reload_ok
   why: Whether the last Alertmanager config reload succeeded
   query: min(alertmanager_config_last_reload_successful)
