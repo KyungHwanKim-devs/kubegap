@@ -28,13 +28,14 @@ import re
 import shutil
 import stat
 import tarfile
+import tempfile
 import urllib.request
 import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import paths, shell
-from .snapshot import write_private_bytes
+from .snapshot import write_private, write_private_bytes
 
 
 @dataclass
@@ -320,14 +321,36 @@ def supported_host() -> tuple[bool, str]:
     return False, f"unsupported OS: {platform.system()}"
 
 
+_PIN_FILE = "kubegap-pin"  # written next to a venv install: the tag the tool was installed from, because the tool itself may not know its version (krr)
+
+
+def _venv_pin(path: str | None) -> str | None:
+    """The tag recorded when `install_in_venv` installed the executable at `path` (a symlink into `.tools/<name>-venv/`), else None."""
+    if not path:
+        return None
+    try:
+        real = Path(path).resolve()
+        venv = next((p for p in real.parents if p.parent == shell.TOOLS_DIR.resolve() and p.name.endswith("-venv")), None)
+        return (venv / _PIN_FILE).read_text(encoding="utf-8").strip() or None if venv else None
+    except OSError:
+        return None
+
+
 def tool_version(tool: Tool) -> str | None:
-    r = shell.run([tool.name, *tool.version_args], timeout=15)
+    # The probe runs from the temp directory, never from the current one: krr v1.31.1 ships `__version__ = "dev"` (robusta_krr/__init__.py:3, pyproject.toml:3 says 1.8.2-dev; only
+    # a release build patches it) and then prints `git describe --tags` of the working directory (robusta_krr/utils/version.py:13-24), which inside this repository is kubegap's
+    # own tag. A venv install reports the tag it was installed from (the pin file) and what the tool said, as two different facts.
+    r = shell.run([tool.name, *tool.version_args], timeout=15, cwd=Path(tempfile.gettempdir()))
     text = (r.stdout or "") + (r.stderr or "")
     if tool.name == "kubectl":
         m = re.search(r'"gitVersion":\s*"([^"]+)"', text)
         return m.group(1) if m else None
     m = _VERSION_RE.search(text)
-    return m.group(1) if m else (text.strip().splitlines()[0][:40] if text.strip() else None)
+    probe = m.group(1) if m else (text.strip().splitlines()[0][:40] if text.strip() else None)
+    pin = _venv_pin(shell.which(tool.name)) if tool.venv else None
+    if pin:
+        return pin if probe in (pin, pin.lstrip("v")) else f"{pin} (installed from that tag; the tool reports {probe or 'nothing'})"
+    return probe
 
 
 def _download_applicable(tool: Tool) -> bool:
@@ -578,7 +601,16 @@ def install_in_venv(tool: Tool, log=None) -> dict:
     if target.exists() or target.is_symlink():
         target.unlink()
     target.symlink_to(real)
-    return {"name": tool.name, "method": method, "ok": True, "error": None, "path": str(target), "python": py}
+    tag = _venv_tag(v)
+    if tag:
+        write_private(dest / _PIN_FILE, tag + "\n")
+    return {"name": tool.name, "method": method, "ok": True, "error": None, "path": str(target), "python": py, "version": tag}
+
+
+def _venv_tag(v: dict) -> str | None:
+    """The version tag inside a venv's pip source (`.../refs/tags/v1.31.1.tar.gz` or `name==1.2.3`), else None."""
+    m = re.search(r"refs/tags/([^/]+?)\.(?:tar\.gz|zip)$", str(v.get("pip") or "")) or re.search(r"==\s*([\w.+-]+)$", str(v.get("pip") or ""))
+    return m.group(1) if m else None
 
 
 def _tap_first(tool: Tool) -> bool:

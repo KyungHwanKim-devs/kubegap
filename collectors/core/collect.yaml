@@ -78,6 +78,7 @@
   type: tool
   tool: krr
   cmd: [krr, simple, -c, "{context}", -p, "{prometheus_url}", -f, json, -q, --logtostderr, --fileoutput, "{out}", --max-workers, "4"]
+  source: "krr: robusta_krr/main.py:78-80@v1.31.1 (-c/--context), :113-114 (-p), :249-250 (-f), :269-270 (-q), :272-273 (--logtostderr), :282-283 (--fileoutput), :217-218 (--max-workers); core/runner.py:121-135 writes the formatted result to --fileoutput; shape in references/sources.md"
   writes_out: true
   out: tools/krr.json
   timeout: 900
@@ -86,7 +87,11 @@
   modes: [full]   # skipped by the daily run
   type: tool
   tool: polaris
-  cmd: [polaris, audit, --context, "{context}", --format, json, --only-show-failed-tests]
+  # Not --only-show-failed-tests: it drops every controller whose only failures are controller-level checks (missingPodDisruptionBudget, deploymentMissingReplicas …),
+  # because the filter keeps a controller only when its PodResult is non-empty (pkg/validator/output.go:180-185@v10.2.6; schema.go:245-249 always sets PodResult).
+  # lib/hygiene.py skips the Success entries itself.
+  cmd: [polaris, audit, --context, "{context}", --format, json]
+  source: "polaris: cmd/polaris/root.go:47@v10.2.6 (--context), cmd/polaris/audit.go:62 (--format); exit 0 unless --set-exit-code-* (audit.go:127-134); shape in references/sources.md"
   out: tools/polaris.json
   timeout: 300
 - id: pluto
@@ -98,6 +103,7 @@
   # (pkg/api/output.go:333-341@v5.24.5, cmd/root.go:353); lib/shell.py writes the output file only on exit 0, so the items were never saved and the
   # check passed with nothing to judge. The flags do not filter the items (FilterOutput, pkg/api/output.go:159-181 does not read them).
   cmd: [pluto, detect-api-resources, -v=2, --kube-context, "{context}", -o, json, --target-versions, "k8s={k8s_next_minor}", --ignore-deprecations, --ignore-removals, --ignore-unavailable-replacements]
+  source: "pluto: cmd/root.go:109@v5.24.5 (--kube-context), :94 (-o), :93 (--target-versions), :87-89 (--ignore-*), :119-120 (-v via klog); exit codes pkg/api/output.go:333-341; shape in references/sources.md"
   out: tools/pluto.json
   timeout: 300
 - id: kubent
@@ -105,6 +111,7 @@
   type: tool
   tool: kubent
   cmd: [kubent, --context, "{context}", -o, json, -t, "{k8s_next_minor_short}", --helm3=false]   # the Helm v3 collector lists release Secrets, which the ClusterRole forbids; the cluster collector is enough
+  source: "kubent: pkg/config/config.go:45@0.7.3 (--context), :51 (-o), :54 (-t), :48 (--helm3); exit 0 with [] when nothing is found or read (cmd/kubent/main.go:49-56, pkg/collector/cluster.go:119-125); shape in references/sources.md"
   out: tools/kubent.json
   timeout: 300
 # Helm keeps each release record in a Secret (sh.helm.release.v1.<name>.v<n>), so `helm list` reads Secrets. kubegap stores only what list prints: name, namespace, status, revision, chart and app version, updated. User values (`helm get values`) are not collected: they often hold credentials. The shipped ClusterRole has no secrets permission, so with it this step fails and the Helm checks are skipped (lib/hygiene.py says why).
@@ -113,5 +120,6 @@
   type: tool
   tool: helm
   cmd: [helm, list, -A, -o, json, --kube-context, "{context}", --deployed, --failed, --pending, --uninstalling, --uninstalled]
+  source: "helm: pkg/cmd/list.go:126-132@v4.3.1 (-A, --deployed, --failed, --pending, --uninstalling, --uninstalled), pkg/cli/environment.go:155 (--kube-context); the same flags in helm v3.22.1 cmd/helm/list.go:119-125; shape in references/sources.md"
   out: tools/helm-list.json
   timeout: 120

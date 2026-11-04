@@ -1,0 +1,78 @@
+# Facts read from other projects' sources
+
+Every fact about another program that kubegap relies on, with where kubegap relies on it and the line of the project's source that states it, at the version kubegap pins in `lib/tools.py` (or supports). `references/development.md` says why: a sentence written from `--help`, from one cluster or from memory has already been wrong in this repository. `tests/test_sources.py` checks that every row has a `file:line@version` citation and that the kubegap location exists.
+
+How to read a row: *Fact* is what kubegap assumes; *kubegap* is the function, step or check that assumes it; *Source* is the file and line at the tag, as `path:line@tag`; *Holds for* says which other versions were checked. A fact that could not be found in source is marked **unverified** with the reason. "Observed" in a row means it was also seen in a real run; a fact marked only observed is not verified.
+
+Sources are fetched with `curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/<tag>/<path>` into a scratch folder that is never executed.
+
+## Tool output files (`type: tool` steps of `collectors/core/collect.yaml`, issue #119)
+
+### krr (robusta-dev/krr, tag `v1.31.1`)
+
+| Fact | kubegap | Source | Holds for |
+|---|---|---|---|
+| `-c/--context`, `-p/--prometheus-url`, `-f/--formatter`, `-q/--quiet`, `--logtostderr`, `--fileoutput`, `--max-workers` exist | step `core.krr` | `robusta_krr/main.py:78-80, 113-114, 249-250, 269-270, 272-273, 282-283, 217-218@v1.31.1` | v1.31.1 |
+| `--fileoutput <path>` writes the formatted result to that file (the step uses `writes_out`) | step `core.krr` | `robusta_krr/core/runner.py:121-135@v1.31.1` | v1.31.1 |
+| `-f json` is `Result.json(indent=2)` | `lib/resources.py:analyze_krr` | `robusta_krr/formatters/json.py:5-7@v1.31.1` | v1.31.1 |
+| Top level: `scans[]`, `score`, `resources`, `description`, `strategy{name, settings}`, `errors[]`, `clusterSummary{}`, `config{}` | `analyze_krr` | `robusta_krr/core/models/result.py:62-70@v1.31.1` | v1.31.1 |
+| A scan is `{object, recommended, severity}`; `recommended` is `{requests{cpu, memory}, limits{cpu, memory}, info{cpu, memory}}` and each entry `{value, severity}` | `analyze_krr` | `result.py:14-28@v1.31.1` | v1.31.1 |
+| `object` is `{cluster, name, container, pods[{name, deleted}], hpa, namespace, kind, allocations{requests, limits, info}, warnings[], labels, annotations}` | `analyze_krr` (pods_live, hpa, warnings) | `robusta_krr/core/models/objects.py:48-60, 24-26@v1.31.1` | v1.31.1 |
+| `kind` is one of Deployment, DaemonSet, StatefulSet, Job, CronJob, Rollout, DeploymentConfig, StrimziPodSet, GroupedJob | check `resources.krr-recommendation` (excludes Job and CronJob) | `objects.py:11-21@v1.31.1` | v1.31.1 |
+| A value is a float, the string `"?"` or null (`_num` keeps only the float) | `analyze_krr` `_num` | `robusta_krr/core/models/allocations.py:23@v1.31.1` | v1.31.1 |
+| Severity is one of UNKNOWN, GOOD, OK, WARNING, CRITICAL | `analyze_krr` SEV_ORDER | `robusta_krr/core/models/severity.py:17-21@v1.31.1` | v1.31.1 |
+| CPU severity by absolute difference: ≥ 0.5 cores CRITICAL, ≥ 0.25 WARNING, ≥ 0.1 OK, else GOOD; memory: ≥ 500 MiB CRITICAL, ≥ 250 WARNING, ≥ 100 OK; one side missing → WARNING, both missing → GOOD; `"?"` on either side → UNKNOWN. The same rule for limits and requests, which is why kubegap keeps its own `kubegap_level` | `analyze_krr` (comment on kubegap_level) | `severity.py:34-40, 93-130@v1.31.1` | v1.31.1 |
+| `score` = (scans − CRITICAL·1 − WARNING·0.7) / scans · 100, 0 with no scans | `analyze_krr` (score) | `result.py:90-101@v1.31.1` | v1.31.1 |
+| simple strategy: CPU request = the `cpu_percentile` (95) percentile, CPU limit unset, memory request = limit = max + `memory_buffer_percentage` (15) %; `history_duration` is in hours (336 = 14 days), `timeframe_duration` in minutes | `analyze_krr` docstring, history_hours | `robusta_krr/strategies/simple.py:28-34, 93-98, 138, 181@v1.31.1`; `robusta_krr/core/abstract/strategies.py:47-50@v1.31.1` (the hour and minute defaults) | v1.31.1 |
+| `config` is krr's full Config: `kubeconfig`, `prometheus_url`, `file_output`, the EKS fields; `eks_access_key` is a plain `str`, while `prometheus_auth_header`, `prometheus_other_headers`, `eks_secret_key` and `coralogix_token` are `SecretStr` and serialise masked. kubegap drops the key after the run | `lib/collect.py:_run_tool_step` | `result.py:70@v1.31.1`; `robusta_krr/core/models/config.py:27, 39-52, 87@v1.31.1` | v1.31.1 |
+| `krr version` prints `__version__`, which is `"dev"` in the tagged source (a release build patches it), and then `git describe --tags` of the current directory | `lib/tools.py:tool_version` (runs the probe outside the repository and reports the install tag) | `robusta_krr/__init__.py:3@v1.31.1`; `robusta_krr/utils/version.py:13-24@v1.31.1`; `pyproject.toml:3@v1.31.1` (`1.8.2-dev`) | v1.31.1; observed: inside this repository it printed kubegap's own tag |
+
+### polaris (FairwindsOps/polaris, tag `v10.2.6`)
+
+| Fact | kubegap | Source | Holds for |
+|---|---|---|---|
+| `--context/-x` is a root flag and `--format/-f json` an audit flag; no flag of either command is a kubeconfig path (the loader reads `KUBECONFIG`, #104) | step `core.polaris` | `cmd/polaris/root.go:45-52@v10.2.6`; `cmd/polaris/audit.go:56-72@v10.2.6` | v10.2.6 |
+| Exit code 0 unless `--set-exit-code-on-danger` (3) or `--set-exit-code-below-score` (4) | step `core.polaris` | `audit.go:57, 59, 127-134@v10.2.6` | v10.2.6 |
+| Top level `{PolarisOutputVersion, AuditTime, SourceType, SourceName, DisplayName, ClusterInfo{Version, Nodes, Pods, Namespaces, Controllers}, Results[], Score}` | `lib/hygiene.py:_polaris` | `pkg/validator/output.go:45-54, 95-101@v10.2.6` | v10.2.6 |
+| A result is `{Name, Namespace, Kind, Results, PodResult, CreatedTime}`; `PodResult` is `{Name, Results, ContainerResults[{Name, Results}]}` or null; `Results` maps check id → `{ID, Message, Details, Success, Severity, Category, Mutations}` | `_polaris` `take()` | `output.go:151-158, 188-192, 222-225, 104-115@v10.2.6` | v10.2.6 |
+| Severity values: `ignore`, `warning`, `danger` | `_polaris` (danger/warning counts), checks `hygiene.polaris-reliability-danger`, `security.polaris-security-danger` | `pkg/config/severity.go:22-28@v10.2.6` | v10.2.6 |
+| Categories of the 44 built-in checks: Security 27, Reliability 13, Efficiency 4 (`SECURITY_CATEGORY = "Security"`) | `_polaris`, `lib/security.py` | `pkg/config/checks/runAsRootAllowed.yaml:3@v10.2.6` and the `category:` line of the other 43 check files | v10.2.6 |
+| `Score` = successes·2 / (successes·2 + warnings + dangers·2) · 100, computed over every check before the output filter | `_polaris` (score) | `pkg/validator/summary.go:35-42@v10.2.6`; `pkg/validator/fullaudit.go:59@v10.2.6`; `audit.go:119-125@v10.2.6` | v10.2.6 |
+| `--only-show-failed-tests` removes successful checks and then every object whose result set is empty, and for a controller it looks only at `PodResult`, so a controller whose only failures are controller-level checks (missingPodDisruptionBudget, deploymentMissingReplicas …) disappears. kubegap does not pass the flag and skips `Success: true` itself; `len(Results)` is then every audited object of any kind and `ClusterInfo.Controllers` the audited controllers | step `core.polaris`, `_polaris` (audited, with_failures, controllers) | `output.go:77-91, 160-186@v10.2.6`; `pkg/validator/schema.go:245-249@v10.2.6` (every controller gets a PodResult); `pkg/validator/fullaudit.go:55@v10.2.6` | v10.2.6; observed with the flag: `Results` (131, 160) exceeded `Controllers` (113, 93) on the two clusters |
+
+### pluto (FairwindsOps/pluto, tag `v5.24.5`)
+
+| Fact | kubegap | Source | Holds for |
+|---|---|---|---|
+| `--kube-context`, `-o/--output`, `-t/--target-versions`, `--ignore-deprecations`, `--ignore-removals`, `--ignore-unavailable-replacements` exist; `-v` is klog's flag added to the root command | step `core.pluto` | `cmd/root.go:109, 94, 93, 87-89, 119-120@v5.24.5` | v5.24.5; observed: `-v=2` accepted after the subcommand |
+| Exit 2 with deprecations, 3 with removals, 4 with unavailable replacements unless the `--ignore-*` flag is set; the flags do not filter the items | step `core.pluto` (#131) | `pkg/api/output.go:333-341, 159-181@v5.24.5`; `cmd/root.go:353, 167@v5.24.5` | v5.24.5; observed on `detect-files` |
+| Top level `{items[], target-versions{}}`, both `omitempty`: nothing deprecated means no `items` key | `lib/hygiene.py:_deprecated` | `pkg/api/output.go:57-66@v5.24.5` | v5.24.5; observed on both clusters |
+| An item is `{name, filePath, namespace (omitempty), api{version, kind, deprecated-in, removed-in, replacement-api, replacement-available-in, component}, deprecated, removed, replacementAvailable}`; `deprecated`/`removed` are judged against the target | `_deprecated` | `output.go:28-55, 162-163@v5.24.5`; `pkg/api/versions.go:60-76@v5.24.5` | v5.24.5 |
+| In-cluster detection reads only objects carrying the `kubectl.kubernetes.io/last-applied-configuration` annotation; a List that fails is skipped silently; an empty List logs `No annotations for ResourceVer` at `-v=2`; `Result from resources` is always 0 | `lib/collect.py:_run_tool_step` (api_read, #131) | `pkg/discovery-api/discovery_api.go:107-168@v5.24.5` | v5.24.5 |
+| `detect-all-in-cluster` also runs the Helm detection, which lists release Secrets | step comment | `cmd/root.go:358-368@v5.24.5` | v5.24.5 |
+
+### kubent (doitintl/kube-no-trouble, tag `0.7.3`)
+
+| Fact | kubegap | Source | Holds for |
+|---|---|---|---|
+| `-x/--context`, `-o/--output json`, `-t/--target-version`, `--helm3`, `-l/--log-level` exist; the default log level is Info | step `core.kubent` | `pkg/config/config.go:38, 45, 48, 51, 53, 54@0.7.3` | 0.7.3 |
+| `-o json` is `json.Encoder.Encode([]judge.Result)`: an empty result prints `[]` | `lib/hygiene.py:_deprecated` | `pkg/printer/json.go:32-40@0.7.3` | 0.7.3; observed on both clusters |
+| A result is `{Name, Namespace, Kind, ApiVersion, RuleSet, ReplaceWith, Since}`; `Since` serialises as text with three segments (`1.21.0`: the wrapped hashicorp go-version pads the string), empty when nil | `_deprecated` | `pkg/judge/judge.go:3-11@0.7.3`; `pkg/judge/version.go:12-14, 24-29@0.7.3`; go-version `version.go:83-85, 384-401@v1.7.0` (kubent `go.mod:7`) | 0.7.3 |
+| `Since` is the minor in which the API was deprecated; the removal minor is only in the `RuleSet` text (`Deprecated APIs removed in 1.25`, or `Deprecated APIs to be removed in future`) | `_deprecated` (removed_in, removed) | `pkg/rules/rego/deprecated-1-25.rego:13-33@0.7.3` (PodDisruptionBudget policy/v1beta1: `since 1.21` in the 1.25 rule set); `deprecated-future.rego:13@0.7.3` | 0.7.3 |
+| `-t` keeps the results whose `Since` ≤ target, and those without a `Since` | `_deprecated` | `pkg/printer/filter.go:7-21@0.7.3` | 0.7.3 |
+| The rules write `"<undefined>"` for a missing name or namespace (so for every cluster-scoped object) and `"<removed>"` for an API with no successor | `_deprecated` (maps the three to null) | `pkg/rules/rego/deprecated-1-25.rego:7-9, 34-37@0.7.3` (every rule set has the same head); `pkg/judge/rego.go:61-64@0.7.3` is only the fallback | 0.7.3 |
+| The cluster collector lists 40 resource types and keeps only objects with a `last-applied-configuration` annotation; a failed List is logged at Debug and skipped; the Info line `Retrieved N resources from collector name=Cluster` follows; an init failure logs `Failed to initialize collector` and the run still exits 0 | `lib/collect.py:_run_tool_step` (api_read, #131) | `pkg/collector/cluster.go:119-142@0.7.3`; `cmd/kubent/main.go:49-56, 180@0.7.3` | 0.7.3; observed |
+| Logs go to stderr through zerolog's ConsoleWriter with colours (`\x1b[36mname=\x1b[0mCluster`) | `_run_tool_step` (strips SGR) | `cmd/kubent/main.go:180@0.7.3` | 0.7.3; observed |
+| Exit 0 even with findings unless `-e/--exit-error`; 100 when a collector fails to retrieve | step `core.kubent` | `pkg/config/config.go:46@0.7.3`; `cmd/kubent/main.go:30-34, 128, 164-167@0.7.3` | 0.7.3 |
+
+### helm (helm/helm, tag `v4.3.1`; compared with `v3.22.1`)
+
+| Fact | kubegap | Source | Holds for |
+|---|---|---|---|
+| `list -A -o json --kube-context <ctx> --deployed --failed --pending --uninstalling --uninstalled`: every flag exists | step `core.helm-list` | `pkg/cmd/list.go:126-132@v4.3.1`; `pkg/cli/environment.go:155@v4.3.1` | v4.3.1; v3.22.1 (`cmd/helm/list.go:119-125`) |
+| A row is `{name, namespace, revision, updated, status, chart, app_version}`; an empty list prints `[]` | `lib/hygiene.py:_helm`, `lib/scaling.py` (Karpenter version from app_version/chart) | `pkg/cmd/list.go:142-150, 158-181@v4.3.1` | v4.3.1; identical in v3.22.1 (`cmd/helm/list.go:135-173`) |
+| `updated` is Go `time.Time.String()` (`2025-12-29 02:07:42.385466 +0900 KST`) unless `--time-format` | `_helm` via `_ts` | `pkg/cmd/list.go:171-179@v4.3.1` | v4.3.1; v3.22.1 (`cmd/helm/list.go:163-171`) |
+| `status` is one of unknown, deployed, uninstalled, superseded, failed, uninstalling, pending-install, pending-upgrade, pending-rollback | check `hygiene.helm-release-not-deployed` | `pkg/release/common/status.go:25-41@v4.3.1` | v4.3.1; v3.22.1 (`pkg/release/status.go:25-41`) |
+| `chart` is `<name>-<version>` and `app_version` the chart's appVersion | `_helm` (chart_name, chart_version) | `pkg/cmd/list.go:167-168@v4.3.1` (`formatChartName`, `formatAppVersion`) | v4.3.1 |
+| Helm 4 dropped `--all` and lists every status by default, where Helm 3 listed deployed and failed; kubegap names the statuses explicitly, so the output is the same | step comment in `lib/tools.py` | `cmd/helm/list.go:37-39, 118, 122@v3.22.1`; `pkg/cmd/list.go:40-43@v4.3.1` | — |
+| `helm list` reads release records stored as Secrets, so the shipped ClusterRole makes it fail | `_helm_missing_note` | **unverified in source**: observed on the EKS cluster (`secrets is forbidden`); the storage driver is `pkg/storage/driver/secrets.go` | — |

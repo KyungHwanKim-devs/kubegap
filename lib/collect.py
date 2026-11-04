@@ -401,8 +401,14 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     if m:
         ph["k8s_next_minor"] = f"v{m.group(1)}.{int(m.group(2)) + 1}.0"
         ph["k8s_next_minor_short"] = f"{m.group(1)}.{int(m.group(2)) + 1}"
-    else:
-        ph["k8s_next_minor"], ph["k8s_next_minor_short"] = "v1.99.0", "1.99"
+    elif any("{k8s_next_minor" in str(a) for a in st["cmd"]):
+        # No server version, no target: a made-up one (this used to be 1.99) makes pluto flag every API as removed and kubent list every rule set, and the summary
+        # would judge the rows against the same invented minor. Skipping is the honest answer; the check then skips with the step's reason.
+        reason = "server version unknown: no target minor for the deprecated-API tools"
+        log.skip(id=f"{name}.{sid}", reason=reason, collector=name)
+        if echo:
+            echo(f"    skipped: {reason}")
+        return {"ok": False, "skipped": reason}
     for store in ("prometheus", "alertmanager", "loki", "grafana"):
         if any(f"{{{store}_url}}" in str(a) for a in st["cmd"]):
             url = stores.url(store) if stores else None
@@ -448,6 +454,17 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     r = _shell.run(cmd, timeout=timeout, env=tool_env, id=f"{name}.{sid}", log=log, collector=name, out_path=None if st.get("writes_out") else out)
     if st.get("writes_out") and out.is_file():
         out.chmod(0o600)  # the tool wrote the file with its own mode (krr: 0644); every file in a snapshot is owner-only
+    if tool == "krr" and out.is_file():  # whatever the exit code: the file may be complete when krr is killed after writing it
+        # krr's JSON carries its whole Config (robusta_krr/core/models/result.py:70@v1.31.1): kubeconfig path, prometheus_url, this file's absolute path and, when someone
+        # runs it with the EKS flags, eks_access_key as plain text (core/models/config.py:47; only the *_secret_key, auth header and token fields are SecretStr and come out
+        # masked). Nothing in kubegap reads it, so it is dropped before the file is read again; strategy.settings, which the summary reads, is a separate key.
+        try:
+            doc = json.loads(out.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            doc = None
+        if isinstance(doc, dict) and "config" in doc:
+            doc.pop("config")
+            write_private(out, json.dumps(doc, ensure_ascii=False, indent=2))
     ok = r.ok and out.is_file() and out.stat().st_size > 0
     read = None
     error = r.error or r.stderr.strip()[-300:] or "no output"

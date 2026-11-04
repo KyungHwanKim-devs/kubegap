@@ -256,7 +256,7 @@ def _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr, code=0):
     fake.chmod(0o700)
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
     step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == tool)
-    result = collect._run_tool_step(step, tool, "core", "unreachable", None, tmp_path, RunLog(None), None, 10, None)
+    result = collect._run_tool_step(step, tool, "core", "unreachable", None, tmp_path, RunLog(None), None, 10, None, inv={"cluster": {"server_version": "v1.32.0"}})
     (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {tool: result}}}))
     return result
 
