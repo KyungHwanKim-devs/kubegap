@@ -250,4 +250,3 @@ def test_the_kube_proxy_minor_comes_from_the_daemonset_image_before_the_server_v
     _metric(snap, "kubeproxy_ct_invalid_dropped_1h", [])
     out = kubeproxy.analyze(snap, inv)["summary"]
     assert out["kube_proxy_minor"] == 30 and out["ct_invalid_reason"].startswith("kube-proxy 1.30")
-    assert kubeproxy._minor_of("v1.33.5+k3s1") == 33 and kubeproxy._minor_of("1.30.9-eksbuild.3") == 30 and kubeproxy._minor_of(None) is None

@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import aws as _aws
-from . import kube, nodecommands, paths, scrub, yamlite
+from . import kube, nodecommands, paths, scrub, versions, yamlite
 from .config import Config
 from .portfwd import PortForward
 from .prom import Prometheus
@@ -395,12 +395,10 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     paths.ensure_private_dir(out.parent)  # the tool writes the file itself, so the folder must exist before it runs
     ph = {"context": context or "", "out": str(out)}
     # Next minor of the cluster server version (target for Pluto/kubent). v1.32.13-eks -> v1.33.0 / 1.33
-    import re as _re
-
-    m = _re.match(r"v?(\d+)\.(\d+)", str(((inv or {}).get("cluster") or {}).get("server_version") or ""))
-    if m:
-        ph["k8s_next_minor"] = f"v{m.group(1)}.{int(m.group(2)) + 1}.0"
-        ph["k8s_next_minor_short"] = f"{m.group(1)}.{int(m.group(2)) + 1}"
+    nxt = versions.next_minor_text(((inv or {}).get("cluster") or {}).get("server_version"))
+    if nxt:
+        ph["k8s_next_minor"] = f"v{nxt}.0"
+        ph["k8s_next_minor_short"] = nxt
     elif any("{k8s_next_minor" in str(a) for a in st["cmd"]):
         # No server version, no target: a made-up one (this used to be 1.99) makes pluto flag every API as removed and kubent list every rule set, and the summary
         # would judge the rows against the same invented minor. Skipping is the honest answer; the check then skips with the step's reason.
@@ -475,11 +473,11 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
                 doc = json.loads(out.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 doc = None
-            stderr = _re.sub(r"\x1b\[[0-9;]*m", "", r.stderr)  # kubent's zerolog ConsoleWriter colors field names.
+            stderr = re.sub(r"\x1b\[[0-9;]*m", "", r.stderr)  # kubent's zerolog ConsoleWriter colors field names.
             if tool == "kubent":
                 # kube-no-trouble cmd/kubent/main.go:49,56 and pkg/collector/cluster.go:119-142@0.7.3:
                 # list errors are swallowed; zero counts also mean no last-applied annotations, not proof of a read.
-                read = isinstance(doc, list) and bool(_re.search(r"Retrieved [1-9][0-9]* resources from collector[^\n]*name=Cluster\b", stderr))
+                read = isinstance(doc, list) and bool(re.search(r"Retrieved [1-9][0-9]* resources from collector[^\n]*name=Cluster\b", stderr))
                 if "Failed to initialize collector" in r.stderr or "Failed to retrieve data from collector" in r.stderr:
                     read = False
             else:

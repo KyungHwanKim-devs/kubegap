@@ -16,7 +16,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from . import scrub
+from . import scrub, versions
 from .controlplane import workload_of
 from .snapshot import load_json, objects
 
@@ -235,18 +235,9 @@ def _polaris(cx: _Ctx) -> dict:
 # ---------- Deprecated API ----------
 
 
-def _minor(v) -> tuple[int, int] | None:
-    m = re.match(r"v?(\d+)\.(\d+)", str(v or ""))
-    return (int(m.group(1)), int(m.group(2))) if m else None
-
-
 def _next_minor(server_version, pluto_target: dict | None) -> str | None:
     """The minor the two tools were asked about: the one after the server's (what collect passes as {k8s_next_minor}), else pluto's recorded k8s target."""
-    mm = _minor(server_version)
-    if mm:
-        return f"{mm[0]}.{mm[1] + 1}"
-    mm = _minor((pluto_target or {}).get("k8s"))
-    return f"{mm[0]}.{mm[1]}" if mm else None
+    return versions.next_minor_text(server_version) or versions.minor_text((pluto_target or {}).get("k8s"))
 
 
 def _deprecated(cx: _Ctx) -> dict:
@@ -297,7 +288,7 @@ def _deprecated(cx: _Ctx) -> dict:
                 "removed_in": removed_in,
                 "replacement": None if rep == "<removed>" else rep,
                 "deprecated": True,
-                "removed": bool(removed_in and target and _minor(removed_in) <= _minor(target)),
+                "removed": bool(removed_in and target and versions.major_minor(removed_in) <= versions.major_minor(target)),
                 "rule": it.get("RuleSet"),
             }
         )

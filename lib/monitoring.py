@@ -10,10 +10,9 @@ If the config file provides a URL (`prometheus_url` etc.), discovery is skipped 
 
 from __future__ import annotations
 
-import re
 from dataclasses import asdict, dataclass
 
-from . import http, kube
+from . import http, kube, yamlite
 from .portfwd import PortForward
 
 TARGETS = ("prometheus", "alertmanager", "loki", "grafana")
@@ -78,6 +77,25 @@ def find_services(context: str | None, kubeconfig: str | None = None, log=None) 
 # ---------- connectivity check ----------
 
 
+def _loki_retention(text: str) -> tuple[str | None, str | None, str]:
+    """(limits_config.retention_period, compactor.retention_enabled, how they were read) from Loki's /config text.
+
+    The dump is go-yaml output with plain scalars folded at 80 columns; after `yamlite.unfold_plain_scalars` the whole of a real 2.6.1 dump loads,
+    and the keys are read from the structure ("parsed"). When `load` still refuses the text (a construct outside yamlite's subset) the two keys are
+    read inside their own sections with `yamlite.mapping_value` ("section"): still never a `retention_period` of another section, which the
+    whole-text regular expression used until #126 could return. Booleans come back as the lower-case words the old reader returned."""
+    try:
+        cfg = yamlite.load(yamlite.unfold_plain_scalars(text))
+    except Exception:
+        cfg = None
+    if isinstance(cfg, dict):
+        period = ((cfg.get("limits_config") or {}) if isinstance(cfg.get("limits_config"), dict) else {}).get("retention_period")
+        enabled = ((cfg.get("compactor") or {}) if isinstance(cfg.get("compactor"), dict) else {}).get("retention_enabled")
+        norm = lambda v: None if v is None else (str(v).lower() if isinstance(v, bool) else str(v))  # noqa: E731
+        return norm(period), norm(enabled), "parsed"
+    return yamlite.mapping_value(text, "limits_config", "retention_period"), yamlite.mapping_value(text, "compactor", "retention_enabled"), "section"
+
+
 def _retention_from_flags(flags: dict | None) -> dict:
     out = {}
     if not flags:
@@ -124,11 +142,15 @@ def probe(kind: str, base: str) -> dict:
         if r.ok:
             c = http.get(f"{base}/config", headers={"Accept": "text/plain"})
             if c.ok:
-                m = re.search(r"retention_period:\s*(\S+)", c.body)
-                info["retention"] = {"time": m.group(1)} if m else {}
-                m2 = re.search(r"retention_enabled:\s*(\S+)", c.body)
-                if m2:
-                    info["retention"]["enabled"] = m2.group(1)
+                # The running configuration as YAML (pkg/loki/config_handler.go). Read by section: limits_config.retention_period is the global retention,
+                # compactor.retention_enabled whether it is applied; a regular expression over the whole text took the first `retention_period:` and
+                # table_manager carries one too (0s on the EKS cluster). lib/yamlite.load cannot take the dump (multi-line plain scalars), so the
+                # section reader of yamlite is used instead of a full parse (#126, #148).
+                period, enabled, source = _loki_retention(c.body)
+                info["retention"] = {"time": period} if period else {}
+                if enabled is not None:
+                    info["retention"]["enabled"] = enabled
+                info["retention_source"] = source
         else:
             info["error"] = r.error or f"HTTP {r.status}"
     elif kind == "grafana":

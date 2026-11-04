@@ -43,6 +43,90 @@ def load(text: str) -> Any:
     return value
 
 
+def unfold_plain_scalars(text: str) -> str:
+    """Join the continuation lines of folded plain scalars back onto their first line.
+
+    go-yaml (the library Alertmanager, Loki and most Go servers marshal with) wraps a plain scalar longer than 80 columns onto following
+    lines indented deeper than its key; this parser reads plain scalars from one line only. A continuation line is one that is indented
+    more than the last `key: value` or `- value` line, carries no `key:` of its own, and does not start a sequence item, block scalar,
+    comment or flow collection. Quoted scalars are left alone (`load` already reads them across lines)."""
+    out: list[str] = []
+    anchor_indent: int | None = None  # the indent of the last line whose plain value may continue
+    for line in text.splitlines():
+        body = line.strip()
+        ind = len(line) - len(line.lstrip(" "))
+        if body and anchor_indent is not None and ind > anchor_indent and not body.startswith(("#", "- ", "|", ">", "[", "{", "'", '"')) and _split_key(body) is None and body != "-":
+            out[-1] = out[-1].rstrip() + " " + body
+            continue
+        out.append(line)
+        anchor_indent = None
+        if not body or body.startswith("#"):
+            continue
+        kv = _split_key(body.removeprefix("- "))
+        value = (kv[1] if kv else (body[2:] if body.startswith("- ") else "")).strip()
+        if value and value[:1] not in ("'", '"', "|", ">", "[", "{", "&", "*", "!") and not value.startswith("- "):
+            anchor_indent = ind
+    return "\n".join(out) + ("\n" if text.endswith("\n") else "")
+
+
+def mapping_value(text: str, *path: str) -> str | None:
+    """The raw scalar text at `path` (top-level key, then direct children by indentation) without parsing the whole document, or None.
+
+    For YAML that `load` rejects but whose block structure is plain, such as Loki's /config dump, whose long query strings are emitted as
+    multi-line plain scalars. Only the key's own level is searched: `mapping_value(text, "limits_config", "retention_period")` does not see
+    `table_manager.retention_period`, which a `retention_period:` regular expression over the whole text did (#126). Block scalars, flow collections
+    and quoted values are returned as their first line's text, unquoted when the whole value is one quoted token."""
+    lines = text.splitlines()
+    lo, hi, indent = 0, len(lines), 0
+    for depth, key in enumerate(path):
+        found = None
+        for i in range(lo, hi):
+            ln = lines[i]
+            if not ln.strip() or ln.lstrip().startswith("#"):
+                continue
+            ind = len(ln) - len(ln.lstrip(" "))
+            if ind < indent:
+                break
+            if ind != indent:
+                continue
+            body = ln.strip()
+            if body.startswith("- "):
+                continue
+            kv = _split_key(body)
+            if kv and kv[0] == key:
+                found = i
+                break
+        if found is None:
+            return None
+        if depth == len(path) - 1:
+            raw = _strip_comment(_split_key(lines[found].strip())[1]).strip()
+            if raw[:1] in ("|", ">"):
+                return None  # a block scalar is not a one-line value
+            if raw[:1] in ("'", '"'):
+                try:
+                    raw = _unquote(raw)
+                except YamlError:
+                    return raw  # a quoted value continued on the next line: its first line, as written
+            return raw or None
+        # the block of this key: the following lines indented deeper than it, up to the next line at its indent or less
+        child_indent = None
+        end = found + 1
+        for i in range(found + 1, hi):
+            ln = lines[i]
+            if not ln.strip() or ln.lstrip().startswith("#"):
+                end = i + 1
+                continue
+            ind = len(ln) - len(ln.lstrip(" "))
+            if ind <= indent:
+                break
+            child_indent = ind if child_indent is None else min(child_indent, ind)
+            end = i + 1
+        if child_indent is None:
+            return None
+        lo, hi, indent = found + 1, end, child_indent
+    return None
+
+
 def load_file(path: str | Path) -> Any:
     return load(Path(path).read_text(encoding="utf-8"))
 

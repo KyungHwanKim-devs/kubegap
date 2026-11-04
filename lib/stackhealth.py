@@ -17,7 +17,9 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from . import amconfig as _amconfig
 from . import podmetrics as _pm
+from . import versions
 from .promtext import parse as _parse_prom
 from .snapshot import load_json, objects
 
@@ -46,13 +48,6 @@ def _scalar(snap: Path, qid: str) -> float | None:
 def _ver(image: str | None):
     m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
     return m.group(1) if m else None
-
-
-def _major(v: str | None) -> int | None:
-    try:
-        return int(str(v).split(".")[0])
-    except (ValueError, AttributeError):
-        return None
 
 
 def _mib(b) -> float | None:
@@ -186,7 +181,7 @@ def _prometheus(snap: Path, inv: dict) -> dict:
         "present": True,
         "workload": wl,
         "version": build.get("version") or store.get("version") or wl.get("version"),
-        "major": _major(build.get("version") or store.get("version") or wl.get("version")),
+        "major": versions.major(build.get("version") or store.get("version") or wl.get("version")),
         "start_time": rt.get("startTime"),
         "reload_success": rt.get("reloadConfigSuccess", None if reload_ok is None else reload_ok == 1),
         "last_config_time": rt.get("lastConfigTime"),
@@ -244,13 +239,16 @@ def _alertmanager(snap: Path, inv: dict) -> dict:
     status = load_json(snap / "alertmanager" / "status.json") or {}
     if not wl["present"] and not status:
         return {"present": False}
+    # The loaded configuration (config.original) parsed with lib/amconfig: receivers a route names, inhibit rules, time intervals. Until #126 this was
+    # regular expressions over the text, which could not tell a nested route's receiver from a top-level key. Unparsable text (yamlite's subset) sets
+    # config_parsed false and the checks that need the structure skip.
     cfg_text = (status.get("config") or {}).get("original") or ""
-    referenced: set[str] = set(re.findall(r"^\s*-?\s*receiver:\s*\"?([^\"\n]+)\"?\s*$", cfg_text, re.MULTILINE))
-    declared = [r["name"] for r in (load_json(snap / "alertmanager" / "receivers.json") or [])] or re.findall(r"^- name:\s*\"?([^\"\n]+)\"?\s*$", cfg_text, re.MULTILINE)
-    unused = [r for r in declared if r not in referenced and r != "null"]
-    inhibit = len(re.findall(r"^- source_matchers:|^- target_matchers:", cfg_text, re.MULTILINE))
-    inhibit_rules = cfg_text.count("\n- source_matchers:") + cfg_text.count('\n- target_matchers:\n  - alertname="InfoInhibitor"')
-    time_intervals = "time_intervals:" in cfg_text or "mute_time_intervals:" in cfg_text
+    cfg, parse_error = _amconfig.parse(cfg_text)
+    declared = [r["name"] for r in (load_json(snap / "alertmanager" / "receivers.json") or [])] or (sorted(_amconfig.receiver_kinds(cfg)) if cfg else [])
+    referenced = _amconfig.referenced_receivers(cfg) if cfg else set()
+    unused = [r for r in declared if r not in referenced and r != "null"] if cfg else []
+    inhibit_rules = len(cfg.get("inhibit_rules") or []) if cfg else 0
+    time_intervals = _amconfig.has_time_intervals(cfg) if cfg else False
     retention = next((a.split("=", 1)[1] for a in wl.get("args", []) if a.startswith("--data.retention=")), None)
     notif = {r["metric"].get("integration"): round(_v(r) or 0, 1) for r in _rows(snap, "am_notifications_1d")}
     received = {r["metric"].get("status"): round(_v(r) or 0) for r in _rows(snap, "am_received_1d")}
@@ -277,7 +275,8 @@ def _alertmanager(snap: Path, inv: dict) -> dict:
         "silences_total": len(silences),
         "silences_active": sum(1 for s in silences if (s.get("status") or {}).get("state") == "active"),
         "metrics_available": _has(snap, "am_reload_ok") or _has(snap, "am_received_1d"),
-        "_inhibit_matchers": inhibit,
+        "config_parsed": cfg is not None,
+        "config_parse_error": None if cfg is not None else (parse_error if cfg_text else "config.original missing"),
     }
 
 
@@ -328,7 +327,7 @@ def _grafana(snap: Path, inv: dict) -> dict:
         "present": True,
         "workload": wl,
         "version": ver,
-        "major": _major(ver),
+        "major": versions.major(ver),
         "database": health.get("database"),
         "datasources": ds_rows,
         "datasources_with_errors": [r["datasource"] for r in ds_rows if r["error_ratio"] >= 0.01 and r["errors_5xx_429"] >= 10],
@@ -360,7 +359,7 @@ def _loki(snap: Path, inv: dict) -> dict:
         "present": True,
         "workload": wl,
         "version": build.get("version") or wl.get("version"),
-        "major": _major(build.get("version") or wl.get("version")),
+        "major": versions.major(build.get("version") or wl.get("version")),
         "ready": (snap / "loki" / "ready.txt").read_text(errors="replace").strip() == "ready" if (snap / "loki" / "ready.txt").exists() else None,
         "metrics_available": pm is not None,
         "storage": wl.get("storage"),
@@ -479,6 +478,8 @@ AM_KEYS = [
     "replicas",
     "ready",
     "target",
+    "config_parsed",
+    "config_parse_error",
 ]
 GRAFANA_KEYS = [
     "version",
@@ -542,7 +543,6 @@ def _finish(d: dict, keys: list[str]) -> dict:
         d.setdefault("target", f"{w.get('namespace')}/{(w.get('kind') or '').lower()}/{w.get('name')}" if w.get("present") else "cluster")
     for k in keys:
         d.setdefault(k, None)
-    d.pop("_inhibit_matchers", None)
     return d
 
 

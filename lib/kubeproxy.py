@@ -15,6 +15,7 @@ import math
 import re
 from pathlib import Path
 
+from . import versions
 from .snapshot import load_json, objects
 
 
@@ -38,17 +39,6 @@ def _scalar(snap: Path, qid: str):
 
 def _r(x, n=3):
     return None if x is None else round(x, n)
-
-
-def _minor_of(version) -> int | None:
-    """The minor of a version string ("v1.33.5+k3s1", "1.30.9-eksbuild.3" -> 33, 30), None when unknown."""
-    m = re.match(r"v?\d+\.(\d+)", str(version or ""))
-    return int(m.group(1)) if m else None
-
-
-def _k8s_minor(inv: dict | None) -> int | None:
-    """The minor of inventory cluster.server_version, None when unknown."""
-    return _minor_of(((inv or {}).get("cluster") or {}).get("server_version"))
 
 
 def _parse_config(text: str) -> dict:
@@ -222,7 +212,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     # the proxier has created the nfacct counter, and a failed read of that counter leaves the series absent (:363-377@v1.31.14). So "no series" never means
     # "no drops": the total is None with the reason, and the check skips instead of passing. The version that matters is kube-proxy's own (the DaemonSet image,
     # which on EKS can lag the control plane), else the server's (k3s: one binary).
-    kube_proxy_minor = _minor_of(dsinfo.get("version")) or _k8s_minor(inv)
+    kube_proxy_minor = versions.minor(dsinfo.get("version")) or versions.minor(((inv or {}).get("cluster") or {}).get("server_version"))
     ct_served = any(x["ct_invalid_dropped_1h"] is not None for x in nodes)
     mode_word = str(mode or "").split()[0] if mode else None
     if ct_served:

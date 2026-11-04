@@ -15,6 +15,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from . import versions
 from .snapshot import component_logs_aggregate, component_logs_removed, load_json, objects
 
 ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?")
@@ -397,11 +398,7 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
                 m = re.search(r"(\d+\.\d+\.\d+)", str(h.get("app_version") or h.get("chart") or ""))
                 if m:
                     kver = m.group(1)
-    k8s_minor = None
-    sv = ((inv or {}).get("cluster") or {}).get("server_version") or ""
-    m = re.match(r"v?(\d+\.\d+)", sv)
-    if m:
-        k8s_minor = m.group(1)
+    k8s_minor = versions.minor_text(((inv or {}).get("cluster") or {}).get("server_version"))
     compat_error = None
     try:
         compat = _load_compat()
@@ -410,12 +407,9 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
     kmm = ".".join(kver.split(".")[:2]) if kver else None
     max_k8s = compat.get(kmm) if kmm else None
 
-    def _minor(v):
-        return tuple(int(x) for x in v.split("."))
-
     supported = None
     if max_k8s and k8s_minor:
-        supported = _minor(k8s_minor) <= _minor(max_k8s)
+        supported = versions.major_minor(k8s_minor) <= versions.major_minor(max_k8s)
     out = {
         "present": True,
         "interruption_queue": iq,

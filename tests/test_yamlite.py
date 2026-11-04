@@ -346,3 +346,90 @@ def test_parse_scalar_directly():
     assert yamlite.parse_scalar(" 42 ") == 42
     assert yamlite.parse_scalar("{a: [1]}") == {"a": [1]}
     assert yamlite.parse_scalar("") is None
+
+
+LOKI_LIKE = """auth_enabled: false
+server:
+  http_listen_port: 3100
+limits_config:
+  reject_old_samples: true
+  retention_period: 31d
+  per_tenant_override_config: ""
+table_manager:
+  retention_deletes_enabled: false
+  retention_period: 0s
+ruler:
+  storage:
+    type: local
+  write_throttle_query: sum(rate(cortex_dynamo_throttled_total{operation="x"}[1m]))
+    by (table) > 0
+compactor:
+  working_directory: /data/loki/compactor
+  retention_enabled: false
+  retention_delete_delay: 2h0m0s
+"""
+
+
+def test_mapping_value_reads_a_key_inside_its_own_section_of_text_the_parser_cannot_load():
+    """Loki's /config dump carries multi-line plain scalars (yamlite.load rejects them) and a `retention_period` under table_manager as well as under
+    limits_config; the whole-text regular expression kubegap used took whichever came first (#126)."""
+    import pytest
+
+    from lib import yamlite
+
+    with pytest.raises(yamlite.YamlError):
+        yamlite.load(LOKI_LIKE)
+    assert yamlite.mapping_value(LOKI_LIKE, "limits_config", "retention_period") == "31d"
+    assert yamlite.mapping_value(LOKI_LIKE, "table_manager", "retention_period") == "0s"
+    assert yamlite.mapping_value(LOKI_LIKE, "compactor", "retention_enabled") == "false"
+    assert yamlite.mapping_value(LOKI_LIKE, "ruler", "storage", "type") == "local"
+    assert yamlite.mapping_value(LOKI_LIKE, "limits_config", "retention_enabled") is None
+    assert yamlite.mapping_value(LOKI_LIKE, "nowhere", "x") is None and yamlite.mapping_value(LOKI_LIKE, "auth_enabled") == "false"
+    assert yamlite.mapping_value(LOKI_LIKE, "limits_config", "per_tenant_override_config") is None  # an empty quoted value reads as absent
+
+
+FOLDED_AM = """receivers:
+- name: slack
+  slack_configs:
+  - api_url: https://hooks.example/x
+    title: 'a single-quoted title that go-yaml folded at eighty columns onto the
+      next line'
+    text: a plain very long text that go-yaml folded at eighty columns onto the next
+      line and even a third
+      line here
+    send_resolved: true
+route:
+  receiver: slack
+  routes:
+  - receiver: slack
+    matchers:
+    - severity = "critical"
+"""
+
+
+def test_unfolding_plain_scalars_lets_go_yaml_output_load():
+    """Alertmanager serves Config.String() and Loki its /config: both are go-yaml output, which folds plain scalars at 80 columns."""
+    import pytest
+
+    from lib import yamlite
+
+    with pytest.raises(yamlite.YamlError):
+        yamlite.load(FOLDED_AM)
+    d = yamlite.load(yamlite.unfold_plain_scalars(FOLDED_AM))
+    sc = d["receivers"][0]["slack_configs"][0]
+    assert sc["text"] == "a plain very long text that go-yaml folded at eighty columns onto the next line and even a third line here"
+    assert sc["title"] == "a single-quoted title that go-yaml folded at eighty columns onto the next line" and sc["send_resolved"] is True
+    assert d["route"]["routes"][0]["matchers"] == ['severity = "critical"']
+    d2 = yamlite.load(yamlite.unfold_plain_scalars(LOKI_LIKE))
+    assert d2["limits_config"]["retention_period"] == "31d" and d2["ruler"]["write_throttle_query"].endswith("by (table) > 0")
+    assert yamlite.unfold_plain_scalars("a: 1\nb:\n  - x\n  - y\n") == "a: 1\nb:\n  - x\n  - y\n"  # nothing to unfold stays byte-identical
+
+
+def test_mapping_value_handles_block_scalars_comments_and_broken_quotes():
+    from lib import yamlite
+
+    text = 'a:\n  b: |\n    long\n  c: value # a comment\n  d: "quoted # not a comment"\n  e: "unterminated\n    continued"\n'
+    assert yamlite.mapping_value(text, "a", "b") is None
+    assert yamlite.mapping_value(text, "a", "c") == "value"
+    assert yamlite.mapping_value(text, "a", "d") == "quoted # not a comment"
+    assert yamlite.mapping_value(text, "a", "e") == '"unterminated'
