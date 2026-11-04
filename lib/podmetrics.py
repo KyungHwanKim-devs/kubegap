@@ -140,12 +140,7 @@ def tables() -> dict[str, list[dict]]:
 
 def pod_metrics_steps() -> list[tuple[str, dict]]:
     """(collector folder name, step) for every `type: pod-metrics` step of collectors/*/collect.yaml."""
-    out = []
-    for f in sorted(paths.COLLECTORS_DIR.glob("*/collect.yaml")):
-        for st in yamlite.load_file(f) or []:
-            if isinstance(st, dict) and st.get("type") == "pod-metrics":
-                out.append((f.parent.name, st))
-    return out
+    return [(folder, st) for folder, st in paths.collect_steps() if st.get("type") == "pod-metrics"]
 
 
 def default_target(st: dict) -> dict:
@@ -153,45 +148,50 @@ def default_target(st: dict) -> dict:
     return {"namespace": st["namespace"], "selector": st["selector"], "port": int(st["port"]), "workload": None, "source": {"namespace": "default", "selector": "default", "port": "default"}}
 
 
-def _discovered(objs: dict, disc: dict, default_port: int) -> dict | None:
-    """The first workload (kind and `namespace/name` glob of `discover:`) among the fetched objects, with its namespace, its pod selector (spec.selector.matchLabels)
-    and the container port named as `port_names` says. A port named as `https_port_names` says marks a metrics endpoint served over TLS with authentication,
-    which kubegap cannot read through the pod proxy or a node curl: the step then skips and says so instead of reading nothing."""
+def _discovered(objs: dict, disc: dict, default_port: int, default_namespace: str | None = None) -> dict | None:
+    """The workload (kind and `namespace/name` glob of `discover:`) among the fetched objects, with its namespace, its pod selector (spec.selector.matchLabels)
+    and the container port named as `port_names` says. When several workloads match (two installs, or a sibling such as loki-grafana next to grafana), the
+    one in the step's default namespace is taken, else the first by kind order, namespace and name, and every match is listed in `candidates` so the
+    choice is visible; `components.<name>` in config.yaml is the override. A port named as `https_port_names` says marks a metrics endpoint served over
+    TLS with authentication, which kubegap cannot read through the pod proxy or a node curl: the step then skips and says so instead of reading nothing."""
     kinds = disc.get("kind") or []
     kinds = [kinds] if isinstance(kinds, str) else list(kinds)
     names = disc.get("port_names") or []
     https_names = disc.get("https_port_names") or []
+    matches: list[tuple[str, dict]] = []
     for kind in kinds:
         for o in sorted(items(objs.get(kind + "s")), key=lambda o: (o["metadata"].get("namespace") or "", o["metadata"]["name"])):
-            ns, name = o["metadata"].get("namespace") or "", o["metadata"]["name"]
-            if not match_name(str(disc["name"]), ns, name):
-                continue
-            spec = o.get("spec") or {}
-            labels = ((spec.get("selector") or {}).get("matchLabels")) or {}
-            ports = [pt for c in (((spec.get("template") or {}).get("spec") or {}).get("containers") or []) for pt in (c.get("ports") or [])]
-            port, port_source, https = default_port, "default", None
-            for pt in ports:
-                if pt.get("name") in names and pt.get("containerPort"):
-                    port, port_source = int(pt["containerPort"]), "discovered"
-                    break
-            else:
-                for pt in ports:
-                    if pt.get("name") in https_names and pt.get("containerPort"):
-                        https = int(pt["containerPort"])
-                        break
-            out = {
-                "namespace": ns,
-                "selector": ",".join(f"{k}={v}" for k, v in sorted(labels.items())) or None,
-                "port": port,
-                "workload": f"{kind} {ns}/{name}",
-                "source": {"namespace": "discovered", "selector": "discovered" if labels else "default", "port": port_source},
-            }
-            if https is not None:
-                out["skip"] = (
-                    f"{kind} {ns}/{name} serves its metrics on port {https} ({next(pt.get('name') for pt in ports if pt.get('containerPort') == https)}), over TLS with authentication, which the pod proxy and the node curl cannot read"
-                )
-            return out
-    return None
+            if match_name(str(disc["name"]), o["metadata"].get("namespace") or "", o["metadata"]["name"]):
+                matches.append((kind, o))
+    if not matches:
+        return None
+    candidates = [f"{k} {o['metadata'].get('namespace') or ''}/{o['metadata']['name']}" for k, o in matches]
+    kind, o = next(((k, o) for k, o in matches if (o["metadata"].get("namespace") or "") == default_namespace), matches[0])
+    ns, name = o["metadata"].get("namespace") or "", o["metadata"]["name"]
+    spec = o.get("spec") or {}
+    labels = ((spec.get("selector") or {}).get("matchLabels")) or {}
+    ports = [pt for c in (((spec.get("template") or {}).get("spec") or {}).get("containers") or []) for pt in (c.get("ports") or [])]
+    port, port_source, https = default_port, "default", None
+    for pt in ports:
+        if pt.get("name") in names and pt.get("containerPort"):
+            port, port_source = int(pt["containerPort"]), "discovered"
+            break
+    else:
+        for pt in ports:
+            if pt.get("name") in https_names and pt.get("containerPort"):
+                https = int(pt["containerPort"])
+                break
+    out = {
+        "namespace": ns,
+        "selector": ",".join(f"{k}={v}" for k, v in sorted(labels.items())) or None,
+        "port": port,
+        "workload": f"{kind} {ns}/{name}",
+        "candidates": candidates,
+        "source": {"namespace": "discovered", "selector": "discovered" if labels else "default", "port": port_source},
+    }
+    if https is not None:
+        out["skip"] = f"{kind} {ns}/{name} serves its metrics on port {https} ({next(pt.get('name') for pt in ports if pt.get('containerPort') == https)}), over TLS with authentication, which the pod proxy and the node curl cannot read"
+    return out
 
 
 def discover_targets(objs: dict, cfg) -> dict[str, dict]:
@@ -205,18 +205,24 @@ def discover_targets(objs: dict, cfg) -> dict[str, dict]:
         tgt = default_target(st)
         disc = st.get("discover")
         if isinstance(disc, dict) and disc.get("name"):
-            found = _discovered(objs, disc, int(st["port"]))
+            found = _discovered(objs, disc, int(st["port"]), st.get("namespace"))
             if found:
                 tgt = found
                 if found.get("source", {}).get("selector") == "default":
                     tgt["selector"] = st["selector"]
         conf = (comps or {}).get(st.get("component") or folder) if isinstance(comps, dict) else None
         if isinstance(conf, dict):
-            for field, key_c in (("namespace", "namespace"), ("selector", "selector"), ("port", "metrics_port")):
-                if conf.get(key_c) not in (None, ""):
-                    tgt[field] = int(conf[key_c]) if field == "port" else str(conf[key_c])
+            for field in ("namespace", "selector"):
+                if conf.get(field) not in (None, ""):
+                    tgt[field] = str(conf[field])
                     tgt["source"][field] = "config"
-            if conf.get("metrics_port") not in (None, "") and tgt.get("skip"):
-                tgt.pop("skip")  # the user named a plain-HTTP port on purpose
+            mp = conf.get("metrics_port")
+            if mp not in (None, ""):
+                if re.fullmatch(r"[1-9][0-9]{0,4}", str(mp)) and int(mp) <= 65535:
+                    tgt["port"] = int(mp)
+                    tgt["source"]["port"] = "config"
+                    tgt.pop("skip", None)  # the user named a plain-HTTP port on purpose
+                else:
+                    tgt["source"]["port"] = f"{tgt['source']['port']} (config value {mp!r} ignored: not a port)"  # a config mistake must not abort discovery
         out[key] = tgt
     return out

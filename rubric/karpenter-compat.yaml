@@ -4,7 +4,23 @@
 # `karpenter` is a minor ("1.4", every 1.4.x) or a patch ("1.0.5": that patch and the later ones of its minor); the row with the highest version not
 # above the installed one applies. `min_k8s` and `max_k8s` are both judged. Outside the table the check reports "cannot verify (warn)"; a new Karpenter
 # minor is one row. v1.15.x is not in the generated table at v1.15.1, so it has no row until a later tag lists it. On 1.x a version outside the table
-# makes the nodeclass.status controller report 'failed validating kubernetes version'.
+# makes the nodeclass.status controller report 'failed validating kubernetes version'. The rows start at 0.21, the oldest the generated table lists.
+- { karpenter: "0.21", min_k8s: "1.21", max_k8s: "1.24", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:3-5@v1.15.1" }
+- { karpenter: "0.22", min_k8s: "1.21", max_k8s: "1.24", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:6-8@v1.15.1" }
+- { karpenter: "0.23", min_k8s: "1.21", max_k8s: "1.24", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:9-11@v1.15.1" }
+- { karpenter: "0.24", min_k8s: "1.21", max_k8s: "1.24", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:12-14@v1.15.1" }
+- { karpenter: "0.25", min_k8s: "1.21", max_k8s: "1.25", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:15-17@v1.15.1" }
+- { karpenter: "0.26", min_k8s: "1.21", max_k8s: "1.25", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:18-20@v1.15.1" }
+- { karpenter: "0.27", min_k8s: "1.21", max_k8s: "1.25", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:21-23@v1.15.1" }
+- { karpenter: "0.28", min_k8s: "1.23", max_k8s: "1.27", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:24-26@v1.15.1" }
+- { karpenter: "0.29", min_k8s: "1.23", max_k8s: "1.27", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:27-29@v1.15.1" }
+- { karpenter: "0.30", min_k8s: "1.23", max_k8s: "1.27", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:30-32@v1.15.1" }
+- { karpenter: "0.31", min_k8s: "1.23", max_k8s: "1.28", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:33-35@v1.15.1" }
+- { karpenter: "0.32", min_k8s: "1.23", max_k8s: "1.28", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:36-38@v1.15.1" }
+- { karpenter: "0.33", min_k8s: "1.23", max_k8s: "1.28", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:39-41@v1.15.1" }
+- { karpenter: "0.34", min_k8s: "1.23", max_k8s: "1.29", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:42-44@v1.15.1" }
+- { karpenter: "0.35", min_k8s: "1.23", max_k8s: "1.29", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:45-47@v1.15.1" }
+- { karpenter: "0.36", min_k8s: "1.23", max_k8s: "1.29", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:48-50@v1.15.1" }
 - { karpenter: "0.37", min_k8s: "1.23", max_k8s: "1.30", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:51-53@v1.15.1" }
 - { karpenter: "1.0", min_k8s: "1.25", max_k8s: "1.30", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:54-56@v1.15.1" }
 - { karpenter: "1.0.5", min_k8s: "1.25", max_k8s: "1.31", source: "aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml:57-59@v1.15.1" }

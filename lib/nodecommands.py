@@ -21,7 +21,7 @@ import ipaddress
 import json
 import re
 
-from . import paths, yamlite
+from . import paths
 
 DOCUMENT_NAME = "kubegap-node-read"
 DOCUMENT_PATH = paths.ROOT / "deploy" / "permissions" / "ssm-document.yaml"
@@ -89,46 +89,45 @@ def node_commands() -> list[dict]:
         {"step": "probe", "kind": "builtin", "collector": "lib/node.py", "id": "probe", "text": PROBE_CMD, "note": "access check: `kubegap nodes`, setup and discover"},
         {"step": "capabilities", "kind": "builtin", "collector": "lib/node.py", "id": "capabilities", "text": CAPABILITY_SCRIPT, "note": "which privileged reads work on the node (SSH backend: `kubegap nodes`)"},
     ]
-    for folder in sorted(p for p in paths.COLLECTORS_DIR.iterdir() if (p / "collect.yaml").is_file()):
-        steps = yamlite.load_file(folder / "collect.yaml") or []
-        for st in steps:
-            if not isinstance(st, dict) or "id" not in st:
-                continue
-            key = f"{folder.name}/{st['id']}"
-            if st.get("type") == "node":
-                if st.get("script"):
-                    text = (folder / str(st["script"])).read_text(encoding="utf-8")
-                    out.append(
-                        {
-                            "step": key,
-                            "kind": "script",
-                            "collector": folder.name,
-                            "id": st["id"],
-                            "text": text,
-                            "file": f"collectors/{folder.name}/{st['script']}",
-                            "nodes": st.get("nodes", "all"),
-                            "requires": st.get("requires"),
-                            "out": st.get("out"),
-                        }
-                    )
-                else:
-                    out.append({"step": key, "kind": "cmd", "collector": folder.name, "id": st["id"], "text": normalize_cmd(st["cmd"]), "nodes": st.get("nodes", "all"), "requires": st.get("requires"), "out": st.get("out")})
-            elif st.get("type") == "pod-metrics":
-                port, path, keep = st["port"], st.get("path", "/metrics"), st.get("keep")
+    for folder_name, st in paths.collect_steps():
+        folder = paths.COLLECTORS_DIR / folder_name
+        if "id" not in st:
+            continue
+        key = f"{folder.name}/{st['id']}"
+        if st.get("type") == "node":
+            if st.get("script"):
+                text = (folder / str(st["script"])).read_text(encoding="utf-8")
                 out.append(
                     {
                         "step": key,
-                        "kind": "pod-metrics",
+                        "kind": "script",
                         "collector": folder.name,
                         "id": st["id"],
-                        "text": pod_metrics_cmd("<podIp>", port, path, keep),
-                        "port": port,
-                        "path": path,
-                        "keep": keep,
-                        "namespace": st.get("namespace"),
-                        "selector": st.get("selector"),
+                        "text": text,
+                        "file": f"collectors/{folder.name}/{st['script']}",
+                        "nodes": st.get("nodes", "all"),
+                        "requires": st.get("requires"),
+                        "out": st.get("out"),
                     }
                 )
+            else:
+                out.append({"step": key, "kind": "cmd", "collector": folder.name, "id": st["id"], "text": normalize_cmd(st["cmd"]), "nodes": st.get("nodes", "all"), "requires": st.get("requires"), "out": st.get("out")})
+        elif st.get("type") == "pod-metrics":
+            port, path, keep = st["port"], st.get("path", "/metrics"), st.get("keep")
+            out.append(
+                {
+                    "step": key,
+                    "kind": "pod-metrics",
+                    "collector": folder.name,
+                    "id": st["id"],
+                    "text": pod_metrics_cmd("<podIp>", port, path, keep),
+                    "port": port,
+                    "path": path,
+                    "keep": keep,
+                    "namespace": st.get("namespace"),
+                    "selector": st.get("selector"),
+                }
+            )
     return out
 
 

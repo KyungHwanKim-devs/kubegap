@@ -6,7 +6,8 @@ of those files. A rule is "installed if any of the following match" (`any`), and
                 "name contains grafana in any namespace", `*/velero` is "name is exactly velero", `kube-system/coredns` is exact on both sides.
                 A name pattern without a leading `*` is anchored at the first character, which is why most workload patterns start with `*`:
                 a Helm chart names its workload `<release>` when the release name contains the chart name and `<release>-<chart>` otherwise
-                (the `fullname` helper every chart in references/sources.md shares), so the chart name is a suffix, not a prefix (#130)
+                (the `fullname` helper every chart in references/sources.md shares), so the chart name is a suffix, not a prefix, and a release name
+                that merely contains it (`karpenter-aws`) keeps its own name, which is why the patterns end in `*` as well (#130)
   crd:          CRD name (plural.group)
   namespace:    namespace name
   storageclass_provisioner: the provisioner value of a StorageClass
@@ -105,7 +106,7 @@ COMPONENTS: list[dict] = [
             },
             {
                 "deployment": "kube-system/rke2-coredns*",
-                "source": "rancher/rke2 charts/chart_versions.yaml:15-16@v1.37.1+rke2r1 and charts/build-chart.sh:39-42@v1.37.1+rke2r1 (HelmChart rke2-coredns in kube-system); rancher/rke2-charts charts/rke2-coredns/rke2-coredns/1.49.002/templates/_helpers.tpl:13-20@main and templates/deployment.yaml:4-7@main (the Deployment is rke2-coredns-rke2-coredns)",
+                "source": "rancher/rke2 charts/chart_versions.yaml:15-16@v1.37.1+rke2r1 and charts/build-chart.sh:39-42@v1.37.1+rke2r1 (HelmChart rke2-coredns in kube-system); rancher/rke2-charts charts/rke2-coredns/rke2-coredns/1.49.002/templates/_helpers.tpl:13-20@cf8a16b and templates/deployment.yaml:4-7@cf8a16b (the branch main read at that commit on 2026-11-05; the Deployment is rke2-coredns-rke2-coredns)",
             },
         ],
     },
@@ -124,7 +125,7 @@ COMPONENTS: list[dict] = [
             },
             {
                 "node_version_contains": "+rke2",
-                "source": "rancher/rke2 pkg/executor/staticpod/staticpod.go:179-181@v1.37.1+rke2r1 (kube-proxy is a static pod, no DaemonSet), pkg/rke2/kp.go:10,17-18@v1.37.1+rke2r1 (the old rke2-kube-proxy HelmChart is disabled), scripts/version.sh:65@v1.37.1+rke2r1 (the version suffix); until #130 the rule looked for a DaemonSet rke2-kube-proxy* that no RKE2 release ever produced (rancher/rke2-charts charts/rke2-kube-proxy/rke2-kube-proxy/v1.21.1-build2021052004/templates/daemonset.yaml:2-7@main named it kube-proxy), so kube-proxy was absent on every RKE2 cluster",
+                "source": "rancher/rke2 pkg/executor/staticpod/staticpod.go:179-181@v1.37.1+rke2r1 (kube-proxy is a static pod, no DaemonSet), pkg/rke2/kp.go:10,17-18@v1.37.1+rke2r1 (the old rke2-kube-proxy HelmChart is disabled), scripts/version.sh:65@v1.37.1+rke2r1 (the version suffix); until #130 the rule looked for a DaemonSet rke2-kube-proxy* that no RKE2 release ever produced (rancher/rke2-charts charts/rke2-kube-proxy/rke2-kube-proxy/v1.21.1-build2021052004/templates/daemonset.yaml:2-7@cf8a16b named it kube-proxy), so kube-proxy was absent on every RKE2 cluster",
             },
         ],
     },
@@ -251,7 +252,7 @@ COMPONENTS: list[dict] = [
         "any": [
             {
                 "deployment": "*/*metrics-server*",
-                "source": "kubernetes-sigs/metrics-server manifests/base/deployment.yaml:3-6@v0.9.1 (metrics-server in kube-system; the release asset components.yaml is built from it, manifests/base/kustomization.yaml:1-8), charts/metrics-server/templates/deployment.yaml:2-5@v0.9.1 and charts/metrics-server/templates/_helpers.tpl:13-24@v0.9.1 (the release name or <release>-metrics-server in the release namespace; charts/metrics-server/README.md:16 installs without a namespace flag), k3s-io/k3s manifests/metrics-server/metrics-server-deployment.yaml:9-12@v1.37.1+k3s1, rancher/rke2-charts charts/rke2-metrics-server/rke2-metrics-server/3.14.001/templates/_helpers.tpl:13-23@main (rke2-metrics-server); until #130 the rule required kube-system/metrics-server exactly",
+                "source": "kubernetes-sigs/metrics-server manifests/base/deployment.yaml:3-6@v0.9.1 (metrics-server in kube-system; the release asset components.yaml is built from it, manifests/base/kustomization.yaml:1-8), charts/metrics-server/templates/deployment.yaml:2-5@v0.9.1 and charts/metrics-server/templates/_helpers.tpl:13-24@v0.9.1 (the release name or <release>-metrics-server in the release namespace; charts/metrics-server/README.md:16 installs without a namespace flag), k3s-io/k3s manifests/metrics-server/metrics-server-deployment.yaml:9-12@v1.37.1+k3s1, rancher/rke2-charts charts/rke2-metrics-server/rke2-metrics-server/3.14.001/templates/_helpers.tpl:13-23@cf8a16b (the branch main read at that commit on 2026-11-05; rke2-metrics-server); until #130 the rule required kube-system/metrics-server exactly",
             }
         ],
     },
@@ -416,7 +417,7 @@ COMPONENTS: list[dict] = [
         "any": [
             {
                 "daemonset": "kube-system/eks-pod-identity-agent*",
-                "source": "aws/eks-pod-identity-agent charts/eks-pod-identity-agent/templates/daemonset.yaml:11-12@v0.2.6 and charts/eks-pod-identity-agent/values.yaml:5-7,138,159@v0.2.6 (the name is pinned to eks-pod-identity-agent, plus a suffix for the hybrid DaemonSets; charts/eks-pod-identity-agent/README.md:21 installs into kube-system); the managed add-on's manifest is not public, the EKS guide shows pods eks-pod-identity-agent-* in kube-system (awsdocs/amazon-eks-user-guide latest/ug/manage-access/aws-access/pod-id-agent-setup.adoc:78-79@mainline)",
+                "source": "aws/eks-pod-identity-agent charts/eks-pod-identity-agent/templates/daemonset.yaml:11-12@v0.2.6 and charts/eks-pod-identity-agent/values.yaml:5-7,138,159@v0.2.6 (the name is pinned to eks-pod-identity-agent, plus a suffix for the hybrid DaemonSets; charts/eks-pod-identity-agent/README.md:21 installs into kube-system); the managed add-on's manifest is not public, the EKS guide shows pods eks-pod-identity-agent-* in kube-system (awsdocs/amazon-eks-user-guide latest/ug/manage-access/aws-access/pod-id-agent-setup.adoc:78-79@8d43223, the branch mainline read at that commit on 2026-11-05)",
             }
         ],
     },
@@ -427,7 +428,7 @@ COMPONENTS: list[dict] = [
         "any": [
             {
                 "image": ".dkr.ecr.",
-                "source": "awsdocs/amazon-eks-user-guide latest/ug/workloads/add-ons-images.adoc:8,19-28,64,67@mainline (private registries are <account>.dkr.ecr.<region>.amazonaws.com and .amazonaws.com.cn; the ECR user guide repository is archived, so the hostname grammar is read from the EKS add-on registry table). Enabled when pods use ECR images (always with EKS managed add-ons). Images from ECR Public (public.ecr.aws, the EBS and EFS chart defaults) are not counted: they say nothing about the cluster's own registry. The aws step is skipped off EKS",
+                "source": "awsdocs/amazon-eks-user-guide latest/ug/workloads/add-ons-images.adoc:8,19-28,64,67@8d43223 (the branch mainline, read at that commit on 2026-11-05: private registries are <account>.dkr.ecr.<region>.amazonaws.com and .amazonaws.com.cn; the ECR user guide repository is archived, so the hostname grammar itself is unverified and read from the EKS add-on registry table). Enabled when pods use ECR images (always with EKS managed add-ons). Images from ECR Public (public.ecr.aws, the EBS and EFS chart defaults) are not counted: they say nothing about the cluster's own registry. The aws step is skipped off EKS",
             }
         ],
     },
@@ -553,7 +554,7 @@ COMPONENTS: list[dict] = [
         "any": [
             {
                 "image": "grafana/grafana",
-                "source": "grafana-community/helm-charts charts/grafana/values.yaml:119-123@grafana-14.3.1 (docker.io/grafana/grafana; the chart moved from grafana/helm-charts after grafana-10.5.15, grafana/helm-charts charts/grafana/README.md:5@main; kube-prometheus-stack pulls it from ghcr.io/grafana-community, charts/kube-prometheus-stack/Chart.yaml:62-65@kube-prometheus-stack-92.18.0). The substring also matches the chart's own grafana/grafana-image-renderer (values.yaml:1747), the same install",
+                "source": "grafana-community/helm-charts charts/grafana/values.yaml:119-123@grafana-14.3.1 (docker.io/grafana/grafana; the chart moved from grafana/helm-charts after grafana-10.5.15, grafana/helm-charts charts/grafana/README.md:5@80d6bc9, the branch main read at that commit on 2026-11-05; kube-prometheus-stack pulls it from ghcr.io/grafana-community, charts/kube-prometheus-stack/Chart.yaml:62-65@kube-prometheus-stack-92.18.0). The substring also matches the chart's own grafana/grafana-image-renderer (values.yaml:1747), the same install",
             },
             {
                 "deployment": "*/*grafana*",
@@ -589,12 +590,8 @@ COMPONENTS: list[dict] = [
                 "source": "elastic/helm-charts elasticsearch/templates/statefulset.yaml:3,5@v8.5.1 and elasticsearch/values.yaml:2-3@v8.5.1 (<clusterName>-<nodeGroup>, elasticsearch-master; the chart is archived, last release 2022-11-16)",
             },
             {
-                "statefulset": "*/*-es-*",
-                "source": "elastic/cloud-on-k8s pkg/apis/elasticsearch/v1/name.go:61,124-125@v3.5.0 and pkg/controller/elasticsearch/nodespec/statefulset.go:90@v3.5.0 (ECK names a nodeSet's StatefulSet <cluster>-es-<nodeset>; not matched until #130)",
-            },
-            {
                 "image": "elasticsearch/elasticsearch",
-                "source": "elastic/cloud-on-k8s pkg/controller/common/container/container.go:15,56@v3.5.0 (docker.elastic.co/elasticsearch/elasticsearch), elastic/helm-charts elasticsearch/values.yaml:78@v8.5.1",
+                "source": "elastic/cloud-on-k8s pkg/controller/common/container/container.go:15,56@v3.5.0 (docker.elastic.co/elasticsearch/elasticsearch, the image of every ECK nodeSet StatefulSet <cluster>-es-<nodeset>, pkg/apis/elasticsearch/v1/name.go:61,124-125@v3.5.0; a name glob on -es- would also match unrelated StatefulSets, so the image is the evidence), elastic/helm-charts elasticsearch/values.yaml:78@v8.5.1",
             },
             {
                 "statefulset": "*/*opensearch*",

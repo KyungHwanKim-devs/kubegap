@@ -63,7 +63,8 @@ def test_nothing_installed_detects_nothing():
         ("deployments", "local-path-storage", "local-path-provisioner", "x", "local-path-provisioner"),
         ("deployments", "istio-system", "istiod-canary", "x", "istio"),
         ("deployments", "rke2", "rke2-traefik", "x", "traefik"),
-        ("statefulsets", "es", "quickstart-es-default", "x", "elasticsearch-opensearch"),
+        ("statefulsets", "es", "quickstart-es-default", "docker.elastic.co/elasticsearch/elasticsearch:9.1.0", "elasticsearch-opensearch"),  # ECK: by image; a name glob on -es- would take sales-es-worker too
+        ("statefulsets", "sales", "sales-es-worker", "ghcr.io/acme/worker:1", None),
         ("deployments", "vm", "vmsingle-demo", "x", "victoria-metrics"),
         ("statefulsets", "vm", "vm-victoria-metrics-single-server", "x", "victoria-metrics"),
         ("statefulsets", "mon", "vmsingle-demo", "x", None),  # the StatefulSet the old rule looked for: nothing produces it

@@ -423,7 +423,7 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
     try:
         compat = _load_compat()
     except Exception as e:  # a malformed table must show up in the report's tool notes instead of silently disabling the version check
-        compat, compat_error = {}, f"{type(e).__name__}: {e}"
+        compat, compat_error = [], f"{type(e).__name__}: {e}"
     kmm = versions.minor_text(kver) if kver else None
     row = compat_row(compat, kver) if kver else None
     max_k8s = row["max_k8s"] if row else None

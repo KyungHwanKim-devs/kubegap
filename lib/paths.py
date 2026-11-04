@@ -23,6 +23,15 @@ LIB_DIR = ROOT / "lib"
 RUBRIC_DIR = ROOT / "rubric"
 PROFILES_DIR = RUBRIC_DIR / "profiles"
 COLLECTORS_DIR = ROOT / "collectors"
+
+
+def collect_steps() -> list[tuple[str, dict]]:
+    """(collector folder name, step) for every step of collectors/*/collect.yaml, folders sorted: the one walk lib/nodecommands and lib/podmetrics share."""
+    from . import yamlite  # yamlite imports nothing from lib; the lazy import keeps this module free of it at import time
+
+    return [(f.parent.name, st) for f in sorted(COLLECTORS_DIR.glob("*/collect.yaml")) for st in (yamlite.load_file(f) or []) if isinstance(st, dict)]
+
+
 SIGNATURES_DIR = ROOT / "signatures"
 TEMPLATES_DIR = ROOT / "templates"
 # Data and personal config live outside the skill folder (~/.kubegap/) so that cluster data and AWS profiles do not accumulate in the skill repository. The old location (inside the skill folder) is still read for compatibility.

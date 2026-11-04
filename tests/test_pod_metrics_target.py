@@ -178,3 +178,30 @@ def test_the_node_fallback_sends_the_discovered_port(tmp_path, monkeypatch):
     res = collect._step_pod_metrics(ctx, step)
     assert res["pods"]["repo-1"]["via"] == "node:n1"
     assert sent[0][2] == "argocd/repo-server-metrics" and sent[0][3] == {"podIp": "10.0.0.9", "port": 8085} and "http://10.0.0.9:8085/metrics" in sent[0][1]
+
+
+def test_several_matching_workloads_prefer_the_default_namespace_and_are_listed():
+    """`*/*grafana` matches both logging/loki-grafana and monitoring/grafana: the one in the step's default namespace wins and both are named (review of #136)."""
+    objs = _objs(("deployment", _wl("deployment", "logging", "loki-grafana", {"app": "loki-grafana"}, [("grafana", 3000)])), ("deployment", _wl("deployment", "monitoring", "grafana", {"app": "grafana"}, [("grafana", 3000)])))
+    t = podmetrics.discover_targets(objs, Config())["grafana.self-metrics"]
+    assert t["workload"] == "deployment monitoring/grafana" and t["candidates"] == ["deployment logging/loki-grafana", "deployment monitoring/grafana"]
+    # neither in the default namespace: the first by namespace and name, and the list says what else there was
+    objs = _objs(("deployment", _wl("deployment", "obs", "grafana", {"app": "grafana"}, [])), ("deployment", _wl("deployment", "logging", "loki-grafana", {"app": "x"}, [])))
+    t = podmetrics.discover_targets(objs, Config())["grafana.self-metrics"]
+    assert t["workload"] == "deployment logging/loki-grafana" and len(t["candidates"]) == 2
+
+
+def test_an_invalid_config_port_is_ignored_and_said_instead_of_aborting_discovery():
+    t = podmetrics.discover_targets(_objs(), Config({"components": {"argocd": {"metrics_port": "abc"}, "keda": {"metrics_port": 70000}}}))
+    assert t["argocd.repo-server-metrics"]["port"] == 8084 and t["argocd.repo-server-metrics"]["source"]["port"] == "default (config value 'abc' ignored: not a port)"
+    assert t["keda.operator-metrics"]["port"] == 8080 and "ignored" in t["keda.operator-metrics"]["source"]["port"]
+
+
+def test_metallb_before_0_16_is_read_on_its_monitoring_port():
+    """The plain port is named monitoring through 0.15 (metallb-native.yaml:2110-2111@v0.15.3); with the 0.15 chart's kube-rbac-proxy both ports exist and the plain one is read."""
+    sp = _wl("daemonset", "metallb-system", "speaker", {"app": "metallb", "component": "speaker"}, [("monitoring", 7472), ("memberlist-tcp", 7946)])
+    t = podmetrics.discover_targets(_objs(("daemonset", sp)), Config())["metallb.metallb-speaker-metrics"]
+    assert t["port"] == 7472 and t["source"]["port"] == "discovered" and "skip" not in t
+    both = _wl("daemonset", "metallb-system", "lb-metallb-speaker", {"app.kubernetes.io/component": "speaker", "app.kubernetes.io/name": "metallb"}, [("monitoring", 7472), ("metricshttps", 9120)])
+    t = podmetrics.discover_targets(_objs(("daemonset", both)), Config())["metallb.metallb-speaker-metrics"]
+    assert t["port"] == 7472 and "skip" not in t and t["selector"] == "app.kubernetes.io/component=speaker,app.kubernetes.io/name=metallb"
