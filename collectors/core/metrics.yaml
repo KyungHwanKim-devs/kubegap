@@ -276,8 +276,10 @@
   query: >
     (time() - kube_pod_created) * on (namespace, pod) group_left() (kube_pod_status_phase{phase="Pending"} == 1) > 60
 - id: keda_scaler_errors_24h
+  # keda_scaler_detail_errors_total since KEDA 2.14.0, keda_scaler_errors_total until 2.16 (removed in 2.17.0): kedacore/keda pkg/metricscollector/prommetrics.go:116@v2.14.0, :107@v2.16.0, absent @v2.17.0 (collectors/keda/pod-metrics.yaml).
+  # `or` takes the newer counter's series and adds the older one's only where the newer has none, so 2.14-2.16, which emit both, are not counted twice.
   why: KEDA scaler (trigger) failures reading external metrics (24h). No series when KEDA is not scraped by Prometheus
-  query: sum by (namespace, scaledObject) (increase(keda_scaler_errors_total[24h]) > 0)
+  query: sum by (namespace, scaledObject) (increase(keda_scaler_detail_errors_total[24h]) > 0) or sum by (namespace, scaledObject) (increase(keda_scaler_errors_total[24h]) > 0)
 
 # ---------- Traffic ----------
 - id: pod_network_rx_bytes_1h

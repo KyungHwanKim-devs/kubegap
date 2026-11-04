@@ -45,7 +45,7 @@
   names:
     - name: karpenter_nodeclaims_created_total
       since: "1.0.0"
-      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:33@v1.0.0, :35@v1.15.1 (labels reason, nodepool, min_values_relaxed)"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:33@v1.0.0 (labels reason, nodepool, capacity_type), :35@v1.15.1 (labels reason, nodepool, min_values_relaxed)"
     - name: karpenter_nodeclaims_created
       before: "1.0.0"
       source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:31@v0.37.0 (labels reason, nodepool, capacity_type)"
@@ -54,7 +54,7 @@
   names:
     - name: karpenter_nodeclaims_terminated_total
       since: "1.0.0"
-      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:46@v1.0.0, :50@v1.15.1 (labels nodepool, capacity_type, zone; no reason)"
+      source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:46@v1.0.0 (labels nodepool, capacity_type), :50@v1.15.1 (labels nodepool, capacity_type, zone); no reason label since 1.0"
     - name: karpenter_nodeclaims_terminated
       before: "1.0.0"
       source: "kubernetes-sigs/karpenter pkg/metrics/metrics.go:44@v0.37.0 (labels reason, nodepool, capacity_type)"
@@ -181,12 +181,12 @@
   names:
     - name: karpenter_disruption_pods_disrupted_total
       before: "1.0.0"
-      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/metrics.go:75@v0.37.0 (collected for the raw file only; v1.0.0 has pods_disruption_initiated_total)"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/metrics.go:75@v0.37.0 (collected for the raw file only; absent at v1.0.0, karpenter_pods_disruption_initiated_total appears later, pkg/metrics/metrics.go:80@v1.15.1)"
 - key: disruption_queue_depth
   names:
     - name: karpenter_voluntary_disruption_queue_failures_total
       since: "1.0.0"
-      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/orchestration/metrics.go:38@v1.0.0, :234@v1.15.1 (collected for the raw file only)"
+      source: "kubernetes-sigs/karpenter pkg/controllers/disruption/orchestration/metrics.go:38@v1.0.0; pkg/controllers/disruption/metrics.go:234@v1.15.1 (collected for the raw file only)"
     - name: karpenter_disruption_queue_depth
       before: "1.0.0"
       source: "kubernetes-sigs/karpenter pkg/controllers/disruption/orchestration/metrics.go:56@v0.37.0 (collected for the raw file only)"
@@ -206,11 +206,16 @@
     - name: karpenter_provisioner_scheduling_duration_seconds
       before: "1.0.0"
       source: "kubernetes-sigs/karpenter pkg/controllers/provisioning/metrics.go:31@v0.37.0 (collected for the raw file only)"
-- key: eviction_queue_depth
+- key: eviction_requests
   names:
     - name: karpenter_pods_eviction_requests_total
+      since: "1.5.0"
+      source: "kubernetes-sigs/karpenter pkg/controllers/node/termination/terminator/metrics.go:49@v1.5.0, :56@v1.15.1 (collected for the raw file only)"
+    - name: karpenter_nodes_eviction_requests_total
       since: "1.1.0"
-      source: "kubernetes-sigs/karpenter pkg/controllers/node/termination/terminator/metrics.go:34@v1.1.0 (as nodes_eviction_requests_total), :56@v1.15.1 (collected for the raw file only)"
+      source: "kubernetes-sigs/karpenter pkg/controllers/node/termination/terminator/metrics.go:34@v1.1.0, :36-37@v1.2.0 through @v1.7.0 (read at every minor to 1.7); absent at v1.15.1, the removing release was not read (collected for the raw file only)"
+- key: eviction_queue_depth
+  names:
     - name: karpenter_nodes_eviction_queue_depth
       before: "1.0.0"
-      source: "kubernetes-sigs/karpenter pkg/controllers/node/termination/terminator/metrics.go:32@v0.37.0 (collected for the raw file only)"
+      source: "kubernetes-sigs/karpenter pkg/controllers/node/termination/terminator/metrics.go:32@v0.37.0; no eviction metric at v1.0.0 (collected for the raw file only)"

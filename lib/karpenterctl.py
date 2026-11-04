@@ -40,6 +40,10 @@ def _q(v) -> float:
         return 0.0
 
 
+def _int_map(m: dict | None) -> dict | None:
+    return None if m is None else {k: int(v) for k, v in m.items()}
+
+
 def _pm_floor(pm: dict, ld: dict | None) -> str | None:
     """The oldest Karpenter release the leader's metric spellings can come from (None when no spelling carries a version bound)."""
     names = (ld or {}).get("names") or {}
@@ -53,7 +57,7 @@ def _pm_floor(pm: dict, ld: dict | None) -> str | None:
     return best
 
 
-def _pod_metrics(snap: Path) -> dict:
+def _pod_metrics(snap: Path, version: str | None = None) -> dict:
     """Per pod, what the controller's /metrics says. Names come from collectors/karpenter/pod-metrics.yaml through lib/podmetrics (source: lines there):
     Karpenter 1.0 renamed most counters (_total suffix, nodepools, voluntary_disruption, scheduler, _duration_seconds) and dropped interruption actions and
     consistency errors, so each key names its spellings and the first one present is read; `names` records which spelling a pod exposed."""
@@ -105,25 +109,27 @@ def _pod_metrics(snap: Path) -> dict:
             "nodepool_limit": limit,
             "nodepool_usage_ratio": pool_ratio,
             "nodeclaims_created_by_reason": {k: int(v) for k, v in by("nodeclaims_created", "reason").items()},
-            "nodeclaims_terminated_by_reason": {k: int(v) for k, v in by("nodeclaims_terminated", ("reason", "nodepool")).items()},
+            # 1.x dropped the reason label from terminated: None then, never a map keyed by pool names. disrupted is keyed by type on 0.x (consolidation, drift, expiration)
+            # and by reason on 1.x (underutilized, drifted, empty): the same fact in the vocabulary of the running release, metrics_names says which
+            "nodeclaims_terminated_by_reason": _int_map(_pm.by_label_or_none(pm, A, "nodeclaims_terminated", "reason")),
             "nodeclaims_disrupted_by_reason": {k: int(v) for k, v in by("nodeclaims_disrupted", ("reason", "type")).items()},
             "interruption_messages_by_type": {k: int(v) for k, v in by("interruption_received_messages", "message_type").items()},
-            "interruption_actions": None if _pm.removed(pm, A, "interruption_actions_performed") else {k: int(v) for k, v in by("interruption_actions_performed", "action_type").items()},
+            "interruption_actions": None if _pm.removed(pm, A, "interruption_actions_performed", version) else {k: int(v) for k, v in by("interruption_actions_performed", "action_type").items()},
             "interruption_deleted_messages": int(_pm.single(pm, A, "interruption_deleted_messages", 0)),
             "cloudprovider_errors": cp_err,
             "cloudprovider_errors_total": sum(cp_err.values()),
             "reconcile_errors": recon_err,
             "reconcile_errors_total": sum(recon_err.values()),
             "cluster_state_synced": (synced == 1) if synced is not None else None,
-            "consistency_errors": None if _pm.removed(pm, A, "consistency_errors") else (int(_pm.single(pm, A, "consistency_errors", 0)) if _pm.present(pm, A, "consistency_errors") else None),
+            "consistency_errors": None if _pm.removed(pm, A, "consistency_errors", version) else (int(_pm.single(pm, A, "consistency_errors", 0)) if _pm.present(pm, A, "consistency_errors") else None),
             "consistency_errors_by_check": {k: int(v) for k, v in by("consistency_errors", "check").items()},
             "pods_startup_avg_s": _r(startup_sum / startup_cnt, 1) if startup_cnt else None,
             "pods_startup_count": int(startup_cnt),
             "node_termination_avg_s": _r(term_sum / term_cnt, 1) if term_cnt else None,
             "disruption_eligible_nodes": {k: int(v) for k, v in by("disruption_eligible_nodes", ("reason", "method")).items()},
             "disruption_budgets_allowed": budgets,
-            "disruption_actions": {k: int(v) for k, v in by("disruption_actions", ("decision", "method")).items()},
-            "nodes_disrupted_total": None if _pm.removed(pm, A, "nodes_disrupted") else {k: int(v) for k, v in by("nodes_disrupted", "method").items()},
+            "disruption_actions": {k: int(v) for k, v in by("disruption_actions", ("reason", "method")).items()},  # 0.x method and 1.x reason name the same thing
+            "nodes_disrupted_total": None if _pm.removed(pm, A, "nodes_disrupted", version) else {k: int(v) for k, v in by("nodes_disrupted", "method").items()},
             "scheduling_queue_depth": _pm.single(pm, A, "scheduling_queue_depth"),
         }
     return pods
@@ -218,7 +224,7 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
     pools_using = Counter(((p.get("spec") or {}).get("template") or {}).get("spec", {}).get("nodeClassRef", {}).get("name") for p in pools)
     for c in classes:
         c["nodepools"] = pools_using.get(c["name"], 0)
-    pm = _pod_metrics(snap)
+    pm = _pod_metrics(snap, controller.get("version"))
     leader = next((p for p, d in pm.items() if d["leader"]), None) or (max(pm, key=lambda p: pm[p]["pods_startup_count"] + sum(pm[p]["nodeclaims_created_by_reason"].values())) if pm else None)
     ld = pm.get(leader) if leader else None
     sk = (scaling or {}).get("karpenter") or {}

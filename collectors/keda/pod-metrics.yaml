@@ -50,7 +50,7 @@
       source: "kedacore/keda pkg/metricscollector/prommetrics.go:116@v2.14.0, :116@v2.16.0, :84@v2.17.2, :85@v2.21.0 (labels namespace, metric, scaledObject, scaler, triggerIndex, type)"
     - name: keda_scaler_errors_total
       before: "2.17.0"
-      source: "kedacore/keda pkg/metricscollector/prommetrics.go:46@v2.12.0, :107@v2.16.0; absent at v2.17.2 (labels namespace, metric, scaledObject, scaler, triggerIndex, type)"
+      source: "kedacore/keda pkg/metricscollector/prommetrics.go:46@v2.12.0 (labels namespace, metric, scaledObject, scaler, scalerIndex), :107@v2.16.0 (triggerIndex and type since 2.13); absent at v2.17.0"
 - key: operator_metrics_present
   names:
     - name: keda_build_info

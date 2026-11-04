@@ -277,9 +277,9 @@ def _grafana(snap: Path, inv: dict) -> dict:
         notif_fail += int(pm["single"].get("grafana_alerting_notification_failed_total", 0)) + sum(int(v) for _, v in pm["labeled"].get("grafana_alerting_notification_failed_total", []))
         # grafana_stat_total_users is singular in Grafana's source (collectors/grafana/pod-metrics.yaml); the plural spelling read until #120 never existed
         for key in ("stat_totals_dashboard", "stat_totals_datasource", "stat_total_users", "stat_active_users", "stat_totals_alert_rules"):
-            name = _pm.pick(pm, "grafana", key)
-            if name is not None and name in pm["single"]:
-                stats[key.replace("stat_", "")] = int(pm["single"][name])
+            v = _pm.single(pm, "grafana", key)  # grafana_stat_totals_datasource carries plugin_id (one series per datasource type): the sum is the total
+            if v is not None:
+                stats[key.replace("stat_", "")] = int(v)
         rss = pm["single"].get("process_resident_memory_bytes", rss)
     ds_rows = []
     for name, c in ds.items():

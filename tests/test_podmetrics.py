@@ -19,6 +19,7 @@ karpenter_nodepool_usage{nodepool="default",resource_type="cpu"} 40
 karpenter_nodepool_limit{nodepool="default",resource_type="cpu"} 100
 karpenter_nodeclaims_created{reason="provisioning",nodepool="default",capacity_type="spot"} 12
 karpenter_nodeclaims_terminated{reason="expiration",nodepool="default",capacity_type="spot"} 3
+karpenter_nodeclaims_disrupted{type="consolidation",nodepool="default"} 5
 karpenter_interruption_received_messages{message_type="SpotInterruptionKind"} 7
 karpenter_interruption_actions_performed{action_type="CordonAndDrain"} 7
 karpenter_interruption_deleted_messages 7
@@ -39,6 +40,7 @@ karpenter_nodepools_usage{nodepool="default",resource_type="cpu"} 40
 karpenter_nodepools_limit{nodepool="default",resource_type="cpu"} 100
 karpenter_nodeclaims_created_total{reason="provisioning",nodepool="default",min_values_relaxed="false"} 12
 karpenter_nodeclaims_terminated_total{nodepool="default",capacity_type="spot",zone="ap-northeast-2a"} 3
+karpenter_nodeclaims_disrupted_total{reason="underutilized",nodepool="default",capacity_type="spot"} 5
 karpenter_interruption_received_messages_total{message_type="SpotInterruptionKind"} 7
 karpenter_interruption_deleted_messages_total 7
 karpenter_cluster_state_synced 1
@@ -80,7 +82,16 @@ def test_karpenter_both_spellings_give_the_same_summary(tmp_path):
     # what 1.0 removed is None, not zero: the report says "not emitted by this version" instead of "no interruption actions"
     assert out["0.37"]["interruption_actions"] == {"CordonAndDrain": 7} and out["0.37"]["consistency_errors"] == 2
     assert out["1.15"]["interruption_actions"] is None and out["1.15"]["consistency_errors"] is None
-    assert out["0.37"]["nodeclaims_terminated_by_reason"] == {"expiration": 3} and out["1.15"]["nodeclaims_terminated_by_reason"] == {"default": 3}  # 1.x dropped the reason label
+    assert out["0.37"]["nodeclaims_terminated_by_reason"] == {"expiration": 3} and out["1.15"]["nodeclaims_terminated_by_reason"] is None  # 1.x dropped the reason label: None, not pool names
+    assert out["0.37"]["nodeclaims_disrupted_by_reason"] == {"consolidation": 5} and out["1.15"]["nodeclaims_disrupted_by_reason"] == {"underutilized": 5}  # 0.x type, 1.x reason
+
+
+def test_a_fresh_karpenter_1x_with_no_series_yet_still_reports_the_removed_metrics_as_removed(tmp_path):
+    """Before any NodePool exists no nodepools_* series proves the generation; the controller image version does."""
+    pods = karpenterctl._pod_metrics(_snap(tmp_path, "karpenter", "karpenter_cluster_state_synced 1\nprocess_start_time_seconds 1.7e9\n"), version="1.15.1")
+    assert pods["pod-0"]["interruption_actions"] is None and pods["pod-0"]["consistency_errors"] is None and pods["pod-0"]["nodes_disrupted_total"] is None
+    pods = karpenterctl._pod_metrics(_snap(tmp_path / "old", "karpenter", "karpenter_cluster_state_synced 1\n"), version="0.37.0")
+    assert pods["pod-0"]["interruption_actions"] == {} and pods["pod-0"]["consistency_errors"] is None  # 0.x: no series yet is {} / absent, not removed
 
 
 def test_two_spellings_in_one_text_are_never_added():
@@ -135,6 +146,7 @@ def test_grafana_user_total_is_read_under_its_real_name(tmp_path):
     (snap / "grafana" / "health.json").write_text(json.dumps({"version": "12.2.1", "database": "ok"}))
     g = stackhealth._grafana(snap, {"stores": {"grafana": {"present": True}}})
     assert g["stats"]["total_users"] == 5 and g["stats"]["active_users"] == 2 and g["stats"]["totals_dashboard"] == 42
+    assert g["stats"]["totals_datasource"] == 3  # labeled by plugin_id: summed, not skipped
 
 
 def test_every_table_name_passes_its_step_keep_filter():

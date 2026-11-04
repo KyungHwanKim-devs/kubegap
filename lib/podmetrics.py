@@ -11,6 +11,7 @@ in collect.yaml, and that no parser spells a metric name outside its table.
 
 from __future__ import annotations
 
+import re
 from functools import cache
 from pathlib import Path
 
@@ -100,14 +101,27 @@ def floor_version(parsed: dict, area: str) -> str | None:
     return best
 
 
-def removed(parsed: dict, area: str, key: str) -> bool:
-    """True when every spelling of `key` carries a `before` bound and another present name proves the text comes from a release at or past it:
-    the component no longer emits the metric, which is not the same as a counter that has no series yet."""
+def removed(parsed: dict, area: str, key: str, version: str | None = None) -> bool:
+    """True when every spelling of `key` carries a `before` bound and the text is known to come from a release at or past it: by another present
+    name's `since`, or by `version` (the component's image tag, which a fresh deployment whose counters have no series yet still carries).
+    The component no longer emits the metric, which is not the same as a counter that has no series yet."""
     names = entry(area, key).get("names") or []
     if not names or any(not n.get("before") for n in names):
         return False
     floor = floor_version(parsed, area)
+    v = re.match(r"v?(\d+\.\d+(?:\.\d+)?)", str(version or ""))
+    if v and (floor is None or _vt(v.group(1)) > _vt(floor)):
+        floor = v.group(1)
     return floor is not None and all(_vt(floor) >= _vt(n["before"]) for n in names)
+
+
+def by_label_or_none(parsed: dict, area: str, key: str, label: str) -> dict[str, float] | None:
+    """Like by_label for one label, but None when the present spelling carries no such label at all (a 1.x counter that dropped `reason`):
+    a summary keyed by the wrong label would read as if the reasons had changed."""
+    rows = labeled(parsed, area, key)
+    if rows and not any(label in lab for lab, _ in rows):
+        return None
+    return by_label(parsed, area, key, label)
 
 
 def all_names(area: str) -> list[str]:

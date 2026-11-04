@@ -62,9 +62,6 @@ def test_every_tool_step_names_its_source():
 # ---------- pod /metrics names (#120): collectors/<area>/pod-metrics.yaml ----------
 
 VERSION = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
-METRIC_LITERAL = re.compile(
-    r'"((?:karpenter|argocd|certmanager|externalsecret|clustersecretstore|secretstore|grafana|keda|metallb|aws_api|controller_runtime|workqueue|rest_client|leader_election|apiserver|registered_metrics|grpc_server|process)_[a-z0-9_]+)"'
-)
 PARSERS = ["lib/karpenterctl.py", "lib/kedactl.py", "lib/stackhealth.py", "lib/argocdctl.py", "lib/albctl.py", "lib/certmanager.py", "lib/esoctl.py", "lib/metallbctl.py", "lib/k3s.py"]
 
 
@@ -98,19 +95,44 @@ def test_every_pod_metric_name_has_a_source_and_a_valid_version_range():
 
 
 def test_every_metric_literal_in_a_parser_is_in_a_table():
-    """A parser may read a metric only under a spelling its area's table carries; the grafana_stat_totals_users typo lived for weeks because nothing checked this."""
+    """A parser may spell a metric only as one of its area's table carries. Every metric-shaped string literal counts, in a tuple, a startswith, an `in`
+    test or a .get on the parsed text; a dict key (`"x":`) and a read of another dict (`rec["x"]`, `(ld or {}).get("x")`) do not. The
+    grafana_stat_totals_users typo lived in a tuple for weeks because nothing checked this."""
     from lib import podmetrics
 
     names = {n for a in podmetrics.tables() for n in podmetrics.all_names(a)}
-    # a read of a parsed /metrics text: pm["labeled"].get(...), pm["single"].get(...), the lb/sg/s shorthands the parsers use, or a startswith on a raw line
-    read = re.compile(
-        r'(?:pm\["(?:labeled|single)"\]\.get|\b(?:lb|sg|s)\.get|startswith)\("((?:karpenter|argocd|certmanager|externalsecret|clustersecretstore|secretstore|grafana|keda|metallb|aws_api|controller_runtime|workqueue|rest_client|leader_election|apiserver|registered_metrics|grpc_server|process)_[a-z0-9_]+)'
+    literal = re.compile(
+        r'"((?:karpenter|argocd|certmanager|externalsecret|clustersecretstore|secretstore|grafana|keda|metallb|aws_api|controller_runtime|workqueue|rest_client|leader_election|apiserver|registered_metrics|grpc_server)_[a-z0-9_]+)"'
     )
     seen = 0
     for rel in PARSERS:
-        for m in read.finditer((ROOT / rel).read_text(encoding="utf-8")):
+        text = (ROOT / rel).read_text(encoding="utf-8")
+        for m in literal.finditer(text):
+            before, after = text[max(0, m.start() - 60) : m.start()].rstrip(), text[m.end() : m.end() + 3]
+            if after.lstrip().startswith(":"):
+                continue  # a summary field being built
+            recv = before[:-5] if before.endswith(".get(") else before[:-1] if before.endswith("[") else None
+            if recv is not None and not (recv.endswith(('pm["labeled"]', 'pm["single"]')) or re.search(r"\b(?:lb|sg|s|parsed)$", recv)):
+                continue  # a read of some other dict (a summary row, a config)
             lit = m.group(1)
             base = re.sub(r"_(sum|count|bucket)$", "", lit)
             seen += 1
             assert lit in names or base in names, (rel, lit, "not in any collectors/*/pod-metrics.yaml")
-    assert seen >= 40
+    assert seen >= 60
+
+
+def test_the_literal_test_catches_a_tuple_typo(tmp_path, monkeypatch):
+    """The old stackhealth loop spelled the typo in a tuple; the test above must see it."""
+    bad = tmp_path / "lib" / "stackhealth.py"
+    bad.parent.mkdir()
+    bad.write_text('for k in ("grafana_stat_totals_dashboard", "grafana_stat_totals_users"):\n    if k in pm["single"]:\n        pass\n')
+    import sys
+
+    import pytest
+
+    me = sys.modules[__name__]  # pytest may import this file under either name; patch the module object the test function closes over
+    monkeypatch.setattr(me, "ROOT", tmp_path)
+    monkeypatch.setattr(me, "PARSERS", ["lib/stackhealth.py"])
+
+    with pytest.raises(AssertionError, match="grafana_stat_totals_users"):
+        test_every_metric_literal_in_a_parser_is_in_a_table()
