@@ -18,11 +18,16 @@ def test_every_kind_of_control_sequence_is_removed_but_newline_and_tab_stay():
         "\x1b]8;;http://evil.example\x07click here\x1b]8;;\x07": "click here",  # OSC 8 hyperlink, BEL-terminated
         "\x1b]0;title\x1b\\x": "x",  # OSC, ST-terminated
         "\x1b]0;unterminated": "",  # OSC without a terminator runs to the end of its line
+        "pod \x1b]8;;http://x\x9c name tail": "pod  name tail",  # OSC ended by the 8-bit ST (ECMA-48 §8.3.143): the text after it stays (#128)
+        "a \x9d8;;http://x\x9c b": "a  b",  # 8-bit OSC introducer (Table 2b) with its payload
+        "a \x1bPq#0;2;0;0;0#0~~\x1b\\ b": "a  b",  # DCS (sixel) with its payload up to ST, 7-bit
+        "a \x90payload\x9c b\x9fapc\x1b\\c\x1b_x\x1b\\d\x1b^pm\x1b\\e\x1bXsos\x9cf": "a  bcdef",  # DCS, APC, PM, SOS in both widths
+        "a \x1b_unterminated apc\nnext line": "a \nnext line",  # a control string without ST ends at its line
         "a\x1b]0;unterminated\nsecond line stays\nmore": "a\nsecond line stays\nmore",  # ... and never past it: the next lines stay
         "\x1bc\x1b(B\x1b=": "",  # RIS and the other Fe/Fs escapes are two bytes each
         "\x9b31m\x9b0mred": "red",  # 8-bit CSI
         "\x00\x07\x08\x0b\x0c\x0e\x1f\x7f": "",  # C0 and DEL
-        "a\x85b\x9fc": "abc",  # C1
+        "a\x85b\x8ec": "abc",  # lone C1 bytes (NEL, SS2); 0x9F is APC and opens a control string, see the cases above
         "line1\r\nline2\tcol": "line1\nline2\tcol",  # CR goes, LF and TAB stay
         "plain pod-name-7f9 ok": "plain pod-name-7f9 ok",
         "한글과 émoji 🙂 stay": "한글과 émoji 🙂 stay",

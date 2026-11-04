@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import aws as _aws
-from . import kube, nodecommands, paths, scrub, versions, yamlite
+from . import kube, mask, nodecommands, paths, scrub, versions, yamlite
 from .config import Config
 from .portfwd import PortForward
 from .prom import Prometheus
@@ -473,7 +473,7 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
                 doc = json.loads(out.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 doc = None
-            stderr = re.sub(r"\x1b\[[0-9;]*m", "", r.stderr)  # kubent's zerolog ConsoleWriter colors field names.
+            stderr = mask.strip_control(r.stderr)[0]  # kubent's zerolog ConsoleWriter colours field names (SGR sequences); lib/mask knows the shapes
             if tool == "kubent":
                 # kube-no-trouble cmd/kubent/main.go:49,56 and pkg/collector/cluster.go:119-142@0.7.3:
                 # list errors are swallowed; zero counts also mean no last-applied annotations, not proof of a read.

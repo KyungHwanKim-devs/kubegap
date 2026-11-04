@@ -9,8 +9,8 @@ What is masked:
 - base64 runs of 40 or more characters (certificate/key data)
 - AWS account ids: the 12 digits inside ARNs and every known account id (from inventory) → <account>
 - (optional, --ips) private IPv4 → <ip>. Off by default: an IP needed for a finding may be written individually, and not dumping the full list is a rule of the LLM procedure (SKILL.md).
-- terminal control characters, first of all: ANSI CSI and OSC escape sequences (colours, cursor moves, `\x1b[2J`, OSC 8 hyperlinks), the other two-byte
-  ESC sequences, and every C0 and C1 control character except newline and tab. Report strings come from pod names, annotations, events and log lines,
+- terminal control characters, first of all: ECMA-48 control sequences (CSI: colours, cursor moves, `\x1b[2J`), control strings (OSC 8 hyperlinks,
+  DCS, SOS, PM, APC, each with its payload up to ST), the other ESC sequences, and every C0 and C1 control character except newline and tab. Report strings come from pod names, annotations, events and log lines,
   and a terminal that `cat`s the report would interpret them. Removed before the credential patterns so an escape sequence cannot split a token in two.
   Unicode above U+009F is left alone, bidi overrides and zero-width characters included: they change how text reads, not what a terminal executes.
 """
@@ -22,9 +22,28 @@ from dataclasses import dataclass, field
 
 MASK = "<masked>"
 
-# CSI `ESC [ params intermediates final` (7- and 8-bit), OSC `ESC ] ... BEL|ST` (an unterminated one ends at its line, never beyond), any other escape
-# `ESC intermediates final` (ESC c, ESC ( B, ESC =; a DCS/APC introducer goes and its payload stays as text), then lone C0 (minus \n and \t), DEL and C1 bytes
-_CONTROL = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]|\x9b[0-?]*[ -/]*[@-~]|\x1b\][^\x07\x1b\n]*(?:\x07|\x1b\\)?|\x1b[ -/]*[0-~]|[\x00-\x08\x0b-\x1f\x7f\x80-\x9f]")
+# ECMA-48 5th edition (references/sources.md, #128): a control sequence is CSI (ESC [ or 0x9B) + parameter bytes 0x30-0x3F + intermediate bytes 0x20-0x2F
+# + one final byte 0x40-0x7E (§5.4, §8.3.16); a control string is OSC/DCS/SOS/PM/APC (ESC ] P X ^ _ or 0x9D 0x90 0x98 0x9E 0x9F) up to ST (ESC \ or 0x9C; §5.6,
+# §8.3.143), and OSC also up to BEL, which terminals accept although the standard does not name it; an unterminated string ends at its line, never beyond.
+# Then any other escape sequence, ESC + intermediates + one final byte 0x30-0x7E (ESC c, ESC ( B, ESC =; §8.3.48), then lone C0 (minus \n and \t), DEL and C1 bytes.
+# Until #128 a string that ended with the 8-bit ST, or that opened with an 8-bit introducer, was cut at the wrong place: the OSC pattern knew BEL and ESC \ only,
+# so `ESC ] 8;;url 0x9C name` lost `name` with the link, and the DCS/APC payload was left in the text.
+_CONTROL = re.compile(
+    r"\x1b\[[0-?]*[ -/]*[@-~]"
+    r"|\x9b[0-?]*[ -/]*[@-~]"
+    r"|(?:\x1b\]|\x9d)[^\x07\x1b\x9c\n]*(?:\x07|\x1b\\|\x9c)?"
+    r"|(?:\x1b[PX^_]|[\x90\x98\x9e\x9f])[^\x1b\x9c\n]*(?:\x1b\\|\x9c)?"
+    r"|\x1b[ -/]*[0-~]"
+    r"|[\x00-\x08\x0b-\x1f\x7f\x80-\x9f]"
+)
+
+
+def strip_control(text: str) -> tuple[str, int]:
+    """`text` without terminal control sequences and control characters (newline and tab stay), and how many were removed. The one place that knows the
+    ECMA-48 shapes; lib/collect.py reads a tool's coloured stderr through it before matching log lines."""
+    return _CONTROL.subn("", text)
+
+
 _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("pem", re.compile(r"-----BEGIN [A-Z ]+-----.*?-----END [A-Z ]+-----", re.DOTALL)),
     ("bearer", re.compile(r"(?i)\bBearer\s+[A-Za-z0-9\-._~+/]+=*")),
@@ -64,7 +83,7 @@ def mask_text(text: str, account_ids: list[str] | None = None, ips: bool = False
         if n:
             counts[name] = counts.get(name, 0) + n
 
-    text, n = _CONTROL.subn("", text)
+    text, n = strip_control(text)
     bump("control-chars", n)
     for name, pat in _PATTERNS:
         if name in ("authorization", "kv-secret", "aws-secret-key"):
