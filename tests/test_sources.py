@@ -150,7 +150,31 @@ def test_the_literal_test_catches_a_tuple_typo(tmp_path, monkeypatch):
 
 # ---------- log signatures (#129): collectors/*/signatures.yaml carry a source: list per signature ----------
 
-COVERED = ["coredns"]
+# Collectors whose signatures have not been read in source yet (#129): each leaves this list in the pull request that reads its phrases. A new
+# collectors/<name>/signatures.yaml is covered by default, so a signature without `source:` fails CI unless its collector is listed here.
+NOT_YET_READ = [
+    "alb-controller",
+    "alertmanager",
+    "argocd",
+    "cert-manager",
+    "core",
+    "ebs-csi",
+    "ecr",
+    "eks-platform",
+    "external-secrets",
+    "flannel",
+    "grafana",
+    "k3s-platform",
+    "karpenter",
+    "keda",
+    "kube-proxy",
+    "local-path-provisioner",
+    "loki",
+    "metallb",
+    "prometheus",
+    "vpc-cni",
+]
+COVERED = sorted(p.parent.name for p in (ROOT / "collectors").glob("*/signatures.yaml") if p.parent.name not in NOT_YET_READ)
 SIG_CITATION = re.compile(r"^[\w.-]+/[\w.-]+ \S+:\d+(,\d+)*@\S+$")
 
 
@@ -161,6 +185,12 @@ def _entries(name: str) -> list[dict]:
 def _all_files():
     yield paths.SIGNATURES_DIR / "catalog.yaml"
     yield from sorted(paths.COLLECTORS_DIR.glob("*/signatures.yaml"))
+
+
+def test_the_not_yet_read_list_names_only_collectors_that_exist():
+    have = {p.parent.name for p in (ROOT / "collectors").glob("*/signatures.yaml")}
+    assert set(NOT_YET_READ) <= have, sorted(set(NOT_YET_READ) - have)
+    assert "coredns" in COVERED
 
 
 @pytest.mark.parametrize("name", COVERED)
@@ -219,9 +249,9 @@ def coredns():
 @pytest.mark.parametrize(
     ("line", "expected"),
     [
-        (ERR_TIMEOUT, {"coredns.servfail", "coredns.upstream-timeout"}),
+        (ERR_TIMEOUT, {"coredns.upstream-timeout"}),  # one outage, one finding: the timeout line is not also a servfail line
         (ERR_NO_HEALTHY, {"coredns.servfail"}),
-        (ERR_UNREACHABLE, {"coredns.servfail", "coredns.upstream-timeout"}),
+        (ERR_UNREACHABLE, {"coredns.upstream-timeout"}),
         (QUERY_SERVFAIL, {"coredns.servfail"}),
         (QUERY_NOERROR, set()),
         (LOOP, {"coredns.loop"}),
@@ -238,3 +268,17 @@ def test_coredns_servfail_matches_without_the_log_plugin(coredns):
     # The default k3s Corefile has no `log` plugin (manifests/coredns.yaml@v1.33.5+k3s1), so the errors line is the only SERVFAIL CoreDNS writes. #129
     assert "SERVFAIL" not in ERR_NO_HEALTHY
     assert coredns["coredns.servfail"].regex.search(ERR_NO_HEALTHY)
+
+
+def test_one_upstream_outage_is_one_finding(tmp_path):
+    """250 timeout lines on each of two pods: coredns.upstream-timeout fails (500 >= 200) and coredns.servfail counts nothing, so the outage is not two findings."""
+    from lib import logs
+
+    d = tmp_path / "logs" / "pods" / "coredns"
+    d.mkdir(parents=True)
+    for pod in ("a", "b"):
+        (d / f"kube-system_coredns-{pod}.log").write_text((ERR_TIMEOUT + "\n") * 250 + ERR_NO_HEALTHY + "\n", encoding="utf-8")
+    sigs, errors = signatures.load(["coredns"])
+    assert not errors
+    counts = {r["id"]: r["count"] for r in logs.scan(tmp_path, sigs)["signatures"]}
+    assert counts.get("coredns.upstream-timeout") == 500 and counts.get("coredns.servfail") == 2
