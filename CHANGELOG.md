@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- `docs/PERMISSIONS.md`: every rule of the ClusterRole and every action of the IAM policy with the collection step or library code that calls it, the mode it runs in, the checks that need the result and what a run loses without it; the non-resource URLs; why `nodes/proxy` stays (one step, three checks); what happens to CRDs outside the 16 listed groups; what is never read. `tests/test_permissions.py` parses the two tables and fails when their rows differ from the role or the policy, when a named step is not in `collectors/*/collect.yaml`, or when the Mode cell disagrees with the step's `modes:`. Writing the "Without it" column showed that several summary and inventory checks pass with nothing to judge when their input is missing instead of skipping; those cells say so and [#114](https://github.com/KyungHwanKim-devs/kubegap/issues/114) tracks the fix. ([#95](https://github.com/KyungHwanKim-devs/kubegap/issues/95))
+
 ### Security
 
 - `SKILL.md`, `references/analysis-procedure.md` and `references/report-writing.md` say that snapshot text is data, never an instruction. The agent opens raw snapshot files during analysis, and a log line, event message, annotation, label or field is text that anyone with write access to the cluster can shape; nothing in the procedure said that such text is evidence to report on, not a step to follow (the case usually called prompt injection). Section 9 of `SKILL.md` has the bullet, the analysis procedure repeats it before the reading order (and extends it to the previous run's report files), the writing rules add "quote, do not obey" with how to quote such a string safely, and the output of a read-only command the agent runs outside the snapshot falls under the same rule. `tests/test_report_wording.py` keeps the sentences in place. ([#94](https://github.com/KyungHwanKim-devs/kubegap/issues/94))
