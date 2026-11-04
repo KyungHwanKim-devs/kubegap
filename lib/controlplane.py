@@ -14,7 +14,9 @@ from pathlib import Path
 
 from .snapshot import load_json
 
-KLOG_RE = re.compile(r"^([EIWF])\d{4} [\d:.]+\s+\d+ ([a-zA-Z_]+\.go):\d+\] (.*)$")
+# klog header `Lmmdd hh:mm:ss.uuuuuu <pid, %7d> file.go:line] ` (k8s.io/klog/v2 internal/buffer/buffer.go:117-155@v2.130.1, @v2.140.0); the file name may hold digits
+# (cronjob_controllerv2.go) or a directory with --add_dir_header, hence `\S+`.
+KLOG_RE = re.compile(r"^([EIWF])\d{4} [\d:.]+ +\d+ (\S+\.go):\d+\] (.*)$")
 POD_HASH_RE = re.compile(r"^(.*?)-[0-9a-f]{5,10}-[0-9a-z]{5}$|^(.*?)-\d{6,}-[0-9a-z]{5}$|^(.*?)-[0-9a-z]{5}$")
 
 
