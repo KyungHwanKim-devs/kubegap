@@ -226,9 +226,11 @@ def _polaris(cx: _Ctx) -> dict:
 
 
 def _deprecated(cx: _Ctx) -> dict:
+    steps = ((load_json(cx.snap / "collect-result.json") or {}).get("core") or {}).get("steps") or {}
+    read = {f"{tool}_read": bool((steps.get(tool) or {}).get("ok") and (steps.get(tool) or {}).get("api_read")) for tool in ("pluto", "kubent")}
     items = []
     pl = load_json(cx.snap / "tools" / "pluto.json") or {}
-    for it in pl.get("items") or []:
+    for it in (pl.get("items") or []) if read["pluto_read"] else []:
         items.append(
             {
                 "source": "pluto",
@@ -244,7 +246,7 @@ def _deprecated(cx: _Ctx) -> dict:
             }
         )
     kb = load_json(cx.snap / "tools" / "kubent.json")
-    for it in kb if isinstance(kb, list) else []:
+    for it in kb if read["kubent_read"] and isinstance(kb, list) else []:
         items.append(
             {
                 "source": "kubent",
@@ -274,9 +276,13 @@ def _deprecated(cx: _Ctx) -> dict:
                 "last_transition": i.get("lastTransitionTime"),
             }
         )
+    for item in items:
+        item.update(read)
     return {
-        "items": items,
-        "count": len(items),
+        **read,
+        # None makes the existing evaluator skip even when there are no rows on which to test rule.needs.
+        "items": items if any(read.values()) else None,
+        "count": len(items) if any(read.values()) else None,
         "removed_next": [i for i in items if i["removed"]],
         "pluto_present": (cx.snap / "tools" / "pluto.json").is_file(),
         "kubent_present": (cx.snap / "tools" / "kubent.json").is_file(),

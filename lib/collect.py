@@ -449,9 +449,36 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     if st.get("writes_out") and out.is_file():
         out.chmod(0o600)  # the tool wrote the file with its own mode (krr: 0644); every file in a snapshot is owner-only
     ok = r.ok and out.is_file() and out.stat().st_size > 0
+    read = None
+    error = r.error or r.stderr.strip()[-300:] or "no output"
+    if tool in ("kubent", "pluto"):
+        read = False
+        if ok:
+            try:
+                doc = json.loads(out.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                doc = None
+            stderr = _re.sub(r"\x1b\[[0-9;]*m", "", r.stderr)  # kubent's zerolog ConsoleWriter colors field names.
+            if tool == "kubent":
+                # kube-no-trouble cmd/kubent/main.go:49,56 and pkg/collector/cluster.go:119-142@0.7.3:
+                # list errors are swallowed; zero counts also mean no last-applied annotations, not proof of a read.
+                read = isinstance(doc, list) and bool(_re.search(r"Retrieved [1-9][0-9]* resources from collector[^\n]*name=Cluster\b", stderr))
+                if "Failed to initialize collector" in r.stderr or "Failed to retrieve data from collector" in r.stderr:
+                    read = False
+            else:
+                # Pluto pkg/api/output.go:58@v5.24.5 omits empty items. discovery-api/discovery_api.go:121-122
+                # logs an empty successful List at -v=2. Its :168 count is ALWAYS zero (results is never populated),
+                # even after failed discovery; neither that count nor a "Retrieving" line proves a read.
+                read = isinstance(doc, dict) and (bool(doc.get("items")) or "No annotations for ResourceVer " in stderr)
+            ok = bool(read)
+            if not ok:
+                error = f"{tool}: API resources not confirmed read" + (f"; {r.stderr.strip()[-300:]}" if r.stderr.strip() else "")
     if echo:
-        echo(f"    {'saved ' + st['out'] + f' ({out.stat().st_size // 1024} KB)' if ok else 'failed: ' + str(r.error or r.stderr.strip()[-200:] or 'no output')}")
-    return {"ok": ok, "seconds": round(r.seconds, 1) if hasattr(r, "seconds") else None, "error": None if ok else (r.error or r.stderr.strip()[-300:] or "no output")}
+        echo(f"    {'saved ' + st['out'] + f' ({out.stat().st_size // 1024} KB)' if ok else 'failed: ' + error}")
+    result = {"ok": ok, "seconds": round(r.seconds, 1) if hasattr(r, "seconds") else None, "error": None if ok else error}
+    if read is not None:
+        result["api_read"] = bool(ok and read)
+    return result
 
 
 # The node command backends that collection sends node steps to. `none` is the absence of one. The DaemonSet backend was missing from this

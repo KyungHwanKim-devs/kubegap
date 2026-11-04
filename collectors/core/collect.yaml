@@ -93,7 +93,7 @@
   modes: [full]   # skipped by the daily run
   type: tool
   tool: pluto
-  cmd: [pluto, detect-api-resources, --kube-context, "{context}", -o, json, --target-versions, "k8s={k8s_next_minor}"]   # not detect-all-in-cluster: its helm-detect lists release Secrets, which the ClusterRole forbids, and the whole run then fails
+  cmd: [pluto, detect-api-resources, -v=2, --kube-context, "{context}", -o, json, --target-versions, "k8s={k8s_next_minor}"]   # not detect-all-in-cluster: its helm-detect lists release Secrets, which the ClusterRole forbids, and the whole run then fails
   out: tools/pluto.json
   timeout: 300
 - id: kubent
