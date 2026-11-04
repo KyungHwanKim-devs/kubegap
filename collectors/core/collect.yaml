@@ -95,8 +95,8 @@
   tool: pluto
   # not detect-all-in-cluster: its helm-detect lists release Secrets, which the ClusterRole forbids, and the whole run then fails.
   # The three --ignore-* flags keep the exit code 0 when pluto finds something: without them it exits 2 (deprecated), 3 (removed) or 4 (no replacement)
-  # (pkg/api/output.go:333-341@v5.24.5, cmd/root.go:353), the step would count as failed and its read evidence would be discarded. The flags do not
-  # filter the items (FilterOutput, pkg/api/output.go:159-181 does not read them).
+  # (pkg/api/output.go:333-341@v5.24.5, cmd/root.go:353); lib/shell.py writes the output file only on exit 0, so the items were never saved and the
+  # check passed with nothing to judge. The flags do not filter the items (FilterOutput, pkg/api/output.go:159-181 does not read them).
   cmd: [pluto, detect-api-resources, -v=2, --kube-context, "{context}", -o, json, --target-versions, "k8s={k8s_next_minor}", --ignore-deprecations, --ignore-removals, --ignore-unavailable-replacements]
   out: tools/pluto.json
   timeout: 300
