@@ -395,6 +395,13 @@ def cmd_nodes(args) -> int:
             if not args.pod_ip:
                 print(f"{args.step} curls a pod; pass --pod-ip <IP of a {c.get('namespace')} pod matching {c.get('selector')}>", file=sys.stderr)
                 return EXIT_ERROR
+            ip_ok, ip_why = _nc.pod_ip_allowed(args.pod_ip)
+            if not ip_ok:
+                print(
+                    f"--pod-ip {args.pod_ip} refused: {ip_why}. The node-side curl goes only to an IPv4 pod address in {_nc.POD_NETWORKS_TEXT}, the same rule collect applies; there is no override, read such a pod through the apiserver proxy instead",
+                    file=sys.stderr,
+                )
+                return EXIT_ERROR
             text, params = _nc.pod_metrics_cmd(args.pod_ip, c["port"], c["path"], c["keep"]), {"podIp": args.pod_ip}
         elif args.pod_ip:
             print("--pod-ip applies to pod-metrics steps only", file=sys.stderr)
@@ -580,7 +587,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--snapshot", default="latest", help="snapshot whose inventory.json to read. Default latest")
     s.add_argument("--cmd", help="read-only command to run instead (e.g. 'df -h /'). SSH and DaemonSet backends only; SSM runs document steps, see --step")
     s.add_argument("--step", help="run one named step from deploy/node-access/COMMANDS.md (e.g. core/node-os) instead of the probe")
-    s.add_argument("--pod-ip", help="with --step on a pod-metrics step: the pod IP to curl")
+    s.add_argument("--pod-ip", help="with --step on a pod-metrics step: the pod IP to curl (an IPv4 address in 10/8, 172.16/12, 192.168/16 or 100.64/10; anything else is refused)")
     s.add_argument("--timeout", type=float, default=60)
     s.set_defaults(func=cmd_nodes)
 

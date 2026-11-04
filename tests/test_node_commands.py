@@ -85,3 +85,39 @@ def test_node_reader_daemonset_image_is_pinned_by_index_digest():
     image = containers[0]["image"]
     assert re.fullmatch(r"public\.ecr\.aws/docker/library/busybox:1\.36@sha256:[0-9a-f]{64}", image), image
     assert "crane digest public.ecr.aws/docker/library/busybox:1.36" in text, "the bump command stays next to the pin"
+
+
+def test_pod_ip_allowed_admits_pod_addresses_only():
+    """The node-side curl may be pointed at a pod address and nothing else; the refusal carries the reason (#93)."""
+    assert nodecommands.pod_ip_allowed("10.0.12.34") == (True, "private IPv4")
+    assert nodecommands.pod_ip_allowed("172.16.5.6") == (True, "private IPv4")
+    assert nodecommands.pod_ip_allowed("192.168.0.1") == (True, "private IPv4")
+    assert nodecommands.pod_ip_allowed("100.64.0.1") == (True, "shared address space (100.64.0.0/10)"), "EKS custom networking pods live here and ipaddress.is_private says False"
+    assert nodecommands.pod_ip_allowed(" 10.0.0.5\n") == (False, "not an IP address"), "the string is sent as it is, so only an exact address passes"
+    outside = "not in a pod address range (10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or 100.64.0.0/10)"
+    refused = {
+        "127.0.0.1": "loopback",
+        "169.254.169.254": "link-local",
+        "224.0.0.1": "multicast",
+        "8.8.8.8": outside,
+        "100.128.0.1": outside,
+        "198.18.0.1": outside,
+        "192.0.0.170": outside,
+        "203.0.113.1": outside,
+        "0.0.0.1": outside,
+        "255.255.255.255": "reserved",
+        "fd00::1": "IPv6 pod: node-side metrics fallback not supported",
+        "::1": "IPv6 pod: node-side metrics fallback not supported",
+        "0.0.0.0": "unspecified",
+        "not-an-ip": "not an IP address",
+        "": "not an IP address",
+        "10.0.0.5; rm -rf /": "not an IP address",
+    }
+    for ip, why in refused.items():
+        assert nodecommands.pod_ip_allowed(ip) == (False, why), ip
+    assert nodecommands.pod_ip_allowed(None) == (False, "not an IP address")
+
+
+def test_commands_md_says_which_pods_are_curled():
+    text = nodecommands.COMMANDS_MD_PATH.read_text(encoding="utf-8")
+    assert "Only Running pods with an IPv4 address in 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or 100.64.0.0/10 are curled" in text

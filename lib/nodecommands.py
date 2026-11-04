@@ -17,6 +17,7 @@ The two files come from one walk over the collectors, so they cannot disagree wi
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 import json
 import re
 
@@ -27,6 +28,33 @@ DOCUMENT_PATH = paths.ROOT / "deploy" / "permissions" / "ssm-document.yaml"
 COMMANDS_MD_PATH = paths.ROOT / "deploy" / "node-access" / "COMMANDS.md"
 SUDOERS_PATH = paths.ROOT / "deploy" / "node-access" / "kubegap-sudoers"
 IPV4_PATTERN = r"^[0-9]{1,3}(\.[0-9]{1,3}){3}$"
+# The ranges a pod address can be in: RFC 1918 and the RFC 6598 shared address space (EKS custom networking commonly gives pods a secondary VPC
+# CIDR from 100.64.0.0/10; the ipaddress module does not count it as private). An explicit list rather than `is_private`, whose table differs
+# between Python versions, so the rule is the one written here and in COMMANDS.md.
+POD_NETWORKS = tuple(ipaddress.ip_network(n) for n in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "100.64.0.0/10"))
+POD_NETWORKS_TEXT = "10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or 100.64.0.0/10"
+
+
+def pod_ip_allowed(ip: object) -> tuple[bool, str]:
+    """Whether the node-side metrics curl may be pointed at `ip`: exactly an IPv4 address (no surrounding whitespace, the string is sent as it is)
+    inside one of POD_NETWORKS. Loopback, link-local (the instance metadata service lives there), multicast, reserved, unspecified, anything
+    outside those ranges and IPv6 are refused with the reason. The SSM document's `allowedPattern` on podIp stays as the second layer; SSH and
+    the DaemonSet have only this one."""
+    try:
+        a = ipaddress.ip_address(ip) if isinstance(ip, str) else ipaddress.ip_address(str(ip))
+    except ValueError:
+        return False, "not an IP address"
+    if a.version != 4:
+        return False, "IPv6 pod: node-side metrics fallback not supported"
+    for attr, why in (("is_unspecified", "unspecified"), ("is_loopback", "loopback"), ("is_link_local", "link-local"), ("is_multicast", "multicast"), ("is_reserved", "reserved")):
+        if getattr(a, attr):
+            return False, why
+    if a in POD_NETWORKS[3]:
+        return True, "shared address space (100.64.0.0/10)"
+    if any(a in n for n in POD_NETWORKS[:3]):
+        return True, "private IPv4"
+    return False, f"not in a pod address range ({POD_NETWORKS_TEXT})"
+
 
 # Built-in commands of lib/node.py (not collector steps). Kept here so the generator and the runtime read the same strings.
 PROBE_CMD = "echo kubegap-ok; uname -r; hostname"
@@ -175,7 +203,7 @@ def render_markdown(cmds: list[dict] | None = None) -> str:
     L.append("## Pod metrics fallback (`type: pod-metrics`)")
     L.append("")
     L.append(
-        "These steps first read `/metrics` through the apiserver pod proxy. When the proxy is blocked by the node security group, kubegap runs the curl below from inside a node (the pod network is reachable from any node). `<podIp>` is the pod's IP from `kubectl get pod`; port, path and the metric filter are fixed per step."
+        "These steps first read `/metrics` through the apiserver pod proxy. When the proxy is blocked by the node security group, kubegap runs the curl below from inside a node (the pod network is reachable from any node). `<podIp>` is the pod's IP from `kubectl get pod`; port, path and the metric filter are fixed per step. Only Running pods with an IPv4 address in 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or 100.64.0.0/10 are curled: a pod in another phase, or one whose address is loopback, link-local, multicast, reserved, outside those ranges or IPv6, is skipped with the reason recorded."
     )
     L.append("")
     L.append("| Step | Port | Path | Pods |")
