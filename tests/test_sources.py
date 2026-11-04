@@ -284,17 +284,26 @@ def test_one_upstream_outage_is_one_finding(tmp_path):
     assert counts.get("coredns.upstream-timeout") == 500 and counts.get("coredns.servfail") == 2
 
 
-# ---------- PromQL queries (#121): every query that reads a node-exporter, cAdvisor, kubelet or kube-state-metrics name cites each name ----------
+# ---------- PromQL queries (#121, #122): every query that reads a node-exporter, cAdvisor, kubelet, kube-state-metrics, apiserver, CoreDNS, kube-proxy, EBS CSI,
+# kubelet volume, client-go or `up` name cites each name ----------
 
-QUERY_FAMILIES = re.compile(r"\b(node_[A-Za-z0-9_]+|kube_[A-Za-z0-9_]+|kubelet_[A-Za-z0-9_]+|container_[A-Za-z0-9_]+)\b")
+QUERY_FAMILIES = re.compile(
+    r"\b(node_[A-Za-z0-9_]+|kube_[A-Za-z0-9_]+|kubelet_[A-Za-z0-9_]+|container_[A-Za-z0-9_]+|apiserver_[A-Za-z0-9_]+|coredns_[A-Za-z0-9_]+|kubeproxy_[A-Za-z0-9_]+"
+    r"|aws_ebs_csi_[A-Za-z0-9_]+|cloudprovider_aws_[A-Za-z0-9_]+|csi_operations_seconds_[a-z]+|storage_operation_duration_seconds_[a-z]+|rest_client_requests_total)\b"
+)
+# a `{__name__=~"<pattern>"}` selector reads every name the pattern matches; the entries name each of them and the test matches them against the pattern
+NAME_SELECTOR = re.compile(r'__name__=~"([^"]+)"')
 # '<name>: <owner>/<repo> <file>:<line>@<tag>' then more citations and notes; or 'label <what>: ...' for a label the scrape configuration sets
 QUERY_CITATION = re.compile(r"^(?:[A-Za-z_:][A-Za-z0-9_:]*|label [^:]+): [\w.-]+/[\w.-]+ \S+?:\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*@[\w.+-]+")
-# Names an exporter removed or leaves off by default, with the source that says so. A query reading one is empty on every default install and nothing tells
+# Names an exporter removed, renamed or leaves off by default, with the source that says so. A query reading one is empty on every default install and nothing tells
 # "the situation did not occur" from "the series does not exist". node_processes_state may come back behind a `needs` that reads the collector state
 # once a check needs it; today nothing does.
 GONE = {
     "kube_endpoint_address_not_ready": 'kube-state-metrics 2.14.0 removed it (internal/store/endpoint.go:148@v2.13.0, absent @v2.14.0); read kube_endpoint_address{ready="false"}',
     "node_processes_state": "the node-exporter processes collector is off by default (collector/processes_linux.go:46@v1.7.0, :45@v1.10.2, :44@v1.12.1)",
+    "coredns_forward_request_duration_seconds_bucket": "CoreDNS 1.11.0 moved it to coredns_proxy_request_duration_seconds{proxy_name} (plugin/forward/metrics.go:27@v1.10.1, plugin/pkg/proxy/metrics.go:15@v1.11.0)",
+    "coredns_forward_request_duration_seconds_count": "CoreDNS 1.11.0 moved it to coredns_proxy_request_duration_seconds{proxy_name} (plugin/forward/metrics.go:27@v1.10.1, plugin/pkg/proxy/metrics.go:15@v1.11.0)",
+    "coredns_forward_healthcheck_failures_total": "CoreDNS 1.11.0 moved it to coredns_proxy_healthcheck_failures_total{proxy_name} (plugin/forward/metrics.go:34@v1.10.1, plugin/pkg/proxy/metrics.go:23@v1.11.0)",
 }
 
 
@@ -304,21 +313,34 @@ def _queries():
             yield f.parent.name, it
 
 
+def _query_names(query: str) -> tuple[set[str], list[str]]:
+    """The names a query reads outside its `__name__` selectors, and the patterns of those selectors."""
+    # a selector such as {__name__=~"http_.*"} reads no cited family; one whose pattern spells a family name does
+    patterns = [pat for pat in NAME_SELECTOR.findall(query) if QUERY_FAMILIES.search(re.sub(r"[()|?]", "", pat))]
+    rest = NAME_SELECTOR.sub("", query)
+    names = set(QUERY_FAMILIES.findall(rest))
+    if re.search(r"\bup\{", rest):
+        names.add("up")
+    return names, patterns
+
+
 def test_every_query_of_the_read_families_cites_each_name():
     seen = 0
     for area, it in _queries():
-        names = set(QUERY_FAMILIES.findall(str(it["query"])))
-        if not names:
+        names, patterns = _query_names(str(it["query"]))
+        if not names and not patterns:
             continue
         seen += 1
         src = it.get("source")
-        assert isinstance(src, list) and src, (area, it["id"], "a query reading node_, container_, kubelet_ or kube_ series needs a source: list, one entry per name")
+        assert isinstance(src, list) and src, (area, it["id"], "a query reading one of the cited families needs a source: list, one entry per name")
         subjects = set()
         for e in src:
             assert QUERY_CITATION.match(str(e)), (area, it["id"], e, "an entry reads '<name>: <owner>/<repo> <file>:<line>@<tag> ...'")
             subjects.add(str(e).split(":", 1)[0])
         assert names <= subjects, (area, it["id"], sorted(names - subjects), "every name the query reads has an entry")
-    assert seen >= 80
+        for pat in patterns:
+            assert any(re.fullmatch(pat, s) for s in subjects), (area, it["id"], pat, "a __name__ selector needs an entry per name it matches")
+    assert seen >= 125
 
 
 def test_no_query_reads_a_name_the_exporter_removed_or_leaves_off():
@@ -327,12 +349,90 @@ def test_no_query_reads_a_name_the_exporter_removed_or_leaves_off():
             assert name not in GONE, (area, it["id"], name, GONE.get(name))
 
 
+def _query_text(qid: str) -> str:
+    qs = {it["id"]: " ".join(str(it["query"]).split()) for _, it in _queries()}
+    assert qid in qs, qid
+    return qs[qid]
+
+
 def test_endpoint_address_counts_collapse_the_per_port_series():
     """Since kube-state-metrics 2.14.0 kube_endpoint_address has one series per address and port (internal/store/endpoint.go:136-153@v2.14.0); a plain
     count would give addresses times ports for a Service with more than one port, and before 2.14.0 the same expression counts one series per address."""
-    qs = {it["id"]: " ".join(str(it["query"]).split()) for _, it in _queries()}
     for qid, ready in (("endpoint_ready_addresses", "true"), ("endpoint_not_ready_addresses", "false")):
-        assert f'count by (namespace, endpoint) (count by (namespace, endpoint, ip) (kube_endpoint_address{{ready="{ready}"}}))' in qs[qid], qid
+        assert f'count by (namespace, endpoint) (count by (namespace, endpoint, ip) (kube_endpoint_address{{ready="{ready}"}}))' in _query_text(qid), qid
+
+
+def test_every_apiserver_selector_filters_on_the_apiserver_job():
+    """On k3s the kubelet scrape serves the apiserver's registry a second time (k3s pkg/daemons/executor/embed.go:77,99,126@v1.33.5+k3s1); a sum without
+    the job filter doubled (observed 1274 watches for one node)."""
+    seen = 0
+    for area, it in _queries():
+        q = " ".join(str(it["query"]).split())
+        for m in re.finditer(r"\bapiserver_[A-Za-z0-9_]+(\{[^}]*\})?", q):
+            seen += 1
+            assert m.group(1) and 'job="apiserver"' in m.group(1), (area, it["id"], m.group(0), 'every apiserver_* selector carries job="apiserver"')
+    assert seen >= 13
+
+
+def test_the_stored_object_queries_read_the_old_and_the_new_name():
+    """apiserver_storage_objects is deprecated since 1.34.0 and hidden from 1.37 (component-base registry.go:47-70,74-83@v1.37.2); apiserver_resource_objects exists
+    since 1.34 (storage/etcd3/metrics/metrics.go:91-95@v1.34.13). lib/controlplane.py reads the new query first."""
+    assert _query_text("apiserver_storage_objects_top") == 'topk(15, apiserver_storage_objects{job="apiserver"})'
+    assert _query_text("apiserver_resource_objects_top") == 'topk(15, apiserver_resource_objects{job="apiserver"})'
+
+
+def test_the_no_local_endpoints_gauge_is_read_as_a_value_never_as_a_rate():
+    """kubeproxy_sync_proxy_rules_no_local_endpoints_total is a gauge of Services (pkg/proxy/metrics/metrics.go:269-276@v1.33.5); increase() over it measured nothing."""
+    for area, it in _queries():
+        q = " ".join(str(it["query"]).split())
+        assert not re.search(r"(increase|rate|irate|delta)\(kubeproxy_sync_proxy_rules_no_local_endpoints_total", q), (area, it["id"])
+    assert _query_text("kubeproxy_no_local_endpoint_services") == "max by (instance, traffic_policy) (kubeproxy_sync_proxy_rules_no_local_endpoints_total)"
+
+
+def test_the_restore_failure_counters_are_read_by_two_queries_that_the_library_adds():
+    """Since 1.33 each counter has a series only after its first failure and in ipvs mode only the full one is registered (pkg/proxy/metrics/metrics.go:159-181,343-351@v1.33.5);
+    one expression adding the two was empty whenever one side had no series, and increase() over a __name__ selector matching both is refused (same label set)."""
+    assert _query_text("kubeproxy_restore_failures_24h") == "sum by (instance) (increase(kubeproxy_sync_proxy_rules_iptables_restore_failures_total[24h]))"
+    assert _query_text("kubeproxy_partial_restore_failures_24h") == "sum by (instance) (increase(kubeproxy_sync_proxy_rules_iptables_partial_restore_failures_total[24h]))"
+    for area, it in _queries():
+        q = " ".join(str(it["query"]).split())
+        assert not ("iptables_restore_failures_total" in q and "partial_restore_failures_total" in q), (area, it["id"], "one query must not add the two counters")
+
+
+def test_the_iptables_rule_query_adds_the_ip_families():
+    """Since 1.33 kubeproxy_sync_proxy_rules_iptables_total has one series per ip_family (pkg/proxy/metrics/metrics.go:186-190@v1.33.5); a max picked the larger family."""
+    assert _query_text("kubeproxy_iptables_rules") == "sum by (instance, table) (kubeproxy_sync_proxy_rules_iptables_total)"
+
+
+def test_the_ebs_csi_controller_queries_read_both_name_generations():
+    """The aws_ebs_csi_ names exist since driver v1.38.1 (pkg/cloud/handlers.go:47,52,60@v1.38.1); before, cloudprovider_aws_ (handlers.go:47,49,54@v1.37.0). A count over
+    aws_ebs_csi_.* also counted the node plugin's NVMe series (pkg/metrics/nvme.go:41-60@v1.38.1)."""
+    errors = _query_text("ebscsi_api_errors_24h")
+    assert "increase(aws_ebs_csi_api_request_errors_total[24h]) or increase(cloudprovider_aws_api_request_errors[24h])" in errors, errors
+    throttles = _query_text("ebscsi_api_throttles_24h")
+    assert "increase(aws_ebs_csi_api_request_throttles_total[24h]) or increase(cloudprovider_aws_api_throttled_requests_total[24h])" in throttles, throttles
+    count = _query_text("ebscsi_controller_metrics_series")
+    pat = NAME_SELECTOR.search(count)
+    assert pat, count
+    for name in ("aws_ebs_csi_api_request_duration_seconds_count", "cloudprovider_aws_api_request_duration_seconds_count"):
+        assert re.fullmatch(pat.group(1), name), (pat.group(1), name)
+    assert not re.fullmatch(pat.group(1), "aws_ebs_csi_read_ops_total"), "the node plugin's NVMe series must not count as controller metrics"
+
+
+def test_the_ebs_csi_kubelet_queries_match_the_ebs_driver_exactly():
+    """storage_operation_duration_seconds carries volume_plugin kubernetes.io/csi:<driver> (pkg/volume/util/metrics.go:120-129@v1.30.14); a kubernetes.io/csi.* pattern
+    counted every CSI driver's failures as EBS."""
+    for qid in ("ebscsi_storage_ops_by_status_24h", "ebscsi_storage_ops_p99_24h"):
+        q = _query_text(qid)
+        assert 'volume_plugin="kubernetes.io/csi:ebs.csi.aws.com"' in q and "csi.*" not in q, (qid, q)
+    for qid in ("ebscsi_node_ops_by_status_24h", "ebscsi_node_ops_p99_24h"):
+        assert 'driver_name="ebs.csi.aws.com"' in _query_text(qid), qid
+
+
+def test_the_servfail_ratio_has_a_zero_numerator_when_no_servfail_series_exists():
+    """A rate of a series that never existed is empty (observed on EKS), so without the fallback the ratio was missing instead of 0."""
+    q = _query_text("coredns_servfail_ratio_1h")
+    assert q.startswith('(sum(rate(coredns_dns_responses_total{rcode="SERVFAIL"}[1h])) or vector(0)) / sum(rate(coredns_dns_responses_total[1h]))'), q
 
 
 def test_every_version_a_query_cites_is_named_in_sources():
@@ -341,6 +441,6 @@ def test_every_version_a_query_cites_is_named_in_sources():
     for _, it in _queries():
         for e in it.get("source") or []:
             tags |= set(re.findall(r"@([\w.+-]+)", str(e)))
-    assert len(tags) >= 15
+    assert len(tags) >= 40
     missing = sorted(t for t in tags if t not in text)
     assert not missing, (missing, "name the version in the PromQL section of references/sources.md")

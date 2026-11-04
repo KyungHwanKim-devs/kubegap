@@ -1,43 +1,77 @@
 # CoreDNS PromQL. Window is 1 hour. On both clusters observed, 43-44 coredns_* series were in Prometheus.
+# source: per name, read in coredns/coredns at v1.10.1 (the last release before the forward plugin's metrics moved to plugin/pkg/proxy as coredns_proxy_* with a proxy_name label),
+# v1.11.0, v1.11.1, v1.11.3 (EKS, kubeadm 1.30 to 1.32), v1.12.3 (k3s), v1.14.6 (kubeadm 1.37), v1.15.0 (newest); the format is the one of #121 (core/metrics.yaml header). The job label of the
+# up query is the kube-prometheus-stack one (56.0.0, 79.5.0).
 - id: coredns_responses_by_rcode_1h
   why: Responses in 1h by rcode. A high NXDOMAIN ratio is the noise of external names being queried first with the cluster.local suffixes because of the ndots:5 search path
   query: sum by (rcode) (increase(coredns_dns_responses_total[1h]))
+  source:
+    - "coredns_dns_responses_total: coredns/coredns plugin/metrics/vars/vars.go:53@v1.10.1, :53@v1.11.0, :53@v1.11.1, :56@v1.11.3, :56@v1.12.3, :56@v1.14.6, :56@v1.15.0 (counter; labels server, zone, view, rcode, plugin plugin/metrics/vars/vars.go:55@v1.10.1, :55@v1.11.0, :55@v1.11.1, :58@v1.11.3, :58@v1.12.3, :58@v1.14.6, :58@v1.15.0; a sum over rcode collapses the plugin label; a rate of an rcode that never occurred is empty, so the SERVFAIL ratio query adds or vector(0) to its numerator)"
 - id: coredns_requests_by_type_1h
   why: Requests in 1h by record type. In a cluster without IPv6, AAAA equal to A means half of the queries are wasted
   query: sum by (type) (increase(coredns_dns_requests_total[1h]))
+  source:
+    - "coredns_dns_requests_total: coredns/coredns plugin/metrics/vars/vars.go:15@v1.10.1, :15@v1.11.0, :15@v1.11.1, :15@v1.11.3, :15@v1.12.3, :15@v1.14.6, :15@v1.15.0 (counter; labels server, zone, view, proto, family, type plugin/metrics/vars/vars.go:17 at every version read; name coredns_dns_<name> from plugin.Namespace plugin/plugin.go:103@v1.10.1, :103@v1.11.0, :103@v1.11.1, :103@v1.11.3, :103@v1.12.3, :154@v1.14.6, :154@v1.15.0 and subsystem dns plugin/metrics/vars/vars.go:78@v1.10.1, :85@v1.11.0, :85@v1.11.1, :88@v1.11.3, :88@v1.12.3, :95@v1.14.6, :95@v1.15.0; written only when the prometheus plugin is in the Corefile, as the kubeadm, EKS and k3s defaults have)"
 - id: coredns_qps_by_pod
   why: Queries per second per pod (5m). Concentration on one pod means UDP conntrack pinning or client cache bias
   query: sum by (pod) (rate(coredns_dns_requests_total[5m]))
+  source:
+    - "coredns_dns_requests_total: coredns/coredns plugin/metrics/vars/vars.go:15@v1.10.1, :15@v1.11.0, :15@v1.11.1, :15@v1.11.3, :15@v1.12.3, :15@v1.14.6, :15@v1.15.0 (counter; labels server, zone, view, proto, family, type plugin/metrics/vars/vars.go:17 at every version read; name coredns_dns_<name> from plugin.Namespace plugin/plugin.go:103@v1.10.1, :103@v1.11.0, :103@v1.11.1, :103@v1.11.3, :103@v1.12.3, :154@v1.14.6, :154@v1.15.0 and subsystem dns plugin/metrics/vars/vars.go:78@v1.10.1, :85@v1.11.0, :85@v1.11.1, :88@v1.11.3, :88@v1.12.3, :95@v1.14.6, :95@v1.15.0; written only when the prometheus plugin is in the Corefile, as the kubeadm, EKS and k3s defaults have)"
 - id: coredns_cache_hit_ratio_1h
   why: Cache hit ratio (1h). When low, upstream round trips grow and spread into latency and SERVFAIL. Input for tuning cache TTL and autopath
   query: sum(increase(coredns_cache_hits_total[1h])) / (sum(increase(coredns_cache_hits_total[1h])) + sum(increase(coredns_cache_misses_total[1h])))
+  source:
+    - "coredns_cache_hits_total: coredns/coredns plugin/cache/metrics.go:29@v1.10.1, :29@v1.11.0, :29@v1.11.1, :29@v1.11.3, :29@v1.12.3, :29@v1.14.6, :29@v1.15.0 (counter; labels server, type, zones, view plugin/cache/metrics.go:31 at every version read)"
+    - "coredns_cache_misses_total: coredns/coredns plugin/cache/metrics.go:36@v1.10.1, :36@v1.11.0, :36@v1.11.1, :36@v1.11.3, :36@v1.12.3, :36@v1.14.6, :36@v1.15.0 (counter; labels server, zones, view plugin/cache/metrics.go:38 at every version read)"
 - id: coredns_cache_entries
   why: Cache entries (by pod and type). Read together with the default memory limit of 170Mi
   query: sum by (pod, type) (coredns_cache_entries)
+  source:
+    - "coredns_cache_entries: coredns/coredns plugin/cache/metrics.go:15@v1.10.1, :15@v1.11.0, :15@v1.11.1, :15@v1.11.3, :15@v1.12.3, :15@v1.14.6, :15@v1.15.0 (gauge; labels server, type, zones, view plugin/cache/metrics.go:17 at every version read; type is success or denial; written only with the cache plugin in the Corefile)"
 - id: coredns_p50_1h
   why: Request p50 (seconds). p99 is in core. A p50 above 10ms means CoreDNS itself is slow
   query: histogram_quantile(0.5, sum by (le) (rate(coredns_dns_request_duration_seconds_bucket[1h])))
+  source:
+    - "coredns_dns_request_duration_seconds_bucket: coredns/coredns plugin/metrics/vars/vars.go:22@v1.10.1, :22@v1.11.0, :22@v1.11.1, :22@v1.11.3, :22@v1.12.3, :22@v1.14.6, :22@v1.15.0 (histogram coredns_dns_request_duration_seconds; labels server, zone, view plugin/metrics/vars/vars.go:25@v1.10.1, :25@v1.11.0, :25@v1.11.1, :26@v1.11.3, :26@v1.12.3, :26@v1.14.6, :26@v1.15.0; the query reads _bucket with le)"
 - id: coredns_forward_by_upstream_rcode_1h
   why: Forwarded queries per upstream (forward target) and rcode (1h). Many NXDOMAINs sent upstream mean ndots noise leaking out; SERVFAIL means an upstream failure
   query: sum by (to, rcode) (increase(coredns_proxy_request_duration_seconds_count{proxy_name="forward"}[1h]))
+  source:
+    - "coredns_proxy_request_duration_seconds_count: coredns/coredns plugin/pkg/proxy/metrics.go:15@v1.11.0, :15@v1.11.1, :15@v1.11.3, :15@v1.12.3, :15@v1.14.6, :15@v1.15.0 (the _count series of the histogram above, same labels proxy_name, to, rcode; absent before 1.11.0, where plugin/forward/metrics.go:27@v1.10.1 defines coredns_forward_request_duration_seconds)"
 - id: coredns_forward_p99_1h
   why: Upstream response p99 (seconds). Tells whether a high overall CoreDNS p99 is caused by the upstream
   query: histogram_quantile(0.99, sum by (le) (rate(coredns_proxy_request_duration_seconds_bucket{proxy_name="forward"}[1h])))
+  source:
+    - "coredns_proxy_request_duration_seconds_bucket: coredns/coredns plugin/pkg/proxy/metrics.go:15@v1.11.0, :15@v1.11.1, :15@v1.11.3, :15@v1.12.3, :15@v1.14.6, :15@v1.15.0 (histogram coredns_proxy_request_duration_seconds; labels proxy_name, to, rcode plugin/pkg/proxy/metrics.go:18@v1.11.0, :18@v1.11.1, :19@v1.11.3, :19@v1.12.3, :19@v1.14.6, :19@v1.15.0, subsystem proxy :14 at every version read; proxy_name is the string the forward plugin passes to NewProxy, "forward", plugin/forward/setup.go:133@v1.11.0, :133@v1.11.1, :134@v1.11.3, :135@v1.12.3, :205@v1.14.6, :210@v1.15.0, observed at plugin/pkg/proxy/connect.go:155@v1.11.0, :145@v1.11.1, :159@v1.11.3, :189@v1.12.3, :272@v1.14.6, :336@v1.15.0; before 1.11.0 the forward plugin kept its own coredns_forward_request_duration_seconds{to,rcode}, plugin/forward/metrics.go:27@v1.10.1, and plugin/pkg/proxy did not exist; kubeadm ships CoreDNS v1.11.3 with Kubernetes 1.30, kubernetes/kubernetes cmd/kubeadm/app/constants/constants.go:361@v1.30.14, and v1.14.6 with 1.37, :368@v1.37.2, so every supported version is past the boundary)"
 - id: coredns_forward_healthcheck_failures_1h
   why: Upstream health check failures (1h). Non-zero means the upstream resolver dies intermittently
   query: sum(increase(coredns_proxy_healthcheck_failures_total[1h])) + sum(increase(coredns_forward_healthcheck_broken_total[1h]))
+  source:
+    - "coredns_proxy_healthcheck_failures_total: coredns/coredns plugin/pkg/proxy/metrics.go:23@v1.11.0, :23@v1.11.1, :24@v1.11.3, :24@v1.12.3, :24@v1.14.6, :24@v1.15.0 (counter; labels proxy_name, to plugin/pkg/proxy/metrics.go:25@v1.11.0, :25@v1.11.1, :26@v1.11.3, :26@v1.12.3, :26@v1.14.6, :26@v1.15.0; incremented at plugin/pkg/proxy/health.go:110@v1.11.0, :110@v1.11.1, :110@v1.11.3, :110@v1.12.3, :136@v1.14.6, :128@v1.15.0; before 1.11.0 it was coredns_forward_healthcheck_failures_total{to}, plugin/forward/metrics.go:34@v1.10.1)"
+    - "coredns_forward_healthcheck_broken_total: coredns/coredns plugin/forward/metrics.go:40@v1.10.1, :15@v1.11.0, :15@v1.11.1, :15@v1.11.3, :15@v1.12.3, :15@v1.14.6, :15@v1.15.0 (counter without labels; subsystem forward plugin/forward/metrics.go:14 at every version read)"
 - id: coredns_max_concurrent_rejects_1h
   why: Queries rejected by the forward max_concurrent limit (1h). Non-zero means CoreDNS is overloaded
   query: sum(increase(coredns_forward_max_concurrent_rejects_total[1h]))
+  source:
+    - "coredns_forward_max_concurrent_rejects_total: coredns/coredns plugin/forward/metrics.go:46@v1.10.1, :22@v1.11.0, :22@v1.11.1, :22@v1.11.3, :22@v1.12.3, :22@v1.14.6, :22@v1.15.0 (counter without labels; counts only when the forward block sets max_concurrent)"
 - id: coredns_panics_1h
   why: Plugin panics (1h). Must be 0
   query: sum(increase(coredns_panics_total[1h]))
+  source:
+    - "coredns_panics_total: coredns/coredns plugin/metrics/vars/vars.go:59@v1.10.1, :59@v1.11.0, :59@v1.11.1, :62@v1.11.3, :62@v1.12.3, :62@v1.14.6, :62@v1.15.0 (counter without labels)"
 - id: coredns_reload_failed_1h
   why: Corefile reload failures (1h). A bad ConfigMap edit leaves CoreDNS running on the old configuration
   query: sum(increase(coredns_reload_failed_total[1h]))
+  source:
+    - "coredns_reload_failed_total: coredns/coredns plugin/reload/metrics.go:16@v1.10.1, :16@v1.11.0, :16@v1.11.1, :16@v1.11.3, :16@v1.12.3, :16@v1.14.6, :16@v1.15.0 (counter without labels; subsystem reload plugin/reload/metrics.go:15 at every version read; written only with the reload plugin in the Corefile)"
 - id: coredns_rest_client_errors_1h
   why: Non-2xx responses from CoreDNS → apiserver calls (1h). If the Service/EndpointSlice watch breaks, new service names stop resolving
   query: sum by (code) (increase(coredns_kubernetes_rest_client_requests_total{code!~"2.."}[1h]))
+  source:
+    - "coredns_kubernetes_rest_client_requests_total: coredns/coredns plugin/kubernetes/metrics.go:45@v1.11.0, :45@v1.11.1, :47@v1.11.3, :47@v1.12.3, :49@v1.14.6, :49@v1.15.0 (counter; labels code, method, host plugin/kubernetes/metrics.go:48@v1.11.0, :48@v1.11.1, :50@v1.11.3, :50@v1.12.3, :52@v1.14.6, :52@v1.15.0; a client-go metrics adapter, so code is the HTTP status, or "<error>" for a request that got no response, kubernetes/client-go rest/request.go:819@v0.29.3, :1020@v0.32.5, :882@v0.37.1, the client-go versions coredns go.mod pins at v1.11.3, v1.12.3 and v1.15.0; absent before 1.11.0, the file does not exist at v1.10.1)"
 - id: coredns_up
   why: Number of CoreDNS pods being scraped
   query: count(up{job=~".*coredns.*"} == 1)
+  source:
+    - "up: prometheus/prometheus scrape/scrape.go:1726,1746@v2.49.1, :2055,2131@v3.7.3 (written by Prometheus for every scrape target, 1 when the scrape succeeded and 0 when it failed; it carries the target's job and instance labels, never an exporter label)"
+    - "label job on coredns series: prometheus-community/helm-charts charts/kube-prometheus-stack/templates/exporters/core-dns/service.yaml:8@kube-prometheus-stack-56.0.0, :8@kube-prometheus-stack-79.5.0 (the Service label jobLabel: coredns that the ServiceMonitor's jobLabel names, templates/exporters/core-dns/servicemonitor.yaml:18@kube-prometheus-stack-56.0.0, :18@kube-prometheus-stack-79.5.0, charts/kube-prometheus-stack/values.yaml:2008@kube-prometheus-stack-79.5.0; the prometheus-operator turns it into the job label, prometheus-operator/prometheus-operator pkg/prometheus/promcfg.go:1373-1376@v0.71.0, :2063-2066@v0.86.2; a scrape configuration with another job name matches the .*coredns.* pattern only if it contains coredns)"

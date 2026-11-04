@@ -290,6 +290,7 @@ def _summary(controller: dict, node: dict, windows: dict | None, credentials: di
         "publish_p99_s": metrics["publish_p99_s"],
         "storage_ops_failures_24h": metrics["storage_ops_failures_24h"],
         "controller_metrics_enabled": metrics["controller_metrics_enabled"],
+        "controller_metrics_series": metrics["controller_metrics_series"],
         "api_errors_24h": metrics["api_errors_24h"],
         "api_throttles_24h": metrics["api_throttles_24h"],
         "events_24h": dict(ev_counts),
