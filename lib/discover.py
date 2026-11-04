@@ -30,14 +30,13 @@ platform is wired in at these points and nowhere else:
 from __future__ import annotations
 
 import datetime as _dt
-import fnmatch
 import json
 import re
 from pathlib import Path
 
-from . import __version__, aws, kube, monitoring, paths, scrub
+from . import __version__, aws, kube, monitoring, paths, podmetrics, scrub
 from . import rubric as _rubric
-from .components import COMPONENTS
+from .components import COMPONENTS, match_name
 from .config import Config
 from .runlog import RunLog
 from .snapshot import items, write_private
@@ -60,11 +59,6 @@ OBJECT_KINDS = {  # the minimum set of kinds inventory needs. collect fetches mo
         "--show-managed-fields",
     ],  # configuration only visible in config bodies (e.g. the fluent-bit kubernetes_events input). managedFields carry the last change time per manager, which hygiene.config_changes compares with pod start times; kubectl drops them without the flag. Size: about 1 KB per ConfigMap, under 300 KB on a cluster with 93
 }
-
-
-def _match_name(pattern: str, ns: str, name: str) -> bool:
-    pns, _, pname = pattern.partition("/")
-    return fnmatch.fnmatchcase(ns, pns) and fnmatch.fnmatchcase(name, pname)
 
 
 class _Facts:
@@ -103,7 +97,7 @@ class _Facts:
         for key, val in rule.items():
             if key in ("daemonset", "deployment", "statefulset", "cronjob"):
                 for ns, name in self.workloads.get(key, []):
-                    if _match_name(val, ns, name):
+                    if match_name(val, ns, name):
                         return f"{key} {ns}/{name}"
             elif key == "crd" and val in self.crds:
                 return f"crd {val}"
@@ -434,6 +428,9 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
         "taken_at": taken.isoformat(timespec="seconds"),
         "cluster": {"platform": platform, "platform_reasons": platform_reasons, "server_version": server_version, "server": ctx_info.get("server"), "cluster_name": ctx_info.get("cluster_name"), "eks": eks_facts},
         "profile": profile,
+        # The namespace, selector and port each pod-metrics step will read, found in the workloads just fetched (or set in config.yaml, or the step's default);
+        # collectors run concurrently, so the step cannot wait for the core object dump (#136)
+        "pod_metrics_targets": podmetrics.discover_targets(objs, cfg),
         "node_access": node_access,
         "nodes": nodes,
         "namespaces": {"count": len(ns_names), "names": ns_names, "prod_like": [n for n in ns_names if re.search(r"(^|-)prod($|-)|production", n)], "dev_like": [n for n in ns_names if re.search(r"(^|-)(dev|staging|stage|test)($|-)", n)]},

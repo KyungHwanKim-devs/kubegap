@@ -35,6 +35,7 @@ KNOWN_KEYS = {
     "ssm_document",
     "keep_component_logs",
     "retention",
+    "components",
 }
 INSTALL_POLICIES = ("ask", "always", "never")
 

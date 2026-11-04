@@ -434,7 +434,7 @@ curl -s -m 5 http://127.0.0.1:61678/metrics | grep -E '^awscni_' | grep -vE 'per
 
 ## Pod metrics fallback (`type: pod-metrics`)
 
-These steps first read `/metrics` through the apiserver pod proxy. When the proxy is blocked by the node security group, kubegap runs the curl below from inside a node (the pod network is reachable from any node). `<podIp>` is the pod's IP from `kubectl get pod`; port, path and the metric filter are fixed per step. Only Running pods with an IPv4 address in 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or 100.64.0.0/10 are curled: a pod in another phase, or one whose address is loopback, link-local, multicast, reserved, outside those ranges or IPv6, is skipped with the reason recorded.
+These steps first read `/metrics` through the apiserver pod proxy. When the proxy is blocked by the node security group, kubegap runs the curl below from inside a node (the pod network is reachable from any node). `<podIp>` is the pod's IP from `kubectl get pod`; path and the metric filter are fixed per step. The port, the namespace and the selector in the table are the step's defaults: at discovery kubegap looks for the component's workload (`discover:` in the step, matched against the fetched Deployments, DaemonSets and StatefulSets) and takes its namespace, its pod selector and its container port named for metrics, and `components.<name>.{namespace, selector, metrics_port}` in config.yaml overrides both (lib/podmetrics.discover_targets, #136); the SSM document takes the port as a digits-only parameter. Only Running pods with an IPv4 address in 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or 100.64.0.0/10 are curled: a pod in another phase, or one whose address is loopback, link-local, multicast, reserved, outside those ranges or IPv6, is skipped with the reason recorded.
 
 | Step | Port | Path | Pods |
 |---|---|---|---|
@@ -442,7 +442,7 @@ These steps first read `/metrics` through the apiserver pod proxy. When the prox
 | `argocd/application-controller-metrics` | 8082 | `/metrics` | `argocd` / `app.kubernetes.io/name=argocd-application-controller` |
 | `argocd/repo-server-metrics` | 8084 | `/metrics` | `argocd` / `app.kubernetes.io/name=argocd-repo-server` |
 | `argocd/server-metrics` | 8083 | `/metrics` | `argocd` / `app.kubernetes.io/name=argocd-server` |
-| `cert-manager/controller-metrics` | 9402 | `/metrics` | `cert-manager` / `app.kubernetes.io/component=controller,app.kubernetes.io/instance=cert-manager` |
+| `cert-manager/controller-metrics` | 9402 | `/metrics` | `cert-manager` / `app.kubernetes.io/name=cert-manager,app.kubernetes.io/component=controller` |
 | `external-secrets/controller-metrics` | 8080 | `/metrics` | `external-secrets` / `app.kubernetes.io/name=external-secrets` |
 | `grafana/self-metrics` | 3000 | `/metrics` | `monitoring` / `app.kubernetes.io/name=grafana` |
 | `karpenter/controller-metrics` | 8000 | `/metrics` | `karpenter` / `app.kubernetes.io/name=karpenter` |

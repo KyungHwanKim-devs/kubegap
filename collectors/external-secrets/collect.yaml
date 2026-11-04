@@ -7,8 +7,9 @@
   namespace: external-secrets
   selector: app.kubernetes.io/name=external-secrets
   port: 8080
+  discover: { kind: deployment, name: "*/*external-secrets", port_names: [metrics] }   # the controller is <fullname>; the webhook and cert-controller carry a suffix
   path: /metrics
   out: metrics/pod/external-secrets
-  source: "names and their definitions per version: collectors/external-secrets/pod-metrics.yaml; port 8080 and the selector are observed, not read in source"
+  source: "names and their definitions per version: collectors/external-secrets/pod-metrics.yaml. Port 8080 is --metrics-addr's default (external-secrets/external-secrets cmd/controller/root.go:350@v2.14.0) and the chart's metrics.listen.port, container port metrics (deploy/charts/external-secrets/templates/deployment.yaml:152,172-174@v2.14.0, values.yaml:371); the pod label app.kubernetes.io/name=external-secrets is the chart's (templates/_helpers.tpl:141-144@v2.14.0); namespace external-secrets is the README's install convention (deploy/charts/external-secrets/README.md:14,20@v2.14.0), not a chart default (_helpers.tpl:43-49)"
   keep: '^(externalsecret_(sync_calls_total|sync_calls_error|provider_api_calls_count)|clustersecretstore_status_condition|secretstore_status_condition|controller_runtime_reconcile_(errors_total|total)|controller_runtime_reconcile_time_seconds_(sum|count)|process_(start_time|resident_memory_bytes))'
   timeout: 30

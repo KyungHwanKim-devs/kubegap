@@ -7,9 +7,10 @@
   namespace: keda
   selector: app.kubernetes.io/name=keda-operator-metrics-apiserver
   port: 8080
+  discover: { kind: deployment, name: "*/*keda-operator-metrics-apiserver", port_names: [metrics] }
   path: /metrics
   out: metrics/pod/keda-metrics-apiserver
-  source: "names and their definitions per version: collectors/keda/pod-metrics.yaml; port 8080 and the selector are observed, not read in source"
+  source: "names and their definitions per version: collectors/keda/pod-metrics.yaml. Port 8080 is the metrics API server's --port default (kedacore/keda cmd/adapter/main.go:239@v2.21.0) and the chart's prometheus.metricServer.port, container port metrics (kedacore/charts keda/values.yaml:735-742@v2.21.0, keda/templates/metrics-server/deployment.yaml:133-134,153-159); the pod label app.kubernetes.io/name=keda-operator-metrics-apiserver is the chart's (templates/metrics-server/deployment.yaml:25-30@v2.21.0); namespace keda is the install convention"
   keep: '^(apiserver_request_total|keda_internal_metricsservice_grpc_client_(handled|started)_total|registered_metrics_total|apiserver_current_inflight_requests|process_(start_time|resident_memory_bytes))'
   timeout: 30
 - id: operator-metrics
@@ -18,8 +19,9 @@
   selector: app.kubernetes.io/name=keda-operator
   skip_if_container_arg: "--enable-prometheus-metrics=false"
   port: 8080
+  discover: { kind: deployment, name: "*/*keda-operator", port_names: [metrics] }   # <fullname>; the metrics-apiserver and admission-webhooks carry a suffix
   path: /metrics
   out: metrics/pod/keda-operator
-  source: "names and their definitions per version: collectors/keda/pod-metrics.yaml; port 8080, the selector and the --enable-prometheus-metrics flag are observed, not read in source"
+  source: "names and their definitions per version: collectors/keda/pod-metrics.yaml. The operator serves /metrics on --metrics-bind-address, default :8080, only when --enable-prometheus-metrics is true (kedacore/keda cmd/operator/main.go:104,107,200@v2.21.0; the flag exists since v2.12.0, cmd/operator/main.go:82-84@v2.12.0); the chart passes --enable-prometheus-metrics=false by default (kedacore/charts keda/values.yaml:793-797@v2.21.0, keda/templates/manager/deployment.yaml:113-116,163-171), so the skip below is the chart's normal case, not an exception; the pod label app.kubernetes.io/name=keda-operator is the chart's (templates/manager/deployment.yaml:31-37@v2.21.0)"
   keep: '^(keda_|controller_runtime_reconcile_errors_total|leader_election|process_(start_time|resident_memory_bytes))'
   timeout: 30

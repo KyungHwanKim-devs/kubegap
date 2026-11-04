@@ -8,7 +8,7 @@
 #   aws ssm update-document-default-version --name kubegap-node-read --document-version <new version>
 # `kubegap setup --install-ssm-document` runs these for you with the current AWS credentials.
 schemaVersion: "2.2"
-description: kubegap read-only node inspection. step selects one of 26 fixed read commands; podIp is the only free value. Generated from the kubegap repository, do not edit by hand.
+description: kubegap read-only node inspection. step selects one of 26 fixed read commands; podIp (an IPv4 address) and port (digits) are the only free values. Generated from the kubegap repository, do not edit by hand.
 parameters:
   step:
     type: String
@@ -45,6 +45,11 @@ parameters:
     description: Pod IP for the pod-metrics curl steps. Ignored by the other steps.
     default: 127.0.0.1
     allowedPattern: '^[0-9]{1,3}(\.[0-9]{1,3}){3}$'
+  port:
+    type: String
+    description: Metrics port for the pod-metrics curl steps, found at discovery from the component's container port (lib/podmetrics.discover_targets). Ignored by the other steps.
+    default: '0'
+    allowedPattern: '^[0-9]{1,5}$'
   executionTimeout:
     type: String
     description: Seconds before the command is stopped.
@@ -69,19 +74,19 @@ mainSteps:
             echo cap:journal=$( journalctl -n1 -q -u k3s -u k3s-agent -u kubelet -u containerd >/dev/null 2>&1 && echo yes || echo no );echo cap:kernlog=$( [ -r /var/log/kern.log ] && echo yes || echo no );echo cap:dmesg=$( dmesg -T >/dev/null 2>&1 && echo yes || ( sudo -n dmesg -T >/dev/null 2>&1 && echo sudo || echo no ) );echo cap:k3s-db=$( ls /var/lib/rancher/k3s/server/db >/dev/null 2>&1 && echo yes || ( sudo -n ls -la /var/lib/rancher/k3s/server/db >/dev/null 2>&1 && echo sudo || echo no ) );echo cap:k3s-config=$( cat /etc/rancher/k3s/config.yaml >/dev/null 2>&1 && echo yes || ( sudo -n cat /etc/rancher/k3s/config.yaml >/dev/null 2>&1 && echo sudo || ( [ -e /etc/rancher/k3s/config.yaml ] && echo no || echo absent ) ) );echo cap:crictl=$( (command -v crictl >/dev/null && crictl info >/dev/null 2>&1) && echo yes || ( sudo -n /usr/local/bin/k3s crictl info >/dev/null 2>&1 && echo sudo || echo no ) );echo cap:sudo-any=$( sudo -n true >/dev/null 2>&1 && echo yes || echo no );echo cap:k3s-role=$( systemctl is-active k3s >/dev/null 2>&1 && echo server || ( systemctl is-active k3s-agent >/dev/null 2>&1 && echo agent || echo none ) );echo cap:cgroup=$( stat -fc %T /sys/fs/cgroup/ 2>/dev/null )
             ;;
           alb-controller/controller-metrics)
-            curl -s -m 8 http://{{ podIp }}:8080/metrics | grep -vE '^#|_bucket\{' | grep -E '^(aws_api_call_duration_seconds_(sum|count)|aws_api_call_retries_(sum|count)|controller_runtime_(reconcile|webhook_requests_total|max_concurrent)|leader_election|rest_client_requests_total|workqueue_depth|process_(resident_memory_bytes|start_time))'
+            curl -s -m 8 http://{{ podIp }}:{{ port }}/metrics | grep -vE '^#|_bucket\{' | grep -E '^(aws_api_call_duration_seconds_(sum|count)|aws_api_call_retries_(sum|count)|controller_runtime_(reconcile|webhook_requests_total|max_concurrent)|leader_election|rest_client_requests_total|workqueue_depth|process_(resident_memory_bytes|start_time))'
             ;;
           argocd/application-controller-metrics)
-            curl -s -m 8 http://{{ podIp }}:8082/metrics | grep -vE '^#|_bucket\{' | grep -E '^(argocd_app_(sync_total|reconcile_(sum|count))|argocd_app_k8s_request_total\{.*response_code="[45][0-9][0-9]"|argocd_cluster_(cache_age_seconds|api_resource_objects|api_resources|connection_status|events_total|info)|argocd_redis_request_total|argocd_kubectl_exec_(total|pending)|process_(start_time|resident_memory_bytes))'
+            curl -s -m 8 http://{{ podIp }}:{{ port }}/metrics | grep -vE '^#|_bucket\{' | grep -E '^(argocd_app_(sync_total|reconcile_(sum|count))|argocd_app_k8s_request_total\{.*response_code="[45][0-9][0-9]"|argocd_cluster_(cache_age_seconds|api_resource_objects|api_resources|connection_status|events_total|info)|argocd_redis_request_total|argocd_kubectl_exec_(total|pending)|process_(start_time|resident_memory_bytes))'
             ;;
           argocd/repo-server-metrics)
-            curl -s -m 8 http://{{ podIp }}:8084/metrics | grep -vE '^#|_bucket\{' | grep -E '^(argocd_git_(request_total|lsremote_fail_total|fetch_fail_total|request_duration_seconds_(sum|count))|argocd_repo_pending_request_total|argocd_redis_request_total|process_(start_time|resident_memory_bytes))'
+            curl -s -m 8 http://{{ podIp }}:{{ port }}/metrics | grep -vE '^#|_bucket\{' | grep -E '^(argocd_git_(request_total|lsremote_fail_total|fetch_fail_total|request_duration_seconds_(sum|count))|argocd_repo_pending_request_total|argocd_redis_request_total|process_(start_time|resident_memory_bytes))'
             ;;
           argocd/server-metrics)
-            curl -s -m 8 http://{{ podIp }}:8083/metrics | grep -vE '^#|_bucket\{' | grep -E '^(grpc_server_handled_total\{.*\} [1-9]|argocd_redis_request_total|argocd_info|process_(start_time|resident_memory_bytes))'
+            curl -s -m 8 http://{{ podIp }}:{{ port }}/metrics | grep -vE '^#|_bucket\{' | grep -E '^(grpc_server_handled_total\{.*\} [1-9]|argocd_redis_request_total|argocd_info|process_(start_time|resident_memory_bytes))'
             ;;
           cert-manager/controller-metrics)
-            curl -s -m 8 http://{{ podIp }}:9402/metrics | grep -vE '^#|_bucket\{' | grep -E '^(certmanager_(certificate_(expiration_timestamp_seconds|renewal_timestamp_seconds|ready_status)|http_acme_client_request_count|controller_sync_(error_count|call_count)|clock_time_seconds)|process_(start_time|resident_memory_bytes))'
+            curl -s -m 8 http://{{ podIp }}:{{ port }}/metrics | grep -vE '^#|_bucket\{' | grep -E '^(certmanager_(certificate_(expiration_timestamp_seconds|renewal_timestamp_seconds|ready_status)|http_acme_client_request_count|controller_sync_(error_count|call_count)|clock_time_seconds)|process_(start_time|resident_memory_bytes))'
             ;;
           core/node-os)
             #!/bin/sh
@@ -278,10 +283,10 @@ mainSteps:
             journalctl -u containerd --since -24h -o short-iso --no-pager -q 2>/dev/null | grep -E 'level=(warn|error|fatal)' | tail -n 2000
             ;;
           external-secrets/controller-metrics)
-            curl -s -m 8 http://{{ podIp }}:8080/metrics | grep -vE '^#|_bucket\{' | grep -E '^(externalsecret_(sync_calls_total|sync_calls_error|provider_api_calls_count)|clustersecretstore_status_condition|secretstore_status_condition|controller_runtime_reconcile_(errors_total|total)|controller_runtime_reconcile_time_seconds_(sum|count)|process_(start_time|resident_memory_bytes))'
+            curl -s -m 8 http://{{ podIp }}:{{ port }}/metrics | grep -vE '^#|_bucket\{' | grep -E '^(externalsecret_(sync_calls_total|sync_calls_error|provider_api_calls_count)|clustersecretstore_status_condition|secretstore_status_condition|controller_runtime_reconcile_(errors_total|total)|controller_runtime_reconcile_time_seconds_(sum|count)|process_(start_time|resident_memory_bytes))'
             ;;
           grafana/self-metrics)
-            curl -s -m 8 http://{{ podIp }}:3000/metrics | grep -vE '^#|_bucket\{' | grep -E '^(grafana_(build_info|datasource_request_total|api_response_status_total|alerting_(active_alerts|rule_evaluation_failures_total|notification_failed_total|active_configurations)|stat_totals_(dashboard|datasource|alert_rules)|stat_total_users|stat_active_users|db_datasource_query_by_id_total|plugin_build_info)|process_(start_time|resident_memory_bytes))'
+            curl -s -m 8 http://{{ podIp }}:{{ port }}/metrics | grep -vE '^#|_bucket\{' | grep -E '^(grafana_(build_info|datasource_request_total|api_response_status_total|alerting_(active_alerts|rule_evaluation_failures_total|notification_failed_total|active_configurations)|stat_totals_(dashboard|datasource|alert_rules)|stat_total_users|stat_active_users|db_datasource_query_by_id_total|plugin_build_info)|process_(start_time|resident_memory_bytes))'
             ;;
           k3s-platform/k3s-journal-errors)
             journalctl -u k3s -u k3s-agent --since -24h --no-pager -q -o short-iso 2>/dev/null | sed -E 's/^[^ ]+ [^ ]+ k3s(-agent)?\[[0-9]+\]: //' | grep -E '^[EW][0-9]{4}|"level":"(warn|error|fatal)"|level=(warning|error|fatal)' | tail -n 3000
@@ -393,19 +398,19 @@ mainSteps:
             sudo -n /usr/bin/tail -n 2000 /var/lib/rancher/k3s/agent/containerd/containerd.log 2>/dev/null | grep -E 'level=(warn|error|fatal)' | tail -n 1500
             ;;
           karpenter/controller-metrics)
-            curl -s -m 8 http://{{ podIp }}:8000/metrics | grep -vE '^#|_bucket\{' | grep -E '^(karpenter_(nodepools?_|nodeclaims_|nodes_(created|terminated|eviction_requests_total|termination_(time|duration)_seconds_(sum|count))|interruption_|cloudprovider_(errors_total|duration_seconds_(sum|count))|cluster_state_synced|consistency_errors|pods_startup_(time|duration)_seconds_(sum|count)|pods_eviction_requests_total|disruption_(eligible_nodes|budgets_allowed_disruptions|nodes_disrupted_total|pods_disrupted_total|actions_performed_total|queue_depth)|voluntary_disruption_(eligible_nodes|decisions_total|queue_failures_total)|provisioner_scheduling_(queue_depth|duration_seconds_(sum|count))|scheduler_(queue_depth|scheduling_duration_seconds_(sum|count))|nodes_eviction_queue_depth)|controller_runtime_reconcile_errors_total|leader_election|process_(start_time|resident_memory_bytes))'
+            curl -s -m 8 http://{{ podIp }}:{{ port }}/metrics | grep -vE '^#|_bucket\{' | grep -E '^(karpenter_(nodepools?_|nodeclaims_|nodes_(created|terminated|eviction_requests_total|termination_(time|duration)_seconds_(sum|count))|interruption_|cloudprovider_(errors_total|duration_seconds_(sum|count))|cluster_state_synced|consistency_errors|pods_startup_(time|duration)_seconds_(sum|count)|pods_eviction_requests_total|disruption_(eligible_nodes|budgets_allowed_disruptions|nodes_disrupted_total|pods_disrupted_total|actions_performed_total|queue_depth)|voluntary_disruption_(eligible_nodes|decisions_total|queue_failures_total)|provisioner_scheduling_(queue_depth|duration_seconds_(sum|count))|scheduler_(queue_depth|scheduling_duration_seconds_(sum|count))|nodes_eviction_queue_depth)|controller_runtime_reconcile_errors_total|leader_election|process_(start_time|resident_memory_bytes))'
             ;;
           keda/metrics-apiserver-metrics)
-            curl -s -m 8 http://{{ podIp }}:8080/metrics | grep -vE '^#|_bucket\{' | grep -E '^(apiserver_request_total|keda_internal_metricsservice_grpc_client_(handled|started)_total|registered_metrics_total|apiserver_current_inflight_requests|process_(start_time|resident_memory_bytes))'
+            curl -s -m 8 http://{{ podIp }}:{{ port }}/metrics | grep -vE '^#|_bucket\{' | grep -E '^(apiserver_request_total|keda_internal_metricsservice_grpc_client_(handled|started)_total|registered_metrics_total|apiserver_current_inflight_requests|process_(start_time|resident_memory_bytes))'
             ;;
           keda/operator-metrics)
-            curl -s -m 8 http://{{ podIp }}:8080/metrics | grep -vE '^#|_bucket\{' | grep -E '^(keda_|controller_runtime_reconcile_errors_total|leader_election|process_(start_time|resident_memory_bytes))'
+            curl -s -m 8 http://{{ podIp }}:{{ port }}/metrics | grep -vE '^#|_bucket\{' | grep -E '^(keda_|controller_runtime_reconcile_errors_total|leader_election|process_(start_time|resident_memory_bytes))'
             ;;
           kube-proxy/proxy-mode)
             echo "mode=$(curl -s -m 3 http://127.0.0.1:10249/proxyMode)"; echo "healthz=$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:10256/healthz)"; echo "metrics_local=$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:10249/metrics)"
             ;;
           metallb/metallb-speaker-metrics)
-            curl -s -m 8 http://{{ podIp }}:7472/metrics | grep -vE '^#|_bucket\{' | grep -E '^(metallb_(speaker_announced|k8s_client_(config_loaded_bool|config_stale_bool|update_errors_total|updates_total)|layer2_(gratuitous_sent|requests_received|responses_sent)|bgp_session_up|bgp_updates_total|allocator_)|process_(start_time|resident_memory_bytes))'
+            curl -s -m 8 http://{{ podIp }}:{{ port }}/metrics | grep -vE '^#|_bucket\{' | grep -E '^(metallb_(speaker_announced|k8s_client_(config_loaded_bool|config_stale_bool|update_errors_total|updates_total)|layer2_(gratuitous_sent|requests_received|responses_sent)|bgp_session_up|bgp_updates_total|allocator_)|process_(start_time|resident_memory_bytes))'
             ;;
           vpc-cni/ipamd-metrics)
             curl -s -m 5 http://127.0.0.1:61678/metrics | grep -E '^awscni_' | grep -vE 'per_cidr|_bucket'

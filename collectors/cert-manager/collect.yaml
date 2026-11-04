@@ -3,10 +3,11 @@
 - id: controller-metrics
   type: pod-metrics
   namespace: cert-manager
-  selector: app.kubernetes.io/component=controller,app.kubernetes.io/instance=cert-manager
+  selector: app.kubernetes.io/name=cert-manager,app.kubernetes.io/component=controller
   port: 9402
+  discover: { kind: deployment, name: "*/*cert-manager", port_names: [http-metrics] }   # the controller's Deployment is <fullname>; cainjector and webhook carry a suffix
   path: /metrics
   out: metrics/pod/cert-manager
-  source: "names and their definitions per version: collectors/cert-manager/pod-metrics.yaml; port 9402 and the selector are observed, not read in source"
+  source: "names and their definitions per version: collectors/cert-manager/pod-metrics.yaml. Port 9402 is the controller's default metrics address (cert-manager/cert-manager internal/apis/config/controller/v1alpha1/defaults.go:85,275-276@v1.21.3; flag --metrics-listen-address, cmd/controller/app/options/options.go:206@v1.21.3) and the chart's container port http-metrics (deploy/charts/cert-manager/templates/deployment.yaml:159-160@v1.21.3). The pod labels app.kubernetes.io/name=cert-manager and app.kubernetes.io/component=controller come from the chart (templates/deployment.yaml:34-37@v1.21.3; until #136 the selector carried app.kubernetes.io/instance=cert-manager, the release name, so a release named otherwise was not found). Namespace cert-manager is the static manifest's (deploy/manifests/namespace.yaml:4@v1.21.3); a chart release's is its own (templates/_helpers.tpl:172-174@v1.21.3), which discovery reads from the Deployment"
   keep: '^(certmanager_(certificate_(expiration_timestamp_seconds|renewal_timestamp_seconds|ready_status)|http_acme_client_request_count|controller_sync_(error_count|call_count)|clock_time_seconds)|process_(start_time|resident_memory_bytes))'
   timeout: 30

@@ -6,9 +6,10 @@
   namespace: kube-system
   selector: app.kubernetes.io/name=aws-load-balancer-controller
   port: 8080
+  discover: { kind: deployment, name: "*/*aws-load-balancer-controller*", port_names: [metrics-server] }
   path: /metrics
   out: metrics/pod/alb-controller
-  source: "names and their definitions per version: collectors/alb-controller/pod-metrics.yaml; port 8080 and the selector are observed, not read in source"
+  source: "names and their definitions per version: collectors/alb-controller/pod-metrics.yaml. Port 8080 is --metrics-bind-addr's default (kubernetes-sigs/aws-load-balancer-controller pkg/config/runtime_config.go:24,42,79@v3.6.2) and the chart's container port metrics-server (helm/aws-load-balancer-controller/templates/deployment.yaml:250-252@v3.6.2, values.yaml:228); the pod label app.kubernetes.io/name=aws-load-balancer-controller is the chart's (templates/deployment.yaml:24-27@v3.6.2, _helpers.tpl:64-67); kube-system is the documented install namespace, not a chart default"
   # When fetched via curl inside a node, keep only the needed metric names so the output stays under the SSM 24,000-character output limit (the leader exposes ~30 AWS API operations × histograms and gets truncated without the filter).
   keep: '^(aws_api_call_duration_seconds_(sum|count)|aws_api_call_retries_(sum|count)|controller_runtime_(reconcile|webhook_requests_total|max_concurrent)|leader_election|rest_client_requests_total|workqueue_depth|process_(resident_memory_bytes|start_time))'
   timeout: 30

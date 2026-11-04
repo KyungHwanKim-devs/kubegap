@@ -34,6 +34,16 @@ platform name alone (see discover.py "Adding a platform").
 
 from __future__ import annotations
 
+import fnmatch
+
+
+def match_name(pattern: str, ns: str, name: str) -> bool:
+    """`namespace/name` glob: each side is an fnmatch pattern (`*` anywhere, `?`, `[...]`, case-sensitive), applied to the namespace and the name separately.
+    The one matcher for the detection rules below and for the pod-metrics `discover.name` patterns of collectors/*/collect.yaml (#136)."""
+    pns, _, pname = pattern.partition("/")
+    return fnmatch.fnmatchcase(ns, pns) and fnmatch.fnmatchcase(name, pname)
+
+
 EVIDENCE_KEYS = ("daemonset", "deployment", "statefulset", "cronjob", "crd", "namespace", "storageclass_provisioner", "node_annotation", "node_version_contains", "configmap_data_regex", "image", "aws_addons")
 
 COMPONENTS: list[dict] = [

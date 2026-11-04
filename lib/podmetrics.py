@@ -16,6 +16,8 @@ from functools import cache
 from pathlib import Path
 
 from . import paths, yamlite
+from .components import match_name
+from .snapshot import items
 
 
 @cache
@@ -131,3 +133,90 @@ def all_names(area: str) -> list[str]:
 def tables() -> dict[str, list[dict]]:
     """Every area that has a table, for the tests and the catalog."""
     return {p.parent.name: table(p.parent.name) for p in sorted(Path(paths.COLLECTORS_DIR).glob("*/pod-metrics.yaml"))}
+
+
+# ---------- where a pod-metrics step reads (#136) ----------
+
+
+def pod_metrics_steps() -> list[tuple[str, dict]]:
+    """(collector folder name, step) for every `type: pod-metrics` step of collectors/*/collect.yaml."""
+    out = []
+    for f in sorted(paths.COLLECTORS_DIR.glob("*/collect.yaml")):
+        for st in yamlite.load_file(f) or []:
+            if isinstance(st, dict) and st.get("type") == "pod-metrics":
+                out.append((f.parent.name, st))
+    return out
+
+
+def default_target(st: dict) -> dict:
+    """The step's own namespace, selector and port: what every step read until #136, and the fallback when nothing is discovered or configured."""
+    return {"namespace": st["namespace"], "selector": st["selector"], "port": int(st["port"]), "workload": None, "source": {"namespace": "default", "selector": "default", "port": "default"}}
+
+
+def _discovered(objs: dict, disc: dict, default_port: int) -> dict | None:
+    """The first workload (kind and `namespace/name` glob of `discover:`) among the fetched objects, with its namespace, its pod selector (spec.selector.matchLabels)
+    and the container port named as `port_names` says. A port named as `https_port_names` says marks a metrics endpoint served over TLS with authentication,
+    which kubegap cannot read through the pod proxy or a node curl: the step then skips and says so instead of reading nothing."""
+    kinds = disc.get("kind") or []
+    kinds = [kinds] if isinstance(kinds, str) else list(kinds)
+    names = disc.get("port_names") or []
+    https_names = disc.get("https_port_names") or []
+    for kind in kinds:
+        for o in sorted(items(objs.get(kind + "s")), key=lambda o: (o["metadata"].get("namespace") or "", o["metadata"]["name"])):
+            ns, name = o["metadata"].get("namespace") or "", o["metadata"]["name"]
+            if not match_name(str(disc["name"]), ns, name):
+                continue
+            spec = o.get("spec") or {}
+            labels = ((spec.get("selector") or {}).get("matchLabels")) or {}
+            ports = [pt for c in (((spec.get("template") or {}).get("spec") or {}).get("containers") or []) for pt in (c.get("ports") or [])]
+            port, port_source, https = default_port, "default", None
+            for pt in ports:
+                if pt.get("name") in names and pt.get("containerPort"):
+                    port, port_source = int(pt["containerPort"]), "discovered"
+                    break
+            else:
+                for pt in ports:
+                    if pt.get("name") in https_names and pt.get("containerPort"):
+                        https = int(pt["containerPort"])
+                        break
+            out = {
+                "namespace": ns,
+                "selector": ",".join(f"{k}={v}" for k, v in sorted(labels.items())) or None,
+                "port": port,
+                "workload": f"{kind} {ns}/{name}",
+                "source": {"namespace": "discovered", "selector": "discovered" if labels else "default", "port": port_source},
+            }
+            if https is not None:
+                out["skip"] = (
+                    f"{kind} {ns}/{name} serves its metrics on port {https} ({next(pt.get('name') for pt in ports if pt.get('containerPort') == https)}), over TLS with authentication, which the pod proxy and the node curl cannot read"
+                )
+            return out
+    return None
+
+
+def discover_targets(objs: dict, cfg) -> dict[str, dict]:
+    """`<collector>.<step id>` -> {namespace, selector, port, workload, source{namespace, selector, port}: discovered|config|default, skip?} for every pod-metrics step.
+    Precedence per field: `components.<name>.{namespace, selector, metrics_port}` of config.yaml, then the workload found by the step's `discover:` block among
+    `objs` (the Deployments, DaemonSets and StatefulSets discovery fetched), then the step's own values. `<name>` is the step's `component`, else its collector folder."""
+    comps = (cfg or {}).get("components") if isinstance(cfg, dict) else None
+    out: dict[str, dict] = {}
+    for folder, st in pod_metrics_steps():
+        key = f"{folder}.{st['id']}"
+        tgt = default_target(st)
+        disc = st.get("discover")
+        if isinstance(disc, dict) and disc.get("name"):
+            found = _discovered(objs, disc, int(st["port"]))
+            if found:
+                tgt = found
+                if found.get("source", {}).get("selector") == "default":
+                    tgt["selector"] = st["selector"]
+        conf = (comps or {}).get(st.get("component") or folder) if isinstance(comps, dict) else None
+        if isinstance(conf, dict):
+            for field, key_c in (("namespace", "namespace"), ("selector", "selector"), ("port", "metrics_port")):
+                if conf.get(key_c) not in (None, ""):
+                    tgt[field] = int(conf[key_c]) if field == "port" else str(conf[key_c])
+                    tgt["source"][field] = "config"
+            if conf.get("metrics_port") not in (None, "") and tgt.get("skip"):
+                tgt.pop("skip")  # the user named a plain-HTTP port on purpose
+        out[key] = tgt
+    return out
