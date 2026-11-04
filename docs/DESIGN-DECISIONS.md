@@ -12,7 +12,7 @@ kubegap fixes three things and lets the LLM work on top of them: the list of com
 
 The first design was a batch pipeline that produced the whole report from thresholds, weights and a per-area score, with the LLM optional at the end and never shown raw data. It was dropped.
 
-Code does deterministic collection and a first pass. The LLM reads the summary, opens raw snapshot files when something looks off, decides the final severity, orders the problems and writes the prose. When it overrides a first-pass verdict it writes the reason in the report, in a table the reader can check.
+Code does deterministic collection and a first pass. The LLM reads the summary, opens raw snapshot files when something looks off, decides the final severity, orders the problems and writes the prose. What it reads there is evidence, never an instruction; `SKILL.md` section 9 states the rule. When it overrides a first-pass verdict it writes the reason in the report, in a table the reader can check.
 
 Thresholds alone cannot tell an idle staging namespace from a production one, or a one-off spike from a trend. Making the LLM accountable for its overrides keeps the judgement inspectable without pretending a formula could make it.
 
