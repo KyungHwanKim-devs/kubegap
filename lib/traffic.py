@@ -15,6 +15,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from . import versions as _versions  # `versions` is a local name in this module
 from .controlplane import workload_of
 from .snapshot import load_json, objects
 
@@ -670,14 +671,9 @@ def _alb_groups(ingresses: list[dict]) -> list[dict]:
 NGINX_FIXED = ((1, 11, 5), (1, 12, 1))
 
 
-def _semver(v: str | None) -> tuple[int, int, int] | None:
-    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", str(v or ""))
-    return (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
-
-
 def nginx_vulnerable(version: str | None) -> bool | None:
     """True below the IngressNightmare fix of its line: 1.11.x below 1.11.5, everything else below 1.12.1. None when the version is unknown."""
-    t = _semver(version)
+    t = _versions.triple(version)
     if t is None:
         return None
     if t[:2] == (1, 11):
@@ -757,7 +753,7 @@ def _nginx(snap: Path, ingresses: list, inv: dict | None = None) -> dict | None:
             if "nginx.ingress.kubernetes.io" in str(h.get("name") or ""):
                 vwc.append({"configuration": w["metadata"]["name"], "failure_policy": h.get("failurePolicy")})
     versions = [r["version"] for r in rows if r["version"]]
-    oldest = min(versions, key=lambda v: _semver(v) or (0, 0, 0)) if versions else None
+    oldest = min(versions, key=lambda v: _versions.triple(v) or (0, 0, 0)) if versions else None
     mitigated = _webhook_netpol(snap, rows, inv)
     unknown = [f"{r['namespace']}/{r['name']} ({r['image']})" for r in rows if not r["version"]]
     # A controller whose image tag carries no version (digest only, a prefixed tag the regex misses) cannot be cleared: vulnerable stays None for the whole set

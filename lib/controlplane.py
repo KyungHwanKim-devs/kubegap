@@ -103,8 +103,12 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         if not math.isnan(v):  # skip NaN
             webhook_p99.append({"name": r["metric"].get("name"), "p99_seconds": round(v, 3)})
     webhook_p99.sort(key=lambda x: -x["p99_seconds"])
+    job = load_json(snap / "prometheus" / "apiserver_job.json") or {}
     out["apiserver_metrics"] = {
         "source": "metrics/apiserver_*.json",
+        "job": job.get("job"),  # the job label the apiserver queries filtered on (prometheus/apiserver_job.json: config, detected, or none when no apiserver series exists)
+        "job_source": job.get("source"),
+        "job_candidates": job.get("candidates"),
         "rate_429": _metric_scalar(snap, "apiserver_429_rate"),
         "rate_5xx": _metric_scalar(snap, "apiserver_5xx_rate"),
         "p99_by_verb": p99,

@@ -2271,6 +2271,8 @@
   each: observability.alertmanager
   cluster_level: true
   rule:
+    needs: "not item.get('config_error')"
+    needs_reason: "Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)"
     expr: "bool(item.get('default_is_null'))"
     warn_expr: "bool(item.get('null_receivers')) and len(item.get('null_receivers', [])) > 1"
   target: "'cluster'"
@@ -2324,7 +2326,19 @@
           null_receivers: []
           unused_receivers: []
           severity_routed: true
-
+      - expect: "skip"
+        item:
+          config_error: \"config YAML parse failure (syntax unsupported by yamlite)\"
+          default_is_null: false
+          default_receiver: "slack"
+          default_receiver_kinds:
+            - "slack"
+          receivers:
+            - "slack"
+          route_count: 2
+          null_receivers: []
+          unused_receivers: []
+          severity_routed: true
 - id: observability.alertmanager-notification-failed
   name: Alertmanager notification delivery failures
   area: observability
@@ -2548,6 +2562,8 @@
   each: observability.alertmanager
   cluster_level: true
   rule:
+    needs: "not item.get('config_error')"
+    needs_reason: "Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)"
     warn_expr: "item.get('routes') is not None and not any(any('severity' in (mm or '') for mm in (r.get('matchers') or [])) and r.get('receiver') not in (None, 'null') for r in item['routes'])"
   target: "'cluster'"
   evidence: "f\"routes {[(r.get('receiver'), r.get('matchers')) for r in (item.get('routes') or [])][:6]}, receivers {list((item.get('receivers') or {}).keys())}, default receiver {item.get('default_receiver')}\""
@@ -2671,6 +2687,57 @@
           null_receivers:
             - "null"
           routes: null
+      - expect: "skip"
+        item:
+          config_error: \"config YAML parse failure (syntax unsupported by yamlite)\"
+          default_receiver: "slack-system"
+          default_is_null: false
+          receivers:
+            null: []
+            slack-sre:
+              - "slack"
+            slack-system:
+              - "slack"
+          null_receivers:
+            - "null"
+          routes:
+            - depth: 0
+              receiver: "slack-system"
+              matchers: null
+              continue: false
+              group_by:
+                - "namespace"
+              repeat_interval: "12h"
+            - depth: 1
+              receiver: "null"
+              matchers:
+                - "alertname=\"Watchdog\""
+              continue: false
+              group_by: null
+              repeat_interval: null
+            - depth: 1
+              receiver: "slack-sre"
+              matchers:
+                - "env=\"prod\""
+                - "service=\"image-inference\""
+                - "slo=\"img-inference\""
+              continue: false
+              group_by: null
+              repeat_interval: null
+            - depth: 1
+              receiver: "slack-sre"
+              matchers:
+                - "env=\"prod\""
+                - "service=\"lora-training\""
+                - "slo=\"lora-training\""
+              continue: false
+              group_by: null
+              repeat_interval: null
+            - depth: 1
+              receiver: "pagerduty"
+              matchers:
+                - "severity=\"critical\""
+              continue: false
 - id: observability.page-severity-cause-alerts
   name: Many cause alerts at page (critical) severity (wake people at night without user impact)
   area: observability

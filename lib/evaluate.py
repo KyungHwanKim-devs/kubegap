@@ -23,7 +23,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar
 
-from . import __version__, paths, rubric
+from . import __version__, paths, rubric, versions
 from .config import Config
 from .resilience import is_db_like, mounts_pvc
 from .snapshot import items, load_json, write_private
@@ -299,17 +299,17 @@ class Context:
         out: dict = {"minor": None, "upstream": None, "eks_standard": None, "primary": None, "primary_source": None}
         if not version:
             return out
-        m = re.match(r"v?(\d+\.\d+)", version)
-        if not m:
+        minor = versions.minor_text(version)
+        if not minor:
             return out
-        out["minor"] = m.group(1)
+        out["minor"] = minor
         for row in self._k8s_versions:
-            if str(row.get("minor")) == m.group(1):
+            if str(row.get("minor")) == minor:
                 out["upstream"] = str(row.get("eol"))
         if (self.inv.get("cluster") or {}).get("eks"):
             cv = self.aws_file("describe-cluster-versions.json")
             for v in (cv or {}).get("clusterVersions") or []:
-                if v.get("clusterVersion") == m.group(1) and v.get("endOfStandardSupportDate"):
+                if v.get("clusterVersion") == minor and v.get("endOfStandardSupportDate"):
                     out["eks_standard"] = str(v["endOfStandardSupportDate"])[:10]
         if out["eks_standard"]:
             out["primary"], out["primary_source"] = out["eks_standard"], "EKS end of standard support"
@@ -388,14 +388,7 @@ class Context:
 
     @staticmethod
     def addon_minor_gap(installed: str | None, latest: str | None) -> int:
-        def parse(v):
-            m = re.match(r"v?(\d+)\.(\d+)", v or "")
-            return (int(m.group(1)), int(m.group(2))) if m else None
-
-        a, b = parse(installed), parse(latest)
-        if not a or not b:
-            return 0
-        return (b[0] - a[0]) * 100 + (b[1] - a[1])
+        return versions.minor_gap(installed, latest)
 
     def eks_version_dates(self) -> dict:
         cv = self.aws_file("describe-cluster-versions.json") or {}

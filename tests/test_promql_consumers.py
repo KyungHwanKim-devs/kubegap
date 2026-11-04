@@ -185,3 +185,68 @@ def test_the_logs_summary_reads_the_same_loki_table(tmp_path):
     sm = out["self_metrics"]
     assert sm["discarded_samples_since_start"] == {"rate_limited": 7} and sm["streams_in_memory"] == 12 and sm["lines_received_since_start"] == 5000
     assert sm["requests_5xx_since_start"] == 3 and sm["panics"] == 0 and sm["rss_mb"] == 191
+
+
+def _kubeproxy_node_mode(snap: Path, node: str, mode: str) -> None:
+    (snap / "logs" / "node" / node).mkdir(parents=True, exist_ok=True)
+    (snap / "logs" / "node" / node / "kube-proxy.txt").write_text(f"mode={mode}\nhealthz=200\n", encoding="utf-8")
+
+
+def test_the_conntrack_counter_is_none_with_the_reason_when_it_is_not_served(tmp_path):
+    """The counter does not exist at 1.30 and is registered in iptables mode with nfacct only (metrics.go:302-303@v1.31.14, absent at v1.30.14); the check read
+    its absence as 0 drops and passed."""
+    snap, inv = _kubeproxy_snapshot(tmp_path)
+    inv["cluster"]["server_version"] = "v1.33.5+k3s1"
+    _metric(snap, "kubeproxy_syncs_1h", [({"instance": "10.0.0.1:10250"}, 6)])
+    _metric(snap, "kubeproxy_ct_invalid_dropped_1h", [])
+    _kubeproxy_node_mode(snap, "n1", "ipvs")
+    out = kubeproxy.analyze(snap, inv)["summary"]
+    assert out["ct_invalid_dropped_1h"] is None and out["kube_proxy_minor"] == 33 and out["ct_invalid_reason"].startswith("ipvs mode")
+    _kubeproxy_node_mode(snap, "n1", "iptables")
+    out = kubeproxy.analyze(snap, inv)["summary"]
+    assert out["ct_invalid_dropped_1h"] is None and "nfacct" in out["ct_invalid_reason"]
+    inv["cluster"]["server_version"] = "v1.30.14-eks-abc"
+    out = kubeproxy.analyze(snap, inv)["summary"]
+    assert out["kube_proxy_minor"] == 30 and out["ct_invalid_reason"].startswith("kube-proxy 1.30")
+    # the mode not read at all (no ConfigMap, no node /proxyMode): the absence cannot be attributed and the reason says so
+    inv["cluster"]["server_version"] = "v1.33.5+k3s1"
+    (snap / "logs" / "node" / "n1" / "kube-proxy.txt").unlink()
+    out = kubeproxy.analyze(snap, inv)["summary"]
+    assert out["ct_invalid_dropped_1h"] is None and out["ct_invalid_reason"].startswith("proxy mode not read")
+    _kubeproxy_node_mode(snap, "n1", "iptables")
+    _metric(snap, "kubeproxy_ct_invalid_dropped_1h", [({"instance": "10.0.0.1:10250"}, 0)])
+    inv["cluster"]["server_version"] = "v1.33.5+k3s1"
+    out = kubeproxy.analyze(snap, inv)["summary"]
+    assert out["ct_invalid_dropped_1h"] == 0 and out["ct_invalid_reason"] is None
+
+
+def test_the_control_plane_summary_names_the_apiserver_job_the_queries_used(tmp_path):
+    snap = tmp_path / "snap"
+    (snap / "prometheus").mkdir(parents=True)
+    (snap / "objects").mkdir()
+    (snap / "prometheus" / "apiserver_job.json").write_text(json.dumps({"job": "kubernetes-apiservers", "source": "detected", "candidates": ["kubernetes-apiservers"]}), encoding="utf-8")
+    inv = {"cluster": {"platform": "k3s"}}
+    out = controlplane.analyze(snap, inv)
+    assert out["apiserver_metrics"]["job"] == "kubernetes-apiservers" and out["apiserver_metrics"]["job_source"] == "detected"
+
+
+def test_the_kube_proxy_minor_comes_from_the_daemonset_image_before_the_server_version(tmp_path):
+    """On EKS the kube-proxy add-on can lag the control plane; the counter's existence depends on the kube-proxy binary."""
+    snap = tmp_path / "snap"
+    (snap / "objects").mkdir(parents=True)
+    (snap / "logs" / "node").mkdir(parents=True)
+    ds = {
+        "items": [
+            {
+                "metadata": {"name": "kube-proxy", "namespace": "kube-system"},
+                "spec": {"template": {"spec": {"containers": [{"name": "kube-proxy", "image": "602401143452.dkr.ecr.ap-northeast-2.amazonaws.com/eks/kube-proxy:v1.30.9-eksbuild.3"}]}}},
+                "status": {"desiredNumberScheduled": 1, "numberReady": 1},
+            }
+        ]
+    }
+    (snap / "objects" / "daemonsets.json").write_text(json.dumps(ds), encoding="utf-8")
+    inv = {"cluster": {"platform": "eks", "server_version": "v1.32.13-eks-577a51e"}, "nodes": {"nodes": [{"name": "n1", "internal_ip": "10.0.0.1"}]}}
+    _metric(snap, "kubeproxy_syncs_1h", [({"instance": "10.0.0.1:10249"}, 6)])
+    _metric(snap, "kubeproxy_ct_invalid_dropped_1h", [])
+    out = kubeproxy.analyze(snap, inv)["summary"]
+    assert out["kube_proxy_minor"] == 30 and out["ct_invalid_reason"].startswith("kube-proxy 1.30")

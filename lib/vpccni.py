@@ -17,6 +17,7 @@ import ipaddress
 import re
 from pathlib import Path
 
+from . import versions
 from .controlplane import workload_of  # noqa: F401  (used by the report to map pod -> workload name)
 from .snapshot import load_json, objects
 
@@ -204,8 +205,7 @@ def snat_port_mode(version: str | None, randomize_snat: str | None, external_sna
     - 'unknown': the image carries no version."""
     if external_snat:
         return "not-applicable"
-    m = re.match(r"v?(\d+)\.(\d+)\.(\d+)", str(version or ""))
-    ver = (int(m.group(1)), int(m.group(2)), int(m.group(3))) if m else None
+    ver = versions.triple(version)
     value = randomize_snat or None  # exact match only: the CNI's typeOfSNAT() compares the raw string and falls back to the version default otherwise
     if value == "none":
         return "sequential"

@@ -122,6 +122,7 @@ kubegap 에는 자체 자격 증명 저장소가 없습니다. 지금 쓰는 PC 
 | AWS, EKS 일 때만 | `~/.kubegap/config.yaml` 의 `aws_profile` 과 `aws_region`, 없으면 kubeconfig `exec` 환경의 `AWS_PROFILE`, 그것도 없으면 AWS CLI 기본값 | `aws sts get-caller-identity --profile <p>` |
 | Prometheus, Alertmanager, Loki, Grafana | 클러스터 안에서 찾아 포트포워딩. 또는 설정의 `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url` | `kubegap setup --context <이름>` 의 3절과 4절 |
 | Grafana 대시보드 | 설정의 `grafana_api_token`, Viewer 권한의 서비스 계정 토큰 | 같은 명령. 없으면 "자격 증명 없음" 으로 건너뜀 |
+| apiserver 메트릭 | apiserver 스크레이프의 `job` 라벨: `apiserver_request_total` 에서 감지 (kube-prometheus-stack 은 `apiserver`, 흔한 수동 설정은 `kubernetes-apiservers`) 하거나 config 의 `apiserver_job` | 같음; 어느 job 에도 apiserver 시리즈가 없으면 apiserver 질의 14개를 실패로 저장하고 그것을 읽는 control-plane 체크는 통과가 아니라 skip |
 | 노드 OS, EKS | SSM `send-command` 와 `kubegap-node-read` 문서, 위 AWS 자격 증명 사용 | `scripts/kubegap nodes --context <이름>` |
 | 노드 OS, k3s 와 베어메탈 | SSH. `~/.ssh/config` 의 사용자와 키, 또는 설정의 `ssh:` 블록 | `scripts/kubegap nodes --context <이름>` |
 | 노드 OS, SSM 도 SSH 도 없을 때 | `deploy/node-access/daemonset.yaml` 의 DaemonSet 을 `kubectl exec` 로 읽음 | `scripts/kubegap nodes --context <이름>` |

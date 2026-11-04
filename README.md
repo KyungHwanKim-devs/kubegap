@@ -122,6 +122,7 @@ kubegap does not have its own credential store. It reuses what is already on you
 | AWS (EKS only) | `aws_profile` / `aws_region` in `~/.kubegap/config.yaml`, else the kubeconfig `exec` env `AWS_PROFILE`, else the AWS CLI default | `aws sts get-caller-identity --profile <p>` |
 | Prometheus, Alertmanager, Loki, Grafana | discovered in the cluster and port-forwarded; or `prometheus_url` / `alertmanager_url` / `loki_url` / `grafana_url` in config | `kubegap setup --context <name>` (section 3/4) |
 | Grafana dashboards | `grafana_api_token` in config (Viewer service-account token) | same; skipped as "no credentials" without it |
+| apiserver metrics | the apiserver scrape's `job` label, detected from `apiserver_request_total` (`apiserver` under kube-prometheus-stack, `kubernetes-apiservers` in the common hand-written config) or set as `apiserver_job` in config | same; with no apiserver series under any job the 14 apiserver queries are saved as failed and the control-plane checks that read them are skipped, not passed |
 | Node OS (EKS) | SSM `send-command` with the `kubegap-node-read` document, using the AWS credentials above | `scripts/kubegap nodes --context <name>` |
 | Node OS (k3s, bare metal) | SSH with `~/.ssh/config` user and key, or the `ssh:` block in config | `scripts/kubegap nodes --context <name>` |
 | Node OS (no SSM, no SSH) | the DaemonSet in `deploy/node-access/daemonset.yaml`, read through `kubectl exec` | `scripts/kubegap nodes --context <name>` |

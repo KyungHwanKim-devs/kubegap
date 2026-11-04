@@ -15,6 +15,7 @@ import math
 import re
 from pathlib import Path
 
+from . import versions
 from .snapshot import load_json, objects
 
 
@@ -206,6 +207,26 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         )
     modes = sorted({x["mode"] for x in nodes if x["mode"]})
     mode = cfg.get("mode") if cfg.get("mode") and not cfg["mode"].endswith("(default)") else (modes[0] if len(modes) == 1 else cfg.get("mode"))
+    # kubeproxy_iptables_ct_state_invalid_dropped_packets_total does not exist in kube-proxy 1.30 and since 1.31 is registered in iptables mode only, and only when
+    # nfacct is available (pkg/proxy/metrics/metrics.go:302-303@v1.31.14, :335@v1.33.5, :417@v1.37.2; absent at v1.30.14); registered, it is served (at 0 too) once
+    # the proxier has created the nfacct counter, and a failed read of that counter leaves the series absent (:363-377@v1.31.14). So "no series" never means
+    # "no drops": the total is None with the reason, and the check skips instead of passing. The version that matters is kube-proxy's own (the DaemonSet image,
+    # which on EKS can lag the control plane), else the server's (k3s: one binary).
+    kube_proxy_minor = versions.minor(dsinfo.get("version")) or versions.minor(((inv or {}).get("cluster") or {}).get("server_version"))
+    ct_served = any(x["ct_invalid_dropped_1h"] is not None for x in nodes)
+    mode_word = str(mode or "").split()[0] if mode else None
+    if ct_served:
+        ct_reason = None
+    elif kube_proxy_minor is not None and kube_proxy_minor < 31:
+        ct_reason = f"kube-proxy 1.{kube_proxy_minor} has no conntrack INVALID counter (added in 1.31)"
+    elif not any(x["metrics_available"] for x in nodes):
+        ct_reason = "kube-proxy metrics not read"
+    elif mode_word is None:
+        ct_reason = "proxy mode not read (no kube-proxy ConfigMap, no node /proxyMode): the counter exists in iptables mode with nfacct only, so its absence cannot be attributed"
+    elif mode_word != "iptables":
+        ct_reason = f"{mode_word} mode: the counter is registered in iptables mode only"
+    else:
+        ct_reason = "iptables mode but no series: nfacct is unavailable on the nodes, or the proxier has not created its counter yet"
     bind = cfg.get("metrics_bind_address") or ""
     metrics_loopback_only = bind.startswith(("127.0.0.1", "localhost"))
     up_n = sum(1 for v in targets.values() if v == 1)
@@ -257,7 +278,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "restore_failure_nodes": [x["node"] for x in nodes if (x["restore_failures_24h"] or 0) > 0],
         "no_local_endpoint_services": max((int(x["no_local_endpoint_services"] or 0) for x in nodes), default=0),
         "no_local_endpoint_services_by_node": {x["node"]: int(x["no_local_endpoint_services"]) for x in nodes if (x["no_local_endpoint_services"] or 0) > 0},
-        "ct_invalid_dropped_1h": sum(int(x["ct_invalid_dropped_1h"] or 0) for x in nodes),
+        "ct_invalid_dropped_1h": sum(int(x["ct_invalid_dropped_1h"] or 0) for x in nodes) if ct_served else None,
+        "ct_invalid_reason": ct_reason,
+        "kube_proxy_minor": kube_proxy_minor,
         "programming_p99_s": metrics["programming_p99_s"],
         "healthz_failing_nodes": [x["node"] for x in nodes if x["healthz"] and x["healthz"] != "200"],
         "node_cmd_unavailable": gaps,

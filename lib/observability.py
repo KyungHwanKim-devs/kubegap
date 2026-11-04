@@ -12,7 +12,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
-from . import yamlite
+from . import amconfig
 from .snapshot import items, load_json
 
 # Symptom/cause classification heuristic. If the expr has any symptom metric it is a symptom; if every metric is infrastructure it is a cause; otherwise (the app's own metrics) it is "app (assumed symptom)".
@@ -249,23 +249,6 @@ def _metric_rows(snap: Path, qid: str) -> list[dict]:
     return d.get("result", []) if d.get("ok") else []
 
 
-def _walk_routes(route: dict, depth: int = 0, acc: list | None = None) -> list[dict]:
-    acc = [] if acc is None else acc
-    acc.append(
-        {
-            "depth": depth,
-            "receiver": route.get("receiver"),
-            "matchers": route.get("matchers") or route.get("match") or route.get("match_re"),
-            "continue": route.get("continue"),
-            "group_by": route.get("group_by"),
-            "repeat_interval": route.get("repeat_interval"),
-        }
-    )
-    for r in route.get("routes") or []:
-        _walk_routes(r, depth + 1, acc)
-    return acc
-
-
 def _rules(alerting: list[dict], recording: list[dict], src: str | None) -> dict:
     """Rule classification (symptom/cause/app), severity counts and unhealthy rules; sets r["class"] on each alerting rule. Reads nothing (rules come from _rules_from_api)."""
     for r in alerting:
@@ -361,24 +344,15 @@ def _am_config(snap: Path) -> dict:
     """Alertmanager routing tree and receivers from the running config, or config_error/config_head (plus config_parse_error with the exception) when it cannot be read. Reads alertmanager/status.json."""
     st = load_json(snap / "alertmanager" / "status.json") or {}
     cfg_text = ((st.get("config") or {}).get("original")) or ""
-    cfg, parse_error = None, None
-    if cfg_text:
-        try:
-            cfg = yamlite.load(cfg_text)
-        except Exception as e:  # surfaced below so the report's tool notes show why the routing tree is missing
-            parse_error = f"{type(e).__name__}: {e}"
+    cfg, parse_error = amconfig.parse(cfg_text)
     if not cfg:
         out = {"config_error": "status.json missing or config parse failure" if not cfg_text else "config YAML parse failure (syntax unsupported by yamlite)", "config_head": cfg_text[:300]}
-        if parse_error:
+        if parse_error and cfg_text:
             out["config_parse_error"] = parse_error
         return out
     route = cfg.get("route") or {}
-    receivers = cfg.get("receivers") or []
-    recv_kinds = {}
-    for rcv in receivers:
-        kinds = [k.replace("_configs", "") for k in rcv if k.endswith("_configs") and rcv.get(k)]
-        recv_kinds[rcv.get("name")] = kinds
-    routes = _walk_routes(route)
+    recv_kinds = amconfig.receiver_kinds(cfg)
+    routes = amconfig.walk_routes(route)
     used = {r["receiver"] for r in routes}
     return {
         "default_receiver": route.get("receiver"),

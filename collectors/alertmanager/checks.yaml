@@ -26,6 +26,7 @@
       - expect: "warn"
         item:
           present: true
+          config_parsed: true
           version: "0.26.0"
           cluster_status: "disabled"
           cluster_peers: 0
@@ -56,6 +57,7 @@
       - expect: "pass"
         item:
           present: true
+          config_parsed: true
           version: "0.26.0"
           cluster_status: "ready"
           cluster_peers: 2
@@ -111,6 +113,7 @@
       - expect: "fail"
         item:
           present: true
+          config_parsed: true
           version: "0.26.0"
           cluster_status: "disabled"
           cluster_peers: 0
@@ -141,6 +144,7 @@
       - expect: "warn"
         item:
           present: true
+          config_parsed: true
           version: "0.26.0"
           cluster_status: "disabled"
           cluster_peers: 0
@@ -171,6 +175,7 @@
       - expect: "pass"
         item:
           present: true
+          config_parsed: true
           version: "0.26.0"
           cluster_status: "disabled"
           cluster_peers: 0
@@ -205,8 +210,8 @@
   each: stackhealth.alertmanager
   cluster_level: true
   rule:
-    needs: "item['present']"
-    needs_reason: "alertmanager not present"
+    needs: "item['present'] and item['config_parsed']"
+    needs_reason: "alertmanager not present, or its configuration could not be parsed (config_parse_error)"
     warn_expr: "(len(item['receivers_unused'] or []) > 0 or (item['inhibit_rules'] or 0) == 0)"
   target: "item['target']"
   evidence: "f\"receivers {item['receivers']}, receivers unused by routes {item['receivers_unused']}, inhibit rules {item['inhibit_rules']}, time_intervals (business hours, maintenance windows) {item['time_intervals']}\""
@@ -225,6 +230,7 @@
       - expect: "warn"
         item:
           present: true
+          config_parsed: true
           version: "0.26.0"
           cluster_status: "disabled"
           cluster_peers: 0
@@ -256,6 +262,7 @@
       - expect: "warn"
         item:
           present: true
+          config_parsed: true
           version: "0.26.0"
           cluster_status: "disabled"
           cluster_peers: 0
@@ -286,6 +293,39 @@
       - expect: "pass"
         item:
           present: true
+          config_parsed: true
+          version: "0.26.0"
+          cluster_status: "disabled"
+          cluster_peers: 0
+          cluster_members_metric: null
+          reload_success: true
+          invalid_alerts_1d: 0
+          receivers:
+            - "null"
+            - "slack-sre"
+            - "slack-system"
+          receivers_unused: []
+          inhibit_rules: 4
+          time_intervals: false
+          data_retention: "120h"
+          storage: "emptyDir"
+          notifications_1d:
+            slack: 9.0
+          received_1d:
+            firing: 17625
+            resolved: 1915
+          silences_total: 0
+          silences_active: 0
+          metrics_available: true
+          notifications_1d_total: 9.0
+          replicas: 1
+          ready: 1
+          target: "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+      - expect: "skip"
+        item:
+          present: true
+          config_parsed: false
+          config_parse_error: "YamlError: line 3: anchors (&) are not supported"
           version: "0.26.0"
           cluster_status: "disabled"
           cluster_peers: 0
@@ -340,6 +380,7 @@
       - expect: "fail"
         item:
           present: true
+          config_parsed: true
           version: "0.26.0"
           cluster_status: "disabled"
           cluster_peers: 0
@@ -369,6 +410,7 @@
       - expect: "pass"
         item:
           present: true
+          config_parsed: true
           version: "0.26.0"
           cluster_status: "disabled"
           cluster_peers: 0
@@ -399,6 +441,7 @@
       - expect: "pass"
         item:
           present: true
+          config_parsed: true
           version: "0.26.0"
           cluster_status: "disabled"
           cluster_peers: 0
@@ -427,6 +470,7 @@
       - expect: "skip"
         item:
           present: true
+          config_parsed: true
           version: "0.26.0"
           cluster_status: "disabled"
           cluster_peers: 0
