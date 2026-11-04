@@ -50,6 +50,7 @@ OBJECT_KINDS = {  # the minimum set of kinds inventory needs. collect fetches mo
     "daemonsets": ["get", "daemonsets", "-A"],
     "deployments": ["get", "deployments", "-A"],
     "statefulsets": ["get", "statefulsets", "-A"],
+    "cronjobs": ["get", "cronjobs", "-A"],  # the descheduler chart's default install is a CronJob (#130)
     "services": ["get", "services", "-A"],
     "pods": ["get", "pods", "-A"],
     "configmaps": [
@@ -72,12 +73,14 @@ class _Facts:
     def __init__(self, objs: dict, aws_addons: list | None):
         self.workloads: dict[str, list[tuple[str, str]]] = {}
         self.images: set[str] = set()
-        for kind in ("daemonsets", "deployments", "statefulsets"):
+        for kind in ("daemonsets", "deployments", "statefulsets", "cronjobs"):
             lst = []
             for o in items(objs.get(kind)):
                 m = o["metadata"]
                 lst.append((m["namespace"], m["name"]))
-                for c in o.get("spec", {}).get("template", {}).get("spec", {}).get("containers", []) or []:
+                spec = o.get("spec") or {}
+                pod = ((spec.get("jobTemplate") or {}).get("spec") or {}).get("template") if kind == "cronjobs" else spec.get("template")
+                for c in ((pod or {}).get("spec") or {}).get("containers") or []:
                     if c.get("image"):
                         self.images.add(c["image"])
             self.workloads[kind[:-1]] = lst
@@ -98,7 +101,7 @@ class _Facts:
 
     def evidence(self, rule: dict) -> str | None:
         for key, val in rule.items():
-            if key in ("daemonset", "deployment", "statefulset"):
+            if key in ("daemonset", "deployment", "statefulset", "cronjob"):
                 for ns, name in self.workloads.get(key, []):
                     if _match_name(val, ns, name):
                         return f"{key} {ns}/{name}"
