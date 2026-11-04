@@ -1,6 +1,8 @@
 # Log signature catalog. The version is in signatures/version.
 # Fields: id (<component>.<name>), name, component, area (one of the 12 areas), severity (critical|high|medium|low), sources (glob list relative to the snapshot),
 #        pattern (regex, case sensitive; use (?i) to ignore case), meaning (what it means), cause (usual causes), verify (command to confirm), warn_at (default 1), fail_at (default 10).
+# source: list of "<owner>/<repo> <path>:<line>@<tag>" naming the component's logging call at each version the pattern was read at (references/sources.md, #129). Not the same as sources, which lists snapshot files.
+#        tests/test_sources.py requires it on the signatures of the collectors listed there.
 # The summary (lib/logs.py) scans the files in sources once and writes count, first/last timestamp and 5 sample lines per signature to summary.logs.signatures;
 # the evaluation (type: signature checks) emits a finding: fail when count >= fail_at, warn when >= warn_at. Finding id = logs.signatures.<signature id>.
 # Error lines matching no signature are normalized and the top 30 patterns go to summary.logs.unclassified_errors (candidates for new signatures).
