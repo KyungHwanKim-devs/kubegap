@@ -72,7 +72,7 @@ def test_every_tool_step_names_its_source():
 # ---------- pod /metrics names (#120): collectors/<area>/pod-metrics.yaml ----------
 
 VERSION = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
-PARSERS = ["lib/karpenterctl.py", "lib/kedactl.py", "lib/stackhealth.py", "lib/argocdctl.py", "lib/albctl.py", "lib/certmanager.py", "lib/esoctl.py", "lib/metallbctl.py", "lib/k3s.py"]
+PARSERS = ["lib/karpenterctl.py", "lib/kedactl.py", "lib/stackhealth.py", "lib/argocdctl.py", "lib/albctl.py", "lib/certmanager.py", "lib/esoctl.py", "lib/metallbctl.py", "lib/k3s.py", "lib/logs.py"]
 
 
 def test_every_pod_metrics_step_names_its_table():
@@ -84,6 +84,10 @@ def test_every_pod_metrics_step_names_its_table():
                 src = str(s.get("source") or "")
                 assert f"collectors/{f.parent.name}/pod-metrics.yaml" in src, (f.name, s.get("id"), "a pod-metrics step names its pod-metrics.yaml in source:")
                 assert podmetrics.table(f.parent.name), (f.parent.name, "has a pod-metrics step but no pod-metrics.yaml")
+    # a table may also back an http step that saves a /metrics text (Loki); then that step names it
+    for t in (ROOT / "collectors").glob("*/pod-metrics.yaml"):
+        steps = yamlite.load_file(t.parent / "collect.yaml") or []
+        assert any(f"collectors/{t.parent.name}/pod-metrics.yaml" in str(s.get("source") or "") for s in steps), (t.parent.name, "no collect step names its pod-metrics.yaml in source:")
 
 
 def test_every_pod_metric_name_has_a_source_and_a_valid_version_range():
@@ -111,8 +115,9 @@ def test_every_metric_literal_in_a_parser_is_in_a_table():
     from lib import podmetrics
 
     names = {n for a in podmetrics.tables() for n in podmetrics.all_names(a)}
+    query_ids = {it["id"] for _, it in _queries()}  # a metrics.yaml query id (`loki_discarded_1h`) is not a metric name
     literal = re.compile(
-        r'"((?:karpenter|argocd|certmanager|externalsecret|clustersecretstore|secretstore|grafana|keda|metallb|aws_api|controller_runtime|workqueue|rest_client|leader_election|apiserver|registered_metrics|grpc_server)_[a-z0-9_]+)"'
+        r'"((?:karpenter|argocd|certmanager|externalsecret|clustersecretstore|secretstore|grafana|keda|metallb|aws_api|controller_runtime|workqueue|rest_client|leader_election|apiserver|registered_metrics|grpc_server|loki)_[a-z0-9_]+)"'
     )
     seen = 0
     for rel in PARSERS:
@@ -125,6 +130,8 @@ def test_every_metric_literal_in_a_parser_is_in_a_table():
             if recv is not None and not (recv.endswith(('pm["labeled"]', 'pm["single"]')) or re.search(r"\b(?:lb|sg|s|parsed)$", recv)):
                 continue  # a read of some other dict (a summary row, a config)
             lit = m.group(1)
+            if lit in query_ids:
+                continue
             base = re.sub(r"_(sum|count|bucket)$", "", lit)
             seen += 1
             assert lit in names or base in names, (rel, lit, "not in any collectors/*/pod-metrics.yaml")
@@ -284,17 +291,23 @@ def test_one_upstream_outage_is_one_finding(tmp_path):
     assert counts.get("coredns.upstream-timeout") == 500 and counts.get("coredns.servfail") == 2
 
 
-# ---------- PromQL queries (#121, #122): every query that reads a node-exporter, cAdvisor, kubelet, kube-state-metrics, apiserver, CoreDNS, kube-proxy, EBS CSI,
-# kubelet volume, client-go or `up` name cites each name ----------
+# ---------- PromQL queries (#121, #122, #123): every query that reads a node-exporter, cAdvisor, kubelet, kube-state-metrics, apiserver, CoreDNS, kube-proxy,
+# EBS CSI, kubelet volume, client-go, Prometheus, Alertmanager, Loki, promtail, Fluent Bit, KEDA or ingress-controller name, or a series Prometheus writes
+# itself (`up`, `scrape_*`, `ALERTS`, `ALERTS_FOR_STATE`), cites each name ----------
 
 QUERY_FAMILIES = re.compile(
     r"\b(node_[A-Za-z0-9_]+|kube_[A-Za-z0-9_]+|kubelet_[A-Za-z0-9_]+|container_[A-Za-z0-9_]+|apiserver_[A-Za-z0-9_]+|coredns_[A-Za-z0-9_]+|kubeproxy_[A-Za-z0-9_]+"
-    r"|aws_ebs_csi_[A-Za-z0-9_]+|cloudprovider_aws_[A-Za-z0-9_]+|csi_operations_seconds_[a-z]+|storage_operation_duration_seconds_[a-z]+|rest_client_requests_total)\b"
+    r"|aws_ebs_csi_[A-Za-z0-9_]+|cloudprovider_aws_[A-Za-z0-9_]+|csi_operations_seconds_[a-z]+|storage_operation_duration_seconds_[a-z]+|rest_client_requests_total"
+    r"|prometheus_[A-Za-z0-9_]+|alertmanager_[A-Za-z0-9_]+|promtail_[A-Za-z0-9_]+|loki_[A-Za-z0-9_]+|fluentbit_[A-Za-z0-9_]+|keda_[A-Za-z0-9_]+"
+    r"|nginx_ingress_controller_[A-Za-z0-9_]+|traefik_[A-Za-z0-9_]+|scrape_duration_seconds|scrape_samples_scraped|ALERTS_FOR_STATE|ALERTS)\b"
 )
 # a `{__name__=~"<pattern>"}` selector reads every name the pattern matches; the entries are expected to name each of them, which the test cannot enumerate,
 # so it requires at least one entry the pattern matches on every selector that spells a cited family (a `.+` or `http_.*` selector reads no cited family)
 NAME_SELECTOR = re.compile(r'__name__=~"([^"]+)"')
-FAMILY_PREFIX = re.compile(r"(?<![A-Za-z0-9_])(node_|kube_|kubelet_|container_|apiserver_|coredns_|kubeproxy_|aws_ebs_csi|cloudprovider_aws|csi_operations_seconds|storage_operation_duration_seconds|rest_client_requests)")
+FAMILY_PREFIX = re.compile(
+    r"(?<![A-Za-z0-9_])(node_|kube_|kubelet_|container_|apiserver_|coredns_|kubeproxy_|aws_ebs_csi|cloudprovider_aws|csi_operations_seconds|storage_operation_duration_seconds|rest_client_requests"
+    r"|prometheus_|alertmanager_|promtail_|loki_|fluentbit_|keda_|nginx_ingress_controller_|traefik_)"
+)
 # '<name>: <owner>/<repo> <file>:<line>@<tag>' then more citations and notes; or 'label <what>: ...' for a label the scrape configuration sets
 QUERY_CITATION = re.compile(r"^(?:[A-Za-z_:][A-Za-z0-9_:]*|label [^:]+): [\w.-]+/[\w.-]+ \S+?:\d+(?:-\d+)?(?:,\d+(?:-\d+)?)*@[\w.+-]+")
 # Names an exporter removed, renamed or leaves off by default, with the source that says so. A query reading one is empty on every default install and nothing tells
@@ -320,7 +333,7 @@ def _query_names(query: str) -> tuple[set[str], list[str]]:
     patterns = [pat for pat in NAME_SELECTOR.findall(query) if FAMILY_PREFIX.search(pat)]
     rest = NAME_SELECTOR.sub("", query)
     names = set(QUERY_FAMILIES.findall(rest))
-    if re.search(r"\bup\{", rest):
+    if re.search(r"\bup\b", rest):  # `up{...}` and the bare `up == 0`
         names.add("up")
     return names, patterns
 
@@ -335,6 +348,13 @@ def _query_names(query: str) -> tuple[set[str], list[str]]:
         ('topk(20, count by (__name__) ({__name__=~".+"}))', set(), []),
         ('count by (namespace) ({__name__=~"http_requests_total|grpc_server_handled_total"})', set(), []),
         ('count(up{job=~".*coredns.*"} == 1)', {"up"}, []),
+        ("count by (job) (up == 0)", {"up"}, []),
+        ("count(prometheus_build_info)", {"prometheus_build_info"}, []),
+        ('count by (exported_namespace, ingress) ({__name__=~"nginx_ingress_controller_requests|traefik_service_requests_total"})', set(), ["nginx_ingress_controller_requests|traefik_service_requests_total"]),
+        ("sum by (instance) (promtail_targets_active_total)", {"promtail_targets_active_total"}, []),
+        ('count by (alertname) (count_over_time(ALERTS{alertstate="firing"}[15d]))', {"ALERTS"}, []),
+        ('(time() - ALERTS_FOR_STATE{alertname!="Watchdog"}) / 86400 > 3', {"ALERTS_FOR_STATE"}, []),
+        ("sum by (name) (increase(fluentbit_output_errors_total[1h])) > 0", {"fluentbit_output_errors_total"}, []),
         ('node_network_up{device=~"flannel.*"}', {"node_network_up"}, []),
         ('sum(rate(apiserver_request_total{job="apiserver",code="401"}[1h]))', {"apiserver_request_total"}, []),
     ],
@@ -359,7 +379,7 @@ def test_every_query_of_the_read_families_cites_each_name():
         assert names <= subjects, (area, it["id"], sorted(names - subjects), "every name the query reads has an entry")
         for pat in patterns:
             assert any(re.fullmatch(pat, s) for s in subjects), (area, it["id"], pat, "a __name__ selector that spells a cited family needs an entry the pattern matches")
-    assert seen >= 125
+    assert seen >= 170
 
 
 def test_no_query_reads_a_name_the_exporter_removed_or_leaves_off():
@@ -454,12 +474,57 @@ def test_the_servfail_ratio_has_a_zero_numerator_when_no_servfail_series_exists(
     assert q.startswith('(sum(rate(coredns_dns_responses_total{rcode="SERVFAIL"}[1h])) or vector(0)) / sum(rate(coredns_dns_responses_total[1h]))'), q
 
 
+def _query(area: str, qid: str) -> dict:
+    return next(it for a, it in _queries() if a == area and it["id"] == qid)
+
+
+def test_the_replica_count_reads_one_series_per_prometheus_process():
+    """kube-prometheus-stack scrapes two ports of each Prometheus pod under one job (web and reloader-web), so `count(up{job=~".*prometheus$"} == 1)`
+    read 2 for a single replica; prometheus_build_info is served by the Prometheus process only, once."""
+    q = _query("prometheus", "prom_replicas")
+    assert q["query"] == "count(prometheus_build_info)"
+    assert any(str(e).startswith("prometheus_build_info: ") for e in q["source"])
+    assert any(str(e).startswith("label job on these self series: ") and "reloader-web" in str(e) for e in q["source"])
+
+
+def test_the_sample_limit_counter_is_summed_without_a_job_label():
+    """prometheus_target_scrapes_exceeded_sample_limit_total is one Counter per Prometheus with no target label (scrape/metrics.go); a `sum by (job)`
+    grouped it by the Prometheus's own job. The library names the targets from prometheus/targets.json instead."""
+    q = str(_query("prometheus", "prom_sample_limit_exceeded_1h")["query"])
+    assert "prometheus_target_scrapes_exceeded_sample_limit_total" in q and "by (job)" not in q
+    slow = str(_query("prometheus", "prom_scrape_interval_s")["why"])
+    assert "targets.json" in slow, "the interval query is the fallback; targets.json carries each job's own scrapeInterval"
+
+
+def test_the_two_up_equals_zero_queries_cite_up():
+    for area, qid in (("core", "targets_down"), ("prometheus", "scrape_targets_down_by_job")):
+        q = _query(area, qid)
+        assert "up" in _query_names(str(q["query"]))[0]
+        assert any(str(e).startswith("up: prometheus/prometheus scrape/scrape.go") for e in q["source"]), (area, qid)
+
+
+def test_the_keda_error_query_reads_only_the_counter_that_carries_a_scaled_object():
+    """keda_scaler_errors_total is a plain total with no labels at every version (prommetrics.go:49@v2.12.0, :110@v2.16.0); grouped by namespace and scaledObject
+    it yields one row with empty labels that no ScaledObject matches."""
+    q = str(_query("core", "keda_scaler_errors_24h")["query"])
+    assert "keda_scaler_detail_errors_total" in q and "keda_scaler_errors_total" not in q
+
+
+def test_the_loki_table_carries_both_retention_names():
+    from lib import podmetrics
+
+    names = podmetrics.entry("loki", "retention_last_run")["names"]
+    assert [n["name"] for n in names] == ["loki_compactor_apply_retention_last_successful_run_timestamp_seconds", "loki_boltdb_shipper_apply_retention_last_successful_run_timestamp_seconds"]
+    assert names[0]["since"] == "3.0.0" and names[1]["before"] == "3.0.0"
+    assert podmetrics.candidates("loki", "compactor_running") == ["loki_boltdb_shipper_compactor_running"]
+
+
 def test_every_version_a_query_cites_is_named_in_sources():
     text = SOURCES.read_text(encoding="utf-8")
     tags = set()
     for _, it in _queries():
         for e in it.get("source") or []:
             tags |= set(re.findall(r"@([\w.+-]+)", str(e)))
-    assert len(tags) >= 40
+    assert len(tags) >= 60
     missing = sorted(t for t in tags if t not in text)
     assert not missing, (missing, "name the version in the PromQL section of references/sources.md")

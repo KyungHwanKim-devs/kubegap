@@ -66,6 +66,7 @@
   accept: text
   out: loki/metrics.txt
   timeout: 30
+  source: "names and their definitions per version: collectors/loki/pod-metrics.yaml (lib/stackhealth.py and lib/logs.py read the text through it); /metrics on the store's port is where the store setup found Loki, observed here, not read in source for this issue"
 - id: metrics.loki
   type: promql
   file: metrics.yaml
