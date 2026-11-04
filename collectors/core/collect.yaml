@@ -87,8 +87,11 @@
   modes: [full]   # skipped by the daily run
   type: tool
   tool: polaris
-  cmd: [polaris, audit, --context, "{context}", --format, json, --only-show-failed-tests]
-  source: "polaris: cmd/polaris/root.go:47@v10.2.6 (--context), cmd/polaris/audit.go:62 (--format), :58 (--only-show-failed-tests); exit 0 unless --set-exit-code-* (audit.go:127-134); shape in references/sources.md"
+  # Not --only-show-failed-tests: it drops every controller whose only failures are controller-level checks (missingPodDisruptionBudget, deploymentMissingReplicas …),
+  # because the filter keeps a controller only when its PodResult is non-empty (pkg/validator/output.go:180-185@v10.2.6; schema.go:245-249 always sets PodResult).
+  # lib/hygiene.py skips the Success entries itself.
+  cmd: [polaris, audit, --context, "{context}", --format, json]
+  source: "polaris: cmd/polaris/root.go:47@v10.2.6 (--context), cmd/polaris/audit.go:62 (--format); exit 0 unless --set-exit-code-* (audit.go:127-134); shape in references/sources.md"
   out: tools/polaris.json
   timeout: 300
 - id: pluto

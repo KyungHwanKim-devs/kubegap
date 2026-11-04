@@ -117,3 +117,14 @@ def test_krr_config_block_is_dropped_from_the_saved_file(tmp_path, monkeypatch):
     assert "config" not in saved and saved["strategy"]["settings"]["history_duration"] == 336.0
     assert "AKIAEXAMPLE" not in (snap / "tools" / "krr.json").read_text()
     assert stat.S_IMODE((snap / "tools" / "krr.json").stat().st_mode) == 0o600
+
+
+def test_deprecation_tools_are_skipped_without_a_server_version(tmp_path, monkeypatch):
+    """No made-up target: pluto flags every API against the target and kubent lists every rule set whose Since is below it (pkg/printer/filter.go:12@0.7.3)."""
+    _fake_tool(tmp_path, monkeypatch)
+    step = {"id": "pluto", "type": "tool", "tool": "faketool", "cmd": ["faketool", "--target-versions", "k8s={k8s_next_minor}"], "out": "tools/pluto.json"}
+    snap = tmp_path / "snap"
+    res = collect._run_tool_step(step, "pluto", "core", "ctx", None, snap, RunLog(None), None, 30, None, inv={"cluster": {"server_version": None}})
+    assert res["ok"] is False and res["skipped"].startswith("server version unknown") and not (snap / "tools" / "pluto.json").exists()
+    res = collect._run_tool_step(step, "pluto", "core", "ctx", None, snap, RunLog(None), None, 30, None, inv={"cluster": {"server_version": "v1.32.13-eks-abc"}})
+    assert res["ok"] and '"args": "--target-versions k8s=v1.33.0"' in (snap / "tools" / "pluto.json").read_text()

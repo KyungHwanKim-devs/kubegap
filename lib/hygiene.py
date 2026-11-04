@@ -165,10 +165,10 @@ def _polaris(cx: _Ctx) -> dict:
     # source: polaris v10.2.6 pkg/validator/output.go:45-54 AuditData{PolarisOutputVersion, AuditTime, SourceType, SourceName, DisplayName, ClusterInfo, Results, Score},
     # :95-101 ClusterInfo{Version, Nodes, Pods, Namespaces, Controllers}, :151-158 Result{Name, Namespace, Kind, Results, PodResult, CreatedTime}, :188-192 PodResult{Name, Results,
     # ContainerResults}, :222-225 ContainerResult{Name, Results}, :104-112 ResultMessage{ID, Message, Details, Success, Severity, Category, Mutations}; pkg/config/severity.go:22-28
-    # severities ignore|warning|danger; pkg/config/checks/*.yaml categories Security (27), Reliability (13), Efficiency (4). The Score is computed over every check before
-    # `--only-show-failed-tests` drops the successes (pkg/validator/fullaudit.go:59, then cmd/polaris/audit.go:125), and that flag also drops every controller without a failed
-    # check (output.go:77-91 keeps a Result only when isNotEmpty), so len(Results) counts the audited objects of every kind (controllers, Ingresses, Namespaces, bindings …) that
-    # have a failure, while ClusterInfo.Controllers (pkg/validator/fullaudit.go:55, GetNumberOfControllers) counts audited controllers only; the two are not comparable.
+    # severities ignore|warning|danger; pkg/config/checks/*.yaml categories Security (27), Reliability (13), Efficiency (4). The step runs without --only-show-failed-tests:
+    # that filter keeps a controller only when its PodResult is non-empty (output.go:180-185; schema.go:245-249 always sets one), so a controller whose only failures are
+    # controller-level checks vanished. The successes are skipped here instead. len(Results) is every audited object of every kind (controllers, Ingresses, Namespaces,
+    # bindings …) and ClusterInfo.Controllers (pkg/validator/fullaudit.go:55, GetNumberOfControllers) the audited controllers.
     d = load_json(cx.snap / "tools" / "polaris.json")
     if not d:
         return {"present": False, "note": "tools/polaris.json missing (polaris not installed or not collected yet)"}
@@ -219,8 +219,9 @@ def _polaris(cx: _Ctx) -> dict:
         "present": True,
         "source": "tools/polaris.json",
         "score": d.get("Score"),
+        "audited": len(d.get("Results") or []),
+        "with_failures": len(rows),
         "controllers": (d.get("ClusterInfo") or {}).get("Controllers"),
-        "with_failures": len(d.get("Results") or []),
         "cluster_info": d.get("ClusterInfo"),
         "version": d.get("PolarisOutputVersion"),
         "checks": checks,
@@ -272,10 +273,11 @@ def _deprecated(cx: _Ctx) -> dict:
             }
         )
     # source: kubent 0.7.3 pkg/printer/json.go:32-40 encodes []judge.Result; pkg/judge/judge.go:3-11 Result{Name, Namespace, Kind, ApiVersion, RuleSet, ReplaceWith, Since}, Since as
-    # text (judge/version.go:12-14). Since is the minor in which the API was deprecated, not removed: pkg/rules/rego/deprecated-1-25.rego:14-33 gives PodDisruptionBudget policy/v1beta1
+    # text with three segments, "1.21.0" (judge/version.go:12-14 wraps hashicorp go-version, which pads). Since is the minor in which the API was deprecated, not removed:
+    # pkg/rules/rego/deprecated-1-25.rego:13-33 gives PodDisruptionBudget policy/v1beta1
     # `since: 1.21` inside the rule set "Deprecated APIs removed in 1.25", so the removal minor exists only in the RuleSet text ("Deprecated APIs to be removed in future" for the ones
-    # without a date, deprecated-future.rego:13). `-t` keeps the rows whose Since <= target (pkg/printer/filter.go:12). A cluster-scoped object carries Namespace "<undefined>"
-    # (pkg/judge/rego.go:61-64) and an API with no successor ReplaceWith "<removed>" (deprecated-1-25.rego:34-37).
+    # without a date, deprecated-future.rego:13). `-t` keeps the rows whose Since <= target or is empty (pkg/printer/filter.go:12). The rules write "<undefined>" for a missing
+    # name or namespace (deprecated-1-25.rego:7-9; rego.go:61-64 is the fallback) and "<removed>" for an API with no successor (deprecated-1-25.rego:34-37).
     target = _next_minor(cx.server_version, pl.get("target-versions"))
     kb = load_json(cx.snap / "tools" / "kubent.json")
     for it in kb if read["kubent_read"] and isinstance(kb, list) else []:
@@ -283,11 +285,12 @@ def _deprecated(cx: _Ctx) -> dict:
         removed_in = m.group(1) if m else None
         ns = it.get("Namespace")
         rep = it.get("ReplaceWith")
+        nm = it.get("Name")
         items.append(
             {
                 "source": "kubent",
                 "kind": it.get("Kind"),
-                "name": it.get("Name"),
+                "name": None if nm == "<undefined>" else nm,
                 "namespace": None if ns == "<undefined>" else ns,
                 "api": it.get("ApiVersion"),
                 "deprecated_in": it.get("Since"),

@@ -19,12 +19,12 @@ def _snap(tmp_path, **files):
     return tmp_path
 
 
-# kubent 0.7.3 pkg/judge/judge.go:3-11, pkg/rules/rego/deprecated-1-25.rego:13-33 (PodDisruptionBudget: since 1.21 in the rule set "removed in 1.25"), rego.go:61-64 ("<undefined>")
+# kubent 0.7.3 pkg/judge/judge.go:3-11, pkg/rules/rego/deprecated-1-25.rego:7-9 ("<undefined>"), :13-33 (PodDisruptionBudget: since 1.21 in the rule set "removed in 1.25")
 KUBENT_ROWS = [
-    {"Name": "restricted", "Namespace": "<undefined>", "Kind": "PodSecurityPolicy", "ApiVersion": "policy/v1beta1", "RuleSet": "Deprecated APIs removed in 1.25", "ReplaceWith": "<removed>", "Since": "1.21"},
-    {"Name": "web", "Namespace": "prod-a", "Kind": "PodDisruptionBudget", "ApiVersion": "policy/v1beta1", "RuleSet": "Deprecated APIs removed in 1.25", "ReplaceWith": "policy/v1", "Since": "1.21"},
-    {"Name": "fs", "Namespace": "prod-a", "Kind": "FlowSchema", "ApiVersion": "flowcontrol.apiserver.k8s.io/v1beta3", "RuleSet": "Deprecated APIs removed in 1.32", "ReplaceWith": "flowcontrol.apiserver.k8s.io/v1", "Since": "1.29"},
-    {"Name": "x", "Namespace": "prod-a", "Kind": "Thing", "ApiVersion": "x/v1beta1", "RuleSet": "Deprecated APIs to be removed in future", "ReplaceWith": "x/v1", "Since": "1.21"},
+    {"Name": "restricted", "Namespace": "<undefined>", "Kind": "PodSecurityPolicy", "ApiVersion": "policy/v1beta1", "RuleSet": "Deprecated APIs removed in 1.25", "ReplaceWith": "<removed>", "Since": "1.21.0"},
+    {"Name": "web", "Namespace": "prod-a", "Kind": "PodDisruptionBudget", "ApiVersion": "policy/v1beta1", "RuleSet": "Deprecated APIs removed in 1.25", "ReplaceWith": "policy/v1", "Since": "1.21.0"},
+    {"Name": "fs", "Namespace": "prod-a", "Kind": "FlowSchema", "ApiVersion": "flowcontrol.apiserver.k8s.io/v1beta3", "RuleSet": "Deprecated APIs removed in 1.32", "ReplaceWith": "flowcontrol.apiserver.k8s.io/v1", "Since": "1.29.0"},
+    {"Name": "x", "Namespace": "prod-a", "Kind": "Thing", "ApiVersion": "x/v1beta1", "RuleSet": "Deprecated APIs to be removed in future", "ReplaceWith": "x/v1", "Since": "1.21.0"},
 ]
 
 
@@ -34,7 +34,7 @@ def test_kubent_removed_minor_comes_from_the_rule_set_and_is_judged_against_the_
     assert d["target_minor"] == "1.25"
     by_name = {i["name"]: i for i in d["items"]}
     psp, pdb, fs, future = by_name["restricted"], by_name["web"], by_name["fs"], by_name["x"]
-    assert psp["deprecated_in"] == "1.21" and psp["removed_in"] == "1.25" and psp["removed"] is True
+    assert psp["deprecated_in"] == "1.21.0" and psp["removed_in"] == "1.25" and psp["removed"] is True  # Since has three segments (go-version pads)
     assert psp["namespace"] is None and psp["replacement"] is None  # "<undefined>" and "<removed>" are kubent's spellings of absence
     assert pdb["removed"] is True and pdb["replacement"] == "policy/v1" and pdb["namespace"] == "prod-a"
     assert fs["removed_in"] == "1.32" and fs["removed"] is False  # removed later than the target: still deprecated, not removed
@@ -68,8 +68,13 @@ def test_the_check_fails_on_a_kubent_row_removed_by_the_target(tmp_path):
     assert "removed 1.25" in r["findings"][0]["evidence"]
 
 
-# polaris v10.2.6 pkg/validator/output.go:77-91: with --only-show-failed-tests a controller without a failed check is not in Results at all
-def test_polaris_controllers_is_the_cluster_info_count_and_results_are_objects_with_failures(tmp_path):
+# polaris v10.2.6: without --only-show-failed-tests every audited object is in Results with every check, Success true or false (pkg/validator/output.go:104-115)
+def _msg(cid, success, severity, category):
+    return {"ID": cid, "Message": cid, "Details": None, "Success": success, "Severity": severity, "Category": category, "Mutations": None}
+
+
+def test_polaris_counts_every_audited_object_and_skips_the_successes(tmp_path):
+    ok = {"hostIPCSet": _msg("hostIPCSet", True, "danger", "Security")}
     doc = {
         "PolarisOutputVersion": "1.0",
         "ClusterInfo": {"Version": "v1.32.0", "Nodes": 3, "Pods": 40, "Namespaces": 8, "Controllers": 25},
@@ -80,31 +85,26 @@ def test_polaris_controllers_is_the_cluster_info_count_and_results_are_objects_w
                 "Namespace": "prod-a",
                 "Kind": "Deployment",
                 "Results": {},
-                "PodResult": {
-                    "Name": "",
-                    "Results": {},
-                    "ContainerResults": [
-                        {
-                            "Name": "app",
-                            "Results": {"cpuLimitsMissing": {"ID": "cpuLimitsMissing", "Message": "CPU limits should be set", "Details": None, "Success": False, "Severity": "warning", "Category": "Efficiency", "Mutations": None}},
-                        }
-                    ],
-                },
+                "PodResult": {"Name": "", "Results": dict(ok), "ContainerResults": [{"Name": "app", "Results": {"cpuLimitsMissing": _msg("cpuLimitsMissing", False, "warning", "Efficiency")}}]},
                 "CreatedTime": "2026-01-01T00:00:00Z",
             },
+            {"Name": "ing", "Namespace": "prod-a", "Kind": "Ingress", "Results": {"tlsSettingsMissing": _msg("tlsSettingsMissing", False, "warning", "Security")}, "PodResult": None, "CreatedTime": "2026-01-01T00:00:00Z"},
+            # a controller whose only failure is a controller-level check: --only-show-failed-tests would have dropped it (output.go:180-185 looks at PodResult only)
             {
-                "Name": "ing",
+                "Name": "api",
                 "Namespace": "prod-a",
-                "Kind": "Ingress",
-                "Results": {"tlsSettingsMissing": {"ID": "tlsSettingsMissing", "Message": "Ingress does not have TLS configured", "Details": None, "Success": False, "Severity": "warning", "Category": "Security", "Mutations": None}},
-                "PodResult": None,
+                "Kind": "Deployment",
+                "Results": {"missingPodDisruptionBudget": _msg("missingPodDisruptionBudget", False, "warning", "Reliability")},
+                "PodResult": {"Name": "", "Results": dict(ok), "ContainerResults": []},
                 "CreatedTime": "2026-01-01T00:00:00Z",
             },
+            {"Name": "clean", "Namespace": "prod-a", "Kind": "Deployment", "Results": {}, "PodResult": {"Name": "", "Results": dict(ok), "ContainerResults": []}, "CreatedTime": "2026-01-01T00:00:00Z"},
         ],
     }
     snap = _snap(tmp_path, polaris=doc)
     p = hygiene._polaris(hygiene._Ctx(snap, {"namespaces": {"prod_like": ["prod-a"]}}))
-    assert p["controllers"] == 25 and p["with_failures"] == 2 and p["score"] == 81 and "audited" not in p
-    assert [w["target"] for w in p["workloads"]] == ["prod-a/deployment/web", "prod-a/ingress/ing"]
-    assert p["workloads"][0]["failed"][0]["where"] == "container:app"
-    assert p["by_category"] == {"Efficiency/warning": 1, "Security/warning": 1}
+    assert p["audited"] == 4 and p["with_failures"] == 3 and p["controllers"] == 25 and p["score"] == 81
+    assert sorted(w["target"] for w in p["workloads"]) == ["prod-a/deployment/api", "prod-a/deployment/web", "prod-a/ingress/ing"]
+    assert next(w for w in p["workloads"] if w["name"] == "web")["failed"][0]["where"] == "container:app"
+    assert p["by_category"] == {"Efficiency/warning": 1, "Security/warning": 1, "Reliability/warning": 1}
+    assert all(f["check"] != "hostIPCSet" for w in p["workloads"] for f in w["failed"])  # a Success entry is never a failure

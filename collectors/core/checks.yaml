@@ -12097,7 +12097,7 @@
           name: "restricted"
           namespace: ""
           api: "policy/v1beta1"
-          deprecated_in: "1.21"
+          deprecated_in: "1.21.0"
           removed_in: "1.25"
           replacement: ""
           deprecated: true
