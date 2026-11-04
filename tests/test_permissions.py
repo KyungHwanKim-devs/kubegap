@@ -391,3 +391,143 @@ def test_dump_all_lists_forbidden_kinds_as_not_permitted(tmp_path, fake_kubectl_
     s = collect.dump_all(None, None, tmp_path, [], 10, RunLog(tmp_path / "run.log"), "core")
     assert s["kinds"] == 1 and s["failed"] == {} and s["not_permitted"] == ["podtemplates"]
     assert (tmp_path / "objects" / "pods.json").is_file() and not (tmp_path / "objects" / "podtemplates.json").exists()
+
+
+# ---------- docs/PERMISSIONS.md says the same as the role, the policy and the collectors (#95) ----------
+
+PERMISSIONS_DOC = ROOT / "docs" / "PERMISSIONS.md"
+
+
+def _doc_tables() -> dict[str, list[list[str]]]:
+    """Markdown tables of docs/PERMISSIONS.md keyed by the first header cell; each row is its list of cells. The document writes no pipe inside a cell (the column-count test catches one)."""
+    tables: dict[str, list[list[str]]] = {}
+    header: list[str] | None = None
+    for ln in PERMISSIONS_DOC.read_text(encoding="utf-8").splitlines():
+        if not ln.startswith("|"):
+            header = None
+            continue
+        cells = [c.strip() for c in ln.strip().strip("|").split("|")]
+        if header is None:
+            header = cells
+            tables[header[0]] = []
+        elif all(set(c) <= set("-: ") for c in cells):
+            continue
+        else:
+            tables[header[0]].append(cells)
+    return tables
+
+
+def _steps_by_name() -> dict[str, dict]:
+    return {f"{coll}/{st['id']}": st for coll, st in _collect_steps()}
+
+
+def _steps_in_cell(cell: str, steps: dict[str, dict]) -> list[str]:
+    """`collector/step-id` tokens in code spans; a token with a slash that is not a step is a bug in the document."""
+    out = []
+    for tok in re.findall(r"`([a-z0-9-]+/[a-z0-9.-]+)`", cell):
+        if tok.startswith(("lib/", "deploy/", "docs/")) or tok.endswith((".py", ".md", ".yaml", ".json")):
+            continue
+        if "/" in tok and tok.split("/")[0] in {c for c, _ in _collect_steps()}:
+            assert tok in steps, f"docs/PERMISSIONS.md names step {tok}, which is not in collectors/*/collect.yaml"
+            out.append(tok)
+    return out
+
+
+def _mode_of(step_names: list[str], steps: dict[str, dict]) -> str | None:
+    if not step_names:
+        return None
+    modes = {tuple(steps[s].get("modes") or ()) for s in step_names}
+    return "full" if modes == {("full",)} else "both"
+
+
+def test_permissions_doc_kubernetes_table_matches_the_clusterrole():
+    rows = _doc_tables()["API group"]
+    role = _role()
+    want = {}
+    for rule in role["rules"]:
+        for g in rule.get("apiGroups") or []:
+            for res in rule.get("resources") or []:
+                want[(g or "core", res)] = tuple(sorted(rule["verbs"]))
+    got = {}
+    for cells in rows:
+        group, resource, verbs = cells[0].strip("`"), cells[1].strip("`"), tuple(sorted(v.strip() for v in cells[2].split(",")))
+        got[(group, resource)] = verbs
+    assert set(got) == set(want), f"rows missing: {set(want) - set(got)}; rows extra: {set(got) - set(want)}"
+    assert got == want, {k: (got[k], want[k]) for k in want if got[k] != want[k]}
+
+
+def test_permissions_doc_aws_table_matches_the_policy():
+    rows = _doc_tables()["Action"]
+    got = [cells[0].strip("`") for cells in rows]
+    assert sorted(got) == sorted(_policy_actions()), sorted(set(got) ^ _policy_actions())
+    assert len(got) == len(set(got)), "an action is listed twice"
+
+
+def test_permissions_doc_steps_and_modes_match_the_collectors():
+    """Every step a row names exists, and the Mode cell is `full` only when every named step is full-only. A row that names no step (library code) says both."""
+    steps = _steps_by_name()
+    tables = _doc_tables()
+    checked = 0
+    for header, mode_col, by_col in (("API group", 4, 3), ("Action", 2, 1)):
+        for cells in tables[header]:
+            named = _steps_in_cell(cells[by_col], steps)
+            mode_cell = cells[mode_col]
+            has_lib = any(
+                f"`lib/{m}.py`" in cells[by_col] for m in ("discover", "setup", "aws", "monitoring", "portfwd", "node", "nodecommands", "albmetrics")
+            )  # library code that runs in both modes; lib/cwlogs.py is bound to its full-only step
+            if not named:
+                assert mode_cell.startswith("both"), (cells[0], mode_cell)
+                continue
+            full_only = [s for s in named if tuple(steps[s].get("modes") or ()) == ("full",)]
+            if _mode_of(named, steps) == "full" and not has_lib:
+                assert mode_cell == "full", (cells[0], mode_cell)
+            else:
+                assert mode_cell.startswith("both"), (cells[0], mode_cell)
+                for s in full_only:  # the exceptions are named in the cell: "both (`x`, `y`: full)"
+                    assert s.split("/", 1)[1] in mode_cell, f"{cells[0]}: step {s} is full-only but the Mode cell does not say so"
+                for tok in re.findall(r"`([a-z0-9.-]+)`", mode_cell):  # and only full-only steps may be named as exceptions
+                    matches = [s for s in named if s.split("/", 1)[1] == tok]
+                    assert all(s in full_only for s in matches), f"{cells[0]}: `{tok}` is named as a full-only exception but runs in both modes"
+            checked += 1
+    assert checked >= 40
+    for cells in tables["URL"]:
+        assert cells[3] == "both", (cells[0], cells[3])
+
+
+def _check_ids() -> set[str]:
+    ids: set[str] = set()
+    for f in sorted(ROOT.glob("collectors/*/checks.yaml")):
+        ids |= set(re.findall(r"^- id: (\S+)", f.read_text(encoding="utf-8"), re.MULTILINE))
+    return ids
+
+
+def test_permissions_doc_check_column_names_real_checks():
+    """Every `area.id` in a check column is a check, and every `area.prefix-*` or `area.*` pattern matches at least one check."""
+    ids = _check_ids()
+    tables = _doc_tables()
+    seen = 0
+    for header, col in (("API group", 5), ("Action", 3)):
+        for cells in tables[header]:
+            for tok in re.findall(r"`([a-z]+\.[a-z0-9*.-]+)`", cells[col]):
+                seen += 1
+                if "*" in tok:
+                    prefix = tok.split("*")[0]
+                    assert any(i.startswith(prefix) for i in ids), f"{cells[0]}: no check matches `{tok}`"
+                else:
+                    assert tok in ids, f"{cells[0]}: `{tok}` is not a check id"
+    assert seen >= 100
+
+
+def test_permissions_doc_names_every_pod_metrics_step_and_the_node_steps():
+    steps = _steps_by_name()
+    text = PERMISSIONS_DOC.read_text(encoding="utf-8")
+    for name, st in steps.items():
+        if st.get("type") in ("pod-metrics", "node"):
+            assert f"`{name}`" in text, f"{name} ({st.get('type')}) is not named in docs/PERMISSIONS.md"
+
+
+def test_permissions_doc_tables_parse_as_expected():
+    tables = _doc_tables()
+    assert set(tables) >= {"API group", "URL", "Action"}
+    assert all(len(c) == 7 for c in tables["API group"]), [c for c in tables["API group"] if len(c) != 7]
+    assert all(len(c) == 5 for c in tables["Action"]), [c for c in tables["Action"] if len(c) != 5]
