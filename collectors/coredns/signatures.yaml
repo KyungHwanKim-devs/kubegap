@@ -9,7 +9,7 @@
   severity: medium
   sources: ["logs/pods/coredns/*.log"]
   pattern: ' SERVFAIL |plugin/errors: 2 '
-  meaning: DNS queries are failing. Apps see "no such host" or timeouts.
+  meaning: DNS queries are failing. Apps see "no such host" or timeouts. An upstream timeout line counts here and under coredns.upstream-timeout (the answer the client got, and its cause).
   cause: Upstream (VPC resolver, external DNS) not responding, forward configuration, conntrack drops.
   verify: "kubectl logs -n kube-system -l k8s-app=kube-dns --since=1h | grep -cE ' SERVFAIL |plugin/errors: 2 '"
   warn_at: 20
