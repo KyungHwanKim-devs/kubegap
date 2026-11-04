@@ -237,7 +237,7 @@ def _profile(platform: str, nodes: dict, cfg: Config, override: str | None) -> d
     return {"name": "small-prod", "source": "detected", "reasons": [f"platform {platform} (not EKS or k3s)", f"{nodes['count']} nodes (4-20), {len(zones)} AZs — inherits the checks of the base profile eks, quota and cost checks disabled"]}
 
 
-def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log: RunLog) -> dict:
+def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log: RunLog, *, context: str | None = None, kubeconfig: str | None = None) -> dict:
     forced = cfg.get("node_access")
     out: dict = {"method": None, "source": "detected", "reasons": [], "ssm_registered": [], "ssm_unregistered": []}
     if forced in ("ssm", "ssh", "none"):
@@ -256,7 +256,7 @@ def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log:
     # If the user has applied deploy/node-access/daemonset.yaml (environments where neither SSM nor SSH works), nodes are read via kubectl exec — the third backend.
     # (A regression on 2026-10-26 attached the `else` above to this `if`, which turned EKS node access off; keep this block separate from the chain.)
     if cfg.get("node_access") in (None, "", "daemonset") and (platform != "eks" or cfg.get("node_access") == "daemonset"):
-        ds_pods, _ = kube.kubectl_json(["get", "pods", "-n", "kubegap", "-l", "app.kubernetes.io/name=kubegap-node-reader", "-o", "json"], context=cfg.get("context"), timeout=20)
+        ds_pods, _ = kube.kubectl_json(["get", "pods", "-n", "kubegap", "-l", "app.kubernetes.io/name=kubegap-node-reader", "-o", "json"], context=context or cfg.get("context"), kubeconfig=kubeconfig, timeout=20)
         running = [p_["spec"].get("nodeName") for p_ in ((ds_pods or {}).get("items") or []) if (p_.get("status") or {}).get("phase") == "Running"]
         if running:
             out["method"], out["reasons"] = "daemonset", [f"kubegap-node-reader DaemonSet: {len(running)} pods Running (namespace kubegap) — nodes are read via kubectl exec"]
@@ -380,7 +380,7 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
     platform, platform_reasons = detect_platform(ctx_info, nodes, comps, objs)
     write_objects()
     profile = _profile(platform, nodes, cfg, profile_override)
-    node_access = _node_access(platform, nodes, cfg, ctx_info.get("eks") if ctx_info.get("is_eks") else None, log)
+    node_access = _node_access(platform, nodes, cfg, ctx_info.get("eks") if ctx_info.get("is_eks") else None, log, context=context, kubeconfig=kubeconfig)
 
     # Stores: service discovery + connect and read retention (same code as setup)
     svcs, _err = monitoring.find_services(context, kubeconfig, log=log)

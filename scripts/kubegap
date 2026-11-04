@@ -368,7 +368,7 @@ def cmd_nodes(args) -> int:
     cfg = load_config(args.config)
     snap = _resolve_snapshot_arg(args, args.snapshot)
     inv = _json.loads((snap / "inventory.json").read_text(encoding="utf-8"))
-    na = NodeAccess(inv, cfg)
+    na = NodeAccess(inv, cfg, kubeconfig=args.kubeconfig)
     print(f"snapshot {snap.name}, backend {na.method}" + (" (overridden by config.yaml)" if cfg.get("node_access") else ""))
     if na.method == "ssm":
         from lib import nodecommands as _nc
