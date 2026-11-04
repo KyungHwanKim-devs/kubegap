@@ -11,7 +11,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.11", "3.12", "3.13", "3.14"]  # pyproject.toml says >=3.11; the two ends and the two between (#128)
     steps:
       # Check out the repository into a folder named kubegap (the Agent Skills validator requires the folder name to match the skill name)
       - uses: actions/checkout@v4
