@@ -40,7 +40,31 @@ COUNT_ONLY_KINDS = {
     "ephemeralrunners.actions.github.com",
     "ephemeralrunnersets.actions.github.com",
 }
-BODY_KEYS = ("spec", "data", "binaryData", "rules", "subjects", "roleRef", "webhooks", "provisioner", "parameters", "reclaimPolicy", "allowVolumeExpansion", "stringData", "secrets", "automountServiceAccountToken", "value", "globalDefault")
+# every top-level key that carries configuration on a kind without `spec`: StorageClass (storage.k8s.io/v1 types.go:46-88@v1.37.2), PriorityClass (scheduling.k8s.io/v1 types.go:42-60@v1.37.2), ServiceAccount, ConfigMap, RBAC, webhooks (#124 K2-6)
+BODY_KEYS = (
+    "spec",
+    "data",
+    "binaryData",
+    "rules",
+    "subjects",
+    "roleRef",
+    "webhooks",
+    "provisioner",
+    "parameters",
+    "reclaimPolicy",
+    "allowVolumeExpansion",
+    "volumeBindingMode",
+    "mountOptions",
+    "allowedTopologies",
+    "stringData",
+    "secrets",
+    "imagePullSecrets",
+    "automountServiceAccountToken",
+    "value",
+    "globalDefault",
+    "description",
+    "preemptionPolicy",
+)
 METRIC_DELTA_LABELS = ("node", "instance", "mountpoint", "namespace", "pod", "container", "horizontalpodautoscaler", "qos_class", "device")
 
 

@@ -601,8 +601,9 @@ def _orphans(cx: _Ctx) -> dict:
             if v.get("persistentVolumeClaim"):
                 pvc_used.add((o["metadata"]["namespace"], v["persistentVolumeClaim"].get("claimName")))
         if kind == "StatefulSet":
+            start = (((o.get("spec") or {}).get("ordinals") or {}).get("start")) or 0  # pods are numbered from spec.ordinals.start (kubernetes/kubernetes pkg/controller/statefulset/stateful_set_utils.go:100-102@v1.37.2) (#124 K2-2)
             for vct in (o.get("spec") or {}).get("volumeClaimTemplates") or []:
-                for i in range(((o.get("spec") or {}).get("replicas") or 1) + 2):
+                for i in range(start, start + ((o.get("spec") or {}).get("replicas") or 1) + 2):
                     pvc_used.add((o["metadata"]["namespace"], f"{vct['metadata']['name']}-{o['metadata']['name']}-{i}"))
     for p in cx.pods:
         for v in (p.get("spec") or {}).get("volumes") or []:
@@ -687,11 +688,14 @@ def _templating(cx: _Ctx) -> dict:
         managed = None
         if labels.get("app.kubernetes.io/managed-by") == "Helm" or any(k.startswith("meta.helm.sh/") for k in ann):
             managed = "helm"
-        if "argocd.argoproj.io/tracking-id" in ann or "argocd.argoproj.io/instance" in labels:
+        # Argo CD's default tracking is the label `app.kubernetes.io/instance` = application name (argoproj/argo-cd common/common.go:161@v2.13.0, :190@v3.6.1); `argocd.argoproj.io/instance`
+        # is the configured alternative and the annotation is the annotation-tracking method (#124 K2-5)
+        if "argocd.argoproj.io/tracking-id" in ann or "argocd.argoproj.io/instance" in labels or labels.get("app.kubernetes.io/instance") in cx.argo_apps:
             managed = "argocd" + ("+helm" if managed == "helm" else "")
         if any(k.startswith(("kustomize.toolkit.fluxcd.io/", "helm.toolkit.fluxcd.io/")) for k in labels):
             managed = "flux"
-        if labels.get("app.kubernetes.io/managed-by") in ("eks", "EKS") or ann.get("eks.amazonaws.com/addon") or md["namespace"] == "kube-system":
+        # EKS add-ons carry the labels `app.kubernetes.io/managed-by: EKS` and `eks.amazonaws.com/component` (observed on the add-on workloads; no public manifest, #124 K2-4)
+        if labels.get("app.kubernetes.io/managed-by") in ("eks", "EKS") or "eks.amazonaws.com/component" in labels or md["namespace"] == "kube-system":
             managed = managed or "platform"
         rows.append({"workload": cx.key(kind, o), "namespace": md["namespace"], "prod": md["namespace"] in cx.prod, "managed_by": managed, "last_applied": "kubectl.kubernetes.io/last-applied-configuration" in ann})
     apps = objects(cx.snap, "applications.argoproj.io")
@@ -874,7 +878,7 @@ def _config_changes(cx: _Ctx) -> dict | None:
         "stale": stale,
         "restart_needed": [r for r in stale if r["restart_needed_pods"]],
         "refresh_only": [r for r in stale if not r["restart_needed_pods"]],
-        "note": "changed_at is the latest managedFields entry that wrote data or binaryData; a re-apply of identical content (Argo CD sync, helm upgrade) also refreshes it, label-only or annotation-only writes do not. Compared with the start of the containers that read the ConfigMap, so a container restarted after the change is not listed. File mounts are refreshed by the kubelet, env/envFrom/subPath are not. Secrets are not collected and not judged",
+        "note": "changed_at is the latest managedFields entry that wrote data or binaryData; a re-apply of identical content (Argo CD sync, helm upgrade) also refreshes it, and so does a label-only or annotation-only write by the same manager that wrote the data earlier (the apiserver refreshes the manager's whole entry); a label-only write by another manager does not. Compared with the start of the containers that read the ConfigMap, so a container restarted after the change is not listed. File mounts are refreshed by the kubelet, env/envFrom/subPath are not. Secrets are not collected and not judged",
     }
 
 
