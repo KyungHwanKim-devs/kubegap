@@ -15,6 +15,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from .durations import go_duration_s
 from .promtext import parse as _parse_prom
 from .snapshot import load_json, objects
 
@@ -32,11 +33,9 @@ def _ts(s):
 
 
 def _dur_s(s) -> float | None:
-    m = re.match(r"^(\d+)([smh])$", str(s or ""))
-    if not m:
-        return None
-    n, u = int(m.group(1)), m.group(2)
-    return n if u == "s" else (n * 60 if u == "m" else n * 3600)
+    """Seconds of a Go duration (`180s`, `3m0s`, `2m30s`): Argo CD parses `timeout.reconciliation` with `time.ParseDuration` (lib/durations)."""
+    secs = go_duration_s(s)
+    return secs if secs and secs > 0 else None
 
 
 def _prom_dir(snap: Path, name: str) -> dict:

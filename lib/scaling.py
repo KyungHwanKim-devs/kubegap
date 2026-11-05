@@ -16,6 +16,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from . import versions
+from .durations import go_duration_s
+from .events import count_of
 from .snapshot import component_logs_aggregate, component_logs_removed, load_json, objects
 
 ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?")
@@ -85,13 +87,9 @@ def _ts(s) -> _dt.datetime | None:
 
 
 def _dur_h(s: str | None) -> float | None:
-    """'720h' '30m' '20m0s' -> hours. For Karpenter expireAfter/consolidateAfter."""
-    if not s or s == "Never":
-        return None
-    total = 0.0
-    for num, unit in re.findall(r"(\d+(?:\.\d+)?)([hms])", str(s)):
-        total += float(num) * {"h": 1, "m": 1 / 60, "s": 1 / 3600}[unit]
-    return round(total, 3) if total else None
+    """'720h' '30m' '20m0s' -> hours; None for `Never`, empty or zero. For Karpenter expireAfter/consolidateAfter (lib/durations)."""
+    secs = go_duration_s(s)
+    return round(secs / 3600, 3) if secs else None
 
 
 def _metric_map(snap: Path, qid: str, keys: tuple[str, ...]) -> dict[tuple, float]:

@@ -14,6 +14,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from .durations import go_duration_s
 from .promtext import parse as _parse_prom
 from .snapshot import objects
 
@@ -31,11 +32,10 @@ def _ts(s):
 
 
 def _interval_h(s) -> float | None:
-    m = re.match(r"^(\d+)([smh])$", str(s or ""))
-    if not m:
-        return None
-    n, u = int(m.group(1)), m.group(2)
-    return n / 3600 if u == "s" else (n / 60 if u == "m" else float(n))
+    """Hours of `spec.refreshInterval`, a `metav1.Duration` (`1h`, `1h30m`, `90m0s`); None when unset, `0` or negative (refresh disabled:
+    external-secrets/external-secrets pkg/controllers/externalsecret/externalsecret_controller.go:751@v2.14.0) (lib/durations)."""
+    secs = go_duration_s(s)
+    return secs / 3600 if secs and secs > 0 else None
 
 
 def _deploy(snap: Path, name: str) -> dict:
