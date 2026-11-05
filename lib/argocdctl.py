@@ -78,7 +78,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             "version": _ver(c0.get("image")),
             "kind": "StatefulSet" if "volumeClaimTemplates" in sp or (w["metadata"]["name"].endswith("controller") and "serviceName" in sp) else "Deployment",
         }
-    version = (comps.get("server") or comps.get("application-controller") or {}).get("version")
+    version = next((comps[k]["version"] for k in ("server", "application-controller", "repo-server", "applicationset-controller", "dex-server", "notifications-controller") if (comps.get(k) or {}).get("version")), None)
     # --- settings
     cms = {c["metadata"]["name"]: (c.get("data") or {}) for c in objects(snap, "configmaps") if c["metadata"]["namespace"] == "argocd"}
     cm, params, rbac, notif = cms.get("argocd-cm", {}), cms.get("argocd-cmd-params-cm", {}), cms.get("argocd-rbac-cm", {}), cms.get("argocd-notifications-cm", {})
@@ -101,6 +101,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "server_insecure": flag(params, "server.insecure", False),
         "timeout_reconciliation": cm.get("timeout.reconciliation", f"{reconcile_default}s (default)"),
         "timeout_reconciliation_s": reconcile_s,
+        "reconcile_default_basis": f"Argo CD {version}: {reconcile_default} s" if version else "no semver image tag on any argocd-* workload: assumed 2.x (180 s)",
         "status_processors": params.get("controller.status.processors"),
         "operation_processors": params.get("controller.operation.processors"),
         "rbac_policy_default": rbac.get("policy.default", ""),
