@@ -79,8 +79,9 @@ def _settings(snap: Path) -> dict:
 
     def flag(name, default="false"):
         # the CNI reads its booleans with strconv.ParseBool (aws/amazon-vpc-cni-k8s utils/utils.go:12-22@v1.19.0): 1, t, T, TRUE, true, True are on; anything unparsable is the default (#124 O-6)
-        v = str(env.get(name, default)).strip().lower()
-        return v in ("1", "t", "true") if v in ("1", "t", "true", "0", "f", "false") else str(default).lower() == "true"
+        on, off = ("1", "t", "T", "TRUE", "true", "True"), ("0", "f", "F", "FALSE", "false", "False")
+        v = str(env.get(name, default))
+        return v in on if v in on + off else str(default) in on
 
     netpol = next((a.split("=", 1)[1] for a in nodeagent_args if a.startswith("--enable-network-policy=")), None)
     return {

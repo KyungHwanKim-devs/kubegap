@@ -291,7 +291,7 @@ def _node_base(n: dict, o: dict, node_ips: set[str]) -> dict:
         "node": n["name"],
         "roles": n.get("roles") or [],
         "role": parsed["role"],
-        "args": args,  # k3s already masks the token values in the node-args annotation (k3s-io/k3s pkg/nodeconfig/nodeconfig.go:26,139-141@v1.37.2+k3s1); the former expression here masked nothing (#124 K3-7)
+        "args": args,  # k3s already masks the token values in the node-args annotation (k3s-io/k3s pkg/nodeconfig/nodeconfig.go:27,136@v1.37.2+k3s1); the former expression here masked nothing (#124 K3-7)
         "disable": parsed["disable"],
         "tls_san": parsed["tls_san"],
         "node_ip": parsed["node_ip"],

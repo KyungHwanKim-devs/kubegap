@@ -2,8 +2,8 @@
 
 The grammar is `[-+]?([0-9]*(\\.[0-9]*)?[a-z]+)+` with the units ns, us (or µs/μs), ms, s, m and h; `0` alone is allowed, a number without a unit is not
 (golang/go src/time/format.go:1605-1614,1621-1718@go1.25.0: `unitMap`, `ParseDuration`). Karpenter's `expireAfter`/`consolidateAfter` also take `Never`
-(the CRD pattern `^(([0-9]+(s|m|h))+)|(Never)$`, kubernetes-sigs/karpenter pkg/apis/v1/nodepool.go:65,213@v1.0.0); callers map that themselves. Before this module three copies accepted only `^\\d+[smh]$`
-(`1h30m`, `3m0s`, `90m0s` fell through to None: a silent skip of the check that read them, #124 N-7/N-8).
+(the CRD pattern `^(([0-9]+(s|m|h))+)|(Never)$`, kubernetes-sigs/karpenter pkg/apis/v1/nodepool.go:65,213@v1.0.0); callers map that themselves. Before this module `esoctl` and `argocdctl` accepted only `^\\d+[smh]$` (`1h30m`, `3m0s`, `90m0s` fell through
+to None: a silent skip of the check that read them, #124 N-7/N-8) and `scaling` kept a third regex of its own.
 """
 
 from __future__ import annotations

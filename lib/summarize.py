@@ -374,14 +374,14 @@ def summarize_webhooks(snap: Path) -> dict:
     }
 
 
-def summarize_recent_changes(snap: Path, hours: int = 24) -> dict:
+def summarize_recent_changes(snap: Path, hours: int = 24, now: _dt.datetime | None = None) -> dict:
     """`recent_changes` of summary.json, read in every mode: workloads changed in the last N hours. A Deployment's change time is the `lastUpdateTime` of its
     conditions (the Progressing condition is refreshed on every rollout: kubernetes/kubernetes pkg/controller/deployment/progress.go:36@v1.37.2 `syncRolloutStatus`). StatefulSets and
     DaemonSets declare `status.conditions` but no controller writes them (0 writers in pkg/controller/statefulset and pkg/controller/daemon at v1.30.14 and v1.37.2;
     #124 K2-1), so their change time is the `creationTimestamp` of the newest ControllerRevision they own (the controllers create one per template change:
     pkg/controller/history/controller_history.go:293@v1.37.2 `CreateControllerRevision`). The targets of ScalingReplicaSet/SuccessfulCreate events are listed too; generation is recorded."""
     odir = snap / "objects"
-    since = _dt.datetime.now(_dt.UTC) - _dt.timedelta(hours=hours)
+    since = (now or _dt.datetime.now(_dt.UTC)) - _dt.timedelta(hours=hours)
     changed: list[dict] = []
     revisions: dict[tuple[str, str, str], _dt.datetime] = {}  # (owner kind, namespace, owner name) -> newest ControllerRevision creation
     for cr in items(load_json(odir / "controllerrevisions.apps.json")):

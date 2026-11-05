@@ -163,7 +163,7 @@ def test_statefulset_change_time_comes_from_its_newest_controller_revision(tmp_p
         ],
     )
     _write(tmp_path, "events", [], folder="")
-    out = summarize.summarize_recent_changes(tmp_path)
+    out = summarize.summarize_recent_changes(tmp_path, now=NOW)
     assert [(w["kind"], w["name"], w["last_update"]) for w in out["workloads"]] == [("StatefulSet", "db", recent)]
 
 
@@ -475,9 +475,9 @@ def test_vpc_cni_booleans_parse_like_strconv_parsebool_and_warm_prefix_defaults_
             }
         ]
 
-    _write(tmp_path, "daemonsets", ds({"ENABLE_PREFIX_DELEGATION": "1", "AWS_VPC_K8S_CNI_EXTERNALSNAT": "T", "ENABLE_POD_ENI": "nonsense"}))
+    _write(tmp_path, "daemonsets", ds({"ENABLE_PREFIX_DELEGATION": "1", "AWS_VPC_K8S_CNI_EXTERNALSNAT": "T", "ENABLE_POD_ENI": "nonsense", "AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG": "tRue"}))
     st = vpccni._settings(tmp_path)
-    assert st["prefix_delegation"] is True and st["external_snat"] is True and st["pod_eni"] is False and st["warm_prefix_target"] == 0
+    assert st["prefix_delegation"] is True and st["external_snat"] is True and st["pod_eni"] is False and st["custom_networking"] is False and st["warm_prefix_target"] == 0
     _write(tmp_path, "daemonsets", ds({"WARM_PREFIX_TARGET": "1", "ENABLE_PREFIX_DELEGATION": "false"}))
     st = vpccni._settings(tmp_path)
     assert st["prefix_delegation"] is False and st["warm_prefix_target"] == 1

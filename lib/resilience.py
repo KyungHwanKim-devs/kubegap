@@ -431,7 +431,7 @@ def _graceful(cx: _Ctx) -> dict:
                 "readiness_gate": ns_gate.get(o["metadata"]["namespace"]),
                 "replicas": (o.get("spec") or {}).get("replicas"),
                 "strategy": ((o.get("spec") or {}).get("strategy") or {}).get("type") or ((o.get("spec") or {}).get("updateStrategy") or {}).get("type"),
-                # Deployments carry `spec.strategy`, StatefulSets and DaemonSets `spec.updateStrategy` (kubernetes/kubernetes staging/src/k8s.io/api/apps/v1/types.go:130,145@v1.37.2) (#124 K1-3)
+                # Deployments carry `spec.strategy`, StatefulSets and DaemonSets `spec.updateStrategy` (kubernetes/kubernetes staging/src/k8s.io/api/apps/v1/types.go:436,268,715@v1.37.2) (#124 K1-3)
                 "max_unavailable": ((((o.get("spec") or {}).get("strategy") or (o.get("spec") or {}).get("updateStrategy") or {}).get("rollingUpdate") or {}).get("maxUnavailable")),
             }
         )
@@ -1156,7 +1156,7 @@ OFFSITE_RE = re.compile(r"(s3://|s3\.|aws s3|rclone|restic|gs://|gsutil|b2 |back
 
 def _field_match(f: dict, node: dict) -> bool:
     """`matchFields` of a node selector term: the only field key the scheduler supports is `metadata.name` (kubernetes/kubernetes
-    staging/src/k8s.io/component-helpers/scheduling/corev1/nodeaffinity/nodeaffinity.go:126-134@v1.37.2), compared with the node's name, not its labels (#124 K1-5)."""
+    staging/src/k8s.io/component-helpers/scheduling/corev1/nodeaffinity/nodeaffinity.go:159,180-182@v1.37.2), compared with the node's name, not its labels (#124 K1-5)."""
     if f.get("operator") != "In":
         return True
     value = node["metadata"].get("name") if f.get("key") == "metadata.name" else None

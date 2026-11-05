@@ -62,7 +62,7 @@ SYSTEM_NS = {
     "polaris",
 }
 CI_NS_RE = re.compile(r"(runner|^ci$|^ci-|-ci$|jenkins|tekton|drone|buildkit|gitlab|woodpecker|argo-workflows|^arc-runners)", re.IGNORECASE)
-# pod owners of the CI controllers: gha-runner-scale-set pods are owned by EphemeralRunner (actions/actions-runner-controller controllers/actions.github.com/ephemeralrunner_controller.go@gha-runner-scale-set-0.15.1),
+# pod owners of the CI controllers: gha-runner-scale-set pods are owned by EphemeralRunner (actions/actions-runner-controller controllers/actions.github.com/resourcebuilder.go:935@gha-runner-scale-set-0.15.1),
 # summerwind runner pods by Runner (controllers/actions.summerwind.net/runner_controller.go:418@v0.27.6); a KEDA ScaledJob owns Jobs, never pods (kedacore/keda pkg/scaling/executor/scale_jobs.go:221@v2.21.0) (#124 N-6)
 CI_OWNER_KINDS = {"EphemeralRunner", "EphemeralRunnerSet", "AutoscalingRunnerSet", "AutoscalingListener", "Runner", "RunnerDeployment", "RunnerReplicaSet", "RunnerSet", "PipelineRun", "TaskRun"}
 NODE_TOLERATION_PREFIX = ("node.kubernetes.io/", "node.cloudprovider.kubernetes.io/", "kubernetes.io/", "CriticalAddonsOnly")
