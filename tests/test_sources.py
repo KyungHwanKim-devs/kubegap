@@ -12,7 +12,7 @@ from lib import paths, signatures, yamlite
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "references" / "sources.md"
-CITATION = re.compile(r"(?:[\w./-]+\.(?:go|py|rego|toml|yaml|yml|txt|pdf|md|adoc|tpl|json|ini|sh|c|h|java|properties|gradle)|(?:[\w./-]+/)?(?:Makefile(?:\.common)?|Dockerfile)):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+")
+CITATION = re.compile(r"(?:[\w./-]+\.(?:go|py|rego|toml|yaml|yml|txt|pdf|md|adoc|tpl|json|ini|sh|c|h|java|properties|gradle|proto)|(?:[\w./-]+/)?(?:Makefile(?:\.common)?|Dockerfile)):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+")
 KUBEGAP_LOCATION = re.compile(r"`(lib/[\w/]+\.py)(?::(\w+))?`|step `([\w.-]+)`|check `([\w.-]+)`|`([A-Za-z_]\w*)`")
 
 
@@ -553,3 +553,166 @@ def test_every_component_rule_entry_cites_the_chart_or_manifest():
         for e in comp["any"]:
             src = str(e.get("source") or "")
             assert CITATION.search(src) or src.startswith("unverified"), (comp["name"], e)
+
+
+# ---------- Kubernetes object fields the summaries read (#124): the `| Kind | Field | kubegap | ... |` tables ----------
+
+OBJECT_FIELD_MODULES = [
+    "resilience",
+    "events",
+    "logs",
+    "podmetrics",
+    "kubeproxy",
+    "metallbctl",
+    "coredns",
+    "hygiene",
+    "summarize",
+    "security",
+    "diff",
+    "evaluate",
+    "collect",
+    "discover",
+    "setup",
+    "storage",
+    "ebscsi",
+    "localpath",
+    "k3s",
+    "traffic",
+    "stackhealth",
+    "nodeos",
+    "scaling",
+    "karpenterctl",
+    "albctl",
+    "vpccni",
+    "kedactl",
+    "certmanager",
+    "esoctl",
+    "argocdctl",
+    "tenancy",
+]
+# camelCase string keys these modules read that are not Kubernetes object fields: tool outputs (#119), store APIs (#126), AWS API responses (#125), DNS, HTTP and kubegap's own
+NOT_OBJECT_FIELD_KEYS: dict[str, str] = {
+    **dict.fromkeys(
+        (
+            "addonVersion",
+            "addonVersions",
+            "insightStatus",
+            "kubernetesVersion",
+            "keyArn",
+            "encryptionConfig",
+            "clusterVersion",
+            "defaultVersion",
+            "clusterVersions",
+            "endOfStandardSupportDate",
+            "publicAccessCidrs",
+            "vpcId",
+            "platformVersion",
+            "accessConfig",
+            "supportType",
+            "clusterSecurityGroupId",
+            "endpointPrivateAccess",
+            "securityGroupIds",
+            "upgradePolicy",
+            "authenticationMode",
+            "createdAt",
+            "endpointPublicAccess",
+            "subnetIds",
+            "resourcesVpcConfig",
+            "clusterLogging",
+            "serviceAccountRoleArn",
+        ),
+        "EKS describe-cluster / describe-addon / describe-addon-versions / list-insights response (AWS API, #125)",
+    ),
+    "repositoryName": "ECR describe-repositories response (AWS API, #125)",
+    "serviceAccount": "EKS list-pod-identity-associations response `associations[].serviceAccount` (AWS API, #125)",
+    **dict.fromkeys(
+        (
+            "headStats",
+            "chunkCount",
+            "versionInfo",
+            "labelValueCountByLabelName",
+            "lastConfigTime",
+            "reloadConfigSuccess",
+            "numLabelPairs",
+            "numSeries",
+            "corruptionCount",
+            "seriesCountByMetricName",
+            "activeTargets",
+            "droppedTargets",
+            "lastError",
+            "scrapeInterval",
+        ),
+        "Prometheus /api/v1/status/tsdb, /status/runtimeinfo, /status/buildinfo and /targets response keys (store API, #126)",
+    ),
+}
+
+
+def _field_rows():
+    """Rows of the `| Kind | Field | kubegap | Assumes | Source | Setter / default | Holds for / verdict |` tables of the #124 section."""
+    rows = []
+    ours = False
+    for ln in SOURCES.read_text(encoding="utf-8").splitlines():
+        if ln.startswith("| Kind | Field |"):
+            ours = True
+        elif ln.startswith("| ") and not ln.startswith("|---"):
+            if ours:
+                cells = [c.strip() for c in ln.strip().strip("|").split("|")]
+                if len(cells) == 7:
+                    rows.append(cells)
+        elif not ln.startswith("|"):
+            ours = False
+    return rows
+
+
+def test_every_object_field_row_cites_the_type_or_says_unverified():
+    rows = _field_rows()
+    assert len(rows) >= 900
+    for kind, field, _where, _assumes, source, setter, _verdict in rows:
+        assert CITATION.search(source) or source.startswith("**unverified") or (source == "-" and CITATION.search(setter)), (kind, field, source[:120])  # a semantics row cites the setter only
+        assert setter in ("-", "") or CITATION.search(setter) or "unverified" in setter, (kind, field, setter[:120])
+
+
+def test_every_object_field_location_exists():
+    lib_texts = {f.name: f.read_text(encoding="utf-8") for f in (ROOT / "lib").glob("*.py")}
+    seen = 0
+    for kind, field, where, *_ in _field_rows():
+        for m in re.finditer(r"`(lib/(\w+\.py))(?::(\w+))?`", where):
+            seen += 1
+            _path, name, func = m.groups()
+            assert name in lib_texts, (kind, field, name)
+            assert not func or f"def {func}(" in lib_texts[name], (kind, field, name, func, "no such function in that module")
+    assert seen >= 900
+
+
+def _camel_keys(module: str) -> set[str]:
+    """String-literal keys read with .get("k"), ["k"] or `"k" in x` that carry an upper-case letter and no separator: the camelCase of a Kubernetes field."""
+    import ast
+
+    tree = ast.parse((ROOT / "lib" / f"{module}.py").read_text(encoding="utf-8"))
+    keys = set()
+    for node in ast.walk(tree):
+        k = None
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get" and node.args and isinstance(node.args[0], ast.Constant):
+            k = node.args[0].value
+        elif isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Constant):
+            k = node.slice.value
+        elif isinstance(node, ast.Compare) and isinstance(node.left, ast.Constant) and any(isinstance(op, (ast.In, ast.NotIn)) for op in node.ops):
+            k = node.left.value
+        if isinstance(k, str) and re.fullmatch(r"[a-z][a-zA-Z0-9]*", k) and k != k.lower():
+            keys.add(k)
+    return keys
+
+
+def test_every_camel_case_key_the_summaries_read_is_documented():
+    """A camelCase key a summary module reads from an object is in a row of references/sources.md (any section: the tool-output, store-API and field tables),
+    or is listed in NOT_OBJECT_FIELD_KEYS with the reason it is not an object field. A new field read from memory fails here until its type line is cited."""
+    text = SOURCES.read_text(encoding="utf-8")
+    missing = {}
+    for module in OBJECT_FIELD_MODULES:
+        for k in _camel_keys(module):
+            if k in NOT_OBJECT_FIELD_KEYS:
+                continue
+            if re.search(rf"\b{k}\b", text):
+                continue
+            missing.setdefault(k, []).append(module)
+    assert not missing, f"keys read with no row in references/sources.md (cite the type line, or list under NOT_OBJECT_FIELD_KEYS with a reason): {missing}"
