@@ -357,8 +357,8 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
                 "has_limits": bool((sp.get("limits") or {}).get("cpu")),
                 "consolidation_policy": dis.get("consolidationPolicy"),
                 "consolidate_after": dis.get("consolidateAfter"),
-                "expire_after": dis.get("expireAfter"),
-                "expire_after_h": _dur_h(dis.get("expireAfter")),
+                "expire_after": expire_after,
+                "expire_after_h": _dur_h(expire_after),
                 "budgets": dis.get("budgets"),
                 "capacity_types": reqs.get("karpenter.sh/capacity-type"),
                 "archs": reqs.get("kubernetes.io/arch"),
@@ -402,7 +402,9 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
                 "registered_s": secs("Registered"),
                 "initialized_s": secs("Initialized"),
                 "ready": (conds.get("Ready") or {}).get("status") == "True",
-                "expired": (conds.get("Expired") or {}).get("status") == "True",
+                # the `Expired` condition exists at v1beta1 only (kubernetes-sigs/karpenter pkg/apis/v1beta1/nodeclaim_status.go:30@v0.37.0); from 1.0.0 expiration is a timer on the NodeClaim
+                # (pkg/controllers/nodeclaim/expiration/controller.go:51-54@v1.0.0), so past the pool's expireAfter counts as expired there (#124 O-2)
+                "expired": (conds.get("Expired") or {}).get("status") == "True" or (c.get("apiVersion") != "karpenter.sh/v1beta1" and exp_h is not None and age_h is not None and age_h > exp_h),
                 "drifted": (conds.get("Drifted") or {}).get("status") == "True",
                 "expire_after_h": exp_h,
                 "hours_past_expiry": round(age_h - exp_h, 1) if (age_h is not None and exp_h) and age_h > exp_h else None,
