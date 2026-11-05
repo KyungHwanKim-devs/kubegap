@@ -149,8 +149,8 @@ def test_pv_node_pin_accepts_a_custom_affinity_key():
 
 
 def test_statefulset_change_time_comes_from_its_newest_controller_revision(tmp_path):
-    recent = (dt.datetime.now(dt.UTC) - dt.timedelta(hours=2)).isoformat(timespec="seconds")
-    old = (dt.datetime.now(dt.UTC) - dt.timedelta(days=9)).isoformat(timespec="seconds")
+    recent = (NOW - dt.timedelta(hours=2)).isoformat(timespec="seconds")
+    old = (NOW - dt.timedelta(days=9)).isoformat(timespec="seconds")
     _write(tmp_path, "deployments", [])
     _write(tmp_path, "daemonsets", [])
     _write(tmp_path, "statefulsets", [{"metadata": {"namespace": "p", "name": "db", "generation": 4}, "status": {"observedGeneration": 4}}])
@@ -180,14 +180,14 @@ def test_pvc_unused_counts_from_the_start_ordinal(tmp_path):
 
 
 def test_templating_recognises_the_default_argocd_label_and_the_eks_component_label(tmp_path):
-    _write(tmp_path, "applications.argoproj.io", [{"metadata": {"namespace": "argocd", "name": "shop"}}])
+    _write(tmp_path, "applications.argoproj.io", [{"metadata": {"namespace": "argocd", "name": "shop"}, "status": {"resources": [{"kind": "Deployment", "namespace": "prod", "name": "shop-api"}]}}])
     _write(
         tmp_path,
         "deployments",
         [
             {"metadata": {"namespace": "prod", "name": "shop-api", "labels": {"app.kubernetes.io/instance": "shop"}, "annotations": {}}, "spec": {"template": {"spec": {"containers": []}}}},
             {"metadata": {"namespace": "ops", "name": "ebs-csi-controller", "labels": {"eks.amazonaws.com/component": "ebs-csi-controller"}, "annotations": {}}, "spec": {"template": {"spec": {"containers": []}}}},
-            {"metadata": {"namespace": "prod", "name": "loose", "labels": {"app.kubernetes.io/instance": "not-an-app"}, "annotations": {}}, "spec": {"template": {"spec": {"containers": []}}}},
+            {"metadata": {"namespace": "prod", "name": "loose", "labels": {"app.kubernetes.io/instance": "shop"}, "annotations": {}}, "spec": {"template": {"spec": {"containers": []}}}},
         ],
     )
     for stem in ("statefulsets", "daemonsets", "cronjobs", "pods"):

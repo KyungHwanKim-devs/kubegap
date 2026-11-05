@@ -99,7 +99,9 @@ class _Ctx:
             for o in objects(snap, stem):
                 self.workloads.append((kind, o))
         self.pods = objects(snap, "pods")
-        self.argo_apps = {a["metadata"]["name"] for a in objects(snap, "applications.argoproj.io")}  # for the default Argo CD label tracking (#124 K2-5)
+        self.argo_apps = objects(snap, "applications.argoproj.io")
+        # what Argo CD manages, whatever its tracking method: Application status.resources (argoproj/argo-cd pkg/apis/application/v1alpha1/types.go:1018@v2.13.0, :1151@v3.6.1) (#124 K2-5)
+        self.argo_managed = {((r.get("kind") or "").lower(), r.get("namespace"), r.get("name")) for a in self.argo_apps for r in (a.get("status") or {}).get("resources") or []}
 
     @staticmethod
     def tpl(kind, o) -> dict:
@@ -688,9 +690,9 @@ def _templating(cx: _Ctx) -> dict:
         managed = None
         if labels.get("app.kubernetes.io/managed-by") == "Helm" or any(k.startswith("meta.helm.sh/") for k in ann):
             managed = "helm"
-        # Argo CD's default tracking is the label `app.kubernetes.io/instance` = application name (argoproj/argo-cd common/common.go:161@v2.13.0, :190@v3.6.1); `argocd.argoproj.io/instance`
-        # is the configured alternative and the annotation is the annotation-tracking method (#124 K2-5)
-        if "argocd.argoproj.io/tracking-id" in ann or "argocd.argoproj.io/instance" in labels or labels.get("app.kubernetes.io/instance") in cx.argo_apps:
+        # Argo CD's default tracking is the label `app.kubernetes.io/instance` = application name (argoproj/argo-cd common/common.go:161@v2.13.0, :190@v3.6.1), which Helm releases also set, so a
+        # workload counts as Argo-managed when an Application lists it in status.resources; the configured `argocd.argoproj.io/instance` label and the tracking annotation are exact on their own (#124 K2-5)
+        if "argocd.argoproj.io/tracking-id" in ann or "argocd.argoproj.io/instance" in labels or (kind.lower(), md["namespace"], md["name"]) in cx.argo_managed:
             managed = "argocd" + ("+helm" if managed == "helm" else "")
         if any(k.startswith(("kustomize.toolkit.fluxcd.io/", "helm.toolkit.fluxcd.io/")) for k in labels):
             managed = "flux"
@@ -698,7 +700,7 @@ def _templating(cx: _Ctx) -> dict:
         if labels.get("app.kubernetes.io/managed-by") in ("eks", "EKS") or "eks.amazonaws.com/component" in labels or md["namespace"] == "kube-system":
             managed = managed or "platform"
         rows.append({"workload": cx.key(kind, o), "namespace": md["namespace"], "prod": md["namespace"] in cx.prod, "managed_by": managed, "last_applied": "kubectl.kubernetes.io/last-applied-configuration" in ann})
-    apps = objects(cx.snap, "applications.argoproj.io")
+    apps = cx.argo_apps
     return {
         "workloads": len(rows),
         "by_manager": dict(Counter(r["managed_by"] or "none" for r in rows)),
