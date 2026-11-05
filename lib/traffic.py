@@ -17,6 +17,7 @@ from pathlib import Path
 
 from . import versions as _versions  # `versions` is a local name in this module
 from .controlplane import workload_of
+from .events import count_of
 from .snapshot import load_json, objects
 
 ADMIN_HOST_RE = re.compile(r"(^|[.-])(admin|grafana|argocd|argo|deploy|kibana|prometheus|alertmanager|minio|registry|pgadmin|phpmyadmin|console|dashboard|jenkins|vault|keycloak|portainer|longhorn|traefik)([.-]|$)", re.IGNORECASE)
@@ -27,6 +28,7 @@ AUTH_ANN = (
     "nginx.ingress.kubernetes.io/auth-type",
     "nginx.ingress.kubernetes.io/auth-tls-secret",
     "nginx.ingress.kubernetes.io/whitelist-source-range",
+    "nginx.ingress.kubernetes.io/allowlist-source-range",  # the current name; whitelist-source-range is its deprecated alias (kubernetes/ingress-nginx internal/ingress/annotations/ipallowlist/main.go:34-35@controller-v1.12.1) (#124 K3-3)
     "nginx.ingress.kubernetes.io/auth-signin",
     "traefik.ingress.kubernetes.io/router.middlewares",
     "ingress.kubernetes.io/auth-type",
@@ -75,7 +77,13 @@ class _Objects:
         self.tgb = {}
         for t in objects(snap, "targetgroupbindings.elbv2.k8s.aws"):
             sp = t.get("spec") or {}
-            self.tgb[sp.get("targetGroupARN")] = {"namespace": t["metadata"]["namespace"], "service": (sp.get("serviceRef") or {}).get("name"), "port": (sp.get("serviceRef") or {}).get("port"), "target_type": sp.get("targetType")}
+            rec = {"namespace": t["metadata"]["namespace"], "service": (sp.get("serviceRef") or {}).get("name"), "port": (sp.get("serviceRef") or {}).get("port"), "target_type": sp.get("targetType")}
+            # `spec.targetGroupARN` is optional from aws-load-balancer-controller 3.0.0, where `spec.targetGroupName` may name the group instead and the controller never writes the ARN back
+            # (kubernetes-sigs/aws-load-balancer-controller apis/elbv2/v1beta1/targetgroupbinding_types.go:129,133@v3.6.2); keyed by both (#124 K3-4)
+            if sp.get("targetGroupARN"):
+                self.tgb[sp["targetGroupARN"]] = rec
+            if sp.get("targetGroupName"):
+                self.tgb["name:" + sp["targetGroupName"]] = rec
         self.endpoints_ready = {}
         for es in objects(snap, "endpointslices.discovery.k8s.io"):
             svc = (es["metadata"].get("labels") or {}).get("kubernetes.io/service-name")
@@ -259,7 +267,7 @@ def _alb(snap: Path, objs: _Objects) -> dict:
         def g(k, f="sum"):
             return (m.get(k) or {}).get(f)
 
-        b = objs.tgb.get(tg["arn"]) or {}
+        b = objs.tgb.get(tg["arn"]) or objs.tgb.get("name:" + str(tg.get("name"))) or {}
         wls = objs.backend_workloads(b.get("namespace"), b.get("service")) if b else []
         req = g("RequestCount_Sum")
         grace = min((w["grace_s"] for w in wls), default=None)
@@ -600,7 +608,7 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
         if e.get("reason") == "Unhealthy":
             io = e.get("involvedObject") or {}
             if io.get("kind") == "Pod":
-                unhealthy[_wl(io.get("namespace", ""), io.get("name", ""))] += int(e.get("count") or 1)
+                unhealthy[_wl(io.get("namespace", ""), io.get("name", ""))] += count_of(e)
     by_wl: dict[str, list] = defaultdict(list)
     for lab, v in _metric_rows(snap, "pod_ready_ratio_24h"):
         ns, pod = lab.get("namespace"), lab.get("pod")
@@ -808,11 +816,12 @@ def alb_covered_services(snap: Path) -> set[tuple[str, str]]:
     if not d:
         return set()
     tgm = (d.get("metrics") or {}).get("tg", {})
+    dim_by_name = {tg.get("name"): tg.get("dim") for tg in d.get("target_groups") or [] if tg.get("name")}
     out = set()
     for t in objects(snap, "targetgroupbindings.elbv2.k8s.aws"):
         sp = t.get("spec") or {}
         arn = sp.get("targetGroupARN") or ""
-        dim = arn.split(":", 5)[5] if arn.count(":") >= 5 else arn
+        dim = (arn.split(":", 5)[5] if arn.count(":") >= 5 else arn) or dim_by_name.get(sp.get("targetGroupName"))  # a name-only binding (controller 3.x, #124 K3-4)
         if (tgm.get(dim) or {}).get("RequestCount_Sum", {}).get("points"):
             out.add((t["metadata"]["namespace"], (sp.get("serviceRef") or {}).get("name")))
     return out

@@ -15,6 +15,7 @@ import datetime as _dt
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from .events import count_of
 from .snapshot import load_json, objects
 
 DB_HINT = ("postgres", "mysql", "mariadb", "mongo", "redis", "neo4j", "elastic", "kafka", "minio", "qdrant", "clickhouse", "influx", "etcd", "db", "data")
@@ -183,7 +184,7 @@ def _attach(snap: Path) -> dict:
     for e in (load_json(snap / "events.json") or {}).get("items") or []:
         r = e.get("reason")
         if r in ("FailedAttachVolume", "FailedMount", "ProvisioningFailed", "VolumeResizeFailed", "FailedBinding", "VolumeFailedDelete"):
-            ev_counts[r] += int(e.get("count") or 1)
+            ev_counts[r] += count_of(e)
             ev_samples.setdefault(r, f"{(e.get('involvedObject') or {}).get('namespace')}/{(e.get('involvedObject') or {}).get('name')}: {(e.get('message') or '')[:140]}")
     return {
         "nodes": attach_rows,

@@ -30,7 +30,8 @@ def _ver(image: str | None):
 
 
 def _conds(obj) -> dict:
-    return {c.get("type"): (c.get("status"), c.get("reason"), (c.get("message") or "")[:160]) for c in (obj.get("status") or {}).get("conditions") or []}
+    """type -> (status, reason, message, lastTransitionTime) of `status.conditions` (cert-manager/cert-manager pkg/apis/certmanager/v1/types_certificate.go:580-600@v1.14.4)."""
+    return {c.get("type"): (c.get("status"), c.get("reason"), (c.get("message") or "")[:160], c.get("lastTransitionTime")) for c in (obj.get("status") or {}).get("conditions") or []}
 
 
 def analyze(snap: Path, inv: dict | None) -> dict:
@@ -85,8 +86,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         ns, name = o["metadata"]["namespace"], o["metadata"]["name"]
         sp, st = o.get("spec") or {}, o.get("status") or {}
         c = _conds(o)
-        ready = c.get("Ready", (None, None, None))
-        issuing = c.get("Issuing", (None, None, None))
+        ready = c.get("Ready", (None, None, None, None))
+        issuing = c.get("Issuing", (None, None, None, None))
+        issuing_since = _ts(issuing[3]) if issuing[0] == "True" else None
         na, rt = _ts(st.get("notAfter")), _ts(st.get("renewalTime"))
         days = round((na - now).total_seconds() / 86400, 1) if na else None
         renew_overdue_h = round((now - rt).total_seconds() / 3600, 1) if rt and now > rt else None
@@ -110,6 +112,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "issuing": issuing[0] == "True",
                 "issuing_reason": issuing[1],
                 "issuing_message": issuing[2],
+                "issuing_h": round((now - issuing_since).total_seconds() / 3600, 1) if issuing_since and now > issuing_since else None,
                 "not_after": (st.get("notAfter") or "")[:10],
                 "days_to_expiry": days,
                 "renewal_time": (st.get("renewalTime") or "")[:10],
@@ -121,12 +124,21 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         )
     # --- requests, orders, challenges
     crs = objects(snap, "certificaterequests.cert-manager.io")
-    cr_failed = [f"{o['metadata']['namespace']}/{o['metadata']['name']}({_conds(o).get('Ready', (None, None))[1]})" for o in crs if _conds(o).get("Ready", (None,))[0] == "False"]
+    # Ready=False with reason Pending is every request in flight (cert-manager/cert-manager pkg/controller/certificaterequests/util/reporter.go:102-103@v1.14.4); only Failed and Denied are terminal
+    # (pkg/apis/certmanager/v1/types_certificaterequest.go:32,42@v1.14.4) (#124 N-3)
+    cr_failed = [f"{o['metadata']['namespace']}/{o['metadata']['name']}({_conds(o).get('Ready', (None, None))[1]})" for o in crs if _conds(o).get("Ready", (None, None))[:2] in (("False", "Failed"), ("False", "Denied"))]
+    cr_pending_old = [
+        f"{o['metadata']['namespace']}/{o['metadata']['name']}"
+        for o in crs
+        if _conds(o).get("Ready", (None, None))[:2] == ("False", "Pending") and _ts(o["metadata"].get("creationTimestamp")) and (now - _ts(o["metadata"]["creationTimestamp"])).total_seconds() > 3600
+    ]
     cr_denied = [f"{o['metadata']['namespace']}/{o['metadata']['name']}" for o in crs if _conds(o).get("Denied", (None,))[0] == "True"]
     orders = objects(snap, "orders.acme.cert-manager.io")
     order_state = Counter((o.get("status") or {}).get("state") or "none" for o in orders)
     orders_bad = [
-        f"{o['metadata']['namespace']}/{o['metadata']['name']}({(o.get('status') or {}).get('state')}: {((o.get('status') or {}).get('reason') or '')[:100]})" for o in orders if (o.get("status") or {}).get("state") in ("errored", "invalid")
+        f"{o['metadata']['namespace']}/{o['metadata']['name']}({(o.get('status') or {}).get('state')}: {((o.get('status') or {}).get('reason') or '')[:100]})"
+        for o in orders
+        if (o.get("status") or {}).get("state") in ("errored", "invalid", "expired")
     ]
     orders_pending_old = [
         f"{o['metadata']['namespace']}/{o['metadata']['name']}"
@@ -206,7 +218,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "expired": [r["target"] for r in rows if (r["days_to_expiry"] or 99) <= 0],
         "min_days_to_expiry": min([r["days_to_expiry"] for r in rows if r["days_to_expiry"] is not None], default=None),
         "renewal_overdue": [(r["target"], r["renewal_overdue_h"]) for r in rows if (r["renewal_overdue_h"] or 0) > 24],
-        "issuing_stuck": [f"{r['target']}({r['issuing_reason']}: {r['issuing_message'][:80]})" for r in rows if r["issuing"] and not r["ready"]],
+        # Issuing=True with Ready=False is the normal state of every Certificate for the seconds of an issuance; stuck means the Issuing condition is older than an hour (#124 N-10)
+        "issuing_stuck": [f"{r['target']}({r['issuing_reason']}: {r['issuing_message'][:80]})" for r in rows if r["issuing"] and not r["ready"] and (r["issuing_h"] or 0) >= 1],
         "staging_certs": [r["target"] for r in rows if r["issuer_staging"]],
         "staging_certs_prod": [r["target"] for r in rows if r["issuer_staging"] and r["prod"]],
         "issuers": len(issuers),
@@ -216,6 +229,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "solvers": sorted({s for i in issuers for s in i["solvers"]}),
         "certificaterequests": len(crs),
         "certificaterequests_failed": cr_failed[:10],
+        "certificaterequests_pending_old": cr_pending_old[:10],
         "certificaterequests_denied": cr_denied[:10],
         "orders": len(orders),
         "orders_by_state": dict(order_state),

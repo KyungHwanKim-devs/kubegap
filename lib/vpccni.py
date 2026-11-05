@@ -19,6 +19,7 @@ from pathlib import Path
 
 from . import versions
 from .controlplane import workload_of  # noqa: F401  (used by the report to map pod -> workload name)
+from .events import count_of
 from .snapshot import load_json, objects
 
 METRIC_RE = re.compile(r"^(awscni_[a-z0-9_]+)(\{([^}]*)\})?\s+([0-9.eE+-]+)\s*$")
@@ -77,7 +78,10 @@ def _settings(snap: Path) -> dict:
         latest = None
 
     def flag(name, default="false"):
-        return str(env.get(name, default)).lower() == "true"
+        # the CNI reads its booleans with strconv.ParseBool (aws/amazon-vpc-cni-k8s utils/utils.go:12-22@v1.19.0): 1, t, T, TRUE, true, True are on; anything unparsable is the default (#124 O-6)
+        on, off = ("1", "t", "T", "TRUE", "true", "True"), ("0", "f", "F", "FALSE", "false", "False")
+        v = str(env.get(name, default))
+        return v in on if v in on + off else str(default) in on
 
     netpol = next((a.split("=", 1)[1] for a in nodeagent_args if a.startswith("--enable-network-policy=")), None)
     return {
@@ -98,7 +102,7 @@ def _settings(snap: Path) -> dict:
         "warm_eni_target": _q(env.get("WARM_ENI_TARGET", "1")),
         "warm_ip_target": _q(env["WARM_IP_TARGET"]) if env.get("WARM_IP_TARGET") else None,
         "minimum_ip_target": _q(env["MINIMUM_IP_TARGET"]) if env.get("MINIMUM_IP_TARGET") else None,
-        "warm_prefix_target": _q(env.get("WARM_PREFIX_TARGET", "1")),
+        "warm_prefix_target": _q(env.get("WARM_PREFIX_TARGET", "0")),  # ipamd's default when the variable is unset is 0 (aws/amazon-vpc-cni-k8s pkg/ipamd/ipamd.go:150@v1.19.0, :153@v1.23.2); the chart sets 1 (#124 O-5)
         "custom_networking": flag("AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG"),
         "pod_eni": flag("ENABLE_POD_ENI"),
         "ipv6": flag("ENABLE_IPv6"),
@@ -351,7 +355,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     sandbox = 0
     for e in (load_json(snap / "events.json") or {}).get("items") or []:
         if e.get("reason") == "FailedCreatePodSandBox":
-            sandbox += int(e.get("count") or 1)
+            sandbox += count_of(e)
     # warm pool: with only WARM_ENI_TARGET and no WARM_IP_TARGET, one whole ENI (= per_eni - 1 IPs) is kept empty on every node
     per_node_reserve = None
     if not st["prefix_delegation"] and st["warm_ip_target"] is None and st["warm_eni_target"] >= 1:

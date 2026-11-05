@@ -26,7 +26,8 @@ from typing import ClassVar
 from . import __version__, paths, rubric, versions
 from .config import Config
 from .resilience import is_db_like, mounts_pvc
-from .snapshot import items, load_json, write_private
+from .snapshot import load_json, write_private
+from .snapshot import objects as snapshot_objects
 
 SAFE_BUILTINS = {
     "len": len,
@@ -172,7 +173,7 @@ class Context:
     # ---- Objects ----
     def objects(self, file_stem: str) -> list:
         if file_stem not in self._objects:
-            self._objects[file_stem] = items(load_json(self.snap / "objects" / f"{file_stem}.json"))
+            self._objects[file_stem] = snapshot_objects(self.snap, file_stem)
         return self._objects[file_stem]
 
     def metric(self, qid: str) -> dict | None:
@@ -338,7 +339,7 @@ class Context:
         """There may be backup activity even without a backup tool: k3s etcd snapshot objects, CronJobs named backup/dump/snapshot, VolumeSnapshots."""
         etcd = self.objects("etcdsnapshotfiles.k3s.cattle.io")
         cron, stale = [], []
-        for c in self.objects("cronjobs.batch"):
+        for c in self.objects("cronjobs"):
             if not re.search(r"backup|dump|snapshot|archive", c["metadata"]["name"], re.IGNORECASE):
                 continue
             name = f"{c['metadata']['namespace']}/{c['metadata']['name']}"

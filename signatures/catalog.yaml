@@ -14,8 +14,8 @@
 # from collectors/kube-proxy/signatures.yaml. Every phrase was read in the component source at the versions named in references/sources.md (kubernetes v1.32.13 /
 # v1.33.5 / v1.37.2, containerd v1.7.29 / v2.1.5 / k3s v2.1.4-k3s1 / v2.4.2, k3s v1.33.5+k3s1 / v1.37.2+k3s1, flannel v0.27.0 / v0.28.10, metrics-server v0.8.0 / v0.9.1,
 # Go go1.24.13 / go1.24.6 / go1.26.10). `source:` names the logging call at each version.
-# The two journal collectors keep klog E/W lines, logrus/zap warn+error+fatal lines and, since kubegap 0.1.78, the klog I lines "Eviction manager: ",
-# "Container runtime network not ready" and "Probe failed"; every other I line never reaches logs/node/*/kubelet-24h.log or k3s-errors-24h.log.
+# The two journal collectors keep klog E/W lines, logrus/zap warn+error+fatal lines and, since kubegap 0.1.78, the klog I lines "Eviction manager: " and
+# "Container runtime network not ready" ("Probe failed" was tried and dropped: at --v=1 it prints once per failed probe); every other I line never reaches logs/node/*/kubelet-24h.log or k3s-errors-24h.log.
 # kubelet.system-oom was removed: both of its phrases are the SystemOOM Event (reason and message), which the events summary (lib/events.py TRACKED: SystemOOM, OOMKilling) already covers.
 - id: kubelet.pleg-not-healthy
   name: kubelet PLEG not healthy

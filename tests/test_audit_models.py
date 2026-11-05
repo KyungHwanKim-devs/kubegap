@@ -91,7 +91,7 @@ def test_backup_signals_count_only_live_cronjobs(tmp_path):
         {"metadata": {"namespace": "p", "name": "new-backup", "creationTimestamp": today.isoformat() + "T00:00:00Z"}, "spec": {}, "status": {}},
         {"metadata": {"namespace": "p", "name": "web"}, "spec": {}, "status": {}},
     ]
-    _write(tmp_path, "cronjobs.batch", crons)
+    _write(tmp_path, "cronjobs", crons)
     cx = Context(tmp_path, {}, {}, {"name": "prod"})
     sig = cx.backup_signals()
     assert sig["backup_cronjobs"] == ["p/pg-backup", "p/new-backup"]

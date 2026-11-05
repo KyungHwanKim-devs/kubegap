@@ -18,6 +18,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from .events import count_of
 from .snapshot import load_json, objects
 
 
@@ -186,7 +187,8 @@ def _storage_classes(snap: Path) -> list[dict]:
         prov = sc.get("provisioner")
         if prov not in ("ebs.csi.aws.com", "kubernetes.io/aws-ebs"):
             continue
-        params = sc.get("parameters") or {}
+        # the driver lower-cases every parameter key before reading it (kubernetes-sigs/aws-ebs-csi-driver pkg/driver/controller.go:133@v1.37.0, :142@v1.67.2; keys pkg/driver/constants.go:38-56@v1.37.0), so `Encrypted`/`KmsKeyId` count (#124 K3-2)
+        params = {str(k).lower(): v for k, v in (sc.get("parameters") or {}).items()}
         classes.append(
             {
                 "name": sc["metadata"]["name"],
@@ -194,7 +196,7 @@ def _storage_classes(snap: Path) -> list[dict]:
                 "default": (sc["metadata"].get("annotations") or {}).get("storageclass.kubernetes.io/is-default-class") == "true",
                 "type": params.get("type"),
                 "encrypted": str(params.get("encrypted", "")).lower() == "true",
-                "kms_key": params.get("kmsKeyId"),
+                "kms_key": params.get("kmskeyid"),
                 "iops": params.get("iops"),
                 "throughput": params.get("throughput"),
                 "allow_expansion": bool(sc.get("allowVolumeExpansion")),
@@ -249,8 +251,11 @@ def _events(snap: Path) -> Counter:
     ev_counts: Counter = Counter()
     for e in (load_json(snap / "events.json") or {}).get("items") or []:
         r = e.get("reason") or ""
-        if r in ("FailedAttachVolume", "FailedMount", "FailedMapVolume", "VolumeResizeFailed", "FileSystemResizeFailed", "ProvisioningFailed", "VolumeFailedDelete", "FailedDetachVolume", "ExternalExpanding"):
-            ev_counts[r] += int(e.get("count") or 1)
+        # ExternalExpanding is a Normal event while the resizer works and a Warning only on error (kubernetes/kubernetes pkg/controller/volume/expand/expand_controller.go:258,262,269@v1.37.2) (#124 K3-5)
+        if r in ("FailedAttachVolume", "FailedMount", "FailedMapVolume", "VolumeResizeFailed", "FileSystemResizeFailed", "ProvisioningFailed", "VolumeFailedDelete", "FailedDetachVolume") or (
+            r == "ExternalExpanding" and e.get("type") == "Warning"
+        ):
+            ev_counts[r] += count_of(e)
     return ev_counts
 
 

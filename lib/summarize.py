@@ -374,15 +374,28 @@ def summarize_webhooks(snap: Path) -> dict:
     }
 
 
-def summarize_recent_changes(snap: Path, hours: int = 24) -> dict:
-    """`recent_changes` of summary.json, read in every mode: workloads changed in the last N hours. Defined by the status.conditions lastUpdateTime of Deployments, StatefulSets and DaemonSets
-    (the Progressing condition is refreshed on every rollout), or by the targets of ScalingReplicaSet/SuccessfulCreate events. generation is recorded too."""
+def summarize_recent_changes(snap: Path, hours: int = 24, now: _dt.datetime | None = None) -> dict:
+    """`recent_changes` of summary.json, read in every mode: workloads changed in the last N hours. A Deployment's change time is the `lastUpdateTime` of its
+    conditions (the Progressing condition is refreshed on every rollout: kubernetes/kubernetes pkg/controller/deployment/progress.go:36@v1.37.2 `syncRolloutStatus`). StatefulSets and
+    DaemonSets declare `status.conditions` but no controller writes them (0 writers in pkg/controller/statefulset and pkg/controller/daemon at v1.30.14 and v1.37.2;
+    #124 K2-1), so their change time is the `creationTimestamp` of the newest ControllerRevision they own (the controllers create one per template change:
+    pkg/controller/history/controller_history.go:293@v1.37.2 `CreateControllerRevision`). The targets of ScalingReplicaSet/SuccessfulCreate events are listed too; generation is recorded."""
     odir = snap / "objects"
-    since = _dt.datetime.now(_dt.UTC) - _dt.timedelta(hours=hours)
+    since = (now or _dt.datetime.now(_dt.UTC)) - _dt.timedelta(hours=hours)
     changed: list[dict] = []
+    revisions: dict[tuple[str, str, str], _dt.datetime] = {}  # (owner kind, namespace, owner name) -> newest ControllerRevision creation
+    for cr in items(load_json(odir / "controllerrevisions.apps.json")):
+        for ref in cr["metadata"].get("ownerReferences") or []:
+            try:
+                dt = _dt.datetime.fromisoformat(cr["metadata"].get("creationTimestamp") or "")
+            except ValueError:
+                continue
+            k = (ref.get("kind"), cr["metadata"]["namespace"], ref.get("name"))
+            if k not in revisions or dt > revisions[k]:
+                revisions[k] = dt
     for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet")):
         for o in items(load_json(odir / f"{stem}.json")):
-            latest = None
+            latest = revisions.get((kind, o["metadata"]["namespace"], o["metadata"]["name"])) if kind != "Deployment" else None
             for cnd in (o.get("status") or {}).get("conditions") or []:
                 t = cnd.get("lastUpdateTime") or cnd.get("lastTransitionTime")
                 if t:
@@ -416,7 +429,7 @@ def summarize_recent_changes(snap: Path, hours: int = 24) -> dict:
                 ev_targets.append(f"{inv.get('kind')}/{inv.get('namespace')}/{inv.get('name')}")
     changed.sort(key=lambda r: r["last_update"], reverse=True)
     return {
-        "source": "objects/deployments.json, objects/statefulsets.json, objects/daemonsets.json, events.json",
+        "source": "objects/deployments.json, objects/statefulsets.json, objects/daemonsets.json, objects/controllerrevisions.apps.json, events.json",
         "hours": hours,
         "workloads": changed,
         "namespaces": sorted({c["namespace"] for c in changed}),

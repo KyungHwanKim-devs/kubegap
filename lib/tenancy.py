@@ -62,7 +62,9 @@ SYSTEM_NS = {
     "polaris",
 }
 CI_NS_RE = re.compile(r"(runner|^ci$|^ci-|-ci$|jenkins|tekton|drone|buildkit|gitlab|woodpecker|argo-workflows|^arc-runners)", re.IGNORECASE)
-CI_OWNER_KINDS = {"EphemeralRunner", "EphemeralRunnerSet", "AutoscalingRunnerSet", "AutoscalingListener", "RunnerDeployment", "RunnerSet", "ScaledJob", "PipelineRun", "TaskRun"}
+# pod owners of the CI controllers: gha-runner-scale-set pods are owned by EphemeralRunner (actions/actions-runner-controller controllers/actions.github.com/resourcebuilder.go:935@gha-runner-scale-set-0.15.1),
+# summerwind runner pods by Runner (controllers/actions.summerwind.net/runner_controller.go:418@v0.27.6); a KEDA ScaledJob owns Jobs, never pods (kedacore/keda pkg/scaling/executor/scale_jobs.go:221@v2.21.0) (#124 N-6)
+CI_OWNER_KINDS = {"EphemeralRunner", "EphemeralRunnerSet", "AutoscalingRunnerSet", "AutoscalingListener", "Runner", "RunnerDeployment", "RunnerReplicaSet", "RunnerSet", "PipelineRun", "TaskRun"}
 NODE_TOLERATION_PREFIX = ("node.kubernetes.io/", "node.cloudprovider.kubernetes.io/", "kubernetes.io/", "CriticalAddonsOnly")
 BROAD_ROLES = {"admin", "edit", "cluster-admin"}
 
@@ -131,7 +133,8 @@ def _requests(pod: dict) -> tuple[float, float, float, float, int, int]:
     """(cpu_req, mem_req, cpu_lim, mem_lim, containers_without_requests, containers_without_memory_limit)."""
     cr = mr = cl = ml = 0.0
     noreq = nolim = 0
-    for c in pod["spec"].get("containers") or []:
+    # restartable init containers (sidecars, `restartPolicy: Always`) run for the pod's whole life and are scheduled like app containers (kubernetes/kubernetes staging/src/k8s.io/api/core/v1/types.go:4384@v1.37.2) (#124 N-14)
+    for c in (pod["spec"].get("containers") or []) + [c for c in pod["spec"].get("initContainers") or [] if c.get("restartPolicy") == "Always"]:
         res = c.get("resources") or {}
         rq, lm = res.get("requests") or {}, res.get("limits") or {}
         if not rq.get("cpu") and not rq.get("memory"):
@@ -187,7 +190,9 @@ def _pools(inv: dict | None, snap: Path) -> tuple[dict[str, str], dict[str, dict
         p = pools.setdefault(name, {"pool": name, "source": "karpenter", "nodes": [], "taints": [], "labels": {}})
         p["labels"] = (tmpl.get("metadata") or {}).get("labels") or {}
         p["taints"] = [{"key": t.get("key"), "value": t.get("value"), "effect": t.get("effect")} for t in ((tmpl.get("spec") or {}).get("taints") or [])] or p["taints"]
-        p["nodeclaims"] = ((np_.get("status") or {}).get("resources") or {}).get("nodes")
+        # `status.resources.nodes` exists from Karpenter 1.0.0 (kubernetes-sigs/karpenter pkg/controllers/nodepool/counter/controller.go:50,107@v1.0.0); at v1beta1 the counter merges node capacity only, so count the pool's nodes (#124 N-4)
+        counted = ((np_.get("status") or {}).get("resources") or {}).get("nodes")
+        p["nodeclaims"] = int(counted) if counted is not None else len(p["nodes"])
     return node_pool, pools
 
 
@@ -315,7 +320,7 @@ def _rbac_scope(cx: _Ctx) -> tuple[dict[str, set], dict[str, set], list[dict]]:
                 continue
             sid = f"{s.get('kind')}:{(s.get('namespace') + '/') if s.get('kind') == 'ServiceAccount' and s.get('namespace') else ''}{s.get('name')}"
             rb_subjects_by_ns[ns].add(sid)
-            if role in BROAD_ROLES and cx.tn.kind(ns) in ("prod", "dev", "other", "ci"):
+            if role in BROAD_ROLES and (rb.get("roleRef") or {}).get("kind") == "ClusterRole" and cx.tn.kind(ns) in ("prod", "dev", "other", "ci"):  # a namespaced Role named admin is not the aggregated ClusterRole (#124 N-15)
                 broad_by_subject[sid].add(ns)
     cross_tenant = []
     for sid, nss in sorted(broad_by_subject.items()):
@@ -466,6 +471,11 @@ def _pool_rows(cx: _Ctx, nodes_out: list[dict]) -> list[dict]:
 def _ci_templates(cx: _Ctx, pools_out: list[dict]) -> list[dict]:
     """CI runner templates: placement constraints, matching and dedicated (tainted) pools, requests. Reads objects/autoscalingrunnersets.actions.github.com, runnerdeployments.actions.summerwind.dev, scaledjobs.keda.sh; falls back to deployments/cronjobs in CI namespaces."""
     ci_templates = []
+    # summerwind min/max live on the HorizontalRunnerAutoscaler that targets the RunnerDeployment (actions/actions-runner-controller apis/actions.summerwind.net/v1alpha1/horizontalrunnerautoscaler_types.go:30,34@v0.27.6), not on the RunnerDeployment (#124 N-5)
+    hra = {}
+    for h in objects(cx.snap, "horizontalrunnerautoscalers.actions.summerwind.dev"):
+        ref = (h.get("spec") or {}).get("scaleTargetRef") or {}
+        hra[(h["metadata"]["namespace"], ref.get("kind") or "RunnerDeployment", ref.get("name"))] = h.get("spec") or {}
     for stem, kind_label, path in (
         ("autoscalingrunnersets.actions.github.com", "AutoscalingRunnerSet", ("spec", "template", "spec")),
         ("runnerdeployments.actions.summerwind.dev", "RunnerDeployment", ("spec", "template", "spec")),
@@ -478,15 +488,24 @@ def _ci_templates(cx: _Ctx, pools_out: list[dict]) -> list[dict]:
                 cur = (cur or {}).get(k) or {}
             cons = _placement_constraint(cur)
             matched = [p["pool"] for p in pools_out if _pool_matches(cons, cx.pools[p["pool"]])] if cons["constrained"] else []
-            reqs = [((c.get("resources") or {}).get("requests") or {}) for c in cur.get("containers") or []]
+            if kind_label == "RunnerDeployment":
+                # `spec.template.spec` is a RunnerSpec: the runner's own requests are `.resources`, the dockerd sidecar's `.dockerdContainerResources`, `.containers` holds extra containers only
+                # (actions/actions-runner-controller apis/actions.summerwind.net/v1alpha1/runner_types.go:96,105,117@v0.27.6) (#124 N-5)
+                reqs = [((cur.get("resources") or {}).get("requests") or {}), ((cur.get("dockerdContainerResources") or {}).get("requests") or {})] + [((c.get("resources") or {}).get("requests") or {}) for c in cur.get("containers") or []]
+                scale = hra.get((ns, "RunnerDeployment", o["metadata"]["name"]), {})
+                lo, hi = scale.get("minReplicas", (o.get("spec") or {}).get("replicas")), scale.get("maxReplicas", (o.get("spec") or {}).get("replicas"))
+            else:
+                reqs = [((c.get("resources") or {}).get("requests") or {}) for c in cur.get("containers") or []]
+                lo = (o.get("spec") or {}).get("minRunners", (o.get("spec") or {}).get("minReplicaCount"))
+                hi = (o.get("spec") or {}).get("maxRunners", (o.get("spec") or {}).get("maxReplicaCount"))
             ci_templates.append(
                 {
                     "namespace": ns,
                     "kind": kind_label,
                     "name": o["metadata"]["name"],
                     "target": f"{ns}/{kind_label}/{o['metadata']['name']}",
-                    "min": (o.get("spec") or {}).get("minRunners", (o.get("spec") or {}).get("minReplicaCount")),
-                    "max": (o.get("spec") or {}).get("maxRunners", (o.get("spec") or {}).get("maxReplicaCount")),
+                    "min": lo,
+                    "max": hi,
                     **cons,
                     "matching_pools": matched,
                     "dedicated_pool": next((p for p in matched if cx.pools[p].get("taints")), None),

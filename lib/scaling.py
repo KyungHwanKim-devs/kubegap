@@ -16,6 +16,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from . import versions
+from .durations import go_duration_s
+from .events import count_of
 from .snapshot import component_logs_aggregate, component_logs_removed, load_json, objects
 
 ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?")
@@ -85,13 +87,9 @@ def _ts(s) -> _dt.datetime | None:
 
 
 def _dur_h(s: str | None) -> float | None:
-    """'720h' '30m' '20m0s' -> hours. For Karpenter expireAfter/consolidateAfter."""
-    if not s or s == "Never":
-        return None
-    total = 0.0
-    for num, unit in re.findall(r"(\d+(?:\.\d+)?)([hms])", str(s)):
-        total += float(num) * {"h": 1, "m": 1 / 60, "s": 1 / 3600}[unit]
-    return round(total, 3) if total else None
+    """'720h' '30m' '20m0s' -> hours; None for `Never`, empty or zero. For Karpenter expireAfter/consolidateAfter (lib/durations)."""
+    secs = go_duration_s(s)
+    return round(secs / 3600, 3) if secs else None
 
 
 def _metric_map(snap: Path, qid: str, keys: tuple[str, ...]) -> dict[tuple, float]:
@@ -335,19 +333,22 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
             kind = "do-not-disrupt pods"
         elif "blocking budget" in msg:
             kind = "budget"
-        elif "PDB" in msg or "PodDisruptionBudget" in msg:
+        elif "pdb" in msg.lower() or "poddisruptionbudget" in msg.lower():  # `PDB "ns/name"` at 0.37, `pdb "ns/name" prevents pod evictions` at 1.0, `PodDisruptionBudget=` at 1.15 (#124 O-4)
             kind = "PDB"
-        elif "Nominated" in msg:
+        elif "nominated" in msg.lower():  # `Nominated for a pending pod` at 0.37, `state node is nominated` at 1.0, `Node is nominated` at 1.15
             kind = "nominated for pending pods"
         else:
             kind = msg[:60]
-        blocked[f"{io.get('kind')}/{io.get('name')}"][kind] += int(e.get("count") or 1)
+        blocked[f"{io.get('kind')}/{io.get('name')}"][kind] += count_of(e)
     pool_rows = []
     claims_by_pool: Counter = Counter(((c["metadata"].get("labels") or {}).get("karpenter.sh/nodepool")) for c in claims)
     for p in pools:
         sp, st = p.get("spec") or {}, p.get("status") or {}
         dis = sp.get("disruption") or {}
-        reqs = {r.get("key"): r.get("values") for r in ((sp.get("template") or {}).get("spec") or {}).get("requirements") or []}
+        tmpl_spec = (sp.get("template") or {}).get("spec") or {}
+        # `expireAfter` is `spec.disruption.expireAfter` at karpenter.sh/v1beta1 (kubernetes-sigs/karpenter pkg/apis/v1beta1/nodepool.go:88@v0.37.0) and `spec.template.spec.expireAfter` at v1 (pkg/apis/v1/nodepool.go:217@v1.0.0, :272@v1.15.1) (#124 O-1)
+        expire_after = dis.get("expireAfter") if "expireAfter" in dis else tmpl_spec.get("expireAfter")
+        reqs = {r.get("key"): r.get("values") for r in tmpl_spec.get("requirements") or []}
         pool_rows.append(
             {
                 "name": p["metadata"]["name"],
@@ -356,8 +357,8 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
                 "has_limits": bool((sp.get("limits") or {}).get("cpu")),
                 "consolidation_policy": dis.get("consolidationPolicy"),
                 "consolidate_after": dis.get("consolidateAfter"),
-                "expire_after": dis.get("expireAfter"),
-                "expire_after_h": _dur_h(dis.get("expireAfter")),
+                "expire_after": expire_after,
+                "expire_after_h": _dur_h(expire_after),
                 "budgets": dis.get("budgets"),
                 "capacity_types": reqs.get("karpenter.sh/capacity-type"),
                 "archs": reqs.get("kubernetes.io/arch"),
@@ -385,7 +386,10 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
 
         pool = labels.get("karpenter.sh/nodepool")
         age_h = round((now - created).total_seconds() / 3600, 1) if created else None
-        exp_h = pool_expire.get(pool)
+        # Karpenter 1.x applies the NodeClaim's own spec.expireAfter, copied from the pool template when the claim is made (kubernetes-sigs/karpenter pkg/apis/v1/nodeclaim.go:75@v1.0.0, :83@v1.15.1;
+        # pkg/controllers/nodeclaim/expiration/controller.go:51-54@v1.0.0, :72-75@v1.15.1), so a pool edited later does not move an existing claim; a v1beta1 claim has no expireAfter and the pool's value applies
+        spec = c.get("spec") or {}
+        exp_h = _dur_h(spec.get("expireAfter")) if "expireAfter" in spec else pool_expire.get(pool)
         claim_rows.append(
             {
                 "name": md["name"],
@@ -401,7 +405,9 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
                 "registered_s": secs("Registered"),
                 "initialized_s": secs("Initialized"),
                 "ready": (conds.get("Ready") or {}).get("status") == "True",
-                "expired": (conds.get("Expired") or {}).get("status") == "True",
+                # the `Expired` condition exists at v1beta1 only (kubernetes-sigs/karpenter pkg/apis/v1beta1/nodeclaim_status.go:30@v0.37.0); from 1.0.0 expiration is a timer on the NodeClaim
+                # (pkg/controllers/nodeclaim/expiration/controller.go:51-54@v1.0.0, :72-75@v1.15.1), so a claim past its expireAfter counts as expired there (#124 O-2)
+                "expired": (conds.get("Expired") or {}).get("status") == "True" or (c.get("apiVersion") != "karpenter.sh/v1beta1" and exp_h is not None and age_h is not None and age_h > exp_h),
                 "drifted": (conds.get("Drifted") or {}).get("status") == "True",
                 "expire_after_h": exp_h,
                 "hours_past_expiry": round(age_h - exp_h, 1) if (age_h is not None and exp_h) and age_h > exp_h else None,

@@ -145,7 +145,7 @@ def _service_accounts(snap: Path, prod: set, bound_sa: set) -> dict:
 def _pod_security(snap: Path, prod: set) -> dict:
     rows = []
     workloads = []
-    for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet"), ("cronjobs.batch", "CronJob")):
+    for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet"), ("cronjobs", "CronJob")):
         for o in objects(snap, stem):
             workloads.append((kind, o))
     for kind, o in workloads:
@@ -215,7 +215,7 @@ def _pod_security(snap: Path, prod: set) -> dict:
 
 def _secrets(snap: Path, prod: set, platform: str | None) -> dict:
     plain = []
-    for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet"), ("cronjobs.batch", "CronJob")):
+    for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet"), ("cronjobs", "CronJob")):
         for o in objects(snap, stem):
             ns = o["metadata"]["namespace"]
             for c in _tpl(kind, o).get("containers") or []:
@@ -234,7 +234,7 @@ def _secrets(snap: Path, prod: set, platform: str | None) -> dict:
     # A ConfigMap key is a candidate when its name looks secret-like and its value looks like a secret (key name only is recorded, never the value; e.g. fluent-bit HTTP_Passwd)
     cm_rows = []
     cm_used: dict[tuple, set] = {}
-    for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet"), ("cronjobs.batch", "CronJob")):
+    for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet"), ("cronjobs", "CronJob")):
         for o in objects(snap, stem):
             ns = o["metadata"]["namespace"]
             tpl = _tpl(kind, o)

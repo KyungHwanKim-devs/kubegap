@@ -15,6 +15,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from .durations import go_duration_s
 from .promtext import parse as _parse_prom
 from .snapshot import load_json, objects
 
@@ -32,11 +33,9 @@ def _ts(s):
 
 
 def _dur_s(s) -> float | None:
-    m = re.match(r"^(\d+)([smh])$", str(s or ""))
-    if not m:
-        return None
-    n, u = int(m.group(1)), m.group(2)
-    return n if u == "s" else (n * 60 if u == "m" else n * 3600)
+    """Seconds of a Go duration (`180s`, `3m0s`, `2m30s`): Argo CD parses `timeout.reconciliation` with `time.ParseDuration` (lib/durations)."""
+    secs = go_duration_s(s)
+    return secs if secs and secs > 0 else None
 
 
 def _prom_dir(snap: Path, name: str) -> dict:
@@ -79,7 +78,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             "version": _ver(c0.get("image")),
             "kind": "StatefulSet" if "volumeClaimTemplates" in sp or (w["metadata"]["name"].endswith("controller") and "serviceName" in sp) else "Deployment",
         }
-    version = (comps.get("server") or comps.get("application-controller") or {}).get("version")
+    version = next((comps[k]["version"] for k in ("server", "application-controller", "repo-server", "applicationset-controller", "dex-server", "notifications-controller") if (comps.get(k) or {}).get("version")), None)
     # --- settings
     cms = {c["metadata"]["name"]: (c.get("data") or {}) for c in objects(snap, "configmaps") if c["metadata"]["namespace"] == "argocd"}
     cm, params, rbac, notif = cms.get("argocd-cm", {}), cms.get("argocd-cmd-params-cm", {}), cms.get("argocd-rbac-cm", {}), cms.get("argocd-notifications-cm", {})
@@ -89,7 +88,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         return default if v is None else str(v).lower() == "true"
 
     sso = _non_empty(cm.get("dex.config")) or _non_empty(cm.get("oidc.config"))
-    reconcile_s = _dur_s(cm.get("timeout.reconciliation")) or 180
+    # The controller's default resync period is 180 s through 2.x and 120 s from 3.0.0 (argoproj/argo-cd cmd/argocd-application-controller/commands/argocd_application_controller.go:44@v2.13.0, :47@v3.0.0; #124 N-2)
+    reconcile_default = 120 if (version or "").split(".")[0].isdigit() and int(version.split(".")[0]) >= 3 else 180
+    reconcile_s = _dur_s(cm.get("timeout.reconciliation")) or reconcile_default
     config = {
         "url": cm.get("url"),
         "admin_enabled": flag(cm, "admin.enabled", True),
@@ -98,8 +99,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "exec_enabled": flag(cm, "exec.enabled", False),
         "anonymous_enabled": flag(cm, "users.anonymous.enabled", False),
         "server_insecure": flag(params, "server.insecure", False),
-        "timeout_reconciliation": cm.get("timeout.reconciliation", "180s (default)"),
+        "timeout_reconciliation": cm.get("timeout.reconciliation", f"{reconcile_default}s (default)"),
         "timeout_reconciliation_s": reconcile_s,
+        "reconcile_default_basis": f"Argo CD {version}: {reconcile_default} s" if version else "no semver image tag on any argocd-* workload: assumed 2.x (180 s)",
         "status_processors": params.get("controller.status.processors"),
         "operation_processors": params.get("controller.operation.processors"),
         "rbac_policy_default": rbac.get("policy.default", ""),
@@ -146,6 +148,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         src = sp.get("source") or ((sp.get("sources") or [{}])[0] if sp.get("sources") else {})
         pol = sp.get("syncPolicy") or {}
         auto = pol.get("automated")
+        # Argo CD auto-syncs when `automated` is set and `automated.enabled` is not false (the field exists from 3.1.0: argoproj/argo-cd pkg/apis/application/v1alpha1/types.go:1532@v3.1.0; `IsAutomatedSyncEnabled` :1458-1463@v3.2.0; #124 N-1)
+        automated = auto is not None and (auto or {}).get("enabled") is not False
         op = st.get("operationState") or {}
         dest_ns = (sp.get("destination") or {}).get("namespace")
         kinds = Counter(r.get("kind") for r in st.get("resources") or [])
@@ -167,9 +171,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "chart": src.get("chart"),
                 "target_revision": src.get("targetRevision"),
                 "tracks_moving_ref": str(src.get("targetRevision") or "HEAD") in ("HEAD", "main", "master", "develop", "dev") or not re.match(r"^v?\d", str(src.get("targetRevision") or "HEAD")),
-                "automated": bool(auto),
-                "prune": bool((auto or {}).get("prune")),
-                "self_heal": bool((auto or {}).get("selfHeal")),
+                "automated": automated,
+                "prune": bool(automated and (auto or {}).get("prune")),
+                "self_heal": bool(automated and (auto or {}).get("selfHeal")),
                 "sync_options": pol.get("syncOptions") or [],
                 "sync": sync,
                 "health": health,

@@ -94,6 +94,24 @@ def component_logs_aggregate(snap: Path) -> dict | None:
     return d if isinstance(d, dict) else None
 
 
+# the kinds lib/discover.py fetches before the dump-all step (its OBJECT_KINDS; tests/test_object_fields.py keeps the two equal): their files carry the short name
+LEGACY_STEMS = {"cronjobs.batch": "cronjobs"}  # the spelling readers used before 2026-11-05 -> the file discovery writes
+DISCOVERY_STEMS = frozenset(["configmaps", "cronjobs", "customresourcedefinitions", "daemonsets", "deployments", "namespaces", "nodes", "pods", "services", "statefulsets", "storageclasses"])
+
+
 def objects(snap: Path, stem: str) -> list:
-    """Items of `objects/<stem>.json` in the snapshot. `stem` is the resource file name, e.g. "deployments" or "bgppeers.metallb.io"."""
-    return items(load_json(snap / "objects" / f"{stem}.json"))
+    """Items of `objects/<stem>.json` in the snapshot. `stem` is the resource file name, e.g. "deployments" or "bgppeers.metallb.io".
+
+    The kinds discovery fetches (`lib/discover.py` KINDS) are written under the short name (`cronjobs`), the dump-all step writes every other
+    non-core kind as `<name>.<group>` (`jobs.batch`). A reader names the short stem; a snapshot written before 2026-11-05 still has `cronjobs.batch.json`
+    (discovery did not fetch CronJobs then), so a missing discovery stem falls back to the one `<stem>.<group>.json` file of that name, and the legacy spelling `cronjobs.batch` to `cronjobs`; nothing else falls back, so `pods.metrics.k8s.io` never reads `pods.json` (#124)."""
+    p = snap / "objects" / f"{stem}.json"
+    if not p.is_file():
+        alt = p
+        if stem in LEGACY_STEMS:
+            alt = snap / "objects" / f"{LEGACY_STEMS[stem]}.json"
+        elif stem in DISCOVERY_STEMS:
+            cands = sorted((snap / "objects").glob(f"{stem}.*.json")) if (snap / "objects").is_dir() else []
+            alt = cands[0] if len(cands) == 1 else p
+        p = alt if alt.is_file() else p
+    return items(load_json(p))

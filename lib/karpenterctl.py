@@ -196,7 +196,9 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
     for c in objects(snap, "ec2nodeclasses.karpenter.k8s.aws"):
         sp = c.get("spec") or {}
         md = sp.get("metadataOptions") or {}
-        root = next(((b.get("ebs") or {}) for b in (sp.get("blockDeviceMappings") or [])), {})
+        # the root device is the mapping flagged `rootVolume: true` (aws/karpenter-provider-aws pkg/apis/v1beta1/ec2nodeclass.go:238@v0.37.0, pkg/apis/v1/ec2nodeclass.go:402@v1.15.1); without the flag, the first mapping (#124 O-3)
+        bdms = sp.get("blockDeviceMappings") or []
+        root = next(((b.get("ebs") or {}) for b in bdms if b.get("rootVolume")), next(((b.get("ebs") or {}) for b in bdms), {}))
         ami_terms = sp.get("amiSelectorTerms") or []
         conds = {x.get("type"): x.get("status") for x in (c.get("status") or {}).get("conditions") or []}
         classes.append(

@@ -57,9 +57,15 @@ def _event_key(e: dict) -> str:
     return (e.get("metadata") or {}).get("uid") or f"{e.get('reason')}|{(e.get('involvedObject') or {}).get('uid')}|{e.get('firstTimestamp')}"
 
 
-def _count(e: dict) -> int:
+def count_of(e: dict) -> int:
+    """How many times the Event happened: `count` for events written through the legacy recorder, `series.count` for events written through the
+    events.k8s.io recorder (the scheduler's `Scheduled`, `FailedScheduling`, `Preempted`), which has no `count` in the core/v1 view and keeps the repeats in
+    `series.count` (kubernetes/kubernetes pkg/apis/events/v1/conversion.go:40-42@v1.37.2; staging/src/k8s.io/client-go/tools/events/event_broadcaster.go:181@v1.37.2); 1 when neither is there."""
     c = e.get("count") or ((e.get("series") or {}).get("count")) or 1
     return int(c) if isinstance(c, (int, float)) else 1
+
+
+_count = count_of
 
 
 def _obj(e: dict) -> str:
