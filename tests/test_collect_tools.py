@@ -59,11 +59,12 @@ def test_per_item_tool_runs_get_it_too(tmp_path, monkeypatch):
 
 
 def test_every_tool_step_names_the_context():
-    """A tool step that forgot {context} would read the current context of the kubeconfig, not the one the run was asked for."""
+    """A tool step that forgot {context} would read the current context of the kubeconfig, not the one the run was asked for. A step fed on stdin contacts no cluster."""
     for f in sorted(ROOT.glob("collectors/*/collect.yaml")):
         for st in yamlite.load_file(f) or []:
             if isinstance(st, dict) and st.get("type") == "tool":
-                assert "{context}" in " ".join(map(str, st["cmd"])), f"{f.parent.name}/{st['id']}"
+                names_context = "{context}" in " ".join(map(str, st["cmd"]))
+                assert names_context != bool(st.get("stdin")), f"{f.parent.name}/{st['id']}"
 
 
 def test_daemonset_backend_and_its_discovery_use_the_run_kubeconfig(monkeypatch):

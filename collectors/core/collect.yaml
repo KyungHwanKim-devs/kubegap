@@ -82,7 +82,7 @@
   writes_out: true
   out: tools/krr.json
   timeout: 900
-# ---- Structure and hygiene tools. All read-only, they read the cluster directly (Polaris cannot read List objects from snapshot files). Typical runtime on a 7-node EKS cluster: polaris ~4s, pluto ~7s, kubent ~10s, helm <1s ----
+# ---- Structure and hygiene tools. All read-only. polaris, kubent and helm read the cluster (Polaris cannot read List objects from snapshot files); pluto reads what objects.dump-all saved. Typical runtime on a 7-node EKS cluster: polaris ~4s, pluto <1s, kubent ~10s, helm <1s ----
 - id: polaris
   modes: [full]   # skipped by the daily run
   type: tool
@@ -98,14 +98,17 @@
   modes: [full]   # skipped by the daily run
   type: tool
   tool: pluto
-  # not detect-all-in-cluster: its helm-detect lists release Secrets, which the ClusterRole forbids, and the whole run then fails.
+  # `detect -` reads a manifest List on stdin and contacts nothing. The List is built by lib/lastapplied.py from the objects saved above, so this step depends on objects.dump-all
+  # and fails when that step saved no kind. Not detect-api-resources or detect-all-in-cluster: both List every resource the server advertises, Secrets included when the identity
+  # may (pkg/discovery-api/discovery_api.go:83,115@v5.24.5, no flag excludes one, cmd/root.go:87-114), which is the read the README rules out; the second also reads Helm's release Secrets.
   # The three --ignore-* flags keep the exit code 0 when pluto finds something: without them it exits 2 (deprecated), 3 (removed) or 4 (no replacement)
   # (pkg/api/output.go:333-341@v5.24.5, cmd/root.go:353); lib/shell.py writes the output file only on exit 0, so the items were never saved and the
   # check passed with nothing to judge. The flags do not filter the items (FilterOutput, pkg/api/output.go:159-181 does not read them).
-  cmd: [pluto, detect-api-resources, -v=2, --kube-context, "{context}", -o, json, --target-versions, "k8s={k8s_next_minor}", --ignore-deprecations, --ignore-removals, --ignore-unavailable-replacements]
-  source: "pluto: cmd/root.go:109@v5.24.5 (--kube-context), :94 (-o), :93 (--target-versions), :87-89 (--ignore-*), :119-120 (-v via klog); exit codes pkg/api/output.go:333-341; shape in references/sources.md"
+  stdin: last-applied
+  cmd: [pluto, detect, "-", -o, json, --target-versions, "k8s={k8s_next_minor}", --ignore-deprecations, --ignore-removals, --ignore-unavailable-replacements]
+  source: "pluto: cmd/root.go:387@v5.24.5 (detect), :403-411 (- reads stdin), :94 (-o), :93 (--target-versions), :87-89 (--ignore-*); exit codes pkg/api/output.go:333-341; shape in references/sources.md"
   out: tools/pluto.json
-  timeout: 300
+  timeout: 60
 - id: kubent
   modes: [full]   # skipped by the daily run
   type: tool

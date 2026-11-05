@@ -363,10 +363,13 @@ def render_details(snap: Path, language: str = "en") -> Path:
     if inside:
         w("")
         w(f"Commands that failed inside a step that still succeeded (run.log): {len(inside)}: " + "; ".join(f"`{f.get('id')}` {_cell(str(f.get('error') or '')[:120])}" for f in inside[:20]))
-    # How much of the API the deprecated-API tools saw: Lists the server answered and Lists it refused or did not serve (#132). Both tools swallow a forbidden List.
+    # How much of the API the deprecated-API tools saw (#132). kubent swallows a forbidden List, so its Lists answered and refused are counted from its log; pluto reads the saved objects, so what it saw is what objects.dump-all saved.
     dep = (summary.get("hygiene") or {}).get("deprecated") or {}
+    wording = {"kubent": ("Lists answered", "refused or not served"), "pluto": ("Lists answered", "refused or not served")}
+    if "manifests" in (((cr.get("core") or {}).get("steps") or {}).get("pluto") or {}):  # older snapshots: pluto made its own Lists
+        wording["pluto"] = ("object kinds saved", "not permitted or failed")
     seen = [
-        f"{tool} {dep[f'{tool}_lists_ok']} of {dep[f'{tool}_lists_ok'] + dep[f'{tool}_lists_failed']} Lists answered ({dep[f'{tool}_lists_failed']} refused or not served)"
+        f"{tool} {dep[f'{tool}_lists_ok']} of {dep[f'{tool}_lists_ok'] + dep[f'{tool}_lists_failed']} {wording[tool][0]} ({dep[f'{tool}_lists_failed']} {wording[tool][1]})"
         for tool in ("kubent", "pluto")
         if isinstance(dep.get(f"{tool}_lists_ok"), int) and isinstance(dep.get(f"{tool}_lists_failed"), int)
     ]

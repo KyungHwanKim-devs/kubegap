@@ -246,7 +246,7 @@ def _next_minor(server_version, pluto_target: dict | None) -> str | None:
 def _deprecated(cx: _Ctx) -> dict:
     steps = ((load_json(cx.snap / "collect-result.json") or {}).get("core") or {}).get("steps") or {}
     read = {f"{tool}_read": bool((steps.get(tool) or {}).get("ok") and (steps.get(tool) or {}).get("api_read")) for tool in ("pluto", "kubent")}
-    # How much of the API each tool saw: successful and failed Lists counted from its log by lib/collect.py (#132); None for a snapshot taken before the counts existed.
+    # How much of the API each tool saw, counted by lib/collect.py (#132): kubent's successful and failed Lists from its log, for pluto the kinds objects.dump-all saved and the kinds it could not. None for a snapshot taken before the counts existed.
     lists = {f"{tool}_lists_{k}": (steps.get(tool) or {}).get(f"lists_{k}") for tool in ("pluto", "kubent") for k in ("ok", "failed")}
     items = []
     # source: pluto v5.24.5 pkg/api/output.go:35-54 Output{name, filePath, namespace (omitempty), api, deprecated, removed, replacementAvailable}, :57-59 Instance{items (omitempty),

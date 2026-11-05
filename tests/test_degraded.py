@@ -242,6 +242,9 @@ def test_ssm_list_not_read_makes_ssm_unregistered_skip(tmp_path):
     assert r["status"] == "skip" and "ssm_unregistered missing" in r["reason"]
 
 
+SAVED_KINDS = {"kinds": 110, "skipped": ["pods"], "failed": {"foos.example.com": "boom"}, "not_permitted": ["csrs.certificates.k8s.io"]}  # what objects.dump-all returns; pluto reads what it saved
+
+
 # The pinned binaries can exit 0 without reading the cluster (#117).
 def _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr, code=0):
     import os
@@ -256,7 +259,7 @@ def _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr, code=0):
     fake.chmod(0o700)
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
     step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == tool)
-    result = collect._run_tool_step(step, tool, "core", "unreachable", None, tmp_path, RunLog(None), None, 10, None, inv={"cluster": {"server_version": "v1.32.0"}})
+    result = collect._run_tool_step(step, tool, "core", "unreachable", None, tmp_path, RunLog(None), None, 10, None, inv={"cluster": {"server_version": "v1.32.0"}}, objects_dump=SAVED_KINDS)
     (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {tool: result}}}))
     return result
 
@@ -276,9 +279,6 @@ def _deprecated_result(tmp_path):
         ("kubent", [], "INF Retrieved 0 resources from collector name=Cluster"),
         ("kubent", [], "INF Retrieved 10 resources from collector name=Helm v3"),
         ("kubent", [], "INF Retrieved 10 resources from collector name=Cluster\nERR Failed to initialize collector"),
-        ("pluto", {"target-versions": {"k8s": "v1.33.0"}}, ""),
-        ("pluto", {"target-versions": {}}, "Result from resources: 0"),
-        ("pluto", {"items": []}, "Retrieving : deployments.v1.apps\nFailed to retrieve: connection refused"),
     ],
 )
 def test_deprecated_tools_exit_zero_without_reading_skip(tmp_path, monkeypatch, tool, doc, stderr):
@@ -297,7 +297,7 @@ def test_deprecated_tools_exit_zero_without_reading_skip(tmp_path, monkeypatch, 
     [
         ("kubent", [], "INF Retrieved 12 resources from collector name=Cluster"),
         ("kubent", [], "\x1b[32mINF\x1b[0m Retrieved 12 resources from collector \x1b[36mname=\x1b[0mCluster"),
-        ("pluto", {"target-versions": {"k8s": "v1.33.0"}}, "I1104 discovery_api.go:122] No annotations for ResourceVer apps/v1"),
+        ("pluto", {"target-versions": {"k8s": "v1.33.0"}}, ""),  # a clean run: Instance.Outputs is omitempty (pkg/api/output.go:58@v5.24.5)
     ],
 )
 def test_deprecated_tools_read_but_no_deprecations_pass(tmp_path, monkeypatch, tool, doc, stderr):
@@ -310,7 +310,6 @@ def test_deprecated_tools_read_but_no_deprecations_pass(tmp_path, monkeypatch, t
 
 
 KUBENT_DEBUG = "DBG Retrieving: deployments.v1.apps\nDBG Retrieving: podsecuritypolicies.v1beta1.policy\nDBG Failed to retrieve: policy/v1beta1, Resource=podsecuritypolicies: the server could not find the requested resource\nDBG Retrieving: ingresses.v1.networking.k8s.io\nINF Retrieved 0 resources from collector name=Cluster"
-PLUTO_V2 = "I1104 discovery_api.go:114] Retrieving : deployments.v1.apps\nI1104 discovery_api.go:117] Failed to retrieve: /v1, Resource=bindings the server could not find the requested resource\nI1104 discovery_api.go:114] Retrieving : ingresses.v1.networking.k8s.io"
 
 
 @pytest.mark.parametrize(
@@ -318,12 +317,11 @@ PLUTO_V2 = "I1104 discovery_api.go:114] Retrieving : deployments.v1.apps\nI1104 
     [
         ("kubent", [], KUBENT_DEBUG, (2, 1)),  # three Lists started, one failed: read, although no object carried the annotation (a Helm or server-side-apply cluster)
         ("kubent", [], "\x1b[90m10:20PM\x1b[0m \x1b[33mDBG\x1b[0m Retrieving: deployments.v1.apps\nINF Retrieved 0 resources from collector name=Cluster", (1, 0)),  # coloured
-        ("pluto", {"target-versions": {"k8s": "v1.33.0"}}, PLUTO_V2, (1, 1)),  # no items and no empty List line, but one List succeeded
+        ("pluto", {"target-versions": {"k8s": "v1.33.0"}}, "", (111, 2)),  # pluto reads no List: the kinds objects.dump-all saved, and the two it could not
     ],
 )
 def test_deprecated_tools_successful_lists_are_read_evidence(tmp_path, monkeypatch, tool, doc, stderr, lists):
-    """#132: `Retrieving` minus `Failed to retrieve` (kubent pkg/collector/cluster.go:121,124@0.7.3 at --log-level=debug; pluto pkg/discovery-api/discovery_api.go:114,117@v5.24.5
-    at -v=2) counts the Lists that succeeded. kubent's `Retrieved N` counts annotated objects only (cluster.go:129-130), so 0 after a full read is the normal case on a
+    """#132: `Retrieving` minus `Failed to retrieve` (kubent pkg/collector/cluster.go:121,124@0.7.3 at --log-level=debug) counts the Lists that succeeded. kubent's `Retrieved N` counts annotated objects only (cluster.go:129-130), so 0 after a full read is the normal case on a
     cluster managed by Helm or server-side apply, and until this change every full run of such a cluster had a failed kubent step."""
     result = _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr)
     assert result["ok"] is True and result["api_read"] is True
@@ -355,7 +353,7 @@ def test_a_failed_list_does_not_count_the_collector_level_failure_line(tmp_path,
 
 
 def test_pluto_error_printed_to_stdout_reaches_the_step_error(tmp_path, monkeypatch):
-    """pluto prints the detect-api-resources error with fmt.Println, to stdout, and exits 1 (cmd/root.go:343-346@v5.24.5); stderr has only klog's target-version lines (#132)."""
+    """pluto prints the error of `detect` with fmt.Println, to stdout, and exits 1 (cmd/root.go:413@v5.24.5); stderr has only klog's target-version lines (#132)."""
     import os
     import shlex
 
@@ -366,7 +364,7 @@ def test_pluto_error_printed_to_stdout_reaches_the_step_error(tmp_path, monkeypa
     fake = bindir / "pluto"
     fake.write_text(
         "#!/bin/sh\nprintf '%s\\n' "
-        + shlex.quote('error creating Discovery REST Client: context "x" does not exist')
+        + shlex.quote("Error checking for versions: yaml: did not find expected node content")
         + "\nprintf '%s\\n' "
         + shlex.quote("I1104 root.go:259] assuming default targetVersion cert-manager v1.5.3")
         + " >&2\nexit 1\n"
@@ -374,9 +372,9 @@ def test_pluto_error_printed_to_stdout_reaches_the_step_error(tmp_path, monkeypa
     fake.chmod(0o700)
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
     step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == "pluto")
-    result = collect._run_tool_step(step, "pluto", "core", "x", None, tmp_path, RunLog(None), None, 10, None, inv={"cluster": {"server_version": "v1.32.0"}})
-    assert result["ok"] is False and result["api_read"] is False and result["lists_ok"] == 0
-    assert result["error"].startswith('error creating Discovery REST Client: context "x" does not exist; I1104 root.go:259] assuming default targetVersion')
+    result = collect._run_tool_step(step, "pluto", "core", "x", None, tmp_path, RunLog(None), None, 10, None, inv={"cluster": {"server_version": "v1.32.0"}}, objects_dump=SAVED_KINDS)
+    assert result["ok"] is False and result["api_read"] is False
+    assert result["error"].startswith("Error checking for versions: yaml: did not find expected node content; I1104 root.go:259] assuming default targetVersion")
 
 
 def test_kubent_step_asks_for_the_debug_log_level():
@@ -415,7 +413,7 @@ def test_pluto_step_keeps_exit_code_zero_when_it_finds_something():
     """pluto exits 2 (deprecated), 3 (removed) or 4 (no replacement) unless told not to (pkg/api/output.go:333-341@v5.24.5; cmd/root.go:353 and :167 exit with it).
     lib/shell.py writes the output file only on exit 0, so without the three flags tools/pluto.json was never written when pluto found something and
     the check passed with no pluto rows; with the read evidence of this branch it would skip instead. The flags do not filter the items (FilterOutput, pkg/api/output.go:159-181). Observed with the pinned binary:
-    detect-files on a networking.k8s.io/v1beta1 Ingress exits 3 without the flags and 0 with them, with the same item in both JSONs."""
+    detect on a networking.k8s.io/v1beta1 Ingress exits 3 without the flags and 0 with them, with the same item in both JSONs."""
     step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == "pluto")
     assert {"--ignore-deprecations", "--ignore-removals", "--ignore-unavailable-replacements"} <= set(step["cmd"])
 

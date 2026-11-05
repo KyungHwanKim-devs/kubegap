@@ -94,9 +94,12 @@ def test_raw_paths_in_lib_are_the_pod_proxy_only():
 
 
 def test_tool_steps_do_not_read_helm_release_secrets():
-    """pluto detect-all-in-cluster and kubent's Helm collector list release Secrets; the role forbids Secrets, so the steps use the modes that stay off them."""
-    cmds = {st["id"]: [str(a) for a in st.get("cmd") or []] for _c, st in _collect_steps() if st.get("type") == "tool"}
-    assert cmds["pluto"][1] == "detect-api-resources"
+    """pluto's two in-cluster modes List every resource the server advertises, Secrets included when the identity may (pkg/discovery-api/discovery_api.go:83,115@v5.24.5), and kubent's Helm
+    collector lists release Secrets, so the steps use the modes that stay off them: pluto reads a List on stdin and is given no way to reach the cluster, kubent's cluster collector has a fixed list without Secrets."""
+    steps = {st["id"]: st for _c, st in _collect_steps() if st.get("type") == "tool"}
+    cmds = {sid: [str(a) for a in st.get("cmd") or []] for sid, st in steps.items()}
+    assert cmds["pluto"][1:3] == ["detect", "-"] and steps["pluto"]["stdin"] == "last-applied"
+    assert not {"--kube-context", "--kubeconfig", "{context}"} & set(cmds["pluto"])
     assert "--helm3=false" in cmds["kubent"]
     assert cmds["helm-list"][:2] == ["helm", "list"], "helm list is the one documented read of Helm's Secrets"
 

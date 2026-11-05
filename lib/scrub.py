@@ -48,7 +48,8 @@ KEEP_VALUES: list[tuple[str, str, tuple[str, ...]]] = [
 PRESENCE_ONLY = [("argocd", "argocd-cm", ("dex.config", "oidc.config"))]
 LINE_COUNT_ONLY = [("argocd", "argocd-rbac-cm", ("policy.csv",))]
 # Annotations whose value is a copy of the object, so a ConfigMap's data would survive in them after `data` is scrubbed.
-COPY_ANNOTATIONS = ("kubectl.kubernetes.io/last-applied-configuration", "objectset.rio.cattle.io/applied")
+LAST_APPLIED = "kubectl.kubernetes.io/last-applied-configuration"
+COPY_ANNOTATIONS = (LAST_APPLIED, "objectset.rio.cattle.io/applied")
 
 # Secret-like key detection, moved here from lib/security.py so it can run before the values are dropped.
 SECRET_ENV_RE = re.compile(r"(PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_?KEY|ACCESS_KEY|CLIENT_SECRET|DSN|CONNECTION_STRING)", re.IGNORECASE)
