@@ -88,7 +88,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         return default if v is None else str(v).lower() == "true"
 
     sso = _non_empty(cm.get("dex.config")) or _non_empty(cm.get("oidc.config"))
-    reconcile_s = _dur_s(cm.get("timeout.reconciliation")) or 180
+    # The controller's default resync period is 180 s through 2.x and 120 s from 3.0.0 (argoproj/argo-cd cmd/argocd-application-controller/commands/argocd_application_controller.go:44@v2.13.0, :47@v3.0.0; #124 N-2)
+    reconcile_default = 120 if (version or "").split(".")[0].isdigit() and int(version.split(".")[0]) >= 3 else 180
+    reconcile_s = _dur_s(cm.get("timeout.reconciliation")) or reconcile_default
     config = {
         "url": cm.get("url"),
         "admin_enabled": flag(cm, "admin.enabled", True),
@@ -97,7 +99,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "exec_enabled": flag(cm, "exec.enabled", False),
         "anonymous_enabled": flag(cm, "users.anonymous.enabled", False),
         "server_insecure": flag(params, "server.insecure", False),
-        "timeout_reconciliation": cm.get("timeout.reconciliation", "180s (default)"),
+        "timeout_reconciliation": cm.get("timeout.reconciliation", f"{reconcile_default}s (default)"),
         "timeout_reconciliation_s": reconcile_s,
         "status_processors": params.get("controller.status.processors"),
         "operation_processors": params.get("controller.operation.processors"),
@@ -145,6 +147,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         src = sp.get("source") or ((sp.get("sources") or [{}])[0] if sp.get("sources") else {})
         pol = sp.get("syncPolicy") or {}
         auto = pol.get("automated")
+        # Argo CD auto-syncs when `automated` is set and `automated.enabled` is not false (the field exists from 3.1.0: argoproj/argo-cd pkg/apis/application/v1alpha1/types.go:1532@v3.1.0; `IsAutomatedSyncEnabled` :1458-1463@v3.2.0; #124 N-1)
+        automated = auto is not None and (auto or {}).get("enabled") is not False
         op = st.get("operationState") or {}
         dest_ns = (sp.get("destination") or {}).get("namespace")
         kinds = Counter(r.get("kind") for r in st.get("resources") or [])
@@ -166,9 +170,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "chart": src.get("chart"),
                 "target_revision": src.get("targetRevision"),
                 "tracks_moving_ref": str(src.get("targetRevision") or "HEAD") in ("HEAD", "main", "master", "develop", "dev") or not re.match(r"^v?\d", str(src.get("targetRevision") or "HEAD")),
-                "automated": bool(auto),
-                "prune": bool((auto or {}).get("prune")),
-                "self_heal": bool((auto or {}).get("selfHeal")),
+                "automated": automated,
+                "prune": bool(automated and (auto or {}).get("prune")),
+                "self_heal": bool(automated and (auto or {}).get("selfHeal")),
                 "sync_options": pol.get("syncOptions") or [],
                 "sync": sync,
                 "health": health,
