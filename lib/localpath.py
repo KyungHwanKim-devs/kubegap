@@ -66,8 +66,9 @@ def analyze(snap: Path, inv: dict | None, k3s: dict | None) -> dict:
             "reclaim": s.get("reclaimPolicy"),
             "binding": s.get("volumeBindingMode"),
             "default": (s["metadata"].get("annotations") or {}).get("storageclass.kubernetes.io/is-default-class") == "true",
-            "path": (s.get("parameters") or {}).get("path"),
+            # the provisioner reads the parameters `nodePath` and `pathPattern` only (rancher/local-path-provisioner provisioner.go:357,369@v0.0.31, :398,410@v0.0.37); a `path` parameter is ignored (#124 K3-1)
             "node_path": (s.get("parameters") or {}).get("nodePath"),
+            "path_pattern": (s.get("parameters") or {}).get("pathPattern"),
         }
         for s in scs
     ]

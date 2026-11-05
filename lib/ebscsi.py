@@ -187,7 +187,8 @@ def _storage_classes(snap: Path) -> list[dict]:
         prov = sc.get("provisioner")
         if prov not in ("ebs.csi.aws.com", "kubernetes.io/aws-ebs"):
             continue
-        params = sc.get("parameters") or {}
+        # the driver lower-cases every parameter key before reading it (kubernetes-sigs/aws-ebs-csi-driver pkg/driver/controller.go:133@v1.37.0, :142@v1.67.2; keys pkg/driver/constants.go:38-56@v1.37.0), so `Encrypted`/`KmsKeyId` count (#124 K3-2)
+        params = {str(k).lower(): v for k, v in (sc.get("parameters") or {}).items()}
         classes.append(
             {
                 "name": sc["metadata"]["name"],
@@ -195,7 +196,7 @@ def _storage_classes(snap: Path) -> list[dict]:
                 "default": (sc["metadata"].get("annotations") or {}).get("storageclass.kubernetes.io/is-default-class") == "true",
                 "type": params.get("type"),
                 "encrypted": str(params.get("encrypted", "")).lower() == "true",
-                "kms_key": params.get("kmsKeyId"),
+                "kms_key": params.get("kmskeyid"),
                 "iops": params.get("iops"),
                 "throughput": params.get("throughput"),
                 "allow_expansion": bool(sc.get("allowVolumeExpansion")),
