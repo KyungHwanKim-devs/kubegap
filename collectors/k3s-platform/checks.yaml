@@ -273,17 +273,6 @@
           disabled_without_replacement: []
           builtin_images: {}
           podcidr: []
-          metallb:
-            present: true
-            pools:
-              - name: "p"
-                addresses:
-                  - "192.0.2.200-192.0.2.209"
-                size: 10
-            total_ips: 10
-            used: 1
-            free: 9
-            pending: []
           local_path:
             pv_count: 0
             by_node: {}
@@ -312,17 +301,6 @@
           disabled_without_replacement: []
           builtin_images: {}
           podcidr: []
-          metallb:
-            present: true
-            pools:
-              - name: "p"
-                addresses:
-                  - "192.0.2.200-192.0.2.209"
-                size: 10
-            total_ips: 10
-            used: 1
-            free: 9
-            pending: []
           local_path:
             pv_count: 0
             by_node: {}
@@ -373,17 +351,6 @@
           disabled_without_replacement: []
           builtin_images: {}
           podcidr: []
-          metallb:
-            present: true
-            pools:
-              - name: "p"
-                addresses:
-                  - "192.0.2.200-192.0.2.209"
-                size: 10
-            total_ips: 10
-            used: 1
-            free: 9
-            pending: []
           local_path:
             pv_count: 0
             by_node: {}
@@ -413,17 +380,6 @@
           disabled_without_replacement: []
           builtin_images: {}
           podcidr: []
-          metallb:
-            present: true
-            pools:
-              - name: "p"
-                addresses:
-                  - "192.0.2.200-192.0.2.209"
-                size: 10
-            total_ips: 10
-            used: 1
-            free: 9
-            pending: []
           local_path:
             pv_count: 0
             by_node: {}
@@ -1427,17 +1383,6 @@
             - "traefik"
           builtin_images: {}
           podcidr: []
-          metallb:
-            present: true
-            pools:
-              - name: "p"
-                addresses:
-                  - "192.0.2.200-192.0.2.209"
-                size: 10
-            total_ips: 10
-            used: 1
-            free: 9
-            pending: []
           local_path:
             pv_count: 0
             by_node: {}
@@ -1467,17 +1412,6 @@
           disabled_without_replacement: []
           builtin_images: {}
           podcidr: []
-          metallb:
-            present: true
-            pools:
-              - name: "p"
-                addresses:
-                  - "192.0.2.200-192.0.2.209"
-                size: 10
-            total_ips: 10
-            used: 1
-            free: 9
-            pending: []
           local_path:
             pv_count: 0
             by_node: {}
@@ -1530,17 +1464,6 @@
           disabled_without_replacement: []
           builtin_images: {}
           podcidr: []
-          metallb:
-            present: true
-            pools:
-              - name: "p"
-                addresses:
-                  - "192.0.2.200-192.0.2.209"
-                size: 10
-            total_ips: 10
-            used: 1
-            free: 9
-            pending: []
           local_path:
             pv_count: 0
             by_node: {}
@@ -1569,17 +1492,6 @@
           disabled_without_replacement: []
           builtin_images: {}
           podcidr: []
-          metallb:
-            present: true
-            pools:
-              - name: "p"
-                addresses:
-                  - "192.0.2.200-192.0.2.209"
-                size: 10
-            total_ips: 10
-            used: 1
-            free: 9
-            pending: []
           local_path:
             pv_count: 0
             by_node: {}

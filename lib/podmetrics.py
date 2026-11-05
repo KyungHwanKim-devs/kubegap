@@ -153,7 +153,7 @@ def _discovered(objs: dict, disc: dict, default_port: int, default_namespace: st
     and the container port named as `port_names` says. When several workloads match (two installs, or a sibling such as loki-grafana next to grafana), the
     one in the step's default namespace is taken, else the first by kind order, namespace and name, and every match is listed in `candidates` so the
     choice is visible; `components.<name>` in config.yaml is the override. A port named as `https_port_names` says marks a metrics endpoint served over
-    TLS with authentication, which kubegap cannot read through the pod proxy or a node curl: the step then skips and says so instead of reading nothing."""
+    TLS with authentication, which kubegap cannot read through the pod proxy or a node curl: the step then skips and says so instead of reading nothing, with the `https_note` of the block, which says what stands in for it."""
     kinds = disc.get("kind") or []
     kinds = [kinds] if isinstance(kinds, str) else list(kinds)
     names = disc.get("port_names") or []
@@ -191,6 +191,8 @@ def _discovered(objs: dict, disc: dict, default_port: int, default_namespace: st
     }
     if https is not None:
         out["skip"] = f"{kind} {ns}/{name} serves its metrics on port {https} ({next(pt.get('name') for pt in ports if pt.get('containerPort') == https)}), over TLS with authentication, which the pod proxy and the node curl cannot read"
+        if disc.get("https_note"):
+            out["skip"] += f"; {disc['https_note']}"
     return out
 
 

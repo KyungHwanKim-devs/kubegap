@@ -1,5 +1,5 @@
-# MetalLB collection (small k3s cluster counterpart of the ALB Controller). Objects (IPAddressPool, L2Advertisement, BGPPeer, ServiceL2Status, LoadBalancer Services, speaker DaemonSet, controller Deployment, webhooks) come from core.
-# The speaker /metrics step was moved here from k3s-platform (lib/k3s.py _metallb_l2 reads the metallb collector result from collect-result).
+# MetalLB collection (bare-metal counterpart of the ALB Controller, on any platform). Objects (IPAddressPool, L2Advertisement, BGPPeer, ServiceL2Status, LoadBalancer Services, speaker DaemonSet, controller Deployment, webhooks) come from core.
+# The speaker /metrics step was moved here from k3s-platform (lib/metallbctl.py reads the metallb collector result from collect-result).
 - id: metallb-speaker-metrics
   # Prometheus usually does not scrape the MetalLB speaker (no metallb_* metrics). Read /metrics directly through the pod proxy (read-only GET) and use
   # metallb_speaker_announced{ip,node,service} to see "which node announces which IP" (the L2 leader).
@@ -7,7 +7,7 @@
   namespace: metallb-system
   selector: component=speaker
   port: 7472
-  discover: { kind: daemonset, name: "*/*speaker", port_names: [monitoring], https_port_names: [metricshttps] }   # the plain port is named monitoring through 0.15; 0.16+ serves metrics over TLS with authentication (metricshttps): the step skips and says so
+  discover: { kind: daemonset, name: "*/*speaker", port_names: [monitoring], https_port_names: [metricshttps], https_note: "leaders and config state are read from ServiceL2Status, ServiceBGPStatus and ConfigurationState where the version publishes them; the update error, ARP and BGP session counters are not read" }   # the plain port is named monitoring through 0.15; 0.16+ serves metrics over TLS with authentication (metricshttps): the step skips and says so
   path: /metrics
   out: metrics/pod/metallb-speaker
   source: "names and their definitions per version: collectors/metallb/pod-metrics.yaml. The speaker's --port is 7472 (plain HTTP) through 0.15 (metallb/metallb speaker/main.go:79@v0.13.12, :84@v0.14.9, :86@v0.15.3; manifests/metallb.yaml:329@v0.12.1) and 9120 over TLS with authentication from 0.16.0 (speaker/main.go:94@v0.16.0, :99@v0.16.2; internal/k8s/k8s.go:159-163@v0.16.2 SecureServing with WithAuthenticationAndAuthorization; container port metricshttps, config/manifests/metallb-native.yaml:2333-2334@v0.16.2 and charts/metallb/values.yaml:40-42@v0.16.2), which neither the pod proxy nor the node curl can read: on 0.16+ the step skips with that reason. The container port is named monitoring through 0.15 (config/manifests/metallb-native.yaml:1844-1845@v0.13.12, :2110-2111@v0.15.3; charts/metallb/templates/speaker.yaml:326-327@v0.15.3, where the 0.15 chart's optional kube-rbac-proxy adds metricshttps at :529-530 and the plain port is still read) and metricshttps at 0.16 (above); the FRR sidecar's ports are frrmetrics and frrmetricshttps (speaker.yaml:498-499@v0.15.3, :523-524@v0.16.2). The selector component=speaker is the native manifest's pod label (metallb-native.yaml:2291-2293@v0.16.2); the chart labels its pods app.kubernetes.io/component=speaker instead (charts/metallb/templates/speaker.yaml:161-163@v0.16.2), which discovery reads from the DaemonSet; metallb-system is the native manifest's namespace"

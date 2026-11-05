@@ -77,7 +77,8 @@ def test_metallb_0_16_https_metrics_make_the_step_skip_with_the_reason():
     sp = _wl("daemonset", "metallb-system", "speaker", {"app": "metallb", "component": "speaker"}, [("metricshttps", 9120), ("memberlist-tcp", 7946)])
     t = podmetrics.discover_targets(_objs(("daemonset", sp)), Config())["metallb.metallb-speaker-metrics"]
     assert t["port"] == 7472 and t["source"]["port"] == "default"
-    assert t["skip"] == "daemonset metallb-system/speaker serves its metrics on port 9120 (metricshttps), over TLS with authentication, which the pod proxy and the node curl cannot read"
+    assert t["skip"].startswith("daemonset metallb-system/speaker serves its metrics on port 9120 (metricshttps), over TLS with authentication, which the pod proxy and the node curl cannot read; ")
+    assert "ConfigurationState where the version publishes them" in t["skip"] and "update error" in t["skip"]  # what stands in and what does not reach the report through this reason
     # a plain-HTTP port named in config.yaml is read on purpose
     t2 = podmetrics.discover_targets(_objs(("daemonset", sp)), Config({"components": {"metallb": {"metrics_port": 7472}}}))["metallb.metallb-speaker-metrics"]
     assert "skip" not in t2 and t2["source"]["port"] == "config"
