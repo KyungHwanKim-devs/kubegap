@@ -560,7 +560,7 @@ def _placement(cx: _Ctx) -> dict:
     conc = []
     for nd, c in prod_by_node.most_common():
         lab = (node_meta.get(nd) or {}).get("metadata", {}).get("labels") or {}
-        ctype = lab.get("karpenter.sh/capacity-type") or lab.get("eks.amazonaws.com/capacityType") or lab.get("node.kubernetes.io/capacity-type")
+        ctype = lab.get("karpenter.sh/capacity-type") or lab.get("eks.amazonaws.com/capacityType")  # `node.kubernetes.io/capacity-type` was read too; no project sets that label (#124 K1)
         conc.append(
             {
                 "node": nd,
