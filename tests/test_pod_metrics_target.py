@@ -145,7 +145,7 @@ def test_a_https_target_is_a_skip_not_a_failure(tmp_path, monkeypatch):
     log = RunLog(tmp_path / "run.log")
     ctx = collect.StepContext("metallb", Path("collectors/metallb"), "ctx", Config(), {"pod_metrics_targets": {"metallb.metallb-speaker-metrics": tgt}}, tmp_path, log, None, None, None, None, None, collect.CollectState())
     res = collect._step_pod_metrics(ctx, step)
-    assert res["skipped"] is True and res["ok"] is True and res["note"] == tgt["skip"] and calls == []
+    assert res["skipped"] == tgt["skip"] and res["ok"] is True and res["note"] == tgt["skip"] and calls == []  # the reason: section 7-1 prints this field, and True printed "(True)"
     assert "metricshttps" in (tmp_path / "run.log").read_text()
 
 

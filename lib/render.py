@@ -345,7 +345,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
         steps = c.get("steps") or {}
         failed = [fid[len(name) + 1 :] for fid in failed_ids if fid.startswith(name + ".")]
         failed_steps += [(f"{name}.{sid}", str((steps.get(sid) or {}).get("error") or "")) for sid in failed]
-        skipped = [f"{sid} ({st.get('skipped')})" for sid, st in steps.items() if isinstance(st, dict) and st.get("skipped")]
+        skipped = [f"{sid} ({st.get('note') if st.get('skipped') is True else st.get('skipped')})" for sid, st in steps.items() if isinstance(st, dict) and st.get("skipped")]  # True: a snapshot taken before the step wrote its reason here
         rows.append([name, len(steps), ", ".join(failed) or "", "; ".join(skipped) or (c.get("skipped") or "")])
     w(_table(["Collector", "Steps", "Failed", "Skipped (reason)"], rows))
     npk = ((cr.get("core") or {}).get("steps") or {}).get("objects.dump-all", {}).get("not_permitted") or []

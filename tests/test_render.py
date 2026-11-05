@@ -187,6 +187,31 @@ def test_event_reason_and_failed_command_error_lines_cannot_open_a_block(tmp_pat
     assert not any(ln.startswith("```") for ln in text.splitlines()), "no fence opened by a cluster string (this snapshot has no details block)"
 
 
+def test_a_skipped_metrics_step_shows_its_reason(tmp_path):
+    """A pod-metrics step that skips because the endpoint needs authentication said `skipped: True`, so the table printed `metallb-speaker-metrics (True)` and the reason never reached the report (#155)."""
+    s = _snap(tmp_path, False)
+    cr = json.loads((s / "collect-result.json").read_text())
+    reason = "daemonset metallb-system/speaker serves its metrics on port 9120 (metricshttps); the update error, ARP and BGP session counters are not read"
+    cr["metallb"] = {"collector": "metallb", "steps": {"metallb-speaker-metrics": {"ok": True, "skipped": reason, "pods": {}, "note": reason}}}
+    (s / "collect-result.json").write_text(json.dumps(cr))
+    assert f"metallb-speaker-metrics ({reason})" in render.render_details(s).read_text()
+
+
+def test_older_snapshots_keep_their_own_words(tmp_path):
+    """A snapshot from before the pluto step read the saved objects has Lists, not kinds, and a skipped metrics step that wrote `skipped: True` keeps its reason in `note`."""
+    s = _snap(tmp_path, False)
+    cr = json.loads((s / "collect-result.json").read_text())
+    cr["core"]["steps"]["pluto"] = {"ok": True, "api_read": True, "lists_ok": 119, "lists_failed": 7}
+    cr["metallb"] = {"collector": "metallb", "steps": {"metallb-speaker-metrics": {"ok": True, "skipped": True, "pods": {}, "note": "over TLS with authentication"}}}
+    (s / "collect-result.json").write_text(json.dumps(cr))
+    summ = json.loads((s / "summary.json").read_text())
+    summ["hygiene"] = {"deprecated": {"pluto_lists_ok": 119, "pluto_lists_failed": 7}}
+    (s / "summary.json").write_text(json.dumps(summ))
+    text = render.render_details(s).read_text()
+    assert "Deprecated-API tools: pluto 119 of 126 Lists answered (7 refused or not served)." in text
+    assert "metallb-speaker-metrics (over TLS with authentication)" in text and "(True)" not in text
+
+
 def test_failed_steps_are_counted_from_collect_result_not_from_exit_codes(tmp_path):
     """#132: kubent and pluto exit 0 when their read is not confirmed, so run.log lists no failed command while collect-result.json has the failed step.
     The header row, the Failed column and the count under the table read the same list."""

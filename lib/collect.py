@@ -764,7 +764,7 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
     if tgt.get("skip"):
         if ctx.echo:
             ctx.echo(f"    skipped: {tgt['skip']}")
-        return ctx.skip(sid, tgt["skip"], {"ok": True, "skipped": True, "pods": {}, "target": tgt, "note": tgt["skip"]})
+        return ctx.skip(sid, tgt["skip"], {"ok": True, "skipped": tgt["skip"], "pods": {}, "target": tgt, "note": tgt["skip"]})  # the reason, not True: report section 7-1 prints `skipped`
     r = kube.kubectl(["get", "pods", "-n", ns, "-l", sel, "-o", "json"], context=context, timeout=timeout, id=f"{name}.{sid}.list", log=ctx.log, kubeconfig=ctx.kubeconfig, collector=name)
     runs: dict = {}
     if not r.ok:
@@ -778,7 +778,7 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
         if skip_arg and plist and all(any(skip_arg in str(a) for c in ((p.get("spec") or {}).get("containers") or []) for a in (c.get("args") or [])) for p in plist):
             if ctx.echo:
                 ctx.echo(f"    skipped: {skip_arg} (metrics disabled, expected)")
-            return ctx.skip(sid, f"container arg {skip_arg}", {"ok": True, "skipped": True, "pods": {}, "target": tgt, "note": f"container arg {skip_arg} — no metrics is expected"})
+            return ctx.skip(sid, f"container arg {skip_arg}", {"ok": True, "skipped": f"container arg {skip_arg}: no metrics is expected", "pods": {}, "target": tgt, "note": f"container arg {skip_arg} — no metrics is expected"})
         node_ok = ctx.node_backend_ok()
         for p in plist:
             pname = p["metadata"]["name"]
