@@ -18,6 +18,7 @@ import re
 from collections import Counter
 from pathlib import Path
 
+from .events import count_of
 from .snapshot import load_json, objects
 
 
@@ -249,8 +250,11 @@ def _events(snap: Path) -> Counter:
     ev_counts: Counter = Counter()
     for e in (load_json(snap / "events.json") or {}).get("items") or []:
         r = e.get("reason") or ""
-        if r in ("FailedAttachVolume", "FailedMount", "FailedMapVolume", "VolumeResizeFailed", "FileSystemResizeFailed", "ProvisioningFailed", "VolumeFailedDelete", "FailedDetachVolume", "ExternalExpanding"):
-            ev_counts[r] += int(e.get("count") or 1)
+        # ExternalExpanding is a Normal event while the resizer works and a Warning only on error (kubernetes/kubernetes pkg/controller/volume/expand/expand_controller.go:258,262,269@v1.37.2) (#124 K3-5)
+        if r in ("FailedAttachVolume", "FailedMount", "FailedMapVolume", "VolumeResizeFailed", "FileSystemResizeFailed", "ProvisioningFailed", "VolumeFailedDelete", "FailedDetachVolume") or (
+            r == "ExternalExpanding" and e.get("type") == "Warning"
+        ):
+            ev_counts[r] += count_of(e)
     return ev_counts
 
 

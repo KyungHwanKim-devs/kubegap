@@ -19,6 +19,7 @@ from pathlib import Path
 
 from . import versions
 from .controlplane import workload_of  # noqa: F401  (used by the report to map pod -> workload name)
+from .events import count_of
 from .snapshot import load_json, objects
 
 METRIC_RE = re.compile(r"^(awscni_[a-z0-9_]+)(\{([^}]*)\})?\s+([0-9.eE+-]+)\s*$")
@@ -351,7 +352,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     sandbox = 0
     for e in (load_json(snap / "events.json") or {}).get("items") or []:
         if e.get("reason") == "FailedCreatePodSandBox":
-            sandbox += int(e.get("count") or 1)
+            sandbox += count_of(e)
     # warm pool: with only WARM_ENI_TARGET and no WARM_IP_TARGET, one whole ENI (= per_eni - 1 IPs) is kept empty on every node
     per_node_reserve = None
     if not st["prefix_delegation"] and st["warm_ip_target"] is None and st["warm_eni_target"] >= 1:

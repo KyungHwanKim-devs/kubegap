@@ -17,6 +17,7 @@ from pathlib import Path
 
 from . import versions as _versions  # `versions` is a local name in this module
 from .controlplane import workload_of
+from .events import count_of
 from .snapshot import load_json, objects
 
 ADMIN_HOST_RE = re.compile(r"(^|[.-])(admin|grafana|argocd|argo|deploy|kibana|prometheus|alertmanager|minio|registry|pgadmin|phpmyadmin|console|dashboard|jenkins|vault|keycloak|portainer|longhorn|traefik)([.-]|$)", re.IGNORECASE)
@@ -600,7 +601,7 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
         if e.get("reason") == "Unhealthy":
             io = e.get("involvedObject") or {}
             if io.get("kind") == "Pod":
-                unhealthy[_wl(io.get("namespace", ""), io.get("name", ""))] += int(e.get("count") or 1)
+                unhealthy[_wl(io.get("namespace", ""), io.get("name", ""))] += count_of(e)
     by_wl: dict[str, list] = defaultdict(list)
     for lab, v in _metric_rows(snap, "pod_ready_ratio_24h"):
         ns, pod = lab.get("namespace"), lab.get("pod")

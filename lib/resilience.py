@@ -17,6 +17,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from .controlplane import workload_of
+from .events import count_of
 from .nodeos import kernel_oom_kills
 from .snapshot import load_json, objects
 
@@ -819,10 +820,10 @@ def _restarts(cx: _Ctx) -> dict:
     for e in (load_json(cx.snap / "events.json") or {}).get("items") or []:
         io = e.get("involvedObject") or {}
         if e.get("reason") == "Unhealthy" and io.get("kind") == "Pod":
-            unhealthy[(io.get("namespace"), io.get("name"))] += int(e.get("count") or 1)
+            unhealthy[(io.get("namespace"), io.get("name"))] += count_of(e)
             msg = str(e.get("message") or "")
             kind_p = "startup" if msg.startswith("Startup") else ("readiness" if msg.startswith("Readiness") else ("liveness" if msg.startswith("Liveness") else "?"))
-            by_probe[(io.get("namespace"), io.get("name"), kind_p)] += int(e.get("count") or 1)
+            by_probe[(io.get("namespace"), io.get("name"), kind_p)] += count_of(e)
     rows = []
     for p in cx.pods:
         ns, name = p["metadata"]["namespace"], p["metadata"]["name"]
@@ -1263,7 +1264,7 @@ def _priority(cx: _Ctx) -> dict:
             nonprod_max = max(nonprod_max, pr)
             if pr > 0:
                 offenders.append({"namespace": ns, "pod": p["metadata"]["name"], "priority": pr, "class": pc})
-    preempted = sum(int(e.get("count") or 1) for e in ((load_json(cx.snap / "events.json") or {}).get("items") or []) if e.get("reason") == "Preempted")
+    preempted = sum(count_of(e) for e in ((load_json(cx.snap / "events.json") or {}).get("items") or []) if e.get("reason") == "Preempted")
     inversion = [o for o in offenders if o["priority"] > prod_max] if prod_pods else []
     return {
         "classes": pcs,

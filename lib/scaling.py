@@ -333,19 +333,22 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
             kind = "do-not-disrupt pods"
         elif "blocking budget" in msg:
             kind = "budget"
-        elif "PDB" in msg or "PodDisruptionBudget" in msg:
+        elif "pdb" in msg.lower() or "poddisruptionbudget" in msg.lower():  # `PDB "ns/name"` at 0.37, `pdb "ns/name" prevents pod evictions` at 1.0, `PodDisruptionBudget=` at 1.15 (#124 O-4)
             kind = "PDB"
-        elif "Nominated" in msg:
+        elif "nominated" in msg.lower():  # `Nominated for a pending pod` at 0.37, `state node is nominated` at 1.0, `Node is nominated` at 1.15
             kind = "nominated for pending pods"
         else:
             kind = msg[:60]
-        blocked[f"{io.get('kind')}/{io.get('name')}"][kind] += int(e.get("count") or 1)
+        blocked[f"{io.get('kind')}/{io.get('name')}"][kind] += count_of(e)
     pool_rows = []
     claims_by_pool: Counter = Counter(((c["metadata"].get("labels") or {}).get("karpenter.sh/nodepool")) for c in claims)
     for p in pools:
         sp, st = p.get("spec") or {}, p.get("status") or {}
         dis = sp.get("disruption") or {}
-        reqs = {r.get("key"): r.get("values") for r in ((sp.get("template") or {}).get("spec") or {}).get("requirements") or []}
+        tmpl_spec = (sp.get("template") or {}).get("spec") or {}
+        # `expireAfter` is `spec.disruption.expireAfter` at karpenter.sh/v1beta1 (kubernetes-sigs/karpenter pkg/apis/v1beta1/nodepool.go:88@v0.37.0) and `spec.template.spec.expireAfter` at v1 (pkg/apis/v1/nodepool.go:217@v1.0.0, :272@v1.15.1) (#124 O-1)
+        expire_after = dis.get("expireAfter") if "expireAfter" in dis else tmpl_spec.get("expireAfter")
+        reqs = {r.get("key"): r.get("values") for r in tmpl_spec.get("requirements") or []}
         pool_rows.append(
             {
                 "name": p["metadata"]["name"],
