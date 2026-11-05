@@ -401,7 +401,7 @@ def test_deprecated_read_failure_overrides_success_log(tmp_path, monkeypatch, to
 
 
 def test_deprecated_one_successful_tool_keeps_findings_and_ignores_failed_output(tmp_path, monkeypatch):
-    doc = {"items": [{"name": "web", "namespace": "prod-a", "kind": "Ingress", "api": {"version": "networking.k8s.io/v1beta1"}, "deprecated": True, "removed": True}]}
+    doc = {"items": [{"name": "web", "namespace": "prod-a", "api": {"version": "networking.k8s.io/v1beta1", "kind": "Ingress"}, "deprecated": True, "removed": True}]}  # the shape of the pinned binary's output: the kind is inside api
     pluto = _deprecated_tool(tmp_path, monkeypatch, "pluto", doc, "")
     kubent = _deprecated_tool(tmp_path, monkeypatch, "kubent", [{"Name": "stale"}], "ERR Failed to initialize collector")
     (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {"pluto": pluto, "kubent": kubent}}}))
@@ -423,7 +423,7 @@ def test_pluto_step_keeps_exit_code_zero_when_it_finds_something():
 def test_pluto_findings_with_exit_three_would_be_dropped(tmp_path, monkeypatch):
     """What the flags prevent: a pluto that prints one removed item and exits 3 is a failed step whose output is never saved (lib/shell.py), its read
     evidence is not computed, and the summary carries no items. The test documents the failure mode the flags exist for; it is not a behaviour to keep."""
-    doc = {"items": [{"name": "web", "namespace": "prod-a", "kind": "Ingress", "api": {"version": "networking.k8s.io/v1beta1"}, "deprecated": True, "removed": True}]}
+    doc = {"items": [{"name": "web", "namespace": "prod-a", "api": {"version": "networking.k8s.io/v1beta1", "kind": "Ingress"}, "deprecated": True, "removed": True}]}
     result = _deprecated_tool(tmp_path, monkeypatch, "pluto", doc, "", code=3)
     assert result["ok"] is False and result["api_read"] is False
     summary, verdict = _deprecated_result(tmp_path)

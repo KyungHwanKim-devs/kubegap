@@ -249,7 +249,7 @@ def _deprecated(cx: _Ctx) -> dict:
     # How much of the API each tool saw: successful and failed Lists counted from its log by lib/collect.py (#132); None for a snapshot taken before the counts existed.
     lists = {f"{tool}_lists_{k}": (steps.get(tool) or {}).get(f"lists_{k}") for tool in ("pluto", "kubent") for k in ("ok", "failed")}
     items = []
-    # source: pluto v5.24.5 pkg/api/output.go:28-55 Output{name, filePath, namespace (omitempty), api, deprecated, removed, replacementAvailable}, :57-59 Instance{items (omitempty),
+    # source: pluto v5.24.5 pkg/api/output.go:35-54 Output{name, filePath, namespace (omitempty), api, deprecated, removed, replacementAvailable}, :57-59 Instance{items (omitempty),
     # target-versions}, pkg/api/versions.go:60-76 Version{version, kind, deprecated-in, removed-in, replacement-api, replacement-available-in, component}; deprecated and removed are
     # judged against the target in FilterOutput (output.go:162-163). A cluster-scoped object has no namespace key.
     pl = load_json(cx.snap / "tools" / "pluto.json") or {}
@@ -257,7 +257,7 @@ def _deprecated(cx: _Ctx) -> dict:
         items.append(
             {
                 "source": "pluto",
-                "kind": it.get("kind"),
+                "kind": (it.get("api") or {}).get("kind") if isinstance(it.get("api"), dict) else it.get("kind"),  # pluto's Output has no kind of its own, it is api.kind (pkg/api/output.go:35-54, versions.go:60-76)
                 "name": it.get("name"),
                 "namespace": it.get("namespace"),
                 "api": it.get("api", {}).get("version") if isinstance(it.get("api"), dict) else it.get("api"),
