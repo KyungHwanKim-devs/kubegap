@@ -386,7 +386,10 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
 
         pool = labels.get("karpenter.sh/nodepool")
         age_h = round((now - created).total_seconds() / 3600, 1) if created else None
-        exp_h = pool_expire.get(pool)
+        # Karpenter 1.x applies the NodeClaim's own spec.expireAfter, copied from the pool template when the claim is made (kubernetes-sigs/karpenter pkg/apis/v1/nodeclaim.go:75@v1.0.0, :83@v1.15.1;
+        # pkg/controllers/nodeclaim/expiration/controller.go:51-54@v1.0.0, :72-75@v1.15.1), so a pool edited later does not move an existing claim; a v1beta1 claim has no expireAfter and the pool's value applies
+        spec = c.get("spec") or {}
+        exp_h = _dur_h(spec.get("expireAfter")) if "expireAfter" in spec else pool_expire.get(pool)
         claim_rows.append(
             {
                 "name": md["name"],
@@ -403,7 +406,7 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
                 "initialized_s": secs("Initialized"),
                 "ready": (conds.get("Ready") or {}).get("status") == "True",
                 # the `Expired` condition exists at v1beta1 only (kubernetes-sigs/karpenter pkg/apis/v1beta1/nodeclaim_status.go:30@v0.37.0); from 1.0.0 expiration is a timer on the NodeClaim
-                # (pkg/controllers/nodeclaim/expiration/controller.go:51-54@v1.0.0), so past the pool's expireAfter counts as expired there (#124 O-2)
+                # (pkg/controllers/nodeclaim/expiration/controller.go:51-54@v1.0.0, :72-75@v1.15.1), so a claim past its expireAfter counts as expired there (#124 O-2)
                 "expired": (conds.get("Expired") or {}).get("status") == "True" or (c.get("apiVersion") != "karpenter.sh/v1beta1" and exp_h is not None and age_h is not None and age_h > exp_h),
                 "drifted": (conds.get("Drifted") or {}).get("status") == "True",
                 "expire_after_h": exp_h,

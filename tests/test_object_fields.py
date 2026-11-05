@@ -39,6 +39,17 @@ def test_every_literal_stem_matches_what_discovery_writes():
     assert not bad, f"discovery writes these kinds under the short name, the reader must use it: {bad}"
 
 
+def test_discovery_stems_are_the_table_discovery_fetches():
+    assert frozenset(discover.OBJECT_KINDS) == snapshot.DISCOVERY_STEMS
+
+
+def test_objects_never_falls_back_for_a_kind_discovery_does_not_fetch(tmp_path):
+    _write(tmp_path, "pods", [{"metadata": {"name": "p"}}])
+    _write(tmp_path, "jobs.batch", [{"metadata": {"name": "j"}}])
+    assert snapshot.objects(tmp_path, "pods.metrics.k8s.io") == []  # never pods.json
+    assert snapshot.objects(tmp_path, "jobs") == []  # jobs is not a discovery kind
+
+
 def test_objects_reads_the_old_and_the_new_cronjob_file(tmp_path):
     cj = [{"metadata": {"namespace": "p", "name": "backup"}, "spec": {"schedule": "0 3 * * *"}}]
     _write(tmp_path, "cronjobs.batch", cj)
@@ -408,8 +419,12 @@ def _claim(name, age_h, conds):
 
 
 def test_karpenter_v1_expire_after_lives_on_the_template_and_expiry_is_computed(tmp_path):
+    own = _claim("own", 800, ["Ready"])
+    own["spec"] = {"expireAfter": "2000h"}  # the claim keeps the expireAfter it was made with; a later pool edit does not move it
+    never = _claim("never", 800, ["Ready"])
+    never["spec"] = {"expireAfter": "Never"}
     _karpenter_snapshot(
-        tmp_path, "karpenter.sh/v1", {"spec": {"disruption": {"consolidationPolicy": "WhenEmptyOrUnderutilized"}, "template": {"spec": {"expireAfter": "720h"}}}}, [_claim("old", 800, ["Ready"]), _claim("young", 10, ["Ready"])]
+        tmp_path, "karpenter.sh/v1", {"spec": {"disruption": {"consolidationPolicy": "WhenEmptyOrUnderutilized"}, "template": {"spec": {"expireAfter": "720h"}}}}, [_claim("old", 800, ["Ready"]), _claim("young", 10, ["Ready"]), own, never]
     )
     k = scaling._karpenter(tmp_path, INV, NOW)
     assert k["nodepools"][0]["expire_after"] == "720h" and k["nodepools"][0]["expire_after_h"] == 720
