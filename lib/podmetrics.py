@@ -153,7 +153,7 @@ def _discovered(objs: dict, disc: dict, default_port: int, default_namespace: st
     and the container port named as `port_names` says. When several workloads match (two installs, or a sibling such as loki-grafana next to grafana), the
     one in the step's default namespace is taken, else the first by kind order, namespace and name, and every match is listed in `candidates` so the
     choice is visible; `components.<name>` in config.yaml is the override. A port named as `https_port_names` says marks a metrics endpoint served over
-    TLS with authentication, which kubegap cannot read through the pod proxy or a node curl: the step then skips and says so instead of reading nothing, with the `https_note` of the block, which says what stands in for it."""
+    TLS with authentication, which kubegap cannot read through the pod proxy or a node curl: the step then skips and says so instead of reading nothing, with the `https_note` of the block, which says what stands in for it. `container` limits the port search to that container when it exists."""
     kinds = disc.get("kind") or []
     kinds = [kinds] if isinstance(kinds, str) else list(kinds)
     names = disc.get("port_names") or []
@@ -170,7 +170,10 @@ def _discovered(objs: dict, disc: dict, default_port: int, default_namespace: st
     ns, name = o["metadata"].get("namespace") or "", o["metadata"]["name"]
     spec = o.get("spec") or {}
     labels = ((spec.get("selector") or {}).get("matchLabels")) or {}
-    ports = [pt for c in (((spec.get("template") or {}).get("spec") or {}).get("containers") or []) for pt in (c.get("ports") or [])]
+    containers = ((spec.get("template") or {}).get("spec") or {}).get("containers") or []
+    # `container:` names whose ports count, because a sidecar can use the same port name: metallb-frr.yaml names both frr-metrics:7473 and speaker:7472 `monitoring`, and frr-metrics comes first
+    own = [c for c in containers if c.get("name") == disc.get("container")]
+    ports = [pt for c in (own or containers) for pt in (c.get("ports") or [])]
     port, port_source, https = default_port, "default", None
     for pt in ports:
         if pt.get("name") in names and pt.get("containerPort"):

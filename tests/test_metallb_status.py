@@ -238,3 +238,11 @@ def test_every_metallb_check_runs_wherever_metallb_is_present():
 
     checks = yamlite.load_file(ROOT / "collectors/metallb/checks.yaml")
     assert len(checks) == 6 and all(set(c["profiles"]) == {"prod", "lab"} for c in checks)
+
+
+def test_a_metric_file_without_a_metallb_series_is_not_a_read(tmp_path):
+    """Observed on kind at v0.14.9 with metallb-frr.yaml: the step read the frr-metrics sidecar and saved only process_* lines, and every metric check passed."""
+    step = {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}}}
+    prom = "process_resident_memory_bytes 2.0e+07\nprocess_start_time_seconds 1.7e+09\n"
+    out = metallbctl.analyze(snap(tmp_path, version="v0.14.9", step=step, metrics=prom, daemonsets=[frr_first("v0.14.9")]), INV)
+    assert out["summary"]["metrics_available"] is False and out["summary"]["speakers_read"] == 0 and out["summary"]["config_read"] is False and out["l2"]["available"] is False

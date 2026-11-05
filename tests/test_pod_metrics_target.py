@@ -84,6 +84,15 @@ def test_metallb_0_16_https_metrics_make_the_step_skip_with_the_reason():
     assert "skip" not in t2 and t2["source"]["port"] == "config"
 
 
+def test_the_frr_sidecar_port_of_the_same_name_is_not_the_speaker():
+    """metallb-frr.yaml names frr-metrics:7473 and speaker:7472 `monitoring`, the sidecar first. The discovered port was 7473, and only process_* lines came back (kind, v0.14.9)."""
+    sp = _wl("daemonset", "metallb-system", "speaker", {"app": "metallb", "component": "speaker"}, [("monitoring", 7472)])
+    sp["spec"]["template"]["spec"]["containers"][0]["name"] = "speaker"
+    sp["spec"]["template"]["spec"]["containers"].insert(0, {"name": "frr-metrics", "ports": [{"name": "monitoring", "containerPort": 7473}]})
+    t = podmetrics.discover_targets(_objs(("daemonset", sp)), Config())["metallb.metallb-speaker-metrics"]
+    assert t["port"] == 7472 and t["source"]["port"] == "discovered"
+
+
 def test_an_old_inventory_without_targets_reads_the_step_defaults():
     step = next(s for f, s in podmetrics.pod_metrics_steps() if f == "argocd" and s["id"] == "server-metrics")
     assert podmetrics.default_target(step)["port"] == 8083

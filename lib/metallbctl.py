@@ -50,8 +50,9 @@ def _workload(found: list[dict], role: str) -> dict | None:
 
 
 def _metric_files(snap: Path) -> list[Path]:
+    """The speaker metric files that hold a MetalLB series. A file with none was read from the wrong port (a configured `metrics_port`, or the FRR sidecar): it says nothing about the speaker, and counting it passed every check on nothing."""
     d = snap / "metrics" / "pod" / "metallb-speaker"
-    return [x for x in sorted(d.glob("*.prom")) if x.stat().st_size > 0] if d.is_dir() else []
+    return [x for x in sorted(d.glob("*.prom")) if "metallb_" in x.read_text(encoding="utf-8", errors="replace")] if d.is_dir() else []
 
 
 def _step(snap: Path) -> dict:
