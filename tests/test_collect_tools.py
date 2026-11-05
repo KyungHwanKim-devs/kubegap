@@ -128,3 +128,42 @@ def test_deprecation_tools_are_skipped_without_a_server_version(tmp_path, monkey
     assert res["ok"] is False and res["skipped"].startswith("server version unknown") and not (snap / "tools" / "pluto.json").exists()
     res = collect._run_tool_step(step, "pluto", "core", "ctx", None, snap, RunLog(None), None, 30, None, inv={"cluster": {"server_version": "v1.32.13-eks-abc"}})
     assert res["ok"] and '"args": "--target-versions k8s=v1.33.0"' in (snap / "tools" / "pluto.json").read_text()
+
+
+def _api_resources(tmp_path, monkeypatch, stdout, ok):
+    class R:
+        pass
+
+    r = R()
+    r.ok, r.stdout, r.stderr, r.error = ok, stdout, "unable to retrieve the complete list of server APIs: metrics.k8s.io/v1beta1: the server is currently unable to handle the request", None
+    monkeypatch.setattr(collect.kube, "kubectl", lambda *a, **k: r)
+    return collect.list_api_resources("ctx", None, RunLog(None))
+
+
+TABLE = "NAME          SHORTNAMES   APIVERSION   NAMESPACED   KIND         VERBS\ndeployments   deploy       apps/v1      true         Deployment   get,list\n"
+
+
+def test_a_partial_discovery_still_reads_what_kubectl_printed(tmp_path, monkeypatch):
+    """kubectl api-resources prints what it found and exits non-zero when one aggregated API is down (staging/src/k8s.io/kubectl/pkg/cmd/apiresources/apiresources.go:180-182,251@v1.37.2). `[]` lost the whole dump, and now pluto with it."""
+    assert [r["full"] for r in _api_resources(tmp_path, monkeypatch, TABLE, False)] == ["deployments.apps"]
+    assert _api_resources(tmp_path, monkeypatch, "", False) == []
+
+
+def test_a_crd_with_the_plural_of_a_discovery_kind_is_fetched(tmp_path, monkeypatch):
+    """`name in done` also matched services.serving.knative.dev, so a Knative Service was never saved and pluto could not see it."""
+    (tmp_path / "objects").mkdir()
+    (tmp_path / "objects" / "services.json").write_text('{"items": []}')
+    res = [
+        {"name": "services", "full": "services", "namespaced": True, "kind": "Service", "apiversion": "v1"},
+        {"name": "services", "full": "services.serving.knative.dev", "namespaced": True, "kind": "Service", "apiversion": "serving.knative.dev/v1"},
+    ]
+    monkeypatch.setattr(collect, "list_api_resources", lambda *a: res)
+    asked = []
+
+    def fake_json(args, **k):
+        asked.append(args[1])
+        return {"items": []}, None
+
+    monkeypatch.setattr(collect.kube, "kubectl_json", fake_json)
+    out = collect.dump_all("ctx", None, tmp_path, [], 10, RunLog(None), "core")
+    assert out["skipped"] == ["services"] and asked == ["services.serving.knative.dev"] and (tmp_path / "objects" / "services.serving.knative.dev.json").is_file()

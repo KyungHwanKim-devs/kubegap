@@ -63,7 +63,7 @@ def _glob_match(name: str, patterns: list[str]) -> bool:
 def list_api_resources(context: str | None, kubeconfig: str | None, log: RunLog) -> list[dict]:
     """Parse `kubectl api-resources --verbs=list -o wide` into a list of (name, namespaced, kind, full name)."""
     r = kube.kubectl(["api-resources", "--verbs=list", "-o", "wide"], context=context, timeout=60, id="collect.api-resources", log=log, kubeconfig=kubeconfig)
-    if not r.ok:
+    if not r.ok and not r.stdout.strip():  # kubectl prints what it found and still exits non-zero when one group failed (an unhealthy aggregated API); run.log has the failure
         return []
     lines = r.stdout.splitlines()
     if not lines:
@@ -85,6 +85,21 @@ def list_api_resources(context: str | None, kubeconfig: str | None, log: RunLog)
     return out
 
 
+DISCOVERY_RESOURCES = {
+    "nodes",
+    "namespaces",
+    "services",
+    "pods",
+    "configmaps",
+    "storageclasses.storage.k8s.io",
+    "customresourcedefinitions.apiextensions.k8s.io",
+    "daemonsets.apps",
+    "deployments.apps",
+    "statefulsets.apps",
+    "cronjobs.batch",
+}  # discover.OBJECT_KINDS as `kubectl api-resources` names them
+
+
 def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: list[str], timeout: float, log: RunLog, collector: str, echo=None) -> dict:
     resources = list_api_resources(context, kubeconfig, log)
     done = {p.stem for p in (snap / "objects").glob("*.json")}
@@ -101,7 +116,7 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
         # Kinds discovery already fetched (nodes, pods, deployments ...) are not fetched again. File name: core group = name only, others = name.group
         core_group = not res.get("apiversion", "").count("/")
         file_stem = name if core_group else full
-        if name in done or full in done:
+        if full in done or (full in DISCOVERY_RESOURCES and name in done):  # `name` alone would also match a CRD of the same plural (services.serving.knative.dev), which was then never fetched
             summary["skipped"].append(full)
             continue
         args = ["get", full] + (["-A"] if res["namespaced"] else [])
