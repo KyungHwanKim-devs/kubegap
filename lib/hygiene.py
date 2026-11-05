@@ -95,10 +95,11 @@ class _Ctx:
         self.platform = (inv.get("cluster") or {}).get("platform")
         self.server_version = (inv.get("cluster") or {}).get("server_version")
         self.workloads = []
-        for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet"), ("cronjobs.batch", "CronJob")):
+        for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet"), ("cronjobs", "CronJob")):
             for o in objects(snap, stem):
                 self.workloads.append((kind, o))
         self.pods = objects(snap, "pods")
+        self.argo_apps = {a["metadata"]["name"] for a in objects(snap, "applications.argoproj.io")}  # for the default Argo CD label tracking (#124 K2-5)
 
     @staticmethod
     def tpl(kind, o) -> dict:

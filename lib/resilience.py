@@ -170,7 +170,7 @@ class _Ctx:
             if own:
                 self.job_owner[(j["metadata"]["namespace"], j["metadata"]["name"])] = (own.get("kind"), own.get("name"))
         self.job_names = set(self.job_owner) | {(j["metadata"]["namespace"], j["metadata"]["name"]) for j in objects(snap, "jobs.batch")}
-        self.cronjob_names = {(c["metadata"]["namespace"], c["metadata"]["name"]) for c in objects(snap, "cronjobs.batch")}
+        self.cronjob_names = {(c["metadata"]["namespace"], c["metadata"]["name"]) for c in objects(snap, "cronjobs")}
         self.rs_names = {(rs["metadata"]["namespace"], rs["metadata"]["name"]) for rs in objects(snap, "replicasets.apps")}
         self.rs_owner = {}
         for rs in objects(snap, "replicasets.apps"):
@@ -1073,7 +1073,7 @@ def _cronjobs(cx: _Ctx, now: _dt.datetime) -> dict:
         if own and own.get("kind") == "CronJob":
             jobs_by_owner[(j["metadata"]["namespace"], own.get("name"))].append(j)
     rows = []
-    for cj in objects(cx.snap, "cronjobs.batch"):
+    for cj in objects(cx.snap, "cronjobs"):
         md, sp, st = cj["metadata"], cj.get("spec") or {}, cj.get("status") or {}
         ns = md["namespace"]
         jt = (sp.get("jobTemplate") or {}).get("spec") or {}
@@ -1184,7 +1184,7 @@ def _backup_locality(cx: _Ctx) -> dict:
         for c in sorted(set(claims)):
             db_pvcs[ns].append((cx.wl_key(kind, o), c, pvc_node.get((ns, c))))
     rows = []
-    for cj in objects(cx.snap, "cronjobs.batch"):
+    for cj in objects(cx.snap, "cronjobs"):
         md, sp = cj["metadata"], cj.get("spec") or {}
         ns = md["namespace"]
         pod = (((sp.get("jobTemplate") or {}).get("spec") or {}).get("template") or {}).get("spec") or {}

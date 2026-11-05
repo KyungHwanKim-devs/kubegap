@@ -95,5 +95,17 @@ def component_logs_aggregate(snap: Path) -> dict | None:
 
 
 def objects(snap: Path, stem: str) -> list:
-    """Items of `objects/<stem>.json` in the snapshot. `stem` is the resource file name, e.g. "deployments" or "bgppeers.metallb.io"."""
-    return items(load_json(snap / "objects" / f"{stem}.json"))
+    """Items of `objects/<stem>.json` in the snapshot. `stem` is the resource file name, e.g. "deployments" or "bgppeers.metallb.io".
+
+    The kinds discovery fetches (`lib/discover.py` KINDS) are written under the short name (`cronjobs`), the dump-all step writes every other
+    non-core kind as `<name>.<group>` (`jobs.batch`). A reader names the short stem; a snapshot written before 2026-11-05 still has `cronjobs.batch.json`
+    (discovery did not fetch CronJobs then), so a missing short stem falls back to the one `<stem>.<group>.json` file of that name, and the reverse (#124)."""
+    p = snap / "objects" / f"{stem}.json"
+    if not p.is_file():
+        if "." in stem:
+            alt = snap / "objects" / f"{stem.split('.', 1)[0]}.json"
+        else:
+            cands = sorted((snap / "objects").glob(f"{stem}.*.json")) if (snap / "objects").is_dir() else []
+            alt = cands[0] if len(cands) == 1 else p
+        p = alt if alt.is_file() else p
+    return items(load_json(p))
