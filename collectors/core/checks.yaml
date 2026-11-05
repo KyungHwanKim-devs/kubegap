@@ -3072,7 +3072,7 @@
             - "node-exporter"
           components_present: []
         objects:
-          cronjobs.batch: []
+          cronjobs: []
           etcdsnapshotfiles.k3s.cattle.io: []
           volumesnapshots.snapshot.storage.k8s.io: []
       - expect: "warn"
@@ -3091,7 +3091,7 @@
             - "node-exporter"
           components_present: []
         objects:
-          cronjobs.batch:
+          cronjobs:
             - metadata:
                 namespace: "prod-a"
                 name: "pg-backup"
@@ -3115,7 +3115,7 @@
             - "node-exporter"
           components_present: []
         objects:
-          cronjobs.batch:
+          cronjobs:
             - metadata:
                 namespace: "prod-a"
                 name: "pg-backup"

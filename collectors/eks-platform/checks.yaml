@@ -553,7 +553,7 @@
           backup-plans.json:
             BackupPlansList: []
         objects:
-          cronjobs.batch: []
+          cronjobs: []
           etcdsnapshotfiles.k3s.cattle.io: []
           volumesnapshots.snapshot.storage.k8s.io: []
       - expect: "pass"
@@ -581,7 +581,7 @@
           backup-plans.json:
             BackupPlansList: []
         objects:
-          cronjobs.batch: []
+          cronjobs: []
       - expect: "skip"
         inventory:
           cluster:
@@ -601,7 +601,7 @@
               support_type: "STANDARD"
               addons: {}
         objects:
-          cronjobs.batch: []
+          cronjobs: []
 
 - id: platform.karpenter-version-compat
   name: Karpenter version does not support the cluster Kubernetes version (compatibility table)
