@@ -269,9 +269,7 @@ def eligible_nodes(pod_spec: dict, nodes: list[dict], *, ignore_node_name: bool 
         labels = n["metadata"].get("labels") or {}
         if any(labels.get(k) != v for k, v in sel.items()):
             continue
-        if req and not any(
-            all(_expr_match(e, labels) for e in (t.get("matchExpressions") or [])) and all((labels.get(f.get("key")) in (f.get("values") or [])) if f.get("operator") == "In" else True for f in (t.get("matchFields") or [])) for t in req
-        ):
+        if req and not any(all(_expr_match(e, labels) for e in (t.get("matchExpressions") or [])) and all(_field_match(f, n) for f in (t.get("matchFields") or [])) for t in req):
             continue
         if not _tolerates(pod_spec.get("tolerations") or [], (n.get("spec") or {}).get("taints") or []):
             continue
@@ -393,6 +391,8 @@ def _pdbs(cx: _Ctx) -> dict:
                 "desired_healthy": st.get("desiredHealthy"),
                 "expected_pods": st.get("expectedPods"),
                 "blocks_drain": (st.get("disruptionsAllowed") == 0 and (st.get("expectedPods") or 0) > 0),
+                # the DisruptionAllowed condition's reason tells InsufficientPods (the budget holds) from SyncFailed (the controller could not compute the budget, and the apiserver denies evictions as well: kubernetes/kubernetes pkg/controller/disruption/disruption.go:982-990@v1.37.2) (#124 K1-4)
+                "disruption_allowed_reason": next((c.get("reason") for c in st.get("conditions") or [] if c.get("type") == "DisruptionAllowed"), None),
                 "never_allows": never,
                 "orphan": not covered and (st.get("expectedPods") or 0) == 0,
                 "prod": ns in cx.prod,
@@ -431,7 +431,8 @@ def _graceful(cx: _Ctx) -> dict:
                 "readiness_gate": ns_gate.get(o["metadata"]["namespace"]),
                 "replicas": (o.get("spec") or {}).get("replicas"),
                 "strategy": ((o.get("spec") or {}).get("strategy") or {}).get("type") or ((o.get("spec") or {}).get("updateStrategy") or {}).get("type"),
-                "max_unavailable": (((o.get("spec") or {}).get("strategy") or {}).get("rollingUpdate") or {}).get("maxUnavailable"),
+                # Deployments carry `spec.strategy`, StatefulSets and DaemonSets `spec.updateStrategy` (kubernetes/kubernetes staging/src/k8s.io/api/apps/v1/types.go:130,145@v1.37.2) (#124 K1-3)
+                "max_unavailable": ((((o.get("spec") or {}).get("strategy") or (o.get("spec") or {}).get("updateStrategy") or {}).get("rollingUpdate") or {}).get("maxUnavailable")),
             }
         )
     return {
@@ -1153,11 +1154,26 @@ BACKUP_NAME_RE = re.compile(r"(backup|dump|snapshot|archive|bak)", re.IGNORECASE
 OFFSITE_RE = re.compile(r"(s3://|s3\.|aws s3|rclone|restic|gs://|gsutil|b2 |backblaze|minio|mc cp|azcopy|rsync .*@|scp |sftp|wal-g|pgbackrest|borg|kopia)", re.IGNORECASE)
 
 
+def _field_match(f: dict, node: dict) -> bool:
+    """`matchFields` of a node selector term: the only field key the scheduler supports is `metadata.name` (kubernetes/kubernetes
+    staging/src/k8s.io/component-helpers/scheduling/corev1/nodeaffinity/nodeaffinity.go:126-134@v1.37.2), compared with the node's name, not its labels (#124 K1-5)."""
+    if f.get("operator") != "In":
+        return True
+    value = node["metadata"].get("name") if f.get("key") == "metadata.name" else None
+    return value in (f.get("values") or [])
+
+
 def _pv_node(pv: dict) -> str | None:
+    """The node a PV is pinned to: a required term with one `In` expression and one value. `kubernetes.io/hostname` is the key the local-path
+    provisioner (rancher/local-path-provisioner provisioner.go:526-529@v0.0.37, overridable by the StorageClass parameter `nodeAffinityKey`, :540-542)
+    and static local PVs write; any other single-value key is a pin too (#124 K1-6)."""
     for t in (((pv.get("spec") or {}).get("nodeAffinity") or {}).get("required") or {}).get("nodeSelectorTerms") or []:
-        for e in t.get("matchExpressions") or []:
-            if e.get("key") == "kubernetes.io/hostname" and e.get("values"):
+        exprs = [e for e in t.get("matchExpressions") or [] if e.get("operator", "In") == "In" and len(e.get("values") or []) == 1]
+        for e in exprs:
+            if e.get("key") == "kubernetes.io/hostname":
                 return e["values"][0]
+        if len(exprs) == 1 and len(t.get("matchExpressions") or []) == 1:
+            return exprs[0]["values"][0]
     return None
 
 
