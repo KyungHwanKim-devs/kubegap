@@ -20,7 +20,7 @@ Grafana ends the token.
 
 What stops it, each reported with its reason and the "Show how" way out: no `secretKeyRef` on the Grafana workload (the password is set another
 way), the kubeconfig user may not read that Secret (the shipped ClusterRole excludes Secrets on purpose; an admin kubeconfig usually may),
-Grafana refuses the admin login (external auth, a password that is not the Secret's), or the service account route is not there.
+Grafana refuses the admin login (a password changed since first start, so the Secret is stale; external auth), or the service account route is not there. Seen on the maintainer's k3s cluster: Grafana 12.2.1 answered 401 "invalid password" to the Secret's value, nothing was created and nothing written.
 """
 
 from __future__ import annotations
@@ -100,7 +100,11 @@ def create_via_api(base: str, user: str, password: str, account_name: str) -> di
             continue
         break
     if not r.ok:
-        why = "Grafana refused the admin login (the password in the Secret is not the one Grafana uses, or logins go through an external provider)" if r.status in (401, 403) else (r.error or f"HTTP {r.status}")
+        why = (
+            "Grafana refused the admin login: the password in the Secret is not the one Grafana uses. Grafana takes GF_SECURITY_ADMIN_PASSWORD only when it creates the admin user at first start; a password changed in Grafana since, or a Secret regenerated while Grafana kept its database, leaves the Secret stale. Either set Grafana's admin password back to the Secret's value yourself (`grafana cli admin reset-admin-password` in the Grafana pod) and pick Create now again, or pick Show how"
+            if r.status in (401, 403)
+            else (r.error or f"HTTP {r.status}")
+        )
         return {"ok": False, "error": f"POST /api/serviceaccounts: {why}"}
     sa = r.json() or {}
     sa_id = sa.get("id")
