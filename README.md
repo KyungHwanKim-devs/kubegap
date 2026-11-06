@@ -115,9 +115,9 @@ Node checks run in the full audit. The way in depends on the kind of cluster.
 
 - **EKS.** Read commands run on the nodes as root through AWS Systems Manager. Your AWS account needs the SSM document `kubegap-node-read`, which fixes the commands that may run. If you choose to upload it, kubegap does that for you, and the credentials it uses need `ssm:CreateDocument`. The node role needs `AmazonSSMManagedInstanceCore`.
 - **k3s, RKE2 and clusters you installed yourself.** kubegap connects with the user and key from your local SSH setup. The node's host key must be in `known_hosts`, and some logs can be read only if that user has the right groups or sudoers entries. If a node does not respond, kubegap tells you why and lets you accept the host key, enter an address yourself, or continue with the nodes that do respond.
-- **GKE and AKS.** This takes a DaemonSet that runs a privileged pod on each node, and that pod mounts the node's root file system. kubegap creates nothing in a cluster, so it only shows you the commands. You apply them yourself, and after the audit `kubectl delete namespace kubegap` removes it all.
+- **GKE, AKS and other platforms with neither SSM nor SSH.** kubegap does not read the nodes there. The node checks are reported as not collected, and everything that comes from the Kubernetes API, Prometheus and node-exporter is audited as usual.
 
-If access is already in place, kubegap reads the nodes without asking. That means the SSM document is in the EKS account, the kubegap DaemonSet pods are running, or the config file has `ssh:` or `node_access: ssh`. SSH is never used until you choose it, even where it would work. Once node access is set up, a daily audit can also read, from the nodes, the metrics of components Prometheus does not scrape.
+If access is already in place, kubegap reads the nodes without asking. That means the SSM document is in the EKS account, or the config file has `ssh:` or `node_access: ssh`. SSH is never used until you choose it, even where it would work. Once node access is set up, a daily audit can also read, from the nodes, the metrics of components Prometheus does not scrape.
 
 ## Commands
 
@@ -166,7 +166,7 @@ What is expected depends on the kind and size of the cluster. EKS is held to the
 
 kubegap only reads the cluster. It reads pods, Deployments, events, logs and metrics, and it creates, changes and deletes nothing. It reaches Prometheus and Grafana through a port-forward, which leaves nothing behind in the cluster either.
 
-It connects with the kubeconfig, AWS CLI profile and SSH setup you already use, and it installs nothing in the cluster. The one exception is looking inside the nodes on GKE and AKS, where you start a DaemonSet yourself and can remove it when you are done.
+It connects with the kubeconfig, AWS CLI profile and SSH setup you already use, and it installs nothing in the cluster.
 
 Secret values are not collected. kubegap sees only their names and types. The `helm list` in a full audit does read the release records Helm keeps in Secrets, but kubegap keeps only details such as the release name, status and version, and does not collect the values. pluto never reaches the cluster: it checks the objects kubegap already saved, which hold no Secrets.
 

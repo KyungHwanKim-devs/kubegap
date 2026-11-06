@@ -19,7 +19,7 @@ kubegap은 자격 증명을 따로 저장하지 않습니다. kubeconfig, AWS CL
 | Grafana 데이터소스와 대시보드 목록 | Grafana 사이드카가 읽는 ConfigMap(라벨 `grafana_dashboard`, `grafana_datasource`). 토큰이 필요 없습니다. Grafana 화면에서 만든 대시보드까지 보려면 설정 파일의 `grafana_api_token` | Grafana가 세는 대시보드가 ConfigMap보다 많을 때. 첫 실행에서 몇 개인지와 토큰 만드는 법을 알려 줍니다 |
 | 노드 안쪽, EKS | SSM `send-command`와 SSM 문서 `kubegap-node-read` | AWS 계정마다 한 번. 첫 실행에서 SSM 문서를 올릴지 묻습니다 |
 | 노드 안쪽, k3s와 베어메탈 | `~/.ssh/config`의 사용자와 키로 각 노드의 InternalIP에 SSH 접속 | 그렇게 닿지 않는 노드가 있을 때. 첫 실행에서 주소를 묻습니다 |
-| 노드 안쪽, GKE, AKS와 그 밖의 관리형 노드 | 직접 적용한 DaemonSet에 `kubectl exec` | 이 환경에서 노드 점검을 하고 싶을 때. 첫 실행에서 명령을 보여 줍니다 |
+| 노드 안쪽, GKE, AKS와 그 밖의 관리형 노드 | 읽지 않습니다. kubegap에 이 환경의 노드 접속이 없습니다 | 없음. 노드 점검 항목은 미수집으로 적힙니다 |
 | 추가 도구 | `PATH` | 도구가 없을 때. 첫 실행에서 설치할지 묻습니다 |
 
 연결이 없으면 그 연결이 필요한 점검 항목만 빠지고, 빠졌다는 사실을 리포트에 적습니다. 다른 점검은 멈추지 않습니다.
@@ -33,8 +33,7 @@ kubegap은 자격 증명을 따로 저장하지 않습니다. kubeconfig, AWS CL
 | `home-mode` | `~/.kubegap` 아래 폴더를 이 컴퓨터의 다른 사용자가 읽을 수 있을 때 (옛 kubegap이 만들었거나 직접 권한을 넓힌 경우) | 지금 고치기 (`kubegap protect-home`, chmod 700) · 그대로 두기 |
 | `tools` | 추가 도구가 설치되어 있지 않을 때 | 전부 설치 · 건너뛰기 · 도구 이름을 적어 그 도구만 설치 |
 | `ssm-document` | EKS에서 SSM 문서가 없거나 kubegap에 들어 있는 SSM 문서보다 오래됐을 때 | 올리기 · 건너뛰기 |
-| `node-ssh` | k3s, RKE2 또는 kubegap이 알아보지 못한 플랫폼이고, 설정 파일에 노드 접속(`ssh:` 블록이나 `node_access`)이 없고, DaemonSet 파드도 없을 때 | 지금 SSH 확인 · 건너뛰기. 응답하지 않는 노드가 있으면 호스트 키 받기 또는 다시 확인 · 응답한 노드만 쓰기 · 건너뛰기 · 노드별 주소 입력 |
-| `node-daemonset` | GKE나 AKS에서 노드 DaemonSet이 돌고 있지 않을 때 | 명령 보기 · 건너뛰기 |
+| `node-ssh` | k3s, RKE2 또는 kubegap이 알아보지 못한 플랫폼이고, 설정 파일에 노드 접속(`ssh:` 블록이나 `node_access`)이 없을 때 | 지금 SSH 확인 · 건너뛰기. 응답하지 않는 노드가 있으면 호스트 키 받기 또는 다시 확인 · 응답한 노드만 쓰기 · 건너뛰기 · 노드별 주소 입력 |
 | `grafana-token` | Grafana를 찾았고 토큰이 없는데, 사이드카용 대시보드·데이터소스 ConfigMap이 하나도 없거나 Grafana가 세는 대시보드가 그 ConfigMap보다 많을 때 | 방법 보기 · 건너뛰기 |
 | `stores` | Prometheus, Alertmanager, Loki, Grafana 중 클러스터에 Service가 없는 것이 있을 때. 로그 수집기(fluent-bit, fluentd, promtail) 설정에 로그가 다른 곳으로 간다고 적혀 있으면 Loki는 묻지 않고, 리포트에 어디로 가는지 적습니다 | 설치 안 함 · 다음에 다시 묻기 · 주소 입력 |
 
@@ -67,7 +66,7 @@ kubegap을 쓰면서 내 컴퓨터 바깥에 무언가를 준비해야 할 수 �
 
 일부 정보는 로그인만으로 읽히지 않습니다. 사용자가 로그를 읽는 그룹에 들어 있어야 하고, 선택 사항인 sudoers 파일을 넣으면 root만 읽을 수 있는 나머지도 읽힙니다. 방법은 [`deploy/node-access/README.md`](../../deploy/node-access/README.md)에 있습니다. kubegap은 노드에서 아무것도 바꾸지 않으므로 이 설정은 직접 하세요.
 
-**GKE, AKS, SSM도 SSH도 없는 관리형 노드.** [`deploy/node-access/daemonset.yaml`](../../deploy/node-access/daemonset.yaml)과 [`deploy/permissions/role-daemonset-exec.yaml`](../../deploy/permissions/role-daemonset-exec.yaml)을 적용하세요. DaemonSet 이미지는 다이제스트로 고정되어 있습니다. 다음 점검에서 kubegap이 파드를 찾아 `kubectl exec`로 노드를 읽습니다. 이 파드는 privileged로 돌아갑니다. 계속 남겨 두고 싶지 않으면 점검이 끝난 뒤 `kubegap` 네임스페이스를 지우세요. kubegap이 대신 적용하는 일은 없습니다.
+**GKE, AKS, SSM도 SSH도 없는 관리형 노드.** 노드 안쪽은 읽지 않고, 노드 점검 항목은 미수집으로 적힙니다. 이 플랫폼용 백엔드는 `lib/node.py`에 같은 명령 목록을 실행하는 분기 하나를 더하는 일인데, 관리자에게는 만들고 확인할 클러스터가 없습니다. 그 클러스터를 쓰는 분의 기여를 기다립니다.
 
 노드 접속은 첫 수집 전을 포함해 언제든 확인할 수 있습니다.
 
@@ -164,7 +163,7 @@ scripts/kubegap prune --context <name> --keep-daily 14 --keep-full 4 --dry-run
 ```yaml
 # ~/.kubegap/config.yaml
 mode: daily          # 노드 스크립트, CloudWatch 로그, 비용 데이터, 외부 도구를 쓰지 않습니다
-node_access: none    # SSM send-command, SSH, DaemonSet exec를 쓰지 않습니다
+node_access: none    # SSM send-command, SSH를 쓰지 않습니다
 install_tools: never # 이 컴퓨터에 아무것도 설치하지 않습니다
 # grafana_api_token 없음: Grafana 데이터소스와 대시보드 목록을 읽지 않습니다
 ```

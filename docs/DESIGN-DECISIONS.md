@@ -42,7 +42,7 @@ Every collector is written for EKS first and run on a small k3s cluster in the s
 
 ## 8. Node access through one interface, backend chosen by platform
 
-Kernel logs, containerd state and sysctl values are read inside nodes through one function. On EKS the backend is SSM `send-command`; on bare metal it is SSH; a privileged DaemonSet is the third option for environments with neither. Nodes that cannot be reached produce a finding, and their node-level checks are marked skipped, never silently passed.
+Kernel logs, containerd state and sysctl values are read inside nodes through one function. On EKS the backend is SSM `send-command`; on bare metal it is SSH. Platforms with neither (GKE, AKS) are not read: a privileged DaemonSet was tried as a third option and removed in #172, because no cluster existed to verify it on and it was the only privileged thing kubegap asked for. A backend for them is one more branch of the same function. Nodes that cannot be reached produce a finding, and their node-level checks are marked skipped, never silently passed.
 
 kubelet and node-exporter cannot show OOM-killer lines, soft lockups or NIC resets. Those are the problems that look like application bugs until someone reads `dmesg`.
 

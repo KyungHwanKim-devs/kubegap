@@ -5,7 +5,6 @@
 # nodes/proxy: GET /api/v1/nodes/<node>/proxy/configz (kubelet configuration, full mode).
 # pods/proxy: GET of a component pod's /metrics through the API server proxy (type: pod-metrics steps). Read only. When the proxy is blocked by the node security group kubegap reads the same URL with curl from inside a node instead.
 # pods/portforward: `kubectl port-forward svc/<prometheus|alertmanager|loki|grafana>` to read the stores. The verb is `create` because that is how the API server names opening the stream; nothing is created in the cluster. If config.yaml sets prometheus_url, alertmanager_url, loki_url and grafana_url, this rule can be dropped.
-# The DaemonSet node backend additionally needs `get` and `create` on pods/exec in the kubegap namespace; that is role-daemonset-exec.yaml, kept separate.
 # The external tools of the core collector that reach the cluster (krr, polaris, kubent, helm) list kinds of their own choosing within these grants; `helm list` is the one that needs Secrets and fails under this role. pluto reaches nothing: it reads a list built from the snapshot.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
