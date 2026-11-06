@@ -24,11 +24,11 @@ QUOTA_WATCH = {  # only the quotas that actually block Kubernetes operations (EN
     "L-7EED9B64": "listener rules per ALB",
     "L-822D1B1B": "target groups per ALB",
     "L-9365A611": "certificates per ALB",
-    "L-D18FCD1D": "gp3 storage (TiB)",
-    "L-7A658B76": "gp2 storage (TiB)",
+    "L-D18FCD1D": "gp2 storage (TiB)",  # the two gp codes were swapped until #125 (https://docs.aws.amazon.com/general/latest/gr/ebs-service.html read 2026-11-06: "Storage for General Purpose SSD (gp2) volumes, in TiB" L-D18FCD1D)
+    "L-7A658B76": "gp3 storage (TiB)",
     "L-309BACF6": "EBS snapshots",
-    "L-0EA8095F": "NAT gateways (per AZ)",
-    "L-E79EC296": "internet gateways",
+    "L-FE5A380F": "NAT gateways (per AZ)",  # L-0EA8095F, watched under this label until #125, is "Inbound or outbound rules per security group" (https://docs.aws.amazon.com/general/latest/gr/vpc-service.html read 2026-11-06)
+    "L-A4707A72": "internet gateways",  # L-E79EC296, watched under this label until #125, is "VPC security groups per Region" (same page)
 }
 WORLD = ("0.0.0.0/0", "::/0")
 
