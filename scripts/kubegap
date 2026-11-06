@@ -377,6 +377,20 @@ def cmd_render_details(args) -> int:
     return EXIT_OK
 
 
+def cmd_protect_home(args) -> int:
+    """chmod 700 the folders under ~/.kubegap that other users can read (the "Fix now" of the home-mode first-run question). Changes nothing else."""
+    from lib import paths as _paths
+
+    _paths.ensure_private_dir(_paths.snapshots_root())
+    if args.context:
+        _paths.ensure_private_dir(_paths.context_root(args.context, None), base=_paths.snapshots_root())
+    done = _paths.protect_home()
+    for d in done:
+        print(f"chmod 700 {d}")
+    print(f"protected: {len(done)} folder{'s' if len(done) != 1 else ''}" if done else "nothing to change: every folder under the kubegap home is readable by you only")
+    return EXIT_OK
+
+
 def cmd_keep_report(args) -> int:
     """Move the report of a snapshot to earlier-reports/ so that another report can be written from the same data (SKILL.md section 7)."""
     from lib import render as _render
@@ -687,7 +701,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_questions)
 
     s = sub.add_parser("answer", parents=[common], help="remember the user's choice for a first-run question so it is not asked again")
-    s.add_argument("item", nargs="?", help="question id (tools, ssm-document, node-ssh, node-daemonset, grafana-token, stores)")
+    s.add_argument("item", nargs="?", help="question id (home-mode, tools, ssm-document, node-ssh, node-daemonset, grafana-token, stores)")
     s.add_argument("option", nargs="?", help="the chosen option id, e.g. skip")
     s.add_argument("--forget", action="store_true", help="drop the remembered answer of ITEM, or of every question when no ITEM is given")
     s.set_defaults(func=cmd_answer)
@@ -746,6 +760,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--language", choices=["en", "ko"], default="en")
     s.add_argument("--host", choices=["auto", "claude", "codex"], default="auto", help="which CLI starts the agents. auto: the one this session runs in, else the one installed")
     s.set_defaults(func=cmd_write_report)
+
+    s = sub.add_parser("protect-home", parents=[common], help="chmod 700 the folders under ~/.kubegap that other users can read; the Fix now of the home-mode first-run question")
+    s.set_defaults(func=cmd_protect_home)
 
     s = sub.add_parser("keep-report", parents=[common], help="move the report of a snapshot to earlier-reports/ before writing another one from the same data, for example in the other language")
     s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")

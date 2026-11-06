@@ -12,7 +12,6 @@ import datetime as _dt
 import os
 import re
 import stat
-import sys
 import threading
 from pathlib import Path
 
@@ -42,17 +41,38 @@ DEFAULT_CONFIG = (USER_DIR / "config.yaml") if (USER_DIR / "config.yaml").is_fil
 
 _TS_FMT = "%Y-%m-%dT%H-%M-%S"
 
-_warned_open_dirs: set[Path] = set()
-_warn_lock = threading.Lock()
+_open_dirs: dict[Path, int] = {}  # existing folders under USER_DIR that other users can read, with their mode, in the order they were seen
+_open_lock = threading.Lock()
+
+
+def open_dirs() -> list[tuple[Path, int]]:
+    """The folders `ensure_private_dir` found readable by other users in this process, outermost first, each with its mode."""
+    with _open_lock:
+        return sorted(_open_dirs.items(), key=lambda kv: len(kv[0].parts))
+
+
+def protect_home(dirs: list[Path] | None = None) -> list[Path]:
+    """chmod 700 the recorded open folders (or the given ones) and return the ones that changed. Only a directory the current user owns is changed."""
+    done = []
+    for d in dirs if dirs is not None else [d for d, _ in open_dirs()]:
+        d = Path(d)
+        if d.is_dir() and d.stat().st_uid == os.getuid() and stat.S_IMODE(d.stat().st_mode) & 0o077:
+            d.chmod(0o700)
+            done.append(d)
+            with _open_lock:
+                _open_dirs.pop(d.resolve(), None)
+    return done
 
 
 def ensure_private_dir(path: Path, base: Path | None = None) -> Path:
     """Create `path` and its missing parents readable by the owner only (mode 0700) and return it.
 
     Every missing component is created one by one with 0700: `Path.mkdir(mode=..., parents=True)` would give the mode to the last folder
-    only and leave the parents at the umask default. Components that already exist are never chmod-ed, the user owns that decision; instead,
-    each existing component below `base` (USER_DIR by default) that other users can read gets one warning on stderr per process. A path
-    outside `base` is created the same way but nothing above it is inspected, so a snapshots root under /tmp does not warn about /tmp.
+    only and leave the parents at the umask default. Components that already exist are never chmod-ed here, the user owns that decision;
+    instead, each existing component below `base` (USER_DIR by default) that other users can read is recorded, `open_dirs()` lists them,
+    and `kubegap setup` turns the list into a first-run question whose "Fix now" runs `kubegap protect-home` (lib/firstrun.py). Until
+    #171 this printed a warning on stderr at the start of every command, which made the first screen of a run three warning lines. A path
+    outside `base` is created the same way but nothing above it is inspected, so a snapshots root under /tmp does not record /tmp.
     """
     path = Path(path)
     base = Path(base) if base is not None else USER_DIR
@@ -71,12 +91,8 @@ def ensure_private_dir(path: Path, base: Path | None = None) -> Path:
         if d.is_dir():
             mode = stat.S_IMODE(d.stat().st_mode)
             if mode & 0o077:
-                key = d.resolve()
-                with _warn_lock:
-                    first = key not in _warned_open_dirs
-                    _warned_open_dirs.add(key)
-                if first:
-                    print(f"kubegap: warning: {d} is readable by other users (mode {mode:04o}); chmod 700 it if that is not intended", file=sys.stderr)
+                with _open_lock:
+                    _open_dirs[d.resolve()] = mode
             continue
         with contextlib.suppress(FileExistsError):  # another thread created it in between
             d.mkdir(mode=0o700)

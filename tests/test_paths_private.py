@@ -13,9 +13,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 @pytest.fixture(autouse=True)
-def _umask_022_and_fresh_warnings(monkeypatch):
+def _umask_022_and_fresh_open_dirs(monkeypatch):
     old = os.umask(0o022)
-    monkeypatch.setattr(paths, "_warned_open_dirs", set())
+    monkeypatch.setattr(paths, "_open_dirs", {})
     yield
     os.umask(old)
 
@@ -43,32 +43,46 @@ def test_write_private_creates_owner_only_parents(tmp_path):
     assert _mode(tmp_path / "x" / "y" / "f.json") == 0o600
 
 
-def test_existing_open_folder_is_warned_once_and_not_changed(tmp_path, capsys):
+def test_existing_open_folder_is_recorded_once_not_printed_and_not_changed(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(paths, "_open_dirs", {})
     open_dir = tmp_path / "open"
     open_dir.mkdir(mode=0o755)
     sub = paths.ensure_private_dir(open_dir / "sub", base=tmp_path)
     paths.ensure_private_dir(open_dir / "sub2", base=tmp_path)
-    err = capsys.readouterr().err
-    assert err.count("is readable by other users") == 1
-    assert f"kubegap: warning: {open_dir} is readable by other users (mode 0755); chmod 700 it if that is not intended" in err
-    assert _mode(open_dir) == 0o755, "an existing folder is never chmod-ed"
+    assert capsys.readouterr().err == "", "no warning on stderr: setup asks about it instead (#171)"
+    assert paths.open_dirs() == [(open_dir.resolve(), 0o755)]
+    assert _mode(open_dir) == 0o755, "an existing folder is never chmod-ed by ensure_private_dir"
     assert _mode(sub) == 0o700 and _mode(open_dir / "sub2") == 0o700
 
 
-def test_a_private_existing_folder_is_not_warned_about(tmp_path, capsys):
+def test_protect_home_chmods_the_recorded_folders_outermost_first(tmp_path, monkeypatch):
+    monkeypatch.setattr(paths, "_open_dirs", {})
+    top = tmp_path / "home"
+    top.mkdir(mode=0o755)
+    (top / "snapshots").mkdir(mode=0o755)
+    paths.ensure_private_dir(top / "snapshots" / "ctx", base=top)
+    assert [d for d, _ in paths.open_dirs()] == [top.resolve(), (top / "snapshots").resolve()]
+    assert paths.protect_home() == [top.resolve(), (top / "snapshots").resolve()]
+    assert _mode(top) == 0o700 and _mode(top / "snapshots") == 0o700
+    assert paths.open_dirs() == [] and paths.protect_home() == []
+
+
+def test_a_private_existing_folder_is_not_recorded(tmp_path, monkeypatch):
+    monkeypatch.setattr(paths, "_open_dirs", {})
     d = tmp_path / "closed"
     d.mkdir(mode=0o700)
     paths.ensure_private_dir(d / "sub", base=tmp_path)
-    assert "readable by other users" not in capsys.readouterr().err
+    assert paths.open_dirs() == []
 
 
-def test_nothing_above_the_base_is_inspected(tmp_path, capsys):
+def test_nothing_above_the_base_is_inspected(tmp_path, monkeypatch):
     """tmp_path itself is 0700 on pytest, so make an open folder above the base and check that it is not reported."""
     above = tmp_path / "above"
     above.mkdir(mode=0o755)
     base = above / "root"
+    monkeypatch.setattr(paths, "_open_dirs", {})
     paths.ensure_private_dir(base / "ctx" / "snap", base=base)
-    assert "readable by other users" not in capsys.readouterr().err
+    assert paths.open_dirs() == []
     assert _mode(base) == 0o700 and _mode(base / "ctx") == 0o700
 
 
@@ -85,9 +99,9 @@ def test_a_path_under_user_dir_is_inspected_from_user_dir(tmp_path, capsys, monk
     user_dir = tmp_path / "userdir"
     user_dir.mkdir(mode=0o755)
     monkeypatch.setattr(paths, "USER_DIR", user_dir)
+    monkeypatch.setattr(paths, "_open_dirs", {})
     paths.ensure_private_dir(user_dir / "snapshots" / "ctx")
-    err = capsys.readouterr().err
-    assert f"{user_dir} is readable" in err and err.count("readable by other users") == 1
+    assert paths.open_dirs() == [(user_dir.resolve(), 0o755)]
     assert _mode(user_dir / "snapshots") == 0o700
 
 
@@ -131,16 +145,15 @@ def test_a_file_in_the_way_raises(tmp_path):
         paths.ensure_private_dir(tmp_path / "afile")
 
 
-def test_a_symlink_inside_the_base_is_still_inspected(tmp_path, capsys):
-    """~/.kubegap/snapshots -> a shared disk: the link resolves outside the base, but the open target must still be warned about."""
+def test_a_symlink_inside_the_base_is_still_inspected(tmp_path):
+    """~/.kubegap/snapshots -> a shared disk: the link resolves outside the base, but the open target must still be recorded."""
     base = tmp_path / "base"
     base.mkdir(mode=0o700)
     target = tmp_path / "shared"
     target.mkdir(mode=0o755)
     (base / "snapshots").symlink_to(target)
     paths.ensure_private_dir(base / "snapshots" / "ctx", base=base)
-    err = capsys.readouterr().err
-    assert "snapshots is readable by other users (mode 0755)" in err
+    assert paths.open_dirs() == [(target.resolve(), 0o755)], "recorded under its real path, so protect-home changes the target"
     assert _mode(target / "ctx") == 0o700
 
 

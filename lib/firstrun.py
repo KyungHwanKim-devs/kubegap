@@ -117,6 +117,26 @@ def _skip(lost: str) -> dict:
     return _opt(SKIP, "Skip", f"{lost} Not asked again; `/kubegap setup` brings the question back.")
 
 
+def _q_home_mode(setup: dict, cfg: Config) -> dict | None:
+    dirs = (setup.get("machine") or {}).get("open_dirs") or []
+    if not dirs:
+        return None
+    top = dirs[0]
+    return {
+        "id": "home-mode",
+        "header": "Folder permissions",
+        "question": f"Make {top['path']} readable by you only? Other users of this machine can read it now (mode {top['mode']}).",
+        "explain": "That folder holds the snapshots: every object, event and log line kubegap read from the cluster. kubegap creates it with mode 0700; this one was created by an older kubegap or widened by hand.",
+        "gain": ["nothing in the report; the snapshots are readable by your user only"],
+        "options": [
+            _opt("fix", "Fix now", f"Runs chmod 700 on {len(dirs)} folder{'s' if len(dirs) > 1 else ''} under {top['path']}. Nothing else changes.", run=["protect-home"], remember=False),
+            _opt("leave", "Leave it", "The folders stay as they are. Not asked again; `/kubegap setup` brings the question back."),
+        ],
+        "typed": None,
+        "state": {"missing": [d["path"] for d in dirs]},
+    }
+
+
 def _q_tools(setup: dict, cfg: Config) -> dict | None:
     missing = [t for t in setup.get("tools") or [] if not t["present"] and not t["required"] and t.get("installable")]
     # ssh and aws are not offered on a platform that does not use them
@@ -308,7 +328,7 @@ def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = Fa
     answers = {} if all_ else load_answers(ctx_dir)
     node_access = _load(ctx_dir, NODE_ACCESS_FILE)
     out = []
-    for q in (_q_tools(setup, cfg), _q_ssm_document(setup, cfg), _q_node_ssh(setup, cfg, node_access, again=all_), _q_node_daemonset(setup, cfg), _q_grafana_token(setup, cfg), _q_stores(setup, cfg)):
+    for q in (_q_home_mode(setup, cfg), _q_tools(setup, cfg), _q_ssm_document(setup, cfg), _q_node_ssh(setup, cfg, node_access, again=all_), _q_node_daemonset(setup, cfg), _q_grafana_token(setup, cfg), _q_stores(setup, cfg)):
         if q is None:
             continue
         a = answers.get(q["id"])

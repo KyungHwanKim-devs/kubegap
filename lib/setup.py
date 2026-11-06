@@ -75,6 +75,8 @@ def run_setup(
         paths.ensure_private_dir(ctx_dir, base=snapshots_root or paths.snapshots_root())
         if (ctx_dir / "setup.log").exists():
             (ctx_dir / "setup.log").unlink()
+    # folders under ~/.kubegap that other users can read (created by an older kubegap or widened by hand): a first-run question, not a warning
+    result["machine"]["open_dirs"] = [{"path": str(d), "mode": f"{m:04o}"} for d, m in paths.open_dirs()]
     log.stage("setup", "start", context=context)
 
     # 1. tools -----------------------------------------------------------------------------------------------

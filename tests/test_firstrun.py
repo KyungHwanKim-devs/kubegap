@@ -399,3 +399,15 @@ def test_setup_doc_names_every_key_config_set_writes():
     for key in configedit.SETTABLE:
         assert f"`{key}`" in line or (key.endswith("_url") and "the four `<store>_url` keys" in line), key
     assert "`ssh.hosts.<node>`" in line
+
+
+def test_home_mode_question_comes_first_and_fix_runs_protect_home():
+    s = _setup("k3s")
+    s["machine"] = {"open_dirs": [{"path": "/home/u/.kubegap", "mode": "0755"}, {"path": "/home/u/.kubegap/snapshots", "mode": "0755"}]}
+    qs = firstrun.questions(s, Config(), None)
+    assert qs[0]["id"] == "home-mode"
+    assert "/home/u/.kubegap" in qs[0]["question"] and "0755" in qs[0]["question"]
+    fix, leave = qs[0]["options"]
+    assert fix["run"] == ["protect-home"] and fix["remember"] is False and "2 folders" in fix["description"]
+    assert leave["remember"] is True
+    assert "home-mode" not in _ids(_setup("k3s"))

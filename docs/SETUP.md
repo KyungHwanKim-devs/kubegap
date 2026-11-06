@@ -26,6 +26,7 @@ Without a connection, only the checks that need it are left out, and the report 
 
 | Question | Asked when | Choices |
 |---|---|---|
+| `home-mode` | a folder under `~/.kubegap` is readable by other users of the machine (created by an older kubegap or widened by hand) | Fix now (`kubegap protect-home`, chmod 700) · Leave it |
 | `tools` | optional tools are not installed | Install all · Skip · or type the names to install only those |
 | `ssm-document` | EKS, and the SSM document is missing or older than the one shipped with kubegap | Upload · Skip |
 | `node-ssh` | k3s, RKE2 or an unrecognized platform, the config names no node access (`ssh:` block or `node_access`), and the node DaemonSet is not running | Check SSH now · Skip. If nodes do not answer: Accept host keys or Check again · Use the rest · Skip · or type an address per node |

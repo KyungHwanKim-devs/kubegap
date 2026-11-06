@@ -30,6 +30,7 @@ kubegap은 자격 증명을 따로 저장하지 않습니다. kubeconfig, AWS CL
 
 | 질문 | 묻는 때 | 선택지 |
 |---|---|---|
+| `home-mode` | `~/.kubegap` 아래 폴더를 이 컴퓨터의 다른 사용자가 읽을 수 있을 때 (옛 kubegap이 만들었거나 직접 권한을 넓힌 경우) | 지금 고치기 (`kubegap protect-home`, chmod 700) · 그대로 두기 |
 | `tools` | 추가 도구가 설치되어 있지 않을 때 | 전부 설치 · 건너뛰기 · 도구 이름을 적어 그 도구만 설치 |
 | `ssm-document` | EKS에서 SSM 문서가 없거나 kubegap에 들어 있는 SSM 문서보다 오래됐을 때 | 올리기 · 건너뛰기 |
 | `node-ssh` | k3s, RKE2 또는 kubegap이 알아보지 못한 플랫폼이고, 설정 파일에 노드 접속(`ssh:` 블록이나 `node_access`)이 없고, DaemonSet 파드도 없을 때 | 지금 SSH 확인 · 건너뛰기. 응답하지 않는 노드가 있으면 호스트 키 받기 또는 다시 확인 · 응답한 노드만 쓰기 · 건너뛰기 · 노드별 주소 입력 |
