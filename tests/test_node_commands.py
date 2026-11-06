@@ -122,3 +122,34 @@ def test_pod_ip_allowed_admits_pod_addresses_only():
 def test_commands_md_says_which_pods_are_curled():
     text = nodecommands.COMMANDS_MD_PATH.read_text(encoding="utf-8")
     assert "Only Running pods with an IPv4 address in 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or 100.64.0.0/10 are curled" in text
+
+
+def test_install_document_finds_the_uploaded_version_by_describing_it(monkeypatch):
+    """#125: list-document-versions carries no Hash (DocumentVersionInfo, ssm service-2.json:7949-7990@2.39.3), so a version already holding the local content is found through describe-document --document-version and made the default instead of being uploaded again."""
+    from lib import aws as _aws
+    from lib import nodecommands
+
+    local = nodecommands.document_sha256()
+    calls = []
+
+    def fake(args, **kw):
+        calls.append(args)
+        op = args[1]
+        if op == "describe-document" and "--document-version" not in args:
+            # the default version differs, then after the switch it matches
+            h = local if any(a[1] == "update-document-default-version" for a in calls) else "0" * 64
+            return {"Document": {"Hash": h, "HashType": "Sha256", "DocumentVersion": "3" if h == local else "1", "Status": "Active"}}, None
+        if op == "list-document-versions":
+            return {"DocumentVersions": [{"Name": nodecommands.DOCUMENT_NAME, "DocumentVersion": "1", "IsDefaultVersion": True}, {"Name": nodecommands.DOCUMENT_NAME, "DocumentVersion": "3", "IsDefaultVersion": False}]}, None
+        if op == "describe-document":
+            ver = args[args.index("--document-version") + 1]
+            return {"Document": {"Hash": local if ver == "3" else "0" * 64, "DocumentVersion": ver}}, None
+        if op == "update-document-default-version":
+            return {"Description": {"Name": nodecommands.DOCUMENT_NAME, "DefaultVersion": "3"}}, None
+        raise AssertionError(f"unexpected call {args}")
+
+    monkeypatch.setattr(_aws, "aws_json", fake)
+    res = nodecommands.install_document(None, None)
+    assert res["ok"] and res["action"] == "switch-default" and res["version"] == "3", res
+    assert not any(a[1] == "update-document" for a in calls), "a version with the same content must not be uploaded twice"
+    assert ["ssm", "describe-document", "--name", nodecommands.DOCUMENT_NAME, "--document-version", "3"] in calls
