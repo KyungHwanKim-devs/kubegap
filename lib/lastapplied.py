@@ -13,7 +13,7 @@ DaemonSet (kubernetes/kubernetes pkg/controller/statefulset/stateful_set_utils.g
 (lib/scrub.py), which loses nothing here: versions.yaml@v5.24.5 has no rule for ConfigMap or Secret.
 
 A kind `objects.dump-all` excludes or cannot read is not in the snapshot. Against the 112 rows of versions.yaml that costs nothing pluto could judge: `bindings`, the access and token reviews and the
-`metrics.eks.amazonaws.com` kinds refused the List anyway, `componentstatuses`, `pods.metrics.k8s.io` and `nodes.metrics.k8s.io` have no rule, and Events carry no last-applied annotation because nobody
+`metrics.eks.amazonaws.com` kinds refused the List anyway, `componentstatuses`, `pods.metrics.k8s.io`, `nodes.metrics.k8s.io` and `packagerevisions.*` have no rule, and Events carry no last-applied annotation because nobody
 applies them; an Event applied by hand with `events.k8s.io/v1beta1` would be missed.
 """
 

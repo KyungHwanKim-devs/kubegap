@@ -61,14 +61,16 @@ def _glob_match(name: str, patterns: list[str]) -> bool:
     return any(fnmatch.fnmatchcase(name, p) for p in patterns)
 
 
-def list_api_resources(context: str | None, kubeconfig: str | None, log: RunLog) -> list[dict]:
-    """Parse `kubectl api-resources --verbs=list -o wide` into a list of (name, namespaced, kind, full name)."""
+def api_resources(context: str | None, kubeconfig: str | None, log: RunLog) -> tuple[list[dict], str | None]:
+    """Parse `kubectl api-resources --verbs=list -o wide` into a list of (name, namespaced, kind, full name), with the error of a discovery that was only partial.
+    kubectl prints what it found and still exits non-zero when one group failed (an unhealthy aggregated API), so those rows are good; on a timeout the last row may be cut, so nothing is."""
     r = kube.kubectl(["api-resources", "--verbs=list", "-o", "wide"], context=context, timeout=60, id="collect.api-resources", log=log, kubeconfig=kubeconfig)
-    if not r.ok and not r.stdout.strip():  # kubectl prints what it found and still exits non-zero when one group failed (an unhealthy aggregated API); run.log has the failure
-        return []
+    error = None if r.ok else (r.error or r.stderr.strip()[-200:] or "kubectl api-resources failed")
+    if (not r.ok and not r.stdout.strip()) or r.timed_out:
+        return [], error
     lines = r.stdout.splitlines()
     if not lines:
-        return []
+        return [], error
     header = lines[0]
     cols = [m.start() for m in re.finditer(r"\S+", header)]
     names = re.findall(r"\S+", header)
@@ -83,7 +85,11 @@ def list_api_resources(context: str | None, kubeconfig: str | None, log: RunLog)
         group = row.get("APIVERSION", "").split("/")[0] if "/" in row.get("APIVERSION", "") else ""
         full = row["NAME"] + (f".{group}" if group else "")
         out.append({"name": row["NAME"], "full": full, "namespaced": row.get("NAMESPACED") == "true", "kind": row.get("KIND"), "apiversion": row.get("APIVERSION")})
-    return out
+    return out, error
+
+
+def list_api_resources(context: str | None, kubeconfig: str | None, log: RunLog) -> list[dict]:
+    return api_resources(context, kubeconfig, log)[0]
 
 
 DISCOVERY_RESOURCES = {
@@ -102,9 +108,9 @@ DISCOVERY_RESOURCES = {
 
 
 def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: list[str], timeout: float, log: RunLog, collector: str, echo=None) -> dict:
-    resources = list_api_resources(context, kubeconfig, log)
+    resources, discovery_error = api_resources(context, kubeconfig, log)
     done = {p.stem for p in (snap / "objects").glob("*.json")}
-    summary = {"kinds": 0, "items": 0, "skipped": [], "failed": {}, "excluded": [], "not_permitted": []}
+    summary = {"kinds": 0, "items": 0, "skipped": [], "failed": {}, "excluded": [], "not_permitted": [], "discovery_error": discovery_error}
     hard_exclude = ["secrets", "secrets.*"]
     for res in resources:
         full, name = res["full"], res["name"]
@@ -470,7 +476,7 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     if st.get("stdin") == "last-applied":
         # What pluto sees is what the dump saw: kinds saved or already fetched by discovery, and kinds the server refused or that failed. No kind saved, no judgement: an empty input would read as a clean cluster.
         dump = objects_dump or {}
-        counts = {"lists_ok": int(dump.get("kinds") or 0) + len(dump.get("skipped") or []), "lists_failed": len(dump.get("failed") or {}) + len(dump.get("not_permitted") or [])}
+        counts = {"lists_ok": int(dump.get("kinds") or 0) + len(dump.get("skipped") or []), "lists_failed": len(dump.get("failed") or {}) + len(dump.get("not_permitted") or []) + (1 if dump.get("discovery_error") else 0)}
         if not counts["lists_ok"]:
             error = f"{tool}: API resources not confirmed read; objects.dump-all saved no kind"
             log.skip(id=f"{name}.{sid}", reason=error, collector=name)
