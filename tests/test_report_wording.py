@@ -61,7 +61,7 @@ def test_sre_book_citation_names_the_change_management_chapter():
 
 def test_support_end_names_its_source(tmp_path):
     (tmp_path / "aws").mkdir()
-    (tmp_path / "aws" / "describe-cluster-versions.json").write_text('{"clusterVersions": [{"clusterVersion": "1.32", "endOfStandardSupportDate": "2026-03-23T00:00:00+00:00", "status": "STANDARD_SUPPORT"}]}')
+    (tmp_path / "aws" / "describe-cluster-versions.json").write_text('{"clusterVersions": [{"clusterVersion": "1.32", "endOfStandardSupportDate": "2026-03-23T00:00:00+00:00", "versionStatus": "STANDARD_SUPPORT"}]}')
     eks = Context(tmp_path, {"today": "2026-11-03", "cluster": {"platform": "eks", "eks": {"name": "c"}}}, {}, {"name": "prod"})
     ends = eks.k8s_support_ends("v1.32.13-eks-abc")
     assert ends["eks_standard"] == "2026-03-23" and ends["upstream"] == "2026-02-28" and ends["primary_source"] == "EKS end of standard support"
