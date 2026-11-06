@@ -19,7 +19,7 @@ kubegap makes read calls only. The exact Kubernetes rules and AWS actions, each 
 Everything kubegap collects is written to `~/.kubegap/snapshots/<context>/<timestamp>/` on your machine. kubegap itself sends nothing anywhere.
 
 - Snapshot folders and files are created readable by your user only. A folder that was already there and is open to other users becomes a first-run question (`home-mode`): Fix now runs `kubegap protect-home`, chmod 700 on those folders; Leave it leaves them.
-- Stored as collected, and so readable by the agent: object specs, events, metrics, node journals under `logs/node/` (kubelet, containerd, k3s), CloudWatch control-plane log queries under `logs/cloudwatch/`, and Grafana dashboards.
+- Stored as collected, and so readable by the agent: object specs, events, metrics, node journals under `logs/node/` (kubelet, containerd, k3s, the VPC CNI ipamd log on EKS), CloudWatch control-plane log queries under `logs/cloudwatch/`, and Grafana dashboards.
 - The config file is one you create yourself. It may hold `grafana_api_token`, so `chmod 600` it. `kubegap config set` creates it with that mode and refuses to write the token for you.
 - `scripts/kubegap prune` removes old snapshots; see [`SETUP.md`](SETUP.md#collected-data).
 
