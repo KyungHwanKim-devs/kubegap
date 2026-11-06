@@ -20,8 +20,12 @@ from .controlplane import workload_of
 from .nodeos import _int, _kv, _num, parse_sections
 from .snapshot import items, load_json
 
-CERT_RE = re.compile(r'msg="([^:"]+): certificate ([^ ]+) \(([A-Za-z]+)\) (is ok|[^,"]+), expires at ([0-9T:Z-]+)"')
+# source: k3s-io/k3s pkg/cli/cert/cert.go:106-122@v1.33.5+k3s1; :104-120@v1.37.2+k3s1 (`%s: certificate %s (%s) is ok, expires at %s` / `will expire within %d days at %s` / `expired at %s` / `is not valid before %s`, RFC3339 times); pkg/util/cert.go:12-15, 37@v1.33.5+k3s1 (usages CertSign, ServerAuth, ClientAuth, Unknown joined with commas)
+CERT_RE = re.compile(r'msg="([^:"]+): certificate ([^ ]+) \(([A-Za-z,]+)\) (is ok, expires at|will expire within \d+ days at|expired at|is not valid before) ([0-9T:Z+-]+)"')
+CERT_STATUS = {"is ok, expires at": "ok", "will expire within": "expiring", "expired at": "expired", "is not valid before": "not-yet-valid"}
+# source: rancher/local-path-provisioner provisioner.go:367, 378@v0.0.31; :408, 442@v0.0.37 (`<pvName>_<namespace>_<pvcName>` under the node path, pvName = pvc-<uid>)
 LOCAL_PATH_DIR_RE = re.compile(r"/storage/pvc-([0-9a-f-]{36})_([a-z0-9-]+)_(.+)$")
+# source: kubernetes/kubernetes staging/src/k8s.io/apimachinery/pkg/api/resource/suffix.go:113-116, 128-130@v1.30.14 (the binary Ki/Mi/Gi/Ti and decimal K/M/G/T suffixes of a Quantity)
 SIZE_RE = re.compile(r"^(\d+(?:\.\d+)?)([KMGT]i?)?$")
 
 
@@ -111,7 +115,8 @@ def _parse_server(lines: list[str]) -> dict:
                     days = round((exp - now).total_seconds() / 86400)
                 except ValueError:
                     days = None
-                rec = {"file": m.group(1), "name": m.group(2), "usage": m.group(3), "status": m.group(4), "expires": m.group(5), "days_left": days}
+                status = next(v for k, v in CERT_STATUS.items() if m.group(4).startswith(k))
+                rec = {"file": m.group(1), "name": m.group(2), "usage": m.group(3), "status": status, "expires": m.group(5), "days_left": days}
                 out["certificates"].append(rec)
                 if days is not None and days < 90:
                     out["certificates_expiring_90d"].append(rec)
@@ -164,6 +169,7 @@ def _parse_flannel(kv: dict) -> dict:
     }
 
 
+# source: etcd-io/etcd server/etcdserver/util.go:125, 171-172@v3.5.21 (`zap.Duration("took", d)`, printed as a Go Duration string: 1.5s, 120ms, 300µs; k3s v1.33.5+k3s1 embeds etcd 3.5.21)
 ETCD_TOOK_RE = re.compile(r'"took":"([0-9.]+)(ms|s|µs)"')
 
 
@@ -281,9 +287,9 @@ def _node_runtime(rec: dict, sec: dict) -> None:
     rec["flannel"] = _parse_flannel(_kv(sec.get("flannel", [])))
     jd = _kv(sec.get("journald", []))
     disk = jd.get("disk", "")
-    mdisk = re.match(r"([0-9.]+)([KMG])", disk)
+    mdisk = re.match(r"([0-9.]+)([KMGT]?)", disk)  # systemd's format_bytes: one decimal and a K/M/G/T suffix, bare bytes under 1 KiB
     rec["journald"] = {
-        "disk_mb": round(float(mdisk.group(1)) * {"K": 1 / 1024, "M": 1, "G": 1024}[mdisk.group(2)]) if mdisk else None,
+        "disk_mb": round(float(mdisk.group(1)) * {"": 1 / 1024**2, "K": 1 / 1024, "M": 1, "G": 1024, "T": 1024**2}[mdisk.group(2)]) if mdisk else None,
         "conf": jd.get("conf") or None,
         "k3s_lines_24h": _int(jd.get("k3s_lines_24h"), None) if jd.get("k3s_lines_24h") else None,
         "bounded": bool(jd.get("conf")),
@@ -308,7 +314,8 @@ def _node_server_storage(rec: dict, sec: dict) -> None:
         "present": bool(reg),
     }
     ct = _kv([ln.strip().replace(" = ", "=") for ln in sec.get("containerd", []) if "=" in ln])
-    rec["containerd"] = {"snapshotter": (ct.get("snapshotter") or "").strip('"') or None, "systemd_cgroup": ct.get("SystemdCgroup"), "private_registry_auth": any("registry.configs" in ln for ln in sec.get("containerd", []))}
+    # registry credentials live in registries.yaml `configs:` (section registries); the containerd config.toml of k3s carries them only as table headers, and none on containerd 2.x
+    rec["containerd"] = {"snapshotter": (ct.get("snapshotter") or "").strip('"') or None, "systemd_cgroup": ct.get("SystemdCgroup"), "private_registry_auth": bool(rec["registries"]["auth_configs"])}
     lp = _parse_local_path(sec.get("local-path", []))
     if lp["total_mb"] is None:
         rec["gaps"].append("du /var/lib/rancher/k3s/storage (sudoers)")
