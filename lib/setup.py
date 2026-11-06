@@ -12,7 +12,7 @@ import json
 import platform
 from pathlib import Path
 
-from . import __version__, aws, firstrun, grafana_token, kube, logsinks, monitoring, nodecommands, paths, tools
+from . import __version__, aws, firstrun, kube, logsinks, monitoring, nodecommands, paths, tools
 from . import discover as _discover
 from .config import Config
 from .runlog import RunLog
@@ -196,15 +196,12 @@ def run_setup(
                 if info.get("head_series") is not None:
                     extra += f", active series {info['head_series']:,}"
                 _p(f"  {kind:<12} connected v{info.get('version')} at {where}{extra}")
-                if kind == "grafana" and not cfg.get("grafana_api_token") and info.get("service"):
-                    # where the admin password lives (names only), so the first-run question can offer to create the read token once (lib/grafana_token.py)
-                    ref = grafana_token.admin_ref(context, info["service"]["namespace"], kubeconfig, log)
-                    info["admin_secret"] = ref
-                    _p(
-                        f"  {'':<12} admin password: Secret {info['service']['namespace']}/{ref['secret']} key {ref['password_key']} ({ref['workload']}); a read token can be created once from it"
-                        if ref
-                        else f"  {'':<12} admin password: not taken from a Secret by the Grafana workload; the read token is yours to create"
-                    )
+                if kind == "grafana":
+                    # dashboards and datasources that Helm put into ConfigMaps are read from there, without a token (lib/observability.py, lib/scrub.py);
+                    # Grafana's own /metrics says how many dashboards exist in all, so the first-run question is asked only for the ones made in Grafana itself
+                    prov = monitoring.grafana_provisioned(context, kubeconfig, info, cfg_url, mon.get("prometheus") or {}, cfg.url("prometheus"), log)
+                    info["provisioned"] = prov
+                    _p(f"  {'':<12} {monitoring.describe_provisioned(prov)}")
             else:
                 _p(f"  {kind:<12} missing/failed: {info.get('error')}")
         log.note("monitoring", **dict(mon.items()))

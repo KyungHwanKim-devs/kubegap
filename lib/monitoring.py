@@ -10,6 +10,8 @@ If the config file provides a URL (`prometheus_url` etc.), discovery is skipped 
 
 from __future__ import annotations
 
+import json
+import re
 from dataclasses import asdict, dataclass
 
 from . import http, kube, yamlite
@@ -182,3 +184,82 @@ def connect_and_probe(kind: str, svc: Service | None, configured_url: str | None
     info["service"] = svc.to_dict()
     info.pop("url", None)
     return info
+
+
+# ---------- what Grafana shows without a token ----------
+
+# The Grafana chart's sidecars load dashboards and datasources from ConfigMaps carrying these labels (grafana/helm-charts
+# charts/grafana/values.yaml:951 `sidecar.dashboards.label: grafana_dashboard` and :1028 `sidecar.datasources.label: grafana_datasource`
+# @grafana-8.5.0; kube-prometheus-stack sets the same labels on the ConfigMaps it ships). A chart installed with another label is not seen here.
+DASHBOARD_LABEL = "grafana_dashboard"
+DATASOURCE_LABEL = "grafana_datasource"
+TOTAL_DASHBOARDS_METRIC = "grafana_stat_totals_dashboard"  # grafana/grafana pkg/infra/metrics/metrics.go:483@v12.2.1 (collectors/grafana/pod-metrics.yaml)
+_TOTAL_RE = re.compile(r"^" + TOTAL_DASHBOARDS_METRIC + r"(?:\{[^}]*\})?\s+(\S+)", re.MULTILINE)
+
+
+def _total_from_text(text: str) -> int | None:
+    m = _TOTAL_RE.search(text or "")
+    try:
+        return int(float(m.group(1))) if m else None
+    except ValueError:
+        return None
+
+
+def grafana_provisioned(context: str | None, kubeconfig: str | None, grafana: dict, grafana_url: str | None, prometheus: dict, prometheus_url: str | None, log=None) -> dict:
+    """{dashboards, datasources, total_dashboards, total_source, error}: the ConfigMaps the Grafana sidecars load (names only, counted) and the
+    number of dashboards Grafana itself reports. The total comes from Grafana's own `/metrics`, which the same port-forward or URL as the
+    audit reaches and which needs no login unless `[metrics] basic_auth_username` is set (grafana/grafana conf/defaults.ini:1728-1738@v12.2.1:
+    `enabled = true`, the two basic_auth keys empty); when that fails, from a Prometheus that scrapes Grafana. None when neither answers.
+    Nothing here needs a Grafana login."""
+    out: dict = {"dashboards": 0, "datasources": 0, "total_dashboards": None, "total_source": None, "error": None}
+    for key, label in (("dashboards", DASHBOARD_LABEL), ("datasources", DATASOURCE_LABEL)):
+        data, r = kube.kubectl_json(["get", "configmaps", "-A", "-l", label, "--ignore-not-found"], context=context, timeout=60, id=f"setup.grafana-{key}", log=log, kubeconfig=kubeconfig)
+        if data is None:
+            out["error"] = r.error or r.stderr.strip()[-200:] or "kubectl get configmaps failed"
+            continue
+        out[key] = len(data.get("items") or [])
+    svc = grafana.get("service") or {}
+    if grafana.get("ok") and (grafana_url or svc):
+        text = _read(context, kubeconfig, grafana_url, svc, "/metrics", {"Accept": "text/plain"})
+        total = _total_from_text(text)
+        if total is not None:
+            out["total_dashboards"], out["total_source"] = total, "grafana /metrics"
+            return out
+    psvc = prometheus.get("service") or {}
+    if prometheus.get("ok") and (prometheus_url or psvc):
+        body = _read(context, kubeconfig, prometheus_url, psvc, "/api/v1/query?query=max(" + TOTAL_DASHBOARDS_METRIC + ")", None)
+        try:
+            rows = ((json.loads(body or "null") or {}).get("data") or {}).get("result") or []
+            if rows:
+                out["total_dashboards"], out["total_source"] = int(float(rows[0]["value"][1])), "prometheus"
+        except (KeyError, IndexError, TypeError, ValueError):
+            pass
+    return out
+
+
+def _read(context, kubeconfig, url: str | None, svc: dict, path: str, headers: dict | None) -> str | None:
+    """GET `path` on a store through its configured URL or a short port-forward to its Service; the body, or None."""
+    if url:
+        r = http.get(url.rstrip("/") + path, headers=headers)
+        return r.body if r.ok else None
+    pf = PortForward(context, svc["namespace"], svc["name"], svc["port"], kubeconfig=kubeconfig)
+    if not pf.start():
+        return None
+    try:
+        r = http.get(pf.url + path, headers=headers)
+        return r.body if r.ok else None
+    finally:
+        pf.stop()
+
+
+def describe_provisioned(p: dict) -> str:
+    """The setup line for the provisioned counts."""
+    if not p.get("dashboards") and not p.get("datasources"):
+        return "no dashboard or datasource ConfigMaps for the sidecars" + (f" ({p['error']})" if p.get("error") else "") + "; the lists need grafana_api_token"
+    total = p.get("total_dashboards")
+    if isinstance(total, int):
+        more = total - (p.get("dashboards") or 0)
+        tail = f"; Grafana counts {total}, so {more} made in Grafana itself need a token to be listed" if more > 0 else f"; Grafana counts {total}, nothing missing"
+    else:
+        tail = "; Grafana's own count was not readable (its /metrics, or a Prometheus that scrapes it)"
+    return f"read without a token: {p.get('dashboards') or 0} dashboard and {p.get('datasources') or 0} datasource ConfigMaps{tail}"

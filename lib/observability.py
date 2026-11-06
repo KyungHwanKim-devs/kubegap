@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import datetime as _dt
+import json
 import re
 from collections import Counter
 from pathlib import Path
@@ -481,19 +482,22 @@ def _grafana(snap: Path, alerting: list[dict]) -> dict:
     gh = load_json(snap / "grafana" / "health.json") or {}
     ds = load_json(snap / "grafana" / "datasources.json")
     db = load_json(snap / "grafana" / "dashboards.json")
+    prov = _provisioned(snap)  # the ConfigMaps the Grafana sidecars load: read without a token (lib/scrub.py KEEP_BY_LABEL)
     out = {
         "version": gh.get("version"),
         "database": gh.get("database"),
-        "datasources": [{"name": d.get("name"), "type": d.get("type"), "url": d.get("url"), "default": d.get("isDefault")} for d in ds] if isinstance(ds, list) else "no auth (config.yaml grafana_api_token)",
-        "dashboards": len(db) if isinstance(db, list) else "no auth (config.yaml grafana_api_token)",
+        "datasources": [{"name": d.get("name"), "type": d.get("type"), "url": d.get("url"), "default": d.get("isDefault")} for d in ds] if isinstance(ds, list) else (prov["datasources"] or "no auth (config.yaml grafana_api_token)"),
+        "dashboards": len(db) if isinstance(db, list) else (len(prov["dashboards"]) if prov["dashboards"] else "no auth (config.yaml grafana_api_token)"),
+        "lists_source": "api" if isinstance(db, list) else ("provisioned configmaps" if prov["dashboards"] or prov["datasources"] else "none"),
     }
-    # metrics drawn by dashboard panels ↔ metrics used by alert rules — metrics that alert but have no graph to look at. Only when grafana/dashboards/<uid>.json exists (token required)
+    # metrics drawn by dashboard panels ↔ metrics used by alert rules — metrics that alert but have no graph to look at. From grafana/dashboards/<uid>.json
+    # (the API, token required) or, without a token, from the dashboard ConfigMaps
     ddir = snap / "grafana" / "dashboards"
     dfiles = sorted(ddir.glob("*.json")) if ddir.is_dir() else []
+    sources = [(f.stem, load_json(f) or {}) for f in dfiles] if dfiles else [(name, {"dashboard": dash, "meta": {"folderTitle": folder}}) for name, dash, folder in prov["dashboards"]]
     panel_metrics: set[str] = set()
     dash_rows = []
-    for f in dfiles:
-        d = load_json(f) or {}
+    for stem, d in sources:
         dash = d.get("dashboard") or {}
         exprs: list[str] = []
 
@@ -511,15 +515,16 @@ def _grafana(snap: Path, alerting: list[dict]) -> dict:
         for e in exprs:
             names |= metric_names(e)
         panel_metrics |= names
-        dash_rows.append({"uid": dash.get("uid") or f.stem, "title": dash.get("title"), "panels_with_expr": len(exprs), "metrics": len(names), "folder": (d.get("meta") or {}).get("folderTitle")})
-    if dfiles:
+        dash_rows.append({"uid": dash.get("uid") or stem, "title": dash.get("title"), "panels_with_expr": len(exprs), "metrics": len(names), "folder": (d.get("meta") or {}).get("folderTitle")})
+    if sources:
         alert_metrics: set[str] = set()
         for r in alerting:
             alert_metrics |= metric_names(r.get("expr") or "")
         alert_metrics = {m for m in alert_metrics if not m.startswith(("ALERTS", "up"))}
         without = sorted(alert_metrics - panel_metrics)
         out["dashboards_json"] = {
-            "read": len(dfiles),
+            "read": len(sources),
+            "source": "api" if dfiles else "provisioned configmaps",
             "rows": dash_rows[:200],
             "panel_metrics": len(panel_metrics),
             "alert_metrics": len(alert_metrics),
@@ -529,7 +534,31 @@ def _grafana(snap: Path, alerting: list[dict]) -> dict:
             "available": True,
         }
     else:
-        out["dashboards_json"] = {"available": False, "note": "grafana/dashboards/*.json missing — with grafana_api_token the dashboards-json step fills it"}
+        out["dashboards_json"] = {"available": False, "note": "no grafana/dashboards/*.json (the API, with grafana_api_token) and no dashboard ConfigMaps for the sidecar"}
+    return out
+
+
+def _provisioned(snap: Path) -> dict:
+    """Dashboards and datasources from the ConfigMaps the Grafana sidecars load, kept by lib/scrub.py because of their labels
+    (grafana_dashboard: the JSON model as is; grafana_datasource: name, type, url, isDefault per entry). {dashboards: [(name, model, folder)],
+    datasources: [{name, type, url, default}]}."""
+    out: dict = {"dashboards": [], "datasources": []}
+    for cm in items(load_json(snap / "objects" / "configmaps.json")):
+        meta = cm.get("metadata") or {}
+        labels = meta.get("labels") or {}
+        data = cm.get("data") or {}
+        if "grafana_dashboard" in labels:
+            folder = (meta.get("annotations") or {}).get("grafana_folder")
+            for key, v in data.items():
+                if isinstance(v, str) and v.lstrip().startswith("{"):
+                    with contextlib.suppress(ValueError):
+                        model = json.loads(v)
+                        if isinstance(model, dict):
+                            out["dashboards"].append((f"{meta.get('namespace')}/{meta.get('name')}:{key}", model, folder))
+        elif "grafana_datasource" in labels:
+            for v in data.values():
+                for d in (v.get("datasources") if isinstance(v, dict) else []) or []:
+                    out["datasources"].append({"name": d.get("name"), "type": d.get("type"), "url": d.get("url"), "default": d.get("isDefault")})
     return out
 
 

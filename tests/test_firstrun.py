@@ -216,7 +216,6 @@ def _all_questions(tmp_path, language="en"):
     tools = [_tool("krr", present=False)]
     out = []
     eks = _setup("eks", doc={"present": False, "current": False}, stores_ok=False, tools=tools)
-    eks["monitoring"]["grafana"]["admin_secret"] = {"workload": "deployment/grafana", "container": "grafana", "secret": "grafana", "password_key": "admin-password", "user_key": "admin-user", "user_value": None}
     eks["machine"] = {"open_dirs": [{"path": "/home/u/.kubegap", "mode": "0755"}]}
     out += firstrun.questions(eks, Config(), None, language=language)
     out += firstrun.questions(_setup("k3s"), Config(), None, language=language)
@@ -446,12 +445,23 @@ def test_every_question_is_written_in_korean_not_translated(tmp_path):
     assert "none:" in firstrun.render([], "ctx", language="ko")
 
 
-def test_grafana_create_is_offered_only_when_the_workload_names_the_admin_secret():
+def test_grafana_token_is_asked_only_for_dashboards_that_are_not_in_configmaps():
+    """Helm puts dashboards and datasources into ConfigMaps, which are read without a token. The question comes only when Grafana counts more
+    dashboards than the ConfigMaps hold, with the numbers, or when nothing is provisioned that way."""
     s = _setup("eks")
-    assert [o["id"] for o in next(q for q in firstrun.questions(s, Config(), None) if q["id"] == "grafana-token")["options"]] == ["show", "skip"]
-    s["monitoring"]["grafana"]["admin_secret"] = {"workload": "deployment/grafana", "container": "grafana", "secret": "grafana", "password_key": "admin-password", "user_key": "admin-user", "user_value": None}
+    assert [q["id"] for q in firstrun.questions(s, Config(), None) if q["id"] == "grafana-token"] == ["grafana-token"], "nothing provisioned: asked as before"
+    s["monitoring"]["grafana"]["provisioned"] = {"dashboards": 25, "datasources": 1, "total_dashboards": 25, "error": None}
+    assert "grafana-token" not in [q["id"] for q in firstrun.questions(s, Config(), None)]
+    assert firstrun.noted(s, Config(), None) == ["grafana: no token needed; 25 dashboards and 1 datasources are read from ConfigMaps. Grafana counts 25 dashboards too, so none is missing"]
+    assert firstrun.noted(s, Config(), None, language="ko") == ["grafana: 토큰 없이 ConfigMap에서 대시보드 25개와 데이터소스 1개를 읽어요. Grafana가 세는 대시보드도 25개라 빠진 게 없어요"]
+    s["monitoring"]["grafana"]["provisioned"]["total_dashboards"] = None
+    assert "grafana-token" not in [q["id"] for q in firstrun.questions(s, Config(), None)]
+    assert "could not be read" in firstrun.noted(s, Config(), None)[0]
+    s["monitoring"]["grafana"]["provisioned"]["total_dashboards"] = 30
     q = next(q for q in firstrun.questions(s, Config(), None) if q["id"] == "grafana-token")
-    create = q["options"][0]
-    assert create["id"] == "create" and create["run"] == ["grafana-token", "--create"] and create["remember"] is False
-    assert "monitoring/grafana" in q["explain"] and "once" in q["explain"]
-    assert [q["id"] for q in firstrun.questions(s, Config({"grafana_api_token": "t"}), None) if q["id"] == "grafana-token"] == []
+    assert "Grafana has 30 dashboards and 25 of them" in q["question"] and "The other 5" in q["question"] and [o["id"] for o in q["options"]] == ["show", "skip"]
+    assert "5 dashboards made in Grafana" in q["options"][1]["description"]
+    assert firstrun.noted(s, Config(), None) == []
+    kq = next(q for q in firstrun.questions(s, Config(), None, language="ko") if q["id"] == "grafana-token")
+    assert "대시보드가 30개 있는데" in kq["question"] and "나머지 5개" in kq["question"]
+    assert firstrun.noted(s, Config({"grafana_api_token": "t"}), None) == []

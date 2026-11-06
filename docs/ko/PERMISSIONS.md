@@ -59,7 +59,7 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 - ClusterRole에 있는 리소스의 Kubernetes `get`과 `list`
 - 컴포넌트 로그를 읽는 `pods/log`
 - Prometheus, Alertmanager, Loki, Grafana 포트포워드
-- `grafana_api_token`이 설정되어 있을 때 Grafana API. 첫 실행 질문에서 "지금 만들기"를 고르면 한 번만: Grafana 워크로드가 관리자 비밀번호로 가리키는 Secret 하나의 `get`과, Viewer 서비스 계정과 토큰을 만드는 관리자 로그인(`kubegap grafana-token --create`, 기본 ClusterRole 밖의 권한)
+- `grafana_api_token`이 설정되어 있을 때 Grafana API
 - EKS에서 탐지와 setup에 쓰는 AWS Describe, List 호출: `eks`, `ecr:DescribeRepositories`, `ssm:DescribeInstanceInformation`, `ssm:DescribeDocument`, `sts`, `logs:DescribeLogGroups`
 - EKS의 daily AWS 수집 단계 11개: `nodegroup`, `subnets`, `ssm-instances`, `cluster-security-groups`, `alb-metrics`, `ec2-volumes`, `ec2-volumes-available`, `ec2-addresses`, `ec2-nat-gateways`, `acm-certificates`, `instance-type-network`. 이 가운데 `alb-metrics`는 `elasticloadbalancing:Describe*`, `ec2:DescribeSecurityGroups`, `cloudwatch:GetMetricData`를 씁니다.
 - 노드 접속 방법이 있을 때, 파드 메트릭을 노드 안에서 curl로 대신 읽는 동작. EKS에서는 고정된 문서의 SSM `send-command`와, 그 출력을 읽는 `ssm:GetCommandInvocation`을 씁니다.

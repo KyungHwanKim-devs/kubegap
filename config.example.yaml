@@ -34,7 +34,7 @@ ssm_document: ask            # EKS only. The SSM document kubegap-node-read (dep
 #     namespace: gitops      # each of the three is optional and overrides what discovery found or the step's default
 #     selector: app.kubernetes.io/name=argocd-server
 #     metrics_port: 8083
-# grafana_api_token: glsa_...     # service-account token with the Viewer role, used to list Grafana datasources and dashboards (optional). Without it that part is skipped as "no credentials". `kubegap grafana-token --create` (the Create now of the first-run question) writes it here
+# grafana_api_token: glsa_...     # service-account token with the Viewer role, used to list Grafana datasources and dashboards (optional). Without it that part is skipped as "no credentials"
 # node_access: ssm           # override the node command backend (ssm | ssh | daemonset | none). If empty: EKS = ssm, k3s = ssh, DaemonSet when the kubegap-node-reader pod is running
 # ssh:                       # when node_access is ssh (small k3s cluster). If empty, nodes are reached at their InternalIP with the user and key from ~/.ssh/config
 #   user: ubuntu

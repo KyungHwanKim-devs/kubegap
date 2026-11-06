@@ -82,18 +82,7 @@ def _read_capped(fp, max_bytes: int) -> bytes | None:
 def get(url: str, params: dict | None = None, timeout: float = 15, headers: dict | None = None, max_bytes: int = HTTP_MAX_BYTES) -> HttpResult:
     if params:
         url = url + ("&" if "?" in url else "?") + urllib.parse.urlencode(params)
-    return _open(urllib.request.Request(url, headers=headers or {"Accept": "application/json"}), url, timeout, max_bytes)
-
-
-def post_json(url: str, body: dict, timeout: float = 15, headers: dict | None = None, max_bytes: int = HTTP_MAX_BYTES) -> HttpResult:
-    """One POST with a JSON body. Used by lib/grafana_token.py only (the one write kubegap makes anywhere, and only when the user chose it);
-    every collection path reads with `get`."""
-    data = json.dumps(body).encode("utf-8")
-    h = {"Accept": "application/json", "Content-Type": "application/json", **(headers or {})}
-    return _open(urllib.request.Request(url, data=data, headers=h, method="POST"), url, timeout, max_bytes)
-
-
-def _open(req: urllib.request.Request, url: str, timeout: float, max_bytes: int) -> HttpResult:
+    req = urllib.request.Request(url, headers=headers or {"Accept": "application/json"})
     try:
         with _opener.open(req, timeout=timeout) as resp:  # only opens a local port-forward or a configured URL
             raw = _read_capped(resp, max_bytes)

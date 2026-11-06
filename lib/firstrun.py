@@ -21,7 +21,8 @@ The policies that already exist in config.yaml answer a question for good: `inst
 
 Texts come in two languages, English and Korean, each written from the question's purpose (`language=` of `questions`); the agent copies the
 block as printed and never translates it (#173). Loki is left out of the stores question when the log shipper's configuration says the logs
-go elsewhere (lib/logsinks.py, #174), and the Grafana question offers to create the read token once (lib/grafana_token.py).
+go elsewhere (lib/logsinks.py, #174), and the Grafana token is asked for only when Grafana holds dashboards that are not in ConfigMaps
+(`grafana_without_token`; the provisioned ones are read without a token).
 """
 
 from __future__ import annotations
@@ -368,57 +369,72 @@ def _q_node_daemonset(setup: dict, cfg: Config, L: str) -> dict | None:
     }
 
 
+def grafana_without_token(setup: dict) -> dict | None:
+    """What a run reads from Grafana without a token: the dashboards and datasources Helm put into ConfigMaps (`setup` counts them,
+    `monitoring.grafana.provisioned`). None when nothing is provisioned that way. `unlisted` is how many dashboards exist in Grafana beyond
+    the provisioned ones, from Grafana's own metric; None when that metric was not readable."""
+    g = (setup.get("monitoring") or {}).get("grafana") or {}
+    p = g.get("provisioned") or {}
+    dashboards, datasources, total = p.get("dashboards") or 0, p.get("datasources") or 0, p.get("total_dashboards")
+    if not dashboards and not datasources:
+        return None
+    unlisted = max(total - dashboards, 0) if isinstance(total, int) else None
+    return {"dashboards": dashboards, "datasources": datasources, "total": total, "unlisted": unlisted}
+
+
 def _q_grafana_token(setup: dict, cfg: Config, L: str) -> dict | None:
     g = (setup.get("monitoring") or {}).get("grafana") or {}
     if not g.get("ok") or cfg.get("grafana_api_token"):
         return None
+    prov = grafana_without_token(setup)
+    if prov and not prov["unlisted"]:
+        return None  # every dashboard Grafana counts comes from a ConfigMap, which is read without a token; or the count is unreadable and nothing says otherwise
     cfg_path = cfg.path or paths.DEFAULT_CONFIG
-    ref = g.get("admin_secret")  # lib/grafana_token.admin_ref: the Grafana workload names the Secret that holds the admin password
-    ns = (g.get("service") or {}).get("namespace")
     if L == "ko":
         q = {
             "header": "Grafana",
-            "question": "Grafana의 데이터소스 목록과 대시보드 목록도 읽을까요? 읽기 전용 토큰이 하나 필요해요.",
-            "explain": (
-                f"Grafana는 로그인한 쪽에만 이 두 목록을 보여 줘요. '지금 만들기'를 고르면 kubegap이 Grafana 관리자 비밀번호가 든 Secret(위치: {ns}/{ref['secret']})에서 비밀번호를 딱 한 번 읽어서, Grafana에 읽기 전용(Viewer) 서비스 계정과 토큰을 만들고, 토큰만 설정 파일에 적어요. 비밀번호는 어디에도 남기지 않고, 그 뒤로는 토큰만 써요. kubegap이 Secret 값을 읽는 건 이때뿐이에요."
-                if ref
-                else "Grafana는 로그인한 쪽에만 이 두 목록을 보여 줘요. 이 Grafana는 관리자 비밀번호를 Secret에서 가져오지 않아서 kubegap이 토큰을 대신 만들 수 없어요. 토큰은 직접 만들어 설정 파일에 넣어 주세요. 이 대화에 토큰을 붙여 넣지는 마세요."
+            "question": (
+                f"Grafana에 대시보드가 {prov['total']}개 있는데 ConfigMap에서 읽을 수 있는 건 {prov['dashboards']}개예요. 나머지 {prov['unlisted']}개는 Grafana 화면에서 만든 거라 토큰이 있어야 목록에 나와요. 토큰을 넣을까요?"
+                if prov
+                else "Grafana의 데이터소스 목록과 대시보드 목록도 읽을까요? 읽기 전용 토큰이 하나 필요해요."
             ),
-            "gain": ["리포트에 데이터소스 목록과 대시보드 목록이 들어가요. grafana.* 점검 항목은 토큰이 없어도 Grafana 자체 메트릭으로 돌아가요"],
-            "create": ("지금 만들기", f"Secret을 한 번 읽어 Viewer 서비스 계정과 토큰을 만들고 {cfg_path}에 적어요. 토큰은 화면에 찍지 않아요. 되돌리려면 Grafana에서 그 서비스 계정을 지우면 돼요."),
+            "explain": "Grafana는 로그인한 쪽에만 이 목록을 보여 줘요. kubegap은 관리자 비밀번호를 읽지 않으니(Secret이에요) 토큰은 직접 만들어 설정 파일에 넣어 주세요. 이 대화에 토큰을 붙여 넣지는 마세요."
+            + (" Helm이 ConfigMap으로 넣은 대시보드와 데이터소스는 토큰 없이도 읽어요." if prov else ""),
+            "gain": [
+                f"Grafana 화면에서 만든 대시보드 {prov['unlisted']}개가 목록과 알림 대조에 들어가요" if prov else "리포트에 데이터소스 목록과 대시보드 목록이 들어가요. grafana.* 점검 항목은 토큰이 없어도 Grafana 자체 메트릭으로 돌아가요"
+            ],
             "show": ("방법 보기", "세 단계를 보여 줘요. Grafana와 내 편집기에서 직접 해요."),
             "show_lines": [
                 "1. Grafana에 관리자로 들어가서 Viewer 역할의 서비스 계정을 만들고 토큰을 하나 더해요",
                 f"2. 내 편집기로 {cfg_path}에 이 줄을 더해요:  grafana_api_token: <토큰>",
                 f"3. chmod 600 {cfg_path}",
             ],
-            "skip": "두 목록은 리포트에 '인증 없음'으로 적혀요.",
+            "skip": f"화면에서 만든 대시보드 {prov['unlisted']}개는 목록에 없고, 리포트에 그렇게 적혀요." if prov else "두 목록은 리포트에 '인증 없음'으로 적혀요.",
         }
     else:
         q = {
             "header": "Grafana",
-            "question": "Read the Grafana datasource and dashboard lists too? It needs one read-only token.",
-            "explain": (
-                f"Grafana answers those two lists only to a logged-in caller. Create now has kubegap read the Secret {ns}/{ref['secret']} that holds the Grafana admin password once, create a read-only (Viewer) service account and a token in Grafana, and write only the token to the config file. The password is kept nowhere and the token is what every later run uses. This is the one time kubegap reads a Secret value."
-                if ref
-                else "Grafana answers those two lists only to a logged-in caller. This Grafana does not take its admin password from a Secret, so kubegap cannot create the token for you: create it yourself and put it in the config file. Do not paste it into this chat."
+            "question": (
+                f"Grafana has {prov['total']} dashboards and {prov['dashboards']} of them can be read from ConfigMaps. The other {prov['unlisted']} were made in Grafana itself and need a token to be listed. Add one?"
+                if prov
+                else "Read the Grafana datasource and dashboard lists too? It needs one read-only token."
             ),
-            "gain": ["the datasource list and the dashboard list in the report; the grafana.* checks run from Grafana's own metrics either way"],
-            "create": ("Create now", f"Reads the Secret once, creates the Viewer service account and token, writes the token to {cfg_path}. The token is never printed. To undo, delete that service account in Grafana."),
+            "explain": "Grafana answers those lists only to a logged-in caller. kubegap does not read the admin password (it is a Secret), so the token is yours to create and to put in the config file. Do not paste it into this chat."
+            + (" The dashboards and datasources Helm put into ConfigMaps are read without one." if prov else ""),
+            "gain": [
+                f"the {prov['unlisted']} dashboards made in Grafana itself join the list and the alert comparison"
+                if prov
+                else "the datasource list and the dashboard list in the report; the grafana.* checks run from Grafana's own metrics either way"
+            ],
             "show": ("Show how", "Prints the three steps. You do them in Grafana and in your own editor."),
             "show_lines": [
                 "1. In Grafana, as an admin, create a service account with the role Viewer and add a token to it",
                 f"2. Add this line to {cfg_path} in your own editor:  grafana_api_token: <the token>",
                 f"3. chmod 600 {cfg_path}",
             ],
-            "skip": "The two lists read 'no auth' in the report.",
+            "skip": f"The {prov['unlisted']} dashboards made in Grafana stay unlisted, and the report says so." if prov else "The two lists read 'no auth' in the report.",
         }
-    options = []
-    if ref:
-        options.append(_opt("create", *q["create"], ["grafana-token", "--create"], remember=False))
-    options.append(_opt("show", *q["show"], show=q["show_lines"]))
-    options.append(_skip(L, q["skip"]))
-    return {"id": "grafana-token", "header": q["header"], "question": q["question"], "explain": q["explain"], "gain": q["gain"], "options": options, "typed": None}
+    return {"id": "grafana-token", "header": q["header"], "question": q["question"], "explain": q["explain"], "gain": q["gain"], "options": [_opt("show", *q["show"], show=q["show_lines"]), _skip(L, q["skip"])], "typed": None}
 
 
 _STORE_GAIN = {
@@ -532,10 +548,19 @@ def skipped(setup: dict, cfg: Config, ctx_dir: Path | None, *, language: str = "
 
 def noted(setup: dict, cfg: Config, ctx_dir: Path | None, *, language: str = "en") -> list[str]:
     """Things decided without a question, for the report's "what this run could not see": today, Loki left out because the logs go elsewhere."""
+    out = []
     why = loki_not_asked(setup, language)
-    if not why or cfg.url("loki") or ((setup.get("monitoring") or {}).get("loki") or {}).get("ok"):
-        return []
-    return [f"loki: 묻지 않았어요. {why}. Loki는 읽지 않아요" if language == "ko" else f"loki: not asked. {why}; Loki is not read"]
+    if why and not cfg.url("loki") and not ((setup.get("monitoring") or {}).get("loki") or {}).get("ok"):
+        out.append(f"loki: 묻지 않았어요. {why}. Loki는 읽지 않아요" if language == "ko" else f"loki: not asked. {why}; Loki is not read")
+    prov = grafana_without_token(setup)
+    if prov and not prov["unlisted"] and not cfg.get("grafana_api_token") and ((setup.get("monitoring") or {}).get("grafana") or {}).get("ok"):
+        if language == "ko":
+            tail = f"Grafana가 세는 대시보드도 {prov['total']}개라 빠진 게 없어요" if isinstance(prov["total"], int) else "Grafana 전체 개수는 메트릭을 못 읽어 모르고, 화면에서 만든 대시보드가 있으면 목록에 없어요"
+            out.append(f"grafana: 토큰 없이 ConfigMap에서 대시보드 {prov['dashboards']}개와 데이터소스 {prov['datasources']}개를 읽어요. {tail}")
+        else:
+            tail = f"Grafana counts {prov['total']} dashboards too, so none is missing" if isinstance(prov["total"], int) else "the total in Grafana could not be read from its metric, so a dashboard made in Grafana itself would be unlisted"
+            out.append(f"grafana: no token needed; {prov['dashboards']} dashboards and {prov['datasources']} datasources are read from ConfigMaps. {tail}")
+    return out
 
 
 _RENDER = {

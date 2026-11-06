@@ -116,32 +116,6 @@ def cmd_questions(args) -> int:
     return EXIT_OK
 
 
-def cmd_grafana_token(args) -> int:
-    """`grafana-token --create`: the "Create now" of the grafana-token first-run question. Reads the Grafana admin Secret once, creates a Viewer
-    service account and a token in Grafana, writes the token to config.yaml (mode 0600). Prints what was created, never the token."""
-    from lib import grafana_token as _gt
-
-    if not args.create:
-        print("kubegap grafana-token: pass --create to create the read token (the first-run question's Create now)", file=sys.stderr)
-        return EXIT_USAGE
-    ctx, ctx_dir, setup, cfg = _first_run_state(args)
-    if cfg.get("grafana_api_token"):
-        print(f"nothing to do: grafana_api_token is already set in {cfg.path}")
-        return EXIT_OK
-    g = (setup.get("monitoring") or {}).get("grafana") or {}
-    ref = g.get("admin_secret")
-    if not g.get("ok") or not ref:
-        print("not created: setup found no Grafana that takes its admin password from a Secret. Pick Show how at the question instead", file=sys.stderr)
-        return EXIT_ERROR
-    cfg_path = Path(args.config).expanduser() if args.config else (cfg.path or paths.DEFAULT_CONFIG)
-    from lib.runlog import RunLog
-
-    log = RunLog(ctx_dir / "setup.log", echo=args.verbose) if ctx_dir and ctx_dir.is_dir() else None
-    result = _gt.create(ctx, g, ref, Path(cfg_path), configured_url=cfg.url("grafana"), kubeconfig=args.kubeconfig, log=log)
-    print(_gt.describe(result))
-    return EXIT_OK if result.get("ok") else EXIT_ERROR
-
-
 def cmd_answer(args) -> int:
     """Remember the user's choice for one first-run question so it is not asked again. `--forget` drops remembered answers."""
     from lib import firstrun as _firstrun
@@ -728,10 +702,6 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--ask-again", action="store_true", help="list every first-run question again, including the ones answered before (the `/kubegap setup` mode)")
     s.add_argument("--language", choices=["en", "ko"], help="language of the first-run question block (default: `language:` in config.yaml, else en); the agent copies it as printed")
     s.set_defaults(func=cmd_setup)
-
-    s = sub.add_parser("grafana-token", parents=[common], help="--create: make the read-only Grafana token once (Viewer service account + token through the Grafana API, written to config.yaml); the Create now of the grafana-token first-run question")
-    s.add_argument("--create", action="store_true", help="create the service account and token now; reads the Grafana admin Secret once")
-    s.set_defaults(func=cmd_grafana_token)
 
     s = sub.add_parser("questions", parents=[common], help="print the open first-run questions of this context (from the saved setup result; does not touch the cluster)")
     s.add_argument("--language", choices=["en", "ko"], help="language of the question texts (default: `language:` in config.yaml, else en)")
