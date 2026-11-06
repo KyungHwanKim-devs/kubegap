@@ -1,8 +1,9 @@
 # ---------------- vpc-cni (collectors/vpc-cni/signatures.yaml) ----------------
-# All three vpc-cni signatures read the aws-node pod log, which holds only the logrus lines of the Go entrypoint (cmd/aws-vpc-cni/main.go). ipamd writes its zap JSON to
-# AWS_VPC_K8S_CNI_LOG_FILE, default /host/var/log/aws-routed-eni/ipamd.log (pkg/utils/logger/config.go:9), to stdout only when that env is "stdout" (zaplogger.go:136@v1.19.0);
-# the CNI plugin writes to AWS_VPC_K8S_PLUGIN_LOG_FILE (/var/log/aws-routed-eni/plugin.log). So on the default add-on configuration these patterns can only match
-# the entrypoint lines, and silence is not evidence of health.
+# The three vpc-cni signatures read two files. The aws-node pod log holds only the logrus lines of the Go entrypoint (cmd/aws-vpc-cni/main.go): ipamd writes its zap JSON to
+# AWS_VPC_K8S_CNI_LOG_FILE, default /host/var/log/aws-routed-eni/ipamd.log (pkg/utils/logger/config.go:21), to stdout only when that env is "stdout" (zaplogger.go:136@v1.19.0);
+# the CNI plugin writes to AWS_VPC_K8S_PLUGIN_LOG_FILE (/var/log/aws-routed-eni/plugin.log). A full run with node access reads the warn and error lines of the last 24 hours of
+# ipamd.log from every node into logs/node/<node>/ipamd-24h.log (collectors/vpc-cni/collect.yaml `ipamd-log`, #158), where the ipamd alternatives match. In a daily run, or
+# without node access, only the entrypoint lines are read and silence is not evidence of health.
 # Wording fixed to the source: "DataStore has no available IP/Prefix addresses" (capital D and S, "/Prefix"), "Failed to allocate %d IP addresses", "Failed to assign IPs from network card %d".
 # The plugin's "Failed to assign an IP address to container %s" (cmd/routed-eni-cni-plugin/cni.go:183@v1.19.0, :219@v1.23.2) is matched by the first alternative when plugin.log is read.
 - id: vpc-cni.ip-assign-failed
@@ -10,9 +11,9 @@
   component: vpc-cni
   area: traffic
   severity: high
-  sources: ["logs/pods/vpc-cni/*.log"]
+  sources: ["logs/pods/vpc-cni/*.log", "logs/node/*/ipamd-24h.log"]
   pattern: '[Ff]ailed to (assign|allocate) (an |\d+ )?IP|InsufficientFreeAddressesInSubnet|Unable to attach IPs/Prefixes for the ENI|DataStore has no available IP|no available IP(/Prefix)? addresses'
-  meaning: New pods cannot get an IP and stay in ContainerCreating. The subnet's free IPs or the instance ENI/IP limit are used up. These are ipamd lines; they reach the aws-node pod log only when AWS_VPC_K8S_CNI_LOG_FILE=stdout (the default writes them to /var/log/aws-routed-eni/ipamd.log on the node), so a count of zero is not evidence of health.
+  meaning: New pods cannot get an IP and stay in ContainerCreating. The subnet's free IPs or the instance ENI/IP limit are used up. These are ipamd lines: a full run reads them from the node's ipamd.log; they reach the aws-node pod log only when AWS_VPC_K8S_CNI_LOG_FILE=stdout (the default writes them to /var/log/aws-routed-eni/ipamd.log on the node), so a count of zero is not evidence of health.
   cause: Small subnet, ENI limit of the node type, WARM_IP_TARGET setting, prefix delegation not used.
   verify: "aws ec2 describe-subnets --query 'Subnets[].{id:SubnetId,free:AvailableIpAddressCount}'; kubectl get events -A | grep -i 'failed to assign'"
   source:
@@ -36,9 +37,9 @@
   component: vpc-cni
   area: platform
   severity: medium
-  sources: ["logs/pods/vpc-cni/*.log"]
+  sources: ["logs/pods/vpc-cni/*.log", "logs/node/*/ipamd-24h.log"]
   pattern: 'RequestLimitExceeded|Throttling|Rate exceeded'
-  meaning: ENI/IP allocation API calls slow down, delaying pod startup. The code appears only in an ipamd error line after the SDK's retries failed, and ipamd lines reach the pod log only with AWS_VPC_K8S_CNI_LOG_FILE=stdout (default is /var/log/aws-routed-eni/ipamd.log on the node), so a count of zero is not evidence of health.
+  meaning: ENI/IP allocation API calls slow down, delaying pod startup. The code appears only in an ipamd error line after the SDK's retries failed; a full run reads those from the node's ipamd.log, and they reach the pod log only with AWS_VPC_K8S_CNI_LOG_FILE=stdout (default is /var/log/aws-routed-eni/ipamd.log on the node), so a count of zero is not evidence of health.
   cause: Many nodes launching at once (scale-out, deployment), API quota shared with other controllers.
   verify: "kubectl logs -n kube-system -l k8s-app=aws-node --since=24h | grep -c RequestLimitExceeded"
   warn_at: 5
@@ -60,9 +61,9 @@
   component: vpc-cni
   area: traffic
   severity: medium
-  sources: ["logs/pods/vpc-cni/*.log"]
+  sources: ["logs/pods/vpc-cni/*.log", "logs/node/*/ipamd-24h.log"]
   pattern: 'level=error|"level":"error".*"caller":"ipamd/|[Ff]ailed to (create|attach|delete) ENI|Failed to CreateNetworkInterface'
-  meaning: The aws-node entrypoint (level=error) or the IP management daemon ipamd ("level":"error" JSON) logged errors. Check the samples to tell ENI-related from API-related. ipamd lines reach the pod log only with AWS_VPC_K8S_CNI_LOG_FILE=stdout (default is /var/log/aws-routed-eni/ipamd.log on the node), so a count of zero is not evidence of health.
+  meaning: The aws-node entrypoint (level=error) or the IP management daemon ipamd ("level":"error" JSON) logged errors. Check the samples to tell ENI-related from API-related. A full run reads ipamd's lines from the node's ipamd.log; they reach the pod log only with AWS_VPC_K8S_CNI_LOG_FILE=stdout (default is /var/log/aws-routed-eni/ipamd.log on the node), so a count of zero is not evidence of health.
   cause: IAM permissions (AmazonEKS_CNI_Policy on the node role), security groups, subnet configuration.
   verify: "kubectl logs -n kube-system -l k8s-app=aws-node --since=24h | grep -E 'level=error|\"level\":\"error\"' | head"
   warn_at: 10
