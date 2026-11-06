@@ -91,6 +91,9 @@ def run_setup(
     # 1. tools -----------------------------------------------------------------------------------------------
     _p("== 1/4 dependency tools")
     status = tools.check_tools()
+    catalog = tools.catalog()
+    for t in status:
+        t["checks_text"] = tools.checks_text(t["checks"], catalog)
     missing = [t for t in status if not t["present"]]
     installs: list[dict] = []
     wanted = [t for t in missing if install is True or (isinstance(install, list) and t["name"] in install)]
@@ -100,7 +103,7 @@ def run_setup(
         for t in missing:
             tool = tools.by_name(t["name"])
             _p(f"  - {t['name']}{' [required]' if t['required'] else ''}: {t['role']}")
-            _p(f"      checks skipped without it: {', '.join(t['checks'])}")
+            _p(f"      checks skipped without it: {t['checks_text']}")
             _p(f"      install method: {tools.install_plan(tool)}")
         _p("")
     for t in wanted:
@@ -122,6 +125,8 @@ def run_setup(
             _p(f"    {'done (' + str(res.get('method')) + ')' if res['ok'] else 'failed: ' + str(res['error'])[:300]}")
     if wanted:
         status = tools.check_tools()
+        for t in status:
+            t["checks_text"] = tools.checks_text(t["checks"], catalog)
     result["tools"] = status
     result["installs"] = installs
     result["install_mode"] = "all" if install is True else ("selected" if isinstance(install, list) else "check-only")
@@ -133,7 +138,7 @@ def run_setup(
     optional_missing = [t["name"] for t in status if not t["required"] and not t["present"]]
     if optional_missing:
         affected = sorted({c for t in status if t["name"] in optional_missing for c in t["checks"]})
-        _p(f"  -> missing optional tools {', '.join(optional_missing)}: their checks ({', '.join(affected)}) will be marked 'tool missing'; everything else proceeds")
+        _p(f"  -> missing optional tools {', '.join(optional_missing)}: their checks ({tools.checks_text(affected, catalog)}) are reported as tool missing or skip; everything else proceeds")
     result["required_missing"] = required_missing
     result["optional_missing"] = optional_missing
 

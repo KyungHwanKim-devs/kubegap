@@ -468,6 +468,19 @@ def cmd_checks(args) -> int:
     return EXIT_OK
 
 
+def cmd_tools(args) -> int:
+    """The optional tools: what each feeds, in which mode, how it is installed. --markdown writes the table of docs/SETUP.md (--language ko: docs/ko/SETUP.md), checked by tests/test_tools_doc.py."""
+    from lib import tools as _tools
+
+    catalog = _tools.catalog()
+    if args.markdown:
+        sys.stdout.write(_tools.render_table(args.language, catalog))
+        return 0
+    for t in _tools.TOOLS:
+        print(f"{t.name:<8} {'required' if t.required else 'optional':<8} {t.modes:<14} {_tools.checks_text(t.checks, catalog)}")
+    return 0
+
+
 def cmd_node_commands(args) -> int:
     """Every command kubegap runs on nodes, from the collector definitions and lib/node.py. --markdown writes deploy/node-access/COMMANDS.md, --ssm-document writes deploy/permissions/ssm-document.yaml (both checked by tests/test_node_commands.py)."""
     from lib import nodecommands as _nc
@@ -781,6 +794,11 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("checks", help="list every check by area; --markdown writes the catalog that docs/CHECKS.md is generated from")
     s.add_argument("--markdown", action="store_true", help="Markdown tables instead of plain text")
     s.set_defaults(func=cmd_checks)
+
+    s = sub.add_parser("tools", help="list the tools kubegap runs and the checks each one feeds; --markdown writes the table of docs/SETUP.md")
+    s.add_argument("--markdown", action="store_true", help="the Markdown table")
+    s.add_argument("--language", choices=["en", "ko"], default="en", help="en: docs/SETUP.md, ko: docs/ko/SETUP.md")
+    s.set_defaults(func=cmd_tools)
 
     s = sub.add_parser("node-commands", help="list every command kubegap runs on nodes; --markdown writes deploy/node-access/COMMANDS.md, --ssm-document writes deploy/permissions/ssm-document.yaml")
     s.add_argument("--markdown", action="store_true", help="the COMMANDS.md text")
