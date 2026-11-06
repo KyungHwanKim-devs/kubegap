@@ -1,7 +1,7 @@
 # kubegap development tooling. No runtime dependencies (standard library only, Python 3.11+ for datetime.fromisoformat 'Z' handling and zoneinfo).
 [project]
 name = "kubegap"
-version = "0.1.3"
+version = "0.1.4"
 description = "Kubernetes operational gap audit (Claude Code Agent Skill)"
 requires-python = ">=3.11"
 
