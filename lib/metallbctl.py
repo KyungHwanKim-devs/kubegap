@@ -142,8 +142,10 @@ def _l2(snap: Path, lb: list[dict], node_names: list[str], texts: dict[str, str]
     for a in objects(snap, "l2advertisements.metallb.io"):
         sp = a.get("spec") or {}
         advs.append({"name": a["metadata"]["name"], "pools": sp.get("ipAddressPools"), "node_selectors": sp.get("nodeSelectors"), "interfaces": sp.get("interfaces")})
-    by_node: Counter = Counter(r["node"] for r in announced if r["node"])
-    total = len(announced)
+    # The leader is a Layer 2 idea: over BGP every eligible node announces the same IP, and one node carrying both protocols is two rows for one IP (protocol is "bgp" or "layer2", internal/config/config.go:91-92@v0.16.2)
+    l2_rows = [r for r in announced if r["protocol"] == "layer2"]
+    by_node: Counter = Counter(r["node"] for r in l2_rows if r["node"])
+    total = len(l2_rows)
     leader = by_node.most_common(1)[0] if by_node else (None, 0)
     return {
         "available": source is not None,

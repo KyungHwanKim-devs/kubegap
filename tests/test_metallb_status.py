@@ -84,6 +84,20 @@ def test_bgp_announcements_read_like_the_metric_protocol_label(tmp_path):
     assert out["summary"]["mode"] == "bgp" and out["l2"]["announced"][0] == {"ip": "172.18.255.200", "node": "kind-worker", "protocol": "bgp", "service": "default/web"}
 
 
+def test_bgp_rows_are_no_l2_leader(tmp_path):
+    """Seen on 0.14.9 with a live FRR peer and both advertisement kinds: 2 IPs came out as "4 IPs announced" with both counted as L2 leadership."""
+    rows = "".join(f'metallb_speaker_announced{{ip="172.18.255.200",node="kind-worker",protocol="{p}",service="default/web"}} 1\n' for p in ("bgp", "layer2"))
+    step = {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}}}
+    l2 = metallbctl.analyze(snap(tmp_path, version="v0.15.2", step=step, metrics=rows + "metallb_k8s_client_config_loaded_bool 1\n", daemonsets=[workload("v0.15.2", ("monitoring", 7472))]), INV)["l2"]
+    assert (len(l2["announced"]), l2["announced_total"], l2["by_node"], l2["leader_share"]) == (2, 1, {"kind-worker": 1}, 1.0)
+
+
+def test_a_bgp_only_cluster_has_no_l2_leader_even_with_one_announcing_node(tmp_path):
+    """One eligible node over BGP is not "L2 leaders concentrated on one node"."""
+    l2 = metallbctl.analyze(snap(tmp_path, **{L2: [], BGP: [BGP_WEB]}), INV)["l2"]
+    assert (l2["available"], len(l2["announced"]), l2["announced_total"], l2["by_node"], l2["leader_node"], l2["leader_share"]) == (True, 1, 0, {}, None, None)
+
+
 def test_a_status_created_a_moment_ago_has_no_node_and_is_left_out(tmp_path):
     """CreateOrPatch creates the object first and the next reconcile writes status (layer2_status_controller.go:153@v0.16.2)."""
     out = metallbctl.analyze(snap(tmp_path, **{L2: [{"metadata": {"name": "l2-new"}, "spec": {}}], BGP: [], STATE: []}), INV)
@@ -229,7 +243,7 @@ def test_a_bgp_status_of_a_node_that_is_gone_does_not_count(tmp_path):
     """Only its own node removes a ServiceBGPStatus (bgp_status_controller.go:76-87@v0.16.2); until the Pod object is collected the row stays."""
     gone = {"metadata": {"name": "bgp-old"}, "status": {"node": "node-removed", "peers": ["lab"], "serviceName": "web", "serviceNamespace": "default"}}
     l2 = metallbctl.analyze(snap(tmp_path, **{L2: [], BGP: [BGP_WEB, gone], STATE: []}), INV)["l2"]
-    assert l2["by_node"] == {"kind-worker": 1}
+    assert [r["node"] for r in l2["announced"]] == ["kind-worker"]
 
 
 def test_every_metallb_check_runs_wherever_metallb_is_present():
