@@ -73,7 +73,7 @@ def _kubectl_literals(source: str, filename: str) -> list[tuple[str, str]]:
     return out
 
 
-def test_lib_kubectl_calls_use_read_verbs_and_exec_only_in_node_py():
+def test_lib_kubectl_calls_use_read_verbs_and_never_exec():
     calls = []
     for f in sorted(ROOT.glob("lib/*.py")):
         calls += _kubectl_literals(f.read_text(encoding="utf-8"), f.name)
@@ -81,7 +81,7 @@ def test_lib_kubectl_calls_use_read_verbs_and_exec_only_in_node_py():
     bad = [c for c in calls if c[0] not in KUBECTL_LIB_VERBS]
     assert bad == []
     execs = [c for c in calls if c[0] == "exec"]
-    assert execs and all(c[1].startswith("node.py:") for c in execs), execs
+    assert execs == [], "kubegap runs nothing inside pods; node commands go over SSM or SSH (the kubectl exec node backend was removed in #172)"
 
 
 def test_raw_paths_in_lib_are_the_pod_proxy_only():
@@ -279,18 +279,6 @@ def test_every_clusterrole_grant_has_a_reader():
     unused_groups = sorted(g for g in groups if g not in read_groups and g not in GRANT_READERS)
     unused_core = sorted(r for r in core if r not in read_core and r not in GRANT_READERS)
     assert unused_groups == [] and unused_core == []
-
-
-def test_daemonset_exec_role_matches_the_node_backend():
-    from lib import node
-
-    runner = next(c for c in vars(node).values() if isinstance(c, type) and hasattr(c, "DS_NAMESPACE"))
-    docs = [yamlite.load(d) for d in (ROOT / "deploy" / "permissions" / "role-daemonset-exec.yaml").read_text(encoding="utf-8").split("\n---\n") if d.strip()]
-    role = next(d for d in docs if d.get("kind") == "Role")
-    assert role["metadata"]["namespace"] == runner.DS_NAMESPACE
-    assert role["rules"] == [{"apiGroups": [""], "resources": ["pods/exec"], "verbs": ["get", "create"]}]
-    ds = (ROOT / "deploy" / "node-access" / "daemonset.yaml").read_text(encoding="utf-8")
-    assert f"namespace: {runner.DS_NAMESPACE}" in ds
 
 
 # ---------- the IAM policy ----------

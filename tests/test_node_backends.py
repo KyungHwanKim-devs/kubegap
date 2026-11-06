@@ -1,4 +1,4 @@
-"""Which node command backends collection sends node steps to, and how discover handles config.yaml node_access: daemonset."""
+"""Which node command backends collection sends node steps to, and what discover decides for a platform without one."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def _runner(method):
 STEP = {"id": "os", "type": "node", "cmd": "uname -r", "out": "logs/node/{node}/os.txt", "nodes": "all"}
 
 
-@pytest.mark.parametrize("method", ["ssh", "ssm", "daemonset"])
+@pytest.mark.parametrize("method", ["ssh", "ssm"])
 def test_node_step_runs_on_every_backend(tmp_path, method):
     runner = _runner(method)
     rec = collect._run_node_step(STEP, "os", "core", {}, {}, tmp_path, RunLog(None), runner, 30, None)
@@ -50,7 +50,7 @@ def test_node_step_skipped_without_backend(tmp_path):
     assert collect._run_node_step(STEP, "os", "core", {}, {}, tmp_path, RunLog(None), None, 30, None)["skipped"]
 
 
-@pytest.mark.parametrize("method,ok", [("ssh", True), ("ssm", True), ("daemonset", True), ("none", False)])
+@pytest.mark.parametrize("method,ok", [("ssh", True), ("ssm", True), ("none", False)])
 def test_pod_metrics_node_fallback_precondition(method, ok):
     def ctx(node_access):
         return collect.StepContext("core", Path("collectors/core"), None, {}, {}, Path("."), RunLog(None), None, None, {}, node_access, None, collect.CollectState())
@@ -59,51 +59,22 @@ def test_pod_metrics_node_fallback_precondition(method, ok):
     assert ctx(None).node_backend_ok() is False
 
 
-def _pods(*nodes):
-    return {"items": [{"spec": {"nodeName": n}, "status": {"phase": "Running"}} for n in nodes]}
+def test_discover_gives_no_backend_to_a_platform_without_ssm_or_ssh():
+    """GKE and AKS have neither SSM nor SSH, so no node is contacted and the inventory says why (#172). A forced value still wins."""
+    for platform in ("gke", "aks"):
+        out = discover._node_access(platform, {"nodes": []}, {}, None, RunLog(None))
+        assert out["method"] == "none" and out["source"] == "detected"
+        assert out["reasons"] == [f"{platform}: kubegap has no node access for this platform (node-exporter metrics only)"]
+    assert discover._node_access("gke", {"nodes": []}, {"node_access": "ssh"}, None, RunLog(None))["method"] == "ssh"
 
 
-def test_discover_forced_daemonset_without_pods(monkeypatch):
-    monkeypatch.setattr(discover.kube, "kubectl_json", lambda *a, **k: ({"items": []}, None))
-    out = discover._node_access("k3s", {"nodes": []}, {"node_access": "daemonset"}, None, RunLog(None))
-    assert out["method"] == "daemonset" and out["source"] == "config.yaml"
-    assert out["daemonset_nodes"] == [] and "no kubegap-node-reader pod is Running" in out["reasons"][0]
-
-
-def test_discover_forced_daemonset_with_pods(monkeypatch):
-    monkeypatch.setattr(discover.kube, "kubectl_json", lambda *a, **k: (_pods("a", "b"), None))
-    out = discover._node_access("k3s", {"nodes": []}, {"node_access": "daemonset"}, None, RunLog(None))
-    assert out["method"] == "daemonset" and out["daemonset_nodes"] == ["a", "b"]
-
-
-def test_discover_detects_daemonset_pods_on_k3s(monkeypatch):
-    monkeypatch.setattr(discover.kube, "kubectl_json", lambda *a, **k: (_pods("a"), None))
-    assert discover._node_access("k3s", {"nodes": []}, {}, None, RunLog(None))["method"] == "daemonset"
-    monkeypatch.setattr(discover.kube, "kubectl_json", lambda *a, **k: ({"items": []}, None))
-    assert discover._node_access("k3s", {"nodes": []}, {}, None, RunLog(None))["method"] == "ssh"
-
-
-def test_discover_eks_ignores_daemonset_pods_unless_forced(monkeypatch):
-    monkeypatch.setattr(discover.kube, "kubectl_json", lambda *a, **k: (_pods("a"), None))
-    assert discover._node_access("eks", {"nodes": []}, {}, None, RunLog(None))["method"] == "ssm"
-    out = discover._node_access("eks", {"nodes": []}, {"node_access": "daemonset"}, None, RunLog(None))
-    assert out["method"] == "daemonset" and out["daemonset_nodes"] == ["a"]
-
-
-def test_discover_other_forced_backend_skips_daemonset_detection(monkeypatch):
-    monkeypatch.setattr(discover.kube, "kubectl_json", lambda *a, **k: (_pods("a"), None))
-    for forced in ("ssh", "none"):
-        out = discover._node_access("k3s", {"nodes": []}, {"node_access": forced}, None, RunLog(None))
-        assert out["method"] == forced and "daemonset_nodes" not in out
-
-
-def test_forced_daemonset_without_pods_fails_per_node(monkeypatch):
+def test_node_access_knows_two_backends_only():
     from lib import node as node_mod
 
-    monkeypatch.setattr(node_mod._kube, "kubectl_json", lambda *a, **k: ({"items": []}, None))
-    na = node_mod.NodeAccess({"node_access": {"method": "daemonset", "daemonset_nodes": []}, "nodes": {"nodes": [{"name": "n1"}]}}, {"node_access": "daemonset"})
+    na = node_mod.NodeAccess({"node_access": {"method": "daemonset"}, "nodes": {"nodes": [{"name": "n1"}]}}, {})
     r = na.run_on_node("n1", "true")
-    assert not r.ok and r.backend == "daemonset" and "no Running kubegap-node-reader pod" in r.error
+    assert not r.ok and "no node command backend (method=daemonset)" in r.error, "an unknown method is no backend, never a kubectl exec"
+    assert not any(n.startswith("_ds") or n == "_daemonset" for n in vars(node_mod.NodeAccess))
 
 
 # ---------- the pod-metrics node fallback goes only to Running pods with a pod address (#93) ----------

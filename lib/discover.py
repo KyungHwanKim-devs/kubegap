@@ -15,8 +15,7 @@ platform is wired in at these points and nowhere else:
 1. `detect_platform` (this module): add or sharpen the evidence rule; `setup.py` shows the same result, so no change there.
 2. `collectors/<platform>-platform/` (detect, collect.yaml, checks.yaml, signatures.yaml): `_collectors_enabled` turns it on
    by folder name alone. `PLATFORM_COLLECTOR_ALIASES` maps a platform onto another folder when they share one (rke2 -> k3s-platform).
-3. `_node_access` (this module): choose the node command backend; today gke/aks get "none" and the DaemonSet backend
-   (config `node_access: daemonset`, deploy/node-access/daemonset.yaml) is the way to read nodes on them.
+3. `_node_access` (this module): choose the node command backend; platforms with neither SSM nor SSH (gke, aks) get "none".
 4. `collect.py` `CLOUD_STEP_TYPES` / `_cloud_available`: register cloud-API step types and the inventory block they need
    (the counterpart of `cluster.eks`, which `_eks_facts` fills here).
 5. `components.py`: rules with `"platform": "<name>"` for the platform's add-ons (see its module docstring).
@@ -234,23 +233,14 @@ def _profile(platform: str, nodes: dict, cfg: Config, override: str | None) -> d
     return {"name": "small-prod", "source": "detected", "reasons": [f"platform {platform} (not EKS or k3s)", f"{nodes['count']} nodes (4-20), {len(zones)} AZs — inherits the checks of the base profile eks, quota and cost checks disabled"]}
 
 
-def node_reader_nodes(context: str | None, kubeconfig: str | None = None) -> list[str]:
-    """Names of the nodes that have a Running kubegap-node-reader pod (deploy/node-access/daemonset.yaml, namespace kubegap). Empty when the
-    DaemonSet is not applied or the pods cannot be listed."""
-    ds_pods, _ = kube.kubectl_json(["get", "pods", "-n", "kubegap", "-l", "app.kubernetes.io/name=kubegap-node-reader", "-o", "json"], context=context, kubeconfig=kubeconfig, timeout=20)
-    return [p_["spec"].get("nodeName") for p_ in ((ds_pods or {}).get("items") or []) if (p_.get("status") or {}).get("phase") == "Running"]
-
-
 def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log: RunLog, *, context: str | None = None, kubeconfig: str | None = None, ssh_state: str = "yes") -> dict:
     """ssh_state is `firstrun.ssh_decision`: on an SSH platform a node is contacted only when the user decided so ("yes": a config entry, a
     probe they ran, or the first-run answer). "skipped" and "open" give no backend, with the reason and how to change it. config.yaml
-    `node_access` wins over all of it, and a node-reader DaemonSet the user applied is used wherever its pods run."""
+    `node_access` wins over all of it."""
     forced = cfg.get("node_access")
     out: dict = {"method": None, "source": "detected", "reasons": [], "ssm_registered": [], "ssm_unregistered": []}
     if forced in ("ssm", "ssh", "none"):
         out["method"], out["source"] = forced, "config.yaml"
-    elif forced == "daemonset":
-        out["method"], out["source"] = "daemonset", "config.yaml"  # kept even when no pod is Running, so the node steps fail visibly instead of silently falling back to the platform default
     elif platform == "eks":
         out["method"], out["reasons"] = "ssm", ["EKS: SSM send-command"]
     elif platform in firstrun.SSH_PLATFORMS and ssh_state == "skipped":
@@ -259,20 +249,8 @@ def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log:
         out["method"], out["reasons"] = "none", [f"{platform}: reading nodes over SSH has not been chosen yet, so no node was contacted. `/kubegap setup` asks; `node_access: ssh` in config.yaml decides it without asking"]
     elif platform in firstrun.SSH_PLATFORMS:
         out["method"], out["reasons"] = "ssh", [f"{platform}: SSH"]
-    else:  # gke, aks: no native backend yet (no cluster to test one on); the platform-independent DaemonSet backend is the available option
-        out["method"], out["reasons"] = (
-            "none",
-            [f"{platform}: node access for this platform is not implemented yet (node-exporter metrics only). Apply deploy/node-access/daemonset.yaml and set config.yaml node_access: daemonset to read nodes via kubectl exec"],
-        )
-    # If the user has applied deploy/node-access/daemonset.yaml (environments where neither SSM nor SSH works), nodes are read via kubectl exec — the third backend.
-    # (A regression on 2026-10-26 attached the `else` above to this `if`, which turned EKS node access off; keep this block separate from the chain.)
-    if cfg.get("node_access") in (None, "", "daemonset") and (platform != "eks" or cfg.get("node_access") == "daemonset"):
-        running = node_reader_nodes(context or cfg.get("context"), kubeconfig)
-        if running:
-            out["method"], out["reasons"] = "daemonset", [f"kubegap-node-reader DaemonSet: {len(running)} pods Running (namespace kubegap) — nodes are read via kubectl exec"]
-            out["daemonset_nodes"] = running
-        elif forced == "daemonset":
-            out["reasons"], out["daemonset_nodes"] = ["config.yaml node_access: daemonset, but no kubegap-node-reader pod is Running in namespace kubegap. Apply deploy/node-access/daemonset.yaml; every node step fails until then"], []
+    else:  # gke, aks and anything else without SSM or SSH: no backend (the maintainer has no such cluster to build and test one on)
+        out["method"], out["reasons"] = "none", [f"{platform}: kubegap has no node access for this platform (node-exporter metrics only)"]
     if out["method"] == "ssm" and eks is not None:
         prof = cfg.get("aws_profile") or eks.get("profile")
         region = cfg.get("aws_region") or eks.get("region")

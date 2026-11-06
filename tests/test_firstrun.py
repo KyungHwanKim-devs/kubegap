@@ -104,7 +104,7 @@ def test_k3s_ssh_question_then_follow_up_from_the_probe(tmp_path):
     q = firstrun.questions(s, token, tmp_path)[0]
     assert [o["id"] for o in q["options"]] == ["check", "partial", "skip"] and "a, b" in q["options"][1]["description"]
     # a probe of another backend says nothing about SSH
-    (tmp_path / firstrun.NODE_ACCESS_FILE).write_text(json.dumps({"method": "daemonset", "probe": probe}))
+    (tmp_path / firstrun.NODE_ACCESS_FILE).write_text(json.dumps({"method": "ssm", "probe": probe}))
     assert [o["id"] for o in firstrun.questions(s, token, tmp_path)[0]["options"]] == ["check", "skip"]
     # every node answers: nothing left to ask
     (tmp_path / firstrun.NODE_ACCESS_FILE).write_text(json.dumps({"method": "ssh", "probe": {"a": {"ok": True}, "b": {"ok": True}}}))
@@ -162,13 +162,10 @@ def test_discover_passes_the_ssh_decision_of_the_context_folder():
     assert inspect.signature(discover._node_access).parameters["ssh_state"].default == "yes"  # `kubegap nodes` is itself the decision
 
 
-def test_a_running_node_daemonset_is_used_and_not_asked_about():
+def test_a_platform_without_node_access_gets_no_node_question():
     token = Config({"grafana_api_token": "x"})
-    for platform in ("gke", "k3s"):
-        s = _setup(platform)
-        assert _ids(s, token) == ["node-daemonset" if platform == "gke" else "node-ssh"]
-        s["cluster"]["node_reader_pods"] = 3
-        assert _ids(s, token) == []
+    assert _ids(_setup("gke"), token) == []
+    assert _ids(_setup("k3s"), token) == ["node-ssh"]
 
 
 def test_a_store_that_was_found_but_did_not_answer_is_not_called_absent():
@@ -203,11 +200,9 @@ def test_tools_of_another_platform_are_not_offered():
     assert k3s["options"][0]["run"] == ["setup", "--install-only", "ssh"] and eks["options"][0]["run"] == ["setup", "--install-only", "aws"]
 
 
-def test_stores_and_grafana_and_daemonset():
+def test_stores_and_grafana():
     assert _ids(_setup("eks", stores_ok=False)) == ["grafana-token", "stores"]
     assert _ids(_setup("eks", stores_ok=False), Config({"loki_url": "http://loki:3100"})) == ["grafana-token"]
-    assert _ids(_setup("gke"), Config({"grafana_api_token": "x"})) == ["node-daemonset"]
-    assert _ids(_setup("gke"), Config({"grafana_api_token": "x", "node_access": "daemonset"})) == []
 
 
 def _all_questions(tmp_path, language="en"):
@@ -230,7 +225,7 @@ def _all_questions(tmp_path, language="en"):
 
 def test_every_question_fits_both_choice_windows_and_can_be_skipped(tmp_path):
     qs = _all_questions(tmp_path)
-    assert {q["id"] for q in qs} == {"home-mode", "tools", "ssm-document", "node-ssh", "node-daemonset", "grafana-token", "stores"}
+    assert {q["id"] for q in qs} == {"home-mode", "tools", "ssm-document", "node-ssh", "grafana-token", "stores"}
     assert {q["id"] for q in _all_questions(tmp_path, "ko")} == {q["id"] for q in qs}, "the Korean block asks the same questions"
     for q in qs:
         assert 2 <= len(q["options"]) <= 3, q["id"]  # Codex request_user_input: 2-3 options
@@ -256,7 +251,7 @@ def test_render_names_every_option_with_its_command(tmp_path):
     # an option that acts forgets an earlier remembered answer instead of recording one
     assert "      run:  $KUBEGAP/scripts/kubegap nodes --context ctx\n      then: $KUBEGAP/scripts/kubegap answer --context ctx node-ssh --forget" in text
     assert "      config: ssh.accept_new_hosts true   (dry run" in text
-    assert "      show: kubectl apply -f " in text and "  typed answer: " in text
+    assert "      show: " in text and "  typed answer: " in text
     assert text.count("      then: ") == sum(len(q["options"]) for q in qs)
     assert "none" in firstrun.render([], "ctx")
     tail = firstrun.render([], "ctx", [{"id": "node-ssh", "header": "Node checks", "gain": ["g"]}]).splitlines()[-2:]
@@ -394,7 +389,7 @@ def test_readme_numbers_and_question_names_match_the_code():
     setup_doc = (ROOT / "docs" / "SETUP.md").read_text(encoding="utf-8")
     assert f"the {n} `node.*` checks" in setup_doc
     first_run = (ROOT / "references" / "first-run.md").read_text(encoding="utf-8")
-    for qid in ("tools", "ssm-document", "node-ssh", "node-daemonset", "grafana-token", "stores"):
+    for qid in ("tools", "ssm-document", "node-ssh", "grafana-token", "stores"):
         assert f"| `{qid}` |" in setup_doc and f"| `{qid}` |" in first_run, qid
 
 

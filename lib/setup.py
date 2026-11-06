@@ -173,8 +173,6 @@ def run_setup(
             objs = {"nodes": nodes}
             cluster["platform"], cluster["platform_reasons"] = _discover.detect_platform(info, _discover._node_summary(items), _discover.detect_components(objs, None), objs)
             cluster["is_k3s"] = cluster["platform"] == "k3s"
-            # Running node-reader pods mean the user applied the node DaemonSet: collection uses it, and no node question is asked
-            cluster["node_reader_pods"] = len(_discover.node_reader_nodes(context, kubeconfig)) if cluster["platform"] != "eks" else 0
             _p(f"  {context}: server {cluster.get('server_version')}, {len(items)} nodes ({', '.join(versions)}), detected platform {cluster['platform']}, pods list permission {'yes' if cluster['can_list_pods'] else 'no'}")
             if cluster.get("is_eks"):
                 e = cluster.get("eks") or {}

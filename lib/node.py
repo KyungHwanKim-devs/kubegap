@@ -1,6 +1,6 @@
 """Run commands on nodes.
 
-The node OS layer (kernel log, sysctl, containerd state, disk paths) is invisible to kubectl. This module wraps two backends
+The node OS layer (kernel log, sysctl, containerd state, disk paths) is invisible to kubectl. This module wraps the backends
 behind one interface, `run_on_node(node, cmd)`:
 - ssm : EKS. `aws ssm send-command` with the kubegap-node-read document (deploy/permissions/ssm-document.yaml) → `get-command-invocation` polling.
                 The document embeds every node command; the caller names a `step` and the document runs that fixed command. The IAM policy allows SendCommand on
@@ -11,13 +11,13 @@ behind one interface, `run_on_node(node, cmd)`:
                 InternalIP, in that order. User, key and port come from config.yaml `ssh.user/key/port`; when empty, ~/.ssh/config applies.
                 Host keys are checked strictly: only a node whose key is already in known_hosts is reached (`StrictHostKeyChecking=yes`). The user accepts
                 a new node once by hand, or sets `ssh.accept_new_hosts: true` to let ssh store first-seen keys (`accept-new`).
-- daemonset: anything without SSM or SSH (GKE, AKS, kubeadm). `kubectl exec` into the privileged kubegap-node-reader pod from deploy/node-access/daemonset.yaml, `chroot /host`.
-- none: no backend. Only node-exporter metrics are used.
+- none: no backend (platforms with neither SSM nor SSH, such as GKE and AKS). Only node-exporter metrics are used. A backend for them is one more
+                branch of `run_on_node` that runs the same command list; contributions welcome.
 The detection result (inventory.node_access.method) picks the backend; config.yaml `node_access` overrides it.
 
 Read-only principle: the only commands sent here are the read commands defined by collectors (node entries in collect.yaml) and the two probes in
 lib/nodecommands.py. deploy/node-access/COMMANDS.md lists all of them. On SSM the document enforces the list; on SSH the node's sudoers file limits the
-root commands; on the DaemonSet nothing but this list applies.
+root commands.
 """
 
 from __future__ import annotations
@@ -30,7 +30,6 @@ from functools import cached_property
 from pathlib import Path
 
 from . import aws as _aws
-from . import kube as _kube
 from . import nodecommands, shell
 from .config import Config
 from .runlog import RunLog
@@ -75,7 +74,7 @@ def ssh_hand_command(ssh_cfg: dict, host: str) -> str:
 
 class NodeAccess:
     def __init__(self, inv: dict, cfg: Config, log: RunLog | None = None, kubeconfig: str | None = None):
-        self.kubeconfig = kubeconfig  # the DaemonSet backend's kubectl calls (list the node-reader pods, exec) use the run's file, like every other kubectl call (#104)
+        self.kubeconfig = kubeconfig
         self.inv, self.cfg, self.log = inv, cfg, log
         na = inv.get("node_access") or {}
         self.method = cfg.get("node_access") or na.get("method") or "none"
@@ -89,15 +88,13 @@ class NodeAccess:
 
     # ---------- public interface ----------
     def run_on_node(self, node: str, cmd: str, timeout: float = 60, id: str | None = None, collector: str | None = None, *, step: str | None = None, params: dict | None = None) -> NodeResult:
-        """`cmd` is the shell text (SSH and DaemonSet send it as is). `step` is the same command's name in the SSM document (`<collector>/<step id>`, `probe`, `capabilities`); the SSM backend sends only that name plus `params` (podIp), never the text."""
+        """`cmd` is the shell text (SSH sends it as is). `step` is the same command's name in the SSM document (`<collector>/<step id>`, `probe`, `capabilities`); the SSM backend sends only that name plus `params` (podIp), never the text."""
         if node not in self.nodes:
             return NodeResult(node, self.method, False, error=f"node {node} not in inventory")
         if self.method == "ssm":
             r = self._ssm(node, step, params or {}, timeout)
         elif self.method == "ssh":
             r = self._ssh(node, cmd, timeout)
-        elif self.method == "daemonset":
-            r = self._daemonset(node, cmd, timeout)
         else:
             r = NodeResult(node, self.method, False, error=f"no node command backend (method={self.method}). Using node-exporter metrics only")
         if self.log is not None and id is not None:
@@ -125,27 +122,6 @@ class NodeAccess:
     def probe(self) -> dict[str, NodeResult]:
         """Send the probe (echo, uname, hostname) to every node to confirm access. `kubegap nodes` prints the result."""
         return self.run_on_all(self.PROBE_CMD, timeout=30, id="node.probe", step="probe")
-
-    # ---------- DaemonSet (kubectl exec → chroot /host) ----------
-    DS_NAMESPACE, DS_LABEL = "kubegap", "app.kubernetes.io/name=kubegap-node-reader"
-
-    @cached_property
-    def _ds_pods(self) -> dict[str, str]:
-        """node name -> Running kubegap-node-reader pod name. Listed once per NodeAccess instance (only when the daemonset backend is used)."""
-        d, _ = _kube.kubectl_json(["get", "pods", "-n", self.DS_NAMESPACE, "-l", self.DS_LABEL, "-o", "json"], context=self.inv.get("context") or self.cfg.get("context"), timeout=30, kubeconfig=self.kubeconfig)
-        return {p_["spec"].get("nodeName"): p_["metadata"]["name"] for p_ in ((d or {}).get("items") or []) if (p_.get("status") or {}).get("phase") == "Running"}
-
-    def _ds_pod(self, node: str) -> str | None:
-        return self._ds_pods.get(node)
-
-    def _daemonset(self, node: str, cmd: str, timeout: float) -> NodeResult:
-        """Run node commands with `chroot /host` inside the privileged pod from deploy/node-access/daemonset.yaml. Sending only read commands is the caller's (collector script's) responsibility; the same scripts as SSM/SSH are used."""
-        t0 = time.monotonic()
-        pod = self._ds_pod(node)
-        if not pod:
-            return NodeResult(node, "daemonset", False, error="no Running kubegap-node-reader pod on this node")
-        r = _kube.kubectl(["exec", "-n", self.DS_NAMESPACE, pod, "--", "chroot", "/host", "/bin/sh", "-c", cmd], context=self.inv.get("context") or self.cfg.get("context"), timeout=timeout + 15, kubeconfig=self.kubeconfig)
-        return NodeResult(node, "daemonset", r.ok, stdout=r.stdout, stderr=r.stderr, error=None if r.ok else (r.error or r.stderr.strip()[-300:]), seconds=round(time.monotonic() - t0, 1), detail={"pod": pod})
 
     # ---------- SSM ----------
     def _instance_id(self, node: str) -> str | None:
