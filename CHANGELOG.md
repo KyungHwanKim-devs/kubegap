@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.4] - 2026-11-07
+
+The permissions and data transparency milestone (9) is complete. This release is the one a first-time user meets: the first run asks only about what the cluster or the machine lacks, in the host's choice window and in English or Korean, and the report is rewritten around the engineer who runs it in the morning (`docs/SETUP.md`, `docs/DATA.md` and the Korean docs are new). Installs are verified harder (the AWS CLI zip against its OpenPGP signature, krr from hashed requirements), `kubectl port-forward` picks its own local port, the optional tools are documented in one generated table, and the VPC CNI daemon log is read from EKS nodes. One thing is gone: the privileged DaemonSet node backend; GKE, AKS and other platforms with neither SSM nor SSH are not read inside the nodes. 407 checks, rubric 0.1.83. The SSM document changed, so an EKS user runs `kubegap setup --install-ssm-document` once.
+
 ### Added
 
 - The VPC CNI daemon log is read from the node: the new full-mode node step `vpc-cni/ipamd-log` keeps the lines of level warn and higher of the last 24 hours of `/var/log/aws-routed-eni/ipamd.log` (zap JSON, `"level"` and `"ts"` keys; capped at 3,000 lines like the kubelet journal) in `logs/node/<node>/ipamd-24h.log`, and the three `vpc-cni.*` log signatures read that file next to the aws-node pod log, which by default holds only the entrypoint's lines. The SSM document changed, so an EKS user runs `kubegap setup --install-ssm-document` once. ([#158](https://github.com/KyungHwanKim-devs/kubegap/issues/158))
@@ -246,7 +250,8 @@ The first milestone, permissions and the read-only claim, is complete: issues #1
 - Expectation profiles `prod`, `lab`, `small-prod`, `multi-az-prod` and `dev`.
 - English and Korean README and sample reports.
 
-[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.0...v0.1.1
