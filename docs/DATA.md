@@ -8,6 +8,8 @@ kubegap makes read calls only. The exact Kubernetes rules and AWS actions, each 
 
 **Secrets.** Secret values are never read or recorded. Only the names and types of Secrets are. There is one exception. Helm stores each release record in a Secret, so `helm list` reads those Secrets; kubegap keeps what `helm list` prints, which is the release name, namespace, revision, update time, status, chart and app version, and never collects the release values. Under the shipped ClusterRole, which excludes Secrets, `helm list` fails and the two Helm checks are skipped. pluto and kubent are run in the modes that do not read Helm releases.
 
+**The kubeconfig.** `setup.json` records how the context authenticates: the exec command and its arguments (`aws eks get-token` on EKS) and the names of the environment variables in its `env` block. Of their values only `AWS_PROFILE` and `AWS_REGION` are kept, because kubegap passes them to the AWS CLI. Every other value, such as a tenant id or a token for a custom plugin, is written as `<redacted>` (`lib/kube.py`, `tests/test_kube_context.py`).
+
 **ConfigMaps.** ConfigMap values are not recorded either. The snapshot keeps the length and shape of each key. The real value is kept only for the configuration keys kubegap parses, listed in `KEEP_VALUES` in [`lib/scrub.py`](../lib/scrub.py): the CoreDNS Corefile, the kube-proxy configuration, the local-path-provisioner paths and a few Argo CD flags.
 
 **Logs.** Component pod logs of the last 24 hours are read by code, counted into the summary with masked sample lines, and then deleted from the snapshot before the agent starts. Set `keep_component_logs: true` in the config only if you accept that raw log lines may then be read by the agent.
