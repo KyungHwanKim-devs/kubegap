@@ -28,12 +28,18 @@ def check_tool_updates(only: list[str] | None = None) -> int:
     newest, and for a pin that is behind, the `sha256` entry of the newest version so the pin PR is a copy. Prints only; installs nothing.
     Exit 0 when every pin is current, 1 when one is behind or could not be checked. Bumping a pin is one PR per tool: `version` and `sha256`
     in `lib/tools.py` plus a `CHANGELOG.md` line."""
-    _p("== pinned tool versions (download path; brew installs are not pinned)")
+    _p("== pinned tool versions (the download path and the hashed virtualenv; brew installs are not pinned)")
     rows = tools.check_updates(only)
     behind = 0
     for r in rows:
         if r["error"]:
             _p(f"  {r['name']:<9} pinned {r['pinned']:<10} could not check: {r['error'][:200]}")
+            behind += 1
+        elif r["behind"] and r.get("requirements"):
+            t = tools.by_name(r["name"])
+            _p(f"  {r['name']:<9} pinned {r['pinned']:<10} newest {r['latest']:<10} BEHIND; new {t.venv['requirements']} follows (and the tag in lib/tools.py venv.pip):")
+            for ln in r["requirements"].rstrip("\n").splitlines():
+                _p(ln)
             behind += 1
         elif r["behind"]:
             _p(f"  {r['name']:<9} pinned {r['pinned']:<10} newest {r['latest']:<10} BEHIND")
@@ -43,7 +49,11 @@ def check_tool_updates(only: list[str] | None = None) -> int:
         else:
             _p(f"  {r['name']:<9} pinned {r['pinned']:<10} newest {r['latest']:<10} current")
     _p("")
-    _p(f"{behind} of {len(rows)} pins behind or unchecked. A pin is bumped in lib/tools.py (download.version and download.sha256), one PR per tool, with a CHANGELOG.md line." if behind else "Every pin is current.")
+    _p(
+        f"{behind} of {len(rows)} pins behind or unchecked. A pin is bumped in lib/tools.py (download.version and download.sha256; for a virtualenv tool venv.pip and its deploy/<tool>-requirements.txt), one PR per tool, with a CHANGELOG.md line."
+        if behind
+        else "Every pin is current."
+    )
     return 1 if behind else 0
 
 
@@ -90,7 +100,10 @@ def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None
         installs.append(res)
         if res["ok"] and res.get("checksum") == "verified":
             how = "against the publisher's checksum file" if res.get("sha256_from") == "publisher" else "against a digest computed from the asset when it was pinned; the publisher ships no checksum file"
-            _p(f"    installed {t['name']} {res.get('version')}, checksum verified {how} ({res.get('method')})")
+            sig = f", publisher signature {res['signature']}" if res.get("signature") else ""
+            _p(f"    installed {t['name']} {res.get('version')}, checksum verified {how}{sig} ({res.get('method')})")
+        elif res["ok"] and res.get("hashes") == "required":
+            _p(f"    installed {t['name']} {res.get('version')} into a virtualenv, every package checked against the sha256 pinned in {tools.by_name(t['name']).venv['requirements']} ({res.get('method')})")
         else:
             _p(f"    {'done (' + str(res.get('method')) + ')' if res['ok'] else 'failed: ' + str(res['error'])[:300]}")
     if wanted:

@@ -29,6 +29,7 @@ import shutil
 import stat
 import tarfile
 import tempfile
+import tomllib
 import urllib.request
 import zipfile
 from dataclasses import dataclass, field
@@ -62,7 +63,8 @@ class Tool:
     #   "post": special handling such as "aws-install"
     #   template variables: {version} {tag} {os}(darwin|linux) {arch}(arm64|amd64) {arch_x}(aarch64|x86_64) {jq_os}(macos|linux) {krr_os}
     venv: dict | None = None
-    #   {"pythons": [candidate interpreters], "brew_python": "python@3.11", "pip": "pip arguments", "bin": "executable", "extra_pip": [...]}
+    #   {"pythons": [candidate interpreters], "brew_python": "python@3.11", "pip": "source archive URL or name==version", "bin": "executable", "extra_pip": [...],
+    #    "requirements": "deploy/<name>-requirements.txt" (every package with a sha256 per file; installed with --require-hashes), "releases": "owner/repo" (where --check-tool-updates reads the newest tag)}
     pip: str | None = None
     version_args: list[str] = field(default_factory=lambda: ["--version"])
     checks: list[str] = field(default_factory=list)
@@ -126,11 +128,14 @@ TOOLS: list[Tool] = [
             "sha256": {
                 "linux-amd64": "14cb35809ad7547dd3c69fa9899a3975fbd850b6a6791f3fe264856490cd9a63",
                 "linux-arm64": "f6eb845fbacb11bee87de3f5fbe8043773cbe89d0414607b44b71e216eb9226b",
-            },  # AWS publishes a PGP signature, no plain digest: computed from the zip when the pin was made; the signature itself is not verified
+            },  # AWS publishes a PGP signature, no plain digest: computed from the zip when the pin was made, and the signature below was verified then
+            # The publisher's OpenPGP signature of the zip. With gpg on PATH the install imports the key into a temporary keyring and accepts the zip only when
+            # gpg reports VALIDSIG with this fingerprint (deploy/aws-cli-public-key.asc, from the AWS CLI user guide); without gpg the sha256 pin alone decides and the result says so (#108)
+            "signature": {"url": "{asset_url}.sig", "key": "deploy/aws-cli-public-key.asc", "fingerprint": "FB5DB77FD5C118B80511ADA8A6310ACC4672475C"},
             "latest": {"tags": "aws/aws-cli"},
         },
         checks=["eks-platform", "controlplane-logs", "node-os(ssm)", "cost"],
-        note="On macOS without brew, install https://awscli.amazonaws.com/AWSCLIV2.pkg directly. The Linux zip's PGP signature is not verified; its pinned sha256 was computed from the zip when the version was pinned (#108)",
+        note="On macOS without brew, install https://awscli.amazonaws.com/AWSCLIV2.pkg directly. The Linux zip is checked against its pinned sha256 and, when gpg is installed, against the AWS CLI Team's signature (#108)",
     ),
     Tool(
         "helm",
@@ -182,10 +187,14 @@ TOOLS: list[Tool] = [
             "pip": "https://github.com/robusta-dev/krr/archive/refs/tags/v1.31.1.tar.gz",
             "bin": "krr",
             "extra_pip": ["cachetools", "typer<0.13", "click<8.2"],
+            # Every package the install resolves to, pinned with the sha256 of each file pip may pick on the supported platforms, installed with
+            # `pip install --require-hashes -r`; `kubegap setup --check-tool-updates krr` prints the file for a new tag (#108)
+            "requirements": "deploy/krr-requirements.txt",
+            "releases": "robusta-dev/krr",
         },
         version_args=["version"],
         checks=["resources.krr-recommendation"],
-        note="The macOS release binary crashes on start with a pkg_resources error (packaging defect), and it is not on PyPI. Only Python 3.10-3.12.9 is supported, so the tagged source is installed into a dedicated virtualenv (patching the missing cachetools and the typer 0.13+ incompatibility)",
+        note="The macOS release binary crashes on start with a pkg_resources error (packaging defect), and it is not on PyPI. Only Python 3.10-3.12.9 is supported, so the tagged source is installed into a dedicated virtualenv (patching the missing cachetools and the typer 0.13+ incompatibility), from deploy/krr-requirements.txt with a hash per file",
     ),
     Tool(
         "polaris",
@@ -379,7 +388,8 @@ def platform_key(v: dict | None = None) -> str:
 
 
 def _get(url: str, timeout: float = 60) -> bytes:
-    with urllib.request.urlopen(urllib.request.Request(url, headers=_UA), timeout=timeout) as resp:
+    headers = _UA if url.startswith("https://api.github.com/") else {"User-Agent": "kubegap"}  # codeload.github.com answers 404 to the GitHub API Accept header
+    with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=timeout) as resp:
         return resp.read()
 
 
@@ -480,6 +490,32 @@ def _aws_install(blob: bytes, log=None) -> dict:
     return {"ok": True}
 
 
+def verify_signature(blob: bytes, sig: bytes, key_file: Path, fingerprint: str, log=None) -> tuple[bool, str]:
+    """Verify `sig`, an OpenPGP detached signature of `blob`, against the public key in `key_file` with gpg. (True, "verified ...") when gpg reports
+    VALIDSIG with `fingerprint`; (False, reason) on a bad or foreign signature; (True, "not checked (gpg not found)") when gpg is not on PATH. The key
+    goes into a temporary keyring that is removed afterwards, so the user's own keyring is neither read nor written."""
+    gpg = shell.which("gpg") or shell.which("gpg2")
+    if not gpg:
+        return True, "not checked (gpg not found)"
+    with tempfile.TemporaryDirectory(prefix="kubegap-gpg-") as home:
+        os.chmod(home, 0o700)
+        blob_path, sig_path = Path(home) / "asset", Path(home) / "asset.sig"
+        write_private_bytes(blob_path, blob)
+        write_private_bytes(sig_path, sig)
+        # the import's exit code is not read: gpg exits 2 when it cannot start gpg-agent (a homedir path too long for a socket) although the key is imported; the verify below decides
+        imp = shell.run([gpg, "--batch", "--quiet", "--homedir", home, "--import", str(key_file)], timeout=60, id="install.gpg.import", log=log)
+        r = shell.run([gpg, "--batch", "--homedir", home, "--status-fd", "1", "--verify", str(sig_path), str(blob_path)], timeout=60, id="install.gpg.verify", log=log)
+    # `[GNUPG:] VALIDSIG <sig-fpr> <date> <ts> <exp> <ver> <res> <algo> <hash> <class> <primary-fpr>` (GnuPG doc/DETAILS); a BADSIG or a key we do not hold prints no VALIDSIG
+    valid = [ln.split() for ln in r.stdout.splitlines() if ln.startswith("[GNUPG:] VALIDSIG ")]
+    want = fingerprint.replace(" ", "").upper()
+    if any(len(f) >= 12 and want in (f[2].upper(), f[-1].upper()) for f in valid):
+        return True, f"verified (gpg, key {want[-16:]})"
+    status = next((ln.split()[1] for ln in r.stdout.splitlines() if ln.startswith("[GNUPG:] ") and ln.split()[1] in ("BADSIG", "ERRSIG", "NO_PUBKEY", "EXPKEYSIG", "REVKEYSIG")), None)
+    why = status or ("VALIDSIG for another key" if valid else "no VALIDSIG")
+    detail = (r.stderr.strip() or r.stdout.strip() or imp.stderr.strip())[-200:]
+    return False, f"signature not valid for key {want[-16:]} ({why}): {detail}"
+
+
 def install_download(tool: Tool, log=None) -> dict:
     """Download the pinned version of `tool` for this platform, compare its sha256 with the pinned digest and only then place it in `.tools/bin/`.
     One network request, to the versioned asset URL; nothing asks the publisher what is newest. A digest mismatch, or a platform without a pinned
@@ -502,6 +538,13 @@ def install_download(tool: Tool, log=None) -> dict:
         actual = sha256_hex(blob)
         if actual != expected:
             return {"name": tool.name, "method": method, "ok": False, "error": f"checksum mismatch for {filename}: pinned sha256 {expected[:12]}…, downloaded {actual[:12]}…; nothing written"}
+        signature = None
+        if d.get("signature"):
+            s = d["signature"]
+            sig = _get(s["url"].replace("{asset_url}", url), 60)
+            ok, signature = verify_signature(blob, sig, paths.ROOT / s["key"], s["fingerprint"], log=log)
+            if not ok:
+                return {"name": tool.name, "method": method, "ok": False, "error": f"{filename}: {signature}; nothing written"}
         paths.ensure_private_dir(shell.TOOLS_BIN, base=shell.TOOLS_DIR)
         target = shell.TOOLS_BIN / d["bin"]
         if d.get("post") == "aws-install":
@@ -514,7 +557,18 @@ def install_download(tool: Tool, log=None) -> dict:
                 return {"name": tool.name, "method": method, "ok": False, "error": err}
         if log is not None:
             log.command(id=f"install.{tool.name}", cmd=[method], code=0, seconds=0.0, out_path=str(target), version=tag, sha256=actual)
-        return {"name": tool.name, "method": method, "ok": True, "error": None, "path": str(target), "version": tag, "sha256": actual, "checksum": "verified", "sha256_from": "publisher" if d.get("checksums") else "asset"}
+        return {
+            "name": tool.name,
+            "method": method,
+            "ok": True,
+            "error": None,
+            "path": str(target),
+            "version": tag,
+            "sha256": actual,
+            "checksum": "verified",
+            "sha256_from": "publisher" if d.get("checksums") else "asset",
+            "signature": signature,
+        }
     except Exception as e:  # any network or archive failure is reported only as an install failure
         return {"name": tool.name, "method": method, "ok": False, "error": f"{type(e).__name__}: {e}"}
 
@@ -554,9 +608,22 @@ def check_updates(only: list[str] | None = None) -> list[dict]:
     rows = []
     for name in only or []:
         t = by_name(name)
-        if t is None or not t.download:
+        if t is None or not (t.download or (t.venv or {}).get("requirements")):
             rows.append({"name": name, "pinned": "-", "latest": None, "behind": None, "sha256": None, "error": "unknown tool" if t is None else "no download entry (installed through brew or a virtualenv, not pinned here)"})
     for t in TOOLS:
+        v = t.venv or {}
+        if v.get("requirements") and (not only or t.name in only):
+            # a virtualenv pin: the tag in the source URL against the newest release; when behind, the requirements file for the new tag
+            pinned = _venv_tag(v) or "-"
+            row = {"name": t.name, "pinned": pinned, "latest": None, "behind": None, "sha256": None, "requirements": None, "error": None}
+            try:
+                row["latest"] = _latest_tag(v["releases"]) if v.get("releases") else None
+                row["behind"] = bool(row["latest"]) and row["latest"] != pinned
+                if row["behind"]:
+                    row["requirements"] = venv_requirements_material(t, row["latest"])
+            except Exception as e:
+                row["error"] = f"{type(e).__name__}: {e}"
+            rows.append(row)
         d = t.download
         if not d or (only and t.name not in only):
             continue
@@ -570,6 +637,69 @@ def check_updates(only: list[str] | None = None) -> list[dict]:
             row["error"] = f"{type(e).__name__}: {e}"
         rows.append(row)
     return rows
+
+
+# Wheels the supported hosts can use (linux and darwin, amd64 and arm64, the venv's Pythons) plus the sdist and pure wheels; the other files of a release are left out of the pin
+_WHEEL_KEEP = re.compile(
+    r"(\.tar\.gz|\.zip|-py3-none-any\.whl|-py2\.py3-none-any\.whl|-(cp310|cp311|cp312|cp3\d-abi3)[^/]*-(manylinux[^/]*(x86_64|aarch64)|macosx[^/]*(arm64|x86_64|universal2))\.whl)$"
+)  # glibc Linux and macOS; a musl host falls back to nothing and the install fails closed
+
+
+BUILD_MARKER = "# build-system: the source archive's build backend, installed first so the archive is built without build isolation and nothing unpinned is fetched"
+
+
+def venv_requirements_material(tool: Tool, tag: str, python: str | None = None) -> str:
+    """The text of `deploy/<tool>-requirements.txt` for version `tag`: every package pip resolves for the tool's source archive and extra
+    requirements, pinned `name==version` with `--hash=sha256:` for each file of that release the supported hosts can use (PyPI's release JSON),
+    and the archive itself as a URL with its sha256. Resolution runs `pip install --dry-run --report` in a throwaway virtualenv, so it needs one
+    of the tool's Pythons on this machine. Network reads only; nothing is installed under .tools/ or written to the repository."""
+    v = tool.venv or {}
+    py = python or next((p for p in v.get("pythons", []) if shell.which(p)), None)
+    if not py:
+        raise RuntimeError(f"no supported Python ({', '.join(v.get('pythons', []))}) to resolve the dependencies with")
+    archive = re.sub(r"(refs/tags/)[^/]+?(\.tar\.gz|\.zip)$", rf"\g<1>{tag}\2", str(v["pip"]))
+    blob = _get(archive, 600)
+    with tempfile.TemporaryDirectory(prefix="kubegap-pin-") as work:
+        venv = Path(work) / "venv"
+        r = shell.run([py, "-m", "venv", str(venv)], timeout=120, id=f"pin.{tool.name}.venv")
+        if not r.ok:
+            raise RuntimeError(f"venv creation failed: {(r.error or r.stderr.strip())[-200:]}")
+        pip = str(venv / "bin" / "pip")
+        shell.run([pip, "install", "-q", "--upgrade", "pip"], timeout=300, id=f"pin.{tool.name}.pip-upgrade")  # --report needs pip 22.2+
+        report = Path(work) / "report.json"
+        r = shell.run([pip, "install", "-q", "--dry-run", "--ignore-installed", "--report", str(report), archive, *list(v.get("extra_pip", []))], timeout=900, id=f"pin.{tool.name}.resolve")
+        if not r.ok:
+            raise RuntimeError(f"pip could not resolve the dependencies: {(r.error or r.stderr.strip())[-300:]}")
+        items = json.loads(report.read_text(encoding="utf-8"))["install"]
+    # pip's hash checking does not cover build-isolation dependencies, so the build backend of the source archive is pinned too and installed first (install_in_venv)
+    with tarfile.open(fileobj=io.BytesIO(blob), mode="r:gz") as tf:
+        member = next(m for m in tf.getmembers() if m.name.count("/") == 1 and m.name.endswith("/pyproject.toml"))
+        build_requires = tomllib.loads(tf.extractfile(member).read().decode("utf-8")).get("build-system", {}).get("requires", [])
+    backends = []
+    for req in build_requires:
+        name = re.split(r"[<>=!~\[; ]", req, maxsplit=1)[0]
+        ver = json.loads(_get(f"https://pypi.org/pypi/{name}/json", 60).decode("utf-8"))["info"]["version"]  # the backend is unpinned in krr's pyproject: the newest release
+        backends.append((name, ver))
+    lines = [
+        f"# {tool.name} {tag} and every package pip resolves for it, with the sha256 of each file the supported hosts can use (linux/darwin, amd64/arm64, {'/'.join(v.get('pythons', []))}).",
+        f"# Generated by `kubegap setup --check-tool-updates {tool.name}` from PyPI's release metadata; installed with `pip install --require-hashes -r` (lib/tools.py, #108). Do not edit by hand.",
+        f"{archive} \\\n    --hash=sha256:{sha256_hex(blob)}",
+    ]
+
+    def pinned(name: str, ver: str) -> str:
+        rel = json.loads(_get(f"https://pypi.org/pypi/{name}/{ver}/json", 60).decode("utf-8"))
+        hashes = sorted({f["digests"]["sha256"] for f in rel["urls"] if not f.get("yanked") and _WHEEL_KEEP.search(f["filename"])})
+        if not hashes:
+            raise RuntimeError(f"{name}=={ver}: no file for the supported hosts on PyPI")
+        return f"{name}=={ver} \\\n" + " \\\n".join(f"    --hash=sha256:{h}" for h in hashes)
+
+    for it in sorted(items, key=lambda i: i["metadata"]["name"].lower()):
+        if "github.com" in it["download_info"]["url"]:
+            continue
+        lines.append(pinned(it["metadata"]["name"], it["metadata"]["version"]))
+    lines.append(BUILD_MARKER)
+    lines.extend(pinned(n, ver) for n, ver in backends)
+    return "\n".join(lines) + "\n"
 
 
 def install_in_venv(tool: Tool, log=None) -> dict:
@@ -587,10 +717,24 @@ def install_in_venv(tool: Tool, log=None) -> dict:
     dest = shell.TOOLS_DIR / f"{tool.name}-venv"
     if dest.exists():
         shutil.rmtree(dest)
+    paths.ensure_private_dir(dest, base=shell.TOOLS_DIR)  # `python -m venv` would create .tools/ and the venv folder with the umask default (0755); it accepts an existing empty folder
     r = shell.run([py, "-m", "venv", str(dest)], timeout=120, id=f"install.{tool.name}.venv", log=log)
     if not r.ok:
         return {"name": tool.name, "method": method, "ok": False, "error": f"venv creation failed: {(r.error or r.stderr.strip())[-300:]}"}
-    r = shell.run([str(dest / "bin" / "pip"), "install", "-q", v["pip"], *list(v.get("extra_pip", []))], timeout=900, id=f"install.{tool.name}.pip", log=log)
+    if v.get("requirements"):
+        # every file is named with its sha256; pip refuses a package without a matching hash, so the install cannot drift from the pinned set. The build backend
+        # (the lines after BUILD_MARKER) goes in first, then the archive is built with --no-build-isolation so pip fetches nothing outside the file
+        req = paths.ROOT / v["requirements"]
+        _, _, backend = req.read_text(encoding="utf-8").partition(BUILD_MARKER + "\n")
+        if backend.strip():
+            write_private(dest / "build-requirements.txt", backend)
+            r = shell.run([str(dest / "bin" / "pip"), "install", "-q", "--require-hashes", "-r", str(dest / "build-requirements.txt")], timeout=300, id=f"install.{tool.name}.pip-build", log=log)
+            if not r.ok:
+                return {"name": tool.name, "method": method, "ok": False, "error": f"pip install of the build backend failed: {(r.error or r.stderr.strip())[-400:]}"}
+        pip_cmd = [str(dest / "bin" / "pip"), "install", "-q", "--require-hashes", "--no-build-isolation", "-r", str(req)]
+    else:
+        pip_cmd = [str(dest / "bin" / "pip"), "install", "-q", v["pip"], *list(v.get("extra_pip", []))]
+    r = shell.run(pip_cmd, timeout=900, id=f"install.{tool.name}.pip", log=log)
     if not r.ok:
         return {"name": tool.name, "method": method, "ok": False, "error": f"pip install failed: {(r.error or r.stderr.strip())[-400:]}"}
     real = dest / "bin" / v["bin"]
@@ -604,7 +748,7 @@ def install_in_venv(tool: Tool, log=None) -> dict:
     tag = _venv_tag(v)
     if tag:
         write_private(dest / _PIN_FILE, tag + "\n")
-    return {"name": tool.name, "method": method, "ok": True, "error": None, "path": str(target), "python": py, "version": tag}
+    return {"name": tool.name, "method": method, "ok": True, "error": None, "path": str(target), "python": py, "version": tag, "hashes": "required" if v.get("requirements") else None}
 
 
 def _venv_tag(v: dict) -> str | None:
@@ -619,9 +763,20 @@ def _tap_first(tool: Tool) -> bool:
     return bool(tool.brew and "/" in tool.brew and _download_applicable(tool))
 
 
+def _venv_first(tool: Tool) -> bool:
+    """The same rule for a tool whose pinned form is a virtualenv with a hashed requirements file (krr): the venv goes before a third-party tap formula."""
+    return bool(tool.brew and "/" in tool.brew and tool.venv and tool.venv.get("requirements"))
+
+
 def install_tool(tool: Tool, log=None) -> dict:
-    """Try brew -> download -> venv -> pip in order (download before brew for a third-party tap formula, see _tap_first). Never raises. If everything fails, the collected reasons are returned."""
+    """Try brew -> download -> venv -> pip in order (download before brew for a third-party tap formula, see _tap_first; the hashed venv before brew, see _venv_first). Never raises. If everything fails, the collected reasons are returned."""
     errors: list[str] = []
+    if _venv_first(tool):
+        res = install_in_venv(tool, log=log)
+        if res["ok"]:
+            res["fallback_from"] = None
+            return res
+        errors.append(res["error"])
     order = ["download", "brew"] if _tap_first(tool) else ["brew", "download"]
     for step in order:
         if step == "brew" and tool.brew and shell.which("brew"):
@@ -640,7 +795,7 @@ def install_tool(tool: Tool, log=None) -> dict:
                 res["fallback_from"] = errors or None
                 return res
             errors.append(res["error"])
-    if tool.venv:
+    if tool.venv and not _venv_first(tool):
         res = install_in_venv(tool, log=log)
         if res["ok"]:
             res["fallback_from"] = errors or None
@@ -661,6 +816,9 @@ def install_plan(tool: Tool) -> str:
     """One human-readable line saying how and where this tool would be installed. Shown when asking for consent."""
     steps = []
     brew_step = (f"brew install {tool.brew}" + (" (third-party tap: brew trust first)" if "/" in tool.brew else "")) if tool.brew and shell.which("brew") else None
+    if tool.venv and _venv_first(tool):
+        v = tool.venv
+        steps.append(f"dedicated Python virtualenv {shell.TOOLS_DIR}/{tool.name}-venv/ ({'/'.join(v['pythons'])}, {v['requirements']} with a sha256 per file)")
     if brew_step and not _tap_first(tool):
         steps.append(brew_step)
     if _download_applicable(tool):
@@ -669,7 +827,7 @@ def install_plan(tool: Tool) -> str:
         steps.append(f"official binary {d['version']} from {src}, sha256 pinned in lib/tools.py -> {shell.TOOLS_BIN}/")
     if brew_step and _tap_first(tool):
         steps.append(brew_step)
-    if tool.venv:
+    if tool.venv and not _venv_first(tool):
         v = tool.venv
         steps.append(f"dedicated Python virtualenv {shell.TOOLS_DIR}/{tool.name}-venv/ ({'/'.join(v['pythons'])}, {v['pip']})")
     if tool.pip and (shell.which("pip3") or shell.which("pip")):

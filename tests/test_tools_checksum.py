@@ -312,14 +312,14 @@ def test_an_unsupported_cpu_downloads_nothing(monkeypatch):
 
 def test_check_updates_names_an_unknown_or_unpinned_tool_instead_of_calling_it_current(monkeypatch):
     _serve(monkeypatch, {})
-    rows = tools.check_updates(["bogus", "krr"])
-    assert [(r["name"], r["error"]) for r in rows] == [("bogus", "unknown tool"), ("krr", "no download entry (installed through brew or a virtualenv, not pinned here)")]
+    rows = tools.check_updates(["bogus", "python3"])
+    assert [(r["name"], r["error"]) for r in rows] == [("bogus", "unknown tool"), ("python3", "no download entry (installed through brew or a virtualenv, not pinned here)")]
     from lib import setup as _setup
 
     monkeypatch.setattr(_setup.tools, "check_updates", lambda only=None: rows)
     lines = []
     monkeypatch.setattr(_setup, "_p", lines.append)
-    assert _setup.check_tool_updates(["bogus", "krr"]) == 1
+    assert _setup.check_tool_updates(["bogus", "python3"]) == 1
     assert any("bogus" in ln and "could not check: unknown tool" in ln for ln in lines), lines
 
 
@@ -440,3 +440,191 @@ def test_aws_zip_extraction_stays_inside_the_work_folder_and_makes_no_link(tmp_p
     blob = _zip_members([("../../escape.txt", b"out"), ("/tmp/abs.txt", b"abs"), ("aws/install", b"#!/bin/sh\n"), ("aws/dist/aws", b"bin"), ("aws/dist/link", None)])
     assert tools._aws_install(blob) == {"ok": True}
     assert seen == {"escape_outside": False, "escape_inside": "out", "abs_inside": True, "link": False, "link_text": "../outside"}
+
+
+# ---------- #108: the aws zip's publisher signature and krr's hashed requirements ----------
+
+AWS_T = tools.by_name("aws")
+SIG_URL = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.39.3.zip.sig"
+AWS_URL = "https://awscli.amazonaws.com/awscli-exe-linux-x86_64-2.39.3.zip"
+
+
+def _aws_zip() -> bytes:
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("aws/install", "#!/bin/sh\nexit 0\n")
+        zf.writestr("aws/dist/aws", "bin")
+    return buf.getvalue()
+
+
+def _linux_amd64(monkeypatch, blob: bytes):
+    monkeypatch.setattr(tools.platform, "machine", lambda: "x86_64")
+    monkeypatch.setattr(tools.platform, "system", lambda: "Linux")
+    monkeypatch.setattr(tools, "host_os", lambda: "linux")
+    monkeypatch.setitem(AWS_T.download["sha256"], "linux-amd64", hashlib.sha256(blob).hexdigest())
+
+
+def _gpg_result(stdout: str, code: int = 0):
+    def run(cmd, **kw):
+        if cmd[0] == "/usr/bin/gpg" and "--verify" in cmd:
+            return shell.Result(cmd=cmd, code=code, stdout=stdout, stderr="gpg: BAD signature" if code else "")
+        return shell.Result(cmd=cmd, code=0, stdout="")
+
+    return run
+
+
+def test_aws_zip_with_a_valid_publisher_signature_is_installed_and_the_result_says_so(monkeypatch):
+    blob = _aws_zip()
+    _linux_amd64(monkeypatch, blob)
+    _serve(monkeypatch, {AWS_URL: blob, SIG_URL: b"sig"})
+    monkeypatch.setattr(shell, "which", lambda name: "/usr/bin/gpg" if name == "gpg" else None)
+    fpr = AWS_T.download["signature"]["fingerprint"]
+    monkeypatch.setattr(shell, "run", _gpg_result(f"[GNUPG:] GOODSIG A6310ACC4672475C AWS CLI Team <aws-cli@amazon.com>\n[GNUPG:] VALIDSIG {fpr} 2026-10-30 1793383820 0 4 0 1 10 00 {fpr}\n"))
+    res = tools.install_download(AWS_T)
+    assert res["ok"] and res["signature"] == "verified (gpg, key A6310ACC4672475C)", res
+
+
+@pytest.mark.parametrize(
+    "stdout,code,reason",
+    [
+        ("[GNUPG:] BADSIG A6310ACC4672475C AWS CLI Team\n", 1, "BADSIG"),
+        ("[GNUPG:] GOODSIG 0000000000000001 Someone Else\n[GNUPG:] VALIDSIG 0000000000000000000000000000000000000001 2026-10-30 1 0 4 0 1 10 00 0000000000000000000000000000000000000001\n", 0, "VALIDSIG for another key"),
+        ("[GNUPG:] ERRSIG A6310ACC4672475C 1 10 00 1793383820 9 -\n[GNUPG:] NO_PUBKEY A6310ACC4672475C\n", 2, "ERRSIG"),
+    ],
+)
+def test_a_bad_or_foreign_signature_installs_nothing(monkeypatch, stdout, code, reason):
+    blob = _aws_zip()
+    _linux_amd64(monkeypatch, blob)
+    _serve(monkeypatch, {AWS_URL: blob, SIG_URL: b"sig"})
+    monkeypatch.setattr(shell, "which", lambda name: "/usr/bin/gpg" if name == "gpg" else None)
+    monkeypatch.setattr(shell, "run", _gpg_result(stdout, code))
+    res = tools.install_download(AWS_T)
+    assert not res["ok"] and reason in res["error"] and "nothing written" in res["error"], res
+    assert not (shell.TOOLS_DIR / "aws-cli").exists() and not shell.TOOLS_BIN.exists()
+
+
+def test_without_gpg_the_digest_decides_and_the_result_says_the_signature_was_not_checked(monkeypatch):
+    blob = _aws_zip()
+    _linux_amd64(monkeypatch, blob)
+    asked = _serve(monkeypatch, {AWS_URL: blob, SIG_URL: b"sig"})
+    monkeypatch.setattr(shell, "which", lambda name: None)
+    monkeypatch.setattr(shell, "run", lambda cmd, **kw: shell.Result(cmd=cmd, code=0, stdout=""))
+    res = tools.install_download(AWS_T)
+    assert res["ok"] and res["signature"] == "not checked (gpg not found)", res
+    assert SIG_URL in asked, "the signature is fetched with the asset either way"
+
+
+def test_verify_signature_uses_a_temporary_keyring_only(monkeypatch, tmp_path):
+    seen = []
+    monkeypatch.setattr(shell, "which", lambda name: "/usr/bin/gpg" if name == "gpg" else None)
+
+    def run(cmd, **kw):
+        seen.append(cmd)
+        return shell.Result(cmd=cmd, code=0, stdout="[GNUPG:] VALIDSIG AA 2026 1 0 4 0 1 10 00 " + "F" * 40 + "\n")
+
+    monkeypatch.setattr(shell, "run", run)
+    key = tmp_path / "key.asc"
+    key.write_text("key")
+    ok, text = tools.verify_signature(b"blob", b"sig", key, "f" * 40)
+    assert ok and text.startswith("verified")
+    assert all("--homedir" in c and "--batch" in c for c in seen) and "--import" in seen[0] and "--verify" in seen[1], seen
+    home = seen[0][seen[0].index("--homedir") + 1]
+    assert not Path(home).exists(), "the temporary keyring is removed afterwards"
+
+
+def _v4_fingerprint(armored: str) -> str:
+    """RFC 4880 12.2: the fingerprint of a version-4 key is the SHA-1 of 0x99, the two-byte body length and the public-key packet body. The armor is
+    base64 between the header's blank line and the `=` CRC line; the first packet is the public key (old-format tag 6)."""
+    import base64
+
+    body = armored.split("-----BEGIN PGP PUBLIC KEY BLOCK-----", 1)[1].split("-----END", 1)[0]
+    b64 = "".join(ln for ln in body.splitlines()[1:] if ln and not ln.startswith("="))
+    raw = base64.b64decode("".join(b64.split()))
+    tag_byte = raw[0]
+    assert tag_byte & 0x80 and not tag_byte & 0x40 and (tag_byte >> 2) & 0x0F == 6, "first packet is an old-format public-key packet"
+    ltype = tag_byte & 0x03
+    n = {0: 1, 1: 2, 2: 4}[ltype]
+    length = int.from_bytes(raw[1 : 1 + n], "big")
+    pkt = raw[1 + n : 1 + n + length]
+    assert pkt[0] == 4, "version 4 key"
+    return hashlib.sha1(b"\x99" + length.to_bytes(2, "big") + pkt).hexdigest().upper()
+
+
+def test_the_shipped_aws_key_is_the_pinned_fingerprint():
+    text = (ROOT / AWS_T.download["signature"]["key"]).read_text(encoding="utf-8")
+    fpr = AWS_T.download["signature"]["fingerprint"]
+    assert _v4_fingerprint(text) == fpr == "FB5DB77FD5C118B80511ADA8A6310ACC4672475C", "the key material itself, not only the header text"
+    spaced = " ".join(fpr[i : i + 4] for i in range(0, 40, 4)).replace("18B8 0511 ADA8", "18B8 0511  ADA8")
+    assert spaced in text, "the header names the fingerprint the install compares with"
+
+
+# ---------- krr ----------
+
+KRR_T = tools.by_name("krr")
+
+
+def test_krr_requirements_pin_every_package_with_a_hash_and_name_the_pinned_archive():
+    text = (ROOT / KRR_T.venv["requirements"]).read_text(encoding="utf-8")
+    reqs = [ln for ln in text.splitlines() if ln and not ln.startswith(("#", "    --hash="))]
+    assert reqs[0].startswith(KRR_T.venv["pip"] + " \\"), "the first requirement is the pinned source archive by URL"
+    assert all(ln.endswith(" \\") for ln in reqs), "every requirement continues into hash lines"
+    assert len(reqs) >= 50 and text.count("--hash=sha256:") >= len(reqs)
+    _, _, backend = text.partition(tools.BUILD_MARKER + "\n")
+    assert backend.startswith("poetry-core=="), "krr's build backend (pyproject [build-system] requires) is pinned too"
+    for extra in KRR_T.venv["extra_pip"]:
+        name = extra.split("<")[0]
+        assert any(ln.lower().startswith(f"{name.lower()}==") for ln in reqs), extra
+    assert tools._venv_tag(KRR_T.venv) == "v1.31.1" and "v1.31.1" in text.splitlines()[0]
+
+
+def test_krr_is_installed_with_require_hashes_from_the_requirements_file(monkeypatch, tmp_path):
+    calls = []
+
+    def run(cmd, **kw):
+        calls.append(cmd)
+        if cmd[1:3] == ["-m", "venv"]:
+            (Path(cmd[3]) / "bin").mkdir(parents=True)
+            (Path(cmd[3]) / "bin" / "pip").write_text("")
+            (Path(cmd[3]) / "bin" / "krr").write_text("")
+        return shell.Result(cmd=cmd, code=0, stdout="")
+
+    monkeypatch.setattr(shell, "which", lambda name: "/usr/bin/python3.11" if name == "python3.11" else None)
+    monkeypatch.setattr(shell, "run", run)
+    res = tools.install_in_venv(KRR_T)
+    pips = [c for c in calls if "install" in c]
+    assert pips[0][1:5] == ["install", "-q", "--require-hashes", "-r"] and pips[0][5].endswith("krr-venv/build-requirements.txt"), pips[0]
+    assert (Path(pips[0][5]).read_text(encoding="utf-8")).startswith("poetry-core=="), "the build backend goes in first, from the hashed lines after the marker"
+    assert pips[1][1:6] == ["install", "-q", "--require-hashes", "--no-build-isolation", "-r"] and pips[1][6].endswith("deploy/krr-requirements.txt"), pips[1]
+    assert all("cachetools" not in c and not any(a.startswith("https://") for a in c) for c in pips), "nothing is named outside the hashed file"
+    assert res["ok"] and res["hashes"] == "required" and res["version"] == "v1.31.1"
+
+
+def test_krr_venv_goes_before_the_tap_formula(monkeypatch):
+    calls = []
+    monkeypatch.setattr(shell, "which", lambda name: "/opt/homebrew/bin/brew" if name == "brew" else None)
+    monkeypatch.setattr(shell, "run", lambda cmd, **kw: calls.append(cmd) or shell.Result(cmd=cmd, code=0, stdout=""))
+    monkeypatch.setattr(tools, "install_in_venv", lambda tool, log=None: {"name": "krr", "method": "venv", "ok": True, "error": None, "hashes": "required"})
+    res = tools.install_tool(KRR_T)
+    assert res["method"] == "venv" and calls == [], "no brew trust, no brew install when the hashed venv succeeds"
+    monkeypatch.setattr(tools, "install_in_venv", lambda tool, log=None: {"name": "krr", "method": "venv", "ok": False, "error": "no supported Python"})
+    res = tools.install_tool(KRR_T)
+    assert res["method"] == "brew install robusta-dev/krr/krr" and res["fallback_from"] == ["no supported Python"]
+    assert calls[0] == ["brew", "trust", "--formula", "robusta-dev/krr/krr"]
+    plan = tools.install_plan(KRR_T)
+    assert plan.index("deploy/krr-requirements.txt") < plan.index("brew install robusta-dev/krr/krr")
+
+
+def test_check_updates_reports_the_krr_pin_and_prints_the_requirements_when_behind(monkeypatch):
+    monkeypatch.setattr(tools, "_latest_tag", lambda repo, match=None: "v1.32.0" if repo == "robusta-dev/krr" else "")
+    monkeypatch.setattr(tools, "venv_requirements_material", lambda tool, tag, python=None: f"# krr {tag}\nhttps://x/{tag}.tar.gz \\\n    --hash=sha256:aa\n")
+    rows = tools.check_updates(["krr"])
+    row = next(r for r in rows if r["name"] == "krr")
+    assert (row["pinned"], row["latest"], row["behind"]) == ("v1.31.1", "v1.32.0", True) and row["requirements"].startswith("# krr v1.32.0"), row
+    from lib import setup as _setup
+
+    lines = []
+    monkeypatch.setattr(_setup, "_p", lines.append)
+    assert _setup.check_tool_updates(["krr"]) == 1
+    assert any("krr" in ln and "BEHIND" in ln and "deploy/krr-requirements.txt" in ln for ln in lines) and any(ln.startswith("https://x/v1.32.0.tar.gz") for ln in lines), lines
+    monkeypatch.setattr(tools, "_latest_tag", lambda repo, match=None: "v1.31.1")
+    assert tools.check_updates(["krr"])[0]["behind"] is False
