@@ -3,6 +3,8 @@
 #    So it is read with curl from inside the node (SSM root or SSH). per_cidr series are one line per IP and are dropped. Output logs/node/<node>/awscni.prom (not scanned as a log — .prom).
 # 2) ENI/IP limits per instance type (describe-instance-types): max IPs a node can hold = ENIs × (IPv4 per ENI − 1). Compared with max-pods.
 # 3) Remaining subnet IPs come from eks-platform aws/describe-subnets.json; aws-node logs from core component-logs (logs/pods/vpc-cni/).
+# 4) ipamd log: the IP management daemon writes zap JSON to /var/log/aws-routed-eni/ipamd.log on the node, not to the pod log (the pod log holds the entrypoint's logrus lines only),
+#    so the three vpc-cni log signatures read it from the node: the lines of level warn and higher of the last 24 hours, capped like the kubelet journal (#158). Output logs/node/<node>/ipamd-24h.log.
 - id: ipamd-metrics
   modes: [full]   # skipped by the daily run
   type: node
@@ -11,6 +13,19 @@
   source: "aws/amazon-vpc-cni-k8s cmd/aws-k8s-agent/main.go:32, 80-83@v1.19.0, :38, 170-173@v1.23.2 (ipamd serves /metrics on :61678); the names kubegap reads are collectors/vpc-cni/pod-metrics.yaml (#127); utils/prometheusmetrics/prometheusmetrics.go:157-162@v1.19.0 (awscni_assigned_ip_per_cidr, one series per IP, dropped by the grep)"
   out: logs/node/{node}/awscni.prom
   timeout: 30
+- id: ipamd-log
+  modes: [full]   # skipped by the daily run
+  type: node
+  nodes: all
+  cmd: >
+    F=/var/log/aws-routed-eni/ipamd.log; if [ ! -r "$F" ]; then echo "ipamd log not readable: $F" >&2; exit 0; fi;
+    SINCE=$(date -u -d '-24 hours' '+%Y-%m-%dT%H:%M:%S');
+    grep -E '"level":"(warn|error|dpanic|panic|fatal)"' "$F" | awk -v s="$SINCE" 'match($0, /"ts":"[^"]*"/) { if (substr($0, RSTART + 6, 19) >= s) print }' | tail -n 3000
+  # Level and ts keys and their spelling: zap's production encoder (`"level"` lowercase, `"ts"` ISO 8601 `2006-01-02T15:04:05.000Z0700`), which ipamd uses with the time encoder swapped;
+  # the file is rotated by lumberjack at 100 MB (5 backups, 30 days), so a day of lines is in the current file on every node that does not write 100 MB a day, and only that file is read.
+  source: "aws/amazon-vpc-cni-k8s pkg/utils/logger/config.go:21-22@v1.19.0, @v1.23.2 (default file /host/var/log/aws-routed-eni/ipamd.log, default level Debug); pkg/utils/logger/zaplogger.go:101-104,144-151@v1.19.0, :103-105,153-160@v1.23.2 (production encoder with ISO8601TimeEncoder, lumberjack 100 MB/5/30); uber-go/zap config.go:126-127,134@v1.26.0, @v1.28.0 (TimeKey ts, LevelKey level, LowercaseLevelEncoder); uber-go/zap zapcore/encoder.go:135-136@v1.26.0, :141-142@v1.28.0 (ISO8601TimeEncoder layout); natefinch/lumberjack lumberjack.go:39,247-258@v2.2.1 (backups are ipamd-<timestamp>.log, the current file keeps its name)"
+  out: logs/node/{node}/ipamd-24h.log
+  timeout: 60
 - id: instance-type-network
   type: aws
   source: "ec2 DescribeInstanceTypes: output DescribeInstanceTypesResult awscli/botocore/data/ec2/2016-11-15/service-2.json:29382@2.39.3, input DescribeInstanceTypesRequest :29351; fields in references/sources.md (#125)"

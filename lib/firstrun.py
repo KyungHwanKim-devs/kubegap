@@ -40,7 +40,6 @@ ANSWERS_FILE = "answers.json"
 NODE_ACCESS_FILE = "node-access.json"
 STORES = ("prometheus", "alertmanager", "loki", "grafana")
 SSH_PLATFORMS = ("k3s", "rke2", "unknown")  # the platforms read over SSH; lib/discover._node_access uses this tuple
-DAEMONSET_PLATFORMS = ("gke", "aks")  # no SSM, no SSH: the DaemonSet backend is the way in
 SKIP = "skip"
 PARTIAL = "partial"  # node-ssh: go on with the nodes that answer
 
@@ -250,8 +249,8 @@ def _q_ssm_document(setup: dict, cfg: Config, L: str) -> dict | None:
 
 def _q_node_ssh(setup: dict, cfg: Config, node_access: dict, L: str, *, again: bool = False) -> dict | None:
     c = setup.get("cluster") or {}
-    if c.get("platform") not in SSH_PLATFORMS or cfg.get("node_access") not in (None, "", "ssh") or c.get("node_reader_pods"):
-        return None  # another platform, a backend named in the config, or the node DaemonSet is already running and is what gets used
+    if c.get("platform") not in SSH_PLATFORMS or cfg.get("node_access") not in (None, "", "ssh"):
+        return None  # another platform, or a backend named in the config
     probed = (node_access.get("probe") or {}) if node_access.get("method") == "ssh" else {}
     failed = {n: r for n, r in probed.items() if not r.get("ok")}
     n_checks = node_script_checks()
@@ -325,45 +324,6 @@ def _q_node_ssh(setup: dict, cfg: Config, node_access: dict, L: str, *, again: b
         explain = "What failed, per node: " + what
         typed = "values only you know, one per item: `<node>=<address>` (an address this machine can reach, e.g. a Tailscale IP; `user@address` when the login differs), `user=<login>`, `key=<path of the private key>`. Each one is a config value: `ssh.hosts.<node>`, `ssh.user` or `ssh.key`. After they are written, run `nodes` again"
     return {"id": "node-ssh", "header": header, "question": question, "explain": explain, "gain": gain, "options": opts, "typed": typed}
-
-
-def _q_node_daemonset(setup: dict, cfg: Config, L: str) -> dict | None:
-    c = setup.get("cluster") or {}
-    if c.get("platform") not in DAEMONSET_PLATFORMS or cfg.get("node_access") or c.get("node_reader_pods"):
-        return None  # already applied: the pods are found and used, nothing to ask
-    show = [
-        f"kubectl apply -f {paths.ROOT / 'deploy/node-access/daemonset.yaml'}",
-        f"kubectl apply -f {paths.ROOT / 'deploy/permissions/role-daemonset-exec.yaml'}",
-        "# to remove it afterwards: kubectl delete namespace kubegap" if L == "en" else "# 나중에 지우려면: kubectl delete namespace kubegap",
-    ]
-    n = node_script_checks()
-    if L == "ko":
-        q = {
-            "header": "노드 점검",
-            "question": "노드 안쪽(디스크, 커널 로그, kubelet 설정)을 읽을까요? 이 플랫폼에서는 작은 DaemonSet을 직접 적용해야 해요.",
-            "explain": "kubegap은 클러스터에 아무것도 쓰지 않아서 이 DaemonSet을 대신 적용해 주지 않아요. DaemonSet은 노드마다 특권 파드를 하나씩 띄우고, 파드가 뜨면 kubegap이 `kubectl exec`로 노드를 읽어요. 점검이 끝나면 지워도 돼요.",
-            "gain": [f"full 점검에서 노드 점검 항목이 최대 {n}개 늘어요"],
-            "show": ("명령 보기", "적용 명령 두 개와 지우는 명령 하나를 보여 줘요. 다음 점검부터 파드를 알아서 찾아요."),
-            "skip": "아무것도 적용하지 않으니 노드를 읽지 않아요. 노드 점검 항목은 '노드 접근 없음'으로 적혀요.",
-        }
-    else:
-        q = {
-            "header": "Node checks",
-            "question": "Read inside the nodes (disk, kernel log, kubelet settings)? On this platform it needs a small DaemonSet that you apply yourself.",
-            "explain": "kubegap never writes to a cluster, so it will not apply this for you. The DaemonSet runs one privileged pod per node; once its pods run, kubegap reads each node through `kubectl exec`. You can delete it after the audit.",
-            "gain": [f"up to {n} node checks in a full run"],
-            "show": ("Show the commands", "Prints the two commands to apply and the one to remove it. The next run finds the pods by itself."),
-            "skip": "Nothing is applied, so no node is read. The node checks are reported as 'no node access'.",
-        }
-    return {
-        "id": "node-daemonset",
-        "header": q["header"],
-        "question": q["question"],
-        "explain": q["explain"],
-        "gain": q["gain"],
-        "options": [_opt("show", *q["show"], show=show), _skip(L, q["skip"])],
-        "typed": None,
-    }
 
 
 def grafana_without_token(setup: dict) -> dict | None:
@@ -519,7 +479,6 @@ def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = Fa
         _q_tools(setup, cfg, L),
         _q_ssm_document(setup, cfg, L),
         _q_node_ssh(setup, cfg, node_access, L, again=all_),
-        _q_node_daemonset(setup, cfg, L),
         _q_grafana_token(setup, cfg, L),
         _q_stores(setup, cfg, L),
     )

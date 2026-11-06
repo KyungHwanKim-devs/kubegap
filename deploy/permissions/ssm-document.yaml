@@ -8,7 +8,7 @@
 #   aws ssm update-document-default-version --name kubegap-node-read --document-version <new version>
 # `kubegap setup --install-ssm-document` runs these for you with the current AWS credentials.
 schemaVersion: "2.2"
-description: kubegap read-only node inspection. step selects one of 26 fixed read commands; podIp (an IPv4 address) and port (digits) are the only free values. Generated from the kubegap repository, do not edit by hand.
+description: kubegap read-only node inspection. step selects one of 27 fixed read commands; podIp (an IPv4 address) and port (digits) are the only free values. Generated from the kubegap repository, do not edit by hand.
 parameters:
   step:
     type: String
@@ -40,6 +40,7 @@ parameters:
       - kube-proxy/proxy-mode
       - metallb/metallb-speaker-metrics
       - vpc-cni/ipamd-metrics
+      - vpc-cni/ipamd-log
   podIp:
     type: String
     description: Pod IP for the pod-metrics curl steps. Ignored by the other steps.
@@ -441,6 +442,9 @@ mainSteps:
             ;;
           vpc-cni/ipamd-metrics)
             curl -s -m 5 http://127.0.0.1:61678/metrics | grep -E '^awscni_' | grep -vE 'per_cidr|_bucket'
+            ;;
+          vpc-cni/ipamd-log)
+            F=/var/log/aws-routed-eni/ipamd.log; if [ ! -r "$F" ]; then echo "ipamd log not readable: $F" >&2; exit 0; fi; SINCE=$(date -u -d '-24 hours' '+%Y-%m-%dT%H:%M:%S'); grep -E '"level":"(warn|error|dpanic|panic|fatal)"' "$F" | awk -v s="$SINCE" 'match($0, /"ts":"[^"]*"/) { if (substr($0, RSTART + 6, 19) >= s) print }' | tail -n 3000
             ;;
           *)
             echo "kubegap: unknown step {{ step }}" >&2; exit 2

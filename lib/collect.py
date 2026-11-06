@@ -549,18 +549,17 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     return result
 
 
-# The node command backends that collection sends node steps to. `none` is the absence of one. The DaemonSet backend was missing from this
-# list for a while, so collection skipped every node step on it although lib/node.py and deploy/node-access/daemonset.yaml were in place (#5).
-NODE_BACKENDS = ("ssh", "ssm", "daemonset")
+# The node command backends that collection sends node steps to. `none` is the absence of one.
+NODE_BACKENDS = ("ssh", "ssm")
 
 
 class NodeRunner:
     """For node command steps. Builds the NodeAccess and the capabilities table once and reuses them."""
 
-    def __init__(self, inv: dict, cfg: Config, log: RunLog, kubeconfig: str | None = None):
+    def __init__(self, inv: dict, cfg: Config, log: RunLog):
         from .node import NodeAccess
 
-        self.na = NodeAccess(inv, cfg, log, kubeconfig=kubeconfig)
+        self.na = NodeAccess(inv, cfg, log)
         self._caps: dict | None = None
         self.nodes = {n["name"]: n for n in (inv.get("nodes") or {}).get("nodes", [])}
 
@@ -648,7 +647,7 @@ def _run_component_logs_step(st: dict, sid: str, name: str, inv: dict, context: 
             objs[k] = []
     present = [c for c in (inv.get("components_present") or []) if c not in set(st.get("exclude") or []) and c not in NON_WORKLOAD_COMPONENTS]
     rules = {c["name"]: c for c in COMPONENTS}
-    since, tail, tail_ds = str(st.get("since", "24h")), int(st.get("tail", 1500)), int(st.get("tail_daemonset", 600))
+    since, tail, tail_ds = str(st.get("since", "24h")), int(st.get("tail", 1500)), int(st.get("tail_daemonset", 600))  # tail_daemonset: Kubernetes DaemonSet workloads (one pod per node, so a smaller cap each)
     targets: list[tuple[str, str, str, str, dict]] = []
     seen: set[tuple[str, str]] = set()
     for comp in present:
@@ -1097,7 +1096,7 @@ def collect(context: str, cfg: Config, inv: dict, snap: Path, log: RunLog, *, ku
     if prom is None:
         echo("  Could not connect to Prometheus; all PromQL steps are skipped")
     stores = Stores(context, cfg, inv, kubeconfig, log)
-    node_runner = NodeRunner(inv, cfg, log, kubeconfig=kubeconfig)
+    node_runner = NodeRunner(inv, cfg, log)
     state = CollectState()
     print_lock = threading.Lock()
 

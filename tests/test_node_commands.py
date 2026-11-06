@@ -55,7 +55,7 @@ def test_document_script_is_valid_shell():
 
 
 def test_pod_metrics_cmd_matches_collect_py():
-    """collect.py sends exactly this text over SSH and DaemonSet, and the document embeds it with {{ podIp }}; the two must be the same function."""
+    """collect.py sends exactly this text over SSH, and the document embeds it with {{ podIp }}; the two must be the same function."""
     assert nodecommands.pod_metrics_cmd("10.1.2.3", 8080, "/metrics", None) == "curl -s -m 8 http://10.1.2.3:8080/metrics | grep -vE '^#|_bucket\\{'"
     assert nodecommands.pod_metrics_cmd("10.1.2.3", 9402, "/metrics", "^certmanager_").endswith(" | grep -E '^certmanager_'")
 
@@ -73,19 +73,6 @@ def test_iam_policy_allows_only_the_document():
     inst = [st for st in send if any("instance/" in r for r in ([st["Resource"]] if isinstance(st["Resource"], str) else st["Resource"]))]
     assert inst and all("Condition" in st for st in inst), "the instance statement must carry the cluster tag condition"
     assert "ssm:DescribeDocument" in pol["Statement"][0]["Action"]
-
-
-def test_node_reader_daemonset_image_is_pinned_by_index_digest():
-    """The node-reader pod is privileged with the host root mounted, so a moved tag must not change what runs: the image carries the digest of the
-    multi-architecture index. yamlite reads one document at a time, so the file is split on its `---` line and the DaemonSet document is loaded."""
-    text = (ROOT / "deploy" / "node-access" / "daemonset.yaml").read_text(encoding="utf-8")
-    docs = [yamlite.load(part) for part in re.split(r"^---$", text, flags=re.MULTILINE) if part.strip()]
-    assert [d["kind"] for d in docs] == ["Namespace", "DaemonSet"]
-    containers = docs[1]["spec"]["template"]["spec"]["containers"]
-    assert len(containers) == 1
-    image = containers[0]["image"]
-    assert re.fullmatch(r"public\.ecr\.aws/docker/library/busybox:1\.36@sha256:[0-9a-f]{64}", image), image
-    assert "crane digest public.ecr.aws/docker/library/busybox:1.36" in text, "the bump command stays next to the pin"
 
 
 def test_pod_ip_allowed_admits_pod_addresses_only():

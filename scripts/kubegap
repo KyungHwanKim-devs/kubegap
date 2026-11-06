@@ -523,7 +523,7 @@ def cmd_mask(args) -> int:
 
 
 def cmd_nodes(args) -> int:
-    """Verify node command backend (SSM, SSH or DaemonSet) access. Sends `echo; uname -r; hostname` to every node the cluster has now
+    """Verify node command backend (SSM or SSH) access. Sends `echo; uname -r; hostname` to every node the cluster has now
     (or, with --snapshot, to the nodes in that snapshot's inventory.json), so it works before the first collection."""
     import json as _json
 
@@ -541,7 +541,7 @@ def cmd_nodes(args) -> int:
         ctx = _context(args, cfg)
         inv = _discover.live_inventory(ctx, cfg, kubeconfig=args.kubeconfig)
         ctx_dir, snap, source = paths.ensure_private_dir(paths.context_root(ctx, _root(args)), base=_root(args)), None, f"{inv['nodes']['count']} nodes read from the cluster now"
-    na = NodeAccess(inv, cfg, kubeconfig=args.kubeconfig)
+    na = NodeAccess(inv, cfg)
     print(f"{source}, backend {na.method}" + (" (overridden by config.yaml)" if cfg.get("node_access") else ""))
     for why in (inv.get("node_access") or {}).get("reasons") or []:
         if na.method == "none":
@@ -723,7 +723,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_questions)
 
     s = sub.add_parser("answer", parents=[common], help="remember the user's choice for a first-run question so it is not asked again")
-    s.add_argument("item", nargs="?", help="question id (home-mode, tools, ssm-document, node-ssh, node-daemonset, grafana-token, stores)")
+    s.add_argument("item", nargs="?", help="question id (home-mode, tools, ssm-document, node-ssh, grafana-token, stores)")
     s.add_argument("option", nargs="?", help="the chosen option id, e.g. skip")
     s.add_argument("--forget", action="store_true", help="drop the remembered answer of ITEM, or of every question when no ITEM is given")
     s.set_defaults(func=cmd_answer)
@@ -815,7 +815,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("nodes", parents=[common], help="verify node command backend (SSM/SSH) access. Default command: echo, uname, hostname")
     s.add_argument("--snapshot", help="read the node list from this snapshot's inventory.json instead of from the cluster (path, name, date prefix or latest)")
-    s.add_argument("--cmd", help="read-only command to run instead (e.g. 'df -h /'). SSH and DaemonSet backends only; SSM runs document steps, see --step")
+    s.add_argument("--cmd", help="read-only command to run instead (e.g. 'df -h /'). SSH backend only; SSM runs document steps, see --step")
     s.add_argument("--step", help="run one named step from deploy/node-access/COMMANDS.md (e.g. core/node-os) instead of the probe")
     s.add_argument("--pod-ip", help="with --step on a pod-metrics step: the pod IP to curl (an IPv4 address in 10/8, 172.16/12, 192.168/16 or 100.64/10; anything else is refused)")
     s.add_argument("--timeout", type=float, default=60)

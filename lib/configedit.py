@@ -30,7 +30,7 @@ _ADDRESS = re.compile(r"^([A-Za-z0-9._-]+@)?[A-Za-z0-9.:_-]+$")  # host, IP, or 
 SETTABLE: dict[str, tuple] = {
     "language": (lambda v: v in ("en", "ko"), "en or ko"),
     "mode": (lambda v: v in MODES, " or ".join(MODES)),
-    "node_access": (lambda v: v in ("ssm", "ssh", "daemonset", "none"), "ssm, ssh, daemonset or none"),
+    "node_access": (lambda v: v in ("ssm", "ssh", "none"), "ssm, ssh or none"),
     "install_tools": (lambda v: v in INSTALL_POLICIES, ", ".join(INSTALL_POLICIES)),
     "ssm_document": (lambda v: v in INSTALL_POLICIES, ", ".join(INSTALL_POLICIES)),
     "confirm_context": (lambda v: v in _BOOL, "true or false"),

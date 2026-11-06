@@ -9,7 +9,7 @@ One collector = one folder. Each folder has these files (the first four always, 
 | `checks.yaml` | List of check definitions, each with embedded `test.cases` |
 | `signatures.yaml` | Log signatures for this component |
 | `metrics.yaml`, `cwlogs.yaml` | PromQL and CloudWatch Logs Insights queries referenced by `collect.yaml` (where used) |
-| `node-os.sh`, `k3s-node.sh` | Scripts run on nodes through SSM, SSH or the DaemonSet backend (`core/`, `k3s-platform/`) |
+| `node-os.sh`, `k3s-node.sh` | Scripts run on nodes through SSM or SSH (`core/`, `k3s-platform/`) |
 
 A collector that produces its own summary section registers it in `COMPONENT_SECTIONS` in `lib/summarize.py` (summary key, `lib/<module>.py` exposing `analyze(snap, inv, …)`, the collector folder names that enable it); when none of those collectors is in `inventory.collectors_enabled` the section is written as `{"present": false}`. Component detection rules live in `lib/components.py`. See `references/development.md`.
 

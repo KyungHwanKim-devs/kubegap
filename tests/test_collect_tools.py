@@ -67,31 +67,6 @@ def test_every_tool_step_names_the_context():
                 assert names_context != bool(st.get("stdin")), f"{f.parent.name}/{st['id']}"
 
 
-def test_daemonset_backend_and_its_discovery_use_the_run_kubeconfig(monkeypatch):
-    from lib import discover, shell
-    from lib import node as node_mod
-
-    calls = []
-
-    def fake_json(args, **kw):
-        calls.append((args[:2], kw.get("context"), kw.get("kubeconfig")))
-        return {"items": [{"metadata": {"name": "p1"}, "spec": {"nodeName": "n1"}, "status": {"phase": "Running"}}]}, None
-
-    def fake_kubectl(args, **kw):
-        calls.append((args[:2], kw.get("context"), kw.get("kubeconfig")))
-        return shell.Result(cmd=["kubectl"], code=0, stdout="ok\n")
-
-    monkeypatch.setattr(node_mod._kube, "kubectl_json", fake_json)
-    monkeypatch.setattr(node_mod._kube, "kubectl", fake_kubectl)
-    na = node_mod.NodeAccess({"context": "ctx-x", "node_access": {"method": "daemonset", "daemonset_nodes": ["n1"]}, "nodes": {"nodes": [{"name": "n1"}]}}, {"node_access": "daemonset"}, kubeconfig="/x/kc")
-    assert na.run_on_node("n1", "true").ok
-    assert calls == [(["get", "pods"], "ctx-x", "/x/kc"), (["exec", "-n"], "ctx-x", "/x/kc")]
-    calls.clear()
-    monkeypatch.setattr(discover.kube, "kubectl_json", fake_json)
-    out = discover._node_access("k3s", {"nodes": []}, {}, None, RunLog(None), context="ctx-x", kubeconfig="/x/kc")
-    assert out["method"] == "daemonset" and calls == [(["get", "pods"], "ctx-x", "/x/kc")]
-
-
 def test_krr_config_block_is_dropped_from_the_saved_file(tmp_path, monkeypatch):
     """krr's JSON carries its whole Config (robusta_krr/core/models/result.py:70@v1.31.1), kubeconfig path and EKS access key included (core/models/config.py:27, 47); kubegap reads none of it."""
     import json

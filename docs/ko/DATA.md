@@ -21,7 +21,7 @@ kubegap은 읽기 호출만 합니다. 어떤 Kubernetes 규칙과 AWS 액션을
 kubegap이 모은 것은 전부 내 컴퓨터의 `~/.kubegap/snapshots/<context>/<timestamp>/`에 저장됩니다. kubegap 자체는 아무 데도 데이터를 보내지 않습니다.
 
 - 스냅샷 폴더와 파일은 내 사용자만 읽을 수 있게 만듭니다. 이미 있던 폴더가 다른 사용자에게 열려 있으면 첫 실행 질문(`home-mode`)으로 묻습니다. "지금 고치기"는 `kubegap protect-home`으로 그 폴더들에 chmod 700을 하고, "그대로 두기"는 그대로 둡니다.
-- 오브젝트 spec, 이벤트, 메트릭, `logs/node/` 아래의 노드 저널, `logs/cloudwatch/` 아래의 CloudWatch 컨트롤플레인 로그 쿼리 결과, Grafana 대시보드는 모은 그대로 저장합니다. 노드 저널은 kubelet, containerd, k3s의 것입니다. 이 파일들은 에이전트가 읽을 수 있습니다.
+- 오브젝트 spec, 이벤트, 메트릭, `logs/node/` 아래의 노드 저널, `logs/cloudwatch/` 아래의 CloudWatch 컨트롤플레인 로그 쿼리 결과, Grafana 대시보드는 모은 그대로 저장합니다. 노드 저널은 kubelet, containerd, k3s의 것이고, EKS에서는 VPC CNI의 ipamd 로그도 있습니다. 이 파일들은 에이전트가 읽을 수 있습니다.
 - 설정 파일은 직접 만드는 파일입니다. `grafana_api_token`이 들어갈 수 있으니 `chmod 600`으로 권한을 제한하세요. `kubegap config set`은 이 권한으로 파일을 만들고, 토큰을 대신 써 주지는 않습니다.
 - 오래된 스냅샷은 `scripts/kubegap prune`으로 지웁니다. 사용법은 [SETUP.md](SETUP.md#모은-데이터)에 있습니다.
 

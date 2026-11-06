@@ -2,7 +2,7 @@
 
 Inputs:
 - logs/pods/<component>/*.log : component pod logs fetched by the core `component-logs` step with kubectl logs (24 hours, 1500 lines per pod, --prefix --timestamps)
-- logs/node/<node>/kubelet-24h.log, containerd-24h.log (EKS SSM), k3s-errors-24h.log (k3s)
+- logs/node/<node>/kubelet-24h.log, containerd-24h.log, ipamd-24h.log (EKS SSM), k3s-errors-24h.log (k3s)
 - loki/*.json|txt : what the loki collector fetched from the Loki HTTP API (1-hour window label values, lines per namespace, error lines, JSON lines, /metrics)
 - metrics/<id>.json : promtail, loki and fluent-bit metrics
 - objects/pods.json : collection gap cross-check (pods Running for over an hour that have no pod label in Loki)

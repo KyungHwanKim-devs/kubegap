@@ -15,7 +15,7 @@ kubegap has no credential store. It uses what is already on your machine: the ku
 | Grafana datasource and dashboard lists | the ConfigMaps the Grafana sidecars load (labels `grafana_dashboard`, `grafana_datasource`), no token needed; `grafana_api_token` in the config for the dashboards made in Grafana itself | Grafana counts more dashboards than the ConfigMaps hold: the first run says how many and shows how to make a token |
 | Inside the nodes, EKS | SSM `send-command` with the document `kubegap-node-read` | once per account: the first run offers to upload the document |
 | Inside the nodes, k3s and bare metal | SSH to each node's InternalIP with the user and key of your `~/.ssh/config` | a node is not reachable that way: the first run asks for the address |
-| Inside the nodes, GKE, AKS and other managed nodes | `kubectl exec` into a DaemonSet you apply | you want node checks there: the first run shows the commands |
+| Inside the nodes, GKE, AKS and other managed nodes | not read: kubegap has no node access there | never; the node checks are reported as not collected |
 | Optional tools | your `PATH` | a tool is missing: the first run offers to install it |
 
 Without a connection, only the checks that need it are left out, and the report says so. Nothing else stops.
@@ -29,8 +29,7 @@ Without a connection, only the checks that need it are left out, and the report 
 | `home-mode` | a folder under `~/.kubegap` is readable by other users of the machine (created by an older kubegap or widened by hand) | Fix now (`kubegap protect-home`, chmod 700) · Leave it |
 | `tools` | optional tools are not installed | Install all · Skip · or type the names to install only those |
 | `ssm-document` | EKS, and the SSM document is missing or older than the one shipped with kubegap | Upload · Skip |
-| `node-ssh` | k3s, RKE2 or an unrecognized platform, the config names no node access (`ssh:` block or `node_access`), and the node DaemonSet is not running | Check SSH now · Skip. If nodes do not answer: Accept host keys or Check again · Use the rest · Skip · or type an address per node |
-| `node-daemonset` | GKE or AKS, and the node DaemonSet is not running | Show the commands · Skip |
+| `node-ssh` | k3s, RKE2 or an unrecognized platform, and the config names no node access (`ssh:` block or `node_access`) | Check SSH now · Skip. If nodes do not answer: Accept host keys or Check again · Use the rest · Skip · or type an address per node |
 | `grafana-token` | Grafana was found, no token is set, and either no dashboard or datasource ConfigMap exists for the sidecars or Grafana counts more dashboards than those ConfigMaps hold | Show how · Skip |
 | `stores` | Prometheus, Alertmanager, Loki or Grafana has no Service in the cluster. Loki is left out when the log shipper's configuration (fluent-bit, fluentd, promtail) says the logs go elsewhere; the report then says where | Not installed · Ask next time · or type the address |
 
@@ -59,7 +58,7 @@ Disk, inodes, the kernel log, the kubelet configuration and the container runtim
 
 Some reads need more than a plain login. The user needs the log-reading groups, and an optional sudoers file unlocks the remaining root-only reads: [`deploy/node-access/README.md`](../deploy/node-access/README.md). kubegap does not change anything on a node; you add those yourself.
 
-**GKE, AKS, managed nodes with neither SSM nor SSH.** Apply [`deploy/node-access/daemonset.yaml`](../deploy/node-access/daemonset.yaml), whose image is pinned by digest, and [`deploy/permissions/role-daemonset-exec.yaml`](../deploy/permissions/role-daemonset-exec.yaml). kubegap finds the pods on the next run and reads each node through `kubectl exec`. The pod runs privileged; delete the namespace `kubegap` after the audit if you do not want it to stay. kubegap never applies it for you.
+**GKE, AKS, managed nodes with neither SSM nor SSH.** kubegap does not read the nodes there; the node checks are reported as not collected. A backend for those platforms is one more branch of `lib/node.py` that runs the same command list, and the maintainer has no such cluster to build and test one on: contributions from people who run them are welcome.
 
 Check node access at any time, also before the first collection:
 
@@ -135,7 +134,7 @@ For a first run before security approval, or on a cluster where you may read onl
 ```yaml
 # ~/.kubegap/config.yaml
 mode: daily          # no node scripts, no CloudWatch logs, no cost data, no external tools
-node_access: none    # no SSM send-command, no SSH, no DaemonSet exec
+node_access: none    # no SSM send-command, no SSH
 install_tools: never # nothing is installed on this machine
 # no grafana_api_token: the Grafana datasource and dashboard lists are not read
 ```

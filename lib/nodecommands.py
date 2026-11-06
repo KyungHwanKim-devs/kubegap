@@ -1,6 +1,6 @@
 """The complete list of commands kubegap runs on nodes, and the SSM document that pins them.
 
-Node access is a shell on the node (SSM on EKS, SSH on k3s and bare metal, `kubectl exec` into the DaemonSet elsewhere). A shell
+Node access is a shell on the node (SSM on EKS, SSH on k3s and bare metal). A shell
 has no read-only mode, so "read-only" has to be made visible and enforced on top of it:
 
 - `deploy/node-access/COMMANDS.md` lists every command, per backend, generated from the collector definitions
@@ -39,8 +39,7 @@ POD_NETWORKS_TEXT = "10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16 or 100.64.0.0/10"
 def pod_ip_allowed(ip: object) -> tuple[bool, str]:
     """Whether the node-side metrics curl may be pointed at `ip`: exactly an IPv4 address (no surrounding whitespace, the string is sent as it is)
     inside one of POD_NETWORKS. Loopback, link-local (the instance metadata service lives there), multicast, reserved, unspecified, anything
-    outside those ranges and IPv6 are refused with the reason. The SSM document's `allowedPattern` on podIp stays as the second layer; SSH and
-    the DaemonSet have only this one."""
+    outside those ranges and IPv6 are refused with the reason. The SSM document's `allowedPattern` on podIp stays as the second layer; SSH has only this one."""
     try:
         a = ipaddress.ip_address(ip) if isinstance(ip, str) else ipaddress.ip_address(str(ip))
     except ValueError:
@@ -163,9 +162,6 @@ def render_markdown(cmds: list[dict] | None = None) -> str:
     )
     L.append(
         '| SSH | k3s, bare metal, kubeadm | the login user; root only for the commands in [`kubegap-sudoers`](kubegap-sudoers) via `sudo -n` | The sudoers file lists the allowed root commands one by one. Anything not listed fails and the section is reported as "no permission". |'
-    )
-    L.append(
-        "| DaemonSet | GKE, AKS, anything without SSM or SSH | root inside the privileged pod from [`daemonset.yaml`](daemonset.yaml), as `kubectl exec … chroot /host /bin/sh -c <command>` | No enforcement beyond this list; the pod runs the same commands as the other two backends. Delete the DaemonSet after the audit. |"
     )
     L.append("")
     L.append("## Built-in probes (`lib/node.py`)")

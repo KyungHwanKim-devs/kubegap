@@ -115,9 +115,9 @@ mkdir -p ~/.agents/skills && ln -s ~/src/kubegap ~/.agents/skills/kubegap
 
 - **EKS.** AWS Systems Manager로 노드에서 읽기 명령을 root로 실행합니다. 실행할 수 있는 명령을 고정해 둔 SSM 문서 `kubegap-node-read`가 AWS 계정에 있어야 합니다. 올리겠다고 고르면 kubegap이 올리는데, 이때 쓰는 자격 증명에 SSM 문서를 올릴 권한이 필요합니다. 노드 역할에는 `AmazonSSMManagedInstanceCore`가 있어야 합니다.
 - **k3s, RKE2, 직접 설치한 클러스터.** 로컬 SSH 설정에 있는 사용자와 키로 접속합니다. 노드의 호스트 키가 `known_hosts`에 있어야 하고, 일부 로그는 그 사용자에게 그룹이나 sudoers 설정이 있어야 읽힙니다. 응답하지 않는 노드가 있으면 이유를 알려 주고, 호스트 키를 받을지, 주소를 직접 적을지, 응답하는 노드만으로 갈지 고르게 합니다.
-- **GKE, AKS.** 노드마다 privileged 파드를 띄우는 DaemonSet이 필요하고, 이 파드는 노드의 루트 파일 시스템을 마운트합니다. kubegap은 클러스터에 아무것도 만들지 않기 때문에 명령만 보여 줍니다. 적용은 직접 하고, 점검이 끝나면 `kubectl delete namespace kubegap`으로 지우면 됩니다.
+- **GKE, AKS처럼 SSM도 SSH도 없는 플랫폼.** 노드 안쪽은 읽지 않습니다. 노드 점검 항목은 미수집으로 적히고, Kubernetes API와 Prometheus, node-exporter에서 오는 것은 그대로 점검합니다.
 
-이미 준비돼 있으면 묻지 않고 노드 안쪽까지 봅니다. EKS 계정에 SSM 문서가 있거나, kubegap DaemonSet의 파드가 떠 있거나, 설정 파일에 `ssh:`나 `node_access: ssh`가 있는 경우입니다. SSH는 접속이 되는 환경이어도 직접 고르기 전에는 쓰지 않습니다. 노드 접속이 정해져 있으면 daily 점검도 Prometheus가 수집하지 않는 컴포넌트의 메트릭을 노드에서 읽을 수 있습니다.
+이미 준비돼 있으면 묻지 않고 노드 안쪽까지 봅니다. EKS 계정에 SSM 문서가 있거나, 설정 파일에 `ssh:`나 `node_access: ssh`가 있는 경우입니다. SSH는 접속이 되는 환경이어도 직접 고르기 전에는 쓰지 않습니다. 노드 접속이 정해져 있으면 daily 점검도 Prometheus가 수집하지 않는 컴포넌트의 메트릭을 노드에서 읽을 수 있습니다.
 
 ## 명령
 
@@ -166,7 +166,7 @@ mkdir -p ~/.agents/skills && ln -s ~/src/kubegap ~/.agents/skills/kubegap
 
 kubegap은 클러스터를 읽기만 합니다. Pod, Deployment, 이벤트, 로그, 메트릭을 읽어 올 뿐 아무것도 만들거나 바꾸거나 지우지 않습니다. Prometheus나 Grafana는 포트포워드로 읽는데, 이것도 클러스터에 아무것도 남기지 않습니다.
 
-접속에는 지금 쓰고 있는 kubeconfig, AWS CLI 프로파일, SSH 설정을 그대로 씁니다. 클러스터에 따로 깔아 두는 것도 없습니다. GKE, AKS에서 노드 안쪽까지 보려는 경우에만 DaemonSet을 직접 띄우면 되고, 다 쓰면 지울 수 있습니다.
+접속에는 지금 쓰고 있는 kubeconfig, AWS CLI 프로파일, SSH 설정을 그대로 씁니다. 클러스터에 따로 깔아 두는 것도 없습니다.
 
 Secret 값은 모으지 않고 이름과 종류만 봅니다. full 점검에서 쓰는 `helm list`는 Helm이 Secret에 넣어 둔 릴리스 기록을 읽지만, kubegap은 릴리스 이름과 상태, 버전 같은 정보만 남기고 values는 수집하지 않습니다. pluto는 클러스터에 접속하지 않고, kubegap이 Secret 없이 저장해 둔 오브젝트를 검사합니다.
 

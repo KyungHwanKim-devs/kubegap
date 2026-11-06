@@ -1533,6 +1533,22 @@ CASES: list[tuple[str, set[str], str]] = [
         {"vpc-cni.ip-assign-failed"},
         "logs/pods/vpc-cni/kube-system_aws-node.log",
     ),
+    # the same ipamd lines as the node writes them to /var/log/aws-routed-eni/ipamd.log (no kubectl prefix), read by the vpc-cni/ipamd-log node step (#158)
+    (
+        '{"level":"error","ts":"2026-11-06T09:12:03.118Z","caller":"ipamd/ipamd.go:1728","msg":"Failed to attach ENI eni-0a1b2c3d4e5f67890: AttachmentLimitExceeded: Interface count 4 exceeds the limit for t3.medium"}',
+        {"vpc-cni.ipamd-error"},
+        "logs/node/ip-10-0-1-23.ap-northeast-2.compute.internal/ipamd-24h.log",
+    ),
+    (
+        '{"level":"warn","ts":"2026-11-06T09:12:03.118Z","caller":"ipamd/ipamd.go:1081","msg":"Failed to allocate 5 IP addresses on an ENI: InsufficientFreeAddressesInSubnet: The specified subnet does not have enough free addresses to satisfy the request."}',
+        {"vpc-cni.ip-assign-failed"},
+        "logs/node/ip-10-0-1-23.ap-northeast-2.compute.internal/ipamd-24h.log",
+    ),
+    (
+        '{"level":"error","ts":"2026-11-06T09:12:03.118Z","caller":"awsutils/awsutils.go:1452","msg":"Failed to CreateNetworkInterface RequestLimitExceeded: Request limit exceeded. for subnet subnet-0a1b2c3d"}',
+        {"vpc-cni.ipamd-error", "vpc-cni.ec2-throttled"},
+        "logs/node/ip-10-0-1-23.ap-northeast-2.compute.internal/ipamd-24h.log",
+    ),
     (
         '[pod/aws-node-ptq7m/aws-node] 2026-11-04T10:53:46.454132000Z {"level":"warn","ts":"2026-11-04T10:53:46.454Z","caller":"ipamd/rpc_handler.go:233","msg":"Failed to assign IPs from network card 0: AssignPodIPAddress: no available IP/Prefix addresses"}',
         {"vpc-cni.ip-assign-failed"},

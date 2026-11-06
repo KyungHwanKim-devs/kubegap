@@ -27,7 +27,7 @@ SSM 문서 ARN에 계정 ID가 들어 있어서, 다른 계정이 공유한 같�
 
 **k3s와 베어메탈의 SSH 노드.** [`deploy/node-access/README.md`](../../deploy/node-access/README.md)를 따르세요. 로그를 읽는 그룹에 사용자를 넣는 한 줄이 있고, 필요하면 읽기 전용 명령을 허용하는 sudoers 파일을 추가합니다.
 
-**SSM도 SSH도 없는 노드, GKE, AKS와 그 밖의 관리형 노드.** [`deploy/node-access/daemonset.yaml`](../../deploy/node-access/daemonset.yaml)을 직접 적용하세요. 점검이 끝나면 지워도 됩니다. 이 DaemonSet은 privileged로 돌아갑니다. `kubectl exec`를 쓰려면 `kubegap` 네임스페이스의 `pods/exec`에 `get`과 `create`가 필요합니다. 이 권한은 [`deploy/permissions/role-daemonset-exec.yaml`](../../deploy/permissions/role-daemonset-exec.yaml)에 있습니다. `daemonset.yaml`이 네임스페이스를 만들기 때문에 DaemonSet을 먼저 적용하세요. exec는 그 파드에서 셸을 열 뿐 클러스터에 아무것도 쓰지 않습니다.
+**SSM도 SSH도 없는 노드, GKE, AKS와 그 밖의 관리형 노드.** 읽지 않습니다. 노드 점검 항목은 미수집으로 적힙니다.
 
 SSM 문서를 한 번 올리는 일은 점검 정책에 들어 있지 않습니다. 내 자격 증명으로 실행하며, `ssm:CreateDocument`, `ssm:UpdateDocument`, `ssm:UpdateDocumentDefaultVersion`, `ssm:ListDocumentVersions`가 필요합니다.
 
@@ -66,7 +66,7 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 
 **full 점검.** daily 점검이 쓰는 것 전부에 아래를 더합니다.
 
-- 노드 스크립트: SSM, SSH, DaemonSet 중 하나로 실행합니다.
+- 노드 스크립트: SSM 또는 SSH로 실행합니다.
 - kubelet 설정을 읽는 `nodes/proxy`
 - CloudWatch Logs Insights: `logs:StartQuery`, `GetQueryResults`, `StopQuery`
 - 쿼터와 EBS의 `GetMetricData` 쿼리
@@ -106,7 +106,7 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 
 **`nodes/proxy`.** full 점검에서 `core/kubelet-configz` 단계 하나만 씁니다. `/api/v1/nodes/<node>/proxy/configz`로 kubelet 설정을 읽고, `node.kubelet-reserved-missing`, `node.kubelet-eviction-memory-missing`, `node.kubelet-api-qps-low` 세 항목이 그 결과를 봅니다.
 
-역할에 이 권한을 남겨 둔 이유는 같은 정보를 얻을 다른 방법이 노드의 kubelet 설정 파일뿐이기 때문입니다. 그 파일을 읽으려면 노드 접속이 필요한데, DaemonSet을 쓰지 않는 GKE와 AKS 사용자에게는 접속 방법이 없습니다.
+역할에 이 권한을 남겨 둔 이유는 같은 정보를 얻을 다른 방법이 노드의 kubelet 설정 파일뿐이기 때문입니다. 그 파일을 읽으려면 노드 접속이 필요한데, GKE와 AKS 사용자에게는 접속 방법이 없습니다.
 
 빼면 정확히 이 세 항목만 "kubelet not read"로 `skip`이 되고 다른 것은 바뀌지 않습니다. 단계는 노드마다 실패해서 7-1절에 나타나고, 노드 리포트에는 `kubelet configz (node proxy permission or kubelet not responding)`가 적힙니다.
 
@@ -241,7 +241,7 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 
 **`ssm:SendCommand`.** `lib/node.py`가 `type: node` 수집 단계와, API 서버 프록시가 막혔을 때 파드 메트릭을 대신 읽는 동작에 씁니다. 수집 단계는 full 전용이고, 메트릭을 대신 읽는 curl은 daily와 full 모두에서 돌아갑니다.
 
-노드 스크립트와 kubelet configz를 읽는 `node.*` 항목 26개, `vpccni.*`의 ipamd 행, `kubeproxy.*`의 모드 행, `*.metrics-unreadable`의 대체 경로가 씁니다. `node.*`의 나머지 10개는 Prometheus를 읽습니다. 없으면 이 노드 항목들은 daily에서 수집되지 않고, full에서는 읽지 못한 노드마다 `skip`이 됩니다. 파드 메트릭을 대신 읽을 수도 없어서 `metrics-unreadable`이 warn을 냅니다.
+노드 스크립트와 kubelet configz를 읽는 `node.*` 항목 26개, `vpccni.*`의 ipamd 행, `vpc-cni.*` 로그 시그니처 셋(ipamd.log), `kubeproxy.*`의 모드 행, `*.metrics-unreadable`의 대체 경로가 씁니다. `node.*`의 나머지 10개는 Prometheus를 읽습니다. 없으면 이 노드 항목들은 daily에서 수집되지 않고, full에서는 읽지 못한 노드마다 `skip`이 됩니다. 파드 메트릭을 대신 읽을 수도 없어서 `metrics-unreadable`이 warn을 냅니다.
 
 **`ssm:GetCommandInvocation`.** `lib/node.py`가 모든 SSM 명령의 결과를 읽습니다. 쓰는 항목은 `ssm:SendCommand`와 같습니다. 없으면 명령은 가지만 출력을 읽지 못해서 노드 단계가 실패합니다.
 
@@ -288,14 +288,14 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 
 ## 노드에 닿는 명령
 
-EKS에서는 `ssm:SendCommand`로 노드에 들어갑니다. k3s와 베어메탈에서는 같은 스크립트를 SSH로 보내고, 두 방법 다 없으면 노드 읽기용 DaemonSet에 `kubectl exec`를 씁니다. 필요한 준비는 [`deploy/node-access/README.md`](../../deploy/node-access/README.md)와 [`deploy/node-access/daemonset.yaml`](../../deploy/node-access/daemonset.yaml)에 있고, exec에 필요한 `kubegap` 네임스페이스의 `pods/exec` `get`, `create`는 [`deploy/permissions/role-daemonset-exec.yaml`](../../deploy/permissions/role-daemonset-exec.yaml)에 있습니다.
+EKS에서는 `ssm:SendCommand`로 노드에 들어갑니다. k3s와 베어메탈에서는 같은 스크립트를 SSH로 보내고, 두 방법 다 없으면 노드를 읽지 않습니다. 필요한 준비는 [`deploy/node-access/README.md`](../../deploy/node-access/README.md)에 있습니다.
 
 `type: node` 수집 단계는 모두 full 전용입니다.
 
 | 플랫폼 | 수집 단계 |
 |---|---|
 | 모든 플랫폼 | `core/node-os`, `kube-proxy/proxy-mode` |
-| EKS | `eks-platform/kubelet-journal`, `eks-platform/containerd-journal`, `vpc-cni/ipamd-metrics` |
+| EKS | `eks-platform/kubelet-journal`, `eks-platform/containerd-journal`, `vpc-cni/ipamd-metrics`, `vpc-cni/ipamd-log` |
 | k3s | `k3s-platform/k3s-journal-errors`, `k3s-platform/k3s-journal-stats`, `k3s-platform/k3s-scheduler-unschedulable`, `k3s-platform/k3s-webhook-failures`, `k3s-platform/k3s-etcd-slow`, `k3s-platform/kubelet-pleg`, `k3s-platform/k3s-node`, `k3s-platform/containerd-log` |
 
 파드 메트릭을 대신 읽는 curl은 daily와 full 모두에서 돌아갑니다. 접속 방식별 명령 전문은 [`deploy/node-access/COMMANDS.md`](../../deploy/node-access/COMMANDS.md)에 있습니다.
