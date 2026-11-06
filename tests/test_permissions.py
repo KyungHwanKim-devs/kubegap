@@ -534,3 +534,10 @@ def test_permissions_doc_tables_parse_as_expected():
     assert set(tables) >= {"API group", "URL", "Action"}
     assert all(len(c) == 7 for c in tables["API group"]), [c for c in tables["API group"] if len(c) != 7]
     assert all(len(c) == 5 for c in tables["Action"]), [c for c in tables["Action"] if len(c) != 5]
+
+
+def test_no_module_asks_kubectl_for_a_secret():
+    """kubegap reads no Secret value: `helm list` (Helm's own release records) is the one documented exception, and it is a tool step, not a kubectl call in lib/."""
+    texts = {f.name: f.read_text(encoding="utf-8") for f in ROOT.glob("lib/*.py")}
+    askers = {n for n, t in texts.items() if '"get", "secret"' in t or "get secret" in t or '["get", "secrets"' in t}
+    assert askers == set(), askers

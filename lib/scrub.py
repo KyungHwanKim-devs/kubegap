@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 import re
 
-from . import shell
+from . import shell, yamlite
 from .components import match_name
 
 SECRET_KINDS = {"Secret", "SecretList"}
@@ -44,6 +44,12 @@ KEEP_VALUES: list[tuple[str, str, tuple[str, ...]]] = [
     ("argocd", "argocd-cmd-params-cm", ("controller.status.processors", "controller.operation.processors", "application.namespaces", "server.insecure")),
     ("argocd", "argocd-rbac-cm", ("policy.default",)),
 ]
+# ConfigMaps the Grafana sidecars load (label names: grafana/helm-charts charts/grafana/values.yaml:951,1028@grafana-8.5.0). A dashboard ConfigMap
+# keeps its data: the value is the dashboard's JSON model, which the alert-metric-without-dashboard comparison reads (lib/observability.py).
+# A datasource ConfigMap is a provisioning file that may carry a password or a header value (grafana/grafana
+# pkg/services/provisioning/datasources/types.go:32-45@v12.2.1: basicAuthPassword, secureJsonData), so only name, type, url and isDefault of
+# each datasource are kept, parsed here before the value is dropped.
+KEEP_BY_LABEL = {"grafana_dashboard": "dashboard", "grafana_datasource": "datasource"}
 # Keys whose value is reduced to the string "present" (they can embed an OIDC client secret) or to "<n lines>".
 PRESENCE_ONLY = [("argocd", "argocd-cm", ("dex.config", "oidc.config"))]
 LINE_COUNT_ONLY = [("argocd", "argocd-rbac-cm", ("policy.csv",))]
@@ -127,9 +133,16 @@ def scrub_configmap(cm: dict) -> dict:
             found = list(dict.fromkeys(found + _secret_like_in_applied(ann[k])))[:8]
             ann[k] = {"len": len(str(ann[k])), "shape": shape(ann[k])}
             dropped_ann.append(k)
+    labels = meta.get("labels") or {}
+    sidecar = next((role for label, role in KEEP_BY_LABEL.items() if label in labels), None)
     new_data: dict = {}
     for k, v in data.items():
-        if k in keep:
+        if sidecar == "dashboard" and isinstance(v, str) and v.lstrip().startswith("{"):
+            new_data[k] = v
+            keep = keep | {k}
+        elif sidecar == "datasource" and isinstance(v, str):
+            new_data[k] = {"datasources": datasource_entries(v), "len": len(v), "shape": shape(v)}
+        elif k in keep:
             new_data[k] = v
         elif k in presence:
             new_data[k] = {"present": len(str(v).strip()) > 0, "len": len(str(v))}
@@ -143,6 +156,21 @@ def scrub_configmap(cm: dict) -> dict:
         cm["binaryData"] = {k: {"len": len(str(v))} for k, v in binary.items()}
     cm[MARK] = {"values_dropped": True, "kept_keys": sorted(k for k in data if k in keep), "data_chars": chars, "secret_like_keys": found, "annotations_dropped": dropped_ann}
     return cm
+
+
+def datasource_entries(text: str) -> list[dict]:
+    """name, type, url and isDefault of each datasource in a Grafana provisioning file (`datasources:` list, grafana/grafana
+    pkg/services/provisioning/datasources/types.go:19-23,32-45@v12.2.1). Nothing else of the file is kept."""
+    try:
+        doc = yamlite.load(text)
+    except Exception:
+        return []
+    rows = (doc or {}).get("datasources") if isinstance(doc, dict) else None
+    out = []
+    for d in rows or []:
+        if isinstance(d, dict) and d.get("name"):
+            out.append({"name": str(d.get("name")), "type": d.get("type"), "url": d.get("url"), "isDefault": bool(d.get("isDefault"))})
+    return out
 
 
 def _secret_like_in_applied(value) -> list[str]:

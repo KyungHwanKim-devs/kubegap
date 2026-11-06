@@ -41,7 +41,7 @@ Add `--context <name>` to every later `scripts/kubegap` command. Always state wh
 ## 2. Setup check and first-run questions
 
 ```bash
-$KUBEGAP/scripts/kubegap setup --context <name>
+$KUBEGAP/scripts/kubegap setup --context <name> --language <en|ko>
 ```
 
 Check only: it installs nothing and changes nothing. It prints four sections (tools, cluster, the four stores, AWS permissions on EKS) and then a block:
@@ -51,7 +51,8 @@ Check only: it installs nothing and changes nothing. It prints four sections (to
 ```
 
 - **N is 0** (nothing is missing, or every question was answered on an earlier run): go on to step 3. This is the normal case from the second run on.
-- **N is above 0, or the output ends with "Not ready"**: **read [references/first-run.md](references/first-run.md) now and follow it.** Each entry of the block is one question for the choice window, with its explanation, what it adds, its options and the command behind each option. Run a command only after the user picked its option. A skipped question is remembered and not asked again; `/kubegap setup` brings it back.
+- **N is above 0, or the output ends with "Not ready"**: **read [references/first-run.md](references/first-run.md) now and follow it.** Each entry of the block is one question for the choice window, with its explanation, what it adds, its options and the command behind each option. The block is printed in the report language (`--language ko` when Korean was chosen; the texts are written in each language, not translated): put the texts into the window as printed and never translate or reword them. Run a command only after the user picked its option. A skipped question is remembered and not asked again; `/kubegap setup` brings it back.
+- Lines starting with `note` name what was decided without a question: Loki left out because the shipper's configuration says the logs go elsewhere, or the Grafana lists read from ConfigMaps without a token. Remember them for the report section "What this run could not see", with the reason as printed.
 - Lines starting with `skipped earlier` name what the user chose to leave out on an earlier run. Remember them for the report section "What this run could not see".
 - If the fourth section (AWS permissions) has a FAIL, do not stop; note that "EKS platform, control-plane log and SSM checks will not run" and continue.
 

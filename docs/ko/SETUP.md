@@ -16,7 +16,7 @@ kubegap은 자격 증명을 따로 저장하지 않습니다. kubeconfig, AWS CL
 | AWS, EKS일 때만 | 설정 파일의 `aws_profile`과 `aws_region`. 없으면 kubeconfig `exec` 블록의 `AWS_PROFILE`, 그것도 없으면 AWS CLI 기본 설정 | kubectl이 쓰는 프로파일과 다른 프로파일로 점검하고 싶을 때 |
 | Prometheus, Alertmanager, Loki, Grafana | 클러스터의 Service를 찾아 포트포워드로 연결합니다 | 클러스터 밖에서 돌고 있을 때. 첫 실행에서 주소를 묻습니다 |
 | apiserver 메트릭 | `apiserver_request_total`에서 찾아낸, apiserver를 수집하는 job의 `job` 레이블 | 수집 설정의 job 이름을 kubegap이 알아보지 못할 때. `apiserver_job`을 지정하세요 |
-| Grafana 데이터소스와 대시보드 목록 | 설정 파일의 `grafana_api_token` | 이 두 목록이 필요할 때. 첫 실행에서 방법을 알려 줍니다 |
+| Grafana 데이터소스와 대시보드 목록 | Grafana 사이드카가 읽는 ConfigMap(라벨 `grafana_dashboard`, `grafana_datasource`). 토큰이 필요 없습니다. Grafana 화면에서 만든 대시보드까지 보려면 설정 파일의 `grafana_api_token` | Grafana가 세는 대시보드가 ConfigMap보다 많을 때. 첫 실행에서 몇 개인지와 토큰 만드는 법을 알려 줍니다 |
 | 노드 안쪽, EKS | SSM `send-command`와 SSM 문서 `kubegap-node-read` | AWS 계정마다 한 번. 첫 실행에서 SSM 문서를 올릴지 묻습니다 |
 | 노드 안쪽, k3s와 베어메탈 | `~/.ssh/config`의 사용자와 키로 각 노드의 InternalIP에 SSH 접속 | 그렇게 닿지 않는 노드가 있을 때. 첫 실행에서 주소를 묻습니다 |
 | 노드 안쪽, GKE, AKS와 그 밖의 관리형 노드 | 직접 적용한 DaemonSet에 `kubectl exec` | 이 환경에서 노드 점검을 하고 싶을 때. 첫 실행에서 명령을 보여 줍니다 |
@@ -35,8 +35,8 @@ kubegap은 자격 증명을 따로 저장하지 않습니다. kubeconfig, AWS CL
 | `ssm-document` | EKS에서 SSM 문서가 없거나 kubegap에 들어 있는 SSM 문서보다 오래됐을 때 | 올리기 · 건너뛰기 |
 | `node-ssh` | k3s, RKE2 또는 kubegap이 알아보지 못한 플랫폼이고, 설정 파일에 노드 접속(`ssh:` 블록이나 `node_access`)이 없고, DaemonSet 파드도 없을 때 | 지금 SSH 확인 · 건너뛰기. 응답하지 않는 노드가 있으면 호스트 키 받기 또는 다시 확인 · 응답한 노드만 쓰기 · 건너뛰기 · 노드별 주소 입력 |
 | `node-daemonset` | GKE나 AKS에서 노드 DaemonSet이 돌고 있지 않을 때 | 명령 보기 · 건너뛰기 |
-| `grafana-token` | Grafana를 찾았는데 토큰이 설정되어 있지 않을 때 | 방법 보기 · 건너뛰기 |
-| `stores` | Prometheus, Alertmanager, Loki, Grafana 중 클러스터에 Service가 없는 것이 있을 때 | 설치 안 함 · 다음에 다시 묻기 · 주소 입력 |
+| `grafana-token` | Grafana를 찾았고 토큰이 없는데, 사이드카용 대시보드·데이터소스 ConfigMap이 하나도 없거나 Grafana가 세는 대시보드가 그 ConfigMap보다 많을 때 | 방법 보기 · 건너뛰기 |
+| `stores` | Prometheus, Alertmanager, Loki, Grafana 중 클러스터에 Service가 없는 것이 있을 때. 로그 수집기(fluent-bit, fluentd, promtail) 설정에 로그가 다른 곳으로 간다고 적혀 있으면 Loki는 묻지 않고, 리포트에 어디로 가는지 적습니다 | 설치 안 함 · 다음에 다시 묻기 · 주소 입력 |
 
 답은 클러스터별로 `~/.kubegap/snapshots/<context>/answers.json`에 저장됩니다. 건너뛴 질문은 다시 묻지 않고, 무엇을 건너뛰었는지는 리포트에 적습니다. 전부 다시 고르려면 `/kubegap setup`을 실행하세요.
 
@@ -121,6 +121,8 @@ scripts/kubegap config set prometheus_url http://prometheus.example.internal:909
 | `node_access: none` | 어떤 노드에도 접속하지 않고 노드 질문도 하지 않습니다 |
 | `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url` | 그 도구를 적어 둔 주소에서 읽습니다 |
 | `grafana_api_token` | Grafana 목록을 읽습니다 |
+
+**토큰 없이 읽는 것.** Grafana 차트의 사이드카는 `grafana_dashboard`, `grafana_datasource` 라벨이 붙은 ConfigMap에서 대시보드와 데이터소스를 읽어 들입니다. kube-prometheus-stack의 대시보드가 그렇게 들어 있습니다. kubegap은 이 ConfigMap을 스냅샷에 남기고(대시보드 JSON은 그대로, 데이터소스 파일은 항목마다 name, type, url, isDefault만. 비밀번호나 헤더 값은 남기지 않습니다) 두 목록과 "알림 메트릭이 어느 대시보드에도 없는지" 비교를 거기서 만듭니다. Grafana 자체 메트릭 `grafana_stat_totals_dashboard`를 같은 포트포워드의 `/metrics`에서(로그인 없이), 안 되면 Grafana를 긁는 Prometheus에서 읽어 대시보드 전체 개수를 알고, 그 수가 ConfigMap보다 많으면 그만큼은 Grafana 화면에서 만든 것이라 첫 실행 질문이 그 숫자와 함께 토큰을 묻습니다. kubegap은 Grafana 관리자 비밀번호를 읽지 않습니다.
 
 설정 파일에는 다음 키도 넣을 수 있습니다.
 

@@ -18,7 +18,7 @@ Both add a free-text entry to every question by themselves, and the user types i
 - **At most 3 questions per window**, in the order the block lists them. More than 3: a second window after the first is answered.
 - **Never write a question as a chat message that the user answers by typing**, as long as the choice tool is listed among your tools. The user asked to pick, not to type.
 - If the host has no choice tool in this session (Codex in Default mode without the feature, another host), write the same questions once as a numbered list, each with its lettered options, and tell the user the one line that turns the window on for next time when you know it (Codex: `codex --enable default_mode_request_user_input`, `codex-rs/cli/src/main.rs:965-966@rust-v0.164.0`).
-- Translate the texts when the report language is Korean. Keep ids, commands, paths and node names as they are.
+- The block comes in the report language: `setup`, `questions` and `answer` take `--language ko`, and every question is written in Korean in the code, from its purpose, not translated (#173). Put the texts into the window as printed. Do not translate, shorten or reword them; ids, commands, paths and node names are the same in both languages.
 
 ## 2. From the block to the window
 
@@ -43,6 +43,7 @@ Both add a free-text entry to every question by themselves, and the user types i
 | `option <id>: <label> — <description>` | one option: label and description as printed |
 | `config:`, `run:`, `show:`, `then:` under an option | what to do after the user picked that option (section 3). They are not shown in the window |
 | `typed answer` | what the free-text entry means for this question. Mention it in the question text in a few words ("or type the addresses") |
+| `note …` (after the questions) | something decided without a question, with its reason: "loki: not asked. logs go to elasticsearch (…)", "grafana: no token needed; 25 dashboards and 1 datasources are read from ConfigMaps (…)". Not a question; it goes into the report under what this run could not see, as printed |
 
 Every explanation, count and option comes from the block. Do not invent a question, an option or a number of checks; if something you would like to ask is not in the block, it is not asked. The only questions outside the block are the two this file names: Write / Don't write before a config value is written (section 3) and Install / Stop for a missing required tool (section 5).
 
@@ -80,8 +81,8 @@ A question the user closes without choosing (escape, an empty answer) counts as 
 | `ssm-document` | EKS, and the SSM document `kubegap-node-read` is missing or older than the local file | Upload or Update (`setup --install-ssm-document`) · Skip | the node checks are "no node access" |
 | `node-ssh` | k3s, RKE2 or an unrecognized platform, no `ssh:` block in the config, and the node DaemonSet is not running | Check SSH now (`nodes`) · Skip. After a check with failures: Accept host keys (a config value, then `nodes`) or Check again · Use the rest, when some nodes answered · Skip · typed: `<node>=<address>`, `user=<login>`, `key=<path>` | no SSH connection is made; the node checks are "no node access" |
 | `node-daemonset` | GKE or AKS, and the node DaemonSet is not running | Show the commands (the user applies the DaemonSet) · Skip | the node checks are "no node access" |
-| `grafana-token` | Grafana was found and the config has no `grafana_api_token` | Show how (the user creates the token and adds the line) · Skip | the datasource and dashboard lists read "no auth" |
-| `stores` | Prometheus, Alertmanager, Loki or Grafana has no Service in the cluster and no URL in the config | Not installed · Ask next time · typed: `<store>=<address>` | the checks that need that store are skipped |
+| `grafana-token` | Grafana was found, the config has no `grafana_api_token`, and either no ConfigMap for the Grafana sidecars exists or Grafana counts more dashboards than those ConfigMaps hold (setup.json `monitoring.grafana.provisioned`: `dashboards`, `datasources`, `total_dashboards`). The provisioned ones are read without a token, and a `note` line says so | Show how (the user creates the token and adds the line) · Skip | the dashboards made in Grafana itself stay unlisted; with nothing provisioned, both lists read "no auth" |
+| `stores` | Prometheus, Alertmanager, Loki or Grafana has no Service in the cluster and no URL in the config. Loki is left out when the log shipper's configuration says the logs go elsewhere (setup.json `log_sinks`, printed as a `note`); a Loki address found there is pre-filled in the typed-answer hint | Not installed · Ask next time · typed: `<store>=<address>` | the checks that need that store are skipped |
 
 `ssm_document: always|never`, `install_tools: always|never`, `node_access: none`, a `<store>_url` and `grafana_api_token` in the config answer the matching question for good, and it is never listed.
 

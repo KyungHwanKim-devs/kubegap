@@ -10,7 +10,7 @@ kubegap makes read calls only. The exact Kubernetes rules and AWS actions, each 
 
 **The kubeconfig.** `setup.json` records how the context authenticates: the exec command and its arguments (`aws eks get-token` on EKS) and the names of the environment variables in its `env` block. Of their values only `AWS_PROFILE` and `AWS_REGION` are kept, because kubegap passes them to the AWS CLI. Every other value, such as a tenant id or a token for a custom plugin, is written as `<redacted>` (`lib/kube.py`, `tests/test_kube_context.py`).
 
-**ConfigMaps.** ConfigMap values are not recorded either. The snapshot keeps the length and shape of each key. The real value is kept only for the configuration keys kubegap parses, listed in `KEEP_VALUES` in [`lib/scrub.py`](../lib/scrub.py): the CoreDNS Corefile, the kube-proxy configuration, the local-path-provisioner paths and a few Argo CD flags.
+**ConfigMaps.** ConfigMap values are not recorded either. The snapshot keeps the length and shape of each key. The real value is kept only for the configuration keys kubegap parses, listed in `KEEP_VALUES` in [`lib/scrub.py`](../lib/scrub.py): the CoreDNS Corefile, the kube-proxy configuration, the local-path-provisioner paths and a few Argo CD flags. Two kinds of ConfigMap keep more because the Grafana sidecars load them: one labelled `grafana_dashboard` keeps its dashboard JSON as it is, and of one labelled `grafana_datasource` the name, type, url and isDefault of each datasource are kept and the rest of the provisioning file, where a password or a header value could be, is dropped.
 
 **Logs.** Component pod logs of the last 24 hours are read by code, counted into the summary with masked sample lines, and then deleted from the snapshot before the agent starts. Set `keep_component_logs: true` in the config only if you accept that raw log lines may then be read by the agent.
 
@@ -18,7 +18,7 @@ kubegap makes read calls only. The exact Kubernetes rules and AWS actions, each 
 
 Everything kubegap collects is written to `~/.kubegap/snapshots/<context>/<timestamp>/` on your machine. kubegap itself sends nothing anywhere.
 
-- Snapshot folders and files are created readable by your user only. A folder that was already there and is open to other users gets one warning per run and is left as it is.
+- Snapshot folders and files are created readable by your user only. A folder that was already there and is open to other users becomes a first-run question (`home-mode`): Fix now runs `kubegap protect-home`, chmod 700 on those folders; Leave it leaves them.
 - Stored as collected, and so readable by the agent: object specs, events, metrics, node journals under `logs/node/` (kubelet, containerd, k3s), CloudWatch control-plane log queries under `logs/cloudwatch/`, and Grafana dashboards.
 - The config file is one you create yourself. It may hold `grafana_api_token`, so `chmod 600` it. `kubegap config set` creates it with that mode and refuses to write the token for you.
 - `scripts/kubegap prune` removes old snapshots; see [`SETUP.md`](SETUP.md#collected-data).

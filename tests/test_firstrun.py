@@ -210,21 +210,28 @@ def test_stores_and_grafana_and_daemonset():
     assert _ids(_setup("gke"), Config({"grafana_api_token": "x", "node_access": "daemonset"})) == []
 
 
-def _all_questions(tmp_path):
+def _all_questions(tmp_path, language="en"):
     probe = {"a": {"ok": False, "host": "h", "kind": "host-key", "why": "x"}, "b": {"ok": True, "host": "i"}}
     (tmp_path / firstrun.NODE_ACCESS_FILE).write_text(json.dumps({"method": "ssh", "probe": probe}))
     tools = [_tool("krr", present=False)]
     out = []
-    out += firstrun.questions(_setup("eks", doc={"present": False, "current": False}, stores_ok=False, tools=tools), Config(), None)
-    out += firstrun.questions(_setup("k3s"), Config(), None)
-    out += firstrun.questions(_setup("k3s"), Config(), tmp_path)
-    out += firstrun.questions(_setup("aks"), Config(), None)
+    eks = _setup("eks", doc={"present": False, "current": False}, stores_ok=False, tools=tools)
+    eks["machine"] = {"open_dirs": [{"path": "/home/u/.kubegap", "mode": "0755"}]}
+    out += firstrun.questions(eks, Config(), None, language=language)
+    out += firstrun.questions(_setup("k3s"), Config(), None, language=language)
+    out += firstrun.questions(_setup("k3s"), Config(), tmp_path, language=language)
+    out += firstrun.questions(_setup("aks"), Config(), None, language=language)
+    probe_rest = {"a": {"ok": False, "host": "h", "kind": "other", "why": "x"}, "b": {"ok": True, "host": "i"}}
+    (tmp_path / "rest").mkdir(exist_ok=True)
+    (tmp_path / "rest" / firstrun.NODE_ACCESS_FILE).write_text(json.dumps({"method": "ssh", "probe": probe_rest}))
+    out += firstrun.questions(_setup("k3s"), Config({"ssh": {"accept_new_hosts": True}}), tmp_path / "rest", language=language)
     return out
 
 
 def test_every_question_fits_both_choice_windows_and_can_be_skipped(tmp_path):
     qs = _all_questions(tmp_path)
-    assert {q["id"] for q in qs} == {"tools", "ssm-document", "node-ssh", "node-daemonset", "grafana-token", "stores"}
+    assert {q["id"] for q in qs} == {"home-mode", "tools", "ssm-document", "node-ssh", "node-daemonset", "grafana-token", "stores"}
+    assert {q["id"] for q in _all_questions(tmp_path, "ko")} == {q["id"] for q in qs}, "the Korean block asks the same questions"
     for q in qs:
         assert 2 <= len(q["options"]) <= 3, q["id"]  # Codex request_user_input: 2-3 options
         assert len(q["header"]) <= 12, q["header"]  # both hosts: header of 12 characters or fewer
@@ -411,3 +418,50 @@ def test_home_mode_question_comes_first_and_fix_runs_protect_home():
     assert fix["run"] == ["protect-home"] and fix["remember"] is False and "2 folders" in fix["description"]
     assert leave["remember"] is True
     assert "home-mode" not in _ids(_setup("k3s"))
+
+
+_TRANSLATIONESE = ("에 대해", "를 통해", "에 있어", "되어지", "에 의해", "가지고 있", "수행", "실시")
+
+
+def test_every_question_is_written_in_korean_not_translated(tmp_path):
+    """The Korean texts are written from the question's purpose (#173). Every English text has a Korean twin that differs, is not English, and
+    carries none of the translation patterns the writing guides are checked against. ids, commands and paths stay the same."""
+    en = {q["id"]: q for q in _all_questions(tmp_path, "en")}
+    ko = {q["id"]: q for q in _all_questions(tmp_path, "ko")}
+    assert set(en) == set(ko)
+    for qid, q in ko.items():
+        texts = [q["header"], q["question"], q["explain"], *q["gain"], q.get("typed") or ""] + [t for o in q["options"] for t in (o["label"], o["description"], *(o["show"] or []))]
+        for t in texts:
+            for pat in _TRANSLATIONESE:
+                assert pat not in t, (qid, pat, t)
+        assert any("\uac00" <= ch <= "\ud7a3" for ch in q["question"]), (qid, q["question"])
+        assert q["question"] != en[qid]["question"] and q["explain"] != en[qid]["explain"]
+        assert [o["id"] for o in q["options"]] == [o["id"] for o in en[qid]["options"]]
+        assert [o["run"] for o in q["options"]] == [o["run"] for o in en[qid]["options"]]
+        assert len(q["header"]) <= 12 and all(len(o["label"]) <= 12 for o in q["options"]), qid
+    text = firstrun.render(list(ko.values()), "ctx", [{"id": "node-ssh", "header": "노드 점검", "gain": ["g"]}], ["loki: 묻지 않았어요"], language="ko")
+    assert "  question: " in text and "  option skip: 건너뛰기 — " in text and "answer --context ctx node-ssh skip" in text
+    assert "skipped earlier [node-ssh] 노드 점검: g" in text and "note loki: 묻지 않았어요" in text and "이번에 못 본 것" in text
+    assert "none:" in firstrun.render([], "ctx", language="ko")
+
+
+def test_grafana_token_is_asked_only_for_dashboards_that_are_not_in_configmaps():
+    """Helm puts dashboards and datasources into ConfigMaps, which are read without a token. The question comes only when Grafana counts more
+    dashboards than the ConfigMaps hold, with the numbers, or when nothing is provisioned that way."""
+    s = _setup("eks")
+    assert [q["id"] for q in firstrun.questions(s, Config(), None) if q["id"] == "grafana-token"] == ["grafana-token"], "nothing provisioned: asked as before"
+    s["monitoring"]["grafana"]["provisioned"] = {"dashboards": 25, "datasources": 1, "total_dashboards": 25, "error": None}
+    assert "grafana-token" not in [q["id"] for q in firstrun.questions(s, Config(), None)]
+    assert firstrun.noted(s, Config(), None) == ["grafana: no token needed; 25 dashboards and 1 datasources are read from ConfigMaps. Grafana counts 25 dashboards too, so none is missing"]
+    assert firstrun.noted(s, Config(), None, language="ko") == ["grafana: 토큰 없이 ConfigMap에서 대시보드 25개와 데이터소스 1개를 읽어요. Grafana가 세는 대시보드도 25개라 빠진 게 없어요"]
+    s["monitoring"]["grafana"]["provisioned"]["total_dashboards"] = None
+    assert "grafana-token" not in [q["id"] for q in firstrun.questions(s, Config(), None)]
+    assert "could not be read" in firstrun.noted(s, Config(), None)[0]
+    s["monitoring"]["grafana"]["provisioned"]["total_dashboards"] = 30
+    q = next(q for q in firstrun.questions(s, Config(), None) if q["id"] == "grafana-token")
+    assert "Grafana has 30 dashboards and 25 of them" in q["question"] and "The other 5" in q["question"] and [o["id"] for o in q["options"]] == ["show", "skip"]
+    assert "5 dashboards made in Grafana" in q["options"][1]["description"]
+    assert firstrun.noted(s, Config(), None) == []
+    kq = next(q for q in firstrun.questions(s, Config(), None, language="ko") if q["id"] == "grafana-token")
+    assert "대시보드가 30개 있는데" in kq["question"] and "나머지 5개" in kq["question"]
+    assert firstrun.noted(s, Config({"grafana_api_token": "t"}), None) == []

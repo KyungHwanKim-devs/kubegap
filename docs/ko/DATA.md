@@ -12,7 +12,7 @@ kubegap은 읽기 호출만 합니다. 어떤 Kubernetes 규칙과 AWS 액션을
 
 **kubeconfig.** `setup.json`에는 이 컨텍스트가 어떻게 인증하는지 적힙니다. exec 명령과 인자(EKS면 `aws eks get-token`), 그리고 `env` 블록에 있는 환경 변수의 이름입니다. 값은 `AWS_PROFILE`과 `AWS_REGION` 두 개만 남깁니다. kubegap이 AWS CLI를 부를 때 넘겨야 해서입니다. 테넌트 id나 다른 인증 플러그인의 토큰 같은 나머지 값은 전부 `<redacted>`로 적습니다(`lib/kube.py`, `tests/test_kube_context.py`).
 
-**ConfigMap.** ConfigMap 값도 기록하지 않습니다. 점검 한 번에 모은 데이터를 담는 폴더를 스냅샷이라고 부르는데, 스냅샷에는 키마다 길이와 형태만 남깁니다. 실제 값을 남기는 키는 kubegap이 분석해야 하는 설정뿐이고, [`lib/scrub.py`](../../lib/scrub.py)의 `KEEP_VALUES`에 적혀 있습니다. CoreDNS Corefile, kube-proxy 설정, local-path-provisioner 경로, Argo CD 플래그 몇 개입니다.
+**ConfigMap.** ConfigMap 값도 기록하지 않습니다. 점검 한 번에 모은 데이터를 담는 폴더를 스냅샷이라고 부르는데, 스냅샷에는 키마다 길이와 형태만 남깁니다. 실제 값을 남기는 키는 kubegap이 분석해야 하는 설정뿐이고, [`lib/scrub.py`](../../lib/scrub.py)의 `KEEP_VALUES`에 적혀 있습니다. CoreDNS Corefile, kube-proxy 설정, local-path-provisioner 경로, Argo CD 플래그 몇 개입니다. Grafana 사이드카가 읽어 들이는 ConfigMap 두 종류는 더 남깁니다. `grafana_dashboard` 라벨이 붙은 것은 대시보드 JSON을 그대로, `grafana_datasource` 라벨이 붙은 것은 데이터소스마다 name, type, url, isDefault만 남기고 비밀번호나 헤더 값이 있을 수 있는 나머지는 지웁니다.
 
 **로그.** 컴포넌트 파드의 최근 24시간 로그는 스크립트가 읽습니다. 스크립트는 오류를 세어 요약에 넣고 마스킹한 샘플 줄을 남긴 뒤, 에이전트가 시작하기 전에 원본을 스냅샷에서 지웁니다. 원본 로그를 에이전트가 읽어도 괜찮을 때만 설정 파일에 `keep_component_logs: true`를 넣으세요.
 
@@ -20,7 +20,7 @@ kubegap은 읽기 호출만 합니다. 어떤 Kubernetes 규칙과 AWS 액션을
 
 kubegap이 모은 것은 전부 내 컴퓨터의 `~/.kubegap/snapshots/<context>/<timestamp>/`에 저장됩니다. kubegap 자체는 아무 데도 데이터를 보내지 않습니다.
 
-- 스냅샷 폴더와 파일은 내 사용자만 읽을 수 있게 만듭니다. 이미 있던 폴더가 다른 사용자에게 열려 있으면 실행마다 한 번 경고하고 그대로 둡니다.
+- 스냅샷 폴더와 파일은 내 사용자만 읽을 수 있게 만듭니다. 이미 있던 폴더가 다른 사용자에게 열려 있으면 첫 실행 질문(`home-mode`)으로 묻습니다. "지금 고치기"는 `kubegap protect-home`으로 그 폴더들에 chmod 700을 하고, "그대로 두기"는 그대로 둡니다.
 - 오브젝트 spec, 이벤트, 메트릭, `logs/node/` 아래의 노드 저널, `logs/cloudwatch/` 아래의 CloudWatch 컨트롤플레인 로그 쿼리 결과, Grafana 대시보드는 모은 그대로 저장합니다. 노드 저널은 kubelet, containerd, k3s의 것입니다. 이 파일들은 에이전트가 읽을 수 있습니다.
 - 설정 파일은 직접 만드는 파일입니다. `grafana_api_token`이 들어갈 수 있으니 `chmod 600`으로 권한을 제한하세요. `kubegap config set`은 이 권한으로 파일을 만들고, 토큰을 대신 써 주지는 않습니다.
 - 오래된 스냅샷은 `scripts/kubegap prune`으로 지웁니다. 사용법은 [SETUP.md](SETUP.md#모은-데이터)에 있습니다.
