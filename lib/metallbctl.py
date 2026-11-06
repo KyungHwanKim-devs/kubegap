@@ -49,10 +49,13 @@ def _workload(found: list[dict], role: str) -> dict | None:
     return next((d for d in found if "metallb" in (_container(d, role).get("image") or "")), found[0] if found else None)
 
 
-def _metric_files(snap: Path) -> list[Path]:
-    """The speaker metric files that hold a MetalLB series. A file with none was read from the wrong port (a configured `metrics_port`, or the FRR sidecar): it says nothing about the speaker, and counting it passed every check on nothing."""
+def _metric_texts(snap: Path) -> dict[str, str]:
+    """pod -> text of the speaker metric files that hold a series only the speaker has. A file without one was read from the wrong port (a configured `metrics_port`, or the FRR sidecar, which also
+    prints metallb_bgp_session_up: frr-tools/metrics/collector/bgp.go:21@v0.14.9): it says nothing about the speaker, and counting it passed every check on nothing. metallb_k8s_client_config_loaded_bool
+    is a plain gauge registered at start (internal/k8s/controllers/stats.go:25,43@v0.16.2), so a healthy speaker always prints it."""
     d = snap / "metrics" / "pod" / "metallb-speaker"
-    return [x for x in sorted(d.glob("*.prom")) if "metallb_" in x.read_text(encoding="utf-8", errors="replace")] if d.is_dir() else []
+    texts = {f.stem: f.read_text(encoding="utf-8", errors="replace") for f in sorted(d.glob("*.prom"))} if d.is_dir() else {}
+    return {pod: text for pod, text in texts.items() if re.search(r"^metallb_k8s_client_", text, re.MULTILINE)}
 
 
 def _step(snap: Path) -> dict:
@@ -86,11 +89,11 @@ def _pools(snap: Path) -> dict:
     return {"present": bool(pools), "pools": pools, "total_ips": total_ips, "used": used, "free": (total_ips - used) if pools else None, "services": lb, "pending": [s for s in lb if s["pending"]]}
 
 
-def _announced_from_metrics(files: list[Path]) -> list[dict]:
+def _announced_from_metrics(texts: dict[str, str]) -> list[dict]:
     """metallb_speaker_announced{ip,node,protocol,service} with a value of 1 or more."""
     announced = []
-    for f in files:
-        for ln in f.read_text(encoding="utf-8", errors="replace").splitlines():
+    for text in texts.values():
+        for ln in text.splitlines():
             if not ln.startswith("metallb_speaker_announced{"):
                 continue
             m = re.match(r"metallb_speaker_announced\{([^}]*)\}\s+([0-9.e+-]+)", ln)
@@ -117,13 +120,12 @@ def _announced_from_status(snap: Path, lb: list[dict], node_names: list[str]) ->
     return rows
 
 
-def _l2(snap: Path, lb: list[dict], node_names: list[str], step: dict, tls_only: bool, https_only_version: bool) -> dict:
+def _l2(snap: Path, lb: list[dict], node_names: list[str], texts: dict[str, str], step: dict, tls_only: bool, https_only_version: bool) -> dict:
     """Which node advertises (leads) which service IP in L2 mode, from the speaker metrics when they were read, else from the status resources. available is false when neither says.
     An empty status list is an answer only where the resources are always written and were saved: 0.16+ with both files in the snapshot. L2Advertisement nodeSelectors are included too."""
-    files = _metric_files(snap)
     announced, source = [], None
-    if files:
-        announced, source = _announced_from_metrics(files), "metrics/pod/metallb-speaker/*.prom (pod proxy GET)"
+    if texts:
+        announced, source = _announced_from_metrics(texts), "metrics/pod/metallb-speaker/*.prom (pod proxy GET)"
     else:
         announced = _announced_from_status(snap, lb, node_names)
         saved = all((snap / "objects" / f"{stem}.json").is_file() for stem in (L2_STATUS, BGP_STATUS))
@@ -134,6 +136,8 @@ def _l2(snap: Path, lb: list[dict], node_names: list[str], step: dict, tls_only:
         for pod, r in (step.get("pods") or {}).items():
             if not r.get("ok"):
                 errors.append({"pod": pod, "node": r.get("node"), "error": (r.get("error") or r.get("skipped") or "")[:160]})
+            elif pod not in texts:
+                errors.append({"pod": pod, "node": r.get("node"), "error": f"port {(step.get('target') or {}).get('port')} answered with no MetalLB series"})
     advs = []
     for a in objects(snap, "l2advertisements.metallb.io"):
         sp = a.get("spec") or {}
@@ -145,7 +149,7 @@ def _l2(snap: Path, lb: list[dict], node_names: list[str], step: dict, tls_only:
         "available": source is not None,
         "source": source,
         "metrics_tls_only": tls_only,
-        "speakers": len(files),
+        "speakers": len(texts),
         "speakers_unreadable": errors,
         "announced": announced,
         "announced_total": total,
@@ -218,14 +222,14 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     step = _step(snap)
     https_only_version = (versions.triple(version) or (0, 0, 0)) >= HTTPS_ONLY_SINCE
     tls_only = https_only_version or bool(step.get("skipped") and (step.get("target") or {}).get("skip"))
-    base["l2"] = _l2(snap, base["services"], [n["name"] for n in (inv.get("nodes") or {}).get("nodes") or []], step, tls_only, https_only_version)
+    texts = _metric_texts(snap)
+    base["l2"] = _l2(snap, base["services"], [n["name"] for n in (inv.get("nodes") or {}).get("nodes") or []], texts, step, tls_only, https_only_version)
     # --- speaker metrics
-    files = _metric_files(snap)
     per_pod = {}
-    for f in files:
-        pm = _parse_prom(f.read_text(encoding="utf-8", errors="replace"))
+    for pod, text in texts.items():
+        pm = _parse_prom(text)
         s = pm["single"]
-        per_pod[f.stem] = {
+        per_pod[pod] = {
             "config_loaded": s.get("metallb_k8s_client_config_loaded_bool"),
             "config_stale": s.get("metallb_k8s_client_config_stale_bool"),
             "update_errors": int(s.get("metallb_k8s_client_update_errors_total", 0)),
@@ -238,8 +242,15 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             "announced": sum(1 for _, v in pm["labeled"].get("metallb_speaker_announced", []) if v >= 1),
         }
     l2 = base["l2"]
-    states = _config_states(snap) if not files else []
+    states = _config_states(snap) if not texts else []
     judged = [s for s in states if s["result"] in ("Valid", "Invalid")]
+    # In FRR mode the session gauge is the frr-metrics sidecar's, the speaker registers it only in native mode (internal/bgp/native/stats.go:51@v0.16.2): peers with no series read is unknown, not 0 sessions up
+    bgp_unread = bool(texts and bgp_peers and not any(v["bgp_sessions"] for v in per_pod.values()))
+    counters = {key: (sum(v[field] for v in per_pod.values()) if texts else None) for key, field in COUNTERS.items()}
+    if bgp_unread:
+        counters.update(bgp_sessions=None, bgp_sessions_up=None)
+    template = ((speaker or {}).get("spec") or {}).get("template", {}).get("spec") or {}
+    selector = set(template.get("nodeSelector") or {}) - {"kubernetes.io/os"}  # every manifest sets the os selector (config/manifests/metallb-native.yaml:2370@v0.16.2)
     summary = {
         "present": True,
         "mode": mode,
@@ -248,6 +259,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "speaker_desired": sp_.get("desired"),
         "speaker_ready": sp_.get("ready"),
         "speaker_all_nodes": (sp_.get("ready") or 0) >= nodes_total if sp_.get("present") else None,
+        "speakers_pinned": bool(selector or (template.get("affinity") or {}).get("nodeAffinity")),  # told not to run everywhere: fewer speakers than nodes is the design, as L2Advertisement nodeSelectors are for leaders
         "nodes_total": nodes_total,
         "controller_replicas": ct_.get("desired"),
         "controller_ready": ct_.get("ready"),
@@ -258,24 +270,24 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "pending": [f"{s['namespace']}/{s['name']}" for s in base.get("pending") or []],
         "lb_services": len(base.get("services") or []),
         "l2_available": l2.get("available"),
-        "speakers_read": len(files),
+        "speakers_read": len(texts),
         "speakers_unreadable": l2.get("speakers_unreadable") or [],
         "leader_node": l2.get("leader_node"),
         "leader_share": l2.get("leader_share"),
         "pinned_by_selector": l2.get("pinned_by_selector"),
-        "config_read": bool(files or judged),
-        "config_source": "metrics" if files else ("configurationstates" if judged else None),
+        "config_read": bool(texts or judged),
+        "config_source": "metrics" if texts else ("configurationstates" if judged else None),
         "config_stale_pods": [p for p, v in per_pod.items() if v["config_stale"] == 1 or v["config_loaded"] == 0] + [s["name"] for s in judged if s["result"] == "Invalid"],
         "config_errors": sorted({s["error"] for s in judged if s["error"]}),
         "config_not_reported": _not_reported(states, sp_.get("desired"), ct_.get("desired")) if judged else [s["name"] for s in states],
-        "update_errors_read": bool(files),
-        **{key: sum(v[field] for v in per_pod.values()) if files else None for key, field in COUNTERS.items()},  # null when not read: a counter nobody read is not a measured zero
+        "update_errors_read": bool(texts),
+        **counters,  # null when not read: a counter nobody read is not a measured zero
         "bgp_peers": len(bgp_peers),
         "webhooks_fail": [w["name"] for w in webhooks if w["failure_policy"] == "Fail"],
         "webhooks": len(webhooks),
-        "metrics_available": bool(files),
+        "metrics_available": bool(texts),
         "metrics_tls_only": tls_only,
-        "metrics_not_read": METRICS_NOT_READ if tls_only and not files else [],
+        "metrics_not_read": METRICS_NOT_READ if tls_only and not texts else (["metallb_bgp_session_up"] if bgp_unread else []),
     }
     return {
         "present": True,

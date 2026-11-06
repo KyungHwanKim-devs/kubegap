@@ -93,6 +93,14 @@ def test_the_frr_sidecar_port_of_the_same_name_is_not_the_speaker():
     assert t["port"] == 7472 and t["source"]["port"] == "discovered"
 
 
+def test_a_workload_running_the_image_goes_before_a_namesake():
+    """Any DaemonSet may be called x-speaker: audio/sonos-speaker sorted first and took the step, so the MetalLB speakers went unread and the https reason was lost."""
+    other = _wl("daemonset", "audio", "sonos-speaker", {"app": "sonos"}, [("http", 8080)], image="example.com/sonos:1.0")
+    sp = _wl("daemonset", "network", "metallb-speaker", {"app.kubernetes.io/component": "speaker"}, [("metricshttps", 9120)], image="quay.io/metallb/speaker:v0.16.2")
+    t = podmetrics.discover_targets(_objs(("daemonset", other), ("daemonset", sp)), Config())["metallb.metallb-speaker-metrics"]
+    assert t["workload"] == "daemonset network/metallb-speaker" and "skip" in t
+
+
 def test_an_old_inventory_without_targets_reads_the_step_defaults():
     step = next(s for f, s in podmetrics.pod_metrics_steps() if f == "argocd" and s["id"] == "server-metrics")
     assert podmetrics.default_target(step)["port"] == 8083

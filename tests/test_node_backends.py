@@ -198,5 +198,5 @@ def test_metallb_speaker_evidence_carries_the_skip_reason(tmp_path):
 
     cr = {"metallb": {"steps": {"metallb-speaker-metrics": {"pods": {"speaker-a": {"ok": False, "node": "n1", "error": None, "skipped": "pod not Running (Pending)"}, "speaker-b": {"ok": True, "node": "n2"}}}}}}
     (tmp_path / "collect-result.json").write_text(json.dumps(cr))
-    out = metallbctl._l2(tmp_path, [], ["n1", "n2"], metallbctl._step(tmp_path), False, False)
+    out = metallbctl._l2(tmp_path, [], ["n1", "n2"], {"speaker-b": "metallb_k8s_client_config_loaded_bool 1\n"}, metallbctl._step(tmp_path), False, False)
     assert out["speakers_unreadable"] == [{"pod": "speaker-a", "node": "n1", "error": "pod not Running (Pending)"}]

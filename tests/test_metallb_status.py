@@ -246,3 +246,52 @@ def test_a_metric_file_without_a_metallb_series_is_not_a_read(tmp_path):
     prom = "process_resident_memory_bytes 2.0e+07\nprocess_start_time_seconds 1.7e+09\n"
     out = metallbctl.analyze(snap(tmp_path, version="v0.14.9", step=step, metrics=prom, daemonsets=[frr_first("v0.14.9")]), INV)
     assert out["summary"]["metrics_available"] is False and out["summary"]["speakers_read"] == 0 and out["summary"]["config_read"] is False and out["l2"]["available"] is False
+
+
+def test_the_frr_sidecar_series_do_not_make_a_read(tmp_path):
+    """The sidecar prints metallb_bgp_session_up (frr-tools/metrics/collector/bgp.go:21@v0.14.9): a filter on `metallb_` let it through on a BGP cluster, with no config value behind `config_read`."""
+    step = {"ok": True, "target": {"port": 7473}, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}}}
+    prom = 'metallb_bgp_session_up{peer="172.20.0.4:179"} 1\nmetallb_bgp_updates_total{peer="172.20.0.4:179"} 2\n'
+    s = metallbctl.analyze(snap(tmp_path, version="v0.14.9", step=step, metrics=prom, daemonsets=[frr_first("v0.14.9")], bgppeers__metallb__io=[{"metadata": {"name": "lab"}}]), INV)["summary"]
+    assert s["metrics_available"] is False and s["config_read"] is False
+    assert s["speakers_unreadable"] == [{"pod": "speaker-a", "node": "kind-worker", "error": "port 7473 answered with no MetalLB series"}]
+
+
+GOOD = "metallb_k8s_client_config_loaded_bool 1\nmetallb_k8s_client_config_stale_bool 0\nmetallb_k8s_client_update_errors_total 0\n"
+
+
+def test_bgp_sessions_on_an_frr_install_are_unknown_not_zero(tmp_path):
+    """The gauge is the sidecar's in FRR mode (internal/bgp/native/stats.go:51@v0.16.2 registers it for native only): good speaker files and peers say nothing about the sessions."""
+    step = {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}}}
+    s = metallbctl.analyze(snap(tmp_path, version="v0.14.9", step=step, metrics=GOOD, daemonsets=[frr_first("v0.14.9")], bgppeers__metallb__io=[{"metadata": {"name": "lab"}}]), INV)["summary"]
+    assert s["bgp_sessions"] is None and s["bgp_sessions_up"] is None and s["metrics_not_read"] == ["metallb_bgp_session_up"]
+    assert s["update_errors_total"] == 0
+
+
+def test_layer2_without_peers_has_zero_sessions(tmp_path):
+    step = {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}}}
+    s = metallbctl.analyze(snap(tmp_path, version="v0.14.9", step=step, metrics=GOOD, daemonsets=[workload("v0.14.9", ("monitoring", 7472))]), INV)["summary"]
+    assert s["bgp_sessions"] == 0 and s["metrics_not_read"] == []
+
+
+def test_one_good_file_does_not_hide_a_pod_that_answered_with_nothing(tmp_path):
+    step = {"ok": True, "target": {"port": 7473}, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}, "speaker-b": {"ok": True, "node": "kind-control-plane"}}}
+    s_ = snap(tmp_path, version="v0.14.9", step=step, metrics=GOOD, daemonsets=[workload("v0.14.9", ("monitoring", 7472))])
+    (tmp_path / "metrics" / "pod" / "metallb-speaker" / "speaker-b.prom").write_text("process_start_time_seconds 1.7e+09\n")
+    s = metallbctl.analyze(s_, INV)["summary"]
+    assert s["speakers_read"] == 1 and [e["pod"] for e in s["speakers_unreadable"]] == ["speaker-b"]
+
+
+def test_a_speaker_pinned_on_purpose_is_named(tmp_path):
+    """Two speakers of four nodes with a nodeSelector is a layout, not a fault. The os selector of every manifest does not count as pinning."""
+    (tmp_path / "a").mkdir()
+    (tmp_path / "b").mkdir()
+    pinned = workload("v0.16.2")
+    pinned["spec"]["template"]["spec"]["nodeSelector"] = {"kubernetes.io/os": "linux", "role": "edge"}
+    inv = {"nodes": {"count": 4, "nodes": [{"name": "kind-worker"}]}}
+    s = metallbctl.analyze(snap(tmp_path / "a", daemonsets=[pinned], **{L2: [], BGP: [], STATE: []}), inv)["summary"]
+    assert s["speaker_all_nodes"] is False and s["speakers_pinned"] is True
+    os_only = workload("v0.16.2")
+    os_only["spec"]["template"]["spec"]["nodeSelector"] = {"kubernetes.io/os": "linux"}
+    s = metallbctl.analyze(snap(tmp_path / "b", daemonsets=[os_only], **{L2: [], BGP: [], STATE: []}), inv)["summary"]
+    assert s["speakers_pinned"] is False

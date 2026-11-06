@@ -165,6 +165,8 @@ def _discovered(objs: dict, disc: dict, default_port: int, default_namespace: st
                 matches.append((kind, o))
     if not matches:
         return None
+    hint = disc.get("image")  # names can collide (any DaemonSet may be called x-speaker): when `image:` is set, a workload running that image goes first
+    matches = [m for m in matches if hint and any(hint in str(c.get("image")) for c in ((m[1].get("spec") or {}).get("template") or {}).get("spec", {}).get("containers") or [])] or matches
     candidates = [f"{k} {o['metadata'].get('namespace') or ''}/{o['metadata']['name']}" for k, o in matches]
     kind, o = next(((k, o) for k, o in matches if (o["metadata"].get("namespace") or "") == default_namespace), matches[0])
     ns, name = o["metadata"].get("namespace") or "", o["metadata"]["name"]
@@ -172,7 +174,7 @@ def _discovered(objs: dict, disc: dict, default_port: int, default_namespace: st
     labels = ((spec.get("selector") or {}).get("matchLabels")) or {}
     containers = ((spec.get("template") or {}).get("spec") or {}).get("containers") or []
     # `container:` names whose ports count, because a sidecar can use the same port name: metallb-frr.yaml names both frr-metrics:7473 and speaker:7472 `monitoring`, and frr-metrics comes first
-    own = [c for c in containers if c.get("name") == disc.get("container")]
+    own = [c for c in containers if c.get("name") == disc.get("container")] or [c for c in containers if disc.get("container") and str(disc["container"]) in str(c.get("image"))]
     ports = [pt for c in (own or containers) for pt in (c.get("ports") or [])]
     port, port_source, https = default_port, "default", None
     for pt in ports:

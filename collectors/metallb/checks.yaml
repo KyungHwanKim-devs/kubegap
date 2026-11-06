@@ -83,7 +83,7 @@
   cluster_level: true
   profiles: [prod, lab]
   rule:
-    needs: "item['available'] or not item.get('metrics_tls_only')"
+    needs: "item.get('available') or not item.get('metrics_tls_only')"
     needs_reason: "L2 leaders not read (metrics over TLS with authentication and no status resources)"
     expr: "item['available'] and item['nodes_total'] >= 2 and item['announced_total'] >= 2 and (item['leader_share'] or 0) >= 1.0 and not item['pinned_by_selector']"
     warn_expr: "(item['available'] and item['nodes_total'] >= 2 and item['announced_total'] >= 2 and (item['leader_share'] or 0) >= 0.8 and not item['pinned_by_selector']) or (not item['available'] and item['lb_services'] > 0)"
@@ -285,16 +285,16 @@
   cluster_level: true
   rule:
     expr: "(item['speaker_ready'] or 0) < (item['speaker_desired'] or 0) or (item['controller_ready'] or 0) < (item['controller_replicas'] or 0)"
-    warn_expr: "item['speaker_all_nodes'] is False or len(item['speakers_unreadable']) > 0 or (item['metrics_available'] is False and not item.get('metrics_tls_only') and (item['lb_services'] or 0) > 0)"
+    warn_expr: "(item['speaker_all_nodes'] is False and not item.get('speakers_pinned')) or len(item['speakers_unreadable']) > 0 or (item['metrics_available'] is False and not item.get('metrics_tls_only') and (item['lb_services'] or 0) > 0)"
   target: "'cluster'"
-  evidence: "f\"speaker ready {item['speaker_ready']}/{item['speaker_desired']} ({item['nodes_total']} nodes, all nodes {item['speaker_all_nodes']}), controller {item['controller_ready']}/{item['controller_replicas']}, speakers with metrics read {item['speakers_read']}, unreadable {item['speakers_unreadable']}, version {item['version']}, mode {item['mode']}\""
+  evidence: "f\"speaker ready {item['speaker_ready']}/{item['speaker_desired']} ({item['nodes_total']} nodes, all nodes {item['speaker_all_nodes']}, pinned by nodeSelector or affinity {item.get('speakers_pinned')}), controller {item['controller_ready']}/{item['controller_replicas']}, speakers with metrics read {item['speakers_read']}, unreadable {item['speakers_unreadable']}, version {item['version']}, mode {item['mode']}\""
   severity_default: high
   symptom_linked: true
   why: >
     In L2 mode a node without a speaker cannot announce any service IP — when the leader node dies, failover to that node does not happen, and an externalTrafficPolicy Local service that lives only on that node is never reachable. If the controller is down, new LoadBalancer services get no IP and stay Pending (existing IPs keep being announced by the speakers).
   measured: >
     Measured on a 2-node k3s cluster: speaker 2/2 (2 nodes), controller 1/1, metrics 2/2 -> pass.
-  suggest: "kubectl -n metallb-system get ds speaker; check node taints (the speaker needs tolerations) and nodeSelector."
+  suggest: "kubectl -n metallb-system get ds speaker; check node taints (the speaker needs tolerations) and nodeSelector. Speakers kept off tainted nodes on purpose read as a warn here: say so in the report."
   verify:
     - "kubectl -n metallb-system get pods -o wide"
   profiles: [prod, lab]
@@ -309,6 +309,7 @@
           speaker_desired: 2
           speaker_ready: 1
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -357,6 +358,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 0
@@ -405,6 +407,7 @@
           speaker_desired: 1
           speaker_ready: 1
           speaker_all_nodes: false
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -453,6 +456,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -504,6 +508,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -552,6 +557,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -591,6 +597,55 @@
           config_errors: []
           config_not_reported: []
           update_errors_read: false
+      - expect: "pass"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 1
+          speaker_ready: 1
+          speaker_all_nodes: false
+          speakers_pinned: true
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+          metrics_tls_only: false
+          metrics_not_read: []
+          config_read: true
+          config_source: "metrics"
+          config_errors: []
+          config_not_reported: []
+          update_errors_read: true
 
 - id: traffic.metallb-config-stale
   name: Speaker MetalLB config is stale or failed to load, or k8s update errors
@@ -604,7 +659,7 @@
     expr: "len(item['config_stale_pods']) > 0"
     warn_expr: "(item['update_errors_total'] or 0) > 0 or len(item.get('config_not_reported') or []) > 0"
   target: "'cluster'"
-  evidence: "f\"source {item['config_source']}: components with stale/unloaded config {item['config_stale_pods']}, errors {item['config_errors']}, not reported {item['config_not_reported']}, k8s client update errors {item['update_errors_total'] if item['update_errors_read'] else 'not read'}, ARP requests/responses {item['arp_requests_total'] if item['update_errors_read'] else 'not read'}/{item['arp_responses_total'] if item['update_errors_read'] else 'not read'}, gratuitous ARP {item['gratuitous_total'] if item['update_errors_read'] else 'not read'}, BGP sessions up {item['bgp_sessions_up'] if item['update_errors_read'] else 'not read'}/{item['bgp_sessions'] if item['update_errors_read'] else 'not read'}\""
+  evidence: "f\"source {item['config_source']}: components with stale/unloaded config {item['config_stale_pods']}, errors {item['config_errors']}, not reported {item['config_not_reported']}, k8s client update errors {item['update_errors_total'] if item['update_errors_read'] else 'not read'}, ARP requests/responses {item['arp_requests_total'] if item['update_errors_read'] else 'not read'}/{item['arp_responses_total'] if item['update_errors_read'] else 'not read'}, gratuitous ARP {item['gratuitous_total'] if item['update_errors_read'] else 'not read'}, BGP sessions up {item['bgp_sessions_up'] if item['bgp_sessions'] is not None else 'not read'}/{item['bgp_sessions'] if item['bgp_sessions'] is not None else 'not read'}\""
   severity_default: high
   symptom_linked: true
   why: >
@@ -628,6 +683,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -677,6 +733,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -725,6 +782,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -773,6 +831,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -821,6 +880,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -869,6 +929,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -918,6 +979,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -966,6 +1028,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -1040,6 +1103,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -1088,6 +1152,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -1136,6 +1201,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -1184,6 +1250,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 1
           controller_replicas: 1
           controller_ready: 1
@@ -1232,6 +1299,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -1303,6 +1371,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -1351,6 +1420,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -1399,6 +1469,7 @@
           speaker_desired: 2
           speaker_ready: 2
           speaker_all_nodes: true
+          speakers_pinned: false
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
