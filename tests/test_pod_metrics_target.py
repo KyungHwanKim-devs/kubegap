@@ -77,10 +77,28 @@ def test_metallb_0_16_https_metrics_make_the_step_skip_with_the_reason():
     sp = _wl("daemonset", "metallb-system", "speaker", {"app": "metallb", "component": "speaker"}, [("metricshttps", 9120), ("memberlist-tcp", 7946)])
     t = podmetrics.discover_targets(_objs(("daemonset", sp)), Config())["metallb.metallb-speaker-metrics"]
     assert t["port"] == 7472 and t["source"]["port"] == "default"
-    assert t["skip"] == "daemonset metallb-system/speaker serves its metrics on port 9120 (metricshttps), over TLS with authentication, which the pod proxy and the node curl cannot read"
+    assert t["skip"].startswith("daemonset metallb-system/speaker serves its metrics on port 9120 (metricshttps), over TLS with authentication, which the pod proxy and the node curl cannot read; ")
+    assert "ConfigurationState where the version publishes them" in t["skip"] and "update error" in t["skip"]  # what stands in and what does not reach the report through this reason
     # a plain-HTTP port named in config.yaml is read on purpose
     t2 = podmetrics.discover_targets(_objs(("daemonset", sp)), Config({"components": {"metallb": {"metrics_port": 7472}}}))["metallb.metallb-speaker-metrics"]
     assert "skip" not in t2 and t2["source"]["port"] == "config"
+
+
+def test_the_frr_sidecar_port_of_the_same_name_is_not_the_speaker():
+    """metallb-frr.yaml names frr-metrics:7473 and speaker:7472 `monitoring`, the sidecar first. The discovered port was 7473, and only process_* lines came back (kind, v0.14.9)."""
+    sp = _wl("daemonset", "metallb-system", "speaker", {"app": "metallb", "component": "speaker"}, [("monitoring", 7472)])
+    sp["spec"]["template"]["spec"]["containers"][0]["name"] = "speaker"
+    sp["spec"]["template"]["spec"]["containers"].insert(0, {"name": "frr-metrics", "ports": [{"name": "monitoring", "containerPort": 7473}]})
+    t = podmetrics.discover_targets(_objs(("daemonset", sp)), Config())["metallb.metallb-speaker-metrics"]
+    assert t["port"] == 7472 and t["source"]["port"] == "discovered"
+
+
+def test_a_workload_running_the_image_goes_before_a_namesake():
+    """Any DaemonSet may be called x-speaker: audio/sonos-speaker sorted first and took the step, so the MetalLB speakers went unread and the https reason was lost."""
+    other = _wl("daemonset", "audio", "sonos-speaker", {"app": "sonos"}, [("http", 8080)], image="example.com/sonos:1.0")
+    sp = _wl("daemonset", "network", "metallb-speaker", {"app.kubernetes.io/component": "speaker"}, [("metricshttps", 9120)], image="quay.io/metallb/speaker:v0.16.2")
+    t = podmetrics.discover_targets(_objs(("daemonset", other), ("daemonset", sp)), Config())["metallb.metallb-speaker-metrics"]
+    assert t["workload"] == "daemonset network/metallb-speaker" and "skip" in t
 
 
 def test_an_old_inventory_without_targets_reads_the_step_defaults():
@@ -145,7 +163,7 @@ def test_a_https_target_is_a_skip_not_a_failure(tmp_path, monkeypatch):
     log = RunLog(tmp_path / "run.log")
     ctx = collect.StepContext("metallb", Path("collectors/metallb"), "ctx", Config(), {"pod_metrics_targets": {"metallb.metallb-speaker-metrics": tgt}}, tmp_path, log, None, None, None, None, None, collect.CollectState())
     res = collect._step_pod_metrics(ctx, step)
-    assert res["skipped"] is True and res["ok"] is True and res["note"] == tgt["skip"] and calls == []
+    assert res["skipped"] == tgt["skip"] and res["ok"] is True and res["note"] == tgt["skip"] and calls == []  # the reason: section 7-1 prints this field, and True printed "(True)"
     assert "metricshttps" in (tmp_path / "run.log").read_text()
 
 

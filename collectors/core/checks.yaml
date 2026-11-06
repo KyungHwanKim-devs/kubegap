@@ -12119,11 +12119,11 @@
   severity_default: high
   symptom_linked: false
   why: >
-    Kubernetes removes APIs every minor version. Objects stored under a removed API disappear after the upgrade or fail to deploy. Pluto inspects in-cluster objects and Helm release manifests; kubent does the same with different rules.
+    Kubernetes removes APIs every minor version. Manifests written against a removed API fail to deploy after the upgrade. Pluto and kubent both judge the apiVersion in the last-applied annotation of each object, with different rules; neither reads Helm release manifests here, because those live in Secrets, and objects applied by Helm or server-side apply carry no such annotation.
     target is the next minor after the cluster server version (collect fills in `{k8s_next_minor}`). The call-based view is the metric apiserver_requested_deprecated_apis (summary.hygiene.deprecated.called_deprecated_apis).
   suggest: "Move manifests and charts to the replacement API. Before the upgrade (platform.k8s-version-eol)."
   verify:
-    - "pluto detect-all-in-cluster -o wide --target-versions k8s=v<next minor>"
+    - "kubectl get <kind> <name> -n <namespace> -o jsonpath='{.metadata.annotations.kubectl\\.kubernetes\\.io/last-applied-configuration}'"
     - "kubent -t <next minor>"
   profiles: [prod, lab]
   test:

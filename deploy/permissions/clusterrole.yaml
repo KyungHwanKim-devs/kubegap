@@ -1,12 +1,12 @@
 # kubegap read-only ClusterRole. Every grant here is something the code calls; tests/test_permissions.py keeps it that way.
 # get and list on the core resources and API groups kubegap reads. Secrets are excluded: list returns the values, so kubegap never reads Secrets through kubectl
-# and only sees names and types via kube-state-metrics kube_secret_info. Helm stores release records in Secrets, so with this role `helm list` fails and the two Helm checks are skipped; grant secrets read if you want them. pluto and kubent are run in their modes that do not read Helm releases for the same reason.
+# and only sees names and types via kube-state-metrics kube_secret_info. Helm stores release records in Secrets, so with this role `helm list` fails and the two Helm checks are skipped; grant secrets read if you want them. kubent is run in the mode that does not read Helm releases, and pluto reads the saved objects and never reaches the cluster.
 # Kinds of groups not listed here (CSRs, flow control, runtime classes, external-secrets generators, operator CRDs kubegap has no checks for) are reported by the dump-all step as "not permitted", not as failures; no check reads them.
 # nodes/proxy: GET /api/v1/nodes/<node>/proxy/configz (kubelet configuration, full mode).
 # pods/proxy: GET of a component pod's /metrics through the API server proxy (type: pod-metrics steps). Read only. When the proxy is blocked by the node security group kubegap reads the same URL with curl from inside a node instead.
 # pods/portforward: `kubectl port-forward svc/<prometheus|alertmanager|loki|grafana>` to read the stores. The verb is `create` because that is how the API server names opening the stream; nothing is created in the cluster. If config.yaml sets prometheus_url, alertmanager_url, loki_url and grafana_url, this rule can be dropped.
 # The DaemonSet node backend additionally needs `get` and `create` on pods/exec in the kubegap namespace; that is role-daemonset-exec.yaml, kept separate.
-# The external tools of the core collector (krr, polaris, pluto, kubent, helm) list kinds of their own choosing within these grants; `helm list` is the one that needs Secrets and fails under this role.
+# The external tools of the core collector that reach the cluster (krr, polaris, kubent, helm) list kinds of their own choosing within these grants; `helm list` is the one that needs Secrets and fails under this role. pluto reaches nothing: it reads a list built from the snapshot.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:

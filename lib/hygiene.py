@@ -246,10 +246,12 @@ def _next_minor(server_version, pluto_target: dict | None) -> str | None:
 def _deprecated(cx: _Ctx) -> dict:
     steps = ((load_json(cx.snap / "collect-result.json") or {}).get("core") or {}).get("steps") or {}
     read = {f"{tool}_read": bool((steps.get(tool) or {}).get("ok") and (steps.get(tool) or {}).get("api_read")) for tool in ("pluto", "kubent")}
-    # How much of the API each tool saw: successful and failed Lists counted from its log by lib/collect.py (#132); None for a snapshot taken before the counts existed.
+    # How much of the API each tool saw, counted by lib/collect.py (#132): kubent's successful and failed Lists from its log, for pluto the kinds objects.dump-all saved and the kinds it could not. None for a snapshot taken before the counts existed.
     lists = {f"{tool}_lists_{k}": (steps.get(tool) or {}).get(f"lists_{k}") for tool in ("pluto", "kubent") for k in ("ok", "failed")}
+    # Both tools judge an object only through its last-applied annotation, so what they could judge is the objects carrying one: pluto gets exactly those, kubent logs `Retrieved N resources` (cmd/kubent/main.go:49@0.7.3). None for an older snapshot.
+    manifests = {f"{tool}_manifests": (steps.get(tool) or {}).get("manifests") for tool in ("pluto", "kubent")}
     items = []
-    # source: pluto v5.24.5 pkg/api/output.go:28-55 Output{name, filePath, namespace (omitempty), api, deprecated, removed, replacementAvailable}, :57-59 Instance{items (omitempty),
+    # source: pluto v5.24.5 pkg/api/output.go:35-54 Output{name, filePath, namespace (omitempty), api, deprecated, removed, replacementAvailable}, :57-59 Instance{items (omitempty),
     # target-versions}, pkg/api/versions.go:60-76 Version{version, kind, deprecated-in, removed-in, replacement-api, replacement-available-in, component}; deprecated and removed are
     # judged against the target in FilterOutput (output.go:162-163). A cluster-scoped object has no namespace key.
     pl = load_json(cx.snap / "tools" / "pluto.json") or {}
@@ -257,7 +259,7 @@ def _deprecated(cx: _Ctx) -> dict:
         items.append(
             {
                 "source": "pluto",
-                "kind": it.get("kind"),
+                "kind": (it.get("api") or {}).get("kind") if isinstance(it.get("api"), dict) else it.get("kind"),  # pluto's Output has no kind of its own, it is api.kind (pkg/api/output.go:35-54, versions.go:60-76)
                 "name": it.get("name"),
                 "namespace": it.get("namespace"),
                 "api": it.get("api", {}).get("version") if isinstance(it.get("api"), dict) else it.get("api"),
@@ -313,12 +315,17 @@ def _deprecated(cx: _Ctx) -> dict:
         )
     for item in items:
         item.update(read)
+    seen = [manifests[f"{tool}_manifests"] for tool in ("pluto", "kubent") if read[f"{tool}_read"]]
+    judged = any(read.values()) and not (seen and all(n == 0 for n in seen))  # a cluster deployed only by Helm or server-side apply gives the tools nothing to judge: no finding is not a pass
     return {
         **read,
         **lists,
+        **manifests,
+        "objects_judged": judged,
+        "skip_reason": None if judged or not any(read.values()) else "no object has a last-applied annotation, so pluto and kubent had nothing to judge",
         # None makes the existing evaluator skip even when there are no rows on which to test rule.needs.
-        "items": items if any(read.values()) else None,
-        "count": len(items) if any(read.values()) else None,
+        "items": items if judged else None,
+        "count": len(items) if judged else None,
         "removed_next": [i for i in items if i["removed"]],
         "pluto_present": (cx.snap / "tools" / "pluto.json").is_file(),
         "kubent_present": (cx.snap / "tools" / "kubent.json").is_file(),

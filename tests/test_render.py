@@ -187,28 +187,54 @@ def test_event_reason_and_failed_command_error_lines_cannot_open_a_block(tmp_pat
     assert not any(ln.startswith("```") for ln in text.splitlines()), "no fence opened by a cluster string (this snapshot has no details block)"
 
 
+def test_a_skipped_metrics_step_shows_its_reason(tmp_path):
+    """A pod-metrics step that skips because the endpoint needs authentication said `skipped: True`, so the table printed `metallb-speaker-metrics (True)` and the reason never reached the report (#155)."""
+    s = _snap(tmp_path, False)
+    cr = json.loads((s / "collect-result.json").read_text())
+    reason = "daemonset metallb-system/speaker serves its metrics on port 9120 (metricshttps); the update error, ARP and BGP session counters are not read"
+    cr["metallb"] = {"collector": "metallb", "steps": {"metallb-speaker-metrics": {"ok": True, "skipped": reason, "pods": {}, "note": reason}}}
+    (s / "collect-result.json").write_text(json.dumps(cr))
+    assert f"metallb-speaker-metrics ({reason})" in render.render_details(s).read_text()
+
+
+def test_older_snapshots_keep_their_own_words(tmp_path):
+    """A snapshot from before the pluto step read the saved objects has Lists, not kinds, and a skipped metrics step that wrote `skipped: True` keeps its reason in `note`."""
+    s = _snap(tmp_path, False)
+    cr = json.loads((s / "collect-result.json").read_text())
+    cr["core"]["steps"]["pluto"] = {"ok": True, "api_read": True, "lists_ok": 119, "lists_failed": 7}
+    cr["metallb"] = {"collector": "metallb", "steps": {"metallb-speaker-metrics": {"ok": True, "skipped": True, "pods": {}, "note": "over TLS with authentication"}}}
+    (s / "collect-result.json").write_text(json.dumps(cr))
+    summ = json.loads((s / "summary.json").read_text())
+    summ["hygiene"] = {"deprecated": {"pluto_lists_ok": 119, "pluto_lists_failed": 7}}
+    (s / "summary.json").write_text(json.dumps(summ))
+    text = render.render_details(s).read_text()
+    assert "Deprecated-API tools: pluto 119 of 126 Lists answered (7 refused or not served)." in text
+    assert "metallb-speaker-metrics (over TLS with authentication)" in text and "(True)" not in text
+
+
 def test_failed_steps_are_counted_from_collect_result_not_from_exit_codes(tmp_path):
     """#132: kubent and pluto exit 0 when their read is not confirmed, so run.log lists no failed command while collect-result.json has the failed step.
     The header row, the Failed column and the count under the table read the same list."""
     s = _snap(tmp_path, False)
     cr = json.loads((s / "collect-result.json").read_text())
     cr["core"]["steps"]["kubent"] = {"ok": False, "api_read": False, "lists_ok": 0, "lists_failed": 2, "error": "kubent: API resources not confirmed read; DBG Failed to retrieve: x"}
+    cr["core"]["steps"]["pluto"] = {"ok": True, "api_read": True, "lists_ok": 102, "lists_failed": 3, "manifests": 40}
     cr["_summary"]["failed"] = ["core.top", "core.kubent"]
     (s / "collect-result.json").write_text(json.dumps(cr))
     summ = json.loads((s / "summary.json").read_text())
-    summ["hygiene"] = {"deprecated": {"kubent_lists_ok": 0, "kubent_lists_failed": 2, "pluto_lists_ok": 119, "pluto_lists_failed": 7}}
+    summ["hygiene"] = {"deprecated": {"kubent_lists_ok": 0, "kubent_lists_failed": 2, "pluto_lists_ok": 102, "pluto_lists_failed": 3}}
     summ["run"] = {
         "commands": 5,
         "failed": [{"id": "core.top", "collector": "core", "error": "exit 1"}, {"id": "core.kubent.extra", "error": "x"}, {"id": "metallb.speaker-metrics.speaker-abc", "collector": "metallb", "error": "502 Bad Gateway"}],
     }
     (s / "summary.json").write_text(json.dumps(summ))
     text = render.render_details(s).read_text()
-    assert "| core | 4 | top, kubent | krr (not collected in daily mode) |" in text
+    assert "| core | 5 | top, kubent | krr (not collected in daily mode) |" in text
     assert "5 commands, 60 s. Failed steps: 2: `core.top` boom; `core.kubent` kubent: API resources not confirmed read; DBG Failed to retrieve: x" in text
     # run.log's failures are not a second count of the same thing: the ones that belong to a failed step are not repeated, the one inside a step that succeeded is shown as such
     assert "Commands that failed inside a step that still succeeded (run.log): 1: `metallb.speaker-metrics.speaker-abc` 502 Bad Gateway" in text
     assert text.count("`core.top`") == 1 and "core.kubent.extra" not in text  # the failed step once, not again as a run.log command
-    assert "Deprecated-API tools: kubent 0 of 2 Lists answered (2 refused or not served); pluto 119 of 126 Lists answered (7 refused or not served)." in text
+    assert "Deprecated-API tools: kubent 0 of 2 Lists answered (2 refused or not served); pluto 102 of 105 object kinds saved (3 not permitted or failed)." in text
 
 
 def test_a_snapshot_without_list_counts_prints_no_tool_line(tmp_path):

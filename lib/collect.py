@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import aws as _aws
-from . import components, kube, mask, nodecommands, paths, podmetrics, scrub, versions, yamlite
+from . import components, kube, lastapplied, mask, nodecommands, paths, podmetrics, scrub, versions, yamlite
 from .config import Config
 from .portfwd import PortForward
 from .prom import Prometheus
@@ -43,6 +43,7 @@ class CollectState:
     future multi-context run — do not leak state into each other."""
 
     proxy_blocked: set = field(default_factory=set)  # contexts where the apiserver pod proxy timed out in this run (pod-metrics goes straight to node curl)
+    objects_dump: dict | None = None  # the result of the objects.dump-all step of this run, which is what the pluto step reads and how much of the API that is
 
 
 class _Blocked:
@@ -60,14 +61,16 @@ def _glob_match(name: str, patterns: list[str]) -> bool:
     return any(fnmatch.fnmatchcase(name, p) for p in patterns)
 
 
-def list_api_resources(context: str | None, kubeconfig: str | None, log: RunLog) -> list[dict]:
-    """Parse `kubectl api-resources --verbs=list -o wide` into a list of (name, namespaced, kind, full name)."""
+def api_resources(context: str | None, kubeconfig: str | None, log: RunLog) -> tuple[list[dict], str | None]:
+    """Parse `kubectl api-resources --verbs=list -o wide` into a list of (name, namespaced, kind, full name), with the error of a discovery that was only partial.
+    kubectl prints what it found and still exits non-zero when one group failed (an unhealthy aggregated API), so those rows are good; on a timeout the last row may be cut, so nothing is."""
     r = kube.kubectl(["api-resources", "--verbs=list", "-o", "wide"], context=context, timeout=60, id="collect.api-resources", log=log, kubeconfig=kubeconfig)
-    if not r.ok:
-        return []
+    error = None if r.ok else (r.error or r.stderr.strip()[-200:] or "kubectl api-resources failed")
+    if (not r.ok and not r.stdout.strip()) or r.timed_out:
+        return [], error
     lines = r.stdout.splitlines()
     if not lines:
-        return []
+        return [], error
     header = lines[0]
     cols = [m.start() for m in re.finditer(r"\S+", header)]
     names = re.findall(r"\S+", header)
@@ -82,13 +85,28 @@ def list_api_resources(context: str | None, kubeconfig: str | None, log: RunLog)
         group = row.get("APIVERSION", "").split("/")[0] if "/" in row.get("APIVERSION", "") else ""
         full = row["NAME"] + (f".{group}" if group else "")
         out.append({"name": row["NAME"], "full": full, "namespaced": row.get("NAMESPACED") == "true", "kind": row.get("KIND"), "apiversion": row.get("APIVERSION")})
-    return out
+    return out, error
+
+
+DISCOVERY_RESOURCES = {
+    "nodes",
+    "namespaces",
+    "services",
+    "pods",
+    "configmaps",
+    "storageclasses.storage.k8s.io",
+    "customresourcedefinitions.apiextensions.k8s.io",
+    "daemonsets.apps",
+    "deployments.apps",
+    "statefulsets.apps",
+    "cronjobs.batch",
+}  # discover.OBJECT_KINDS as `kubectl api-resources` names them
 
 
 def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: list[str], timeout: float, log: RunLog, collector: str, echo=None) -> dict:
-    resources = list_api_resources(context, kubeconfig, log)
+    resources, discovery_error = api_resources(context, kubeconfig, log)
     done = {p.stem for p in (snap / "objects").glob("*.json")}
-    summary = {"kinds": 0, "items": 0, "skipped": [], "failed": {}, "excluded": [], "not_permitted": []}
+    summary = {"kinds": 0, "items": 0, "skipped": [], "failed": {}, "excluded": [], "not_permitted": [], "discovery_error": discovery_error}
     hard_exclude = ["secrets", "secrets.*"]
     for res in resources:
         full, name = res["full"], res["name"]
@@ -101,7 +119,7 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
         # Kinds discovery already fetched (nodes, pods, deployments ...) are not fetched again. File name: core group = name only, others = name.group
         core_group = not res.get("apiversion", "").count("/")
         file_stem = name if core_group else full
-        if name in done or full in done:
+        if full in done or (full in DISCOVERY_RESOURCES and name in done):  # `name` alone would also match a CRD of the same plural (services.serving.knative.dev), which was then never fetched
             summary["skipped"].append(full)
             continue
         args = ["get", full] + (["-A"] if res["namespaced"] else [])
@@ -371,15 +389,16 @@ def _run_http_step(st: dict, sid: str, name: str, cfg: Config, snap: Path, log: 
     return {"ok": r.ok, "status": r.status, "bytes": len(r.body) if r.ok else 0, "error": None if r.ok else (r.error or f"HTTP {r.status}")}
 
 
-def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfig: str | None, snap: Path, log: RunLog, stores: Stores | None, timeout: float, echo, inv: dict | None = None) -> dict:
+def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfig: str | None, snap: Path, log: RunLog, stores: Stores | None, timeout: float, echo, inv: dict | None = None, objects_dump: dict | None = None) -> dict:
     """Run an external CLI (KRR, Polaris, Pluto, etc.) locally. Placeholders in cmd: {context} {out} (absolute path) {prometheus_url} etc. {<store>_url}.
     tool: executable name (PATH or .tools/bin). If missing, the step is skipped and becomes input for the report's "tool missing" section. If a store URL is needed but there is no connection, the step is skipped.
     The kubeconfig the run was given reaches every tool as the KUBECONFIG environment variable, so a command names the context only and a context that lives outside
     ~/.kube/config still resolves (#104). Checked in the sources of the pinned versions, not assumed: polaris v10.2.6 has no kubeconfig flag and calls controller-runtime
-    GetConfigWithContext (pkg/kube/resources.go:249), whose loader reads KUBECONFIG (controller-runtime v0.25.2 pkg/client/config/config.go:123); pluto v5.24.5 goes through the
-    same call (pkg/kube/kube.go:88); kubent 0.7.3 defaults its --kubeconfig flag to os.Getenv(KUBECONFIG) (pkg/config/config.go:50); helm v4.3.1 reads it in pkg/cli/environment.go:101;
-    krr v1.31.1 passes kubeconfig=None to kubernetes-python load_kube_config (core/integrations/kubernetes/__init__.py:185), whose default location is the KUBECONFIG value
-    (kubernetes/config/kube_config.py:48). A future tool that reads only a flag would need the flag in its cmd; none of the five does."""
+    GetConfigWithContext (pkg/kube/resources.go:249), whose loader reads KUBECONFIG (controller-runtime v0.25.2 pkg/client/config/config.go:123); kubent 0.7.3 defaults its
+    --kubeconfig flag to os.Getenv(KUBECONFIG) (pkg/config/config.go:50); helm v4.3.1 reads it in pkg/cli/environment.go:101; krr v1.31.1 passes kubeconfig=None to kubernetes-python
+    load_kube_config (core/integrations/kubernetes/__init__.py:185), whose default location is the KUBECONFIG value (kubernetes/config/kube_config.py:48). A future tool that reads
+    only a flag would need the flag in its cmd; none of the four does. pluto does not contact the cluster: a step with `stdin: last-applied` gets lib/lastapplied.py's List on stdin,
+    built from what objects.dump-all saved, and fails instead of judging nothing when that step saved no kind (`objects_dump`, the step's result)."""
     from . import shell as _shell
 
     tool_env = {"KUBECONFIG": kubeconfig} if kubeconfig else None
@@ -449,7 +468,19 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
             echo(f"    {sum(1 for x in runs.values() if x['ok'])}/{len(runs)} items saved ({str(st['out']).rsplit('/', 1)[0]})")
         return {"ok": any(x["ok"] for x in runs.values()) if runs else False, "runs": len(runs), "failed": sum(1 for x in runs.values() if not x["ok"]), "detail": runs}
     cmd = build({})
-    r = _shell.run(cmd, timeout=timeout, env=tool_env, id=f"{name}.{sid}", log=log, collector=name, out_path=None if st.get("writes_out") else out)
+    stdin, counts = None, {}
+    if st.get("stdin") == "last-applied":
+        # What pluto sees is what the dump saw: kinds saved or already fetched by discovery, and kinds the server refused or that failed. No kind saved, no judgement: an empty input would read as a clean cluster.
+        dump = objects_dump or {}
+        counts = {"lists_ok": int(dump.get("kinds") or 0) + len(dump.get("skipped") or []), "lists_failed": len(dump.get("failed") or {}) + len(dump.get("not_permitted") or []) + (1 if dump.get("discovery_error") else 0)}
+        if not counts["lists_ok"]:
+            error = f"{tool}: API resources not confirmed read; objects.dump-all saved no kind"
+            log.skip(id=f"{name}.{sid}", reason=error, collector=name)
+            if echo:
+                echo(f"    failed: {error}")
+            return {"ok": False, "seconds": None, "error": error, "api_read": False, **counts}
+        stdin, counts["manifests"] = lastapplied.pluto_input(snap)
+    r = _shell.run(cmd, timeout=timeout, env=tool_env, stdin=stdin, id=f"{name}.{sid}", log=log, collector=name, out_path=None if st.get("writes_out") else out)
     if st.get("writes_out") and out.is_file():
         out.chmod(0o600)  # the tool wrote the file with its own mode (krr: 0644); every file in a snapshot is owner-only
     if tool == "krr" and out.is_file():  # whatever the exit code: the file may be complete when krr is killed after writing it
@@ -466,14 +497,13 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     ok = r.ok and out.is_file() and out.stat().st_size > 0
     read = None
     error = r.error or r.stderr.strip()[-300:] or "no output"
-    counts: dict = {}
-    if tool in ("kubent", "pluto"):
+    if tool == "kubent":
         read = False
         stderr = mask.strip_control(r.stderr)[0]  # kubent's zerolog ConsoleWriter colours field names (SGR sequences); lib/mask knows the shapes
-        # Both tools log one line per List and one more when it failed, and swallow the failure: kubent pkg/collector/cluster.go:121,124-125@0.7.3 at --log-level=debug
-        # (the default is Info, pkg/config/config.go:38; the step passes the flag), pluto pkg/discovery-api/discovery_api.go:114,117-118@v5.24.5 at -v=2. `Retrieving` minus
-        # `Failed to retrieve` is the number of Lists that succeeded. A forbidden kind is a failed List, so the count never says the whole API was read (#132).
-        # Observed 2026-11-04 with the pinned binaries: kubent 41 started / 13 failed and pluto 126 / 7 on k3s, 41 / 13 and 111 / 10 on EKS, 0 / 0 against a context that does not exist.
+        # kubent logs one line per List and one more when it failed, and swallows the failure: pkg/collector/cluster.go:121,124-125@0.7.3 at --log-level=debug
+        # (the default is Info, pkg/config/config.go:38; the step passes the flag). `Retrieving` minus `Failed to retrieve` is the number of Lists that succeeded.
+        # A forbidden kind is a failed List, so the count never says the whole API was read (#132). Observed 2026-11-04 with the pinned binary: 41 started / 13 failed
+        # on k3s and on EKS, 0 / 0 against a context that does not exist.
         started = len(re.findall(r"\bRetrieving ?: ", stderr))
         counts = {"lists_failed": len(re.findall(r"\bFailed to retrieve: ", stderr))}
         counts["lists_ok"] = max(started - counts["lists_failed"], 0)
@@ -482,26 +512,35 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
                 doc = json.loads(out.read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 doc = None
-            if tool == "kubent":
-                # `Retrieved N resources from collector name=Cluster` (cmd/kubent/main.go:49) counts the objects that carry a last-applied-configuration annotation
-                # (cluster.go:129-130), so 0 is what a cluster managed by Helm or server-side apply prints after reading everything; a positive N is still evidence
-                # when the log carries no List lines. main.go:45,56: the collector failed to initialise or to return, whatever else the log says.
-                read = isinstance(doc, list) and (counts["lists_ok"] > 0 or bool(re.search(r"Retrieved [1-9][0-9]* resources from collector[^\n]*name=Cluster\b", stderr)))
-                if "Failed to initialize collector" in stderr or "Failed to retrieve data from collector" in stderr:
-                    read = False
-            else:
-                # Pluto pkg/api/output.go:58@v5.24.5 omits empty items. discovery-api/discovery_api.go:121-122 logs an empty successful List at -v=2 (weaker than the
-                # List count: it needs some kind to be empty). Its :168 count is ALWAYS zero (results is never populated), even after failed discovery.
-                read = isinstance(doc, dict) and (counts["lists_ok"] > 0 or bool(doc.get("items")) or "No annotations for ResourceVer " in stderr)
+            # `Retrieved N resources from collector name=Cluster` (cmd/kubent/main.go:49) counts the objects that carry a last-applied-configuration annotation
+            # (cluster.go:129-130), so 0 is what a cluster managed by Helm or server-side apply prints after reading everything; a positive N is still evidence
+            # when the log carries no List lines. main.go:45,56: the collector failed to initialise or to return, whatever else the log says.
+            cluster = re.search(r"Retrieved ([0-9]+) resources from collector[^\n]*name=Cluster\b", stderr)
+            if cluster:
+                counts["manifests"] = int(cluster.group(1))
+            read = isinstance(doc, list) and (counts["lists_ok"] > 0 or bool(cluster and int(cluster.group(1))))
+            if "Failed to initialize collector" in stderr or "Failed to retrieve data from collector" in stderr:
+                read = False
             ok = bool(read)
             if not ok:
                 # The tail of stderr is not the reason: kubent ends every run with its `Loaded ruleset` lines. Keep the lines that say what happened.
                 why = [ln.strip() for ln in stderr.splitlines() if any(k in ln for k in ("Failed", "Retrieved", "ERR", "error"))]
                 error = f"{tool}: API resources not confirmed read" + (f"; {'; '.join(why[-3:])[-300:]}" if why else " (no item and no successful List in its log)")
-        elif tool == "pluto" and r.stdout.strip():
-            # pluto prints the error of detect-api-resources with fmt.Println, to stdout, and exits 1 (cmd/root.go:343-346@v5.24.5); stderr holds klog's
-            # `assuming default targetVersion` lines only, so the tail of stderr would not say why. Observed: `error creating Discovery REST Client: context "x" does not exist`.
-            error = "; ".join(x for x in (r.error, r.stdout.strip()[-300:], stderr.strip()[-300:]) if x)
+    elif tool == "pluto":
+        read = False
+        if ok:
+            # The input is the evidence of what was read (the guard above). What is left to confirm is that pluto answered: pkg/api/output.go:58@v5.24.5 omits empty items, so a clean run is `{"target-versions": ...}`.
+            try:
+                doc = json.loads(out.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                doc = None
+            read = isinstance(doc, dict)
+            ok = read
+            if not ok:
+                error = f"{tool}: output is not the JSON object it prints"
+        elif r.stdout.strip():
+            # pluto prints the error of `detect` with fmt.Println, to stdout, and exits 1 (cmd/root.go:407,413,419@v5.24.5); stderr holds klog's `assuming default targetVersion` lines only, so the tail of stderr would not say why.
+            error = "; ".join(x for x in (r.error, r.stdout.strip()[-300:], mask.strip_control(r.stderr)[0].strip()[-300:]) if x)
     if echo:
         echo(f"    {'saved ' + st['out'] + f' ({out.stat().st_size // 1024} KB)' if ok else 'failed: ' + error}")
     result = {"ok": ok, "seconds": round(r.seconds, 1) if hasattr(r, "seconds") else None, "error": None if ok else error, **counts}
@@ -708,7 +747,8 @@ def _metrics_filter(keep: str | None):
 
 
 def _step_kubectl_dump_all(ctx: StepContext, st: dict) -> dict:
-    return dump_all(ctx.context, ctx.kubeconfig, ctx.snap, st.get("exclude", []), float(st.get("timeout", 60)), ctx.log, ctx.name, ctx.echo)
+    ctx.state.objects_dump = dump_all(ctx.context, ctx.kubeconfig, ctx.snap, st.get("exclude", []), float(st.get("timeout", 60)), ctx.log, ctx.name, ctx.echo)
+    return ctx.state.objects_dump
 
 
 def _step_kubectl(ctx: StepContext, st: dict) -> dict:
@@ -749,7 +789,7 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
     if tgt.get("skip"):
         if ctx.echo:
             ctx.echo(f"    skipped: {tgt['skip']}")
-        return ctx.skip(sid, tgt["skip"], {"ok": True, "skipped": True, "pods": {}, "target": tgt, "note": tgt["skip"]})
+        return ctx.skip(sid, tgt["skip"], {"ok": True, "skipped": tgt["skip"], "pods": {}, "target": tgt, "note": tgt["skip"]})  # the reason, not True: report section 7-1 prints `skipped`
     r = kube.kubectl(["get", "pods", "-n", ns, "-l", sel, "-o", "json"], context=context, timeout=timeout, id=f"{name}.{sid}.list", log=ctx.log, kubeconfig=ctx.kubeconfig, collector=name)
     runs: dict = {}
     if not r.ok:
@@ -763,7 +803,7 @@ def _step_pod_metrics(ctx: StepContext, st: dict) -> dict:
         if skip_arg and plist and all(any(skip_arg in str(a) for c in ((p.get("spec") or {}).get("containers") or []) for a in (c.get("args") or [])) for p in plist):
             if ctx.echo:
                 ctx.echo(f"    skipped: {skip_arg} (metrics disabled, expected)")
-            return ctx.skip(sid, f"container arg {skip_arg}", {"ok": True, "skipped": True, "pods": {}, "target": tgt, "note": f"container arg {skip_arg} — no metrics is expected"})
+            return ctx.skip(sid, f"container arg {skip_arg}", {"ok": True, "skipped": f"container arg {skip_arg}: no metrics is expected", "pods": {}, "target": tgt, "note": f"container arg {skip_arg} — no metrics is expected"})
         node_ok = ctx.node_backend_ok()
         for p in plist:
             pname = p["metadata"]["name"]
@@ -908,7 +948,7 @@ def _step_cw_metrics(ctx: StepContext, st: dict) -> dict:
 
 
 def _step_tool(ctx: StepContext, st: dict) -> dict:
-    return _run_tool_step(st, st["id"], ctx.name, ctx.context, ctx.kubeconfig, ctx.snap, ctx.log, ctx.stores, float(st.get("timeout", 60)), ctx.echo, inv=ctx.inv)
+    return _run_tool_step(st, st["id"], ctx.name, ctx.context, ctx.kubeconfig, ctx.snap, ctx.log, ctx.stores, float(st.get("timeout", 60)), ctx.echo, inv=ctx.inv, objects_dump=ctx.state.objects_dump)
 
 
 def _step_component_logs(ctx: StepContext, st: dict) -> dict:

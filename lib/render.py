@@ -345,7 +345,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
         steps = c.get("steps") or {}
         failed = [fid[len(name) + 1 :] for fid in failed_ids if fid.startswith(name + ".")]
         failed_steps += [(f"{name}.{sid}", str((steps.get(sid) or {}).get("error") or "")) for sid in failed]
-        skipped = [f"{sid} ({st.get('skipped')})" for sid, st in steps.items() if isinstance(st, dict) and st.get("skipped")]
+        skipped = [f"{sid} ({st.get('note') if st.get('skipped') is True else st.get('skipped')})" for sid, st in steps.items() if isinstance(st, dict) and st.get("skipped")]  # True: a snapshot taken before the step wrote its reason here
         rows.append([name, len(steps), ", ".join(failed) or "", "; ".join(skipped) or (c.get("skipped") or "")])
     w(_table(["Collector", "Steps", "Failed", "Skipped (reason)"], rows))
     npk = ((cr.get("core") or {}).get("steps") or {}).get("objects.dump-all", {}).get("not_permitted") or []
@@ -363,13 +363,17 @@ def render_details(snap: Path, language: str = "en") -> Path:
     if inside:
         w("")
         w(f"Commands that failed inside a step that still succeeded (run.log): {len(inside)}: " + "; ".join(f"`{f.get('id')}` {_cell(str(f.get('error') or '')[:120])}" for f in inside[:20]))
-    # How much of the API the deprecated-API tools saw: Lists the server answered and Lists it refused or did not serve (#132). Both tools swallow a forbidden List.
+    # How much of the API the deprecated-API tools saw (#132). kubent swallows a forbidden List, so its Lists answered and refused are counted from its log; pluto reads the saved objects, so what it saw is what objects.dump-all saved.
     dep = (summary.get("hygiene") or {}).get("deprecated") or {}
+    wording = {"kubent": ("Lists answered", "refused or not served"), "pluto": ("Lists answered", "refused or not served")}
+    if "manifests" in (((cr.get("core") or {}).get("steps") or {}).get("pluto") or {}):  # older snapshots: pluto made its own Lists
+        wording["pluto"] = ("object kinds saved", "not permitted or failed")
     seen = [
-        f"{tool} {dep[f'{tool}_lists_ok']} of {dep[f'{tool}_lists_ok'] + dep[f'{tool}_lists_failed']} Lists answered ({dep[f'{tool}_lists_failed']} refused or not served)"
+        f"{tool} {dep[f'{tool}_lists_ok']} of {dep[f'{tool}_lists_ok'] + dep[f'{tool}_lists_failed']} {wording[tool][0]} ({dep[f'{tool}_lists_failed']} {wording[tool][1]})"
         for tool in ("kubent", "pluto")
         if isinstance(dep.get(f"{tool}_lists_ok"), int) and isinstance(dep.get(f"{tool}_lists_failed"), int)
     ]
+    seen += [f"{tool} had {dep[f'{tool}_manifests']} objects with a last-applied annotation to judge" for tool in ("kubent", "pluto") if dep.get(f"{tool}_read") and isinstance(dep.get(f"{tool}_manifests"), int)]
     if seen:
         w("")
         w("Deprecated-API tools: " + "; ".join(seen) + ".")

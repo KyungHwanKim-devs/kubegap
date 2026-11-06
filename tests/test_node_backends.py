@@ -191,12 +191,12 @@ def test_pod_metrics_refusal_after_a_real_proxy_error_stays_a_failure(tmp_path, 
 
 
 def test_metallb_speaker_evidence_carries_the_skip_reason(tmp_path):
-    """k3s._metallb_l2 lists unreadable speakers from the step's pod entries; a skipped pod has no error, so the skip reason is what the evidence shows."""
+    """metallbctl._l2 lists unreadable speakers from the step's pod entries; a skipped pod has no error, so the skip reason is what the evidence shows."""
     import json
 
-    from lib import k3s
+    from lib import metallbctl
 
     cr = {"metallb": {"steps": {"metallb-speaker-metrics": {"pods": {"speaker-a": {"ok": False, "node": "n1", "error": None, "skipped": "pod not Running (Pending)"}, "speaker-b": {"ok": True, "node": "n2"}}}}}}
     (tmp_path / "collect-result.json").write_text(json.dumps(cr))
-    out = k3s._metallb_l2(tmp_path, [], ["n1", "n2"])
+    out = metallbctl._l2(tmp_path, [], ["n1", "n2"], {"speaker-b": "metallb_k8s_client_config_loaded_bool 1\n"}, metallbctl._step(tmp_path), False, False)
     assert out["speakers_unreadable"] == [{"pod": "speaker-a", "node": "n1", "error": "pod not Running (Pending)"}]

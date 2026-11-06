@@ -504,7 +504,7 @@ COMPONENT_SECTIONS: tuple[tuple[str, str, tuple[str, ...], str | None], ...] = (
     ("argocdctl", "argocdctl", ("argocd",), None),
     ("flannel", "flannelctl", ("flannel",), "k3s"),
     ("local_path", "localpath", ("local-path-provisioner",), "k3s"),
-    ("metallb", "metallbctl", ("metallb",), "k3s"),
+    ("metallb", "metallbctl", ("metallb",), None),
     ("certmanager", "certmanager", ("cert-manager",), None),
     ("eksplatform", "eksplatform", ("eks-platform",), None),
     ("ecr", "ecr", ("ecr",), None),

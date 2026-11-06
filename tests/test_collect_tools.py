@@ -59,11 +59,12 @@ def test_per_item_tool_runs_get_it_too(tmp_path, monkeypatch):
 
 
 def test_every_tool_step_names_the_context():
-    """A tool step that forgot {context} would read the current context of the kubeconfig, not the one the run was asked for."""
+    """A tool step that forgot {context} would read the current context of the kubeconfig, not the one the run was asked for. A step fed on stdin contacts no cluster."""
     for f in sorted(ROOT.glob("collectors/*/collect.yaml")):
         for st in yamlite.load_file(f) or []:
             if isinstance(st, dict) and st.get("type") == "tool":
-                assert "{context}" in " ".join(map(str, st["cmd"])), f"{f.parent.name}/{st['id']}"
+                names_context = "{context}" in " ".join(map(str, st["cmd"]))
+                assert names_context != bool(st.get("stdin")), f"{f.parent.name}/{st['id']}"
 
 
 def test_daemonset_backend_and_its_discovery_use_the_run_kubeconfig(monkeypatch):
@@ -128,3 +129,87 @@ def test_deprecation_tools_are_skipped_without_a_server_version(tmp_path, monkey
     assert res["ok"] is False and res["skipped"].startswith("server version unknown") and not (snap / "tools" / "pluto.json").exists()
     res = collect._run_tool_step(step, "pluto", "core", "ctx", None, snap, RunLog(None), None, 30, None, inv={"cluster": {"server_version": "v1.32.13-eks-abc"}})
     assert res["ok"] and '"args": "--target-versions k8s=v1.33.0"' in (snap / "tools" / "pluto.json").read_text()
+
+
+def _api_resources(tmp_path, monkeypatch, stdout, ok, timed_out=False):
+    class R:
+        pass
+
+    r = R()
+    r.timed_out = timed_out
+    r.ok, r.stdout, r.stderr, r.error = ok, stdout, "unable to retrieve the complete list of server APIs: metrics.k8s.io/v1beta1: the server is currently unable to handle the request", None
+    monkeypatch.setattr(collect.kube, "kubectl", lambda *a, **k: r)
+    return collect.api_resources("ctx", None, RunLog(None))
+
+
+TABLE = "NAME          SHORTNAMES   APIVERSION   NAMESPACED   KIND         VERBS\ndeployments   deploy       apps/v1      true         Deployment   get,list\n"
+
+
+def test_a_partial_discovery_still_reads_what_kubectl_printed(tmp_path, monkeypatch):
+    """kubectl api-resources prints what it found and exits non-zero when one aggregated API is down (staging/src/k8s.io/kubectl/pkg/cmd/apiresources/apiresources.go:180-182,251@v1.37.2). `[]` lost the whole dump, and now pluto with it."""
+    rows, error = _api_resources(tmp_path, monkeypatch, TABLE, False)
+    assert [r["full"] for r in rows] == ["deployments.apps"] and "metrics.k8s.io/v1beta1" in error
+    assert _api_resources(tmp_path, monkeypatch, "", False)[0] == []
+    assert _api_resources(tmp_path, monkeypatch, TABLE, True)[1] is None
+
+
+def test_a_timed_out_discovery_is_not_parsed(tmp_path, monkeypatch):
+    """A row cut inside NAMESPACED would be read as cluster-scoped and saved from one namespace."""
+    rows, error = _api_resources(tmp_path, monkeypatch, TABLE[:-20], False, timed_out=True)
+    assert rows == [] and error
+
+
+def test_a_partial_discovery_reaches_the_numbers_pluto_reports(tmp_path, monkeypatch):
+    """The report would otherwise say 67 of 67 kinds saved while a whole API group went unread."""
+    import os
+
+    bindir = tmp_path / "fakebin"
+    bindir.mkdir()
+    fake = bindir / "pluto"
+    fake.write_text("#!/bin/sh\ncat > /dev/null\nprintf '%s\\n' '{}'\n")
+    fake.chmod(0o700)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
+    (tmp_path / "objects").mkdir()
+    step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == "pluto")
+    res = collect._run_tool_step(
+        step,
+        "pluto",
+        "core",
+        "ctx",
+        None,
+        tmp_path,
+        RunLog(None),
+        None,
+        10,
+        None,
+        inv={"cluster": {"server_version": "v1.32.0"}},
+        objects_dump={"kinds": 5, "skipped": [], "failed": {}, "not_permitted": [], "discovery_error": "metrics.k8s.io down"},
+    )
+    assert (res["lists_ok"], res["lists_failed"]) == (5, 1)
+
+
+def test_discovery_resources_stay_the_discovery_kinds():
+    """Three hand-kept lists of one fact: a kind added to OBJECT_KINDS alone would be fetched again by the dump, and pluto would see every object twice."""
+    from lib import discover, snapshot
+
+    assert {r.split(".", 1)[0] for r in collect.DISCOVERY_RESOURCES} == set(discover.OBJECT_KINDS) == set(snapshot.DISCOVERY_STEMS)
+
+
+def test_a_crd_with_the_plural_of_a_discovery_kind_is_fetched(tmp_path, monkeypatch):
+    """`name in done` also matched services.serving.knative.dev, so a Knative Service was never saved and pluto could not see it."""
+    (tmp_path / "objects").mkdir()
+    (tmp_path / "objects" / "services.json").write_text('{"items": []}')
+    res = [
+        {"name": "services", "full": "services", "namespaced": True, "kind": "Service", "apiversion": "v1"},
+        {"name": "services", "full": "services.serving.knative.dev", "namespaced": True, "kind": "Service", "apiversion": "serving.knative.dev/v1"},
+    ]
+    monkeypatch.setattr(collect, "api_resources", lambda *a: (res, None))
+    asked = []
+
+    def fake_json(args, **k):
+        asked.append(args[1])
+        return {"items": []}, None
+
+    monkeypatch.setattr(collect.kube, "kubectl_json", fake_json)
+    out = collect.dump_all("ctx", None, tmp_path, [], 10, RunLog(None), "core")
+    assert out["skipped"] == ["services"] and asked == ["services.serving.knative.dev"] and (tmp_path / "objects" / "services.serving.knative.dev.json").is_file()

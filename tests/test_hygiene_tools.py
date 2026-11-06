@@ -108,3 +108,25 @@ def test_polaris_counts_every_audited_object_and_skips_the_successes(tmp_path):
     assert next(w for w in p["workloads"] if w["name"] == "web")["failed"][0]["where"] == "container:app"
     assert p["by_category"] == {"Efficiency/warning": 1, "Security/warning": 1, "Reliability/warning": 1}
     assert all(f["check"] != "hostIPCSet" for w in p["workloads"] for f in w["failed"])  # a Success entry is never a failure
+
+
+def test_pluto_rows_take_the_kind_from_the_api_block(tmp_path):
+    """Output has no kind of its own (pkg/api/output.go:35-54@v5.24.5, versions.go:60-76): a row read from the top level had kind None, and the finding said `prod-a/none/web`."""
+    (tmp_path / "tools").mkdir()
+    doc = {
+        "items": [
+            {
+                "name": "web",
+                "namespace": "default",
+                "api": {"version": "apps/v1beta2", "kind": "Deployment", "deprecated-in": "v1.9.0", "removed-in": "v1.16.0", "replacement-api": "apps/v1", "replacement-available-in": "v1.9.0", "component": "k8s"},
+                "deprecated": True,
+                "removed": True,
+                "replacementAvailable": True,
+            }
+        ],
+        "target-versions": {"cert-manager": "v1.5.3", "istio": "v1.11.0", "k8s": "v1.35.0"},
+    }  # the output of the pinned binary on a Deployment annotated with apps/v1beta2, observed on kind 2026-11-05
+    (tmp_path / "tools" / "pluto.json").write_text(json.dumps(doc))
+    (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {"pluto": {"ok": True, "api_read": True}}}}))
+    row = hygiene._deprecated(hygiene._Ctx(tmp_path, {}))["items"][0]
+    assert (row["kind"], row["name"], row["namespace"], row["api"], row["removed_in"], row["replacement"]) == ("Deployment", "web", "default", "apps/v1beta2", "v1.16.0", "apps/v1")

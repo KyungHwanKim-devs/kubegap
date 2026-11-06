@@ -3,13 +3,12 @@
 Inputs:
 - objects/nodes.json : annotation k3s.io/node-args (k3s masks tokens as ********) → server/agent arguments (--disable, --tls-san, --node-ip, --server). Readable without node access.
 - logs/node/<node>/k3s-platform.txt : section-by-section output of collectors/k3s-platform/k3s-node.sh (unit, check-config, ports, flannel, journald, server, registries, containerd, local-path, disks, thermal)
-- objects/pods.json, persistentvolumes.json, services.json, ipaddresspools.metallb.io.json, deployments.json : pod CIDR usage, local-path node-pinned workloads, MetalLB pool remaining, embedded component images
+- objects/pods.json, persistentvolumes.json, deployments.json : pod CIDR usage, local-path node-pinned workloads, embedded component images
 Sections that are empty for lack of permission are recorded in gaps (sudoers stage 2: deploy/node-access/README.md).
 """
 
 from __future__ import annotations
 
-import contextlib
 import datetime as _dt
 import ipaddress
 import json
@@ -162,55 +161,6 @@ def _parse_flannel(kv: dict) -> dict:
         "ip_forward": kv.get("ip_forward"),
         "br_netfilter": kv.get("br_netfilter"),
         "addrs": kv.get("addrs"),
-    }
-
-
-def _metallb_l2(snap: Path, lb_services: list[dict], node_names: list[str]) -> dict:
-    """Which node advertises (leads) which service IP in L2 mode. Input = speaker /metrics read through the pod proxy (metrics/pod/metallb-speaker/*.prom),
-    metallb_speaker_announced{ip,node,protocol,service}. available is false when speaker metrics are missing. L2Advertisement nodeSelectors are included too."""
-    d = snap / "metrics" / "pod" / "metallb-speaker"
-    announced = []
-    files = sorted(d.glob("*.prom")) if d.is_dir() else []
-    for f in files:
-        for ln in f.read_text(encoding="utf-8", errors="replace").splitlines():
-            if not ln.startswith("metallb_speaker_announced{"):
-                continue
-            m = re.match(r"metallb_speaker_announced\{([^}]*)\}\s+([0-9.e+-]+)", ln)
-            if not m or float(m.group(2)) < 1:
-                continue
-            labels = dict(re.findall(r'(\w+)="([^"]*)"', m.group(1)))
-            announced.append({"ip": labels.get("ip"), "node": labels.get("node"), "protocol": labels.get("protocol"), "service": labels.get("service")})
-    errors = []
-    cr = load_json(snap / "collect-result.json") or {}
-    step = (
-        (((cr.get("metallb") or {}).get("steps") or {}).get("metallb-speaker-metrics")) or (((cr.get("k3s-platform") or {}).get("steps") or {}).get("metallb-speaker-metrics")) or {}
-    )  # the step moved to the metallb collector (compatibility with older snapshots)
-    for pod, r in (step.get("pods") or {}).items():
-        if not r.get("ok"):
-            errors.append({"pod": pod, "node": r.get("node"), "error": (r.get("error") or r.get("skipped") or "")[:160]})
-    advs = []
-    for a in items(load_json(snap / "objects" / "l2advertisements.metallb.io.json")):
-        sp = a.get("spec") or {}
-        advs.append({"name": a["metadata"]["name"], "pools": sp.get("ipAddressPools"), "node_selectors": sp.get("nodeSelectors"), "interfaces": sp.get("interfaces")})
-    by_node: Counter = Counter(r["node"] for r in announced if r["node"])
-    total = len(announced)
-    leader = by_node.most_common(1)[0] if by_node else (None, 0)
-    lb_total = len([s for s in lb_services if not s["pending"]])
-    return {
-        "available": bool(files),
-        "source": "metrics/pod/metallb-speaker/*.prom (pod proxy GET)" if files else None,
-        "speakers": len(files),
-        "speakers_unreadable": errors,
-        "announced": announced,
-        "announced_total": total,
-        "lb_services": lb_total,
-        "by_node": dict(by_node),
-        "leader_node": leader[0],
-        "leader_share": round(leader[1] / total, 2) if total else None,
-        "nodes_total": len(node_names),
-        "advertisements": advs,
-        "pinned_by_selector": any(a.get("node_selectors") for a in advs),
-        "note": "In L2 mode one node advertises each service IP. If a single node advertises every IP, its NIC receives all external traffic, and when it dies everything is cut off during failover (about 10 seconds). Intended if pinned with nodeSelectors",
     }
 
 
@@ -426,33 +376,6 @@ def _stale_server_urls(servers: list[dict], node_ips: set[str], node_names: set[
     return stale
 
 
-def _metallb(snap: Path, inv: dict) -> dict:
-    """MetalLB pools (size, used, free), LoadBalancer services, pending ones and L2 leadership. Reads objects/ipaddresspools.metallb.io.json, services.json and speaker metrics via _metallb_l2."""
-    pools = []
-    total_ips = 0
-    for p in items(load_json(snap / "objects" / "ipaddresspools.metallb.io.json")):
-        n = 0
-        for a in (p.get("spec") or {}).get("addresses", []) or []:
-            if "-" in a:
-                lo, hi = a.split("-", 1)
-                with contextlib.suppress(ValueError):
-                    n += int(ipaddress.ip_address(hi.strip())) - int(ipaddress.ip_address(lo.strip())) + 1
-            else:
-                with contextlib.suppress(ValueError):
-                    n += ipaddress.ip_network(a.strip(), strict=False).num_addresses
-        total_ips += n
-        pools.append({"name": p["metadata"]["name"], "addresses": (p.get("spec") or {}).get("addresses"), "size": n, "auto_assign": (p.get("spec") or {}).get("autoAssign", True)})
-    lb = []
-    for s in items(load_json(snap / "objects" / "services.json")):
-        if (s.get("spec") or {}).get("type") == "LoadBalancer":
-            ips = [i.get("ip") for i in ((s.get("status") or {}).get("loadBalancer") or {}).get("ingress", []) or [] if i.get("ip")]
-            lb.append({"namespace": s["metadata"]["namespace"], "name": s["metadata"]["name"], "ips": ips, "pending": not ips})
-    used = len({ip for s in lb for ip in s["ips"]})
-    metallb = {"present": bool(pools), "pools": pools, "total_ips": total_ips, "used": used, "free": (total_ips - used) if pools else None, "services": lb, "pending": [s for s in lb if s["pending"]]}
-    metallb["l2"] = _metallb_l2(snap, lb, [n["name"] for n in (inv.get("nodes") or {}).get("nodes") or []])
-    return metallb
-
-
 def _local_path(snap: Path, recs: list[dict], pods: list[dict]) -> dict:
     """local-path PVs: which node each is pinned to, usage vs capacity (from the du section), consuming workloads. Reads objects/persistentvolumes.json and objects/pods.json (passed in)."""
     pvc_pods: dict[tuple[str, str], set[str]] = defaultdict(set)
@@ -551,7 +474,6 @@ def _cluster(snap: Path, inv: dict, recs: list[dict], node_ips: set[str], versio
         "disabled_without_replacement": _disabled_without_replacement(disabled, set(inv.get("components_present") or [])),
         "builtin_images": _builtin_images(snap),
         "podcidr": _podcidr(recs, pods),
-        "metallb": _metallb(snap, inv),
         "local_path": _local_path(snap, recs, pods),
         "flannel": {r["node"]: r.get("flannel") for r in recs if r.get("flannel")},
         "datastore": _datastore(snap, servers),
