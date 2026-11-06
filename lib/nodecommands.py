@@ -346,8 +346,13 @@ def install_document(profile: str | None, region: str | None, log=None) -> dict:
         action, ver = "create", (d.get("DocumentDescription") or {}).get("DocumentVersion")
     else:
         # A version with the local content may already exist (an earlier run uploaded it but could not switch the default version). update-document would then fail with DuplicateDocumentContent, so look first.
+        # list-document-versions returns no hash (DocumentVersionInfo: awscli/botocore/data/ssm/2014-11-06/service-2.json:7949-7990@2.39.3), so each version is described (DocumentDescription.Hash, :7431).
         d, r = _aws.aws_json(["ssm", "list-document-versions", "--name", DOCUMENT_NAME], id="ssm.list-document-versions", **kw)
-        have = [v.get("DocumentVersion") for v in ((d or {}).get("DocumentVersions") or []) if v.get("Hash") == st["local_hash"]]
+        have = []
+        for v in (d or {}).get("DocumentVersions") or []:
+            dv, _ = _aws.aws_json(["ssm", "describe-document", "--name", DOCUMENT_NAME, "--document-version", str(v.get("DocumentVersion"))], id="ssm.describe-document", **kw)
+            if ((dv or {}).get("Document") or {}).get("Hash") == st["local_hash"]:
+                have.append(v.get("DocumentVersion"))
         if have:
             action, ver = "switch-default", have[0]
         else:

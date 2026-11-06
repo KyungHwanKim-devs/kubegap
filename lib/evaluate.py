@@ -397,7 +397,10 @@ class Context:
         return rows[0] if rows else {}
 
     def eks_version_status(self):
-        return self.eks_version_dates().get("status")
+        """`versionStatus` of describe-cluster-versions (UNSUPPORTED / STANDARD_SUPPORT / EXTENDED_SUPPORT: awscli/botocore/data/eks/2017-11-01/service-2.json:2774,8206-8210@2.39.3).
+        The sibling `status` is deprecated and spelled `extended-support` (:2770-2772,2798-2802), so the rule's value never matched it; an older snapshot that holds only `status` is mapped to the same spelling."""
+        row = self.eks_version_dates()
+        return row.get("versionStatus") or ((row.get("status") or "").upper().replace("-", "_") or None)
 
     def karpenter_pool_nodes(self, pool: str) -> int:
         """Number of NodeClaims in the NodePool (label karpenter.sh/nodepool)."""

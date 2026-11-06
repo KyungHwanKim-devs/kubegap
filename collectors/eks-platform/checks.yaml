@@ -452,7 +452,7 @@
           describe-cluster-versions.json:
             clusterVersions:
               - clusterVersion: "1.32"
-                status: "EXTENDED_SUPPORT"
+                versionStatus: "EXTENDED_SUPPORT"
                 endOfStandardSupportDate: "2026-03-23"
                 endOfExtendedSupportDate: "2027-03-23"
       - expect: "warn"
@@ -477,7 +477,7 @@
           describe-cluster-versions.json:
             clusterVersions:
               - clusterVersion: "1.32"
-                status: "STANDARD_SUPPORT"
+                versionStatus: "STANDARD_SUPPORT"
                 endOfStandardSupportDate: "2027-03-23"
                 endOfExtendedSupportDate: "2028-03-23"
       - expect: "pass"
@@ -502,7 +502,7 @@
           describe-cluster-versions.json:
             clusterVersions:
               - clusterVersion: "1.32"
-                status: "STANDARD_SUPPORT"
+                versionStatus: "STANDARD_SUPPORT"
                 endOfStandardSupportDate: "2027-03-23"
                 endOfExtendedSupportDate: "2028-03-23"
 
