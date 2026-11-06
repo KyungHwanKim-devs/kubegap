@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
-from functools import lru_cache
 from pathlib import Path
 
 from . import paths, rubric, tools
@@ -49,10 +48,8 @@ PARTIAL = "partial"  # node-ssh: go on with the nodes that answer
 # ---------- counts taken from the check catalog ----------
 
 
-@lru_cache(maxsize=1)
 def _checks() -> tuple[dict, ...]:
-    cols = sorted(p.name for p in paths.COLLECTORS_DIR.iterdir() if p.is_dir())
-    return tuple(rubric.load_checks(cols)[0])
+    return rubric.catalog()
 
 
 def node_script_checks() -> int:
@@ -181,23 +178,23 @@ def _q_tools(setup: dict, cfg: Config, L: str) -> dict | None:
         return None
     names = [t["name"] for t in missing]
     if L == "ko":
-        lines = [f"{t['name']}: {t['role']} — {', '.join(t['checks'])} 항목에 쓰여요. 설치 방법: {tools.install_plan(tools.by_name(t['name']))}" for t in missing]
+        lines = [f"{t['name']}: {t['role']} — {t.get('checks_text') or ', '.join(t['checks'])} 항목에 쓰여요. 설치 방법: {tools.install_plan(tools.by_name(t['name']))}" for t in missing]
         q = {
             "header": "도구",
             "question": f"이 컴퓨터에 없는 선택 도구가 {len(names)}개 있어요: {', '.join(names)}. 설치할까요?",
             "explain": "도구마다 kubegap이 직접 계산하지 않는 걸 대신 계산해요. 설치는 이 컴퓨터에만 하고, 클러스터에는 아무것도 설치하지 않아요.",
             "install": ("전부 설치", f"{', '.join(names)}를 설치해요. Homebrew가 있으면 그걸로, 없으면 sha256을 확인한 고정 버전으로요."),
-            "skip": "이 도구들이 맡은 항목은 '도구 없음'으로 적혀요. 나머지는 전부 돌아가요.",
+            "skip": "이 도구들이 맡은 항목은 '도구 없음'으로 적히거나 입력이 없어 건너뛰어요. 나머지는 전부 돌아가요.",
             "typed": "일부만 설치하려면 도구 이름을 쉼표로 적어 주세요. 그 이름으로 `setup --install-only <이름>`을 돌리고, 나머지는 `skip`으로 기록해요",
         }
     else:
-        lines = [f"{t['name']}: {t['role']} — feeds {', '.join(t['checks'])}; install: {tools.install_plan(tools.by_name(t['name']))}" for t in missing]
+        lines = [f"{t['name']}: {t['role']} — feeds {t.get('checks_text') or ', '.join(t['checks'])}; install: {tools.install_plan(tools.by_name(t['name']))}" for t in missing]
         q = {
             "header": "Tools",
             "question": f"{len(names)} optional tool{'s are' if len(names) > 1 else ' is'} not installed on this machine: {', '.join(names)}. Install?",
             "explain": "Each tool computes something kubegap does not compute itself. They are installed on this machine only; nothing is installed in the cluster.",
             "install": ("Install all", f"Installs {', '.join(names)} (Homebrew, or a pinned release whose sha256 is checked)."),
-            "skip": "The checks of these tools are reported as 'tool missing'; everything else runs.",
+            "skip": "The checks of these tools are reported as 'tool missing' or skip because their input is not read; everything else runs.",
             "typed": "tool names separated by commas, to install only those: run `setup --install-only <names>`, then record `skip` for the rest",
         }
     return {

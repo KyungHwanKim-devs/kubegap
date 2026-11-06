@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as _dt
+import functools as _functools
 import json
 
 from . import paths, yamlite
@@ -133,6 +134,18 @@ def validate(check: dict, source: str) -> list[str]:
     if cid.count(".") < 1:
         errs.append(f"{source}: id {cid!r} must have the form <area>.<check-id>")
     return errs
+
+
+def catalog() -> tuple[dict, ...]:
+    """Every check of every collector, loaded once per process (firstrun counts, the tool table and `kubegap tools` share it)."""
+    return _catalog()
+
+
+@_functools.lru_cache(maxsize=1)
+def _catalog() -> tuple[dict, ...]:
+    from . import paths as _paths
+
+    return tuple(load_checks([p.name for p in sorted(_paths.COLLECTORS_DIR.iterdir()) if (p / "checks.yaml").is_file()])[0])
 
 
 def load_checks(collectors: list[str]) -> tuple[list[dict], list[str]]:

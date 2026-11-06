@@ -982,9 +982,9 @@ Versions read:
 
 | Project | EKS cluster | k3s cluster | Newest release | Read for a boundary |
 |---|---|---|---|---|
-| Prometheus (`prometheus/prometheus`) | v2.49.1 | v3.7.3 | v3.15.1 (also the promtool pin of `lib/tools.py`) | v3.8.1, v3.9.1, v3.10.0, v3.12.0, v3.13.0, v3.14.0 (where `prometheus_notifications_dropped_total` gained its label) |
+| Prometheus (`prometheus/prometheus`) | v2.49.1 | v3.7.3 | v3.15.1 | v3.8.1, v3.9.1, v3.10.0, v3.12.0, v3.13.0, v3.14.0 (where `prometheus_notifications_dropped_total` gained its label) |
 | The build-info collector Prometheus registers | `prometheus/common` v0.45.0 (`go.mod@v2.49.1`) | `prometheus/client_golang` v1.23.2 (`go.mod@v3.7.3`) | `prometheus/client_golang` v1.24.1 (`go.mod@v3.15.1`) | — |
-| Alertmanager (`prometheus/alertmanager`) | v0.26.0 | v0.29.0 | v0.34.2 (also the amtool pin of `lib/tools.py`) | — |
+| Alertmanager (`prometheus/alertmanager`) | v0.26.0 | v0.29.0 | v0.34.2 | — |
 | prometheus-operator (`pkg/alertmanager/statefulset.go`; `pkg/prometheus/promcfg.go` from #122) | v0.71.0 | v0.86.2 | v0.94.2 | — |
 | kube-prometheus-stack (`prometheus-community/helm-charts`, the Prometheus and Alertmanager Services and ServiceMonitors) | kube-prometheus-stack-56.0.0 | kube-prometheus-stack-79.5.0 | kube-prometheus-stack-92.17.1 | — |
 | Loki (`grafana/loki`) | v2.6.1 | — | v3.7.9 | v2.7.0, v2.8.0 (the internal log counter), v2.9.2, v3.0.0 (the retention-metric rename) |

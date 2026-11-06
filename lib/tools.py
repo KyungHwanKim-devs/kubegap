@@ -13,8 +13,9 @@ Install methods are tried per tool in this order. None of them needs sudo.
 3. venv      - tools that support only specific Python versions go into a dedicated virtualenv at `.tools/<name>-venv/`.
 4. pip       - `--user` install with the system pip.
 
-Without a required=True tool, collection cannot run at all. For the others, only the checks that tool owns are marked
-"tool missing" and everything else proceeds. `checks` names the check areas the tool owns.
+Without a required=True tool, collection cannot run at all. For the others, the checks that tool feeds are marked
+"tool missing" (`requires_tool` in the check) or skip because their input was not read, and everything else proceeds.
+`checks` names them: catalog ids, `<prefix>.*` or `<prefix>.*@full`; `scripts/kubegap tools` prints the table.
 """
 
 from __future__ import annotations
@@ -68,6 +69,11 @@ class Tool:
     pip: str | None = None
     version_args: list[str] = field(default_factory=lambda: ["--version"])
     checks: list[str] = field(default_factory=list)
+    #   the checks this tool feeds: check ids of the catalog, `<prefix>.*` for every check whose id starts so, `<prefix>.*@full` for
+    #   those of them that run in full mode only (the node checks that read the node scripts, not the ones that read Prometheus),
+    #   or "*" for all of them. tests/test_tools_doc.py resolves each against the catalog; `checks_text` prints them with counts
+    modes: str = "daily and full"  # the modes whose collection runs the tool
+    without: str = ""  # what the report says when the tool is absent; default: the checks are tool missing or skip
     note: str = ""  # guidance shown when there is no install method
 
 
@@ -134,7 +140,25 @@ TOOLS: list[Tool] = [
             "signature": {"url": "{asset_url}.sig", "key": "deploy/aws-cli-public-key.asc", "fingerprint": "FB5DB77FD5C118B80511ADA8A6310ACC4672475C"},
             "latest": {"tags": "aws/aws-cli"},
         },
-        checks=["eks-platform", "controlplane-logs", "node-os(ssm)", "cost"],
+        checks=[
+            "eks.*",
+            "ecr.*",
+            "cost.idle-compute-high",
+            "cost.request-waste",
+            "cost.on-demand-in-spot-pool",
+            "cost.unused-eip",
+            "cost.idle-load-balancer",
+            "cost.idle-node",
+            "controlplane.scheduler-unschedulable",
+            "controlplane.webhook-call-failures",
+            "controlplane.controller-error-repeat",
+            "controlplane.apiserver-slow-traces",
+            "controlplane.authenticator-failures",
+            "controlplane.etcd-slow",
+            "node.*@full",
+        ],
+        modes="daily and full; ECR, the control-plane logs, the nodes and the pricing and cost data in full only",
+        without="the EKS, ECR and cost checks are not collected; the control-plane log checks and the node checks say so in the report",
         note="On macOS without brew, install https://awscli.amazonaws.com/AWSCLIV2.pkg directly. The Linux zip is checked against its pinned sha256 and, when gpg is installed, against the AWS CLI Team's signature (#108)",
     ),
     Tool(
@@ -155,27 +179,8 @@ TOOLS: list[Tool] = [
             "latest": {"repo": "helm/helm"},
         },
         version_args=["version", "--short"],
-        checks=["hygiene.helm-release"],
-    ),
-    Tool(
-        "argocd",
-        "Argo CD application status and diff (login required)",
-        brew="argocd",
-        download={
-            "version": "v3.6.0",
-            "repo": "argoproj/argo-cd",
-            "asset": "argocd-{os}-{arch}",
-            "bin": "argocd",
-            "sha256": {
-                "darwin-arm64": "94c135a62a3478c3df27fcd9224b67d8072f6ba243c0f6cc7e7509782a80a407",
-                "darwin-amd64": "87bedcb0756acd3bdf094e4f1b6b689872a085a185c4efcaf4fdbadf7ab1b6b7",
-                "linux-amd64": "62f4fe7cf0f97f384993effccbde66a4e541bc9250c6682c75a9f992043263a0",
-                "linux-arm64": "45b5c33e4767c80a09c6e824f35bb07fb3f044703e62670b18478e64cbb47fb3",
-            },
-            "checksums": {"asset": "cli_checksums.txt", "format": "list"},
-        },
-        version_args=["version", "--client", "--short"],
-        checks=["gitops.argocd"],
+        checks=["hygiene.helm-release-not-deployed", "hygiene.helm-release-stale"],
+        modes="full",
     ),
     Tool(
         "krr",
@@ -194,6 +199,7 @@ TOOLS: list[Tool] = [
         },
         version_args=["version"],
         checks=["resources.krr-recommendation"],
+        modes="full",
         note="The macOS release binary crashes on start with a pkg_resources error (packaging defect), and it is not on PyPI. Only Python 3.10-3.12.9 is supported, so the tagged source is installed into a dedicated virtualenv (patching the missing cachetools and the typer 0.13+ incompatibility), from deploy/krr-requirements.txt with a hash per file",
     ),
     Tool(
@@ -214,7 +220,8 @@ TOOLS: list[Tool] = [
             "checksums": {"asset": "checksums.txt", "format": "list"},
         },
         version_args=["version"],
-        checks=["hygiene.polaris", "security.polaris"],
+        checks=["hygiene.polaris-reliability-danger", "security.polaris-security-danger"],
+        modes="full",
     ),
     Tool(
         "pluto",
@@ -235,6 +242,7 @@ TOOLS: list[Tool] = [
         },
         version_args=["version"],
         checks=["hygiene.deprecated-api"],
+        modes="full",
     ),
     Tool(
         "kubent",
@@ -254,52 +262,16 @@ TOOLS: list[Tool] = [
             },  # the project publishes no checksum file: computed from the assets when the pin was made
         },
         checks=["hygiene.deprecated-api"],
-    ),
-    Tool(
-        "promtool",
-        "PrometheusRule syntax validation (optional)",
-        brew="prometheus",
-        download={
-            "version": "v3.15.1",
-            "repo": "prometheus/prometheus",
-            "asset": "prometheus-{version}.{os}-{arch}.tar.gz",
-            "bin": "promtool",
-            "sha256": {
-                "darwin-arm64": "0d4d3d9837d27e4fcd0bd16d115b1b8d6732a4bf3e69107f1190d9ef653ae471",
-                "darwin-amd64": "c89fcb30045d8c394c9d93e96cbbee3aaf2448a48326b417e811eb4e528edf88",
-                "linux-amd64": "6a726885328ad9efebbf36e876ce2fb6225468a71fd1e7ce3ba666d5f4d97a84",
-                "linux-arm64": "ceb6d21493c37ca0b4513b147642797c68cf39a0f50a444d50e1e80c74f21b26",
-            },
-            "checksums": {"asset": "sha256sums.txt", "format": "list"},
-        },
-        checks=["observability.rule-syntax"],
-    ),
-    Tool(
-        "amtool",
-        "Alertmanager routes and silences (optional)",
-        brew=None,
-        download={
-            "version": "v0.34.2",
-            "repo": "prometheus/alertmanager",
-            "asset": "alertmanager-{version}.{os}-{arch}.tar.gz",
-            "bin": "amtool",
-            "sha256": {
-                "darwin-arm64": "dc1fcd4ad3e8bef111683eaf385aa5b2b02493277bca9126c129e0a39fc68a4f",
-                "darwin-amd64": "fa5a50303c58771c261fcbed4cf5f9a852cf2c6064942adbd92c6859c65c5f93",
-                "linux-amd64": "17ee14acd0f6ba6e25a436ff223d9c17ddd5cf484f543ad12f0932eaa89ba186",
-                "linux-arm64": "5aaad82e3d167c30c06ce7d38677d2892a6f66f4c3613ea17af7481750fdd0b0",
-            },
-            "checksums": {"asset": "sha256sums.txt", "format": "list"},
-        },
-        checks=["observability.alertmanager"],
-        note="No Homebrew formula; the official release binary is downloaded. Without it the same information is read via the Alertmanager HTTP API",
+        modes="full",
     ),
     Tool(
         "ssh",
         "Small k3s cluster node access (small k3s cluster profile)",
         brew=None,
         version_args=["-V"],
-        checks=["node-os(ssh)"],
+        checks=["node.*@full"],
+        modes="full",
+        without="the node checks are reported as not collected (no node access)",
         note="Included by default on macOS and most Linux. Minimal images (slim containers) may lack it: distro package openssh-client",
     ),
 ]
@@ -839,3 +811,116 @@ def install_plan(tool: Tool) -> str:
 
 def by_name(name: str) -> Tool | None:
     return next((t for t in TOOLS if t.name == name), None)
+
+
+def check_ids(patterns: list[str], catalog: dict[str, dict]) -> list[str]:
+    """The check ids of the catalog (id -> check) that `patterns` name, sorted: an id, `<prefix>.*`, `<prefix>.*@full` (full-mode-only
+    checks of that prefix), or "*"."""
+    out: set[str] = set()
+    for pat in patterns:
+        if pat == "*":
+            out |= set(catalog)
+        elif pat.endswith(".*@full"):
+            out |= {c for c, chk in catalog.items() if c.startswith(pat[: -len("*@full")]) and chk.get("modes") == ["full"]}
+        elif pat.endswith(".*"):
+            out |= {c for c in catalog if c.startswith(pat[:-1])}
+        elif pat in catalog:
+            out.add(pat)
+    return sorted(out)
+
+
+def checks_text(patterns: list[str], catalog: dict[str, dict] | None) -> str:
+    """`patterns` for a person: a prefix with the number of checks it covers, an id as is. Without a catalog, the patterns as written."""
+    if catalog is None:
+        return ", ".join(patterns)
+    parts = []
+    for pat in patterns:
+        n = len(check_ids([pat], catalog))
+        if pat == "*":
+            parts.append(f"every check ({n})")
+        elif pat.endswith(".*@full"):
+            parts.append(f"{pat[: -len('@full')]} ({n}, full mode)")
+        elif pat.endswith(".*"):
+            parts.append(f"{pat} ({n})")
+        else:
+            parts.append(pat)
+    return ", ".join(parts)
+
+
+def _install_text(tool: Tool, language: str) -> str:
+    """Where and how the tool is installed, from the table alone (no look at this machine), for the documentation."""
+    ko = language == "ko"
+    steps = []
+    if tool.venv and _venv_first(tool):
+        steps.append(
+            f"`.tools/{tool.name}-venv/` 전용 Python virtualenv, `{tool.venv['requirements']}`(파일마다 sha256)"
+            if ko
+            else f"a Python virtualenv of its own, `.tools/{tool.name}-venv/`, from `{tool.venv['requirements']}` (a sha256 per file)"
+        )
+    brew = (f"Homebrew `{tool.brew}`" + (" (서드파티 tap)" if ko and "/" in tool.brew else " (third-party tap)" if "/" in tool.brew else "")) if tool.brew else None
+    if brew and not _tap_first(tool):
+        steps.append(brew)
+    if tool.download:
+        d = tool.download
+        src = d["repo"] if d.get("repo") else d["url"].split("/")[2]
+        only = f", {'/'.join(d['only_os'])}만" if ko and d.get("only_os") else f", {'/'.join(d['only_os'])} only" if d.get("only_os") else ""
+        sig = " + OpenPGP 서명" if ko and d.get("signature") else " + OpenPGP signature" if d.get("signature") else ""
+        steps.append(f"고정 버전 {d['version']}을 {src}에서 받아 sha256{sig} 확인 뒤 `.tools/bin/`{only}" if ko else f"the pinned release {d['version']} from {src}, sha256{sig} checked, into `.tools/bin/`{only}")
+    if brew and _tap_first(tool):
+        steps.append(brew)
+    if not steps:
+        return _NOTE_KO.get(tool.name, tool.note) if ko else tool.note
+    return (" → 실패하면 " if ko else " → on failure: ").join(steps)
+
+
+def render_table(language: str, catalog: dict[str, dict]) -> str:
+    """The optional-tools table of docs/SETUP.md (en) and docs/ko/SETUP.md (ko), generated by `scripts/kubegap tools --markdown`."""
+    ko = language == "ko"
+    head = "| 도구 | 하는 일 | 쓰는 점검 항목 | 모드 | 설치 방법과 위치 | 없으면 |" if ko else "| Tool | What it does | Checks that need it | Mode | Install method and location | Without it |"
+    rows = [head, "|---|---|---|---|---|---|"]
+    for t in TOOLS:
+        if t.required:
+            continue
+        ids = check_ids(t.checks, catalog)
+        checks = checks_text(t.checks, catalog)
+        if t.without:
+            without = t.without
+        elif any(catalog[c].get("requires_tool") == t.name for c in ids):
+            without = "그 항목은 '도구 없음'으로 적힙니다" if ko else "those checks are reported as tool missing"
+        else:
+            without = "그 항목은 입력을 읽지 못해 건너뜁니다(통과로 세지 않음)" if ko else "those checks skip because their input is not read (never a pass)"
+        if ko and t.without:
+            without = _WITHOUT_KO.get(t.name, t.without)
+        mode = _MODES_KO.get(t.modes, t.modes) if ko else t.modes
+        rows.append(f"| {t.name} | {_ROLE_KO.get(t.name, t.role) if ko else t.role} | {checks} | {mode} | {_install_text(t, language)} | {without} |")
+    return "\n".join(rows) + "\n"
+
+
+def catalog() -> dict[str, dict]:
+    """Every check of the catalog by id (collectors/*/checks.yaml), loaded once per process by lib.rubric."""
+    from . import rubric
+
+    return {c["id"]: c for c in rubric.catalog()}
+
+
+_ROLE_KO = {
+    "aws": "EKS, EC2, SSM, CloudWatch 조회(EKS 프로필에서만)",
+    "helm": "Helm 릴리스 상태와 나이(Helm이 Secret에 두는 릴리스 기록을 읽음)",
+    "krr": "리소스 requests 추천(Robusta KRR, Prometheus 기반)",
+    "polaris": "매니페스트 정적 점검과 가벼운 보안 점검",
+    "pluto": "지원이 끝난 API 탐지",
+    "kubent": "지원이 끝난 API 탐지(Pluto 보완)",
+    "ssh": "작은 k3s 클러스터의 노드 접근(k3s 프로필)",
+}
+_MODES_KO = {
+    "full": "full",
+    "daily and full": "daily, full",
+    "daily and full; ECR, the control-plane logs, the nodes and the pricing and cost data in full only": "daily, full(ECR·컨트롤플레인 로그·노드·가격과 비용 데이터는 full에서만)",
+}
+_NOTE_KO = {
+    "ssh": "kubegap이 설치하지 않습니다. macOS와 대부분의 Linux에 기본으로 있고, 슬림 컨테이너 이미지에는 없을 수 있습니다(배포판 패키지 openssh-client)",
+}
+_WITHOUT_KO = {
+    "aws": "EKS·ECR·비용 항목은 수집되지 않고, 컨트롤플레인 로그 항목과 노드 항목은 리포트에 그렇게 적힙니다",
+    "ssh": "노드 항목은 '노드 접근 없음'으로 적힙니다",
+}

@@ -79,7 +79,19 @@ scripts/kubegap nodes --context <name>
 
 ## 추가 도구
 
-kubegap은 helm, krr, polaris, pluto, kubent, argocd, promtool, amtool을 `PATH`에서 찾습니다. EKS에서는 aws, SSH를 쓰는 플랫폼에서는 ssh도 찾습니다. `kubegap setup`을 실행하면 없는 도구와 그 도구의 결과를 쓰는 점검 항목이 나옵니다.
+kubegap은 helm, krr, polaris, pluto, kubent를 `PATH`에서 찾습니다. EKS에서는 aws, SSH를 쓰는 플랫폼에서는 ssh도 찾습니다. `kubegap setup`을 실행하면 없는 도구와 그 도구의 결과를 쓰는 점검 항목이 나오고, 첫 실행 질문이 설치할지 묻습니다. 설정에 `install_tools: never`를 두면 그 질문을 건너뛰고 아무것도 설치하지 않습니다. 아래 표는 도구마다 어느 점검 항목에 쓰이는지, 어느 모드에서 돌아가는지, 설치하면 어디에 들어가는지, 없으면 리포트에 어떻게 적히는지입니다. `scripts/kubegap tools --markdown --language ko`가 `lib/tools.py`와 점검 카탈로그에서 만들고, 테스트가 최신인지 확인합니다.
+
+<!-- tools-table:begin -->
+| 도구 | 하는 일 | 쓰는 점검 항목 | 모드 | 설치 방법과 위치 | 없으면 |
+|---|---|---|---|---|---|
+| aws | EKS, EC2, SSM, CloudWatch 조회(EKS 프로필에서만) | eks.* (11), ecr.* (8), cost.idle-compute-high, cost.request-waste, cost.on-demand-in-spot-pool, cost.unused-eip, cost.idle-load-balancer, cost.idle-node, controlplane.scheduler-unschedulable, controlplane.webhook-call-failures, controlplane.controller-error-repeat, controlplane.apiserver-slow-traces, controlplane.authenticator-failures, controlplane.etcd-slow, node.* (26, full mode) | daily, full(ECR·컨트롤플레인 로그·노드·가격과 비용 데이터는 full에서만) | Homebrew `awscli` → 실패하면 고정 버전 2.39.3을 awscli.amazonaws.com에서 받아 sha256 + OpenPGP 서명 확인 뒤 `.tools/bin/`, linux만 | EKS·ECR·비용 항목은 수집되지 않고, 컨트롤플레인 로그 항목과 노드 항목은 리포트에 그렇게 적힙니다 |
+| helm | Helm 릴리스 상태와 나이(Helm이 Secret에 두는 릴리스 기록을 읽음) | hygiene.helm-release-not-deployed, hygiene.helm-release-stale | full | Homebrew `helm` → 실패하면 고정 버전 v4.3.1을 get.helm.sh에서 받아 sha256 확인 뒤 `.tools/bin/` | 그 항목은 '도구 없음'으로 적힙니다 |
+| krr | 리소스 requests 추천(Robusta KRR, Prometheus 기반) | resources.krr-recommendation | full | `.tools/krr-venv/` 전용 Python virtualenv, `deploy/krr-requirements.txt`(파일마다 sha256) → 실패하면 Homebrew `robusta-dev/krr/krr` (서드파티 tap) | 그 항목은 '도구 없음'으로 적힙니다 |
+| polaris | 매니페스트 정적 점검과 가벼운 보안 점검 | hygiene.polaris-reliability-danger, security.polaris-security-danger | full | 고정 버전 v10.2.6을 FairwindsOps/polaris에서 받아 sha256 확인 뒤 `.tools/bin/` → 실패하면 Homebrew `FairwindsOps/tap/polaris` (서드파티 tap) | 그 항목은 '도구 없음'으로 적힙니다 |
+| pluto | 지원이 끝난 API 탐지 | hygiene.deprecated-api | full | 고정 버전 v5.24.5을 FairwindsOps/pluto에서 받아 sha256 확인 뒤 `.tools/bin/` → 실패하면 Homebrew `FairwindsOps/tap/pluto` (서드파티 tap) | 그 항목은 입력을 읽지 못해 건너뜁니다(통과로 세지 않음) |
+| kubent | 지원이 끝난 API 탐지(Pluto 보완) | hygiene.deprecated-api | full | Homebrew `kubent` → 실패하면 고정 버전 0.7.3을 doitintl/kube-no-trouble에서 받아 sha256 확인 뒤 `.tools/bin/` | 그 항목은 입력을 읽지 못해 건너뜁니다(통과로 세지 않음) |
+| ssh | 작은 k3s 클러스터의 노드 접근(k3s 프로필) | node.* (26, full mode) | full | kubegap이 설치하지 않습니다. macOS와 대부분의 Linux에 기본으로 있고, 슬림 컨테이너 이미지에는 없을 수 있습니다(배포판 패키지 openssh-client) | 노드 항목은 '노드 접근 없음'으로 적힙니다 |
+<!-- tools-table:end -->
 
 설치는 이렇게 합니다.
 
