@@ -13,6 +13,7 @@ from lib import paths, signatures, yamlite
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "references" / "sources.md"
 CITATION = re.compile(r"(?:[\w./-]+\.(?:go|py|rego|toml|yaml|yml|txt|pdf|md|adoc|tpl|json|ini|sh|c|h|java|properties|gradle|proto)|(?:[\w./-]+/)?(?:Makefile(?:\.common)?|Dockerfile)):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+")
+DOC_CITATION = re.compile(r"https://docs\.aws\.amazon\.com/\S+ read \d{4}-\d{2}-\d{2}")  # #125: CloudWatch metric names and quota codes live in no source tree, only in the AWS documentation; the page and the day it was read
 KUBEGAP_LOCATION = re.compile(r"`(lib/[\w/]+\.py)(?::(\w+))?`|step `([\w.-]+)`|check `([\w.-]+)`|`([A-Za-z_]\w*)`")
 
 
@@ -38,7 +39,7 @@ def test_every_row_cites_a_file_line_and_version_or_says_unverified():
     rows = _rows()
     assert len(rows) >= 40
     for fact, _where, source, _holds in rows:
-        assert CITATION.search(source) or source.startswith("**unverified"), (fact, source)
+        assert CITATION.search(source) or DOC_CITATION.search(source) or source.startswith("**unverified"), (fact, source)
 
 
 def test_every_kubegap_location_exists():
@@ -67,6 +68,21 @@ def test_every_tool_step_names_its_source():
         for s in yamlite.load_file(f) or []:
             if s.get("type") == "tool":
                 assert CITATION.search(str(s.get("source") or "")), (f.name, s.get("id"), "add a source: line citing the pinned version's file:line")
+
+
+AWS_STEP_TYPES = ("aws", "cwlogs", "alb-metrics", "cw-metrics")
+
+
+def test_every_aws_step_names_its_source():
+    """#125: every step that calls the AWS CLI cites the operation's output shape in the botocore model of the pinned CLI, or the documentation page for a CloudWatch metric."""
+    seen = 0
+    for f in (ROOT / "collectors").glob("*/collect.yaml"):
+        for s in yamlite.load_file(f) or []:
+            if s.get("type") in AWS_STEP_TYPES:
+                seen += 1
+                src = str(s.get("source") or "")
+                assert CITATION.search(src) or DOC_CITATION.search(src), (f.name, s.get("id"), "add a source: line citing the botocore model file:line@cli version, or the docs page and the day read")
+    assert seen >= 29
 
 
 def test_every_http_step_names_its_source():
