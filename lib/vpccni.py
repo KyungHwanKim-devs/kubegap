@@ -17,12 +17,11 @@ import ipaddress
 import re
 from pathlib import Path
 
-from . import versions
+from . import podmetrics as _pm
+from . import promtext, versions
 from .controlplane import workload_of  # noqa: F401  (used by the report to map pod -> workload name)
 from .events import count_of
 from .snapshot import load_json, objects
-
-METRIC_RE = re.compile(r"^(awscni_[a-z0-9_]+)(\{([^}]*)\})?\s+([0-9.eE+-]+)\s*$")
 
 
 def _q(v) -> int:
@@ -30,27 +29,6 @@ def _q(v) -> int:
         return int(str(v).rstrip("i"))
     except (TypeError, ValueError):
         return 0
-
-
-def _parse_prom(text: str) -> dict:
-    """awscni_* lines -> {metric: value | {labels-tuple: value}}. Single-value metrics become numbers; labelled ones become a list of label dicts."""
-    single: dict[str, float] = {}
-    labeled: dict[str, list[tuple[dict, float]]] = {}
-    for ln in text.splitlines():
-        m = METRIC_RE.match(ln.strip())
-        if not m:
-            continue
-        name, labels_txt, val = m.group(1), m.group(3), m.group(4)
-        try:
-            v = float(val)
-        except ValueError:
-            continue
-        if labels_txt is None:
-            single[name] = v
-        else:
-            labels = dict(re.findall(r'(\w+)="([^"]*)"', labels_txt))
-            labeled.setdefault(name, []).append((labels, v))
-    return {"single": single, "labeled": labeled}
 
 
 def _settings(snap: Path) -> dict:
@@ -271,28 +249,31 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         prom = snap / "logs" / "node" / name / "awscni.prom"
         met: dict = {"available": False}
         if prom.is_file() and prom.stat().st_size > 0:
-            pm = _parse_prom(prom.read_text(encoding="utf-8", errors="replace"))
-            sg = pm["single"]
+            pm = promtext.parse(prom.read_text(encoding="utf-8", errors="replace"))  # the names and their versions are collectors/vpc-cni/pod-metrics.yaml (#127)
             ec2_err = 0
             ec2_err_by = {}
-            for labels, v in pm["labeled"].get("awscni_aws_api_latency_ms_count", []):
+            for labels, v in _pm.labeled(pm, "vpc-cni", "api_latency_ms", suffix="_count"):
                 if labels.get("error") == "true" and labels.get("api") != "GetMetadata":  # IMDS 404 is a normal lookup miss; excluded
                     ec2_err += int(v)
                     ec2_err_by[labels.get("api")] = ec2_err_by.get(labels.get("api"), 0) + int(v)
+
+            def count(key: str) -> int:
+                return int(_pm.single(pm, "vpc-cni", key, 0))
+
             met = {
                 "available": True,
-                "assigned": int(sg.get("awscni_assigned_ip_addresses", 0)),
-                "total": int(sg.get("awscni_total_ip_addresses", 0)),
-                "eni_allocated": int(sg.get("awscni_eni_allocated", 0)),
-                "eni_max": int(sg.get("awscni_eni_max", 0)),
-                "ip_max": int(sg.get("awscni_ip_max", 0)),
-                "prefixes": int(sg.get("awscni_total_ipv4_prefixes", 0)),
-                "no_available_ip_events": int(sg.get("awscni_no_available_ip_addresses", 0)),
-                "force_removed_enis": int(sg.get("awscni_force_removed_enis", 0)),
-                "force_removed_ips": int(sg.get("awscni_force_removed_ips", 0)),
+                "assigned": count("assigned_ips"),
+                "total": count("total_ips"),
+                "eni_allocated": count("eni_allocated"),
+                "eni_max": count("eni_max"),
+                "ip_max": count("ip_max"),
+                "prefixes": count("total_ipv4_prefixes"),
+                "no_available_ip_events": count("no_available_ips"),
+                "force_removed_enis": count("force_removed_enis"),
+                "force_removed_ips": count("force_removed_ips"),
                 "ec2_api_errors": ec2_err,
                 "ec2_api_errors_by_api": ec2_err_by,
-                "per_eni": {ln.get("eni"): int(v) for ln, v in pm["labeled"].get("awscni_assigned_ip_per_eni", [])},
+                "per_eni": {ln.get("eni"): int(v) for ln, v in _pm.labeled(pm, "vpc-cni", "assigned_ip_per_eni")},
             }
             warm_idle_total += max(met["total"] - met["assigned"], 0)
         else:

@@ -8,6 +8,7 @@
   type: node
   nodes: all
   cmd: curl -s -m 5 http://127.0.0.1:61678/metrics | grep -E '^awscni_' | grep -vE 'per_cidr|_bucket'
+  source: "aws/amazon-vpc-cni-k8s cmd/aws-k8s-agent/main.go:32, 80-83@v1.19.0, :38, 170-173@v1.23.2 (ipamd serves /metrics on :61678); the names kubegap reads are collectors/vpc-cni/pod-metrics.yaml (#127); utils/prometheusmetrics/prometheusmetrics.go:157-162@v1.19.0 (awscni_assigned_ip_per_cidr, one series per IP, dropped by the grep)"
   out: logs/node/{node}/awscni.prom
   timeout: 30
 - id: instance-type-network
