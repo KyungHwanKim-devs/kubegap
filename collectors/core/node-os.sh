@@ -37,21 +37,36 @@ if [ -z "$KLOG" ]; then
 fi
 echo "source=$KSRC"
 echo "lines=$(printf '%s\n' "$KLOG" | grep -c .)"
-C() { echo "c:$1=$(printf '%s\n' "$KLOG" | grep -cE "$2")"; }
-# Classification patterns (case sensitive). Match the exact message shape so boot messages like nvme_core.io_timeout on the kernel command line are not caught.
+# C <class> <pattern> [<exclude>]: count the lines of one class. <exclude> drops lines another class owns (a soft lockup also says `BUG:`).
+C() { echo "c:$1=$(printf '%s\n' "$KLOG" | grep -E "$2" | grep -vE "${3:-^$}" | grep -c .)"; }
+# Classification patterns (case sensitive), each cited in the kernel source that prints the line (references/sources.md, #127; read at v5.10, v5.15, v6.1, v6.8 and v6.12).
+# Match the exact message shape so boot messages like nvme_core.io_timeout on the kernel command line are not caught.
+# source: torvalds/linux mm/oom_kill.c:891, 1115@v5.10; :949, 1173@v6.12 (`Out of memory: Killed process %d (%s)`; the pattern also takes the older `Kill process` wording)
 P_OOM_NODE='Out of memory: Kill'
+# source: torvalds/linux mm/oom_kill.c:891, 1116@v5.10; :949, 1174@v6.12 (`Memory cgroup out of memory: Killed process`)
 P_OOM_CG='Memory cgroup out of memory'
-P_OOM_SYS='Out of memory: Kill(ed)? process [0-9]+ \((kubelet|containerd|k3s|dockerd|systemd|sshd|containerd-shim)'
-P_LOCKUP='soft lockup|hard LOCKUP|hung_task|blocked for more than|rcu_sched detected|rcu_preempt detected|rcu: INFO'
-P_IO='I/O error|Buffer I/O error|blk_update_request: I/O error|nvme nvme[0-9]+: .*(timeout|reset|Abort|abort)|critical medium error|print_req_error'
-P_FS='EXT4-fs error|EXT4-fs warning|XFS \([a-z0-9]+\): .*(error|Corruption|Metadata)|Remounting filesystem read-only|BTRFS error|Read-only file system'
-P_NIC='ena [0-9a-f:.]+ (eth|ens)[0-9]+: .*(reset|timeout|hang|keep alive)|Link is Down|link down|Tx timeout|Unit Hang|NETDEV WATCHDOG|(eth|ens|enp)[0-9a-z]+: .*(reset|went down)'
+# source: torvalds/linux mm/oom_kill.c:891-892@v5.10; :949-950@v6.12; include/linux/sched.h:213@v5.10; :306@v6.12 (the victim is task->comm, at most 15 characters, so containerd-shim-runc-v2 prints as containerd-shim)
+P_OOM_SYS='Out of memory: Kill(ed)? process [0-9]+ \((kubelet|containerd|k3s|dockerd|systemd|sshd)'
+# source: torvalds/linux kernel/watchdog.c:13, 412@v5.10; :13, 752@v6.12 (`watchdog: BUG: soft lockup - CPU#%d stuck`); kernel/watchdog_hld.c:13, 138@v5.10; kernel/watchdog.c:193@v6.12 (`Watchdog detected hard LOCKUP`); kernel/hung_task.c:129@v5.10; :133@v6.12 (`INFO: task %s:%d blocked for more than %ld seconds`); kernel/rcu/tree_stall.h:485, 551@v5.10; :620, 696@v6.12 (`rcu: INFO: %s detected stalls` / `self-detected stall`, %s = rcu_sched or rcu_preempt)
+P_LOCKUP='soft lockup|hard LOCKUP|blocked for more than|rcu_sched detected|rcu_preempt detected|rcu: INFO'
+# source: torvalds/linux block/blk-core.c:194, 229-231, 1453@v5.10 (`blk_update_request: I/O error, dev`); block/blk-mq.c:779@v6.12 (`I/O error, dev` without prefix since v5.16); fs/buffer.c:130@v5.10; :131@v6.12 (`Buffer I/O error on dev`); drivers/nvme/host/pci.c:1262, 1279, 1297@v5.10; :1354, 1371, 1390@v6.12 (`nvme nvme%d: I/O %d QID %d timeout, reset controller` / `aborting`); block/blk-core.c:180@v5.10; :146@v6.12 (`critical medium error`)
+P_IO='I/O error|nvme nvme[0-9]+: .*(timeout|reset|Abort|abort)|critical medium error'
+# source: torvalds/linux fs/ext4/super.c:721, 745, 948, 688@v5.10; :824, 849, 1016, 736@v6.12 (`EXT4-fs error (device %s)`, `EXT4-fs warning`, `Remounting filesystem read-only`); fs/xfs/xfs_message.c:24@v5.10; :24@v6.12 (`XFS (%s): `) with fs/xfs/xfs_error.c:344, 362@v5.10; :405, 423@v6.12 (`Corruption detected`, `Corruption of in-memory data`, `Metadata corruption detected at`); fs/btrfs/super.c:152, 190-195@v5.10; fs/btrfs/messages.c:148, 190@v6.12 (`BTRFS error (device %s)` and `BTRFS: error (device %s) in`)
+P_FS='EXT4-fs error|EXT4-fs warning|XFS \([a-z0-9-]+\): .*(error|Corruption|Metadata)|Remounting filesystem read-only|BTRFS error|BTRFS: error'
+# source: torvalds/linux drivers/net/ethernet/amazon/ena/ena_netdev.c:3655, 3790, 3882@v5.10; :3466, 3603, 3691@v6.12 (`Keep alive watchdog timeout`, `Trigger reset is on`, `Found a Tx that wasn't completed on time` / v6.12 `TX hasn't completed`, printed as `ena <bus id> <ifname>: `); drivers/net/phy/phy.c:111@v5.10; :126@v6.12 (`Link is Down`); drivers/net/ethernet/intel/igb/igb_main.c:8150@v5.10; :8348@v6.12 (`Detected Tx Unit Hang`); net/sched/sch_generic.c:442@v5.10; :535@v6.12 (`NETDEV WATCHDOG`); `link down`, `Tx timeout` and `went down` have no producer in the drivers read (unverified, kept)
+P_NIC='ena [0-9a-f:.]+ (eth|ens|enp|enX)[0-9a-z]+: .*(reset|timeout|hang|[Kk]eep alive|completed on time|TX hasn.t completed)|Link is Down|link down|Tx timeout|Unit Hang|NETDEV WATCHDOG|(eth|ens|enp|enX)[0-9a-z]+: .*(reset|went down)'
+# source: torvalds/linux net/netfilter/nf_conntrack_core.c:12, 1488@v5.10; :12, 1668@v6.12 (`nf_conntrack: nf_conntrack: table full, dropping packet`, the module name twice through pr_fmt)
 P_CT='nf_conntrack: .*table full'
-P_NET='TCP: out of memory|neighbou?r.*table overflow|SYN flooding|TCP: too many orphaned|dropping packet'
-P_MEM='page allocation failure|Out of socket memory|Out of memory and no killable'
-P_BUG='BUG: |Oops: |Call Trace:|general protection fault'
+# source: torvalds/linux net/ipv4/tcp.c:244, 2404, 2402@v5.10; :244, 3042, 3040@v6.12 (`TCP: out of memory -- consider tuning tcp_mem`, `TCP: too many orphaned sockets`); net/core/neighbour.c:14, 393@v5.10; :14, 486@v6.12 (`neighbour: %s: neighbor table overflow!`); net/ipv4/tcp_input.c:65, 6676@v5.10; :65, 7103@v6.12 (`Possible SYN flooding on port`)
+P_NET='TCP: out of memory|neighbou?r.*table overflow|SYN flooding|TCP: too many orphaned'
+# source: torvalds/linux mm/page_alloc.c:4862@v5.10; :4483@v6.12 (`%s: page allocation failure: order:%u`); mm/oom_kill.c:1105@v5.10; :1163@v6.12 (`Out of memory and no killable processes...`)
+P_MEM='page allocation failure|Out of memory and no killable'
+# source: torvalds/linux arch/x86/mm/fault.c:533, 536@v5.10; :538, 541@v6.12 (`BUG: kernel NULL pointer dereference`, `BUG: unable to handle page fault`); arch/x86/kernel/dumpstack.c:405, 195@v5.10; :408, 195@v6.12 (`Oops: %04lx`, `Call Trace:`); arch/arm64/kernel/stacktrace.c:173@v5.10; :318@v6.12 (`Call trace:` with a lowercase t on arm64); arch/x86/kernel/traps.c:523@v5.10; :580@v6.12 (`general protection fault`)
+P_BUG='BUG: |Oops: |Call [Tt]race:|general protection fault'
+# source: torvalds/linux arch/x86/mm/fault.c:766@v5.10; :759@v6.12 (`%s[%d]: segfault at %lx ip %px sp %px error %lx`; x86 only, arm64 reports a user fault only through the signal, so the count stays 0 on Graviton nodes)
 P_SEG='segfault at'
-P_CLK='clocksource.*unstable|TSC.*unstable|Clocksource .* unstable'
+# source: torvalds/linux kernel/time/clocksource.c:8, 239@v5.10; :8, 284@v6.12 (`clocksource: timekeeping watchdog on CPU%d: Marking clocksource '%s' as unstable`); arch/x86/kernel/tsc.c:2, 1106, 1172@v5.10; :2, 1144, 1214@v6.12 (`tsc: Marking TSC unstable due to %s`)
+P_CLK='clocksource.*unstable|TSC.*unstable'
 C oom_node "$P_OOM_NODE"
 C oom_cgroup "$P_OOM_CG"
 C oom_system_victim "$P_OOM_SYS"
@@ -62,7 +77,7 @@ C nic "$P_NIC"
 C conntrack_full "$P_CT"
 C net_pressure "$P_NET"
 C mem_pressure "$P_MEM"
-C bug "$P_BUG"
+C bug "$P_BUG" "$P_LOCKUP"
 C segfault "$P_SEG"
 C clock "$P_CLK"
 echo "samples:"
@@ -108,16 +123,23 @@ else CRI=""; fi
 echo "cmd=${CRI:-none}"
 if [ -n "$CRI" ]; then
   echo "version=$($CRI version 2>/dev/null | tr '\n' ' ' | tr -s ' ')"
+  # The crictl binary version (`crictl version <tag>`); `crictl version` above prints the CRI API version 0.1.0, not the binary's
+  echo "crictl=$($CRI --version 2>/dev/null | head -1)"
+  # Container states from the STATE column of `crictl ps -a` (Running, Exited, Created, Unknown), cut at the header's column so a pod or container called "running-x" is not counted
   PS=$($CRI ps -a 2>/dev/null)
-  for st in Running Exited Created Unknown; do echo "state:$st=$(printf '%s\n' "$PS" | tail -n +2 | grep -cw "$st")"; done
+  for st in Running Exited Created Unknown; do echo "state:$st=$(printf '%s\n' "$PS" | awk -v s="$st" 'NR==1 {c=index($0,"STATE"); next} c>0 && index(substr($0,c), s)==1' | grep -c .)"; done
   echo "images=$($CRI images 2>/dev/null | tail -n +2 | grep -c .)"
   # Top 15 images by size. Table columns: IMAGE TAG IMAGE_ID SIZE — SIZE is a human unit like "1.23GB", hence sort -h
   echo "images_top:"
   $CRI images 2>/dev/null | tail -n +2 | awk 'NF>=4 {print $4 "\t" $1 ":" $2}' | sort -h -r | head -15
-  echo "imagefs=$($CRI imagefsinfo 2>/dev/null | tr -d ' \n' | cut -c1-400)"
+  # 1,000 characters: the JSON lists containerFilesystems (empty on most nodes, one entry when the runtime splits them) before imageFilesystems, which the parser reads
+  echo "imagefs=$($CRI imagefsinfo 2>/dev/null | tr -d ' \n' | cut -c1-1000)"
   INFO=$($CRI info 2>/dev/null | tr -d ' \n')
-  echo "conditions=$(printf '%s' "$INFO" | grep -oE '"type":"[A-Za-z]+","status":(true|false)|"status":(true|false),"type":"[A-Za-z]+"' | tr '\n' ' ')"
+  # crictl re-marshals the status with encoding/json, which sorts the keys: "status" comes before "type"
+  echo "conditions=$(printf '%s' "$INFO" | grep -oE '"status":(true|false),"type":"[A-Za-z]+"' | tr '\n' ' ')"
   echo "systemd_cgroup=$(printf '%s' "$INFO" | grep -oE '"SystemdCgroup":(true|false)' | head -1 | cut -d: -f2)"
+  # containerd 1.7 puts the global snapshotter and sandboxImage in the config `crictl info` prints; containerd 2.x moved both to the images plugin, which `crictl info` does not print,
+  # so these two are empty there (the parser takes the snapshotter from the imagefs mount point instead) — references/sources.md (#127)
   echo "snapshotter=$(printf '%s' "$INFO" | grep -oE '"snapshotter":"[a-z0-9]+"' | head -1 | cut -d: -f2 | tr -d '"')"
   echo "sandbox_image=$(printf '%s' "$INFO" | grep -oE '"sandboxImage":"[^"]+"' | head -1 | cut -d: -f2- | tr -d '"')"
   echo "cni_error=$(printf '%s' "$INFO" | grep -oE '"lastCNILoadStatus(\.default)?":"[^"]{1,160}"' | head -1 | cut -d: -f2- | tr -d '"')"
@@ -181,6 +203,7 @@ if command -v needs-restarting >/dev/null 2>&1; then
   needs-restarting -r >/dev/null 2>&1; rc=$?
   echo "needs_restarting_rc=$rc"
 fi
-echo "ami_release=$(cat /etc/eks/release 2>/dev/null | grep -E 'BASE_AMI_ID|BUILD_TIME|RELEASE_VERSION' | tr '\n' ';')"
+# The AMI build writes BASE_AMI_ID and BUILD_TIME (and BUILD_KERNEL, ARCH); there is no RELEASE_VERSION line
+echo "ami_release=$(cat /etc/eks/release 2>/dev/null | grep -E 'BASE_AMI_ID|BUILD_TIME' | tr '\n' ';')"
 
 S end

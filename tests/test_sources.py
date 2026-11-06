@@ -12,9 +12,12 @@ from lib import paths, signatures, yamlite
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "references" / "sources.md"
-CITATION = re.compile(r"(?:[\w./-]+\.(?:go|py|rego|toml|yaml|yml|txt|pdf|md|adoc|tpl|json|ini|sh|c|h|java|properties|gradle|proto)|(?:[\w./-]+/)?(?:Makefile(?:\.common)?|Dockerfile)):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+")
+# .cpp (smartmontools), .xml (systemd man pages), .rst (kernel Documentation), .asciidoc (Elasticsearch docs) and .y (gnulib parse-datetime) came with #127
+CITATION = re.compile(
+    r"(?:[\w./-]+\.(?:go|py|rego|toml|yaml|yml|txt|pdf|md|adoc|tpl|json|ini|sh|c|h|java|properties|gradle|proto|cpp|xml|rst|asciidoc|y)|(?:[\w./-]+/)?(?:Makefile(?:\.common)?|Dockerfile)):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+"
+)
 DOC_CITATION = re.compile(r"https://docs\.aws\.amazon\.com/\S+ read \d{4}-\d{2}-\d{2}")  # #125: CloudWatch metric names and quota codes live in no source tree, only in the AWS documentation; the page and the day it was read
-KUBEGAP_LOCATION = re.compile(r"`(lib/[\w/]+\.py)(?::(\w+))?`|step `([\w.-]+)`|check `([\w.-]+)`|`([A-Za-z_]\w*)`")
+KUBEGAP_LOCATION = re.compile(r"`(lib/[\w/]+\.py|collectors/[\w-]+/[\w.-]+\.(?:sh|yaml))(?::(\w+))?`|step `([\w.-]+)`|check `([\w.-]+)`|`([A-Za-z_]\w*)`")
 
 
 def _rows():
@@ -70,6 +73,32 @@ def test_every_tool_step_names_its_source():
                 assert CITATION.search(str(s.get("source") or "")), (f.name, s.get("id"), "add a source: line citing the pinned version's file:line")
 
 
+# ---------- node command output formats (#127): the patterns the node scripts grep and the parsers match ----------
+
+NODE_PATTERN_FILES = {
+    "collectors/core/node-os.sh": re.compile(r"^P_[A-Z_]+="),  # the kernel-message classes
+    "lib/nodeos.py": re.compile(r"^_?[A-Z_]+_RE = re\.compile"),
+    "lib/k3s.py": re.compile(r"^[A-Z_]+_RE = re\.compile"),
+}
+
+
+def test_every_node_pattern_carries_a_source_comment():
+    """A grep pattern in node-os.sh or a module-level regex in the node parsers names, on the comment line right above it, the source line that
+    prints what it matches (`# source: owner/repo file:line@tag`), or says `# source: unverified` with the reason."""
+    seen = 0
+    for rel, pat in NODE_PATTERN_FILES.items():
+        lines = (ROOT / rel).read_text(encoding="utf-8").splitlines()
+        for i, ln in enumerate(lines):
+            if not pat.match(ln):
+                continue
+            seen += 1
+            above = lines[i - 1].strip() if i else ""
+            assert above.startswith("# source:"), (rel, ln[:60], "no `# source:` comment on the line above")
+            body = above[len("# source:") :].strip()
+            assert CITATION.search(body) or body.startswith(("unverified", "kubegap's own format")), (rel, ln[:60], body)
+    assert seen >= 15
+
+
 AWS_STEP_TYPES = ("aws", "cwlogs", "alb-metrics", "cw-metrics")
 
 
@@ -100,7 +129,7 @@ def test_every_http_step_names_its_source():
 # ---------- pod /metrics names (#120): collectors/<area>/pod-metrics.yaml ----------
 
 VERSION = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
-PARSERS = ["lib/karpenterctl.py", "lib/kedactl.py", "lib/stackhealth.py", "lib/argocdctl.py", "lib/albctl.py", "lib/certmanager.py", "lib/esoctl.py", "lib/metallbctl.py", "lib/k3s.py", "lib/logs.py"]
+PARSERS = ["lib/karpenterctl.py", "lib/kedactl.py", "lib/stackhealth.py", "lib/argocdctl.py", "lib/albctl.py", "lib/certmanager.py", "lib/esoctl.py", "lib/metallbctl.py", "lib/k3s.py", "lib/logs.py", "lib/vpccni.py"]
 
 
 def test_every_pod_metrics_step_names_its_table():
@@ -145,7 +174,7 @@ def test_every_metric_literal_in_a_parser_is_in_a_table():
     names = {n for a in podmetrics.tables() for n in podmetrics.all_names(a)}
     query_ids = {it["id"] for _, it in _queries()}  # a metrics.yaml query id (`loki_discarded_1h`) is not a metric name
     literal = re.compile(
-        r'"((?:karpenter|argocd|certmanager|externalsecret|clustersecretstore|secretstore|grafana|keda|metallb|aws_api|controller_runtime|workqueue|rest_client|leader_election|apiserver|registered_metrics|grpc_server|loki)_[a-z0-9_]+)"'
+        r'"((?:karpenter|argocd|certmanager|externalsecret|clustersecretstore|secretstore|grafana|keda|metallb|aws_api|controller_runtime|workqueue|rest_client|leader_election|apiserver|registered_metrics|grpc_server|loki|awscni)_[a-z0-9_]+)"'
     )
     seen = 0
     for rel in PARSERS:

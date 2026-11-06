@@ -1,0 +1,48 @@
+# Metric names kubegap reads from the ipamd /metrics of aws-node (step vpc-cni.ipamd-metrics, a node step that curls 127.0.0.1:61678 from
+# inside the node; parsed by lib/vpccni.py through lib/podmetrics.py). Read in aws/amazon-vpc-cni-k8s at v1.19.0 and v1.23.2 (#127).
+- key: assigned_ips
+  names:
+    - name: awscni_assigned_ip_addresses
+      source: "aws/amazon-vpc-cni-k8s utils/prometheusmetrics/prometheusmetrics.go:133@v1.19.0, :147@v1.23.2"
+- key: total_ips
+  names:
+    - name: awscni_total_ip_addresses
+      source: "aws/amazon-vpc-cni-k8s utils/prometheusmetrics/prometheusmetrics.go:127@v1.19.0, :141@v1.23.2"
+- key: eni_allocated
+  names:
+    - name: awscni_eni_allocated
+      source: "aws/amazon-vpc-cni-k8s utils/prometheusmetrics/prometheusmetrics.go:121@v1.19.0, :135@v1.23.2"
+- key: eni_max
+  names:
+    - name: awscni_eni_max
+      source: "aws/amazon-vpc-cni-k8s utils/prometheusmetrics/prometheusmetrics.go:47@v1.19.0, :47@v1.23.2"
+- key: ip_max
+  names:
+    - name: awscni_ip_max
+      source: "aws/amazon-vpc-cni-k8s utils/prometheusmetrics/prometheusmetrics.go:53@v1.19.0, :53@v1.23.2"
+- key: total_ipv4_prefixes
+  names:
+    - name: awscni_total_ipv4_prefixes
+      source: "aws/amazon-vpc-cni-k8s utils/prometheusmetrics/prometheusmetrics.go:151@v1.19.0, :165@v1.23.2"
+- key: no_available_ips
+  names:
+    - name: awscni_no_available_ip_addresses
+      source: "aws/amazon-vpc-cni-k8s utils/prometheusmetrics/prometheusmetrics.go:164@v1.19.0, :178@v1.23.2"
+- key: force_removed_enis
+  names:
+    - name: awscni_force_removed_enis
+      source: "aws/amazon-vpc-cni-k8s utils/prometheusmetrics/prometheusmetrics.go:139@v1.19.0, :153@v1.23.2"
+- key: force_removed_ips
+  names:
+    - name: awscni_force_removed_ips
+      source: "aws/amazon-vpc-cni-k8s utils/prometheusmetrics/prometheusmetrics.go:145@v1.19.0, :159@v1.23.2"
+- key: assigned_ip_per_eni
+  labels: [eni]
+  names:
+    - name: awscni_assigned_ip_per_eni
+      source: "aws/amazon-vpc-cni-k8s utils/prometheusmetrics/prometheusmetrics.go:170-173@v1.19.0, :184-187@v1.23.2"
+- key: api_latency_ms
+  labels: [api, error, status]
+  names:
+    - name: awscni_aws_api_latency_ms
+      source: "aws/amazon-vpc-cni-k8s utils/prometheusmetrics/prometheusmetrics.go:84-89@v1.19.0, :84-89@v1.23.2 (a SummaryVec with labels api, error, status; the parser reads _count)"

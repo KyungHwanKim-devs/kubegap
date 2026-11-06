@@ -15,8 +15,14 @@ from pathlib import Path
 from .controlplane import workload_of
 from .snapshot import load_json
 
+# `stat -fc %T /sys/fs/cgroup`: cgroup2fs is the unified hierarchy, tmpfs the v1 mount systemd makes; coreutils before 8.26 (Amazon Linux 2 ships 8.22) has no name for the cgroup2 magic and prints it as UNKNOWN (references/sources.md, #127)
+CGROUP_FS = {"cgroup2fs": "v2", "tmpfs": "v1", "UNKNOWN (0x63677270)": "v2"}
+
+# source: kubegap's own format, written by collectors/core/node-os.sh (`### <section>` and `key=value` lines)
 SECTION_RE = re.compile(r"^### (\S+)\s*$")
+# source: kubegap's own format, written by collectors/core/node-os.sh (`### <section>` and `key=value` lines)
 KV_RE = re.compile(r"^([A-Za-z0-9_.:-]+)=(.*)$")
+# source: kubernetes/kubernetes pkg/kubelet/kuberuntime/helpers.go:198-200@v1.30.14; :223-225@v1.37.2 (a pod's log directory is `<namespace>_<name>_<uid>` under /var/log/pods)
 POD_LOG_DIR_RE = re.compile(r"^([a-z0-9-]+)_([a-z0-9.-]+)_([0-9a-f-]{36})$")
 
 
@@ -56,9 +62,13 @@ def _kv(lines: list[str]) -> dict[str, str]:
 
 # The kernel's oom-kill summary line (mm/oom_kill.c dump_oom_summary): `oom-kill:constraint=CONSTRAINT_MEMCG,...,oom_memcg=/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod<uid>.slice,...,task=<comm>,pid=<n>,uid=<n>`
 # cgroup v2 writes the pod uid with underscores inside the slice name; cgroup v1 writes `/kubepods/burstable/pod<uid>/<container id>` with dashes.
+# source: torvalds/linux mm/oom_kill.c:441-451@v5.10; :443-453@v6.12 (dump_oom_summary: `oom-kill:constraint=%s,nodemask=%*pbl,cpuset=%s,mems_allowed=%*pbl,oom_memcg=<path>,task_memcg=<path>,task=%s,pid=%d,uid=%d`; `global_oom` in place of oom_memcg for a node-level kill)
 _OOM_KILL_RE = re.compile(r"oom-kill:(?P<fields>.*)")
+# source: kubernetes/kubernetes pkg/kubelet/cm/cgroup_manager_linux.go:73-74, 86@v1.30.14; :70-71, 83@v1.37.2 (the systemd driver writes `-` of the pod uid as `_` in the slice name); pkg/kubelet/cm/pod_container_manager_linux.go:37@v1.30.14; :38@v1.37.2 (the `pod` prefix)
 _OOM_POD_UID_RE = re.compile(r"pod(?P<uid>[0-9a-f]{8}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{12})")
+# source: torvalds/linux mm/oom_kill.c:441-451@v5.10; :443-453@v6.12 (comma-separated key=value fields; nodemask and mems_allowed may hold commas themselves, which only splits those two)
 _OOM_FIELD_RE = re.compile(r"(?P<k>[a-z_]+)=(?P<v>[^,]*)")
+# source: systemd/systemd src/shared/logs-show.c:379@v249; :404@v252 (`journalctl -o short-iso` starts the line with `%Y-%m-%dT%H:%M:%S%z`; a `dmesg -T` fallback line has a bracketed ctime instead, so the time stays None)
 _OOM_TS_RE = re.compile(r"^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{4}|Z)?)")
 
 
@@ -167,6 +177,8 @@ def _parse_cri(lines: list[str]) -> dict:
     m = re.search(r"RuntimeName:\s*(\S+)\s+RuntimeVersion:\s*(\S+)", ver)
     out["runtime"] = m.group(1) if m else None
     out["version"] = m.group(2) if m else None
+    cv = re.search(r"v?(\d+\.\d+\.\d+)", kv.get("crictl", ""))  # `crictl version v1.33.0`, the binary; absent from an os.txt written before rubric 0.1.82
+    out["crictl_version"] = cv.group(1) if cv else None
     out["states"] = {k[6:]: _int(v) for k, v in kv.items() if k.startswith("state:")}
     out["images"] = _int(kv.get("images"))
     fs = _load_json_str(kv.get("imagefs"))
@@ -226,7 +238,10 @@ def _parse_cri(lines: list[str]) -> dict:
     out["writable_layers_available"] = "writable_layers:" in [ln.strip() for ln in lines]
     out["deprecation_warnings"] = conds.get("ContainerdHasNoDeprecationWarnings") is False
     out["systemd_cgroup"] = kv.get("systemd_cgroup") or None
-    out["snapshotter"] = kv.get("snapshotter") or None
+    # containerd 2.x does not print the snapshotter in `crictl info` (the setting moved to the images plugin); the image filesystem mount point names the snapshotter plugin instead:
+    # <root>/io.containerd.snapshotter.v1.<name> (containerd/containerd plugin/plugin.go:143@v1.7.29 and containerd/plugin plugin.go:97@v1.0.0 for the URI, services/server/server.go:230@v1.7.29 and cmd/containerd/server/server.go:265, 273@v2.1.4 for the root directory)
+    snap_m = re.search(r"io\.containerd\.snapshotter\.v1\.([a-z0-9]+)", out.get("imagefs_mount") or "")
+    out["snapshotter"] = kv.get("snapshotter") or (snap_m.group(1) if snap_m else None)
     out["sandbox_image"] = kv.get("sandbox_image") or None
     out["cni_error"] = None if kv.get("cni_error", "OK") in ("OK", "") else kv.get("cni_error")
     return out
@@ -323,7 +338,8 @@ def _parse_services(lines: list[str]) -> list[dict]:
         kv = {}
         for tok in re.findall(r"(\w+)=((?:(?!\s\w+=).)*)", parts[1]):
             kv[tok[0]] = tok[1].strip()
-        out.append({"unit": parts[0], "active": kv.get("active"), "restarts": _int(kv.get("restarts"), None) if kv.get("restarts", "?") != "?" else None, "since": kv.get("since") or None})
+        since = kv.get("since") or None
+        out.append({"unit": parts[0], "active": kv.get("active"), "restarts": _int(kv.get("restarts"), None) if kv.get("restarts", "?") != "?" else None, "since": None if since == "n/a" else since})
     return out
 
 
@@ -440,7 +456,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         sysv = _kv(sec.get("sysctl", []))
         cri = _parse_cri(sec.get("cri", []))
         cg = _kv(sec.get("cgroup", []))
-        cg_ver = {"cgroup2fs": "v2", "tmpfs": "v1"}.get(cg.get("fs", ""), "unknown")
+        cg_ver = CGROUP_FS.get(cg.get("fs", ""), "unknown")
         disk, pod_logs, pod_dirs = _parse_disk(sec.get("disk", []), uid_to_pod)
         services = _parse_services(sec.get("services", []))
         upd = _parse_updates(sec.get("updates", []))
@@ -486,7 +502,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "loadavg": meta.get("loadavg"),
                 "nproc": _int(meta.get("nproc"), None),
                 "mem_total_gb": round(_int(meta.get("mem_total_kb")) / 1024**2, 1),
-                "containerd_version": (re.search(r"\b(\d+\.\d+\.\d+)\b", meta.get("containerd", "")) or [None, None])[1] if meta.get("containerd") else cri.get("version"),
+                # `containerd github.com/containerd/containerd 1.7.29 <sha>` (an rpm build) or `containerd github.com/containerd/containerd/v2 v2.1.4-k3s1 <sha>` (git describe keeps the v)
+                "containerd_version": (re.search(r"(?<![\w.])v?(\d+\.\d+\.\d+)", meta.get("containerd", "")) or [None, None])[1] if meta.get("containerd") else cri.get("version"),
                 "k3s_version": meta.get("k3s") or None,
                 "zombies": _int(meta.get("zombies")),
                 "kubelet_rss_mb": round(_int(meta.get("kubelet_rss_kb")) / 1024) if meta.get("kubelet_rss_kb") else None,
