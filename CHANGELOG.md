@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-06
+
+The source-verified facts milestone (10) is complete: every fact kubegap takes from another project (tool output files, metric names, PromQL series, log lines, store API shapes, Kubernetes and AWS API fields, component detection, node command output) is cited in that project's source at a pinned version in `references/sources.md`, `source:` keys sit next to the data that relies on them, and CI refuses a new entry without one. Reading the sources found and fixed defects in checks, queries, signatures and parsers; the security round of milestone 8 (no secrets on disk, pinned tools and images, bounded reads, no redirects) and the permissions documentation of milestone 9 are in this release as well. 407 checks, rubric 0.1.82. The SSM document changed, so an EKS user runs `kubegap setup --install-ssm-document` once. Contributors to this release: [@RecordK](https://github.com/RecordK) (#52), [@skier-song9](https://github.com/skier-song9) (#56), [@ShahadatTest](https://github.com/ShahadatTest) (#69), [@hui-st](https://github.com/hui-st) (#131) and [@teddyyyjang-tech](https://github.com/teddyyyjang-tech) (#134).
+
 ### Added
 
 - Every output format the 13 `type: node` steps read (the kernel messages the 13 `node.kernel-*` classes of `collectors/core/node-os.sh` count, the `/proc` and `/sys` files it reads, the `crictl ps`, `images`, `stats`, `version` and `info` tables, the `df`, `du`, `stat`, `date`, `ps`, `uptime`, `dmesg`, `lsblk`, `ss`, `ip`, `timedatectl`, `systemctl`, `journalctl --disk-usage`, `chronyc`, `smartctl` and `sensors` outputs, the `k3s check-config`, `certificate check`, `etcd-snapshot ls` and `secrets-encrypt status` lines, the kube-proxy `/proxyMode` and `/healthz` endpoints, the ipamd `awscni_*` metric names, the Ubuntu `updates-available` and `reboot-required` files, `needs-restarting -r`, `/etc/eks/release`) has a row in `references/sources.md` (182 rows), cited in the source that prints it at the versions the supported node images ship: Ubuntu 22.04 and Amazon Linux 2 (the two clusters) and Ubuntu 24.04 and Amazon Linux 2023 (the newest of each line): torvalds/linux v5.10 to v6.12, systemd v219 to v255, coreutils 8.22 to 9.5, util-linux 2.30.2 to 2.40.2, procps-ng 3.3.10 to 4.0.4, iproute2 4.11.0 to 6.12.0, cri-tools v1.33.0 and v1.37.0, containerd 1.7.29 to 2.3.7, k3s v1.33.5+k3s1 and v1.37.2+k3s1, amazon-vpc-cni-k8s v1.19.0 and v1.23.2, amazon-eks-ami v20251209 and v20261031. Every `P_*` class of `node-os.sh` and every module-level regex of `lib/nodeos.py` and `lib/k3s.py` carries a `# source:` line above it and `tests/test_sources.py` requires it; `collectors/vpc-cni/pod-metrics.yaml` lists the ipamd names and `lib/vpccni.py` reads them through `lib/podmetrics` and `lib/promtext` like the other pod-metrics parsers; `tests/test_node_formats.py` matches the kernel classes against lines built from the cited format strings. 153 facts hold, 11 are unverified, 18 rows record what was wrong and is fixed below. `node-os.sh` also records the crictl binary version (`crictl=`). The SSM document changed, so an EKS user runs `kubegap setup --install-ssm-document` once (the daily run does not need it: every node step is full-mode). ([#127](https://github.com/KyungHwanKim-devs/kubegap/issues/127))
@@ -196,7 +200,8 @@ The first milestone, permissions and the read-only claim, is complete: issues #1
 - Expectation profiles `prod`, `lab`, `small-prod`, `multi-az-prod` and `dev`.
 - English and Korean README and sample reports.
 
-[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/KyungHwanKim-devs/kubegap/releases/tag/v0.1.0
