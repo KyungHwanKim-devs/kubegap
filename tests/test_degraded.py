@@ -344,6 +344,7 @@ def test_deprecated_tools_with_no_annotated_object_judged_nothing(tmp_path, monk
     summary, verdict = _deprecated_result(tmp_path)
     assert summary["pluto_read"] is True and summary["pluto_manifests"] == 0 and summary["objects_judged"] is False
     assert summary["items"] is None and verdict["status"] == "skip" and verdict["findings"] == []
+    assert "no object has a last-applied annotation" in verdict["reason"]
 
 
 def test_deprecated_tools_one_annotated_object_is_enough_to_judge(tmp_path, monkeypatch):

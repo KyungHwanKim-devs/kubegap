@@ -373,8 +373,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
         for tool in ("kubent", "pluto")
         if isinstance(dep.get(f"{tool}_lists_ok"), int) and isinstance(dep.get(f"{tool}_lists_failed"), int)
     ]
-    if isinstance(dep.get("pluto_manifests"), int):
-        seen.append(f"{dep['pluto_manifests']} objects with a last-applied annotation to judge")
+    seen += [f"{tool} had {dep[f'{tool}_manifests']} objects with a last-applied annotation to judge" for tool in ("kubent", "pluto") if dep.get(f"{tool}_read") and isinstance(dep.get(f"{tool}_manifests"), int)]
     if seen:
         w("")
         w("Deprecated-API tools: " + "; ".join(seen) + ".")

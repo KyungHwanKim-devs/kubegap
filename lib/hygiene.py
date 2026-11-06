@@ -322,6 +322,7 @@ def _deprecated(cx: _Ctx) -> dict:
         **lists,
         **manifests,
         "objects_judged": judged,
+        "skip_reason": None if judged or not any(read.values()) else "no object has a last-applied annotation, so pluto and kubent had nothing to judge",
         # None makes the existing evaluator skip even when there are no rows on which to test rule.needs.
         "items": items if judged else None,
         "count": len(items) if judged else None,

@@ -308,7 +308,7 @@ def test_a_speaker_kept_off_nodes_on_purpose_is_named(tmp_path):
     nodes = [node("a", {**linux, "role": "edge"}), node("b", {**linux, "role": "edge"}), node("c", linux), node("d", linux)]
     inv = {"nodes": {"count": 4, "nodes": [{"name": n["metadata"]["name"]} for n in nodes]}}
     s = metallbctl.analyze(snap(tmp_path, daemonsets=[pinned], nodes=nodes, **{L2: [], BGP: [], STATE: []}), inv)["summary"]
-    assert (s["speaker_all_nodes"], s["speakers_pinned"], s["speaker_eligible"]) == (False, True, 2)
+    assert (s["speaker_all_nodes"], s["speaker_eligible"]) == (False, 2)
 
 
 def test_a_taint_keeps_a_speaker_off_a_node_like_a_selector_does(tmp_path):
@@ -317,12 +317,12 @@ def test_a_taint_keeps_a_speaker_off_a_node_like_a_selector_does(tmp_path):
     nodes = [node("a"), node("b"), node("c", taints=taint)]
     inv = {"nodes": {"count": 3, "nodes": [{"name": n["metadata"]["name"]} for n in nodes]}}
     s = metallbctl.analyze(snap(tmp_path, nodes=nodes, **{L2: [], BGP: [], STATE: []}), inv)["summary"]
-    assert (s["speakers_pinned"], s["speaker_eligible"], s["speaker_ready"]) == (True, 2, 2)
+    assert (s["speaker_eligible"], s["speaker_ready"]) == (2, 2)
 
 
 def test_no_node_list_means_eligibility_is_unknown(tmp_path):
     s = metallbctl.analyze(snap(tmp_path, **{L2: [], BGP: [], STATE: []}), INV)["summary"]
-    assert (s["speaker_eligible"], s["speakers_pinned"]) == (None, False)
+    assert s["speaker_eligible"] is None
 
 
 def test_a_speaker_daemonset_with_no_pod_is_not_a_layout(tmp_path):
@@ -430,3 +430,95 @@ def test_metrics_unread_before_0_16_are_named_too(tmp_path):
     step = {"ok": True, "pods": {"speaker-a": {"ok": False, "node": "kind-worker", "error": "HTTP 503"}}}
     s = metallbctl.analyze(snap(tmp_path, version="v0.15.3", step=step, daemonsets=[workload("v0.15.3", ("monitoring", 7472))]), INV)["summary"]
     assert s["metrics_not_read"] == metallbctl.METRICS_NOT_READ
+
+
+def foreign_speaker(desired=2, **template):
+    return {
+        "metadata": {"name": "announce-speaker", "namespace": "voice"},
+        "spec": {"selector": {"matchLabels": {"app": "tts"}}, "template": {"spec": {"containers": [{"name": "tts", "image": "ghcr.io/acme/tts-speaker:1.2.3"}], **template}}},
+        "status": {"desiredNumberScheduled": desired, "numberReady": desired},
+    }
+
+
+def bare(tmp_path, **kinds):
+    objs = tmp_path / "objects"
+    objs.mkdir()
+    for stem, items in kinds.items():
+        (objs / f"{stem}.json").write_text(json.dumps({"items": items}))
+    return tmp_path
+
+
+def test_a_speaker_shaped_name_alone_is_not_metallb(tmp_path):
+    """U2 of the fourth review: no MetalLB, a DaemonSet called x-speaker. No section, so no MetalLB finding, with or without cloud LoadBalancer Services."""
+    assert metallbctl.analyze(bare(tmp_path, daemonsets=[foreign_speaker(0, nodeSelector={"x": "y"})], services=[service("cloud")]), INV) == {"present": False}
+
+
+def test_labels_identify_metallb_past_a_fullname_override_and_a_mirror(tmp_path):
+    """U2: `fullnameOverride: lb` and mirrored images: neither the name nor the image says metallb, the selector does, for the speaker and the controller."""
+    labels = lambda role: {"app.kubernetes.io/name": "metallb", "app.kubernetes.io/component": role}  # noqa: E731
+    ds = {
+        "metadata": {"name": "lb-speaker", "namespace": "net"},
+        "spec": {"selector": {"matchLabels": labels("speaker")}, "template": {"spec": {"containers": [{"name": "speaker", "image": "harbor.corp/net/speaker:v0.16.2"}]}}},
+        "status": {"desiredNumberScheduled": 2, "numberReady": 2},
+    }
+    dp = {
+        "metadata": {"name": "lb-controller", "namespace": "net"},
+        "spec": {"replicas": 1, "selector": {"matchLabels": labels("controller")}, "template": {"spec": {"containers": [{"name": "controller", "image": "harbor.corp/net/controller:v0.16.2"}]}}},
+        "status": {"readyReplicas": 1},
+    }
+    s = metallbctl.analyze(snap(tmp_path, daemonsets=[ds], deployments=[dp], **{L2: [], BGP: [], STATE: []}), INV)["summary"]
+    assert (s["speaker_desired"], s["controller_replicas"], s["version"]) == (2, 1, "0.16.2")
+
+
+def test_a_renamed_daemonset_is_found_by_its_labels(tmp_path):
+    """U1 row E2: `speaker-prod` does not end in -speaker."""
+    ds = workload("v0.16.2")
+    ds["metadata"]["name"] = "speaker-prod"
+    ds["spec"]["selector"] = {"matchLabels": {"app": "metallb", "component": "speaker"}}
+    s = metallbctl.analyze(snap(tmp_path, daemonsets=[ds], **{L2: [], BGP: [], STATE: []}), INV)["summary"]
+    assert s["speaker_desired"] == 2
+
+
+def test_unknown_speakers_are_not_zero_speakers(tmp_path):
+    """U1: a DaemonSet List that failed leaves `objects/daemonsets.json` absent: the summary says not read, and the rule's needs skips on it."""
+    s = metallbctl.analyze(snap(tmp_path, daemonsets=None, **{L2: [], BGP: [], STATE: []}), INV)["summary"]
+    assert (s["speaker_desired"], s["daemonsets_read"]) == (None, False)
+
+
+def test_no_speaker_daemonset_found_is_said_as_found(tmp_path):
+    s = metallbctl.analyze(snap(tmp_path, daemonsets=[], **{L2: [], BGP: [], STATE: []}), INV)["summary"]
+    assert (s["speaker_desired"], s["daemonsets_read"]) == (None, True)
+
+
+def test_a_bgp_cluster_keeps_its_metric_path_with_one_speaker_unread(tmp_path):
+    """U4: BGP rows hold no L2, so they must not replace the metric path: the leader check has no L2 to judge rather than saying nothing was read."""
+    step = partial_step()
+    plain = [workload("v0.15.3", ("monitoring", 7472))]
+    prom = "metallb_k8s_client_config_loaded_bool 1\n"
+    l2 = metallbctl.analyze(snap(tmp_path, version="v0.15.3", step=step, metrics=prom, daemonsets=plain, **{BGP: [BGP_WEB], L2: []}), INV)["l2"]
+    assert l2["source"].startswith("metrics/") and l2["available"] is True and l2["announced_total"] == 0
+
+
+def test_part_of_the_rows_is_marked_partial(tmp_path):
+    """U5: up to 0.14.5 no status row exists by default, so one speaker's rows are a part: the leader checks skip on `partial`."""
+    plain = [workload("v0.14.5", ("monitoring", 7472))]
+    out = metallbctl.analyze(snap(tmp_path, version="v0.14.5", step=partial_step(), metrics=PROM, daemonsets=plain), INV)
+    assert out["l2"]["partial"] is True and out["summary"]["l2_partial"] is True
+
+
+def test_every_speaker_read_is_not_partial(tmp_path):
+    step = {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}}}
+    plain = [workload("v0.14.9", ("monitoring", 7472))]
+    assert metallbctl.analyze(snap(tmp_path, version="v0.14.9", step=step, metrics=PROM, daemonsets=plain), INV)["l2"]["partial"] is False
+
+
+def test_a_single_dash_lb_class_is_read(tmp_path):
+    """U6: Go's flag package takes one dash or two (golang/go src/flag/flag.go:52-53@go1.25.0)."""
+    for args in (["-lb-class=metallb.io/lb"], ["--lb-class=metallb.io/lb"], ["--lb-class", "metallb.io/lb"], ["-lb-class", "metallb.io/lb"]):
+        assert metallbctl._lb_class({"args": args}) == "metallb.io/lb"
+    assert metallbctl._lb_class({"args": ["--port=7472"]}) == ""
+
+
+def test_the_rule_reads_no_removed_key():
+    text = (ROOT / "collectors/metallb/checks.yaml").read_text(encoding="utf-8")
+    assert "speakers_pinned" not in text and "kept off tainted nodes" not in text

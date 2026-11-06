@@ -28,6 +28,7 @@ from .resilience import eligible_nodes
 from .snapshot import load_json, objects
 
 HTTPS_ONLY_SINCE = (0, 16, 0)
+METRICS_SOURCE = "metrics/pod/metallb-speaker/*.prom (pod proxy GET)"
 L2_STATUS, BGP_STATUS, CONFIG_STATE = "servicel2statuses.metallb.io", "servicebgpstatuses.metallb.io", "configurationstates.metallb.io"
 COUNTERS = {"update_errors_total": "update_errors", "arp_requests_total": "arp_requests", "arp_responses_total": "arp_responses", "gratuitous_total": "gratuitous", "bgp_sessions": "bgp_sessions", "bgp_sessions_up": "bgp_sessions_up"}
 METRICS_NOT_READ = ["metallb_k8s_client_update_errors_total", "metallb_layer2_requests_received", "metallb_layer2_responses_sent", "metallb_layer2_gratuitous_sent", "metallb_bgp_session_up"]
@@ -45,9 +46,20 @@ def _container(d: dict, role: str) -> dict:
     return next((c for c in containers if c.get("name") == role), next((c for c in containers if role in (c.get("image") or "")), containers[0]))
 
 
-def _workload(found: list[dict], role: str) -> dict | None:
-    """Of the workloads whose name fits, the one running a MetalLB image: any DaemonSet can be called `x-speaker`."""
-    return next((d for d in found if "metallb" in (_container(d, role).get("image") or "")), found[0] if found else None)
+def _is_metallb(d: dict, role: str) -> bool:
+    """A workload is MetalLB's by the labels it selects, which neither a `fullnameOverride` nor a mirrored image changes, else by its image: native `app: metallb` with `component`
+    (config/manifests/metallb-native.yaml:2284-2285@v0.16.2), chart `app.kubernetes.io/name` with `app.kubernetes.io/component` (charts/metallb/templates/_helpers.tpl:50, templates/speaker.yaml:145, templates/controller.yaml:21@v0.16.2)."""
+    labels = ((d.get("spec") or {}).get("selector") or {}).get("matchLabels") or {}
+    native = labels.get("app") == "metallb" and labels.get("component") == role
+    chart = labels.get("app.kubernetes.io/name") == "metallb" and labels.get("app.kubernetes.io/component") == role
+    return native or chart or "metallb" in (_container(d, role).get("image") or "")
+
+
+def _workload(items: list[dict], role: str, names: tuple[str, ...], suffix: str, pools: bool) -> dict | None:
+    """The MetalLB workload of a role. A name alone says nothing, any DaemonSet can be called `x-speaker`, so it counts only beside MetalLB's own pools. The chart's fullname is the release name
+    when that name holds `metallb` (charts/metallb/templates/_helpers.tpl:14-20@v0.16.2), so the fixed names were never the whole answer."""
+    named = [d for d in items if d["metadata"]["name"] in names or d["metadata"]["name"].endswith(suffix)]
+    return next((d for d in named + items if _is_metallb(d, role)), named[0] if named and pools else None)
 
 
 def _lb_class(*containers: dict) -> str:
@@ -55,10 +67,9 @@ def _lb_class(*containers: dict) -> str:
     for c in containers:
         args = [str(a) for a in c.get("args") or []]
         for i, a in enumerate(args):
-            if a.startswith("--lb-class="):
-                return a.split("=", 1)[1]
-            if a == "--lb-class" and i + 1 < len(args):
-                return args[i + 1]
+            name, _, value = a.lstrip("-").partition("=")  # Go's flag package takes one dash or two (speaker/main.go:18,103@v0.16.2)
+            if a.startswith("-") and name == "lb-class":
+                return value if "=" in a else (args[i + 1] if i + 1 < len(args) else "")
     return ""
 
 
@@ -152,8 +163,8 @@ def _l2(snap: Path, lb: list[dict], node_names: list[str], texts: dict[str, str]
     announced, source = [], None
     status_rows = _announced_from_status(snap, lb, node_names)
     status_source = f"objects/{L2_STATUS}.json, {BGP_STATUS}.json"
-    if texts and not (errors and status_rows):  # the leaders one speaker printed do not stand for the speakers nobody read, when the status resources name them all
-        announced, source = _announced_from_metrics(texts), "metrics/pod/metallb-speaker/*.prom (pod proxy GET)"
+    if texts and not (errors and any(r["protocol"] == "layer2" for r in status_rows)):  # the leaders one speaker printed do not stand for the speakers nobody read, when the status resources name them all
+        announced, source = _announced_from_metrics(texts), METRICS_SOURCE
     else:
         announced = status_rows
         if any(r["protocol"] == "layer2" for r in announced) or (https_only_version and (snap / "objects" / f"{L2_STATUS}.json").is_file()):
@@ -170,6 +181,7 @@ def _l2(snap: Path, lb: list[dict], node_names: list[str], texts: dict[str, str]
     return {
         "available": source is not None,
         "source": source,
+        "partial": bool(errors) and bool(texts) and source == METRICS_SOURCE,  # some speakers unread and no status resource for them (default up to 0.14.5): the read rows are a part, so a share of them proves nothing
         "metrics_tls_only": tls_only,
         "speakers": len(texts),
         "speakers_unreadable": errors,
@@ -212,12 +224,9 @@ def _not_reported(states: list[dict], speakers_desired: int | None, controller_d
 
 def analyze(snap: Path, inv: dict | None) -> dict:
     inv = inv or {}
-    speaker = _workload([d for d in objects(snap, "daemonsets") if d["metadata"]["name"] in ("speaker", "metallb-speaker") or d["metadata"]["name"].endswith("-speaker")], "speaker")
-    # The chart's fullname is the release name when that name holds `metallb` (charts/metallb/templates/_helpers.tpl:14-20@v0.16.2), so release metallb-prod gives metallb-prod-controller. `*-controller` alone is any operator, so past the fixed names the image decides.
-    deployments = objects(snap, "deployments")
-    named = [d for d in deployments if d["metadata"]["name"] in ("controller", "metallb-controller") or d["metadata"]["name"].endswith("metallb-controller")]
-    by_image = [d for d in deployments if d["metadata"]["name"].endswith("-controller") and "metallb" in (_container(d, "controller").get("image") or "") and d not in named]
-    controller = _workload(named + by_image, "controller")
+    pools = bool(objects(snap, "ipaddresspools.metallb.io"))
+    speaker = _workload(objects(snap, "daemonsets"), "speaker", ("speaker", "metallb-speaker"), "-speaker", pools)
+    controller = _workload(objects(snap, "deployments"), "controller", ("controller", "metallb-controller"), "metallb-controller", pools)
     base = _pools(snap, _lb_class(*[_container(d, role) for d, role in ((controller, "controller"), (speaker, "speaker")) if d]))
     if not base.get("present") and speaker is None and controller is None:
         return {"present": False}
@@ -294,7 +303,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "speaker_ready": sp_.get("ready"),
         "speaker_all_nodes": (sp_.get("ready") or 0) >= nodes_total if sp_.get("present") else None,
         "speaker_eligible": eligible,
-        "speakers_pinned": eligible is not None and eligible < nodes_total,  # kept off some nodes on purpose: fewer speakers than nodes is the design, as L2Advertisement nodeSelectors are for leaders
+        "daemonsets_read": (snap / "objects" / "daemonsets.json").is_file(),
+        "deployments_read": (snap / "objects" / "deployments.json").is_file(),
         "nodes_total": nodes_total,
         "controller_replicas": ct_.get("desired"),
         "controller_ready": ct_.get("ready"),
@@ -306,6 +316,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "lb_services": len(base.get("services") or []),
         "lb_services_other_class": base.get("other_class_services") or 0,
         "l2_available": l2.get("available"),
+        "l2_partial": l2.get("partial"),
         "speakers_read": len(texts),
         "speakers_unreadable": l2.get("speakers_unreadable") or [],
         "leader_node": l2.get("leader_node"),

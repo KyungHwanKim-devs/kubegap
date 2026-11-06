@@ -893,7 +893,8 @@ def _eval_object(cx: Context, check: dict, run: _Run) -> dict:
 def _eval_summary(cx: Context, check: dict, run: _Run) -> dict:
     seq = _get_path(cx.summary, check["each"]) if check.get("each") else None
     if seq is None:
-        return run.skip(f"summary.{check.get('each')} missing")
+        parent = _get_path(cx.summary, str(check.get("each")).rpartition(".")[0]) if "." in str(check.get("each")) else None
+        return run.skip((parent or {}).get("skip_reason") if isinstance(parent, dict) and parent.get("skip_reason") else f"summary.{check.get('each')} missing")
     if check.get("cluster_level") or isinstance(seq, dict):
         seq = [seq]  # If the path is a single dict, it is the one item (cluster level)
     for item in seq:

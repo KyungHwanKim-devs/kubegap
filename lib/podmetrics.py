@@ -165,8 +165,13 @@ def _discovered(objs: dict, disc: dict, default_port: int, default_namespace: st
                 matches.append((kind, o))
     if not matches:
         return None
-    hint = disc.get("image")  # names can collide (any DaemonSet may be called x-speaker): when `image:` is set, a workload running that image goes first
-    matches = [m for m in matches if hint and any(hint in str(c.get("image")) for c in ((m[1].get("spec") or {}).get("template") or {}).get("spec", {}).get("containers") or [])] or matches
+    hint = disc.get("image")  # names can collide (any DaemonSet may be called x-speaker): when `image:` is set, a workload running that image, or selecting a label with that value for a mirrored image, goes first
+
+    def hinted(o: dict) -> bool:
+        spec = o.get("spec") or {}
+        return any(hint in str(c.get("image")) for c in ((spec.get("template") or {}).get("spec") or {}).get("containers") or []) or hint in ((spec.get("selector") or {}).get("matchLabels") or {}).values()
+
+    matches = [m for m in matches if hint and hinted(m[1])] or matches
     candidates = [f"{k} {o['metadata'].get('namespace') or ''}/{o['metadata']['name']}" for k, o in matches]
     kind, o = next(((k, o) for k, o in matches if (o["metadata"].get("namespace") or "") == default_namespace), matches[0])
     ns, name = o["metadata"].get("namespace") or "", o["metadata"]["name"]
