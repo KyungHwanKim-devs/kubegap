@@ -1,7 +1,7 @@
 # ---------------- vpc-cni (collectors/vpc-cni/signatures.yaml) ----------------
 # The three vpc-cni signatures read two files. The aws-node pod log holds only the logrus lines of the Go entrypoint (cmd/aws-vpc-cni/main.go): ipamd writes its zap JSON to
 # AWS_VPC_K8S_CNI_LOG_FILE, default /host/var/log/aws-routed-eni/ipamd.log (pkg/utils/logger/config.go:21), to stdout only when that env is "stdout" (zaplogger.go:136@v1.19.0);
-# the CNI plugin writes to AWS_VPC_K8S_PLUGIN_LOG_FILE (/var/log/aws-routed-eni/plugin.log). A full run with node access reads the warn and error lines of the last 24 hours of
+# the CNI plugin writes to AWS_VPC_K8S_PLUGIN_LOG_FILE (/var/log/aws-routed-eni/plugin.log). A full run with node access reads the lines of level warn and higher of the last 24 hours of
 # ipamd.log from every node into logs/node/<node>/ipamd-24h.log (collectors/vpc-cni/collect.yaml `ipamd-log`, #158), where the ipamd alternatives match. In a daily run, or
 # without node access, only the entrypoint lines are read and silence is not evidence of health.
 # Wording fixed to the source: "DataStore has no available IP/Prefix addresses" (capital D and S, "/Prefix"), "Failed to allocate %d IP addresses", "Failed to assign IPs from network card %d".

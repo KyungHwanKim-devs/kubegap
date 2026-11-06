@@ -541,7 +541,7 @@ def cmd_nodes(args) -> int:
         ctx = _context(args, cfg)
         inv = _discover.live_inventory(ctx, cfg, kubeconfig=args.kubeconfig)
         ctx_dir, snap, source = paths.ensure_private_dir(paths.context_root(ctx, _root(args)), base=_root(args)), None, f"{inv['nodes']['count']} nodes read from the cluster now"
-    na = NodeAccess(inv, cfg, kubeconfig=args.kubeconfig)
+    na = NodeAccess(inv, cfg)
     print(f"{source}, backend {na.method}" + (" (overridden by config.yaml)" if cfg.get("node_access") else ""))
     for why in (inv.get("node_access") or {}).get("reasons") or []:
         if na.method == "none":

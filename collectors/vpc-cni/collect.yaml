@@ -4,7 +4,7 @@
 # 2) ENI/IP limits per instance type (describe-instance-types): max IPs a node can hold = ENIs × (IPv4 per ENI − 1). Compared with max-pods.
 # 3) Remaining subnet IPs come from eks-platform aws/describe-subnets.json; aws-node logs from core component-logs (logs/pods/vpc-cni/).
 # 4) ipamd log: the IP management daemon writes zap JSON to /var/log/aws-routed-eni/ipamd.log on the node, not to the pod log (the pod log holds the entrypoint's logrus lines only),
-#    so the three vpc-cni log signatures read it from the node: warn and error lines of the last 24 hours, capped like the kubelet journal (#158). Output logs/node/<node>/ipamd-24h.log.
+#    so the three vpc-cni log signatures read it from the node: the lines of level warn and higher of the last 24 hours, capped like the kubelet journal (#158). Output logs/node/<node>/ipamd-24h.log.
 - id: ipamd-metrics
   modes: [full]   # skipped by the daily run
   type: node
@@ -23,7 +23,7 @@
     grep -E '"level":"(warn|error|dpanic|panic|fatal)"' "$F" | awk -v s="$SINCE" 'match($0, /"ts":"[^"]*"/) { if (substr($0, RSTART + 6, 19) >= s) print }' | tail -n 3000
   # Level and ts keys and their spelling: zap's production encoder (`"level"` lowercase, `"ts"` ISO 8601 `2006-01-02T15:04:05.000Z0700`), which ipamd uses with the time encoder swapped;
   # the file is rotated by lumberjack at 100 MB (5 backups, 30 days), so a day of lines is in the current file on every node that does not write 100 MB a day, and only that file is read.
-  source: "aws/amazon-vpc-cni-k8s pkg/utils/logger/config.go:21-22@v1.19.0, @v1.23.2 (default file /host/var/log/aws-routed-eni/ipamd.log, default level Debug); pkg/utils/logger/zaplogger.go:101-104,144-150@v1.19.0, :103-105,153-160@v1.23.2 (production encoder with ISO8601TimeEncoder, lumberjack 100 MB/5/30); uber-go/zap config.go:126-127,134@v1.26.0, @v1.28.0 (TimeKey ts, LevelKey level, LowercaseLevelEncoder); uber-go/zap zapcore/encoder.go:135-136@v1.26.0, :141-142@v1.28.0 (ISO8601TimeEncoder layout); natefinch/lumberjack lumberjack.go:39,247-258@v2.2.1 (backups are ipamd-<timestamp>.log, the current file keeps its name)"
+  source: "aws/amazon-vpc-cni-k8s pkg/utils/logger/config.go:21-22@v1.19.0, @v1.23.2 (default file /host/var/log/aws-routed-eni/ipamd.log, default level Debug); pkg/utils/logger/zaplogger.go:101-104,144-151@v1.19.0, :103-105,153-160@v1.23.2 (production encoder with ISO8601TimeEncoder, lumberjack 100 MB/5/30); uber-go/zap config.go:126-127,134@v1.26.0, @v1.28.0 (TimeKey ts, LevelKey level, LowercaseLevelEncoder); uber-go/zap zapcore/encoder.go:135-136@v1.26.0, :141-142@v1.28.0 (ISO8601TimeEncoder layout); natefinch/lumberjack lumberjack.go:39,247-258@v2.2.1 (backups are ipamd-<timestamp>.log, the current file keeps its name)"
   out: logs/node/{node}/ipamd-24h.log
   timeout: 60
 - id: instance-type-network

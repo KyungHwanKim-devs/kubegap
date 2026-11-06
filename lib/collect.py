@@ -556,10 +556,10 @@ NODE_BACKENDS = ("ssh", "ssm")
 class NodeRunner:
     """For node command steps. Builds the NodeAccess and the capabilities table once and reuses them."""
 
-    def __init__(self, inv: dict, cfg: Config, log: RunLog, kubeconfig: str | None = None):
+    def __init__(self, inv: dict, cfg: Config, log: RunLog):
         from .node import NodeAccess
 
-        self.na = NodeAccess(inv, cfg, log, kubeconfig=kubeconfig)
+        self.na = NodeAccess(inv, cfg, log)
         self._caps: dict | None = None
         self.nodes = {n["name"]: n for n in (inv.get("nodes") or {}).get("nodes", [])}
 
@@ -1096,7 +1096,7 @@ def collect(context: str, cfg: Config, inv: dict, snap: Path, log: RunLog, *, ku
     if prom is None:
         echo("  Could not connect to Prometheus; all PromQL steps are skipped")
     stores = Stores(context, cfg, inv, kubeconfig, log)
-    node_runner = NodeRunner(inv, cfg, log, kubeconfig=kubeconfig)
+    node_runner = NodeRunner(inv, cfg, log)
     state = CollectState()
     print_lock = threading.Lock()
 

@@ -73,8 +73,7 @@ def ssh_hand_command(ssh_cfg: dict, host: str) -> str:
 
 
 class NodeAccess:
-    def __init__(self, inv: dict, cfg: Config, log: RunLog | None = None, kubeconfig: str | None = None):
-        self.kubeconfig = kubeconfig
+    def __init__(self, inv: dict, cfg: Config, log: RunLog | None = None):
         self.inv, self.cfg, self.log = inv, cfg, log
         na = inv.get("node_access") or {}
         self.method = cfg.get("node_access") or na.get("method") or "none"
