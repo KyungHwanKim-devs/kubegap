@@ -198,7 +198,7 @@ def test_the_frr_container_is_not_the_metallb_version(tmp_path):
     """Read from the first container, 9.1.0 passed as 0.16 or later: an unreadable 0.14 speaker stopped warning. Review of this change, measured with a proxy returning 503."""
     step = {"ok": True, "pods": {"speaker-a": {"ok": False, "node": "kind-worker", "error": "HTTP 503"}}}
     s = metallbctl.analyze(snap(tmp_path, version="v0.14.9", step=step, daemonsets=[frr_first("v0.14.9")]), INV)["summary"]
-    assert s["version"] == "0.14.9" and s["metrics_tls_only"] is False and s["metrics_not_read"] == []
+    assert s["version"] == "0.14.9" and s["metrics_tls_only"] is False and s["metrics_not_read"] == metallbctl.METRICS_NOT_READ
     assert [e["pod"] for e in s["speakers_unreadable"]] == ["speaker-a"]
 
 
@@ -296,16 +296,137 @@ def test_one_good_file_does_not_hide_a_pod_that_answered_with_nothing(tmp_path):
     assert s["speakers_read"] == 1 and [e["pod"] for e in s["speakers_unreadable"]] == ["speaker-b"]
 
 
-def test_a_speaker_pinned_on_purpose_is_named(tmp_path):
-    """Two speakers of four nodes with a nodeSelector is a layout, not a fault. The os selector of every manifest does not count as pinning."""
-    (tmp_path / "a").mkdir()
-    (tmp_path / "b").mkdir()
+def node(name, labels=None, taints=None, **spec):
+    return {"metadata": {"name": name, "labels": labels or {}}, "spec": {"taints": taints or [], **spec}}
+
+
+def test_a_speaker_kept_off_nodes_on_purpose_is_named(tmp_path):
+    """Two speakers of four nodes with a nodeSelector is a layout, not a fault. The os selector of every manifest does not count."""
     pinned = workload("v0.16.2")
     pinned["spec"]["template"]["spec"]["nodeSelector"] = {"kubernetes.io/os": "linux", "role": "edge"}
-    inv = {"nodes": {"count": 4, "nodes": [{"name": "kind-worker"}]}}
-    s = metallbctl.analyze(snap(tmp_path / "a", daemonsets=[pinned], **{L2: [], BGP: [], STATE: []}), inv)["summary"]
-    assert s["speaker_all_nodes"] is False and s["speakers_pinned"] is True
-    os_only = workload("v0.16.2")
-    os_only["spec"]["template"]["spec"]["nodeSelector"] = {"kubernetes.io/os": "linux"}
-    s = metallbctl.analyze(snap(tmp_path / "b", daemonsets=[os_only], **{L2: [], BGP: [], STATE: []}), inv)["summary"]
-    assert s["speakers_pinned"] is False
+    linux = {"kubernetes.io/os": "linux"}
+    nodes = [node("a", {**linux, "role": "edge"}), node("b", {**linux, "role": "edge"}), node("c", linux), node("d", linux)]
+    inv = {"nodes": {"count": 4, "nodes": [{"name": n["metadata"]["name"]} for n in nodes]}}
+    s = metallbctl.analyze(snap(tmp_path, daemonsets=[pinned], nodes=nodes, **{L2: [], BGP: [], STATE: []}), inv)["summary"]
+    assert (s["speaker_all_nodes"], s["speakers_pinned"], s["speaker_eligible"]) == (False, True, 2)
+
+
+def test_a_taint_keeps_a_speaker_off_a_node_like_a_selector_does(tmp_path):
+    """T6 of the third review: no selector, one tainted node, speakers 2 of 3. The DaemonSet runs everywhere it can."""
+    taint = [{"key": "dedicated", "value": "db", "effect": "NoSchedule"}]
+    nodes = [node("a"), node("b"), node("c", taints=taint)]
+    inv = {"nodes": {"count": 3, "nodes": [{"name": n["metadata"]["name"]} for n in nodes]}}
+    s = metallbctl.analyze(snap(tmp_path, nodes=nodes, **{L2: [], BGP: [], STATE: []}), inv)["summary"]
+    assert (s["speakers_pinned"], s["speaker_eligible"], s["speaker_ready"]) == (True, 2, 2)
+
+
+def test_no_node_list_means_eligibility_is_unknown(tmp_path):
+    s = metallbctl.analyze(snap(tmp_path, **{L2: [], BGP: [], STATE: []}), INV)["summary"]
+    assert (s["speaker_eligible"], s["speakers_pinned"]) == (None, False)
+
+
+def test_a_speaker_daemonset_with_no_pod_is_not_a_layout(tmp_path):
+    """T1 of the third review: the node label lost, 0 of 0 speakers, two Services still hold IPs. Nothing announces them; the rule fails on speaker_desired 0 with lb_services above 0."""
+    pinned = workload("v0.16.2")
+    pinned["spec"]["template"]["spec"]["nodeSelector"] = {"lb": "yes"}
+    pinned["status"] = {"desiredNumberScheduled": 0, "numberReady": 0}
+    nodes = [node("kind-worker"), node("kind-control-plane")]
+    s = metallbctl.analyze(snap(tmp_path, daemonsets=[pinned], nodes=nodes, **{L2: [], BGP: [], STATE: []}), INV)["summary"]
+    assert (s["speaker_desired"], s["speaker_ready"], s["speaker_eligible"], s["lb_services"]) == (0, 0, 0, 2)
+
+
+def test_another_implementations_service_is_not_metallbs(tmp_path):
+    """T2 of the third review: MetalLB without --lb-class ignores every Service that sets a class (service_controller.go:159-175@v0.16.2). An NLB with a hostname is neither Pending nor a user of the pool."""
+    nlb = {"metadata": {"name": "nlb", "namespace": "default"}, "spec": {"type": "LoadBalancer", "loadBalancerClass": "service.k8s.aws/nlb"}, "status": {"loadBalancer": {"ingress": [{"hostname": "a.elb.amazonaws.com"}]}}}
+    vip = {"metadata": {"name": "vip", "namespace": "default"}, "spec": {"type": "LoadBalancer", "loadBalancerClass": "kube-vip.io/kube-vip-class"}, "status": {"loadBalancer": {"ingress": [{"ip": "10.9.9.9"}]}}}
+    out = metallbctl.analyze(snap(tmp_path, services=[service("web", "172.18.255.200"), nlb, vip], **{L2: [], BGP: [], STATE: []}), INV)
+    s = out["summary"]
+    assert (s["pending"], s["used"], s["free"], s["lb_services"], s["lb_services_other_class"]) == ([], 1, 10, 1, 2)
+
+
+def test_lb_class_set_means_only_that_class_is_metallbs(tmp_path):
+    """With --lb-class a Service with no class is ignored as well (service_controller.go:166-168@v0.16.2)."""
+    ds = workload("v0.16.2")
+    ds["spec"]["template"]["spec"]["containers"][0]["args"] = ["--lb-class=metallb.io/lb"]
+    mine = service("mine", "172.18.255.200")
+    mine["spec"]["loadBalancerClass"] = "metallb.io/lb"
+    s = metallbctl.analyze(snap(tmp_path, daemonsets=[ds], services=[mine, service("other", "10.0.0.1")], **{L2: [], BGP: [], STATE: []}), INV)["summary"]
+    assert (s["lb_services"], s["lb_services_other_class"], s["used"]) == (1, 1, 1)
+
+
+def test_a_pending_metallb_service_stays_pending(tmp_path):
+    pending = {"metadata": {"name": "web", "namespace": "default"}, "spec": {"type": "LoadBalancer"}, "status": {}}
+    s = metallbctl.analyze(snap(tmp_path, services=[pending], **{L2: [], BGP: [], STATE: []}), INV)["summary"]
+    assert s["pending"] == ["default/web"]
+
+
+def partial_step():
+    return {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}, "speaker-b": {"ok": False, "node": "kind-control-plane", "error": "HTTP 503"}}}
+
+
+PROM = 'metallb_speaker_announced{ip="172.18.255.200",node="kind-worker",protocol="layer2",service="default/web"} 1\nmetallb_k8s_client_config_loaded_bool 1\nmetallb_k8s_client_config_stale_bool 0\n'
+
+
+def test_an_unread_speaker_answers_through_its_configuration_state(tmp_path):
+    """T3 of the third review: one speaker read, the other 503 and Invalid. The answer is in the snapshot, so config-stale must not pass on half its input."""
+    invalid = {"metadata": {"name": "speaker-b", "labels": {"metallb.io/component-type": "speaker", "metallb.io/node-name": "kind-control-plane"}}, "status": {"result": "Invalid", "errorSummary": OVERLAP}}
+    plain = [workload("v0.15.3", ("monitoring", 7472))]
+    s = metallbctl.analyze(snap(tmp_path, version="v0.15.3", step=partial_step(), metrics=PROM, daemonsets=plain, **{STATE: [invalid]}), INV)["summary"]
+    assert (s["config_source"], s["config_stale_pods"], s["config_not_reported"]) == ("metrics and configurationstates", ["speaker-b"], [])
+    assert s["config_errors"] == [OVERLAP]
+
+
+def test_a_speaker_no_source_answers_for_is_not_reported(tmp_path):
+    plain = [workload("v0.14.9", ("monitoring", 7472))]
+    s = metallbctl.analyze(snap(tmp_path, version="v0.14.9", step=partial_step(), metrics=PROM, daemonsets=plain), INV)["summary"]
+    assert (s["config_source"], s["config_stale_pods"], s["config_not_reported"]) == ("metrics", [], ["speaker-b"])
+
+
+def test_status_rows_stand_for_the_speakers_nobody_read(tmp_path):
+    """One speaker's rows are not the cluster's: the status resources name every leader."""
+    other = {"metadata": {"name": "l2-b"}, "status": {"node": "kind-control-plane", "serviceName": "web2", "serviceNamespace": "default"}}
+    plain = [workload("v0.15.3", ("monitoring", 7472))]
+    l2 = metallbctl.analyze(snap(tmp_path, version="v0.15.3", step=partial_step(), metrics=PROM, daemonsets=plain, **{L2: [L2_WEB, other]}), INV)["l2"]
+    assert l2["source"].startswith("objects/") and l2["by_node"] == {"kind-worker": 1, "kind-control-plane": 1}
+
+
+def test_a_release_named_metallb_something_keeps_its_controller(tmp_path):
+    """T5 of the third review: the chart's fullname is the release name when it holds `metallb` (_helpers.tpl:14-20@v0.16.2), so release metallb-prod gives metallb-prod-controller."""
+    ctl = {
+        "metadata": {"name": "metallb-prod-controller", "namespace": "metallb-system"},
+        "spec": {"replicas": 1, "template": {"spec": {"containers": [{"name": "controller", "image": "quay.io/metallb/controller:v0.16.2"}]}}},
+        "status": {"readyReplicas": 0},
+    }
+    s = metallbctl.analyze(snap(tmp_path, deployments=[ctl], **{L2: [], BGP: [], STATE: []}), INV)["summary"]
+    assert (s["controller_replicas"], s["controller_ready"]) == (1, 0)
+
+
+def test_another_operators_controller_is_not_metallbs(tmp_path):
+    ctl = {
+        "metadata": {"name": "ingress-nginx-controller", "namespace": "ingress"},
+        "spec": {"replicas": 2, "template": {"spec": {"containers": [{"name": "controller", "image": "registry.k8s.io/ingress-nginx/controller:v1.10.0"}]}}},
+        "status": {"readyReplicas": 2},
+    }
+    s = metallbctl.analyze(snap(tmp_path, deployments=[ctl], **{L2: [], BGP: [], STATE: []}), INV)["summary"]
+    assert s["controller_replicas"] is None
+
+
+def test_bgp_rows_do_not_make_l2_read(tmp_path):
+    """T7 of the third review: the ServiceL2Status List failed, BGP rows exist: L2 was not read."""
+    l2 = metallbctl.analyze(snap(tmp_path, **{L2: None, BGP: [BGP_WEB], STATE: []}), INV)["l2"]
+    assert (l2["available"], l2["source"], l2["announced_total"]) == (False, None, 0)
+
+
+def test_unread_values_are_unread_everywhere(tmp_path):
+    """T8 of the third review: the per-pod BGP values and the list of metrics not read."""
+    prom = "metallb_k8s_client_config_loaded_bool 1\n"
+    step = {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}}}
+    plain = [workload("v0.14.9", ("monitoring", 7472))]
+    out = metallbctl.analyze(snap(tmp_path, version="v0.14.9", step=step, metrics=prom, daemonsets=plain, bgppeers__metallb__io=[{"metadata": {"name": "lab"}}]), INV)
+    assert out["speaker_metrics"]["speaker-a"]["bgp_sessions"] is None and out["speaker_metrics"]["speaker-a"]["bgp_sessions_up"] is None
+
+
+def test_metrics_unread_before_0_16_are_named_too(tmp_path):
+    step = {"ok": True, "pods": {"speaker-a": {"ok": False, "node": "kind-worker", "error": "HTTP 503"}}}
+    s = metallbctl.analyze(snap(tmp_path, version="v0.15.3", step=step, daemonsets=[workload("v0.15.3", ("monitoring", 7472))]), INV)["summary"]
+    assert s["metrics_not_read"] == metallbctl.METRICS_NOT_READ

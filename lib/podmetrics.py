@@ -151,7 +151,7 @@ def default_target(st: dict) -> dict:
 def _discovered(objs: dict, disc: dict, default_port: int, default_namespace: str | None = None) -> dict | None:
     """The workload (kind and `namespace/name` glob of `discover:`) among the fetched objects, with its namespace, its pod selector (spec.selector.matchLabels)
     and the container port named as `port_names` says. When several workloads match (two installs, or a sibling such as loki-grafana next to grafana), the
-    one in the step's default namespace is taken, else the first by kind order, namespace and name, and every match is listed in `candidates` so the
+    one in the step's default namespace is taken, else the first by kind order, namespace and name, and every match (every one running the `image:` hint when one does) is listed in `candidates` so the
     choice is visible; `components.<name>` in config.yaml is the override. A port named as `https_port_names` says marks a metrics endpoint served over
     TLS with authentication, which kubegap cannot read through the pod proxy or a node curl: the step then skips and says so instead of reading nothing, with the `https_note` of the block, which says what stands in for it. `container` limits the port search to that container when it exists."""
     kinds = disc.get("kind") or []

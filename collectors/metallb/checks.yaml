@@ -83,10 +83,10 @@
   cluster_level: true
   profiles: [prod, lab]
   rule:
-    needs: "item.get('available') or not item.get('metrics_tls_only')"
-    needs_reason: "L2 leaders not read (metrics over TLS with authentication and no status resources)"
-    expr: "item['available'] and item['nodes_total'] >= 2 and item['announced_total'] >= 2 and (item['leader_share'] or 0) >= 1.0 and not item['pinned_by_selector']"
-    warn_expr: "(item['available'] and item['nodes_total'] >= 2 and item['announced_total'] >= 2 and (item['leader_share'] or 0) >= 0.8 and not item['pinned_by_selector']) or (not item['available'] and item['lb_services'] > 0)"
+    needs: "(item.get('available') and (item.get('announced_total') or 0) > 0) or (not item.get('available') and not item.get('metrics_tls_only'))"
+    needs_reason: "no L2 announcement to judge, or L2 leaders not read (metrics over TLS with authentication and no status resources)"
+    expr: "item.get('available') and item['nodes_total'] >= 2 and item['announced_total'] >= 2 and (item['leader_share'] or 0) >= 1.0 and not item['pinned_by_selector']"
+    warn_expr: "(item.get('available') and item['nodes_total'] >= 2 and item['announced_total'] >= 2 and (item['leader_share'] or 0) >= 0.8 and not item['pinned_by_selector']) or (not item.get('available') and item['lb_services'] > 0)"
   target: "'cluster'"
   evidence: "f\"read from {item['source'] or 'nothing'} ({item['speakers']} speakers with metrics, available {item['available']}): {item['announced_total']} IPs announced (LoadBalancer services {item['lb_services']}), by node {item['by_node']}, leader {item['leader_node']} ({item['leader_share']}), pinned by nodeSelectors {item['pinned_by_selector']}, {item['nodes_total']} nodes\" + ('' if item['available'] else ' — could not read speaker /metrics (pod proxy failed or no speaker)')"
   severity_default: low
@@ -284,14 +284,14 @@
   each: metallb.summary
   cluster_level: true
   rule:
-    expr: "(item['speaker_ready'] or 0) < (item['speaker_desired'] or 0) or (item['controller_ready'] or 0) < (item['controller_replicas'] or 0)"
-    warn_expr: "(item['speaker_all_nodes'] is False and not item.get('speakers_pinned')) or len(item['speakers_unreadable']) > 0 or (item['metrics_available'] is False and not item.get('metrics_tls_only') and (item['lb_services'] or 0) > 0)"
+    expr: "(item['speaker_ready'] or 0) < (item['speaker_desired'] or 0) or (item['controller_ready'] or 0) < (item['controller_replicas'] or 0) or ((item['speaker_desired'] or 0) == 0 and (item['lb_services'] or 0) > 0)"
+    warn_expr: "(item.get('speaker_eligible') is not None and (item['speaker_ready'] or 0) < item['speaker_eligible']) or (item.get('speaker_eligible') is None and item['speaker_all_nodes'] is False) or (item['speaker_desired'] is not None and item['controller_replicas'] is None) or len(item['speakers_unreadable']) > 0 or (item['metrics_available'] is False and not item.get('metrics_tls_only') and (item['lb_services'] or 0) > 0)"
   target: "'cluster'"
-  evidence: "f\"speaker ready {item['speaker_ready']}/{item['speaker_desired']} ({item['nodes_total']} nodes, all nodes {item['speaker_all_nodes']}, pinned by nodeSelector or affinity {item.get('speakers_pinned')}), controller {item['controller_ready']}/{item['controller_replicas']}, speakers with metrics read {item['speakers_read']}, unreadable {item['speakers_unreadable']}, version {item['version']}, mode {item['mode']}\""
+  evidence: "f\"speaker ready {item['speaker_ready']}/{item['speaker_desired']} ({item['nodes_total']} nodes, all nodes {item['speaker_all_nodes']}, nodes it can run on {item.get('speaker_eligible')}), controller {item['controller_ready']}/{item['controller_replicas']}, speakers with metrics read {item['speakers_read']}, unreadable {item['speakers_unreadable']}, version {item['version']}, mode {item['mode']}\""
   severity_default: high
   symptom_linked: true
   why: >
-    In L2 mode a node without a speaker cannot announce any service IP — when the leader node dies, failover to that node does not happen, and an externalTrafficPolicy Local service that lives only on that node is never reachable. If the controller is down, new LoadBalancer services get no IP and stay Pending (existing IPs keep being announced by the speakers).
+    A DaemonSet with no pod while Services hold IPs announces nothing at all, so those IPs are unreachable. In L2 mode a node without a speaker cannot announce any service IP — when the leader node dies, failover to that node does not happen, and an externalTrafficPolicy Local service that lives only on that node is never reachable. If the controller is down, new LoadBalancer services get no IP and stay Pending (existing IPs keep being announced by the speakers).
   measured: >
     Measured on a 2-node k3s cluster: speaker 2/2 (2 nodes), controller 1/1, metrics 2/2 -> pass.
   suggest: "kubectl -n metallb-system get ds speaker; check node taints (the speaker needs tolerations) and nodeSelector. Speakers kept off tainted nodes on purpose read as a warn here: say so in the report."
@@ -607,6 +607,157 @@
           speaker_ready: 1
           speaker_all_nodes: false
           speakers_pinned: true
+          speaker_eligible: 1
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+          metrics_tls_only: false
+          metrics_not_read: []
+          config_read: true
+          config_source: "metrics"
+          config_errors: []
+          config_not_reported: []
+          update_errors_read: true
+      - expect: "fail"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 0
+          speaker_ready: 0
+          speaker_all_nodes: false
+          speakers_pinned: true
+          speaker_eligible: 0
+          nodes_total: 2
+          controller_replicas: 1
+          controller_ready: 1
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+          metrics_tls_only: false
+          metrics_not_read: []
+          config_read: true
+          config_source: "metrics"
+          config_errors: []
+          config_not_reported: []
+          update_errors_read: true
+      - expect: "warn"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 1
+          speaker_ready: 1
+          speaker_all_nodes: false
+          speakers_pinned: true
+          speaker_eligible: 1
+          nodes_total: 2
+          controller_replicas: null
+          controller_ready: null
+          pools: 1
+          total_ips: 10
+          used: 1
+          free: 9
+          pending: []
+          lb_services: 1
+          l2_available: true
+          speakers_read: 2
+          speakers_unreadable: []
+          leader_node: "node-b"
+          leader_share: 1.0
+          pinned_by_selector: false
+          config_stale_pods: []
+          update_errors_total: 0
+          arp_requests_total: 27
+          arp_responses_total: 27
+          gratuitous_total: 5020
+          bgp_sessions: 0
+          bgp_sessions_up: 0
+          bgp_peers: 0
+          webhooks_fail:
+            - "bgppeersvalidationwebhook.metallb.io"
+            - "bfdprofilevalidationwebhook.metallb.io"
+            - "bgpadvertisementvalidationwebhook.metallb.io"
+            - "communityvalidationwebhook.metallb.io"
+            - "ipaddresspoolvalidationwebhook.metallb.io"
+            - "l2advertisementvalidationwebhook.metallb.io"
+          webhooks: 6
+          metrics_available: true
+          metrics_tls_only: false
+          metrics_not_read: []
+          config_read: true
+          config_source: "metrics"
+          config_errors: []
+          config_not_reported: []
+          update_errors_read: true
+      - expect: "warn"
+        item:
+          present: true
+          mode: "layer2"
+          version: "0.14.5"
+          namespace: "metallb-system"
+          speaker_desired: 1
+          speaker_ready: 1
+          speaker_all_nodes: false
+          speakers_pinned: true
+          speaker_eligible: 2
           nodes_total: 2
           controller_replicas: 1
           controller_ready: 1
@@ -1358,7 +1509,7 @@
     Measured on a k3s cluster: 0.14.5 -> pass.
   suggest: "Upgrade the metallb Helm chart. CRD changes are in the release notes."
   verify:
-    - "kubectl -n metallb-system get ds speaker -o jsonpath='{.spec.template.spec.containers[0].image}'"
+    - "kubectl -n metallb-system get ds speaker -o jsonpath='{.spec.template.spec.containers[?(@.name==\"speaker\")].image}'"
   profiles: [prod, lab]
   test:
     cases:
