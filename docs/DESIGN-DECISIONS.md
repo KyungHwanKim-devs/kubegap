@@ -92,4 +92,4 @@ A profile says how strict to be: `prod`, `lab`, `small-prod`, `multi-az-prod`, `
 
 ## 19. English is the repository language; the report language is asked for
 
-Code, checks, documentation and samples are in English. The report is written in the language the user chooses when asked; a Korean README and Korean samples are provided. The checks and their rationale are the part worth contributing to, and that needs one language. The report is read by one operator, and it should be in theirs.
+Code, checks, documentation and samples are in English. The report is written in the language the user chooses when asked; a Korean README, Korean samples and Korean versions of the four user documents (`docs/ko/`) are provided. The checks and their rationale are the part worth contributing to, and that needs one language. The report is read by one operator, and it should be in theirs.

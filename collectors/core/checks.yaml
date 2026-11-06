@@ -3051,7 +3051,7 @@
     - { who: InfluxData 2023, url: https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/ }
     - { who: Spotify 2019, url: https://www.youtube.com/watch?v=ix0Tw8uinWs }
     - { who: Oath 2018, url: https://www.youtube.com/watch?v=likHm-KHGWQ }
-  suggest: Velero (plus EBS snapshots or PV backup). On EKS at least a DLM snapshot policy. In a small k3s cluster, k3s etcd-snapshot or a state.db copy plus PV directory backup. A backup is not a backup until a restore has been tested.
+  suggest: Velero (plus EBS snapshots or PV backup). On EKS at least a DLM snapshot policy. In a small k3s cluster, k3s etcd-snapshot or a state.db copy plus PV directory backup. Test a restore; a dump that was never restored may not work.
   verify:
     - "kubectl get crd backups.velero.io ; aws dlm get-lifecycle-policies"
   profiles: [prod, lab]

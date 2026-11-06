@@ -53,7 +53,7 @@ def build(spec: dict) -> list[tuple[str, str]]:
 
 def scrub(text: str, rules: list[tuple[str, str]]) -> str:
     for pat, rep in rules:
-        text = re.sub(pat, rep, text, flags=re.MULTILINE)
+        text = re.sub(pat, rep, text, flags=re.MULTILINE | re.ASCII)  # ASCII: in a Korean report a particle follows the name, and \\b would not see the end of it
     return text
 
 

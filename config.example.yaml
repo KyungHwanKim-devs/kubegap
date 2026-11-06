@@ -1,5 +1,6 @@
 # kubegap configuration example. Everything in here is optional.
 # Copy this file to ~/.kubegap/config.yaml (a config.yaml inside the skill folder is also read, but personal settings end up next to the repository, so it is not recommended). kubegap works without it: the context is kubectl's current context, and Prometheus and Loki are discovered and port-forwarded by the skill.
+# The common keys can be written without opening the file: `scripts/kubegap config set <key> <value>` (docs/SETUP.md lists them). The first run asks about what is missing and writes the answers this way.
 # Three kinds of settings live here: (1) prompts and install policy, (2) connection overrides, (3) suppressions and threshold overrides.
 
 # ---- (1) Prompts and install policy ----

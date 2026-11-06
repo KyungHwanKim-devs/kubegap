@@ -34,7 +34,7 @@ import json
 import re
 from pathlib import Path
 
-from . import __version__, aws, kube, monitoring, paths, podmetrics, scrub
+from . import __version__, aws, firstrun, kube, monitoring, paths, podmetrics, scrub
 from . import rubric as _rubric
 from .components import COMPONENTS, match_name
 from .config import Config
@@ -234,7 +234,17 @@ def _profile(platform: str, nodes: dict, cfg: Config, override: str | None) -> d
     return {"name": "small-prod", "source": "detected", "reasons": [f"platform {platform} (not EKS or k3s)", f"{nodes['count']} nodes (4-20), {len(zones)} AZs — inherits the checks of the base profile eks, quota and cost checks disabled"]}
 
 
-def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log: RunLog, *, context: str | None = None, kubeconfig: str | None = None) -> dict:
+def node_reader_nodes(context: str | None, kubeconfig: str | None = None) -> list[str]:
+    """Names of the nodes that have a Running kubegap-node-reader pod (deploy/node-access/daemonset.yaml, namespace kubegap). Empty when the
+    DaemonSet is not applied or the pods cannot be listed."""
+    ds_pods, _ = kube.kubectl_json(["get", "pods", "-n", "kubegap", "-l", "app.kubernetes.io/name=kubegap-node-reader", "-o", "json"], context=context, kubeconfig=kubeconfig, timeout=20)
+    return [p_["spec"].get("nodeName") for p_ in ((ds_pods or {}).get("items") or []) if (p_.get("status") or {}).get("phase") == "Running"]
+
+
+def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log: RunLog, *, context: str | None = None, kubeconfig: str | None = None, ssh_state: str = "yes") -> dict:
+    """ssh_state is `firstrun.ssh_decision`: on an SSH platform a node is contacted only when the user decided so ("yes": a config entry, a
+    probe they ran, or the first-run answer). "skipped" and "open" give no backend, with the reason and how to change it. config.yaml
+    `node_access` wins over all of it, and a node-reader DaemonSet the user applied is used wherever its pods run."""
     forced = cfg.get("node_access")
     out: dict = {"method": None, "source": "detected", "reasons": [], "ssm_registered": [], "ssm_unregistered": []}
     if forced in ("ssm", "ssh", "none"):
@@ -243,7 +253,11 @@ def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log:
         out["method"], out["source"] = "daemonset", "config.yaml"  # kept even when no pod is Running, so the node steps fail visibly instead of silently falling back to the platform default
     elif platform == "eks":
         out["method"], out["reasons"] = "ssm", ["EKS: SSM send-command"]
-    elif platform in ("k3s", "rke2", "unknown"):
+    elif platform in firstrun.SSH_PLATFORMS and ssh_state == "skipped":
+        out["method"], out["source"], out["reasons"] = "none", "first-run answer", [f"{platform}: reading nodes over SSH was skipped at the first-run question; `/kubegap setup` asks again"]
+    elif platform in firstrun.SSH_PLATFORMS and ssh_state == "open":
+        out["method"], out["reasons"] = "none", [f"{platform}: reading nodes over SSH has not been chosen yet, so no node was contacted. `/kubegap setup` asks; `node_access: ssh` in config.yaml decides it without asking"]
+    elif platform in firstrun.SSH_PLATFORMS:
         out["method"], out["reasons"] = "ssh", [f"{platform}: SSH"]
     else:  # gke, aks: no native backend yet (no cluster to test one on); the platform-independent DaemonSet backend is the available option
         out["method"], out["reasons"] = (
@@ -253,8 +267,7 @@ def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log:
     # If the user has applied deploy/node-access/daemonset.yaml (environments where neither SSM nor SSH works), nodes are read via kubectl exec — the third backend.
     # (A regression on 2026-10-26 attached the `else` above to this `if`, which turned EKS node access off; keep this block separate from the chain.)
     if cfg.get("node_access") in (None, "", "daemonset") and (platform != "eks" or cfg.get("node_access") == "daemonset"):
-        ds_pods, _ = kube.kubectl_json(["get", "pods", "-n", "kubegap", "-l", "app.kubernetes.io/name=kubegap-node-reader", "-o", "json"], context=context or cfg.get("context"), kubeconfig=kubeconfig, timeout=20)
-        running = [p_["spec"].get("nodeName") for p_ in ((ds_pods or {}).get("items") or []) if (p_.get("status") or {}).get("phase") == "Running"]
+        running = node_reader_nodes(context or cfg.get("context"), kubeconfig)
         if running:
             out["method"], out["reasons"] = "daemonset", [f"kubegap-node-reader DaemonSet: {len(running)} pods Running (namespace kubegap) — nodes are read via kubectl exec"]
             out["daemonset_nodes"] = running
@@ -377,7 +390,7 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
     platform, platform_reasons = detect_platform(ctx_info, nodes, comps, objs)
     write_objects()
     profile = _profile(platform, nodes, cfg, profile_override)
-    node_access = _node_access(platform, nodes, cfg, ctx_info.get("eks") if ctx_info.get("is_eks") else None, log, context=context, kubeconfig=kubeconfig)
+    node_access = _node_access(platform, nodes, cfg, ctx_info.get("eks") if ctx_info.get("is_eks") else None, log, context=context, kubeconfig=kubeconfig, ssh_state=firstrun.ssh_decision(snap.parent, cfg))
 
     # Stores: service discovery + connect and read retention (same code as setup)
     svcs, _err = monitoring.find_services(context, kubeconfig, log=log)
@@ -454,6 +467,27 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
 
 # Platforms that share another platform's collector folder. rke2 is close enough to k3s (same binary layout and systemd units) to reuse k3s-platform.
 PLATFORM_COLLECTOR_ALIASES: dict[str, str] = {"rke2": "k3s-platform"}
+
+
+def live_inventory(context: str, cfg: Config, *, kubeconfig: str | None = None, log: RunLog | None = None) -> dict:
+    """The part of inventory.json that node access needs (EKS facts, node list, backend), read from the cluster now. `kubegap nodes` uses it,
+    so node access can be checked before the first collection and against the nodes that exist today (a snapshot's list goes stale on a cluster
+    whose nodes are replaced). Raises FileNotFoundError with the reason when the nodes cannot be listed."""
+    log = log or RunLog(None)
+    ctx_info = kube.context_info(context, kubeconfig)
+    data, r = kube.kubectl_json(["get", "nodes"], context=context, timeout=30, id="nodes.get-nodes", log=log, kubeconfig=kubeconfig)
+    if data is None:
+        raise FileNotFoundError(f"cannot list the nodes of context {context!r}: {r.error or r.stderr.strip()[-300:]}")
+    nodes = _node_summary(items(data))
+    objs = {"nodes": data}
+    platform, reasons = detect_platform(ctx_info, nodes, detect_components(objs, None), objs)
+    eks = ctx_info.get("eks") if ctx_info.get("is_eks") else None
+    return {
+        "context": context,
+        "cluster": {"platform": platform, "platform_reasons": reasons, "eks": eks or {}},
+        "nodes": nodes,
+        "node_access": _node_access(platform, nodes, cfg, eks, log, context=context, kubeconfig=kubeconfig),
+    }
 
 
 def platform_collector(platform: str) -> str | None:

@@ -256,12 +256,15 @@ class NodeAccess:
         r = shell.run(argv, timeout=timeout + 10)
         if not r.ok:
             err = r.error or r.stderr.strip()[-300:] or f"exit {r.code}"
-            hint = ""
+            hint, kind = "", "other"
             if "Host key verification failed" in err or "REMOTE HOST IDENTIFICATION HAS CHANGED" in err:
+                kind = "host-key"
                 hint = f" → the host key of {host} is not in known_hosts, or differs from the stored one. Connect once by hand (`{ssh_hand_command(self.ssh, host)}`) to check and store the key, or set config.yaml ssh.accept_new_hosts: true to store first-seen keys automatically"
             elif "Permission denied" in err:
+                kind = "auth"
                 hint = " → check config.yaml ssh.user / ssh.key (password login is not supported)"
             elif "Could not resolve" in err or "timed out" in err or "No route" in err:
+                kind = "unreachable"
                 hint = " → set config.yaml ssh.hosts.<node> to an address reachable from this machine (e.g. a Tailscale IP)"
-            return NodeResult(node, "ssh", False, stdout=r.stdout, stderr=r.stderr, error=err + hint, seconds=r.seconds, detail={"host": host})
+            return NodeResult(node, "ssh", False, stdout=r.stdout, stderr=r.stderr, error=err + hint, seconds=r.seconds, detail={"host": host, "kind": kind})
         return NodeResult(node, "ssh", True, stdout=r.stdout, stderr=r.stderr, seconds=r.seconds, detail={"host": host})

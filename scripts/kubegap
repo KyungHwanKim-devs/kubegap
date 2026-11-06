@@ -69,8 +69,109 @@ def cmd_setup(args) -> int:
         install = cfg.install_policy == "always"
     # SSM document policy (EKS only): the flag wins; otherwise config ssm_document (always = upload, ask/never = report only). SKILL.md asks the user when setup reports it missing
     install_doc = bool(args.install_ssm_document) or cfg.ssm_document_policy == "always"
-    code, _ = _setup.run_setup(ctx, cfg, kubeconfig=args.kubeconfig, install=install, install_ssm_document=install_doc, snapshots_root=_root(args), verbose=args.verbose)
+    code, _ = _setup.run_setup(ctx, cfg, kubeconfig=args.kubeconfig, install=install, install_ssm_document=install_doc, snapshots_root=_root(args), verbose=args.verbose, ask_again=args.ask_again)
     return code
+
+
+def _context(args, cfg) -> str:
+    """--context, else `context:` in config.yaml, else the kubeconfig's current context. Raises with what to pass when there is none."""
+    ctx = getattr(args, "context", None) or cfg.get("context") or kube.current_context(getattr(args, "kubeconfig", None))
+    if not ctx:
+        raise FileNotFoundError("cannot determine the kube context. Pass `--context <name>`")
+    return ctx
+
+
+def _first_run_state(args, *, need_setup: bool = True):
+    """(context, context folder, saved setup result, config) for the commands that work on the first-run questions."""
+    from lib.config import load_config
+
+    cfg = load_config(args.config)
+    ctx = _context(args, cfg)
+    ctx_dir = paths.context_root(ctx, _root(args))
+    if not (ctx_dir / "setup.json").is_file():
+        if need_setup:
+            raise FileNotFoundError(f"no setup result for context {ctx!r}. Run `kubegap setup --context {ctx}` first")
+        return ctx, ctx_dir, {}, cfg
+    return ctx, ctx_dir, json.loads((ctx_dir / "setup.json").read_text(encoding="utf-8")), cfg
+
+
+def cmd_questions(args) -> int:
+    """Print the open first-run questions of this context from the saved setup result, the saved node probe and the remembered answers.
+    Reads files only; `setup` is what looks at the cluster."""
+    from lib import firstrun as _firstrun
+
+    ctx, ctx_dir, setup, cfg = _first_run_state(args)
+    qs = _firstrun.questions(setup, cfg, ctx_dir, all_=args.all)
+    if args.json:
+        print(json.dumps(qs, ensure_ascii=False, indent=1))
+    else:
+        print(_firstrun.render(qs, ctx, _firstrun.skipped(setup, cfg, ctx_dir)))
+    return EXIT_OK
+
+
+def cmd_answer(args) -> int:
+    """Remember the user's choice for one first-run question so it is not asked again. `--forget` drops remembered answers."""
+    from lib import firstrun as _firstrun
+
+    ctx, ctx_dir, setup, cfg = _first_run_state(args, need_setup=not args.forget)
+    if args.forget:
+        gone = _firstrun.forget_answers(ctx_dir, [args.item] if args.item else None) if ctx_dir.is_dir() else []
+        print(f"forgot: {', '.join(gone) or 'nothing'}")
+        return EXIT_OK
+    if not args.item or not args.option:
+        print("kubegap answer: give the question id and the chosen option, e.g. `answer node-ssh skip`", file=sys.stderr)
+        return EXIT_USAGE
+    known = {q["id"]: q for q in _firstrun.questions(setup, cfg, ctx_dir, all_=True)}
+    q = known.get(args.item)
+    if q is None:
+        print(f"kubegap answer: {args.item!r} is not a question for this context now. Questions: {', '.join(known) or 'none'}", file=sys.stderr)
+        return EXIT_ERROR
+    options = [o["id"] for o in q["options"]]
+    if args.option not in options:
+        print(f"kubegap answer: {args.option!r} is not an option of {args.item}. Options: {', '.join(options)}", file=sys.stderr)
+        return EXIT_ERROR
+    _firstrun.record_answer(ctx_dir, args.item, args.option, q.get("state"))
+    print(f"remembered for {ctx}: {args.item} = {args.option}. `/kubegap setup` asks again.")
+    return EXIT_OK
+
+
+def cmd_config(args) -> int:
+    """`config set <key> <value>`: write one key of config.yaml. --dry-run prints the lines that would change and writes nothing."""
+    from lib import configedit as _ce
+
+    path = Path(args.config).expanduser()
+    try:
+        diff, written = _ce.set_key(path, args.key, args.value, dry_run=args.dry_run)
+    except _ce.ConfigEditError as e:
+        print(f"kubegap config: {e}", file=sys.stderr)
+        return EXIT_ERROR
+    if not diff:
+        print(f"{path}: {args.key} is already {args.value}; nothing to change")
+        return EXIT_OK
+    print(f"{path} ({'would change' if args.dry_run else 'changed'}):")
+    print(diff)
+    if args.dry_run:
+        print("nothing was written (--dry-run)")
+    return EXIT_OK
+
+
+def cmd_iam_policy(args) -> int:
+    """Print deploy/permissions/iam-policy.json with the account id and cluster name of this context filled in. Prints only; nothing is sent to AWS."""
+    from lib.config import load_config
+
+    ctx = _context(args, load_config(args.config))
+    info = kube.context_info(ctx, args.kubeconfig)
+    e = info.get("eks") or {}
+    if not info.get("is_eks") or not e.get("account") or not e.get("name"):
+        print(f"kubegap iam-policy: context {ctx!r} does not name an EKS cluster with its account (the kubeconfig cluster name is not an EKS ARN). Fill <ACCOUNT_ID> and <CLUSTER_NAME> in deploy/permissions/iam-policy.json by hand.", file=sys.stderr)
+        return EXIT_ERROR
+    text = (ROOT / "deploy" / "permissions" / "iam-policy.json").read_text(encoding="utf-8")
+    policy = json.loads(text.replace("<ACCOUNT_ID>", e["account"]).replace("<CLUSTER_NAME>", e["name"]))
+    if args.without_node_access:
+        policy["Statement"] = [s for s in policy["Statement"] if "ssm:SendCommand" not in ([s["Action"]] if isinstance(s["Action"], str) else s["Action"])]
+    print(json.dumps(policy, indent=2))
+    print(f"kubegap iam-policy: filled for account {e['account']}, cluster {e['name']}" + (", without the two ssm:SendCommand statements (node checks are skipped)" if args.without_node_access else "") + ". Nothing was sent to AWS; attach it yourself.", file=sys.stderr)
+    return EXIT_OK
 
 
 def cmd_contexts(args) -> int:
@@ -266,13 +367,42 @@ def cmd_diff(args) -> int:
 
 
 def cmd_render_details(args) -> int:
-    """Assemble report-details.md from the snapshot files and the LLM fragments in <snapshot>/llm/ (see lib/render.py)."""
+    """Assemble report-details.md from the snapshot files and the `analysis` block of <snapshot>/llm/facts.json (see lib/render.py)."""
     from lib import render as _render
 
     snap = _resolve_snapshot_arg(args, args.snapshot)
     p = _render.render_details(snap, language=args.language)
-    missing = [n for n in _render.FRAGMENTS if not (snap / "llm" / f"{n}.md").is_file()]
-    print(f"saved: {p}" + (f" (fragments not written: {', '.join(missing)})" if missing else " (all fragments present)"))
+    missing = _render.empty_analysis_fields(snap, paths.snapshot_mode(snap))
+    print(f"saved: {p}" + (f" (analysis fields left empty in llm/facts.json: {', '.join(missing)})" if missing else " (every analysis field present)"))
+    return EXIT_OK
+
+
+def cmd_keep_report(args) -> int:
+    """Move the report of a snapshot to earlier-reports/ so that another report can be written from the same data (SKILL.md section 7)."""
+    from lib import render as _render
+
+    snap = _resolve_snapshot_arg(args, args.snapshot)
+    kept = _render.keep_report(snap)
+    print(f"kept: {kept}" if kept else "no report to keep")
+    return EXIT_OK
+
+
+def cmd_write_report(args) -> int:
+    """Write report.md from llm/facts.json with separate agents (lib/writer.py). Takes minutes; run it in the background and read its progress lines."""
+    from lib import writer as _writer
+
+    snap = _resolve_snapshot_arg(args, args.snapshot)
+    host = None if args.host == "auto" else args.host
+    host = host or _writer.detect_host()
+    if not host:
+        print("kubegap write-report: neither claude nor codex can be started here. Do the four steps in this session, each from a clean start: references/check-actions-<language>.md on the steps of the facts, references/writing-<language>.md to write, references/check-facts-<language>.md to check the text, references/replace-<language>.md to replace what it named.", file=sys.stderr)
+        return EXIT_ERROR
+    try:
+        p = _writer.write_report(snap, args.language, host, paths.rubric_version(), __version__, say=lambda m: print(m, flush=True))
+    except _writer.WriterError as e:
+        print(f"kubegap write-report: {e}", file=sys.stderr)
+        return EXIT_ERROR
+    print(f"saved: {p} (written with {host}; every agent's text is in llm/writing/, the facts before the step check in llm/facts-analysis.json)")
     return EXIT_OK
 
 
@@ -359,17 +489,32 @@ def cmd_mask(args) -> int:
 
 
 def cmd_nodes(args) -> int:
-    """Verify node command backend (SSM, SSH or DaemonSet) access. Sends `echo; uname -r; hostname` to every node listed in the latest snapshot's inventory.json."""
+    """Verify node command backend (SSM, SSH or DaemonSet) access. Sends `echo; uname -r; hostname` to every node the cluster has now
+    (or, with --snapshot, to the nodes in that snapshot's inventory.json), so it works before the first collection."""
     import json as _json
 
     from lib.config import load_config
     from lib.node import NodeAccess
 
     cfg = load_config(args.config)
-    snap = _resolve_snapshot_arg(args, args.snapshot)
-    inv = _json.loads((snap / "inventory.json").read_text(encoding="utf-8"))
+    if args.snapshot:
+        snap = _resolve_snapshot_arg(args, args.snapshot)
+        inv = _json.loads((snap / "inventory.json").read_text(encoding="utf-8"))
+        ctx_dir, source = snap.parent, f"snapshot {snap.name}"
+    else:
+        from lib import discover as _discover
+
+        ctx = _context(args, cfg)
+        inv = _discover.live_inventory(ctx, cfg, kubeconfig=args.kubeconfig)
+        ctx_dir, snap, source = paths.ensure_private_dir(paths.context_root(ctx, _root(args)), base=_root(args)), None, f"{inv['nodes']['count']} nodes read from the cluster now"
     na = NodeAccess(inv, cfg, kubeconfig=args.kubeconfig)
-    print(f"snapshot {snap.name}, backend {na.method}" + (" (overridden by config.yaml)" if cfg.get("node_access") else ""))
+    print(f"{source}, backend {na.method}" + (" (overridden by config.yaml)" if cfg.get("node_access") else ""))
+    for why in (inv.get("node_access") or {}).get("reasons") or []:
+        if na.method == "none":
+            print(f"  {why}")
+    if na.method == "none":
+        print("no node backend: nothing was sent to a node. The node checks (node.*) are reported as 'no node access'.")
+        return EXIT_ERROR
     if na.method == "ssm":
         from lib import nodecommands as _nc
 
@@ -421,18 +566,24 @@ def cmd_nodes(args) -> int:
             tail = (" | output: " + " / ".join(r.stdout.strip().splitlines()[:4])[:160]) if r.stdout.strip() else ""
             print(f"  failed {n:<48} [{r.backend}] {r.error}{tail}")
     print(f"reachable {ok}/{len(results)}")
-    if not args.cmd and not args.step and ok and na.method == "ssh":
-        import json as _json2
-
+    probing = not args.cmd and not args.step
+    caps = None
+    if probing and ok and na.method == "ssh":
         caps = na.capabilities()
         keys = ["k3s-role", "cgroup", "journal", "kernlog", "dmesg", "k3s-db", "k3s-config", "crictl", "sudo-any"]
         print("node privileges (yes=allowed, sudo=allowed via sudoers, no=not allowed -> those checks are marked 'node privilege missing'). Setup: deploy/node-access/README.md")
         print("  " + f"{'NODE':<12}" + "".join(f"{k:<12}" for k in keys))
         for n, c in caps.items():
             print("  " + f"{n:<12}" + "".join(f"{(c['caps'].get(k) or '-'):<12}" for k in keys))
-        write_private(snap.parent / "node-access.json", _json2.dumps({"snapshot": snap.name, "method": na.method, "nodes": caps}, ensure_ascii=False, indent=1))
-        print(f"saved: {snap.parent / 'node-access.json'}")
-    return EXIT_OK if ok == len(results) else EXIT_ERROR
+    if probing:
+        # The probe result is what the first-run question about node access reads (lib/firstrun.py): which nodes answered and why the others did not
+        from lib import firstrun as _firstrun
+
+        probe = {n: {"ok": r.ok, "host": (r.detail or {}).get("host"), "kind": (r.detail or {}).get("kind"), "why": None if r.ok else (r.error or "").split(" → ")[0][:200]} for n, r in results.items()}
+        doc = {"snapshot": snap.name if snap else None, "method": na.method, "probe": probe, **({"nodes": caps} if caps is not None else {})}
+        write_private(ctx_dir / _firstrun.NODE_ACCESS_FILE, _json.dumps(doc, ensure_ascii=False, indent=1))
+        print(f"saved: {ctx_dir / _firstrun.NODE_ACCESS_FILE}")
+    return EXIT_OK if ok == len(results) and results else EXIT_ERROR
 
 
 def cmd_selftest(args) -> int:
@@ -527,7 +678,30 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="EKS: upload or update the kubegap-node-read SSM document in the account (needs ssm:CreateDocument, ssm:UpdateDocument, ssm:UpdateDocumentDefaultVersion and ssm:ListDocumentVersions on the current credentials; not part of the read-only policy)",
     )
+    s.add_argument("--ask-again", action="store_true", help="list every first-run question again, including the ones answered before (the `/kubegap setup` mode)")
     s.set_defaults(func=cmd_setup)
+
+    s = sub.add_parser("questions", parents=[common], help="print the open first-run questions of this context (from the saved setup result; does not touch the cluster)")
+    s.add_argument("--all", action="store_true", help="include the questions answered before")
+    s.add_argument("--json", action="store_true", help="machine-readable list")
+    s.set_defaults(func=cmd_questions)
+
+    s = sub.add_parser("answer", parents=[common], help="remember the user's choice for a first-run question so it is not asked again")
+    s.add_argument("item", nargs="?", help="question id (tools, ssm-document, node-ssh, node-daemonset, grafana-token, stores)")
+    s.add_argument("option", nargs="?", help="the chosen option id, e.g. skip")
+    s.add_argument("--forget", action="store_true", help="drop the remembered answer of ITEM, or of every question when no ITEM is given")
+    s.set_defaults(func=cmd_answer)
+
+    s = sub.add_parser("config", parents=[common], help="`config set <key> <value>` writes one key of config.yaml (creates the file when absent)")
+    s.add_argument("action", choices=["set"])
+    s.add_argument("key", help="e.g. ssh.hosts.<node>, ssh.user, ssh.accept_new_hosts, prometheus_url, language, mode")
+    s.add_argument("value")
+    s.add_argument("--dry-run", action="store_true", help="print the lines that would change and write nothing")
+    s.set_defaults(func=cmd_config)
+
+    s = sub.add_parser("iam-policy", parents=[common], help="EKS: print deploy/permissions/iam-policy.json with this context's account id and cluster name filled in (prints only)")
+    s.add_argument("--without-node-access", action="store_true", help="leave out the two ssm:SendCommand statements (the least-access run; node checks are skipped)")
+    s.set_defaults(func=cmd_iam_policy)
 
     s = sub.add_parser("contexts", parents=[common], help="list kube contexts, mark the current one, and say whether each is EKS")
     s.set_defaults(func=cmd_contexts)
@@ -560,11 +734,23 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--mode", choices=list(paths.MODES), help="with B = latest: the latest snapshot of this mode. A defaults to the previous snapshot of the same mode")
     s.set_defaults(func=cmd_diff)
 
-    s = sub.add_parser("render-details", parents=[common], help="assemble report-details.md from the snapshot plus the LLM fragments in <snapshot>/llm/ (SKILL.md calls this before mask)")
+    s = sub.add_parser("render-details", parents=[common], help="assemble report-details.md from the snapshot plus the analysis block of <snapshot>/llm/facts.json (SKILL.md calls this before mask)")
     s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
     s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
     s.add_argument("--language", choices=["en", "ko"], default="en", help="language of the headings and fixed phrases; data inside tables stays English")
     s.set_defaults(func=cmd_render_details)
+
+    s = sub.add_parser("write-report", parents=[common], help="write report.md from llm/facts.json with separate agents: a step check on the objects, a writer, a fact check, a sentence replacer (claude -p or codex exec)")
+    s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
+    s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
+    s.add_argument("--language", choices=["en", "ko"], default="en")
+    s.add_argument("--host", choices=["auto", "claude", "codex"], default="auto", help="which CLI starts the agents. auto: the one this session runs in, else the one installed")
+    s.set_defaults(func=cmd_write_report)
+
+    s = sub.add_parser("keep-report", parents=[common], help="move the report of a snapshot to earlier-reports/ before writing another one from the same data, for example in the other language")
+    s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
+    s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
+    s.set_defaults(func=cmd_keep_report)
 
     s = sub.add_parser("checks", help="list every check by area; --markdown writes the catalog that docs/CHECKS.md is generated from")
     s.add_argument("--markdown", action="store_true", help="Markdown tables instead of plain text")
@@ -584,7 +770,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(func=cmd_mask)
 
     s = sub.add_parser("nodes", parents=[common], help="verify node command backend (SSM/SSH) access. Default command: echo, uname, hostname")
-    s.add_argument("--snapshot", default="latest", help="snapshot whose inventory.json to read. Default latest")
+    s.add_argument("--snapshot", help="read the node list from this snapshot's inventory.json instead of from the cluster (path, name, date prefix or latest)")
     s.add_argument("--cmd", help="read-only command to run instead (e.g. 'df -h /'). SSH and DaemonSet backends only; SSM runs document steps, see --step")
     s.add_argument("--step", help="run one named step from deploy/node-access/COMMANDS.md (e.g. core/node-os) instead of the probe")
     s.add_argument("--pod-ip", help="with --step on a pod-metrics step: the pod IP to curl (an IPv4 address in 10/8, 172.16/12, 192.168/16 or 100.64/10; anything else is refused)")

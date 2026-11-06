@@ -4,7 +4,26 @@ What each grant in [`deploy/permissions/clusterrole.yaml`](../deploy/permissions
 
 `tests/test_permissions.py` keeps this file honest: the Kubernetes table must list exactly the ClusterRole's (group, resource) entries with their verbs, the AWS table exactly the policy's actions, every step named in a "Read by" or "Called by" cell must exist in `collectors/*/collect.yaml`, and the "Mode" cell must match the `modes:` of those steps. The check column is written by hand from the summary sections each kind feeds; `tests/test_permissions.py` also proves, in both directions, that the code reads nothing the role does not grant and the role grants nothing the code does not read.
 
-Notation. `core/objects.dump-all` is step `objects.dump-all` of `collectors/core/collect.yaml`; it lists every resource kind the ClusterRole allows, once, and writes `objects/<kind>.json`, so almost every Kubernetes row names it. `lib/discover.py` reads a few kinds before collection to tell what the cluster is (platform, components, profile). Mode `both` means the step runs in `daily` and `full`; `full` means only there. For the README's view of the same facts see "Permissions used" in the modes table and "Run with the least access" in [README.md](../README.md).
+Notation. `core/objects.dump-all` is step `objects.dump-all` of `collectors/core/collect.yaml`; it lists every resource kind the ClusterRole allows, once, and writes `objects/<kind>.json`, so almost every Kubernetes row names it. `lib/discover.py` reads a few kinds before collection to tell what the cluster is (platform, components, profile). Mode `both` means the step runs in `daily` and `full`; `full` means only there. The same facts by mode are in "What each mode uses" below, and the smallest set that still gives a report is in [`SETUP.md`](SETUP.md#run-with-the-least-access).
+
+## The short version
+
+kubegap never changes the cluster. It makes read calls only, and it uses the access your own kubeconfig, AWS profile and SSH already have. For a dedicated audit identity, these are the pieces:
+
+- **Cluster.** [`deploy/permissions/clusterrole.yaml`](../deploy/permissions/clusterrole.yaml): `get` and `list` on the core resources and the API groups kubegap reads, Secrets excluded; `nodes/proxy` for the kubelet configuration; `pods/proxy` for a component pod's `/metrics` through the API server; and `create` on `pods/portforward`, which is how `kubectl port-forward` to Prometheus, Alertmanager, Loki and Grafana is authorized and creates nothing in the cluster. Every grant is one the code calls, and a test keeps it that way. Kinds of groups the role does not list are reported as not permitted, not as failures; no check reads them.
+- **AWS, on EKS.** [`deploy/permissions/iam-policy.json`](../deploy/permissions/iam-policy.json): Describe, List and Get actions, CloudWatch `GetMetricData`, and SSM `SendCommand` limited in two ways. It may run only the document `kubegap-node-read`, which embeds the read commands and takes no free command text, and only on instances tagged `kubernetes.io/cluster/<CLUSTER_NAME>=owned`, the tag managed node groups and Karpenter already put on every node. The account id in the document ARN keeps a same-named document shared from another account from matching. `scripts/kubegap iam-policy --context <name>` prints the policy with `<ACCOUNT_ID>` and `<CLUSTER_NAME>` filled in from your kubeconfig; it prints only and sends nothing to AWS. Add `--without-node-access` for the policy without the two `SendCommand` statements.
+- **Every command that reaches a node, on any backend.** [`deploy/node-access/COMMANDS.md`](../deploy/node-access/COMMANDS.md), generated from the collector definitions and kept current by a test.
+- **Nodes over SSH, on k3s and bare metal.** [`deploy/node-access/README.md`](../deploy/node-access/README.md): one line to join the log-reading groups, optionally a sudoers file allowing read-only commands.
+- **Nodes with neither SSM nor SSH, on GKE, AKS and other managed nodes.** [`deploy/node-access/daemonset.yaml`](../deploy/node-access/daemonset.yaml), which you apply yourself and can delete after the audit. It runs privileged. The exec needs `get` and `create` on `pods/exec` in the `kubegap` namespace: [`deploy/permissions/role-daemonset-exec.yaml`](../deploy/permissions/role-daemonset-exec.yaml), applied after the DaemonSet because that file creates the namespace. It opens a shell in that pod and writes nothing to the cluster.
+
+The one-time upload of the SSM document is not part of the audit policy. It runs with your own credentials and needs `ssm:CreateDocument`, `ssm:UpdateDocument`, `ssm:UpdateDocumentDefaultVersion` and `ssm:ListDocumentVersions`.
+
+### What each mode uses
+
+- **A daily run.** Kubernetes `get` and `list` on the resources in the ClusterRole; `pods/log` for the component logs; port-forward to Prometheus, Alertmanager, Loki and Grafana; the Grafana API with `grafana_api_token` when one is set; on EKS the AWS Describe and List calls of discovery and setup (`eks`, `ecr:DescribeRepositories`, `ssm:DescribeInstanceInformation`, `ssm:DescribeDocument`, `sts`, `logs:DescribeLogGroups`) and the eleven daily AWS steps (`nodegroup`, `subnets`, `ssm-instances`, `cluster-security-groups`, `alb-metrics`, `ec2-volumes`, `ec2-volumes-available`, `ec2-addresses`, `ec2-nat-gateways`, `acm-certificates`, `instance-type-network`; `alb-metrics` is `elasticloadbalancing:Describe*`, `ec2:DescribeSecurityGroups` and `cloudwatch:GetMetricData`); and, when a node backend exists, the node-side curl of the pod-metrics fallback, which on EKS is an SSM `send-command` of the pinned document plus `ssm:GetCommandInvocation` to read its output.
+- **A full run.** Everything a daily run uses, plus the node scripts (SSM, SSH or the DaemonSet), `nodes/proxy` for the kubelet configuration, CloudWatch Logs Insights (`logs:StartQuery`, `GetQueryResults`, `StopQuery`) and the quota and EBS `GetMetricData` queries, `helm list` (reads Helm's release Secrets, metadata only), cost and pricing, ECR, service quotas, and the external tools krr, polaris, pluto and kubent.
+
+How to run with the least of all this, and what such a run cannot see, is in [`SETUP.md`](SETUP.md#run-with-the-least-access). What is collected, kept and sent is in [`DATA.md`](DATA.md).
 
 ## Kubernetes
 
@@ -60,8 +79,8 @@ Every rule is `get` and `list` except `pods/portforward`, which is `create` beca
 
 ### Non-resource URLs
 
-| URL | Verb | Called by | Mode | Without it |
-|---|---|---|---|---|
+| URL | Verb | Called by | Mode | Checks that need it | Without it |
+|---|---|---|---|---|---|
 | `/version` | get | `lib/discover.py`, `lib/setup.py` (`kubectl version`: server version, next minor for pluto and kubent) | both | `platform.k8s-version-eol`, the version lines of `platform.*` | the server version is unknown; `platform.k8s-version-eol` skips |
 | `/api`, `/api/*` | get | every `kubectl` call (API discovery); `core/objects.dump-all` (`kubectl api-resources --verbs=list`) | both | kubectl cannot resolve resource names at all |
 | `/apis`, `/apis/*` | get | same as above, for every API group | both | same as above |
@@ -74,7 +93,7 @@ One step uses it, `core/kubelet-configz`, full mode only, and three checks read 
 
 ### CRDs
 
-The role names 16 CRD groups (the rows from `monitoring.coreos.com` down). With this role a CRD outside them is not readable: `objects.dump-all` lists it among the kinds the API server offers, the LIST is forbidden, and the step records it under `not_permitted` (section 7-1 of `report-details.md` prints "Kinds the ClusterRole does not grant"). No check reads such a kind, so nothing is lost. With an administrator kubeconfig every listable kind is dumped. The README section "Run with the least access" says how to run with this role on a dedicated user.
+The role names 16 CRD groups (the rows from `monitoring.coreos.com` down). With this role a CRD outside them is not readable: `objects.dump-all` lists it among the kinds the API server offers, the LIST is forbidden, and the step records it under `not_permitted` (section 7-1 of `report-details.md` prints "Kinds the ClusterRole does not grant"). No check reads such a kind, so nothing is lost. With an administrator kubeconfig every listable kind is dumped. "Run with the least access" in [`SETUP.md`](SETUP.md#run-with-the-least-access) says how to run with this role on a dedicated user.
 
 ### What is never read
 

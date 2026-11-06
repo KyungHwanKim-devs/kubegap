@@ -1,176 +1,589 @@
-# default (k3s, nodes node-a and node-b) — full audit, 2026-10-26 16:27 KST
+# default — full audit, 2026-11-05 17:25
 
-This cluster is the k3s v1.33.5 installation behind the kube context `default`: two nodes (node-a, a 6-CPU agent; node-b, a 12-CPU server with embedded etcd), 26 namespaces of which 7 are production, 152 pods, 23 detected components, profile `k3s`. Nothing is on fire right now. Both nodes are Ready, 0 pods are Pending, and the only pod that cannot run is `app-c-prod/app-c-coturn`, in a crash loop for 28 days. The one thing that changed since the 15:32 KST full run is that the HorizontalPodAutoscaler of `app-f-prod/app-f-api-server` scaled the Deployment from 2 to 5 replicas at 16:11 and 16:14 KST, the second time today, which puts the cluster back below the N+1 line. The five problems below are the same five as at 15:32 with the numbers of this snapshot; the HPA cycle has moved to the top. None of the actions has been started.
+Urgent now: yes. app-c-coturn, the TURN relay of app-c-prod, has been down for at least 38 days and crash-loops on every start.
 
-## The 5 problems to work on
+Today's problems: ① app-c-coturn crash-looping for 38 days ② No backup copy leaves the nodes ③ Stale alerts, no user-symptom alerts ④ Kubernetes 1.33 past end of life ⑤ Four Postgres DBs open on NodePorts
 
-### 1. app-f-api-server scaled 2 → 5 for the second time today on a 100m request, and the cluster no longer survives losing node-b
-**Problem.** `app-f-prod/app-f-api-server` is the API behind the app-f app. Its HPA measures CPU against a request of 100m with a limit of 500m. When traffic rises the pods pass 60% of 100m within seconds, the HPA adds replicas, every new pod lands on node-a and is throttled by the 500m limit while it warms up, and when the burst ends the HPA steps back to 2. It did this between 13:35 and 14:17 KST, and again from 16:11 KST; at collection time the Deployment is still at 5 with CPU at 1% of request. The three extra pods add 300m of requests to node-a, so the total CPU requests of the cluster are now above what node-a alone can hold: if node-b fails, not everything comes back. Around the same mechanism, several other containers have CPU limits far below their burst need and stall for 31 to 44% of the time, and 13 database containers have liveness probes with a 1-second timeout that a throttled checkpoint can turn into a kill.
+Since the last run:
 
-**Evidence.** The HPA scaled to 4 at 16:11:55 KST and to 5 at 16:14:40 KST with the reason "cpu resource utilization (percentage of request) above target" in events.json. The three new pods were throttled up to 73% at 16:18 KST and sit at 5% and 1% now in metrics/cpu_throttle_ratio_5m.json. CPU requests total 6.31 cores against 6.0 cores allocatable without node-b, so N+1 fails, in summary.json resilience.n_plus_one; it was 6.01 at 15:32. The HPA changed its desired count 20 times in 7 days in metrics/hpa_desired_changes_7d.json. app-e-postgres is throttled 44%, fluent-bit 33% and 31%, Elasticsearch 36%, Prometheus 41% measured during collection, in metrics/cpu_throttle_ratio_5m.json. 13 database containers have livenessProbe timeoutSeconds 1 in objects/statefulsets.apps.json and objects/deployments.json.
+- The previous run listed no problems, so there is no earlier work to mark done or not done.
+- Appeared: 3.
+  - apiserver 503s at 0.004 per second, measured while collection ran.
+  - One failed CoreDNS health check of 1.1.1.1 and 8.8.8.8 in the last hour, with no SERVFAIL answers.
+  - An info-level CPUThrottlingHigh on logging/elasticsearch-0, firing for 3.1 days.
+  - 4 log findings are also new, but only because the log rules changed. The cluster did not cause them.
+- Went away: none.
 
-**Cause.** Confirmed for the scaling: the HPA divides usage by the request, and 100m is far below the real working point, so a small rise in traffic reads as a large percentage. Confirmed for the throttling: bursty processes carry CPU limits of 1.5 to 6 times their request and are cut by CFS bandwidth control. Likely: the traffic that started each burst cannot be named because the ingress controller exposes no request metrics (problem 5). Conflict resolution: the same containers are also flagged as CPU-over-requested; remove the limit first, read the new 7-day p95, then lower the request. app-f-api-server is the exception that needs a higher request, because the request is the HPA denominator. Memory limits are not removed; they are raised from the p95.
+## The cluster at a glance
 
-**Action.** ① app-f-api-server: requests.cpu 100m → 300m, delete limits.cpu, keep the 60% target. The HPA then scales only above a sustained 180m and new pods do not stall. Expect about 15 minutes. ② app-e-postgres and the other 12 database containers: liveness and readiness timeoutSeconds 1 → 3, delete the CPU limit. Expect about 30 minutes. ③ app-a-sandbox-watchdog CronJob: delete its CPU limit, delete the two failed Jobs 29853754 and 29881700 so KubeJobFailed resolves, and decide whether `*/5` is enough. Expect about 30 minutes. ④ Prometheus limit 1 core with request 300m; Elasticsearch and fluent-bit limits at least 1 core. Expect about 30 minutes. ⑤ app-a-postgres memory request 2Gi and limit 2.5Gi, app-a-backend request 1Gi, app-e-minio limit 1Gi, fluent-bit limit 256Mi. Expect about 15 minutes. Expected effect: the HPA cycle stops, N+1 passes again, database probe kills stop, and three permanent alerts resolve.
-```yaml
-# Deployment app-f-api-server, container app
-resources:
-  requests: { cpu: 300m, memory: 1088Mi }   # 100m → 300m (HPA denominator)
-- limits:   { cpu: 500m, memory: 2720Mi }
-+ limits:   { memory: 2720Mi }               # CPU limit removed
+| What | Value |
+|---|---|
+| Nodes | 2 of 2 Ready |
+| Pods | 96 running, 0 pending, 4 failed |
+| Namespaces | 26, 7 production |
+| Components | 23: actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
+| Metrics and log stores | prometheus 3.7.3 / none |
+| Kubernetes | v1.33.5+k3s1 (k3s) |
+
+## Coming up
+
+| When | What | Source |
+|---|---|---|
+| 2026-06-28, already 130 days past | Upstream end of life of Kubernetes 1.33, the version both nodes run | findings-draft.json |
+| 2026-11-06 | cert-manager is due to renew app-g-prod-tls, which expires on 2026-12-06 | summary.json |
+| 2026-11-07 | cert-manager is due to renew app-e-api-tls, which expires on 2026-12-07 | summary.json |
+| every day at 03:00 UTC | containerd-cleanup-node-b prunes unused images and deletes all but the 5 newest etcd snapshots on node-b | objects/cronjobs.json |
+| every day at 03:30 UTC | app-d-postgres-backup deletes dumps older than 3 days; the app-f-mysql and app-g dumps do the same, the app-a dumps after 5 days and the app-e dumps after 7 | objects/cronjobs.json |
+| every day at 04:20 UTC | es-index-retention deletes Elasticsearch k3s-* indices older than 14 days | objects/cronjobs.json |
+| every day at 04:30 UTC | registry-tag-cleanup deletes all but the last 5 commit-hash tags per repository in the in-cluster registry | objects/cronjobs.json |
+| now | app-i-prod uses 2 of the 2 PVCs its quota allows; a third PVC is refused | summary.json |
+
+## 1. app-c-coturn crash-looping for 38 days
+
+**What is happening.** The only app-c-coturn pod exits with code 255 right after each start. It has been in CrashLoopBackOff for at least 38 days, and the Deployment has 0 of 1 replicas available. WebRTC clients of app-c.acme.com and example-h.space that need a TURN relay get none.
+
+- Affected: app-c-prod/app-c-coturn, in CrashLoopBackOff with 10,715 restarts. The last exit was code 255 at 2026-11-05 08:24 UTC, and the Deployment shows Available=False.
+- Checked and healthy: app-c-signaling and app-c-web are Running and Ready on node-a. app-c-postgres-0 is Running and Ready on node-b.
+- Changed for another reason: node-a rebooted around 2026-10-28 22:06 UTC. The BackOff events on record start then.
+- Not checked: whether any call actually failed, because there are no TURN, WebRTC or ingress request metrics. Also not checked: which clients need the relay and how many there are.
+
+**Why.** The container runs coturn/coturn:latest with imagePullPolicy Always. The image it now pulls rejects the argument --no-dtls. Confirmed. The previous container log begins with `turnserver: unrecognized option '--no-dtls'`. When the tag moved is not known.
+
+**Suggested fix.**
+
+① See the rejected option for yourself.
+
 ```
-```yaml
-# StatefulSet app-e-postgres (same for the other 12 DB containers), container postgres
-resources:
-  requests: { cpu: 200m, memory: 128Mi }
-- limits:   { cpu: 200m, memory: 384Mi }
-+ limits:   { memory: 384Mi }
-readinessProbe:
-- timeoutSeconds: 1
-+ timeoutSeconds: 3
-livenessProbe:
-- timeoutSeconds: 1
-+ timeoutSeconds: 3
+kubectl -n app-c-prod logs deploy/app-c-coturn --previous | head -3
 ```
+
+This only reads.
+
+Check: the first line reads `turnserver: unrecognized option '--no-dtls'`. It names only the first option this build rejects, and it does not say why the tag changed.
+
+② If ① shows that line, confirm that the pinned build accepts the peer options.
+
+```
+docker run --rm coturn/coturn@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3 --help 2>&1 | grep -E 'denied-peer-ip|no-loopback-peers'
+```
+
+This only reads.
+
+Check: the output lists --denied-peer-ip. If it does not, do not bring the relay back yet.
+
+③ If ② lists --denied-peer-ip, change the app-c-coturn Deployment in Git, all in one commit. The repository is acme/acme-k8s-manifests, path prod/app-c. Make these changes:
+
+- Delete the lines `- --no-dtls` and `- --no-cli`.
+- Pin the image to the digest that runs today, and set imagePullPolicy to IfNotPresent.
+- Set the update strategy to Recreate.
+- Replace the --user credential with one that is not guessable. Today's value is guessable.
+- Add these arguments in range form, because it is unverified whether this build accepts CIDR:
+  - `--denied-peer-ip=<ip>-<ip>`
+  - `--denied-peer-ip=<ip>-<ip>`
+  - `--denied-peer-ip=<ip>-<ip>`
+  - `--denied-peer-ip=<ip>-<ip>`
+  - `--denied-peer-ip=169.254.0.0-169.254.255.255`
+
+```yaml
+spec:
+  strategy:
+    type: Recreate
+  template:
+    spec:
+      containers:
+      - name: coturn
+        image: coturn/coturn@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3
+        imagePullPolicy: IfNotPresent
+        # args: the same list as today without '- --no-dtls' and '- --no-cli'
+```
+
+When you push, Argo CD applies the change through the app-c app, which runs with selfHeal. Recreate removes the crashing pod first and then starts one new pod on node-a from the pinned image.
+
+After the change, DTLS and the CLI stay off. Peers in the private, CGNAT and link-local ranges are refused. Clients get the new credential through app-c-web and app-c-signaling.
+
+Risk to availability:
+
+- The relay is already down, so the rollout costs no availability.
+- turnserver stops at the first option it rejects, so the log names only --no-dtls.
+- The saved usage text shows --cli but no --no-cli, so --no-cli is removed too.
+- Whether this build accepts every other argument is seen only when it starts.
+
+Risk in the rollout:
+
+- The pod uses hostNetwork and hostPort 3478, and it is pinned to node-a. A new pod can start only after the old pod frees the port, and Recreate deletes the old pod first.
+- The API may reject the change with 'may not be specified when strategy type is Recreate'. If it does, add `rollingUpdate: null` under strategy. That fix is unverified.
+- Argo CD selfHeal reverts a by-hand kubectl edit, so make the change in Git.
+
+Risk once it runs:
+
+- coturn relays for anyone who holds the --user credential, and the web client hands it out.
+- Without the denied ranges, the relay can reach LAN and node addresses from node-a, <ip>. That includes the Postgres NodePorts 30432-30435 of problem 5 and the kubelet on 10250. This is why the ranges go in the same commit.
+- If <public-ip>:3478 is reachable from outside, anyone can use that path. The router's port forwarding was not checked.
+
+Check: after a few minutes, `kubectl -n app-c-prod get pods -l app=app-c-coturn -o wide` shows 1/1 Running on node-a with RESTARTS 0. Then `kubectl -n app-c-prod logs deploy/app-c-coturn | grep -i listener` shows the 3478 listeners.
+
+④ When the pod is Running, confirm that the Deployment is available and the alerts clear.
+
+```
+kubectl -n app-c-prod get deploy app-c-coturn; kubectl -n monitoring port-forward svc/kube-prometheus-stack-alertmanager 9093 & sleep 2; curl -s 'http://localhost:9093/api/v2/alerts?filter=namespace="app-c-prod"' | grep -c alertname
+```
+
+This only reads.
+
+Check: the Deployment shows 1/1 available. The query returns 0 once KubePodCrashLooping and KubeDeploymentReplicasMismatch resolve.
+
+Only a TURN allocation test from a client outside the LAN shows that relaying works. You can run one on the Trickle ICE page with turn:app-c.acme.com:3478.
+
+⑤ When the relay works again, keep the image from moving. Bump the digest only when you want a new coturn release. Move the --user credential into a Secret, referenced from the args or a config file.
+
+This makes a new Deployment revision through Git, rolled out the same way as ③.
+
+Risk: an option the new image does not accept brings back the same crash loop. Before every bump, read `kubectl -n app-c-prod exec deploy/app-c-coturn -- turnserver --help`.
+
+Check: the pod stays Running with 0 restarts, and turnserver --help lists every option in the args.
+
+**Rollback.** Run git revert on the commit, and Argo CD restores the previous Deployment. That Deployment crash-loops again. Nothing is deleted.
 
 **Why this happens.**
-- Principle: A CPU limit is enforced by the kernel's CFS bandwidth control once per 100 ms period. When the quota is used up the container waits for the rest of the period, which shows as latency and probe timeouts rather than as CPU usage. The HPA divides usage by the request, not the limit, so a small request with a low limit produces throttling and scale-out at the same time, and a 1-second probe turns a throttled checkpoint into a kill.
-- Cases: The `resources.cpu-throttling` check definition cites Buffer 2020 (https://erickhun.com/posts/kubernetes-faster-services-no-cpu-limits/) and Omio 2020 (https://medium.com/omio-engineering/cpu-limits-and-aggressive-throttling-in-kubernetes-c5b20bd8a718). Both removed CPU limits to end throttling latency.
-- Read next: "CFS bandwidth control (kernel sched-bwc.txt)", "Kubernetes docs: Resource Management for Pods and Containers (limits and QoS)", "Kubernetes docs: Horizontal Pod Autoscaling (algorithm details, utilization against requests)", "Kubernetes docs: Configure Liveness, Readiness and Startup Probes (timeoutSeconds)".
 
-Evidence checks: `resilience.n-plus-one.cluster`, `resources.cpu-throttling.*` (fail 4, warn 2), `resilience.db-probe-timeout.*` (13), `resilience.exec-probe.*` (13), `resilience.liveness-dependency-path.*` (21), `resources.memory-limit-near-p95.*` (4), `resources.krr-recommendation.*` (30), `resources.cpu-request-overprovisioned.*` (18), `resources.memory-request-overprovisioned.*` (4), `traffic.pod-not-ready.app-f-prod/app-f-api-server` (→ pass), `traffic.pod-request-skew.app-f-prod/app-f-api-server`, `resilience.cronjob-stale.app-a-prod/app-a-sandbox-watchdog`, `observability.alert-firing-stale.CPUThrottlingHigh/monitoring`, `observability.alert-firing-stale.KubeJobFailed/app-a-prod`, `observability.alert-firing-stale.KubeCPUOvercommit`, `observability.alerts-always-firing.CPUThrottlingHigh`, `observability.alerts-always-firing.KubeJobFailed`, `observability.alerts-always-firing.KubeCPUOvercommit`, `scaling.hpa-flapping.app-f-prod/hpa/app-f-app-w`, `tenancy.burst-tenant-unbounded.app-f-prod`, `hygiene.change-correlation.cluster` (LLM)
+- Principle: an image tagged :latest can come up as a different program on any restart. There is no record of which version ran before, so you cannot roll back to it. Pinning a digest and pulling IfNotPresent keeps a restart from changing the program. Exit code 255 with no Unhealthy events means the program itself fails at start, and the previous container log holds the reason.
+- Read: the Kubernetes documentation on Images, for image pull policy and digests. Also the `turnserver --help` output of the pinned version.
 
-### 2. 15 production apps can only run on node node-a because of a scheduling rule, and node-a rebooted yesterday without a shutdown
-**Problem.** 15 Deployments in app-d-prod, app-f-prod, app-c-prod and app-g-prod carry a required nodeAffinity that says "avoid nodes labelled `role=observability`", and node-b carries exactly that label. They cannot move to node-b, so when node-a is down they stay down until node-a returns. app-d (2 replicas), app-f-app-x-client (2) and app-f-api-server (5 right now) declare a hostname topology spread with DoNotSchedule, but with one eligible node every replica lands on node-a, so adding replicas protects nothing. node-a came back without a shutdown sequence at 2026-10-25 13:21 KST, about 30 production pods were down for about 3 minutes, and the cause is still unknown. It has been up for 1.1 days since.
+**Evidence.**
 
-**Evidence.** 15 production Deployments have the single constraint `required nodeAffinity role NotIn [observability]` and `unavoidable pin reasons []` in summary.json resilience.placement. 4 workloads have all replicas on node-a: app-d 2/2, app-f-api-server 5/5, app-f-app-x-client 2/2 with "eligible nodes 1", and app-a-backend 2/2 with 2 eligible nodes and no spread declared, in findings-draft.json. 33 of 47 production pods are on node-a, 70%, in summary.json resilience.placement.prod_by_node; it was 30 of 44 at 15:32. node-b carries `role=observability` and `storage=node-b`, node-a has no label and there are no taints, in objects/nodes.json. 44 containers on node-a show exit 255 / Unknown and are classified "node reboot, not a crash" in summary.json resilience.restarts.by_cause. The 24-hour kernel log of node-a has 0 OOM, lockup or I/O error lines in summary.json nodeos.
+| What | Value | Source |
+|---|---|---|
+| Restarts of the coturn container since 2026-03-20 | 10,715 | summary.json |
+| BackOff events, 2026-10-28 to 2026-11-05 | 49,085 | summary.json |
+| KubePodCrashLooping firing | 38.1 days | findings-draft.json |
+| Ready ratio, last 24 hours | 0.0 | findings-draft.json |
+| First log line of the crashed container | unrecognized option '--no-dtls' | extra/coturn-previous-head.txt |
+| Image and pull policy | coturn/coturn:latest, Always | objects/deployments.json |
 
-**Cause.** Confirmed for the pin: the affinity was written to keep apps off the observability node, and with two nodes "not that node" became "only this node". The reboot cause is not in the snapshot: there is no previous-boot journal or `last -x` collector and the 24-hour kernel log of node-a is clean, so hardware, power and a manual reboot all remain open.
+## 2. No backup copy leaves the nodes
 
-**Action.** ① Change `requiredDuringSchedulingIgnoredDuringExecution` to `preferredDuringSchedulingIgnoredDuringExecution` with weight 100 in the 15 Deployments, one Kustomize or Helm value, then a rolling restart. In normal operation they stay on node-a; when node-a fails they reschedule to node-b. Expect about 30 minutes. ② Change the three DoNotSchedule spreads (app-d, app-f-app-x-client, app-f-api-server) to `whenUnsatisfiable: ScheduleAnyway` and add the same spread to app-a-backend. Expect about 15 minutes. ③ On node-a run `sudo journalctl -b -1 -p err` and `last -x | head` to find the reboot cause and write it in the node notes. Expect about 10 minutes. ④ Keep the pins that are really necessary (local-path PVs, app-f-embed's GPU, app-c-coturn's hostNetwork) and write the reason next to each.
-```yaml
-# spec.template.spec.affinity.nodeAffinity of each of the 15 Deployments — proposal
-- requiredDuringSchedulingIgnoredDuringExecution:
--   nodeSelectorTerms:
--   - matchExpressions:
--     - { key: role, operator: NotIn, values: [observability] }
-+ preferredDuringSchedulingIgnoredDuringExecution:
-+ - weight: 100
-+   preference:
-+     matchExpressions:
-+     - { key: role, operator: NotIn, values: [observability] }
+**What is happening.** Seven dump CronJobs run every night, and every dump lands on a local-path volume on node-a or node-b. Five of them sit on node-b, the same single SSD as the database they copy. The five etcd snapshots are on node-b only. app-c-postgres and app-i-postgres have no dump at all. If node-b's disk fails, the production databases, five of the seven dumps and all etcd snapshots are lost together.
+
+- Affected:
+  - app-d-postgres and app-d-postgres-vn: dump volumes on node-b, the same node as the data.
+  - app-f-mysql: dumps go to a volume of the app-f-mysql StatefulSet itself, on node-b.
+  - app-g-postgres: dump volume on node-b, the same node as the data.
+  - app-e-postgres: dump volume on node-b, the same node as the data.
+  - app-c-postgres and app-i-postgres: no dump CronJob in their namespaces.
+  - etcd: 5 snapshots on node-b's disk, and k3s runs without --etcd-s3.
+- Checked and healthy: the Postgres dump CronJobs succeeded on their last run, 2026-11-05 between 02:50 and 03:50 UTC. The app-a-postgres and app-d-postgres-mx dumps go to node-a, away from their databases.
+- Changed for another reason: none.
+- Not checked:
+  - Whether app-f-mysqldump succeeded. The pipe into gzip has no pipefail, so the Job can report success when mysqldump fails.
+  - The content of any dump, and whether one has ever been restored.
+  - Whether someone copies the node directories elsewhere from outside the cluster.
+  - app-d-redis and app-a-redis persistence.
+  - app-h-postgres and app-e-minio, which have no dump.
+
+**Why.** No off-node copy is set up. Confirmed. Every dump ends with gzip into a directory on one node, and k3s runs without --etcd-s3.
+
+**Suggested fix.**
+
+① List the dump files and etcd snapshots on both nodes.
+
+```
+ssh node-b 'sudo ls -la --time-style=long-iso /var/lib/rancher/k3s/storage/*backup* /var/lib/rancher/k3s/server/db/snapshots'; ssh node-a 'sudo ls -la --time-style=long-iso /var/lib/rancher/k3s/storage/*backup*'
 ```
 
-**Why this happens.**
-- Principle: Required node affinity is a hard filter in the scheduler's filtering phase and is applied before scoring and spreading. When the filter leaves one node, the replica count and topologySpreadConstraints cannot create any spread, and the availability of the workload equals the availability of that node. Preferred affinity is a score, so the same intent survives the loss of the preferred node.
-- Cases: The `resilience.replicas-same-node` check definition records the Moonlight case, where two replicas on one node disappeared together when that node died. The year and URL are not in the check definition.
-- Read next: "Kubernetes docs: Assigning Pods to Nodes (node affinity, required vs preferred)", "Kubernetes docs: Pod Topology Spread Constraints (whenUnsatisfiable)", "Google SRE Book ch. 3 Embracing Risk (availability as a product of dependencies)".
+This only reads.
 
-Evidence checks: `resilience.single-eligible-node.*` (15 avoidable), `resilience.replicas-same-node.app-f-prod/deployment/app-f-api-server`, `resilience.replicas-same-node.app-d-prod/deployment/app-d`, `resilience.replicas-same-node.app-f-prod/deployment/app-f-app-x-client`, `resilience.replicas-same-node.app-a-prod/deployment/app-a-backend`, `hygiene.node-label-dependency.role`, `node.unclean-reboot.node-a`
+Check: each directory has a file dated 2026-11-05 or later, larger than a few kilobytes.
 
-### 3. The TURN server app-c-coturn in app-c-prod has been dead for 28 days and has restarted 7,896 times
-**Problem.** `app-c-prod/app-c-coturn` is the TURN server that relays the app-c app's WebRTC calls across NAT. It exits with code 255 within one second of starting and sits in CrashLoopBackOff. The Deployment has 0 of 1 replicas available, so app-c calls that need relaying fail. This loop produces most of the cluster's noise: 250 BackOff events in 55 minutes, 2,983 kubelet "Error syncing pod" lines on node-a in 24 hours, 73 exited containers on node-a, and three alerts that have been firing for weeks and that nobody reads any more (KubePodCrashLooping, KubeDeploymentReplicasMismatch, and the app-c Argo CD app stuck in Progressing).
+Look at the app-f-mysql sizes in particular. Its Job status does not prove the dump worked.
 
-**Evidence.** The pod `app-c-coturn-549854dfcb-jgp4h` on node-a has 7,896 restarts, waiting reason CrashLoopBackOff, last termination Error exit 255 at 16:26:39 KST with start and finish in the same second, 0 Unhealthy events, in objects/pods.json; it had 7,885 at 15:32. BackOff events for this pod are cumulative 7,416 in events.json, 250 more than at 15:32. The 24-hour Ready ratio is 0.0003, 1,440 minutes not ready, in summary.json traffic.readiness.rows. logs/node/node-a/k3s-errors-24h.log holds 2,983 lines of `Error syncing pod … for "coturn" with CrashLoopBackOff`. KubePodCrashLooping has 20,160 firing samples in 7 days and 28.1 days of age, KubeDeploymentReplicasMismatch 20,005, both at the Watchdog level, in summary.json observability.alerts. The image is `coturn/coturn:latest`, a mutable tag, the container runs with hostNetwork pinned to node-a, CPU limit 200m, memory limit 128Mi, no probes, in objects/deployments.json.
+This does not show that a dump restores. It also misses node-a directories outside /var/lib/rancher/k3s/storage, if the default class there uses another path.
 
-**Cause.** Likely: a configuration or bind error at startup, since it exits 255 within one second with no probe involved. Candidates are a listening address or port that no longer exists on the host network, or a changed image behind the mutable tag. The container log was not collected because the pod never lives long enough for the log collector; the answer is in `kubectl logs --previous` of that pod.
+② Today, before any other change in this report, copy the dumps, the etcd snapshots and the k3s server token to a machine outside the cluster.
 
-**Action.** ① Read the last 20 lines with `kubectl -n app-c-prod logs deploy/app-c-coturn --previous`. Expect about 2 minutes. ② Fix what it says (listening IP, port, realm or certificate path in the turnserver configuration), pin the image to a digest or fixed tag and redeploy. Expect about 30 minutes. ③ If app-c no longer needs relaying, scale the Deployment to 0 in Git so Argo CD stops reporting Progressing and the two alerts resolve. Expect about 5 minutes. Expected effect: the BackOff stream, the 2,983 kubelet error lines per day and the three permanent alerts disappear together.
-
-**Why this happens.**
-- Principle: CrashLoopBackOff is the kubelet's exponential restart delay for a container that exits on its own, from 10 seconds doubling to a 5-minute cap. The exit code tells the class of cause: OOMKilled 137 with a memory limit, a probe kill with Unhealthy events, or an application exit such as 255. Each class has a different fix. A Deployment with 0 available replicas is a full outage of that service regardless of the restart count.
-- Cases: The `hygiene.mutable-image-tag` check definition records a home-cluster case in which a TURN server on `coturn/coturn:latest` crashed for 27 days, with an image change after a reboot as the likely cause. That record is this cluster.
-- Read next: "Kubernetes docs: Container restart policy and CrashLoopBackOff", "coturn turnserver.conf listening-ip and relay-ip options", "Google SRE Book ch. 6 Monitoring Distributed Systems (alerts that page should require intelligent action)".
-
-Evidence checks: `resilience.restarts-crashloop.app-c-prod/app-c-coturn-549854dfcb-jgp4h:coturn`, `events.tracked-warning-reasons.BackOff`, `traffic.pod-not-ready.app-c-prod/app-c-coturn`, `operators.unhealthy-condition.deployments/app-c-prod/app-c-coturn`, `observability.alerts-always-firing.KubePodCrashLooping`, `observability.alerts-always-firing.KubeDeploymentReplicasMismatch`, `observability.alert-firing-stale.KubePodCrashLooping/app-c-prod`, `logs.signatures.kubelet.pod-sync-error`, `hygiene.mutable-image-tag.app-c-prod/deployment/app-c-coturn:coturn`, `resilience.single-node-dependency.app-c-prod/deployment/app-c-coturn`, `node.cri-exited-containers.node-a`
-
-### 4. Every backup lives on a node disk, and 7 Argo CD apps can prune a Namespace: two ways to lose data
-**Problem.** All production databases run on local-path volumes, which are directories on a node disk, and the only copy of their data is a dump file written to the same kind of volume. Of the 7 dump CronJobs, 4 write to the same node as the database they dump and 3 to the other node; none sends a copy off the cluster. The k3s server's etcd snapshots are on node-b's own disk too. One failed node-b disk therefore removes 13 databases and their backups at once. Separately, 7 Argo CD Applications manage a Namespace object with automatic prune enabled. The day a Namespace manifest leaves Git (a directory move, a rename, a generator change), Argo CD deletes that Namespace with the PVCs inside it.
-
-**Evidence.** No backup tool is present and the family `backup` is missing, with 5 local etcd snapshots and 7 backup-type CronJobs, in inventory.json. 4 CronJobs have dump PVC and source database both on node-b (app-d-postgres-backup, app-d-postgres-vn-backup, app-f-mysql-backup, app-g-postgres-backup) and 3 write to the other node (app-a-postgres-backup, app-d-postgres-mx-backup, app-e-postgres-backup), all 7 with `offsite_hint False`, in summary.json resilience.backup.rows. 2 production databases have no backup CronJob at all, app-c-postgres and app-i-postgres, in the same section. 19 production PVs have reclaim policy Delete, 0 VolumeSnapshot support, 26 node-pinned PVs, in findings-draft.json. 7 Applications with prune on manage a Namespace: app-a-prod, app-b-prod, acme-site, app-e-api, app-h, app-k, app-i-prod, in summary.json argocdctl.summary. node-b's local-path directories hold 138,272 MB across 19 PVs, of which `logging/data-elasticsearch-0` is 101,498 MB, in summary.json local_path.summary. Secrets are stored in etcd unencrypted, in findings-draft.json.
-
-**Cause.** Confirmed: the backup CronJobs were written as "dump to a PVC" and a "copy elsewhere" step was never added. k3s was started without `--etcd-s3`. The Argo CD apps create their Namespace from a manifest and use the default `prune: true`.
-
-**Action.** ① Add an off-node step to the 7 CronJobs: after the dump, `rclone copy` or `aws s3 cp` to object storage outside the cluster (MinIO on another machine, B2, S3), and add CronJobs for app-c-postgres and app-i-postgres. Expect about 2 hours for all 9. ② Start k3s on node-b with `--etcd-s3 --etcd-s3-bucket … --etcd-snapshot-schedule-cron "0 */6 * * *"` pointing at the same storage, and enable `--secrets-encryption` in the same restart. Expect about 30 minutes and one server k3s restart. ③ Annotate the 7 Namespaces with `argocd.argoproj.io/sync-options: Prune=false`, or create them with `syncOptions: [CreateNamespace=true]` and remove the Namespace manifests from Git. Expect about 30 minutes. ④ Restore once from the off-node copy into a temporary namespace and write down how long it took. Expect about 1 hour. Expected effect: a disk failure or a Git mistake costs one backup interval instead of everything.
-```yaml
-# Namespace manifests of the 7 pruning apps — proposal
-metadata:
-  annotations:
-    argocd.argoproj.io/sync-options: Prune=false
+```
+umask 077; mkdir -p ~/k3s-backup/$(date +%F) && ssh node-b "sudo -n sh -c 'cd /var/lib/rancher/k3s && tar -czf - storage/*backup* server/db/snapshots server/token'" > ~/k3s-backup/$(date +%F)/node-b.tgz && ssh node-a "sudo -n sh -c 'cd /var/lib/rancher/k3s && tar -czf - storage/*backup*'" > ~/k3s-backup/$(date +%F)/node-a.tgz
 ```
 
+This writes two archives to your machine. The cluster is not changed. The nodes only read their disks.
+
+Risk:
+
+- The archive holds database contents and the k3s server token. umask 077 keeps it readable only by you.
+- The glob takes only the dump volumes. It leaves out Elasticsearch, the registry and app-e-minio. The app-a dump directory alone is about 5.9 GB.
+- Reading adds I/O on node-b, which already logs slow etcd applies. Run it outside 02:50-04:30 UTC, when the dump jobs run.
+- The dump CronJobs delete old dumps every day at 03:30 UTC (app-d, app-f-mysql and app-g after 3 days, app-a after 5, app-e after 7), so today's dumps last only that long on the nodes. Every day es-index-retention also deletes Elasticsearch k3s-* indices older than 14 days at 04:20 UTC, and registry-tag-cleanup keeps only the last 5 commit-hash tags per repository at 04:30 UTC.
+- Do not use ssh -t. A terminal corrupts the binary stream.
+
+If sudo needs a password, sudo -n fails and the command stops. In that case:
+
+1. Open an interactive ssh session on the node.
+2. Write the archive there with `sudo tar -czf /root/<node>.tgz …`.
+3. Run `sudo install -m 600 -o $USER`, then copy the archive with scp.
+4. Delete the archive on the node.
+
+The token path is the k3s default. It is unverified on this node.
+
+Check: `tar -tzf ~/k3s-backup/<date>/node-b.tgz | head -20` lists dump files and etcd-snapshot-node-b-* files. `gzip -t` on the archive reports no error.
+
+③ This week, make a copy leave the nodes every night:
+
+- Enable k3s etcd snapshots to S3-compatible storage with --etcd-s3.
+- Add an rclone or restic step after each dump that sends the file to the same store.
+- Add dump CronJobs for app-c-postgres and app-i-postgres.
+- Add `set -o pipefail` to app-f-mysql-backup.
+
+These also have no dump or off-node copy and need one: app-h-postgres, app-e-minio, the orphaned volume data-app-z-db-0 in default, and the registry data. The registry data, 32.7 GB on node-b, is also pruned every night by registry-gc and registry-tag-cleanup.
+
+This adds new k3s flags on node-b, which restarts k3s there. It also changes CronJobs in Git and adds new CronJobs in app-c-prod and app-i-prod.
+
+Risk:
+
+- node-b is the only server, so the API is unavailable while k3s restarts.
+- Keep the store credentials in a Secret, not in the CronJob env.
+- The app-i-prod quota already holds 2 of 2 PVCs, so a dump PVC there is refused. Send that dump straight to the store, or raise the quota.
+- That quota also caps cpu and memory, and no LimitRange fills in defaults. The dump Job's container must state requests and limits, or the pod is refused.
+- The app-e-api dump volume and the 5.9 GB app-a dump volume on node-a, which has 24.3 GB free, keep growing with retention.
+
+Check: the bucket has a file with tonight's date for each database. `k3s etcd-snapshot ls` on node-b lists s3 locations.
+
+④ When the first off-node copy exists, restore one dump of each engine into a scratch namespace. Write down how long it took. Use `gunzip -c <file> | psql` for Postgres and `gunzip -c <file> | mysql` for app-f-mysql.
+
+This creates a temporary namespace with a throwaway database pod.
+
+Risk: requests already exceed what one node holds. Run it on node-b outside the dump window, and delete it afterwards. Do not point it at a production Service.
+
+Check: row counts of a few tables match production.
+
+**Rollback.** The copy steps change nothing in the cluster. To undo the k3s change, remove the flags and restart k3s. The CronJob changes are Git commits that git revert undoes.
+
 **Why this happens.**
-- Principle: A backup is a backup only if it survives the failure domain of the original (disk, node, cluster, account). A dump on the same disk shares every failure with the original, and a PV with reclaim policy Delete is removed with its PVC, so deleting a namespace deletes the data. GitOps prune turns "absent from Git" into "deleted from the cluster", and that includes a Namespace that owns PVCs.
-- Cases: The `argocd.prune-manages-namespace-or-crd` check definition cites the Skyscanner 2021 incident, where an ApplicationSet generator change removed the apps and prune deleted everything they had managed.
-- Read next: "k3s docs: Backup and Restore (etcd-s3 options)", "Argo CD docs: Sync Options (Prune=false, CreateNamespace)", "Kubernetes docs: Persistent Volumes, reclaim policy", "Google SRE Book ch. 26 Data Integrity".
 
-Evidence checks: `resilience.no-backup.cluster`, `resilience.backup-same-node.*` (7), `resilience.prod-db-without-backup-cronjob.cluster`, `platform.k3s-etcd-snapshot-local-only.node-b`, `platform.k3s-secrets-encryption-off.node-b`, `argocd.prune-manages-namespace-or-crd.cluster`, `storage.prod-db-reclaim-delete.cluster`, `storage.local-path-prod-delete-reclaim.cluster`, `storage.local-path-node-pinned.cluster`, `resilience.single-eligible-node.*` (16 unavoidable local-path pins)
+- Principle: a dump on the same disk as its database dies with it. A backup exists to recover even then, so one copy has to leave the node. A dump that was never restored may not work.
+- Case: at InfluxData in 2023, a wrong object name in a pull request made Argo CD replace a production instance. That deleted its StatefulSets and PersistentVolumeClaims. They recovered from Retain volumes, Velero and object-store backups in just under six hours. Here, seven Argo CD apps run with automated prune, volumes use reclaimPolicy Delete, and no copy exists outside the two nodes. The same mistake would leave nothing to restore.
+- Read: the K3s documentation on etcd-snapshot, for S3 options and restore. Also the PostgreSQL documentation, Backup and Restore: SQL Dump.
 
-### 5. Traffic, errors and latency of 29 services are visible nowhere, and the 30 days of metrics that exist sit on emptyDir
-**Problem.** The ingress controller's metrics are off, so for 29 Ingresses with 47 hosts there is no request rate, no 5xx ratio and no latency anywhere. That is why nobody can say what traffic started the two app-f-api-server scale-ups today. All 161 alert rules watch causes (CPU, disk, pod state); 0 watch symptoms (error ratio, p99 latency), and there is no SLO, a target such as "99.5% of requests succeed". When 15 production apps were down for 3 minutes yesterday, no alert fired because `KubeNodeNotReady` waits 15 minutes. On top of that, Prometheus, Alertmanager and Grafana keep their data on emptyDir, a directory that disappears with the pod, so one chart upgrade, one node-b drain or one eviction resets 30 days of metrics to zero. Prometheus has a 30-day time retention and no size cap.
+**Evidence.**
 
-**Evidence.** 0 `nginx_ingress_controller_requests` series in metrics/ingress_controller_requests.json, and all 29 Ingresses have no metric source in summary.json observability.golden_signals. Rules are 161 alerting: symptom 0, cause 153, app 8, with 0 SLO signals, in summary.json observability.rules and .slo. 135 of 145 rules never fired in 15 days while 6 fire every minute of the 7 days, in summary.json observability.alerts. Alertmanager has 1 replica on emptyDir and one receiver, with 27 notifications in 24 hours against 783 firing and resolved alerts received, in summary.json stackhealth.alertmanager. Prometheus TSDB is 24,175,488,463 bytes, 22.5 GiB, on emptyDir with retention 30d and size cap 0B, oldest sample 32.1 days, 144,937 active series, in summary.json stackhealth.prometheus. node-b's kubelet emptyDir usage is 24,808 MB, of which 23,131 MB is the Prometheus pod, in summary.json nodeos. CoreDNS runs 1 replica on node-b without a PDB at p99 142.7 ms in summary.json coredns.summary.
+| What | Value | Source |
+|---|---|---|
+| Dump CronJobs whose output stays on a node | 7 | summary.json |
+| Dump CronJobs on the same node as their database | 5 | summary.json |
+| etcd snapshots kept off node-b | no | summary.json |
+| Production databases without a dump | 2 | summary.json |
+| app-a dump volume against its 5,120 MB claim | 5,862 MB | summary.json |
 
-**Cause.** Confirmed: `controller.metrics.enabled` is off in the ingress-nginx Helm values, and the kube-prometheus-stack values have no `storageSpec` and no `retentionSize`. Without ingress metrics there is no material for symptom alerts or SLOs.
+## 3. Stale alerts, no user-symptom alerts
 
-**Action.** ① ingress-nginx values: `controller.metrics.enabled: true`, `controller.metrics.serviceMonitor.enabled: true`. Expect about 30 minutes. ② Prometheus CR: a `storageSpec.volumeClaimTemplate` of 40Gi on `local-path-node-b` and `retentionSize: 32GB`; Alertmanager `storage` and Grafana `persistence.enabled: true` the same way. Expect about 1 hour and one Prometheus restart; copy the emptyDir contents first with `kubectl cp` or accept one reset. ③ Once ingress metrics flow, two symptom rules per host group: 5xx ratio above 1% for 5 minutes, p99 above 1 second for 10 minutes, severity page. Expect about 1 hour. ④ One SLO per customer-facing service as Sloth or Pyrra recording rules, starting with app-f-api-server and app-d. Expect half a day. ⑤ Silence or disable the 6 always-firing rules until problems 1 and 3 are fixed so the discord channel carries signal again. Expect about 15 minutes. ⑥ CoreDNS to 2 replicas with a PDB; the manifest is in details section 4, traffic. Expect about 15 minutes.
-```yaml
-# kube-prometheus-stack values — proposal
-prometheus:
-  prometheusSpec:
-    retentionSize: 32GB
-    storageSpec:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: local-path-node-b
-          resources: { requests: { storage: 40Gi } }
-alertmanager:
-  alertmanagerSpec:
-    storage:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: local-path-node-b
-          resources: { requests: { storage: 2Gi } }
-grafana:
-  persistence: { enabled: true, storageClassName: local-path-node-b, size: 5Gi }
+**What is happening.** Five warning alerts go to Discord now, and have for days to weeks. They are KubePodCrashLooping and KubeDeploymentReplicasMismatch for app-c-coturn, two KubeJobFailed for app-a-prod, and KubeCPUOvercommit. Alertmanager sent 24 notifications in the last day and none failed, yet the coturn outage went on for 38 days. Of the 161 alert rules, 153 watch causes and 7 watch app metrics, and none was confirmed to check site error ratio or latency.
+
+- Affected:
+  - app-c-coturn: KubePodCrashLooping has fired for 38.1 days while the pod stayed down.
+  - app-a-sandbox-watchdog: two old failed Jobs from 2026-10-25 and 2026-10-28 keep KubeJobFailed firing. The CronJob succeeds every minute.
+  - Cluster CPU: KubeCPUOvercommit fires because 6.17 cores are requested against the 6.0 cores left if node-b is lost.
+- Checked and healthy: no notification failures in 24 hours, and no active or forgotten silences.
+- Changed for another reason: none.
+- Not checked: what the Discord channel shows and who reads it. Also Grafana alerting, which needs a Grafana token.
+
+**Why.** Cause alerts are left firing until they become background noise. Likely. Evidence: the same five warnings repeat every 4 hours to the default Discord receiver, the failed Jobs were never cleaned up, and the overcommit was never decided on.
+
+**Suggested fix.**
+
+① Save the status of the two failed watchdog Jobs, then delete them.
+
 ```
-```yaml
-# ingress-nginx values — proposal
-controller:
-  metrics:
-    enabled: true
-    serviceMonitor: { enabled: true }
+kubectl -n app-a-prod get job app-a-sandbox-watchdog-29881700 app-a-sandbox-watchdog-29887083 -o yaml > watchdog-failed-jobs.yaml && kubectl -n app-a-prod delete job app-a-sandbox-watchdog-29881700 app-a-sandbox-watchdog-29887083
 ```
+
+The two Jobs and any remaining pods are removed, and KubeJobFailed for app-a-prod resolves.
+
+Risk: the saved file is their only record. Argo CD does not track Jobs made by a CronJob, so nothing recreates them. The next run that exceeds its 120-second deadline fires the alert again, which is the alert working.
+
+Check: `kubectl -n app-a-prod get jobs | grep -c Failed` returns 0. KubeJobFailed for app-a-prod leaves Alertmanager within minutes.
+
+② Today, fix app-c-coturn as in problem 1. That clears the two app-c-prod alerts.
+
+Check: Alertmanager shows no app-c-prod alert.
+
+③ This week, decide on KubeCPUOvercommit. You have two options:
+
+- Lower the CPU requests of stateless workloads until the total fits on node-a alone. Never lower them on the databases.
+- Accept the risk for a two-node cluster. Route the alert to the null receiver in the kube-prometheus-stack values in Git, with a comment saying why.
+
+Risk: lowering requests restarts those pods, and single-replica Deployments are down while they roll. Routing the alert away hides a real capacity limit. Losing node-b already stops the API, so the alert adds little today. It matters again with a third node.
+
+Check: KubeCPUOvercommit no longer reaches Discord, and the reason sits next to the route.
+
+④ When the noise is gone, add alerts on what users see:
+
+- Enable ingress-nginx controller metrics and a ServiceMonitor.
+- Alert on a 5xx ratio above 1% for 5 minutes, and on p99 latency per host.
+- Add an alert for OOMKilled containers. No rule covers them today.
+
+First, save the current values.
+
+```
+helm -n ingress-nginx get values nginx-ingress -o yaml > nginx-values.yaml
+```
+
+Add `controller.metrics.enabled=true` and `controller.metrics.serviceMonitor.enabled=true` to that file. Then upgrade.
+
+```
+helm -n ingress-nginx upgrade nginx-ingress ingress-nginx/ingress-nginx --version 4.14.0 -f nginx-values.yaml
+```
+
+The two controller pods restart. They carry all public traffic. With 2 replicas, surge 1 and unavailable 0, one pod keeps serving while the new pod schedules and becomes Ready.
+
+Risk: without `-f`, Helm resets the values to chart defaults. That includes the Service type and the MetalLB address <ip>. Without `--version`, Helm also upgrades the controller.
+
+ingress-nginx 1.14.0 is retired upstream, so this is also a good time to plan its replacement.
+
+Check: `kubectl -n monitoring get prometheusrules` shows the new rules. The query nginx_ingress_controller_requests returns series.
+
+**Rollback.** The deleted Jobs are recorded in the saved YAML. Undo the Helm change with `helm rollback nginx-ingress` to the previous revision. The rule and route changes are Git commits that git revert undoes.
 
 **Why this happens.**
-- Principle: Alerts should fire on symptoms the user feels (errors, latency) and causes (CPU, disk) belong on dashboards. Without the four golden signals per service there is no definition of "normal", and no way to tell which of 161 rules matters. A metrics store on emptyDir has a retention equal to the pod's lifetime regardless of the configured retention.
-- Cases: Google SRE Book ch. 6 Monitoring Distributed Systems defines the four golden signals (latency, traffic, errors, saturation) and the rule "page on symptoms". The `prometheus.storage-risk` check definition records a home-cluster measurement of 30 days and 23.7 GiB on emptyDir and cites no vendor incident.
-- Read next: "Google SRE Book ch. 6 Monitoring Distributed Systems", "Google SRE Workbook ch. 5 Alerting on SLOs (multi-window burn rate)", "Prometheus Operator docs: Prometheus storageSpec and retentionSize", "ingress-nginx docs: Monitoring (Prometheus metrics)".
 
-Evidence checks: `observability.ingress-controller-metrics-missing.ingress-controller`, `observability.golden-signals-missing.*` (29), `observability.no-slo.cluster`, `observability.no-symptom-alerts.cluster`, `observability.page-severity-cause-alerts.cluster`, `observability.saturation-signal-missing.cluster`, `observability.alerts-never-fired.cluster`, `observability.severity-channels-not-separated.cluster`, `observability.alerts-always-firing.*` (6), `observability.alert-firing-stale.*` (5), `observability.stack-storage-emptydir.*` (3), `prometheus.storage-risk.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus`, `node.pod-dir-large.monitoring/prometheus-kube-prometheus-stack-prometheus-0`, `coredns.availability.cluster`, `traffic.coredns-latency.cluster`, `observability.failure-mode-uncovered.OOMKill`
+- Principle: an alert that has fired for days means nobody is looking, or a false positive was left alone. Real problems get buried in that noise. With alerts only on causes such as CPU or job status, you learn about outages from users.
+- Read: the Google SRE book, chapter 6, Monitoring Distributed Systems. Also the kube-prometheus-stack runbooks for KubeJobFailed and KubeCPUOvercommit.
 
-Quick fix outside the list: raise the `persistentvolumeclaims` quota of `app-i-prod/app-i-prod-quota` from 2 to 4 or delete the line to end KubeQuotaFullyUsed after 117.3 days, and delete the 3 Failed pods (`app-a-prod/app-u`, `app-a-prod/app-a-experiment`, `app-f-prod/app-f-embed-67f6f74f6c-rlm8m`). Under 10 minutes together.
+**Evidence.**
 
-## Since the previous full run (2026-10-26 15:32)
+| What | Value | Source |
+|---|---|---|
+| Alerts active on Discord | 5 | summary.json |
+| Notifications sent, last 24 hours | 24 | metrics/am_notifications_1d.json |
+| Failed notifications, last 24 hours | 0 | metrics/alertmanager_notifications_failed_1d.json |
+| Rules on a user symptom, of 161 | 0 | summary.json |
+| KubeCPUOvercommit firing | 30.6 days | findings-draft.json |
+| Oldest KubeJobFailed for app-a-prod | 11.2 days | findings-draft.json |
 
-The two full snapshots are 55 minutes apart and the only cluster change in between is the app-f-api-server HPA: it scaled the Deployment to 4 at 16:11:55 KST and to 5 at 16:14:40 KST because CPU went above 60% of the 100m request, the three new pods landed on node-a and became Ready after 91 seconds, and at collection time the Deployment is still at 5 with CPU at 1% of request, waiting out the scale-down stabilization. That one change brought N+1 back to fail, because CPU requests rose from 6.01 to 6.31 cores against the 6.0 cores node-a offers without node-b, and it produced two first-pass findings that I overturned, a 24-hour Ready ratio and a traffic skew computed over pods that are 13 to 16 minutes old. The only other object change is a normal rotation of the CI runner pod in arc-systems. Two "resolved" items, API server POST and PUT p99, were values measured during the 15:32 collection and are not an improvement; LIST 0.946 s and PATCH 0.854 s remain inside this run's collection window too. Two "new" throttling warns, app-d-postgres-mx at 10.5% and app-i-web at 10.7%, are the same containers that crossed the 10% threshold downward at 15:32 and upward again now with unchanged limits. Criteria change: rubric 0.1.50 renames the profile `small k3s cluster` to `k3s`, so the cost check is reported as resolved under the old name and new under the new one; nothing else in the rubric changed. Smaller movements: app-c-coturn restarts 7,885 → 7,896 with BackOff +250, Prometheus head series 157,769 → 144,937 after a head compaction, app-e-postgres throttling 31% → 44%, node-b disk 49.9% → 49.5%, node-a 78% unchanged.
+## 4. Kubernetes 1.33 past end of life
 
-Progress on the previous report's problems: problem 1 of 15:32 (nodeAffinity pin, now problem 2) not started, the 15 Deployments still carry `role NotIn [observability]` and 33 of 47 production pods are on node-a. Problem 2 (app-c-coturn, now problem 3) not started, restarts 7,885 → 7,896. Problem 3 (backups, now problem 4) not started, 7 CronJobs still local only, etcd snapshots still local, 7 pruning apps unchanged. Problem 4 (CPU limits and probes, now problem 1) not started, app-f-api-server still 100m/500m and scaled to 5 again, 13 probes still at 1 second, the 2 failed watchdog Jobs still present. Problem 5 (ingress metrics, Prometheus storage) not started, 0 ingress series, Prometheus emptyDir 23,131 MB.
+**What is happening.** Both nodes run k3s v1.33.5+k3s1. Upstream support for 1.33 ended on 2026-06-28, so the cluster has gone 130 days without Kubernetes security patches. 1.34 also left support on 2026-10-27, so reaching a supported version takes two upgrades in a row. Both nodes also have pending OS updates and need a reboot.
+
+- Affected: node-b, the k3s server, needs a reboot and has 7 security updates pending. node-a, the agent, needs a reboot and has 1 pending.
+- Checked and healthy: no API objects that 1.34 removes. The k3s certificates have at least 287 days left.
+- Changed for another reason: none.
+- Not checked: whether any CVE fixed after v1.33.5 applies here. Also manifests in Git or Helm charts that are not applied yet.
+
+**Why.** The cluster has stayed on the version it was installed with, and nothing upgrades k3s automatically. Likely. Evidence: no upgrade controller is present in the cluster.
+
+**Suggested fix.**
+
+① Check for APIs removed up to 1.35.
+
+```
+pluto detect-all-in-cluster --target-versions k8s=v1.35.0 -o wide; kubent --target-version 1.35.0
+```
+
+This only reads.
+
+Check: both print no objects. They do not see manifests that exist only in Git, Helm hook templates, or resources they may not list.
+
+② Right before the upgrade, and after problem 2's off-node copy exists, take an etcd snapshot and copy it off the node.
+
+```
+ssh node-b 'sudo k3s etcd-snapshot save --name pre-upgrade-1.34' && ssh node-b "sudo sh -c 'cat /var/lib/rancher/k3s/server/db/snapshots/pre-upgrade-1.34*'" > ~/k3s-backup/pre-upgrade-1.34.db
+```
+
+This adds a snapshot of about 38 MB on node-b and a copy on your machine.
+
+Risk: the nightly cleanup at 03:00 UTC keeps only the 5 newest snapshots, so the copy on the node is gone within about three days. The off-node copy is the one that counts.
+
+The exact file name k3s gives is unverified. If the glob matches more than one file, list the directory and copy the newest.
+
+Check: `ls -l ~/k3s-backup/pre-upgrade-1.34.db` shows about 38 MB.
+
+③ In a maintenance window, upgrade one version at a time, following the k3s manual upgrade guide:
+
+1. Upgrade node-b, the server, to the latest v1.34 k3s release.
+2. Upgrade node-a, the agent.
+3. Check that every node is Ready and every pod is back.
+4. Repeat for v1.35.
+
+Do the OS reboots separately, one node at a time.
+
+k3s restarts on each node with the new version.
+
+Risk while k3s restarts:
+
+- node-b is the only server. While k3s restarts there, the API is down and nothing can be scheduled or changed.
+- Whether running containers keep running through the restart is unverified here.
+
+Risk during the reboots:
+
+- A reboot of node-b stops all 48 pods on it, including every production database, until it is back.
+- A reboot of node-a stops the app-c, app-f and app-d front ends.
+
+Before you restart k3s on node-b:
+
+- node-b's --server flag points at <ip>, an address no node has. Read the k3s config on node-b first.
+- ingress-nginx 1.14.0 and cert-manager 1.14.4 each support a range of Kubernetes versions. Check those ranges against 1.35.
+
+Check: `kubectl get nodes` shows both nodes Ready on the new version. `kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded` shows only the pods that were failing before.
+
+**Rollback.** The snapshot steps are undone by deleting files. k3s cannot be downgraded a version in place. The way back is restoring the pre-upgrade snapshot from ② on the old binary, with the dumps from problem 2.
+
+**Why this happens.**
+
+- Principle: an unsupported version gets no security patches. On k3s you cannot skip a version, so every month of delay makes the upgrade path longer.
+- Case: in 2025, ZenML ran an outdated EKS version and had skipped several upgrades. During the catch-up, a Terraform change removed IAM permissions from the worker nodes, and all workspaces were down for about 8 hours. Here the cluster is also two versions behind, and the catch-up runs on a single server node.
+- Read: the K3s documentation, Upgrades: manual upgrades. Also the Kubernetes documentation, Version Skew Policy.
+
+**Evidence.**
+
+| What | Value | Source |
+|---|---|---|
+| Server version | v1.33.5+k3s1 | inventory.json |
+| Days since end of life | 130 | findings-draft.json |
+| Objects removed in 1.34 | 0 | summary.json |
+| Security updates pending on node-b | 7 | summary.json |
+| k3s certificates, days left | 287 | summary.json |
+
+## 5. Four Postgres DBs open on NodePorts
+
+**What is happening.** Four production databases are open on NodePorts 30432 to 30435 on both nodes, without TLS. A probe reached all four ports on both nodes, from the other node over the LAN and from a Mac over Tailscale. Anyone on the LAN or the tailnet can try passwords against them.
+
+- Affected: app-d-postgres on 30433, app-d-postgres-mx on 30435, app-d-postgres-vn on 30434 and app-g-postgres on 30432. All answered over the LAN and over Tailscale.
+- Checked and healthy: no other Service is exposed this way besides ingress-nginx on 80 and 443. The MetalLB port 7946 did not answer from the other node.
+- Changed for another reason: none.
+- Not checked: whether the router forwards these ports from the internet, how each database authenticates remote clients, and who connects through the ports today.
+
+**Why.** The *-external Services were added in Git for access from outside the cluster and left in place. Likely. Evidence: they carry Argo CD tracking for the apps app-d-kr, app-d-mx, app-d-vn and app-g, and they were created between 2025-11-11 and 2026-03-14.
+
+**Suggested fix.**
+
+① Before closing the ports, see whether something still uses them.
+
+```
+for t in app-d-prod/app-d-postgres-0 app-d-prod/app-d-postgres-mx-0 app-d-prod/app-d-postgres-vn-0 app-g-prod/app-g-postgres-0; do ns=${t%/*}; pod=${t#*/}; echo "== $t"; kubectl -n $ns exec $pod -- sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select client_addr, usename, application_name, backend_start from pg_stat_activity where client_addr is not null"'; done
+```
+
+This runs four read-only queries.
+
+Risk: none to the data. Through a NodePort, the client address likely shows a node or flannel address, not the real client. It shows that something uses a port, not who. Ask the people who hold the passwords too.
+
+Check: addresses outside <ip>/16, or the 10.42.x.0/1 gateway addresses, mean something still uses the NodePorts. Clients that connect only now and then do not show.
+
+② When nobody needs the ports, or those users have a port-forward instead, delete the four *-external Service manifests in Git. They live in prod/app-d-kr, prod/app-d-mx, prod/app-d-vn and prod/app-g. Argo CD prunes the Services.
+
+For by-hand access, they can use:
+
+```
+kubectl -n app-d-prod port-forward svc/app-d-postgres 15432:5432
+```
+
+The four NodePort Services disappear. The ClusterIP Services that the apps and dump jobs use stay as they are. The database pods do not restart.
+
+Risk: any outside client on 30432-30435 loses access at once. Argo CD selfHeal recreates a Service you delete by hand, so make the change in Git.
+
+Check: `kubectl get svc -A | grep -c NodePort` returns 0. `nc -vz -w 3 <node address> 30433` from the Mac over Tailscale fails.
+
+**Rollback.** Run git revert on the commit, and Argo CD recreates the four Services with the same ports.
+
+**Why this happens.**
+
+- Principle: a NodePort listens on every node interface, so a database behind it is guarded by one password. Safer options are a ClusterIP Service with port-forward, or an interface reachable only over Tailscale.
+- Read: the Kubernetes documentation on Service type NodePort. Also the PostgreSQL documentation, The pg_hba.conf File.
+
+**Evidence.**
+
+| What | Value | Source |
+|---|---|---|
+| NodePort of app-g-postgres-external | 30432 | summary.json |
+| NodePort of app-d-postgres-external | 30433 | summary.json |
+| NodePort of app-d-postgres-vn-external | 30434 | summary.json |
+| NodePort of app-d-postgres-mx-external | 30435 | summary.json |
+| All four ports answered, both nodes | over LAN and Tailscale | extra/node-port-probe.txt, extra/node-port-probe-lan.txt |
+
+## Since the previous full run
+
+2026-11-04T22-29-59 (full)
+
+Work the previous report asked for: none
+
+**Appeared.**
+
+- 503 responses from the apiserver at 0.004 per second, measured while collection ran (controlplane.apiserver-5xx)
+- CoreDNS health checks of the upstream resolvers 1.1.1.1 and 8.8.8.8 failed once in the last hour, with no SERVFAIL answers (coredns.forward-upstream-errors)
+- CPUThrottlingHigh for logging/elasticsearch-0, severity info and routed to the null receiver, firing for 3.1 days
+
+**Went away.**
+
+- none
+
+**Changed because the checks changed, not the cluster.**
+
+- The log-signature rules changed in this kubegap version, so four log findings are new for that reason: cert-manager 'propagation check failed' (10 lines, 02:31-03:35 UTC), 'too many open files' from containerd on node-b (32 lines, 03:30-04:17 UTC), and two MetalLB speaker signatures
+
+**Checks whose rule changed between the runs.**
+
+- `logs.signatures.cert-manager.challenge-failed` (warn/medium)
+- `logs.signatures.common.too-many-open-files` (warn/high)
+- `logs.signatures.metallb.speaker-peer-unreachable` (warn/low)
+- `logs.signatures.metallb.speaker-error` (warn/medium)
+
+## Serious, not today
+
+- No SLO tool or SLO recording rule exists. This waits until problem 3 gives the sites symptom alerts.
+- node-b is the only k3s server and the only node allowed to run the production databases. Without node-b, node-a's 6.0 cores fall short of the 6.17 cores requested, and the API stops anyway. Fixing this needs a third node, which is a hardware decision.
+- node-b's single SSD carries etcd, Elasticsearch, Prometheus, the registry and 19 local-path volumes.
+  - Elasticsearch uses 103,451 MB on a 20,480 MB claim.
+  - Prometheus uses 22,004 MB in emptyDir.
+  - The registry uses 32,732 MB.
+  - etcd logged 191 slow applies in 24 hours, the slowest 1,160 ms, with no leader change.
+  - No user-visible effect was found. Disk latency was not measured.
+- Prometheus, with 21.4 GiB and 30 days of history, keeps its data in emptyDir, and so do Alertmanager and Grafana. A pod restart drops that data.
+- Seven Argo CD apps with automated prune manage their own Namespace object, and local-path volumes use reclaimPolicy Delete. Removing a Namespace manifest from Git deletes the namespace and its data.
+- CoreDNS runs one replica, on node-b, with no PodDisruptionBudget.
+- 37 workloads can run on only one node, because of nodeSelector or local volumes. Among them are app-f-api-server with 3 replicas, app-f-admin, app-f-app-x-client and app-d, all pinned to node-a.
+- node-b reached its inotify instance limit, fs.inotify.max_user_instances=128. containerd logged 'too many open files' 32 times between 03:30 and 04:17 UTC, while the nightly Jobs ran.
+- app-e-api/app-e-minio uses 98% of its memory limit at the 7-day p95. No OOM kill appears in the 7-day metrics.
+- Elasticsearch, Kibana and the es-index-retention CronJob in logging set ELASTIC_PASSWORD as a literal env value, not a Secret reference.
+- default/app-y-backend-config has keys named JWT_SECRET, JWT_RELAY_SECRET, TWITTER_CLIENT_SECRET and TWITTER_CLIENT_SECRET_RELAY, and nothing mounts it. The values were not read.
+- Prometheus, Elasticsearch, app-e-postgres and fluent-bit are CPU-throttled in more than 10% of their periods.
+- cert-manager is due to renew app-g-prod-tls on 2026-11-06 and app-e-api-tls on 2026-11-07. They expire on 2026-12-06 and 2026-12-07.
+
+## Each area in one line
+
+| Area | What |
+|---|---|
+| resources | Requests run ahead of use for CPU and behind for memory; app-e-minio is at 98% of its memory limit. |
+| scaling | 11 CPU-only HPAs, 6 never scaled; no node autoscaler, as expected for two machines. |
+| observability | 161 cause-only alert rules, 6 always firing; monitoring data on emptyDir; no ingress metrics. |
+| traffic | Retired ingress-nginx, four database NodePorts and a down TURN relay. |
+| resilience | No off-node backup, one server node holding every production database, many single replicas. |
+| hygiene | Mutable image tags, the coturn outage among them; four lingering Failed pods. |
+| storage | Local-path claims not enforced: Elasticsearch at 5 times its claim; all volumes reclaim on delete. |
+| security | No literal secrets found in the flagged script ConfigMaps; no NetworkPolicy default deny or Pod Security enforcement; plaintext Elasticsearch password in env. |
+| cost | 4.9% CPU use of two owned machines; nothing to drop. |
+| tenancy | Production, CI and system workloads share both nodes; no saturation in 7 days. |
+| node OS | Both nodes need a reboot; node-b hit the inotify limit; no kernel errors. |
+| platform | k3s 1.33 past end of life; a single etcd server logging slow applies. |
 
 ## What this run could not see
 
-The only component the profile expects and does not find is Loki; this cluster fills that role with Elasticsearch 7.10.2 and fluent-bit, so 5 Loki checks are skipped, and because there is no Elasticsearch collector the index health, thread-pool rejections and the real cause of the fluent-bit flush failures were not read. No tool is missing (13 of 13 present) and all 345 checks of full mode were evaluated or intentionally off (294 evaluated, 41 disabled by profile, 8 skipped, 0 errors). Two collection steps failed: the Argo CD repo-server metrics proxy returned 502, as in every run since 13:34, and the MetalLB speaker metrics proxy on node-a timed out after 20 seconds while the node SSH fallback read the same endpoint. Grafana dashboards and datasources were not read because config has no `grafana_api_token`. Measurements disturbed by collection itself: API server p99 LIST 0.946 s and PATCH 0.854 s, 503 ratio 0.0037/s from kubegap's own two proxy calls, and Prometheus CPU throttling 41%, all from the 16:27:22 to 16:31:57 KST window in which kubegap sent about 100 LISTs and 164 PromQL queries; none counted as user impact. The app-c-coturn container log is not in the snapshot because the pod never lives long enough, and node-a's previous-boot journal is not collected, so the 2026-10-25 reboot cause stays open. The N+1 `margin` field reads 0.02 for the third snapshot in a row while its inputs changed, so it cannot be used.
+- Loki logs: no Loki Service exists, so nothing was searched there. Run `/kubegap setup` and say where Loki runs, or that it is not installed.
+- Grafana datasources, dashboards and alerts: Grafana answers only logged-in callers. Create a Viewer service-account token in Grafana, and add it as grafana_api_token in the kubegap config file in your own editor.
+- Request rate, errors and latency of the sites: ingress-nginx exposes no metrics. Enable controller metrics and a ServiceMonitor as in problem 3, step ④.
+- Whether the NodePorts and the coturn ports are reachable from the internet: read the router's port-forwarding table, or probe the public address from a network outside the LAN and the tailnet.
+- Disk latency and I/O on node-b: query `rate(node_disk_io_time_seconds_total[5m])` for instance <ip>:9100 in Prometheus.
 
 ## Numbers
 
 | Severity | fail | warn | vs. previous full run |
 |---|---|---|---|
-| critical | 2 | 1 | fail +1 (N+1 back below the line) / warn 0 |
-| high | 34 | 5 | 0 / 0 |
-| medium | 81 | 118 | fail 0 / warn +2 (app-d-postgres-mx and app-i-web throttling back above 10%) |
-| low | 35 | 155 | fail 0 / warn +1 (app-f-api-server traffic skew, lowered from medium) |
-| info | 0 | 6 | warn −2 (POST and PUT latency, measured during the 15:32 collection, gone) |
+| critical | 2 | 2 | fail 0, warn 0 |
+| high | 28 | 68 | fail 0, warn +2 |
+| medium | 73 | 135 | fail +2, warn 0 |
+| low | 9 | 121 | fail 0, warn +1 |
 
-Counts by the session's final severity. 135 first-pass rows were changed (warn → fail 33, → pass 5, severity moved 97) and 3 were added; all are in details section 1-1. Final critical+high fail is 36 against a first pass of 35, inside the 3-item band of `history.csv`.
+Checks behind each problem:
 
-Details, every table and the full first-pass list: [`report-details.md`](report-details.md) · kubegap 0.1.0, rubric 0.1.50, signatures 1.0.15 · snapshot `~/.kubegap/snapshots/default/2026-10-26T16-27-22`
+- problem 1: `events.tracked-warning-reasons.BackOff`, `resilience.restarts-crashloop.app-c-prod/app-c-coturn-549854dfcb-jgp4h:coturn`, `security.privileged-or-host-access.app-c-prod/deployment/app-c-coturn`, `hygiene.mutable-image-tag.app-c-prod/deployment/app-c-coturn:coturn`, `hygiene.polaris-reliability-danger.app-c-prod/deployment/app-c-coturn`, `observability.alert-firing-stale.KubePodCrashLooping/app-c-prod`, `operators.unhealthy-condition.deployments/app-c-prod/app-c-coturn`, `traffic.pod-not-ready.app-c-prod/app-c-coturn`, `observability.alerts-always-firing.KubePodCrashLooping`
+- problem 2: `resilience.no-backup.cluster`, `resilience.backup-same-node.app-d-prod/app-d-postgres-backup`, `resilience.backup-same-node.app-d-prod/app-d-postgres-vn-backup`, `resilience.backup-same-node.app-f-prod/app-f-mysql-backup`, `resilience.backup-same-node.app-g-prod/app-g-postgres-backup`, `storage.local-path-over-capacity.app-a-prod/app-a-postgres-backup-pvc`, `resilience.backup-same-node.app-a-prod/app-a-postgres-backup`, `resilience.backup-same-node.app-d-prod/app-d-postgres-mx-backup`, `resilience.backup-same-node.app-e-api/app-e-postgres-backup`, `platform.k3s-etcd-snapshot-local-only.node-b`, `resilience.cronjob-policy.app-d-prod/app-d-postgres-backup`, `resilience.cronjob-policy.app-d-prod/app-d-postgres-mx-backup`, `resilience.cronjob-policy.app-d-prod/app-d-postgres-vn-backup`, `resilience.cronjob-policy.app-f-prod/app-f-mysql-backup`, `resilience.cronjob-policy.app-g-prod/app-g-postgres-backup`, `resilience.prod-db-without-backup-cronjob.cluster`
+- problem 3: `observability.no-symptom-alerts.cluster`, `observability.failure-mode-uncovered.OOMKill`, `observability.alert-firing-stale.CPUThrottlingHigh/monitoring`, `observability.alert-firing-stale.KubeCPUOvercommit`, `observability.alert-firing-stale.KubeJobFailed/app-a-prod`, `observability.alert-firing-stale.KubeQuotaFullyUsed/app-i-prod`, `observability.alerts-always-firing.CPUThrottlingHigh`, `observability.alerts-always-firing.KubeCPUOvercommit`, `observability.alerts-always-firing.KubeDeploymentReplicasMismatch`, `observability.alerts-always-firing.KubeJobFailed`, `observability.alerts-always-firing.KubeQuotaFullyUsed`, `observability.ingress-controller-metrics-missing.ingress-controller`, `observability.alert-firing-stale.CPUThrottlingHigh/logging`, `observability.page-severity-cause-alerts.cluster`, `observability.severity-channels-not-separated.cluster`
+- problem 4: `platform.k8s-version-eol.cluster`, `node.os-updates-pending.node-a`, `node.os-updates-pending.node-b`, `node.reboot-required.node-a`, `node.reboot-required.node-b`
+- problem 5: `traffic.db-exposed.nodeport/app-d-prod/app-d-postgres-external`, `traffic.db-exposed.nodeport/app-d-prod/app-d-postgres-mx-external`, `traffic.db-exposed.nodeport/app-d-prod/app-d-postgres-vn-external`, `traffic.db-exposed.nodeport/app-g-prod/app-g-postgres-external`
+
+Details and every table: [`report-details.md`](report-details.md) · kubegap 0.1.2, rubric 0.1.80 · snapshot `~/.kubegap/snapshots/my-cluster/2026-11-05T17-00-00`

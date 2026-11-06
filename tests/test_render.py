@@ -35,7 +35,7 @@ def _snap(tmp_path, with_fragments: bool):
             {
                 "collection": {"mode": "daily", "mode_skipped_steps": ["core.krr"], "failed_steps": [], "seconds_total": 60},
                 "run": {"commands": 5, "failed": []},
-                "logs": {"signatures_version": "1.0.0", "files_scanned": 1, "lines_scanned": 10, "components_with_logs": ["coredns"], "error_lines_unclassified": 0, "signatures": [], "unclassified_errors": []},
+                "logs": {"signatures_version": "1.0.0", "files_scanned": ["logs/a.log"], "lines_scanned": 10, "components_with_logs": ["coredns"], "error_lines_unclassified": 0, "signatures": [], "unclassified_errors": []},
             }
         )
     )
@@ -86,8 +86,12 @@ def _snap(tmp_path, with_fragments: bool):
     )
     if with_fragments:
         (s / "llm").mkdir()
-        (s / "llm" / "adjustments.md").write_text("| id | first | final | reason |\n|---|---|---|---|\n| a.b.ns/x | fail/high | fail/medium | lab |\n")
-        (s / "llm" / "tool-notes.md").write_text("1. none\n")
+        analysis = {
+            "severity_changes": [{"finding": "a.b.ns/x", "first_pass": "fail/high", "final": "fail/medium", "reason": "lab | pipe"}],
+            "tool_notes": [{"n": 2, "text": "none <b>", "still_open_from": 1}],
+            "commands_outside_snapshot": [{"command": "ssh node 'ls /etc/cron.d'", "saved_as": "extra/cron.txt"}],
+        }
+        (s / "llm" / "facts.json").write_text(json.dumps({"problems": [], "analysis": analysis}))
     return s
 
 
@@ -101,20 +105,26 @@ def test_render_with_fragments(tmp_path):
     assert "| high | 1 | 0 | fail +1 · warn +0 |" in text
     assert "`a.c.cluster` | critical | 2 |" in text  # consecutive runs from persisted rows
     assert "value 0.9 \\| pipe" in text  # pipes escaped in table cells
-    assert "fail/medium | lab" in text  # adjustments fragment inlined
+    assert "| a.b.ns/x | fail/high | fail/medium | lab \\| pipe |" in text  # severity changes from the analysis block, cells escaped
+    assert "2. none < b> (still open from note 1)" in text  # tool notes numbered as written, tags broken
+    assert "| `ssh node 'ls /etc/cron.d'` | `extra/cron.txt` |" in text  # read-only commands outside the snapshot
     assert "(daily mode: no per-area detail" in text
     assert "Not collected in daily mode 1: `a.e`" in text
     assert "| core | 3 | top | krr (not collected in daily mode) |" in text
     assert "BackOff +3 (Pod/ns/x-1)" in text
-    assert text.count("(not written this run)") == 2  # changes, files-read missing; tool-notes and adjustments present; areas replaced by the daily note
+    assert text.count("(not written this run)") == 3  # recounts, why_changed, files_read empty; severity changes and tool notes present; areas replaced by the daily note
+    assert render.empty_analysis_fields(s, "daily") == ["recounts", "why_changed", "files_read"]
 
 
 def test_render_korean_headings(tmp_path):
     s = _snap(tmp_path, False)
     text = render.render_details(s, language="ko").read_text()
-    assert text.startswith("# kubegap 리포트 세부 — lab (`c`), daily 모드")
-    assert "## 1. 1차 결과 집계와 최종 조정" in text
-    assert "(이번 실행에서 쓰지 않음)" in text
+    assert text.startswith("# kubegap 상세 리포트 — lab (`c`), daily 점검")
+    assert "## 1. 자동 판정 집계와 에이전트 조정" in text
+    assert "(이번 점검에서 쓰지 않음)" in text
+    assert "| 항목 | 상태 | 심각도 | 필요한 이유 | 제안 |" in text  # table headers follow the language, not only the section headings
+    for english in ("Failed steps", "Suppressed ", "| Status |", "Load errors", "| Collector |", "(none)"):
+        assert english not in text, english
     assert "`a.b.ns/x`" in text  # data inside tables stays as it is
 
 
@@ -124,7 +134,8 @@ def test_render_without_fragments_and_without_diff(tmp_path):
     text = render.render_details(s).read_text()
     assert "No earlier daily snapshot to compare with." in text
     assert "no previous run of this mode" in text
-    assert text.count("(not written this run)") == 4
+    assert text.count("(not written this run)") == 5
+    assert render.empty_analysis_fields(s, "full") == list(render.ANALYSIS_FIELDS)
 
 
 # ---------- cluster strings cannot change how report-details.md renders (#92) ----------
@@ -243,3 +254,37 @@ def test_a_snapshot_without_list_counts_prints_no_tool_line(tmp_path):
     summ["hygiene"] = {"deprecated": {"kubent_lists_ok": None, "kubent_lists_failed": None}}
     (s / "summary.json").write_text(json.dumps(summ))
     assert "Deprecated-API tools" not in render.render_details(s).read_text()
+
+
+def test_a_cell_ends_at_a_word_and_keeps_short_text():
+    assert render._cut("all replicas on the same node", 21) == "all replicas on the …"
+    assert render._cut("short", 200) == "short"
+    assert render._cut(None, 10) == ""
+    assert render._cut("x" * 30, 10) == "x" * 10 + " …"
+    f = {"evidence": "one two three four", "known_issues": [{"issue": 15}]}
+    assert render._evidence(f, 8) == "one two … known issue #15"
+
+
+def test_signature_line_counts_files_and_placeholders_survive(tmp_path):
+    text = render.render_details(_snap(tmp_path, False), language="ko").read_text()
+    assert "파일 1개" in text and "['logs" not in text
+    assert render._cell("argocd-tls-<n> at <ts>") == "argocd-tls-<n> at <ts>"
+
+
+def test_a_second_report_from_one_snapshot_keeps_the_first(tmp_path):
+    import datetime as dt
+
+    snap = tmp_path / "2026-11-05T17-00-00"
+    (snap / "llm").mkdir(parents=True)
+    (snap / "report.md").write_text("first")
+    (snap / "report-details.md").write_text("details")
+    (snap / "llm" / "changes.md").write_text("why")
+    now = dt.datetime(2026, 11, 5, 18, 0, 0, tzinfo=dt.timezone.utc)
+    kept = render.keep_report(snap, now=now)
+    assert kept == snap / "earlier-reports" / "2026-11-05T18-00-00"
+    assert (kept / "report.md").read_text() == "first" and (kept / "llm" / "changes.md").read_text() == "why"
+    assert not (snap / "report.md").exists() and not (snap / "llm").exists()
+    assert render.keep_report(snap) is None
+    (snap / "report.md").write_text("second")
+    again = render.keep_report(snap, now=now)
+    assert again.name == "2026-11-05T18-00-00-2" and (again / "report.md").read_text() == "second"

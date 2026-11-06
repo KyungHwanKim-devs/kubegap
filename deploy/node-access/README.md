@@ -2,7 +2,7 @@
 
 kubegap **never changes a node**. To read the node operating-system layer (kernel log, k3s server log, datastore size, containerd state),
 you prepare each node once. Anything not prepared is reported as "no node access" and only those checks are skipped.
-EKS needs no preparation on the node (SSM `send-command` runs as root); it needs the SSM document `kubegap-node-read` in the account, which `kubegap setup` uploads with your consent (see the main README). The complete list of commands that reach a node on any backend is [`COMMANDS.md`](COMMANDS.md).
+EKS needs no preparation on the node (SSM `send-command` runs as root); it needs the SSM document `kubegap-node-read` in the account, which `kubegap setup` uploads with your consent (see [`docs/SETUP.md`](../../docs/SETUP.md#inside-the-nodes)). The complete list of commands that reach a node on any backend is [`COMMANDS.md`](COMMANDS.md).
 The node scripts are read against the tools of Ubuntu 22.04 and 24.04 and Amazon Linux 2 and 2023 (`references/sources.md`, #127); a Bottlerocket node has no shell or journalctl for them, and Debian or RHEL nodes were not read. The DaemonSet backend (`daemonset.yaml`, for nodes with neither SSM nor SSH) needs no preparation on the node either: the scripts run as root inside the privileged pod. Its image is pinned by the digest of the multi-architecture index; the commands that resolve a new digest are in the comment above the `image:` line. The kubeconfig user needs `get` and `create` on `pods/exec` in the `kubegap` namespace, from `deploy/permissions/role-daemonset-exec.yaml`, applied after `daemonset.yaml` because that file creates the namespace.
 
 ## Step 1 — log-reading groups (recommended, one line)
@@ -29,7 +29,7 @@ sudo chmod 440 /etc/sudoers.d/kubegap && sudo visudo -c
 ## Verify
 
 ```bash
-scripts/kubegap nodes --context <name>            # per node: reachable or not, and which privileged reads are allowed (journal, kern.log, dmesg, k3s-db, crictl, sudo list)
+scripts/kubegap nodes --context <name>            # reads the node list from the cluster, so it works before the first collection. Per node: reachable or not, and which privileged reads are allowed (journal, kern.log, dmesg, k3s-db, crictl, sudo list)
 ```
 
 ## Host keys

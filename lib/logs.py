@@ -162,7 +162,8 @@ def normalize_unclassified(line: str) -> str:
     body = TS_ANY_RE.sub("<ts>", body)
     body = re.sub(r'"(@?timestamp|ts|time|start time|end time)":\s*"[^"]*"', r'"\1":"<ts>"', body)  # time fields in JSON logs that TS_ANY_RE does not spell
     body = re.sub(r'"(ts|time)":\s*\d+(\.\d+)?', r'"\1":<ts>', body)  # zap EpochTimeEncoder (external-secrets `--zap-time-encoding=epoch`): seconds as a float
-    return _normalize_msg(body)[:140]
+    msg = _normalize_msg(body)
+    return msg if len(msg) <= 140 else msg[:140].rsplit(" ", 1)[0] + " …"  # the table shows this, so a cut is visible and ends at a word
 
 
 def scan(snap: Path, sigs: list[Signature]) -> dict:
