@@ -296,7 +296,7 @@ def _eks_facts(eks: dict, cfg: Config, snap: Path, log: RunLog) -> dict:
     kw = {"profile": prof, "region": region, "log": log}
     d, r = aws.aws_json(["eks", "describe-cluster", "--name", name], id="discover.describe-cluster", out_path=snap / "aws" / "describe-cluster.json", **kw)
     if d is None:
-        out["error"] = r.error or r.stderr.strip()[-300:]
+        out["error"] = aws._why(r)  # "no permission (AccessDenied)" rather than the tail of the message, which the EKS checks print as their skip reason; run.log keeps the full text
         return out
     c = d.get("cluster") or {}
     logging_on = []

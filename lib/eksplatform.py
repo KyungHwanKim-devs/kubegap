@@ -81,6 +81,8 @@ def _quotas(snap: Path) -> dict:
     usage = load_json(snap / "aws" / "cw-quota-usage.json")
     if usage is None:
         return {"available": False}
+    if not usage.get("items") and usage.get("errors"):  # the step writes its file even when every list-service-quotas call was refused; an empty file is not a read (#22 measured it as a pass)
+        return {"available": False, "error": str(usage["errors"][0])[:200]}
     rows = []
     for code, mets in (usage.get("items") or {}).items():
         meta = (usage.get("meta") or {}).get(code) or {}
@@ -120,6 +122,8 @@ def _ebs(snap: Path, inv: dict) -> dict:
     cw = load_json(snap / "aws" / "cw-ebs-volumes.json")
     if cw is None:
         return {"available": False}
+    if not cw.get("items") and cw.get("errors"):  # same as _quotas: no volume list, no metric, nothing to judge
+        return {"available": False, "error": str(cw["errors"][0])[:200]}
     vols = {}
     for f, root in (("ec2-volumes.json", False), ("ec2-root-volumes.json", True)):
         for v in load_json(snap / "aws" / f) or []:
