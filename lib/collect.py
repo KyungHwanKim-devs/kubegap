@@ -88,10 +88,6 @@ def api_resources(context: str | None, kubeconfig: str | None, log: RunLog) -> t
     return out, error
 
 
-def list_api_resources(context: str | None, kubeconfig: str | None, log: RunLog) -> list[dict]:
-    return api_resources(context, kubeconfig, log)[0]
-
-
 DISCOVERY_RESOURCES = {
     "nodes",
     "namespaces",
@@ -519,7 +515,10 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
             # `Retrieved N resources from collector name=Cluster` (cmd/kubent/main.go:49) counts the objects that carry a last-applied-configuration annotation
             # (cluster.go:129-130), so 0 is what a cluster managed by Helm or server-side apply prints after reading everything; a positive N is still evidence
             # when the log carries no List lines. main.go:45,56: the collector failed to initialise or to return, whatever else the log says.
-            read = isinstance(doc, list) and (counts["lists_ok"] > 0 or bool(re.search(r"Retrieved [1-9][0-9]* resources from collector[^\n]*name=Cluster\b", stderr)))
+            cluster = re.search(r"Retrieved ([0-9]+) resources from collector[^\n]*name=Cluster\b", stderr)
+            if cluster:
+                counts["manifests"] = int(cluster.group(1))
+            read = isinstance(doc, list) and (counts["lists_ok"] > 0 or bool(cluster and int(cluster.group(1))))
             if "Failed to initialize collector" in stderr or "Failed to retrieve data from collector" in stderr:
                 read = False
             ok = bool(read)

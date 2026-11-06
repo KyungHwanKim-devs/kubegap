@@ -246,12 +246,18 @@ SAVED_KINDS = {"kinds": 110, "skipped": ["pods"], "failed": {"foos.example.com":
 
 
 # The pinned binaries can exit 0 without reading the cluster (#117).
-def _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr, code=0):
+def _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr, code=0, annotated=True):
     import os
     import shlex
 
     from lib import collect
 
+    if annotated:
+        (tmp_path / "objects").mkdir(exist_ok=True)
+        manifest = json.dumps({"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": "web"}})
+        (tmp_path / "objects" / "deployments.json").write_text(
+            json.dumps({"items": [{"kind": "Deployment", "metadata": {"name": "web", "namespace": "prod-a", "annotations": {"kubectl.kubernetes.io/last-applied-configuration": manifest}}}]})
+        )
     bindir = tmp_path / "fakebin"
     bindir.mkdir(exist_ok=True)
     fake = bindir / tool
@@ -313,14 +319,14 @@ KUBENT_DEBUG = "DBG Retrieving: deployments.v1.apps\nDBG Retrieving: podsecurity
 
 
 @pytest.mark.parametrize(
-    "tool,doc,stderr,lists",
+    "tool,doc,stderr,lists,status",
     [
-        ("kubent", [], KUBENT_DEBUG, (2, 1)),  # three Lists started, one failed: read, although no object carried the annotation (a Helm or server-side-apply cluster)
-        ("kubent", [], "\x1b[90m10:20PM\x1b[0m \x1b[33mDBG\x1b[0m Retrieving: deployments.v1.apps\nINF Retrieved 0 resources from collector name=Cluster", (1, 0)),  # coloured
-        ("pluto", {"target-versions": {"k8s": "v1.33.0"}}, "", (111, 2)),  # pluto reads no List: the kinds objects.dump-all saved, and the two it could not
+        ("kubent", [], KUBENT_DEBUG, (2, 1), "skip"),  # three Lists started, one failed: read, but no object carried the annotation (a Helm or server-side-apply cluster), so nothing was judged
+        ("kubent", [], "\x1b[90m10:20PM\x1b[0m \x1b[33mDBG\x1b[0m Retrieving: deployments.v1.apps\nINF Retrieved 0 resources from collector name=Cluster", (1, 0), "skip"),  # coloured
+        ("pluto", {"target-versions": {"k8s": "v1.33.0"}}, "", (111, 2), "done"),  # pluto reads no List: the kinds objects.dump-all saved, and the two it could not
     ],
 )
-def test_deprecated_tools_successful_lists_are_read_evidence(tmp_path, monkeypatch, tool, doc, stderr, lists):
+def test_deprecated_tools_successful_lists_are_read_evidence(tmp_path, monkeypatch, tool, doc, stderr, lists, status):
     """#132: `Retrieving` minus `Failed to retrieve` (kubent pkg/collector/cluster.go:121,124@0.7.3 at --log-level=debug) counts the Lists that succeeded. kubent's `Retrieved N` counts annotated objects only (cluster.go:129-130), so 0 after a full read is the normal case on a
     cluster managed by Helm or server-side apply, and until this change every full run of such a cluster had a failed kubent step."""
     result = _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr)
@@ -328,7 +334,25 @@ def test_deprecated_tools_successful_lists_are_read_evidence(tmp_path, monkeypat
     assert (result["lists_ok"], result["lists_failed"]) == lists
     summary, verdict = _deprecated_result(tmp_path)
     assert summary[f"{tool}_read"] is True and (summary[f"{tool}_lists_ok"], summary[f"{tool}_lists_failed"]) == lists
-    assert verdict["status"] == "done" and verdict["findings"] == []
+    assert verdict["status"] == status and verdict["findings"] == []
+
+
+def test_deprecated_tools_with_no_annotated_object_judged_nothing(tmp_path, monkeypatch):
+    """Both tools judge through the last-applied annotation. A cluster deployed only by Helm or server-side apply gives them no input, and that is not a pass (third review of #154)."""
+    result = _deprecated_tool(tmp_path, monkeypatch, "pluto", {"target-versions": {"k8s": "v1.33.0"}}, "", annotated=False)
+    assert result["ok"] is True and result["api_read"] is True and result["manifests"] == 0
+    summary, verdict = _deprecated_result(tmp_path)
+    assert summary["pluto_read"] is True and summary["pluto_manifests"] == 0 and summary["objects_judged"] is False
+    assert summary["items"] is None and verdict["status"] == "skip" and verdict["findings"] == []
+
+
+def test_deprecated_tools_one_annotated_object_is_enough_to_judge(tmp_path, monkeypatch):
+    pluto = _deprecated_tool(tmp_path, monkeypatch, "pluto", {"target-versions": {"k8s": "v1.33.0"}}, "")
+    kubent = _deprecated_tool(tmp_path, monkeypatch, "kubent", [], "INF Retrieved 0 resources from collector name=Cluster")
+    (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {"pluto": pluto, "kubent": kubent}}}))
+    summary, verdict = _deprecated_result(tmp_path)
+    assert (summary["pluto_manifests"], summary["kubent_manifests"], summary["objects_judged"]) == (1, 0, True)
+    assert summary["items"] == [] and verdict["status"] == "done"
 
 
 def test_deprecated_tools_every_list_failed_is_not_a_read(tmp_path, monkeypatch):
