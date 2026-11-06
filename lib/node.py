@@ -225,7 +225,8 @@ class NodeAccess:
                     continue  # not registered yet
                 return NodeResult(node, "ssm", False, error=f"get-command-invocation failed: {r.error or r.stderr.strip()[-300:]}", seconds=time.monotonic() - t0)
             status = inv.get("Status")
-            if status in ("Success", "Failed", "Cancelled", "TimedOut", "Cancelling", "DeliveryTimedOut", "ExecutionTimedOut", "Undeliverable", "Terminated"):
+            # the terminal values of CommandInvocationStatus (awscli/botocore/data/ssm/2014-11-06/service-2.json:4621-4632@2.39.3); DeliveryTimedOut and the like are StatusDetails words, never Status
+            if status in ("Success", "Failed", "Cancelled", "TimedOut", "Cancelling"):
                 break
         secs = time.monotonic() - t0
         if status != "Success":
