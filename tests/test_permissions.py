@@ -534,3 +534,12 @@ def test_permissions_doc_tables_parse_as_expected():
     assert set(tables) >= {"API group", "URL", "Action"}
     assert all(len(c) == 7 for c in tables["API group"]), [c for c in tables["API group"] if len(c) != 7]
     assert all(len(c) == 5 for c in tables["Action"]), [c for c in tables["Action"] if len(c) != 5]
+
+
+def test_the_one_secret_read_lives_in_grafana_token_only():
+    """kubegap reads no Secret value, with two documented exceptions: `helm list` (Helm's own release records) and the Grafana admin password
+    that `kubegap grafana-token --create` reads once when the user chose it. No other module may ask kubectl for a Secret."""
+    texts = {f.name: f.read_text(encoding="utf-8") for f in ROOT.glob("lib/*.py")}
+    askers = {n for n, t in texts.items() if '"get", "secret"' in t or "get secret" in t}
+    assert askers == {"grafana_token.py"}, askers
+    assert "post_json" in texts["http.py"] and {n for n, t in texts.items() if "post_json(" in t and n != "http.py"} == {"grafana_token.py"}, "the one HTTP write"

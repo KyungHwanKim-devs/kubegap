@@ -6,7 +6,7 @@ For someone who has to decide whether kubegap may run against a cluster. The sho
 
 kubegap makes read calls only. The exact Kubernetes rules and AWS actions, each with the step that uses it, are in [`PERMISSIONS.md`](PERMISSIONS.md).
 
-**Secrets.** Secret values are never read or recorded. Only the names and types of Secrets are. There is one exception. Helm stores each release record in a Secret, so `helm list` reads those Secrets; kubegap keeps what `helm list` prints, which is the release name, namespace, revision, update time, status, chart and app version, and never collects the release values. Under the shipped ClusterRole, which excludes Secrets, `helm list` fails and the two Helm checks are skipped. pluto and kubent are run in the modes that do not read Helm releases.
+**Secrets.** Secret values are never read or recorded. Only the names and types of Secrets are. There are two exceptions. The second is `kubegap grafana-token --create`, run only when you pick Create now at the Grafana question: it reads the Grafana admin password from the Secret the Grafana workload names, once, keeps it in memory for the two Grafana API calls that create a Viewer service account and its token, and writes neither the password nor anything else from that Secret anywhere. The first is Helm. Helm stores each release record in a Secret, so `helm list` reads those Secrets; kubegap keeps what `helm list` prints, which is the release name, namespace, revision, update time, status, chart and app version, and never collects the release values. Under the shipped ClusterRole, which excludes Secrets, `helm list` fails and the two Helm checks are skipped. pluto and kubent are run in the modes that do not read Helm releases.
 
 **The kubeconfig.** `setup.json` records how the context authenticates: the exec command and its arguments (`aws eks get-token` on EKS) and the names of the environment variables in its `env` block. Of their values only `AWS_PROFILE` and `AWS_REGION` are kept, because kubegap passes them to the AWS CLI. Every other value, such as a tenant id or a token for a custom plugin, is written as `<redacted>` (`lib/kube.py`, `tests/test_kube_context.py`).
 
@@ -18,9 +18,9 @@ kubegap makes read calls only. The exact Kubernetes rules and AWS actions, each 
 
 Everything kubegap collects is written to `~/.kubegap/snapshots/<context>/<timestamp>/` on your machine. kubegap itself sends nothing anywhere.
 
-- Snapshot folders and files are created readable by your user only. A folder that was already there and is open to other users gets one warning per run and is left as it is.
+- Snapshot folders and files are created readable by your user only. A folder that was already there and is open to other users becomes a first-run question (`home-mode`): Fix now runs `kubegap protect-home`, chmod 700 on those folders; Leave it leaves them.
 - Stored as collected, and so readable by the agent: object specs, events, metrics, node journals under `logs/node/` (kubelet, containerd, k3s), CloudWatch control-plane log queries under `logs/cloudwatch/`, and Grafana dashboards.
-- The config file is one you create yourself. It may hold `grafana_api_token`, so `chmod 600` it. `kubegap config set` creates it with that mode and refuses to write the token for you.
+- The config file is one you create yourself, or `kubegap config set` creates with mode 0600. It may hold `grafana_api_token`, so `chmod 600` it. `config set` refuses to write the token from a command line; `kubegap grafana-token --create` writes it from inside the process, with the same mode.
 - `scripts/kubegap prune` removes old snapshots; see [`SETUP.md`](SETUP.md#collected-data).
 
 ## What leaves your machine

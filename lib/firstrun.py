@@ -18,6 +18,10 @@ Rules:
 
 The policies that already exist in config.yaml answer a question for good: `install_tools: never|always`, `ssm_document: never|always`,
 `node_access: none`, a `<store>_url`, `grafana_api_token`.
+
+Texts come in two languages, English and Korean, each written from the question's purpose (`language=` of `questions`); the agent copies the
+block as printed and never translates it (#173). Loki is left out of the stores question when the log shipper's configuration says the logs
+go elsewhere (lib/logsinks.py, #174), and the Grafana question offers to create the read token once (lib/grafana_token.py).
 """
 
 from __future__ import annotations
@@ -113,31 +117,61 @@ def _opt(id: str, label: str, description: str, run: list[str] | None = None, *,
     return {"id": id, "label": label, "description": description, "run": run, "show": show, "config": config, "remember": remember}
 
 
-def _skip(lost: str) -> dict:
-    return _opt(SKIP, "Skip", f"{lost} Not asked again; `/kubegap setup` brings the question back.")
+LANGUAGES = ("en", "ko")
+_AGAIN = {"en": " Not asked again; `/kubegap setup` brings the question back.", "ko": " 다시 묻지 않아요. `/kubegap setup`으로 다시 불러올 수 있어요."}
 
 
-def _q_home_mode(setup: dict, cfg: Config) -> dict | None:
+def _skip(L: str, lost: str) -> dict:
+    return _opt(SKIP, {"en": "Skip", "ko": "건너뛰기"}[L], lost + _AGAIN[L])
+
+
+def _n(L: str, n: int, en_one: str, en_many: str, ko: str) -> str:
+    """A count with its noun: English needs the plural, Korean does not."""
+    return f"{n} {en_one if n == 1 else en_many}" if L == "en" else f"{ko} {n}개"
+
+
+# Every question is written twice, in English and in Korean, from what the question is for. The Korean is not a translation of the English:
+# the person reading the window is deciding what kubegap may touch, and a sentence they have to decode is a wrong choice waiting to happen
+# (#173). tests/test_firstrun.py checks the Korean against the translation-pattern list the writing guides use.
+
+
+def _q_home_mode(setup: dict, cfg: Config, L: str) -> dict | None:
     dirs = (setup.get("machine") or {}).get("open_dirs") or []
     if not dirs:
         return None
     top = dirs[0]
+    n = len(dirs)
+    if L == "ko":
+        q = {
+            "header": "폴더 권한",
+            "question": f"{top['path']} 폴더를 나만 읽을 수 있게 바꿀까요? 지금은 이 컴퓨터의 다른 사용자도 읽을 수 있어요(권한 {top['mode']}).",
+            "explain": "이 폴더에 점검 결과가 쌓여요. 클러스터에서 읽어 온 오브젝트, 이벤트, 로그 줄이 전부 여기 있어요. kubegap은 이 폴더를 0700으로 만드는데, 이 폴더는 옛 버전이 만들었거나 나중에 권한이 넓어졌어요.",
+            "gain": ["리포트는 달라지지 않아요. 점검 결과를 내 계정만 읽을 수 있게 돼요"],
+            "fix": ("지금 고치기", f"{top['path']} 아래 폴더 {n}개에 chmod 700을 해요. 다른 건 건드리지 않아요."),
+            "leave": ("그대로 두기", "폴더는 지금 그대로예요." + _AGAIN["ko"]),
+        }
+    else:
+        q = {
+            "header": "Permissions",
+            "question": f"Make {top['path']} readable by you only? Other users of this machine can read it now (mode {top['mode']}).",
+            "explain": "That folder holds the snapshots: every object, event and log line kubegap read from the cluster. kubegap creates it with mode 0700; this one was created by an older kubegap or widened by hand.",
+            "gain": ["nothing in the report; the snapshots are readable by your user only"],
+            "fix": ("Fix now", f"Runs chmod 700 on {n} folder{'s' if n > 1 else ''} under {top['path']}. Nothing else changes."),
+            "leave": ("Leave it", "The folders stay as they are." + _AGAIN["en"]),
+        }
     return {
         "id": "home-mode",
-        "header": "Folder permissions",
-        "question": f"Make {top['path']} readable by you only? Other users of this machine can read it now (mode {top['mode']}).",
-        "explain": "That folder holds the snapshots: every object, event and log line kubegap read from the cluster. kubegap creates it with mode 0700; this one was created by an older kubegap or widened by hand.",
-        "gain": ["nothing in the report; the snapshots are readable by your user only"],
-        "options": [
-            _opt("fix", "Fix now", f"Runs chmod 700 on {len(dirs)} folder{'s' if len(dirs) > 1 else ''} under {top['path']}. Nothing else changes.", run=["protect-home"], remember=False),
-            _opt("leave", "Leave it", "The folders stay as they are. Not asked again; `/kubegap setup` brings the question back."),
-        ],
+        "header": q["header"],
+        "question": q["question"],
+        "explain": q["explain"],
+        "gain": q["gain"],
+        "options": [_opt("fix", *q["fix"], run=["protect-home"], remember=False), _opt("leave", *q["leave"])],
         "typed": None,
         "state": {"missing": [d["path"] for d in dirs]},
     }
 
 
-def _q_tools(setup: dict, cfg: Config) -> dict | None:
+def _q_tools(setup: dict, cfg: Config, L: str) -> dict | None:
     missing = [t for t in setup.get("tools") or [] if not t["present"] and not t["required"] and t.get("installable")]
     # ssh and aws are not offered on a platform that does not use them
     platform = (setup.get("cluster") or {}).get("platform")
@@ -145,190 +179,338 @@ def _q_tools(setup: dict, cfg: Config) -> dict | None:
     if not missing or cfg.install_policy != "ask":
         return None
     names = [t["name"] for t in missing]
-    lines = [f"{t['name']}: {t['role']} — feeds {', '.join(t['checks'])}; install: {tools.install_plan(tools.by_name(t['name']))}" for t in missing]
+    if L == "ko":
+        lines = [f"{t['name']}: {t['role']} — {', '.join(t['checks'])} 항목에 쓰여요. 설치 방법: {tools.install_plan(tools.by_name(t['name']))}" for t in missing]
+        q = {
+            "header": "도구",
+            "question": f"이 컴퓨터에 없는 선택 도구가 {len(names)}개 있어요: {', '.join(names)}. 설치할까요?",
+            "explain": "도구마다 kubegap이 직접 계산하지 않는 걸 대신 계산해요. 설치는 이 컴퓨터에만 하고, 클러스터에는 아무것도 설치하지 않아요.",
+            "install": ("전부 설치", f"{', '.join(names)}를 설치해요. Homebrew가 있으면 그걸로, 없으면 sha256을 확인한 고정 버전으로요."),
+            "skip": "이 도구들이 맡은 항목은 '도구 없음'으로 적혀요. 나머지는 전부 돌아가요.",
+            "typed": "일부만 설치하려면 도구 이름을 쉼표로 적어 주세요. 그 이름으로 `setup --install-only <이름>`을 돌리고, 나머지는 `skip`으로 기록해요",
+        }
+    else:
+        lines = [f"{t['name']}: {t['role']} — feeds {', '.join(t['checks'])}; install: {tools.install_plan(tools.by_name(t['name']))}" for t in missing]
+        q = {
+            "header": "Tools",
+            "question": f"{len(names)} optional tool{'s are' if len(names) > 1 else ' is'} not installed on this machine: {', '.join(names)}. Install?",
+            "explain": "Each tool computes something kubegap does not compute itself. They are installed on this machine only; nothing is installed in the cluster.",
+            "install": ("Install all", f"Installs {', '.join(names)} (Homebrew, or a pinned release whose sha256 is checked)."),
+            "skip": "The checks of these tools are reported as 'tool missing'; everything else runs.",
+            "typed": "tool names separated by commas, to install only those: run `setup --install-only <names>`, then record `skip` for the rest",
+        }
     return {
         "id": "tools",
-        "header": "Tools",
-        "question": f"{len(names)} optional tool{'s are' if len(names) > 1 else ' is'} not installed on this machine: {', '.join(names)}. Install?",
-        "explain": "Each tool computes something kubegap does not compute itself. They are installed on this machine only; nothing is installed in the cluster.",
+        "header": q["header"],
+        "question": q["question"],
+        "explain": q["explain"],
         "gain": lines,
-        "options": [
-            _opt("install", "Install all", f"Installs {', '.join(names)} (Homebrew, or a pinned release whose sha256 is checked).", ["setup", "--install-only", ",".join(names)], remember=False),
-            _skip("The checks of these tools are reported as 'tool missing'; everything else runs."),
-        ],
-        "typed": "tool names separated by commas, to install only those: run `setup --install-only <names>`, then record `skip` for the rest",
+        "options": [_opt("install", *q["install"], ["setup", "--install-only", ",".join(names)], remember=False), _skip(L, q["skip"])],
+        "typed": q["typed"],
         "state": {"missing": names},
     }
 
 
-def _q_ssm_document(setup: dict, cfg: Config) -> dict | None:
+def _q_ssm_document(setup: dict, cfg: Config, L: str) -> dict | None:
     doc = ((setup.get("aws") or {}).get("ssm_document")) or {}
     if not (setup.get("cluster") or {}).get("is_eks") or cfg.ssm_document_policy != "ask" or cfg.get("node_access") == "none":
         return None
     if doc.get("present") is None or doc.get("current"):  # unreadable (not offered, the reason is in the setup output) or already there
         return None
     e = (setup.get("cluster") or {}).get("eks") or {}
-    verb = "upload" if doc.get("present") is False else "update"
+    new = doc.get("present") is False
+    n = node_script_checks()
+    if L == "ko":
+        q = {
+            "header": "노드 점검",
+            "question": f"노드 안쪽(디스크, 커널 로그, kubelet 설정)을 읽을까요? AWS 계정 {e.get('account')}, 리전 {e.get('region')}에 문서 하나를 {'올려야' if new else '새 버전으로 바꿔야'} 해요.",
+            "explain": "EKS 노드는 SSM으로 읽어요. 노드에서 돌릴 명령은 SSM 문서 kubegap-node-read(deploy/permissions/ssm-document.yaml) 하나에 고정돼 있어요. 그래서 점검용 키로는 그 읽기 명령만 돌릴 수 있고 다른 건 못 해요. 올리는 건 지금 자격 증명으로 호출 한 번이고 ssm:CreateDocument 권한이 필요해요.",
+            "gain": [f"full 점검에서 노드 점검 항목이 최대 {n}개 늘어요. Prometheus가 긁지 않는 컴포넌트 메트릭도 노드 쪽에서 읽어요"],
+            "upload": ("올리기" if new else "새 버전으로 바꾸기", f"문서 kubegap-node-read를 {'올려요' if new else '새 버전으로 바꿔요'}. 노드에서는 아무것도 바뀌지 않아요."),
+            "skip": "노드 점검 항목은 '노드 접근 없음'으로 적혀요.",
+        }
+    else:
+        verb = "upload" if new else "update"
+        q = {
+            "header": "Node checks",
+            "question": f"Read inside the nodes (disk, kernel log, kubelet settings)? It needs one document {verb}ed to AWS account {e.get('account')}, region {e.get('region')}.",
+            "explain": "EKS nodes are read through SSM. The commands are fixed in one SSM document, kubegap-node-read (deploy/permissions/ssm-document.yaml), so the audit key can run those read commands and nothing else. The upload is one call with your current credentials and needs ssm:CreateDocument.",
+            "gain": [f"up to {n} node checks in a full run, and the node-side read of component metrics that Prometheus does not scrape"],
+            "upload": (verb.capitalize(), f"{verb.capitalize()}s the document kubegap-node-read. Nothing on the nodes changes."),
+            "skip": "The node checks are reported as 'no node access'.",
+        }
     return {
         "id": "ssm-document",
-        "header": "Node checks",
-        "question": f"Read inside the nodes (disk, kernel log, kubelet settings)? It needs one document {verb}ed to AWS account {e.get('account')}, region {e.get('region')}.",
-        "explain": "EKS nodes are read through SSM. The commands are fixed in one SSM document, kubegap-node-read (deploy/permissions/ssm-document.yaml), so the audit key can run those read commands and nothing else. The upload is one call with your current credentials and needs ssm:CreateDocument.",
-        "gain": [f"up to {node_script_checks()} node checks in a full run, and the node-side read of component metrics that Prometheus does not scrape"],
-        "options": [
-            _opt("upload", verb.capitalize(), f"{verb.capitalize()}s the document kubegap-node-read. Nothing on the nodes changes.", ["setup", "--install-ssm-document"], remember=False),
-            _skip("The node checks are reported as 'no node access'."),
-        ],
+        "header": q["header"],
+        "question": q["question"],
+        "explain": q["explain"],
+        "gain": q["gain"],
+        "options": [_opt("upload", *q["upload"], ["setup", "--install-ssm-document"], remember=False), _skip(L, q["skip"])],
         "typed": None,
     }
 
 
-def _q_node_ssh(setup: dict, cfg: Config, node_access: dict, *, again: bool = False) -> dict | None:
+def _q_node_ssh(setup: dict, cfg: Config, node_access: dict, L: str, *, again: bool = False) -> dict | None:
     c = setup.get("cluster") or {}
     if c.get("platform") not in SSH_PLATFORMS or cfg.get("node_access") not in (None, "", "ssh") or c.get("node_reader_pods"):
         return None  # another platform, a backend named in the config, or the node DaemonSet is already running and is what gets used
     probed = (node_access.get("probe") or {}) if node_access.get("method") == "ssh" else {}
     failed = {n: r for n, r in probed.items() if not r.get("ok")}
     n_checks = node_script_checks()
-    gain = [f"up to {n_checks} node checks in a full run, and the node-side read of component metrics that Prometheus does not scrape"]
+    nodes = c.get("node_count")
+    ko = L == "ko"
+    gain = (
+        [f"full 점검에서 노드 점검 항목이 최대 {n_checks}개 늘어요. Prometheus가 긁지 않는 컴포넌트 메트릭도 노드 쪽에서 읽어요"]
+        if ko
+        else [f"up to {n_checks} node checks in a full run, and the node-side read of component metrics that Prometheus does not scrape"]
+    )
+    header = "노드 점검" if ko else "Node checks"
     if not probed and (cfg.get("ssh") or cfg.get("node_access") == "ssh"):
         return None  # the user already wrote how to reach the nodes; nothing to decide
     if not probed or (again and not failed):  # asking again when every node answers: the first form, so the user can still turn it off
-        return {
-            "id": "node-ssh",
-            "header": "Node checks",
-            "question": f"Read inside the {c.get('node_count')} node{'s' if c.get('node_count') != 1 else ''} over SSH (disk, kernel log, kubelet settings)?",
-            "explain": "On this cluster nodes are read over SSH, with the user and key your own `ssh` would use. Choosing the check connects to each node once and runs `uname` and `hostname`; nothing is written on a node. Until you choose, kubegap makes no SSH connection.",
-            "gain": gain,
-            "options": [
-                _opt("check", "Check SSH now", "Connects to every node once and reports which ones answer. Later runs then read the nodes over SSH.", ["nodes"], remember=False),
-                _skip("No SSH connection is made. The node checks are reported as 'no node access'."),
-            ],
-            "typed": None,
-        }
+        if ko:
+            question = f"노드 {nodes}대 안쪽(디스크, 커널 로그, kubelet 설정)을 SSH로 읽을까요?"
+            explain = "이 클러스터의 노드는 SSH로 읽어요. 내가 `ssh`를 칠 때 쓰는 사용자와 키를 그대로 써요. '지금 SSH 확인'을 고르면 노드마다 한 번 접속해서 `uname`과 `hostname`만 돌려요. 노드에 아무것도 쓰지 않아요. 고르기 전에는 SSH 접속을 하지 않아요."
+            check = ("지금 SSH 확인", "노드마다 한 번 접속해서 어느 노드가 답하는지 알려 줘요. 그다음 점검부터 노드를 SSH로 읽어요.")
+            skip = "SSH 접속을 하지 않아요. 노드 점검 항목은 '노드 접근 없음'으로 적혀요."
+        else:
+            question = f"Read inside the {nodes} node{'s' if nodes != 1 else ''} over SSH (disk, kernel log, kubelet settings)?"
+            explain = "On this cluster nodes are read over SSH, with the user and key your own `ssh` would use. Choosing the check connects to each node once and runs `uname` and `hostname`; nothing is written on a node. Until you choose, kubegap makes no SSH connection."
+            check = ("Check SSH now", "Connects to every node once and reports which ones answer. Later runs then read the nodes over SSH.")
+            skip = "No SSH connection is made. The node checks are reported as 'no node access'."
+        return {"id": "node-ssh", "header": header, "question": question, "explain": explain, "gain": gain, "options": [_opt("check", *check, ["nodes"], remember=False), _skip(L, skip)], "typed": None}
     if not failed:
         return None
     kinds = sorted({r.get("kind") or "other" for r in failed.values()})
     opts = []
     if "host-key" in kinds and not (cfg.get("ssh") or {}).get("accept_new_hosts"):
-        opts.append(
-            _opt(
-                "accept-keys",
-                "Accept host keys",
-                "Adds `ssh.accept_new_hosts: true` to the config file, so ssh stores the key of a node it sees for the first time. A stored key that later changes is still refused.",
-                ["nodes"],
-                remember=False,
-                config=["ssh.accept_new_hosts", "true"],
+        if ko:
+            opts.append(
+                _opt(
+                    "accept-keys",
+                    "호스트 키 받아들이기",
+                    "설정 파일에 `ssh.accept_new_hosts: true`를 더해요. 그러면 ssh가 처음 보는 노드의 키를 저장해요. 저장한 키가 나중에 바뀌면 그때는 거부해요.",
+                    ["nodes"],
+                    remember=False,
+                    config=["ssh.accept_new_hosts", "true"],
+                )
             )
-        )
+        else:
+            opts.append(
+                _opt(
+                    "accept-keys",
+                    "Accept host keys",
+                    "Adds `ssh.accept_new_hosts: true` to the config file, so ssh stores the key of a node it sees for the first time. A stored key that later changes is still refused.",
+                    ["nodes"],
+                    remember=False,
+                    config=["ssh.accept_new_hosts", "true"],
+                )
+            )
+    elif ko:
+        opts.append(_opt("check", "다시 확인", "직접 뭔가 고친 뒤에 골라요. 한 번 손으로 로그인했거나 키를 더했을 때요.", ["nodes"], remember=False))
     else:
         opts.append(_opt("check", "Check again", "For after you fixed something yourself (logged in once by hand, added a key).", ["nodes"], remember=False))
-    if len(failed) < len(probed):
-        opts.append(_opt(PARTIAL, "Use the rest", f"Goes on with the {len(probed) - len(failed)} node{'s' if len(probed) - len(failed) != 1 else ''} that answered. The node checks are 'no node access' for {', '.join(sorted(failed))}."))
-    opts.append(_skip("No SSH connection is made to any node. The node checks are reported as 'no node access'."))
-    return {
-        "id": "node-ssh",
-        "header": "Node checks",
-        "question": f"SSH did not reach {len(failed)} of {len(probed)} nodes. How do you want to go on?",
-        "explain": "What failed, per node: " + "; ".join(f"{n} ({r.get('host')}): {r.get('why')}" for n, r in sorted(failed.items())),
-        "gain": gain,
-        "options": opts,
-        "typed": "values only you know, one per item: `<node>=<address>` (an address this machine can reach, e.g. a Tailscale IP; `user@address` when the login differs), `user=<login>`, `key=<path of the private key>`. Each one is a config value: `ssh.hosts.<node>`, `ssh.user` or `ssh.key`. After they are written, run `nodes` again",
-    }
+    rest = len(probed) - len(failed)
+    if rest:
+        if ko:
+            opts.append(_opt(PARTIAL, "답한 노드만 쓰기", f"답한 노드 {rest}대로 계속해요. {', '.join(sorted(failed))}의 노드 점검 항목은 '노드 접근 없음'으로 적혀요."))
+        else:
+            opts.append(_opt(PARTIAL, "Use the rest", f"Goes on with the {rest} node{'s' if rest != 1 else ''} that answered. The node checks are 'no node access' for {', '.join(sorted(failed))}."))
+    opts.append(_skip(L, "어느 노드에도 SSH 접속을 하지 않아요. 노드 점검 항목은 '노드 접근 없음'으로 적혀요." if ko else "No SSH connection is made to any node. The node checks are reported as 'no node access'."))
+    what = "; ".join(f"{n} ({r.get('host')}): {r.get('why')}" for n, r in sorted(failed.items()))
+    if ko:
+        question = f"노드 {len(probed)}대 중 {len(failed)}대에 SSH가 닿지 않았어요. 어떻게 할까요?"
+        explain = "노드별로 안 된 이유예요: " + what
+        typed = "나만 아는 값을 항목마다 하나씩 적어 주세요. `<노드>=<주소>`(이 컴퓨터에서 닿는 주소, 예를 들어 Tailscale IP. 로그인 이름이 다르면 `사용자@주소`), `user=<로그인 이름>`, `key=<개인 키 파일 경로>`. 각각 설정 값 `ssh.hosts.<노드>`, `ssh.user`, `ssh.key`로 들어가요. 적고 나면 `nodes`를 다시 돌려요"
+    else:
+        question = f"SSH did not reach {len(failed)} of {len(probed)} nodes. How do you want to go on?"
+        explain = "What failed, per node: " + what
+        typed = "values only you know, one per item: `<node>=<address>` (an address this machine can reach, e.g. a Tailscale IP; `user@address` when the login differs), `user=<login>`, `key=<path of the private key>`. Each one is a config value: `ssh.hosts.<node>`, `ssh.user` or `ssh.key`. After they are written, run `nodes` again"
+    return {"id": "node-ssh", "header": header, "question": question, "explain": explain, "gain": gain, "options": opts, "typed": typed}
 
 
-def _q_node_daemonset(setup: dict, cfg: Config) -> dict | None:
+def _q_node_daemonset(setup: dict, cfg: Config, L: str) -> dict | None:
     c = setup.get("cluster") or {}
     if c.get("platform") not in DAEMONSET_PLATFORMS or cfg.get("node_access") or c.get("node_reader_pods"):
         return None  # already applied: the pods are found and used, nothing to ask
+    show = [
+        f"kubectl apply -f {paths.ROOT / 'deploy/node-access/daemonset.yaml'}",
+        f"kubectl apply -f {paths.ROOT / 'deploy/permissions/role-daemonset-exec.yaml'}",
+        "# to remove it afterwards: kubectl delete namespace kubegap" if L == "en" else "# 나중에 지우려면: kubectl delete namespace kubegap",
+    ]
+    n = node_script_checks()
+    if L == "ko":
+        q = {
+            "header": "노드 점검",
+            "question": "노드 안쪽(디스크, 커널 로그, kubelet 설정)을 읽을까요? 이 플랫폼에서는 작은 DaemonSet을 직접 적용해야 해요.",
+            "explain": "kubegap은 클러스터에 아무것도 쓰지 않아서 이 DaemonSet을 대신 적용해 주지 않아요. DaemonSet은 노드마다 특권 파드를 하나씩 띄우고, 파드가 뜨면 kubegap이 `kubectl exec`로 노드를 읽어요. 점검이 끝나면 지워도 돼요.",
+            "gain": [f"full 점검에서 노드 점검 항목이 최대 {n}개 늘어요"],
+            "show": ("명령 보기", "적용 명령 두 개와 지우는 명령 하나를 보여 줘요. 다음 점검부터 파드를 알아서 찾아요."),
+            "skip": "아무것도 적용하지 않으니 노드를 읽지 않아요. 노드 점검 항목은 '노드 접근 없음'으로 적혀요.",
+        }
+    else:
+        q = {
+            "header": "Node checks",
+            "question": "Read inside the nodes (disk, kernel log, kubelet settings)? On this platform it needs a small DaemonSet that you apply yourself.",
+            "explain": "kubegap never writes to a cluster, so it will not apply this for you. The DaemonSet runs one privileged pod per node; once its pods run, kubegap reads each node through `kubectl exec`. You can delete it after the audit.",
+            "gain": [f"up to {n} node checks in a full run"],
+            "show": ("Show the commands", "Prints the two commands to apply and the one to remove it. The next run finds the pods by itself."),
+            "skip": "Nothing is applied, so no node is read. The node checks are reported as 'no node access'.",
+        }
     return {
         "id": "node-daemonset",
-        "header": "Node checks",
-        "question": "Read inside the nodes (disk, kernel log, kubelet settings)? On this platform it needs a small DaemonSet that you apply yourself.",
-        "explain": "kubegap never writes to a cluster, so it will not apply this for you. The DaemonSet runs one privileged pod per node; once its pods run, kubegap reads each node through `kubectl exec`. You can delete it after the audit.",
-        "gain": [f"up to {node_script_checks()} node checks in a full run"],
-        "options": [
-            _opt(
-                "show",
-                "Show the commands",
-                "Prints the two commands to apply and the one to remove it. The next run finds the pods by itself.",
-                show=[
-                    f"kubectl apply -f {paths.ROOT / 'deploy/node-access/daemonset.yaml'}",
-                    f"kubectl apply -f {paths.ROOT / 'deploy/permissions/role-daemonset-exec.yaml'}",
-                    "# to remove it afterwards: kubectl delete namespace kubegap",
-                ],
-            ),
-            _skip("Nothing is applied, so no node is read. The node checks are reported as 'no node access'."),
-        ],
+        "header": q["header"],
+        "question": q["question"],
+        "explain": q["explain"],
+        "gain": q["gain"],
+        "options": [_opt("show", *q["show"], show=show), _skip(L, q["skip"])],
         "typed": None,
     }
 
 
-def _q_grafana_token(setup: dict, cfg: Config) -> dict | None:
+def _q_grafana_token(setup: dict, cfg: Config, L: str) -> dict | None:
     g = (setup.get("monitoring") or {}).get("grafana") or {}
     if not g.get("ok") or cfg.get("grafana_api_token"):
         return None
     cfg_path = cfg.path or paths.DEFAULT_CONFIG
-    return {
-        "id": "grafana-token",
-        "header": "Grafana",
-        "question": "Read the Grafana datasource and dashboard lists? It needs a read-only Grafana token that you create.",
-        "explain": "Grafana answers those two lists only to a logged-in caller. kubegap does not read the admin password (it is a Secret), so the token is yours to create and to put in the config file. Do not paste it into this chat.",
-        "gain": ["the datasource list and the dashboard list in the report; the grafana.* checks run from Grafana's own metrics either way"],
-        "options": [
-            _opt(
-                "show",
-                "Show how",
-                "Prints the three steps. You do them in Grafana and in your own editor.",
-                show=[
-                    "1. In Grafana, as an admin, create a service account with the role Viewer and add a token to it",
-                    f"2. Add this line to {cfg_path} in your own editor:  grafana_api_token: <the token>",
-                    f"3. chmod 600 {cfg_path}",
-                ],
+    ref = g.get("admin_secret")  # lib/grafana_token.admin_ref: the Grafana workload names the Secret that holds the admin password
+    ns = (g.get("service") or {}).get("namespace")
+    if L == "ko":
+        q = {
+            "header": "Grafana",
+            "question": "Grafana의 데이터소스 목록과 대시보드 목록도 읽을까요? 읽기 전용 토큰이 하나 필요해요.",
+            "explain": (
+                f"Grafana는 로그인한 쪽에만 이 두 목록을 보여 줘요. '지금 만들기'를 고르면 kubegap이 Grafana 관리자 비밀번호가 든 Secret(위치: {ns}/{ref['secret']})에서 비밀번호를 딱 한 번 읽어서, Grafana에 읽기 전용(Viewer) 서비스 계정과 토큰을 만들고, 토큰만 설정 파일에 적어요. 비밀번호는 어디에도 남기지 않고, 그 뒤로는 토큰만 써요. kubegap이 Secret 값을 읽는 건 이때뿐이에요."
+                if ref
+                else "Grafana는 로그인한 쪽에만 이 두 목록을 보여 줘요. 이 Grafana는 관리자 비밀번호를 Secret에서 가져오지 않아서 kubegap이 토큰을 대신 만들 수 없어요. 토큰은 직접 만들어 설정 파일에 넣어 주세요. 이 대화에 토큰을 붙여 넣지는 마세요."
             ),
-            _skip("The two lists read 'no auth' in the report."),
-        ],
-        "typed": None,
-    }
+            "gain": ["리포트에 데이터소스 목록과 대시보드 목록이 들어가요. grafana.* 점검 항목은 토큰이 없어도 Grafana 자체 메트릭으로 돌아가요"],
+            "create": ("지금 만들기", f"Secret을 한 번 읽어 Viewer 서비스 계정과 토큰을 만들고 {cfg_path}에 적어요. 토큰은 화면에 찍지 않아요. 되돌리려면 Grafana에서 그 서비스 계정을 지우면 돼요."),
+            "show": ("방법 보기", "세 단계를 보여 줘요. Grafana와 내 편집기에서 직접 해요."),
+            "show_lines": [
+                "1. Grafana에 관리자로 들어가서 Viewer 역할의 서비스 계정을 만들고 토큰을 하나 더해요",
+                f"2. 내 편집기로 {cfg_path}에 이 줄을 더해요:  grafana_api_token: <토큰>",
+                f"3. chmod 600 {cfg_path}",
+            ],
+            "skip": "두 목록은 리포트에 '인증 없음'으로 적혀요.",
+        }
+    else:
+        q = {
+            "header": "Grafana",
+            "question": "Read the Grafana datasource and dashboard lists too? It needs one read-only token.",
+            "explain": (
+                f"Grafana answers those two lists only to a logged-in caller. Create now has kubegap read the Secret {ns}/{ref['secret']} that holds the Grafana admin password once, create a read-only (Viewer) service account and a token in Grafana, and write only the token to the config file. The password is kept nowhere and the token is what every later run uses. This is the one time kubegap reads a Secret value."
+                if ref
+                else "Grafana answers those two lists only to a logged-in caller. This Grafana does not take its admin password from a Secret, so kubegap cannot create the token for you: create it yourself and put it in the config file. Do not paste it into this chat."
+            ),
+            "gain": ["the datasource list and the dashboard list in the report; the grafana.* checks run from Grafana's own metrics either way"],
+            "create": ("Create now", f"Reads the Secret once, creates the Viewer service account and token, writes the token to {cfg_path}. The token is never printed. To undo, delete that service account in Grafana."),
+            "show": ("Show how", "Prints the three steps. You do them in Grafana and in your own editor."),
+            "show_lines": [
+                "1. In Grafana, as an admin, create a service account with the role Viewer and add a token to it",
+                f"2. Add this line to {cfg_path} in your own editor:  grafana_api_token: <the token>",
+                f"3. chmod 600 {cfg_path}",
+            ],
+            "skip": "The two lists read 'no auth' in the report.",
+        }
+    options = []
+    if ref:
+        options.append(_opt("create", *q["create"], ["grafana-token", "--create"], remember=False))
+    options.append(_opt("show", *q["show"], show=q["show_lines"]))
+    options.append(_skip(L, q["skip"]))
+    return {"id": "grafana-token", "header": q["header"], "question": q["question"], "explain": q["explain"], "gain": q["gain"], "options": options, "typed": None}
 
 
 _STORE_GAIN = {
-    "prometheus": "every check and figure fed by PromQL: usage against requests over 7 days, restarts, throttling, the control-plane and component metrics",
-    "alertmanager": "the alert routing and silence checks",
-    "loki": "the log checks that search Loki",
-    "grafana": "the Grafana health checks",
+    "en": {
+        "prometheus": "every check and figure fed by PromQL: usage against requests over 7 days, restarts, throttling, the control-plane and component metrics",
+        "alertmanager": "the alert routing and silence checks",
+        "loki": "the log checks that search Loki",
+        "grafana": "the Grafana health checks",
+    },
+    "ko": {
+        "prometheus": "PromQL로 보는 점검 항목과 숫자 전부예요. 7일 사용량과 requests 비교, 재시작, 스로틀링, 컨트롤플레인과 컴포넌트 메트릭",
+        "alertmanager": "알림 라우팅과 silence 점검 항목",
+        "loki": "Loki를 검색하는 로그 점검 항목",
+        "grafana": "Grafana 상태 점검 항목",
+    },
 }
 
 
-def _q_stores(setup: dict, cfg: Config) -> dict | None:
+def loki_not_asked(setup: dict, language: str = "en") -> str | None:
+    """Why Loki is left out of the stores question: the shipper's configuration says the logs go somewhere else (lib/logsinks.py, #174).
+    None when Loki could still be the answer: no shipper was read, or an output points at a Loki."""
+    sinks = setup.get("log_sinks") or {}
+    goes = sinks.get("logs_go_to") or []
+    if not goes or "loki" in goes or sinks.get("loki_outside"):
+        return None
+    from . import logsinks
+
+    return logsinks.explain(sinks, language)
+
+
+def _q_stores(setup: dict, cfg: Config, L: str) -> dict | None:
     mon = setup.get("monitoring") or {}
     # only a store with no Service in the cluster. One that was found but did not answer is a failure the setup output shows, not a question
     missing = [k for k in STORES if k in mon and not (mon[k] or {}).get("ok") and (mon[k] or {}).get("access") is None and not cfg.url(k)]
+    if "loki" in missing and loki_not_asked(setup, L):
+        missing.remove("loki")
     if not missing or mon.get("error") or not (setup.get("cluster") or {}).get("reachable"):
         return None
+    outside = (setup.get("log_sinks") or {}).get("loki_outside") if "loki" in missing else None
+    if L == "ko":
+        q = {
+            "header": "모니터링 도구",
+            "question": f"클러스터 안에서 {', '.join(missing)}{'을' if len(missing) == 1 else '를'} 찾지 못했어요. 다른 곳에 설치돼 있나요?",
+            "explain": "kubegap은 이 도구들을 클러스터 안의 Service로 찾아서 포트포워딩으로 읽어요. 다른 클러스터, 관리형 서비스, VM처럼 밖에서 돌고 있으면 주소를 적어 주면 그 주소로 읽어요."
+            + (f" 로그 수집기 설정에 Loki 주소가 적혀 있어요: {outside}. 그 주소가 맞으면 아래에 `loki={outside}`라고 적어 주세요." if outside else ""),
+            "gain": [f"{k}: {_STORE_GAIN['ko'][k]}" for k in missing],
+            "absent": ("설치 안 함", "그 도구가 필요한 점검 항목은 건너뛰고, 리포트에 그렇게 적어요."),
+            "later": ("다음에 다시 묻기", "아무것도 기억하지 않아요."),
+            "typed": f"주소를 도구마다 한 줄씩 적어 주세요. `<도구>=<http 주소>` 형식이에요. 예: `{'loki=' + outside if outside else 'prometheus=http://prometheus.example.internal:9090'}`. 각각 설정 값 `<도구>_url`로 들어가요. 적고 나면 `setup`을 다시 돌려요",
+        }
+    else:
+        q = {
+            "header": "Stores",
+            "question": f"Not found in the cluster: {', '.join(missing)}. {'Is it' if len(missing) == 1 else 'Are they'} installed somewhere else?",
+            "explain": "kubegap looks for these as Services in the cluster and port-forwards to them. One that runs elsewhere (another cluster, a managed service, a VM) is read from its address instead."
+            + (f" The log shipper's configuration names a Loki at {outside}; if that is the one, type `loki={outside}`." if outside else ""),
+            "gain": [f"{k}: {_STORE_GAIN['en'][k]}" for k in missing],
+            "absent": ("Not installed", "The checks that need them are skipped and the report says so."),
+            "later": ("Ask next time", "Nothing is remembered."),
+            "typed": f"the addresses, one per store: `<store>=<http address>`, e.g. `{'loki=' + outside if outside else 'prometheus=http://prometheus.example.internal:9090'}`. Each one is a config value, `<store>_url`. After they are written, run `setup` again",
+        }
     return {
         "id": "stores",
-        "header": "Stores",
-        "question": f"Not found in the cluster: {', '.join(missing)}. {'Is it' if len(missing) == 1 else 'Are they'} installed somewhere else?",
-        "explain": "kubegap looks for these as Services in the cluster and port-forwards to them. One that runs elsewhere (another cluster, a managed service, a VM) is read from its address instead.",
-        "gain": [f"{k}: {_STORE_GAIN[k]}" for k in missing],
-        "options": [
-            _opt("absent", "Not installed", "The checks that need them are skipped and the report says so."),
-            _opt("later", "Ask next time", "Nothing is remembered.", remember=False),
-        ],
-        "typed": "the addresses, one per store: `<store>=<http address>`, e.g. `prometheus=http://prometheus.example.internal:9090`. Each one is a config value, `<store>_url`. After they are written, run `setup` again",
+        "header": q["header"],
+        "question": q["question"],
+        "explain": q["explain"],
+        "gain": q["gain"],
+        "options": [_opt("absent", *q["absent"]), _opt("later", *q["later"], remember=False)],
+        "typed": q["typed"],
         "state": {"missing": missing},
     }
 
 
-def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = False) -> list[dict]:
-    """The open questions for this context, in the order they are asked. `setup` is the dict `run_setup` wrote to setup.json."""
+def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = False, language: str = "en") -> list[dict]:
+    """The open questions for this context, in the order they are asked, with their texts in `language`. `setup` is the dict `run_setup`
+    wrote to setup.json."""
     if not (setup.get("cluster") or {}).get("reachable"):
         return []
+    L = language if language in LANGUAGES else "en"
     answers = {} if all_ else load_answers(ctx_dir)
     node_access = _load(ctx_dir, NODE_ACCESS_FILE)
     out = []
-    for q in (_q_home_mode(setup, cfg), _q_tools(setup, cfg), _q_ssm_document(setup, cfg), _q_node_ssh(setup, cfg, node_access, again=all_), _q_node_daemonset(setup, cfg), _q_grafana_token(setup, cfg), _q_stores(setup, cfg)):
+    builders = (
+        _q_home_mode(setup, cfg, L),
+        _q_tools(setup, cfg, L),
+        _q_ssm_document(setup, cfg, L),
+        _q_node_ssh(setup, cfg, node_access, L, again=all_),
+        _q_node_daemonset(setup, cfg, L),
+        _q_grafana_token(setup, cfg, L),
+        _q_stores(setup, cfg, L),
+    )
+    for q in builders:
         if q is None:
             continue
         a = answers.get(q["id"])
@@ -342,20 +524,54 @@ def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = Fa
     return out
 
 
-def skipped(setup: dict, cfg: Config, ctx_dir: Path | None) -> list[dict]:
+def skipped(setup: dict, cfg: Config, ctx_dir: Path | None, *, language: str = "en") -> list[dict]:
     """Questions answered with "skip" whose gap is still there: the report names them in "what this run could not see"."""
     answers = load_answers(ctx_dir)
-    return [{"id": q["id"], "header": q["header"], "gain": q["gain"], "at": answers[q["id"]].get("at")} for q in questions(setup, cfg, ctx_dir, all_=True) if (answers.get(q["id"]) or {}).get("choice") == SKIP]
+    return [{"id": q["id"], "header": q["header"], "gain": q["gain"], "at": answers[q["id"]].get("at")} for q in questions(setup, cfg, ctx_dir, all_=True, language=language) if (answers.get(q["id"]) or {}).get("choice") == SKIP]
 
 
-def render(qs: list[dict], context: str | None, skipped_items: list[dict] | None = None) -> str:
-    """The text block `kubegap setup` and `kubegap questions` print. SKILL.md reads it to fill the choice window
-    (references/first-run.md says what each line means)."""
+def noted(setup: dict, cfg: Config, ctx_dir: Path | None, *, language: str = "en") -> list[str]:
+    """Things decided without a question, for the report's "what this run could not see": today, Loki left out because the logs go elsewhere."""
+    why = loki_not_asked(setup, language)
+    if not why or cfg.url("loki") or ((setup.get("monitoring") or {}).get("loki") or {}).get("ok"):
+        return []
+    return [f"loki: 묻지 않았어요. {why}. Loki는 읽지 않아요" if language == "ko" else f"loki: not asked. {why}; Loki is not read"]
+
+
+_RENDER = {
+    "en": {
+        "title": "== questions for the user ({n})",
+        "none": "  none: nothing is missing, or every question was answered before",
+        "config": "   (dry run, show the lines, write only after the user picks Write)",
+        "typed": "  typed answer: ",
+        "skipped": "skipped earlier",
+        "tail": "  -> name these in the report under what this run could not see, with: `/kubegap setup` asks again",
+        "note": "note",
+        "note_tail": "  -> name these in the report under what this run could not see",
+    },
+    "ko": {
+        "title": "== questions for the user ({n})",
+        "none": "  none: 빠진 게 없거나, 질문마다 답이 이미 있어요",
+        "config": "   (dry run으로 바뀔 줄을 먼저 보여 주고, 사용자가 '쓰기'를 고른 뒤에만 써요)",
+        "typed": "  typed answer: ",
+        "skipped": "skipped earlier",
+        "tail": "  -> 리포트의 '이번에 못 본 것'에 이 항목을 적고, `/kubegap setup`으로 다시 물을 수 있다고 써요",
+        "note": "note",
+        "note_tail": "  -> 리포트의 '이번에 못 본 것'에 이 항목을 적어요",
+    },
+}
+
+
+def render(qs: list[dict], context: str | None, skipped_items: list[dict] | None = None, notes: list[str] | None = None, *, language: str = "en") -> str:
+    """The text block `kubegap setup` and `kubegap questions` print, in the report language. SKILL.md puts it into the choice window as
+    printed and never translates it (references/first-run.md says what each line means). The line labels (question, explain, adds,
+    option, run, then) stay English in both languages: they are the block's structure, read by the agent, not by the user."""
     cmd = "$KUBEGAP/scripts/kubegap"
     ctx = f" --context {context}" if context else ""
-    L = [f"== questions for the user ({len(qs)})"]
+    R = _RENDER[language if language in LANGUAGES else "en"]
+    L = [R["title"].format(n=len(qs))]
     if not qs:
-        L.append("  none: nothing is missing, or every question was answered before")
+        L.append(R["none"])
     for q in qs:
         L.append(f"[{q['id']}] {q['header']}")
         L.append(f"  question: {q['question']}")
@@ -365,7 +581,7 @@ def render(qs: list[dict], context: str | None, skipped_items: list[dict] | None
         for o in q["options"]:
             L.append(f"  option {o['id']}: {o['label']} — {o['description']}")
             if o["config"]:
-                L.append(f"      config: {o['config'][0]} {o['config'][1]}   (dry run, show the lines, write only after the user picks Write)")
+                L.append(f"      config: {o['config'][0]} {o['config'][1]}{R['config']}")
             if o["run"]:
                 L.append(f"      run:  {cmd} {o['run'][0]}{ctx} {' '.join(o['run'][1:])}".rstrip())
             for s in o["show"] or []:
@@ -373,9 +589,13 @@ def render(qs: list[dict], context: str | None, skipped_items: list[dict] | None
             # a choice that is not remembered also drops an earlier remembered one, so "skip" from last time does not outlive "check now"
             L.append(f"      then: {cmd} answer{ctx} {q['id']} {o['id']}" if o["remember"] else f"      then: {cmd} answer{ctx} {q['id']} --forget")
         if q.get("typed"):
-            L.append(f"  typed answer: {q['typed']}")
+            L.append(f"{R['typed']}{q['typed']}")
     for s in skipped_items or []:
-        L.append(f"skipped earlier [{s['id']}] {s['header']}: {'; '.join(s['gain'])}")
+        L.append(f"{R['skipped']} [{s['id']}] {s['header']}: {'; '.join(s['gain'])}")
     if skipped_items:
-        L.append("  -> name these in the report under what this run could not see, with: `/kubegap setup` asks again")
+        L.append(R["tail"])
+    for n in notes or []:
+        L.append(f"{R['note']} {n}")
+    if notes:
+        L.append(R["note_tail"])
     return "\n".join(L)

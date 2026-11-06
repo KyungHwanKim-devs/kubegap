@@ -6,7 +6,8 @@ and the order of a hand-written file survive; the result is parsed again with li
 for, otherwise nothing is written.
 
 Only the keys in SETTABLE can be set. `grafana_api_token` is refused on purpose: a token typed into the agent's chat or put on a command line the
-agent runs has already left the machine, so the user adds that one line by hand.
+agent runs has already left the machine, so the user adds that one line by hand, or `kubegap grafana-token --create` writes it from inside the
+process through `set_secret_key` (lib/grafana_token.py), where it never touches a command line.
 """
 
 from __future__ import annotations
@@ -52,10 +53,19 @@ class ConfigEditError(ValueError):
     pass
 
 
-def _validate(key: str, value: str) -> list[str]:
-    """The key as a path, after checking that it may be set and that the value has the right shape."""
+_SECRET_SHAPE = {"grafana_api_token": (lambda v: bool(v) and len(v) < 4096 and not re.search(r"[\s\"'#]", v), "a token without spaces or quotes")}
+
+
+def _validate(key: str, value: str, *, internal: bool = False) -> list[str]:
+    """The key as a path, after checking that it may be set and that the value has the right shape. `internal` is for the one in-process
+    caller that writes a secret value (set_secret_key); the command line never passes it."""
     if key in REFUSED:
-        raise ConfigEditError(f"{key} is not set by this command: {REFUSED[key]}")
+        if not internal:
+            raise ConfigEditError(f"{key} is not set by this command: {REFUSED[key]}")
+        ok, shape = _SECRET_SHAPE[key]
+        if not ok(value):
+            raise ConfigEditError(f"{key}: the value is not {shape}")
+        return key.split(".")
     if key.startswith("ssh.hosts."):
         node = key[len("ssh.hosts.") :]
         if not _NODE.match(node):
@@ -123,10 +133,10 @@ def _key_text(key: str) -> str:
     return key if _PLAIN.match(key) else '"' + key + '"'
 
 
-def set_text(text: str, key: str, value: str) -> str:
+def set_text(text: str, key: str, value: str, *, internal: bool = False) -> str:
     """The config text with `key` set to `value`. Raises ConfigEditError when the key may not be set, the value has the wrong shape,
     or the file's layout is one this line editor does not handle (the message says to edit by hand)."""
-    path = _validate(key, value)
+    path = _validate(key, value, internal=internal)
     if text.startswith("\ufeff"):
         raise ConfigEditError("the file starts with a byte order mark; save it as plain UTF-8, or edit it by hand")
     eol = "\r\n" if "\r\n" in text else "\n"  # a file written with Windows line ends keeps them
@@ -173,6 +183,17 @@ def set_text(text: str, key: str, value: str) -> str:
 
 
 HEADER = "# kubegap settings. Every key is optional; config.example.yaml in the kubegap folder lists them.\n"
+
+
+def set_secret_key(path: Path, key: str, value: str) -> bool:
+    """Write a value that must not pass through a command line (`grafana_api_token`), from inside the process. The file ends up readable by
+    the user only, whatever mode it had: the token is in it now. Returns whether the file changed."""
+    path = path.resolve()
+    old = path.read_bytes().decode("utf-8") if path.is_file() else ""
+    new = set_text(old or HEADER, key, value, internal=True)
+    ensure_private_dir(path.parent)
+    write_private(path, new)  # write_private creates with 0600 and chmods an existing file to it
+    return new != old
 
 
 def set_key(path: Path, key: str, value: str, *, dry_run: bool = False) -> tuple[str, bool]:

@@ -12,7 +12,7 @@ kubegap has no credential store. It uses what is already on your machine: the ku
 | AWS, on EKS only | `aws_profile` and `aws_region` in the config, else the `AWS_PROFILE` of the kubeconfig's `exec` block, else the AWS CLI default | the profile kubectl uses is not the one you want the audit to use |
 | Prometheus, Alertmanager, Loki, Grafana | found as Services in the cluster and reached through a port-forward | one of them runs outside the cluster: the first run asks for its address |
 | apiserver metrics | the `job` label of the apiserver scrape, detected from `apiserver_request_total` | your scrape config uses a job name kubegap does not recognize: set `apiserver_job` |
-| Grafana datasource and dashboard lists | `grafana_api_token` in the config | you want those two lists: the first run shows how |
+| Grafana datasource and dashboard lists | `grafana_api_token` in the config | you want those two lists: the first run offers to create the token once (`kubegap grafana-token --create`, see below) or shows how |
 | Inside the nodes, EKS | SSM `send-command` with the document `kubegap-node-read` | once per account: the first run offers to upload the document |
 | Inside the nodes, k3s and bare metal | SSH to each node's InternalIP with the user and key of your `~/.ssh/config` | a node is not reachable that way: the first run asks for the address |
 | Inside the nodes, GKE, AKS and other managed nodes | `kubectl exec` into a DaemonSet you apply | you want node checks there: the first run shows the commands |
@@ -31,8 +31,8 @@ Without a connection, only the checks that need it are left out, and the report 
 | `ssm-document` | EKS, and the SSM document is missing or older than the one shipped with kubegap | Upload · Skip |
 | `node-ssh` | k3s, RKE2 or an unrecognized platform, the config names no node access (`ssh:` block or `node_access`), and the node DaemonSet is not running | Check SSH now · Skip. If nodes do not answer: Accept host keys or Check again · Use the rest · Skip · or type an address per node |
 | `node-daemonset` | GKE or AKS, and the node DaemonSet is not running | Show the commands · Skip |
-| `grafana-token` | Grafana was found and no token is set | Show how · Skip |
-| `stores` | Prometheus, Alertmanager, Loki or Grafana has no Service in the cluster | Not installed · Ask next time · or type the address |
+| `grafana-token` | Grafana was found and no token is set | Create now · Show how · Skip |
+| `stores` | Prometheus, Alertmanager, Loki or Grafana has no Service in the cluster. Loki is left out when the log shipper's configuration (fluent-bit, fluentd, promtail) says the logs go elsewhere; the report then says where | Not installed · Ask next time · or type the address |
 
 An answer is remembered per cluster in `~/.kubegap/snapshots/<context>/answers.json`. A skipped question is not asked again, and the report names what was skipped. `/kubegap setup` asks everything again.
 
@@ -99,6 +99,8 @@ The keys that answer a first-run question for good:
 | `node_access: none` | no node is contacted and no node question is asked |
 | `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url` | that store is read from the address |
 | `grafana_api_token` | the Grafana lists are read |
+
+**Create now** at the `grafana-token` question is the one step where kubegap reads a Secret value and writes somewhere: `kubegap grafana-token --create` reads the admin password from the Secret the Grafana workload names in `GF_SECURITY_ADMIN_PASSWORD` (names found by `setup`, values read only here, kept nowhere), logs in to Grafana through the same port-forward or URL as the audit, creates a service account with the Viewer role and one token (`POST /api/serviceaccounts`, `POST /api/serviceaccounts/<id>/tokens`), and writes `grafana_api_token` to the config file with mode 0600 from inside the process. It is offered only when that env takes a `secretKeyRef`, needs a kubeconfig user that may read that one Secret (the shipped ClusterRole excludes Secrets, so this is usually your own admin kubeconfig), and prints what it created, never the token. To revoke it, delete the service account in Grafana.
 
 Other things the file holds: `mode: full` to make full the default, `profile` and `namespace_profiles` to change what kubegap expects of a cluster or a namespace, `suppress` and `overrides` to silence a check or change a threshold, `retention` and `snapshots_root` for the collected data, `keep_component_logs`, `apiserver_job`.
 

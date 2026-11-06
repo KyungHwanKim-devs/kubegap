@@ -8,7 +8,7 @@ kubegap을 클러스터에 돌려도 되는지 판단해야 하는 분을 위한
 
 kubegap은 읽기 호출만 합니다. 어떤 Kubernetes 규칙과 AWS 액션을 어디에 쓰는지는 [PERMISSIONS.md](PERMISSIONS.md)에 있습니다.
 
-**Secret.** Secret 값은 읽지도 기록하지도 않습니다. 이름과 종류만 기록합니다. 예외가 하나 있습니다. Helm은 릴리스 기록을 Secret에 저장하기 때문에 `helm list`가 이 Secret을 읽습니다. kubegap은 `helm list`가 출력하는 릴리스 이름, 네임스페이스, 리비전, 업데이트 시각, 상태, 차트, 앱 버전만 남기고 릴리스의 values는 수집하지 않습니다. kubegap에 들어 있는 ClusterRole은 Secret을 제외하므로, 이 역할로 돌리면 `helm list`가 실패하고 Helm 점검 항목 2개를 건너뜁니다. pluto와 kubent는 Helm 릴리스를 읽지 않는 모드로 실행합니다.
+**Secret.** Secret 값은 읽지도 기록하지도 않습니다. 이름과 종류만 기록합니다. 예외가 둘 있습니다. 하나는 `kubegap grafana-token --create`입니다. Grafana 질문에서 "지금 만들기"를 고를 때만 돌고, Grafana 워크로드가 가리키는 Secret에서 관리자 비밀번호를 한 번 읽어 Viewer 서비스 계정과 토큰을 만드는 Grafana API 호출 두 번에만 메모리에서 쓰고, 비밀번호도 그 Secret의 다른 값도 어디에도 적지 않습니다. 다른 하나는 Helm입니다. Helm은 릴리스 기록을 Secret에 저장하기 때문에 `helm list`가 이 Secret을 읽습니다. kubegap은 `helm list`가 출력하는 릴리스 이름, 네임스페이스, 리비전, 업데이트 시각, 상태, 차트, 앱 버전만 남기고 릴리스의 values는 수집하지 않습니다. kubegap에 들어 있는 ClusterRole은 Secret을 제외하므로, 이 역할로 돌리면 `helm list`가 실패하고 Helm 점검 항목 2개를 건너뜁니다. pluto와 kubent는 Helm 릴리스를 읽지 않는 모드로 실행합니다.
 
 **kubeconfig.** `setup.json`에는 이 컨텍스트가 어떻게 인증하는지 적힙니다. exec 명령과 인자(EKS면 `aws eks get-token`), 그리고 `env` 블록에 있는 환경 변수의 이름입니다. 값은 `AWS_PROFILE`과 `AWS_REGION` 두 개만 남깁니다. kubegap이 AWS CLI를 부를 때 넘겨야 해서입니다. 테넌트 id나 다른 인증 플러그인의 토큰 같은 나머지 값은 전부 `<redacted>`로 적습니다(`lib/kube.py`, `tests/test_kube_context.py`).
 
@@ -20,9 +20,9 @@ kubegap은 읽기 호출만 합니다. 어떤 Kubernetes 규칙과 AWS 액션을
 
 kubegap이 모은 것은 전부 내 컴퓨터의 `~/.kubegap/snapshots/<context>/<timestamp>/`에 저장됩니다. kubegap 자체는 아무 데도 데이터를 보내지 않습니다.
 
-- 스냅샷 폴더와 파일은 내 사용자만 읽을 수 있게 만듭니다. 이미 있던 폴더가 다른 사용자에게 열려 있으면 실행마다 한 번 경고하고 그대로 둡니다.
+- 스냅샷 폴더와 파일은 내 사용자만 읽을 수 있게 만듭니다. 이미 있던 폴더가 다른 사용자에게 열려 있으면 첫 실행 질문(`home-mode`)으로 묻습니다. "지금 고치기"는 `kubegap protect-home`으로 그 폴더들에 chmod 700을 하고, "그대로 두기"는 그대로 둡니다.
 - 오브젝트 spec, 이벤트, 메트릭, `logs/node/` 아래의 노드 저널, `logs/cloudwatch/` 아래의 CloudWatch 컨트롤플레인 로그 쿼리 결과, Grafana 대시보드는 모은 그대로 저장합니다. 노드 저널은 kubelet, containerd, k3s의 것입니다. 이 파일들은 에이전트가 읽을 수 있습니다.
-- 설정 파일은 직접 만드는 파일입니다. `grafana_api_token`이 들어갈 수 있으니 `chmod 600`으로 권한을 제한하세요. `kubegap config set`은 이 권한으로 파일을 만들고, 토큰을 대신 써 주지는 않습니다.
+- 설정 파일은 직접 만들거나 `kubegap config set`이 0600 권한으로 만듭니다. `grafana_api_token`이 들어갈 수 있으니 `chmod 600`으로 권한을 제한하세요. `config set`은 명령줄로 받은 토큰을 쓰지 않고, `kubegap grafana-token --create`는 프로세스 안에서 같은 권한으로 적습니다.
 - 오래된 스냅샷은 `scripts/kubegap prune`으로 지웁니다. 사용법은 [SETUP.md](SETUP.md#모은-데이터)에 있습니다.
 
 ## 내 컴퓨터 밖으로 나가는 것

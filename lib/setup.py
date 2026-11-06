@@ -12,7 +12,7 @@ import json
 import platform
 from pathlib import Path
 
-from . import __version__, aws, firstrun, kube, monitoring, nodecommands, paths, tools
+from . import __version__, aws, firstrun, grafana_token, kube, logsinks, monitoring, nodecommands, paths, tools
 from . import discover as _discover
 from .config import Config
 from .runlog import RunLog
@@ -58,7 +58,16 @@ def check_tool_updates(only: list[str] | None = None) -> int:
 
 
 def run_setup(
-    context: str | None, cfg: Config, *, kubeconfig: str | None = None, install: bool | list[str] = False, install_ssm_document: bool = False, snapshots_root: Path | None = None, verbose: bool = False, ask_again: bool = False
+    context: str | None,
+    cfg: Config,
+    *,
+    kubeconfig: str | None = None,
+    install: bool | list[str] = False,
+    install_ssm_document: bool = False,
+    snapshots_root: Path | None = None,
+    verbose: bool = False,
+    ask_again: bool = False,
+    language: str = "en",
 ) -> tuple[int, dict]:
     """ask_again=True lists every first-run question again, including the ones answered before (`/kubegap setup`).
     install=False: check only (default). True: install everything missing. List of names: install only those. install_ssm_document=True uploads the kubegap-node-read SSM document when it is missing or outdated (EKS). Both policies are decided by the caller (scripts/kubegap) from config and arguments."""
@@ -187,9 +196,26 @@ def run_setup(
                 if info.get("head_series") is not None:
                     extra += f", active series {info['head_series']:,}"
                 _p(f"  {kind:<12} connected v{info.get('version')} at {where}{extra}")
+                if kind == "grafana" and not cfg.get("grafana_api_token") and info.get("service"):
+                    # where the admin password lives (names only), so the first-run question can offer to create the read token once (lib/grafana_token.py)
+                    ref = grafana_token.admin_ref(context, info["service"]["namespace"], kubeconfig, log)
+                    info["admin_secret"] = ref
+                    _p(
+                        f"  {'':<12} admin password: Secret {info['service']['namespace']}/{ref['secret']} key {ref['password_key']} ({ref['workload']}); a read token can be created once from it"
+                        if ref
+                        else f"  {'':<12} admin password: not taken from a Secret by the Grafana workload; the read token is yours to create"
+                    )
             else:
                 _p(f"  {kind:<12} missing/failed: {info.get('error')}")
         log.note("monitoring", **dict(mon.items()))
+        # where the logs go, so the Loki question is asked only when Loki could be the answer (lib/logsinks.py, #174)
+        sinks = logsinks.detect(context, kubeconfig, log)
+        result["log_sinks"] = sinks
+        said = logsinks.explain(sinks)
+        if said:
+            _p(f"  {'logs':<12} {said}")
+        elif sinks.get("shippers"):
+            _p(f"  {'logs':<12} shipper {', '.join(s['namespace'] + '/' + s['name'] for s in sinks['shippers'])} found, outputs not read" + (f" ({sinks['error']})" if sinks.get("error") else ""))
     else:
         _p("  (skipped: cluster unreachable)")
 
@@ -237,7 +263,7 @@ def run_setup(
     result["ready"] = ok
     result["finished"] = _dt.datetime.now().astimezone().isoformat(timespec="seconds")
     # What is missing becomes questions for the user, each with an explanation, choices and a way to skip (lib/firstrun.py). SKILL.md asks them.
-    open_questions = firstrun.questions(result, cfg, ctx_dir, all_=ask_again) if ok else []
+    open_questions = firstrun.questions(result, cfg, ctx_dir, all_=ask_again, language=language) if ok else []
     result["questions"] = [q["id"] for q in open_questions]
     if ctx_dir:
         write_private(ctx_dir / "setup.json", json.dumps(result, ensure_ascii=False, indent=2, default=str))
@@ -245,7 +271,7 @@ def run_setup(
     log.stage("setup", "end", ready=ok)
     _p("")
     if ok:
-        _p(firstrun.render(open_questions, context, firstrun.skipped(result, cfg, ctx_dir)))
+        _p(firstrun.render(open_questions, context, firstrun.skipped(result, cfg, ctx_dir, language=language), firstrun.noted(result, cfg, ctx_dir, language=language), language=language))
         _p("")
         _p(f"Ready. Collection can proceed. Result: {result.get('path')}")
     else:

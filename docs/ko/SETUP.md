@@ -16,7 +16,7 @@ kubegap은 자격 증명을 따로 저장하지 않습니다. kubeconfig, AWS CL
 | AWS, EKS일 때만 | 설정 파일의 `aws_profile`과 `aws_region`. 없으면 kubeconfig `exec` 블록의 `AWS_PROFILE`, 그것도 없으면 AWS CLI 기본 설정 | kubectl이 쓰는 프로파일과 다른 프로파일로 점검하고 싶을 때 |
 | Prometheus, Alertmanager, Loki, Grafana | 클러스터의 Service를 찾아 포트포워드로 연결합니다 | 클러스터 밖에서 돌고 있을 때. 첫 실행에서 주소를 묻습니다 |
 | apiserver 메트릭 | `apiserver_request_total`에서 찾아낸, apiserver를 수집하는 job의 `job` 레이블 | 수집 설정의 job 이름을 kubegap이 알아보지 못할 때. `apiserver_job`을 지정하세요 |
-| Grafana 데이터소스와 대시보드 목록 | 설정 파일의 `grafana_api_token` | 이 두 목록이 필요할 때. 첫 실행에서 방법을 알려 줍니다 |
+| Grafana 데이터소스와 대시보드 목록 | 설정 파일의 `grafana_api_token` | 이 두 목록이 필요할 때. 첫 실행에서 토큰을 한 번 만들어 주거나(`kubegap grafana-token --create`, 아래 설명) 만드는 방법을 알려 줍니다 |
 | 노드 안쪽, EKS | SSM `send-command`와 SSM 문서 `kubegap-node-read` | AWS 계정마다 한 번. 첫 실행에서 SSM 문서를 올릴지 묻습니다 |
 | 노드 안쪽, k3s와 베어메탈 | `~/.ssh/config`의 사용자와 키로 각 노드의 InternalIP에 SSH 접속 | 그렇게 닿지 않는 노드가 있을 때. 첫 실행에서 주소를 묻습니다 |
 | 노드 안쪽, GKE, AKS와 그 밖의 관리형 노드 | 직접 적용한 DaemonSet에 `kubectl exec` | 이 환경에서 노드 점검을 하고 싶을 때. 첫 실행에서 명령을 보여 줍니다 |
@@ -35,8 +35,8 @@ kubegap은 자격 증명을 따로 저장하지 않습니다. kubeconfig, AWS CL
 | `ssm-document` | EKS에서 SSM 문서가 없거나 kubegap에 들어 있는 SSM 문서보다 오래됐을 때 | 올리기 · 건너뛰기 |
 | `node-ssh` | k3s, RKE2 또는 kubegap이 알아보지 못한 플랫폼이고, 설정 파일에 노드 접속(`ssh:` 블록이나 `node_access`)이 없고, DaemonSet 파드도 없을 때 | 지금 SSH 확인 · 건너뛰기. 응답하지 않는 노드가 있으면 호스트 키 받기 또는 다시 확인 · 응답한 노드만 쓰기 · 건너뛰기 · 노드별 주소 입력 |
 | `node-daemonset` | GKE나 AKS에서 노드 DaemonSet이 돌고 있지 않을 때 | 명령 보기 · 건너뛰기 |
-| `grafana-token` | Grafana를 찾았는데 토큰이 설정되어 있지 않을 때 | 방법 보기 · 건너뛰기 |
-| `stores` | Prometheus, Alertmanager, Loki, Grafana 중 클러스터에 Service가 없는 것이 있을 때 | 설치 안 함 · 다음에 다시 묻기 · 주소 입력 |
+| `grafana-token` | Grafana를 찾았는데 토큰이 설정되어 있지 않을 때 | 지금 만들기 · 방법 보기 · 건너뛰기 |
+| `stores` | Prometheus, Alertmanager, Loki, Grafana 중 클러스터에 Service가 없는 것이 있을 때. 로그 수집기(fluent-bit, fluentd, promtail) 설정에 로그가 다른 곳으로 간다고 적혀 있으면 Loki는 묻지 않고, 리포트에 어디로 가는지 적습니다 | 설치 안 함 · 다음에 다시 묻기 · 주소 입력 |
 
 답은 클러스터별로 `~/.kubegap/snapshots/<context>/answers.json`에 저장됩니다. 건너뛴 질문은 다시 묻지 않고, 무엇을 건너뛰었는지는 리포트에 적습니다. 전부 다시 고르려면 `/kubegap setup`을 실행하세요.
 
@@ -108,7 +108,7 @@ scripts/kubegap config set prometheus_url http://prometheus.example.internal:909
 
 이 명령으로 쓸 수 있는 키는 `language`, `mode`, `node_access`, `install_tools`, `ssm_document`, `confirm_context`, 모니터링 도구 주소 네 개인 `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url`, 그리고 `ssh.user`, `ssh.key`, `ssh.port`, `ssh.accept_new_hosts`, `ssh.hosts.<node>`입니다.
 
-`grafana_api_token`은 일부러 거부합니다. 에이전트가 실행하는 명령줄에 토큰을 넣으면 그 토큰은 이미 내 컴퓨터를 떠난 것이기 때문입니다. 이 한 줄은 직접 편집기로 넣고, 파일을 `chmod 600`으로 바꾸세요.
+`grafana_api_token`은 일부러 거부합니다. 에이전트가 실행하는 명령줄에 토큰을 넣으면 그 토큰은 이미 내 컴퓨터를 떠난 것이기 때문입니다. 이 한 줄은 직접 편집기로 넣고 파일을 `chmod 600`으로 바꾸거나, `kubegap grafana-token --create`가 프로세스 안에서 적게 하세요.
 
 아래 키를 설정하면 첫 실행 질문에 답이 정해져서 다시 묻지 않습니다.
 
@@ -121,6 +121,8 @@ scripts/kubegap config set prometheus_url http://prometheus.example.internal:909
 | `node_access: none` | 어떤 노드에도 접속하지 않고 노드 질문도 하지 않습니다 |
 | `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url` | 그 도구를 적어 둔 주소에서 읽습니다 |
 | `grafana_api_token` | Grafana 목록을 읽습니다 |
+
+`grafana-token` 질문의 **지금 만들기**는 kubegap이 Secret 값을 읽고 어딘가에 쓰는 유일한 단계입니다. `kubegap grafana-token --create`는 Grafana 워크로드가 `GF_SECURITY_ADMIN_PASSWORD`에 가리키는 Secret에서 관리자 비밀번호를 읽습니다(이름은 `setup`이 찾고, 값은 이 명령에서만 읽고 어디에도 남기지 않습니다). 그다음 점검과 같은 포트포워드나 주소로 Grafana에 로그인해 Viewer 역할의 서비스 계정과 토큰 하나를 만들고(`POST /api/serviceaccounts`, `POST /api/serviceaccounts/<id>/tokens`), `grafana_api_token`을 프로세스 안에서 설정 파일에 0600 권한으로 적습니다. 그 환경 변수가 `secretKeyRef`로 되어 있을 때만 선택지로 나오고, kubeconfig 사용자가 그 Secret 하나를 읽을 수 있어야 합니다(기본 ClusterRole은 Secret을 빼므로 보통 내 관리자 kubeconfig입니다). 만든 것만 출력하고 토큰은 출력하지 않습니다. 되돌리려면 Grafana에서 그 서비스 계정을 지우면 됩니다.
 
 설정 파일에는 다음 키도 넣을 수 있습니다.
 
