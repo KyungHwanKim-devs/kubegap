@@ -6,7 +6,7 @@ because it is the baseline the next run of that mode is diffed against (`paths.p
 collections) are removed unless their run.log was written in the last 10 minutes, which means a collection is still running.
 
 Only folders named like a snapshot (`paths.is_snapshot_name`) are touched; files next to them in the context folder (setup.json,
-history.csv, node-access.json) stay.
+history.csv, node-access.json, answers.json) stay.
 """
 
 from __future__ import annotations

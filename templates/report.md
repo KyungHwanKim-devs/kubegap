@@ -1,75 +1,96 @@
 <!--
-kubegap human report. Written entirely by the LLM, saved as <snapshot>/report.md, in both modes (daily: Top 3, full: Top 5).
-The reference half (every table, the full first-pass list, tool notes) is report-details.md, produced by `scripts/kubegap render-details`
-from the snapshot plus the fragments in <snapshot>/llm/. This file never repeats those tables; it links to them.
+kubegap human report, saved as <snapshot>/report.md, in both modes (daily: 3 problems, full: 5).
+`scripts/kubegap write-report` writes it from llm/facts.json: a writer agent writes the body from the facts, in the language's guide
+(references/writing-<language>.md); code adds the title line, the numbers table, the check ids and the tail.
+The reference half (every table, every automatic verdict, the analysis record) is report-details.md, produced by `scripts/kubegap render-details`
+from the snapshot plus the `analysis` block of the facts. This file never repeats those tables; it links to them.
 
-Rules for this file:
-- Written for a person who runs the cluster and reads this once, top to bottom, in five minutes (daily) or fifteen (full). A busy reader stops after the Top N.
-- Speak about things, not about checks: name the namespace, workload, node. Check ids appear only on the one "Evidence checks" line under each problem.
-- Each problem has six parts in this order: Problem, Evidence, Cause, Action, Why this happens (principle / cases / measured when this check was written, only when it bears on the problem / read next), Evidence checks.
-- Tone follows the report tone rules in references/report-writing.md section 8: conclusion first, one idea per sentence, plain words, polite register, numbers with units, no parenthetical asides.
-- No analogies. No invention: every number comes from the snapshot, every source in a learning point comes from the check definition or a primary document.
-- {{...}} are slots. <!-- --> comments are instructions; delete them before saving. Headings are English in the template; translate them when the report language is Korean, keep ids, paths, commands and names as they are.
-- Right before saving, run `scripts/kubegap mask` on this file and report-details.md.
+Shape. The reader is the person who runs the cluster. They read it in the morning, decide what to do today, and run it on production.
+So the first screen settles the decision, every problem ends in steps with a check and a way back, and nothing is said about an entity
+that was not looked at.
 -->
 # {{cluster_name}} — {{mode_word}} audit, {{date}}
 
-{{opening_paragraph}}
-<!-- Three to five sentences: what this cluster is (platform, size, profile), whether anything is on fire right now, the one thing that changed since the previous run of this mode, and whether a full run is due (daily only). No numbers table here. -->
+{{first_screen}}
+<!-- Five lines at most, no heading:
+     Urgent now: yes — <what is broken, in one sentence> / no
+     Today's problems: ① <title> ② <title> ③ <title>          ← the titles of the sections below, nothing more
+     Since the last {{mode_word}} run: <what the previous report asked for and whether it was done> <what appeared, what went away>, with the numbers.
+     With no earlier run of this mode: "No earlier {{mode_word}} run to compare with." -->
 
-## The {{n_top}} problems to work on
-<!-- daily: 3, chosen in this order: new or recurred items that still have impact now, then the persisting critical/high items with the largest impact, then events that have ended. An event has ended when its latest measurement is back under the threshold, such as the latest 1-hour p95 in a latency finding, or its last occurrence is before this collection window; when one is in the Top N, the title or the first Problem sentence says it is over. full: 5, chosen by severity × impact × difficulty; with an SLO, by error-budget burn. Dozens of findings with one cause are one problem. Order 1 = most urgent. -->
+<!-- Code writes the next two sections from the snapshot and the facts. -->
+## The cluster at a glance
+| What | Value |
+|---|---|
+| Nodes | {{ready}} of {{count}} Ready |
+| Pods | … running, … pending, … failed |
+| Namespaces | …, … production |
+| Components | … |
+| Metrics and log stores | … |
+| Kubernetes | … |
 
-### 1. {{problem_1_title}}
-<!-- Title is a plain sentence about the thing, e.g. "15 prod apps can only run on one node, and that node rebooted yesterday" -->
-**Problem.** {{problem_1_what}} <!-- what is wrong, how, and the impact on users or operations right now. Two or three sentences. -->
+## Coming up
+| When | What | Source |
+|---|---|---|
+<!-- From `upcoming` in the facts: node expiries, certificate expiries, end of support, cleanup jobs, quotas about to fill. "none" when the facts carry nothing. -->
 
-**Evidence.** {{problem_1_evidence}} <!-- the three to six numbers that carry the problem, each in its own short sentence with its source file named after the number, not in parentheses. Everything else is in report-details.md; do not pile every value in here. Measured during collection? say so. A number here that differs from the first-pass aggregate for that check (its note, value or item count in findings-draft.json) must have a row in the Recounted aggregates table of llm/adjustments.md with the reason. -->
+## 1. {{problem_1_title}}
+<!-- A noun phrase that names the thing that is wrong, e.g. "15 prod apps that can only run on one node". Never a sentence. -->
 
-**Cause.** {{problem_1_cause}} <!-- why it came to this. When not certain, start with "Most likely," -->
+**What is happening.** {{situation}}
+<!-- What is wrong, since when, and what the reader feels now. Numbers with unit, scope and period. If it is over, say so.
+     Then impact, by what was actually looked at: affected (each with its own evidence) · checked and healthy · changed in the window for another reason (and by what) · not checked. Nothing is affected by inference. -->
 
-**Action.** {{problem_1_action}} <!-- in order ①②③; what to change, the expected effect, and the effort as an estimate that reads as one at the end of the sentence, such as "Expect about 30 minutes." or "Expect an hour or two.", never a bare "Takes 30 minutes." A manifest fragment or exact command where possible. -->
+**Why.** {{cause}}
+<!-- One sentence, then "confirmed", "likely" or "unknown". A likely cause gets its evidence in one line. Never stronger than the facts. -->
 
-**Why this happens.**
-- Principle: {{problem_1_theory}} <!-- the principle behind it in one or two sentences (how the mechanism works, which operating rule it breaks: e.g. CPU limits are a ceiling enforced per 100 ms CFS period; HPA scales on request, not limit). No analogies. -->
-- Cases: {{problem_1_experience}} <!-- a public case, named with year and taken from the check's `cases` or a primary document (Kubernetes docs, Google SRE Book chapter, a vendor postmortem). Never from `why`, `notes` or `measured`. If the check carries none, write "No public case recorded for this check." and nothing else. Never invent a source or a URL. -->
-- Measured when this check was written: {{problem_1_measured}} <!-- optional: delete the line unless the check's `measured` records a failure or a number that bears on this problem. One or two sentences. It comes from the clusters the check was developed on, not this cluster, and is not a case. -->
-- Read next: {{problem_1_study}} <!-- two or three search terms or document sections a reader can look up to go deeper, e.g. "CFS quota and throttling (kernel sched-bwc), Kubernetes docs: Resource Management for Pods, Google SRE Book ch. 4 Service Level Objectives". Terms, not links, unless the link is in the check definition. -->
+**Suggested fix.**
+① {{step}} <!-- If a condition applies, it comes first: "If A, …". Then what to do in one sentence. -->
+```
+{{command}}
+```
+<!-- One command per block, exactly as in the facts, nothing to edit after copying. A manifest fragment is its own block.
+     Then, as sentences: what the cluster does when this runs, and the risk: what restarts, what goes down and for how long, who reverts a by-hand change, what can be lost. Only the ones that apply.
+     Check: how the reader sees it worked, a command or a value. -->
+② …
+③ …
 
-Evidence checks: `{{problem_1_findings}}`
+**Rollback.** {{rollback}}
+<!-- How to undo what the steps changed. When something cannot be undone, say so and which step backs up first. -->
 
-### 2. {{problem_2_title}}
-**Problem.** …
-**Evidence.** …
-**Cause.** …
-**Action.** …
-**Why this happens.**
-- Principle: …
-- Cases: …
-- Measured when this check was written: … <!-- optional -->
-- Read next: …
+**Why this happens.** {{principle}} {{case}} {{reading}}
+<!-- Two or three sentences on the mechanism, from the check's why or a document that was read. One public case with the same mechanism if the facts carry one, what happened and what matches here; no case means no case line. One or two documents to read next, named. -->
 
-Evidence checks: …
+**Evidence.**
+| What | Value | Source |
+|---|---|---|
+<!-- Six rows at most; the file name goes in this column and nowhere else in the problem. With two numbers or fewer, one sentence instead of a table. -->
 
-### 3. {{problem_3_title}}
+## 2. {{problem_2_title}}
 …
 
-<!-- full mode only: problems 4 and 5 in the same shape -->
+## 3. {{problem_3_title}}
+…
+<!-- full mode: problems 4 and 5 in the same shape -->
 
-<!-- Optional, one line, when something outside the Top N takes under 30 minutes to fix: "Quick fix outside the list: …" -->
+<!-- Code writes this section from `since_last` in the facts. -->
+## Since the previous {{mode_word}} run
+| Work the previous report asked for | State | Proof |
+|---|---|---|
+**Appeared.** / **Went away.** / **Changed because the checks changed, not the cluster.** as lists. With no earlier run: "No earlier {{mode_word}} run to compare with."
 
-## Since the previous {{mode_word}} run ({{previous_date_or_none}})
-<!-- From diff.json, as prose, not a list of ids: what appeared, what went away, what came back, what objects changed and why (deploy, scale, config). Five to eight sentences.
-     A finding that exists only because the rubric changed is a "criteria change", written apart from cluster changes.
-     If there is no earlier snapshot of this mode, this section is exactly one sentence: "No earlier {{mode_word}} snapshot to compare with." -->
-{{changes_paragraph}}
+## Serious, not today
+<!-- Every critical or high item that is not among today's problems, items with one cause as one line, fifteen lines at most by severity, then "N more are in section 2 of report-details.md." -->
 
-Progress on the previous report's problems: {{previous_actions_progress}} <!-- one sentence per previous Top N item: started / done / not started, with the number that proves it. Omit the whole line when there is no previous report of this mode. -->
+<!-- full mode only, written by code from `analysis.area_summary`: -->
+## Each area in one line
+| Area | What |
+|---|---|
 
 ## What this run could not see
-<!-- One paragraph. Absent components the profile expects (section 5 of details), checks not evaluated in this mode with the count and the last full run date (daily), tools missing, collection steps that failed, and measurements that collection itself disturbed. Not a list of ids. -->
-{{blind_spots_paragraph}}
+<!-- One line per item: what was not seen, and what the reader does to see it (a full run, a token, a question `/kubegap setup` asks again). -->
 
+<!-- From here on, code writes it. -->
 ## Numbers
 | Severity | fail | warn | vs. previous {{mode_word}} run |
 |---|---|---|---|
@@ -77,6 +98,7 @@ Progress on the previous report's problems: {{previous_actions_progress}} <!-- o
 | high | {{n_high}} | {{w_high}} | {{d_high}} |
 | medium | {{n_medium}} | {{w_medium}} | {{d_medium}} |
 | low | {{n_low}} | {{w_low}} | {{d_low}} |
-<!-- Counts by the LLM's final severity. One sentence under the table when the final critical+high differs from the first pass by 3 or more. -->
 
-Details, every table and the full first-pass list: [`report-details.md`](report-details.md) · kubegap {{kubegap_version}}, rubric {{rubric_version}} · snapshot `{{snapshot_path}}`
+Checks behind each problem: 1 → `{{finding_ids}}` …
+
+Details and every table: [`report-details.md`](report-details.md) · kubegap {{kubegap_version}}, rubric {{rubric_version}} · snapshot `{{snapshot_path}}`

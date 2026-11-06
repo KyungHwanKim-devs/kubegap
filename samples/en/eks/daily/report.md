@@ -1,81 +1,452 @@
-# my-cluster — daily audit, 2026-10-26 16:18 KST
+# my-cluster — daily audit, 2026-11-05 17:01
 
-This is the EKS cluster `my-cluster` (kube context `my-cluster`, Kubernetes 1.32.13, 8 nodes, profile prod, region us-east-1), running 8 production services in 8 prod namespaces and 4 dev namespaces. Nothing is on fire: the 95 minutes since the previous daily run had no spot reclaim, no node change and no deploy. What is new is measured on the traffic side: the `prod-app-q` API had one hour with a p95 response time of 19.45 s after its traffic grew sixty-fold in a day, and three prod frontends are CPU-throttled on their 200 m limit. None of the five actions from the previous report has been started, so 28 of 42 prod pods still sit on one expired spot node. The last full run was 2026-10-26 14:52 KST; a full run is not due yet.
+Urgent now: no
 
-## The 3 problems to work on
+Today's problems: ① Prod pods stuck on one spot node ② Four prod ALB health checks failing ③ app-q-ai OOM kills, no OOM alert
 
-### 1. The `prod-app-q` API had one hour at a 19.45 s p95 after its traffic grew sixty-fold, and nobody was told
-**Problem.** `prod-app-q/app-q-backend` serves `app-q-api.my-cluster` from one pod on node `ip-10-0-1-139`. Yesterday it received 72 requests in 24 hours; today it received 4,350. In one of the six hours that carried traffic the 95th-percentile response time measured by the ALB was 19.45 s, which means timeouts and retries for users in that hour. The other five hours averaged 0.30 s and the current hour is 0.05 s, so the service is responsive now. No alert fired, because the cluster has no latency alert rule. `prod-app-p/app-p-backend` is the second API with a latency finding today: a 24-hour p95 of 1.02 s and a 1-hour maximum of 2.09 s on 1,793 requests.
+Since the last run: No work from the 2026-10-27 report is recorded as done or still open.
 
-**Evidence.** The 24 h request count is 4,350 against 72 one day earlier, in summary.json traffic.ingresses. The six hourly p95 points are 19.4475 s at the maximum, 0.0495 s at the minimum and 0.0527 s in the latest hour, with a sum of 20.944 s, in aws/alb-metrics.json. Target 5xx in 24 hours is 0 and target 4xx is 89. The pod `app-q-backend-7bd4989cbc-c9jrg` has 0 restarts and 7-day p95 CPU of 0.001 cores against a 500 m limit, in objects/pods.json and metrics/cpu_p95_7d_cores.json. The ALB health check on this target group probes `/` and gets 404, so the single target is marked unhealthy and the ALB fails open, in summary.json traffic.alb.unhealthy_target_groups.
+Appeared, 7: the cluster no longer survives losing its largest node, 3 app-q-ai pods were OOM-killed, and argocd-application-controller-0 was OOM-killed again. Also new: 61 of 251 IPs free in subnet us-east-1c, a 79% full root disk on <ip>, app-l-file-worker and app-l-graph-worker not ready for about 180 and 160 minutes in 24 hours, and p95 latency of 2.32 s and 2.51 s on app-q-ai.my-cluster and monitor.my-cluster.
 
-**Cause.** Likely: a slow dependency rather than CPU. The pod used 0.1% of its CPU limit and was never throttled, so the 19 s hour points to the database `app-q-backend-postgresql-0` on `ip-10-0-2-218`, an external call, or a cold path hit by the new traffic pattern. kubegap does not read application logs, so the exact endpoint is unknown. For app-p-backend the 1 to 2 s p95 is steady across the last four runs and matches its request CPU of 500 m with a 2-core limit; likely model inference time, not a fault.
+Gone, 5: FreeDiskSpaceFailed events stopped, and so did the long-firing KubePodNotReady alerts in four namespaces. Subnet us-east-1a is no longer short of IPs, and app-p-backend's ALB target group no longer reports unhealthy targets. Prod pods on node-1-139 fell from 62% to 45%. The audit rules changed between the runs, so some new and gone items may come from the rules, not the cluster.
 
-**Action.** ① Read the application log of app-q-backend for the slow hour and the PostgreSQL slow-query log; `kubectl -n prod-app-q logs deploy/app-q-backend --since=12h | grep -iE "timeout|slow|took"` is the first look. Expect about 20 minutes. ② Set the ALB health check to a real route so the ALB can take a stuck pod out of rotation: add the annotations below to the `app-q-backend` Ingress and sync in Argo CD. Expect about 10 minutes. ③ Add a latency alert for the four prod APIs on the ALB `TargetResponseTime` p95 via the CloudWatch datasource in Grafana, or from the ALB access logs once enabled, threshold 2 s for 10 minutes. Expect about 1 hour. Effect: the next slow hour pages someone while it happens instead of appearing in an audit the next day.
+Coming up: these NodeClaims reach their 720h expireAfter, and Karpenter then replaces each node and evicts its pods:
+
+- system-ondemand-mxf5q (node-1-241) at 2026-11-07 12:31 UTC
+- system-ondemand-jvbnl (node-2-218) at 2026-11-07 12:32 UTC
+- system-ondemand-db9bj (node-2-135) at 2026-11-08 06:28 UTC
+- default-zj4kx (spot node node-1-62) at 2026-11-25 05:17 UTC
+
+## The cluster at a glance
+
+| What | Value |
+|---|---|
+| Nodes | 10 of 10 Ready |
+| Pods | 151 running, 0 pending, 0 failed |
+| Namespaces | 25, 8 production |
+| Components | 23: actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
+| Metrics and log stores | prometheus 2.49.1 / loki 2.6.1 |
+| Kubernetes | v1.32.13-eks-577a51e (eks) |
+
+## Coming up
+
+| When | What | Source |
+|---|---|---|
+| passed on 2026-10-24 | NodeClaim default-n44bh (node node-1-139) passed its 720h expireAfter; Karpenter cannot replace it while the do-not-disrupt pod runs there (problem 1). | objects/nodeclaims.karpenter.sh.json |
+| 2026-11-07 12:31 UTC | NodeClaim system-ondemand-mxf5q (node node-1-241) reaches its 720h expireAfter; Karpenter replaces the node and evicts its pods. | objects/nodeclaims.karpenter.sh.json |
+| 2026-11-07 12:32 UTC | NodeClaim system-ondemand-jvbnl (node node-2-218) reaches its 720h expireAfter. | objects/nodeclaims.karpenter.sh.json |
+| 2026-11-08 06:28 UTC | NodeClaim system-ondemand-db9bj (node node-2-135) reaches its 720h expireAfter. | objects/nodeclaims.karpenter.sh.json |
+| 2026-11-25 05:17 UTC | NodeClaim default-zj4kx (spot node node-1-62) reaches its 720h expireAfter. | objects/nodeclaims.karpenter.sh.json |
+| passed on 2026-02-28 | Upstream end of life of Kubernetes 1.32; the EKS cluster is on extended support. | inventory.json |
+
+## 1. Prod pods stuck on one spot node
+
+**What is happening.** Spot node node-1-139 has run since 2026-09-24. It holds 20 of the 44 prod pods, from 15 prod workloads. Since 2026-10-06, Karpenter has refused to drain, consolidate or expire it, and it passed its 720h expireAfter on 2026-10-24.
+
+If AWS takes the instance back, four prod Deployments lose every replica at once. The other app nodes have no room for the pods. App nodes are the workload-type=app nodes, the only ones prod Deployments may run on.
+
+- Affected:
+  - node-1-139: Karpenter reported 21327 times since 2026-10-06 that it cannot disrupt the node, naming the do-not-disrupt pod prod-app-m/app-m-admin
+  - prod-app-o/app-o-ai: 3 of 3 pods on the node, no spread rule, no PodDisruptionBudget
+  - prod-app-o/app-o-backend: 2 of 2 on the node, no spread rule, no PodDisruptionBudget
+  - prod-app-r/app-r: 2 of 2 on the node, no spread rule, PodDisruptionBudget minAvailable 1
+  - prod-app-l-backend/app-l-frontend: 2 of 2 on the node despite a preferred podAntiAffinity, PodDisruptionBudget minAvailable 1
+  - six single-replica prod services with their only pod on the node and no PodDisruptionBudget: app-m-admin, app-o-admin, app-o-frontend, app-p-backend, app-n-admin-frontend, app-s-backend
+- Checked and healthy:
+  - No other pod and no node carries do-not-disrupt.
+  - No pod on the node uses a PersistentVolumeClaim.
+  - Karpenter has an interruption queue, my-cluster-karpenter.
+  - No spot interruption of this node shows in the events. The node terminations on 2026-11-05 were consolidation and emptiness.
+- Changed for another reason: app nodes node-2-59 and node-2-64. Karpenter created them on 2026-11-05 at 07:37 and 07:54 UTC for pending pods, while it consolidated five short-lived spot nodes.
+- Not checked:
+  - Why do-not-disrupt was added to app-m-admin. The git history of acme was not read.
+  - How often AWS reclaims r8gd.xlarge spot capacity in us-east-1a.
+
+**Why.** The app-m-admin Helm chart puts `karpenter.sh/do-not-disrupt: true` on its only pod, which runs on this node. No prod Deployment has a spread rule, so new pods and replicas keep landing on a node Karpenter cannot touch. Confirmed.
+
+**Suggested fix.**
+
+① Confirm that app-m-admin is the only thing blocking the node.
+
+```
+kubectl get events -A --field-selector reason=DisruptionBlocked -o custom-columns=OBJ:.involvedObject.name,COUNT:.count,MSG:.message | grep -v 'blocking budget'
+```
+
+Then, in a checkout of acme, find where the annotation is set.
+
+```
+grep -rn 'do-not-disrupt' apps/prod/app-m
+```
+
+Both commands only read.
+
+Check: the events name only prod-app-m/app-m-admin for node-1-139, and grep shows the file that sets the annotation. The events command sees only the last hour of events, and grep sees only apps/prod/app-m.
+
+② In acme, add a hostname spread rule to four pod templates: app-r, app-o-ai, app-o-backend and app-l-frontend. Use each Deployment's own selector labels. This example is for app-o-ai.
+
+```yaml
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/instance: app-o-prod
+        app.kubernetes.io/name: ai
+```
+
+Argo CD syncs each application, and each Deployment rolls out new pods. The scheduler then prefers nodes that hold fewer pods of the same Deployment.
+
+Risks:
+
+- Each Deployment restarts all its pods once. app-r and app-l-frontend roll with maxSurge 1 and maxUnavailable 0, and they have readiness probes.
+- app-o-ai and app-o-backend have no readiness probe. Kubernetes counts a new pod ready as soon as its container starts and stops an old pod right away. Requests can fail while a new pod is still starting.
+- Because of that, roll these two at a quiet hour, or add a readinessProbe in the same commit.
+- Each new app-o-ai pod requests 2Gi of memory, and the other app nodes have 8.61 GB free in total. Karpenter may have to add a node, and a new pod stays Pending until the node is up.
+- ScheduleAnyway is only a preference, so pods can still land on node-1-139.
+- Nobody has confirmed that the charts accept topologySpreadConstraints as a value.
+- Argo CD selfHeal reverts kubectl changes, so make this change in git.
+
+Check: this command shows the app-o-ai pods on more than one node.
+
+```
+kubectl get pods -n prod-app-o -l app.kubernetes.io/instance=app-o-prod,app.kubernetes.io/name=ai -o wide
+```
+
+Run the same for app-o-backend, app-r and app-l-frontend, each with its own selector. If any of them still runs entirely on node-1-139, the spread did not take.
+
+③ Do this step only when two things are true. Step ② has spread all four Deployments over more than one node, and the app-m-admin owners have said why the annotation is there. Then remove the annotation from the app-m-admin pod template in acme apps/prod/app-m, at a quiet hour. Delete this line:
+
+```
+karpenter.sh/do-not-disrupt: "true"
+```
+
+Argo CD syncs, and app-m-admin rolls with maxSurge 1 and maxUnavailable 0. The new pod is up before the old one stops. After that, nothing blocks Karpenter. The node is already past expireAfter, so Karpenter can drain and replace it soon, at a time it chooses.
+
+Risks:
+
+- The drain evicts 33 pods: 20 prod, 12 dev and external-secrets. external-secrets has one replica, so ExternalSecret syncing stops until it runs elsewhere.
+- Six single-replica prod services stop until their pod runs elsewhere:
+  - app-m-admin
+  - app-o-admin
+  - app-o-frontend
+  - app-p-backend, which uses Recreate and requests 1Gi
+  - app-n-admin-frontend
+  - app-s-backend
+- Any app-o-ai and app-o-backend pods still on the node are evicted together. Their replacements get traffic before the app is ready.
+- PodDisruptionBudgets with minAvailable 1 slow the eviction of these Deployments:
+  - app-r
+  - app-l-frontend
+  - app-l-backend
+  - app-l-embedding-server
+  - app-m-api, app-m-backend and app-m-frontend
+- The other app nodes cannot hold these pods, so Karpenter must launch a node first.
+- Nobody has confirmed that Karpenter 0.37 starts the replacement node before it drains. Karpenter 0.37 is also not documented for Kubernetes 1.32.
+
+Check: `kubectl get nodeclaims` shows default-n44bh replaced by a new claim. After the replacement, this command returns nothing.
+
+```
+kubectl get pods -A -o wide --field-selector status.phase=Pending
+```
+
+**Rollback.** Revert the commits of steps ② and ③, and Argo CD restores the earlier pod templates. The node replacement that step ③ allows cannot be undone, and there is no need to undo it.
+
+**Why this happens.**
+
+- Principle: Two replicas only help if they can fail separately. Without a spread rule, the scheduler packs pods onto whichever node has room, and Karpenter consolidation gathers them further. A do-not-disrupt pod keeps its node from being consolidated or expired, so that node keeps collecting new pods.
+- Case: At Moonlight, Kubernetes sometimes scheduled all three website pods on the same node. From January 18 to 22, nodes hit 100% CPU and kernel-panicked, and rescheduling the crashed pods made it worse. They then added anti-affinity rules to all major deployments. Here, three app-o-ai pods and two pods each of app-r, app-o-backend and app-l-frontend share node-1-139.
+- Read: the Kubernetes documentation, Pod Topology Spread Constraints. The Karpenter documentation, Disruption.
+
+**Evidence.**
+
+| What | Value | Source |
+|---|---|---|
+| Prod pods on node-1-139 | 20 of 44 | summary.json |
+| DisruptionBlocked events, 2026-10-06 to 2026-11-05 | 21327 | events.json |
+| NodeClaim default-n44bh created, pool expireAfter 720h | 2026-09-24T01:01:07Z | objects/nodeclaims.karpenter.sh.json |
+| CPU if the node is lost, 32 pods: needed vs free | 3.3 vs 1.62 cores | summary.json |
+| Memory if the node is lost, 32 pods: needed vs free | 18.62 vs 8.61 GB | summary.json |
+| Prod Deployments with every replica on the node | 4 | findings-draft.json |
+
+## 2. Four prod ALB health checks failing
+
+**What is happening.** Six ALB target groups have 0 healthy targets, four of them prod, as in the 2026-10-27 run. Users are still served. When every target is unhealthy, the ALB "fails open" and sends traffic to all of them. A dead or hung pod still gets requests, because the health check filters nothing.
+
+- Affected: every check asks for / and expects 200.
+  - prod-app-l-backend/app-l-backend: 0 of 2 healthy, both answer 404
+  - prod-app-q/app-q-backend: 0 of 1 healthy, answers 404
+  - prod-app-o/app-o-frontend: 0 of 1 healthy, answers 307
+  - prod-app-n/app-n-frontend: 0 of 1 healthy, answers 307
+  - dev-app-n/app-n-frontend and dev-app-t/app-t-backend: answer 307 and 404
+- Checked and healthy:
+  - app-q-ai, app-q-studio and app-q-web use /health and are not unhealthy.
+  - The app-p-backend target group uses /healthz and is no longer unhealthy.
+- Changed for another reason: none
+- Not checked:
+  - Request counts and 5xx per target group for the four prod services.
+  - What /health answers when the ALB calls it rather than the kubelet.
+  - Whether any target was actually dead while it got traffic.
+
+**Why.** These six Ingresses set no `alb.ingress.kubernetes.io/healthcheck-path`, so the ALB checks / and expects 200. The backends answer 404, and the frontends redirect with 307. Confirmed.
+
+**Suggested fix.**
+
+① Read the health of one target group.
+
+```
+aws elbv2 describe-target-health --target-group-arn "$(aws elbv2 describe-target-groups --names k8s-app-svc-8c88bb317a --query 'TargetGroups[0].TargetGroupArn' --output text)"
+```
+
+This only reads.
+
+Check: each target shows State unhealthy with Target.ResponseCodeMismatch. The command covers one target group. Run it with the other names to see the rest.
+
+② In acme, set the health-check path of the app-q-backend and app-l-backend Ingresses to /health. Their readiness probes already use that path on the same port.
+
 ```yaml
 metadata:
   annotations:
     alb.ingress.kubernetes.io/healthcheck-path: /health
+```
+
+Argo CD syncs the Ingress, and the AWS Load Balancer Controller changes the target group's health check. Targets turn healthy after two passing checks 15 seconds apart. Pods do not restart.
+
+Risks:
+
+- All 40 Ingresses share the group acme-prod-lb. That includes argocd-server, Grafana, vmauth, kafka-ui, redis-insight and the dev Ingresses.
+- The controller reconciles the whole group together. A malformed annotation may hold back changes to all of them. This is unverified.
+- If /health answers anything but 200, the targets stay unhealthy and the ALB keeps failing open, as it does today.
+- Argo CD selfHeal reverts kubectl changes, so make this change in git.
+
+Check: the step ① command shows State healthy for every target of k8s-app-svc-bb495c72c8 and k8s-app-svc-8c88bb317a.
+
+③ Do this step once the owners of the two frontends say which path answers 200, or that a redirect is fine. Then, for app-o-frontend and app-n-frontend, set healthcheck-path to that path. To accept the 307 instead, widen the success codes.
+
+```yaml
+metadata:
+  annotations:
     alb.ingress.kubernetes.io/success-codes: 200-399
 ```
 
-**Why this happens.**
-- Principle: p95 response time is the latency signal among the four golden signals. ALB `TargetResponseTime` runs from the moment the load balancer sends the request to the first byte back, so it is application time without the network. The ALB publishes p95 per hour, so a burst inside the hour is hidden and a single bad hour is averaged away over a day; read the 1-hour maximum next to the average.
-- Cases: No public case recorded for this check.
-- Read next: "Google SRE Book ch. 6, Monitoring Distributed Systems (the four golden signals)", "AWS docs: CloudWatch metrics for your Application Load Balancer (TargetResponseTime, ExtendedStatistic p95)", "PostgreSQL log_min_duration_statement".
+The controller changes the target group's matcher, and the targets turn healthy after two checks. Pods do not restart.
 
-Evidence checks: `traffic.ingress-p95-latency.prod-app-q/app-q-backend`, `traffic.ingress-p95-latency.prod-app-p/app-p-backend`, `traffic.alb-unhealthy-targets.prod-app-q/app-q-backend`, `observability.no-symptom-alerts.cluster`, `resilience.single-replica-in-prod.prod-app-q/app-q-backend`
+Risks:
 
-### 2. Three prod frontends are stalled by a 200 m CPU limit for 12% to 24% of the time
-**Problem.** `prod-app-m/app-m-frontend` (2 pods), `prod-app-o/app-o-frontend` and `prod-app-n/app-n-frontend` (1 pod each) all run the common frontend chart with a CPU request of 10 m and a limit of 200 m. In the five minutes before collection the kernel paused each of them for 12% to 24% of all scheduling periods because they hit the limit. For a server-side rendered frontend that shows up as page latency, not as CPU usage: the 7-day p95 usage is 0.002 to 0.017 cores. The app-o and app-n frontends are new in this run; app-m-frontend was already at 27% in the previous run and the prometheus pod in `monitoring` has been at 27% for days.
+- With 200-399, a broken app still counts as healthy as long as it redirects.
+- Both frontends run one replica with no readiness probe. Even a correct health check can only move traffic when there is somewhere else to send it.
+- The same group-wide reconcile risk applies as in step ②.
 
-**Evidence.** Throttling ratios are 0.24 and 0.19 for the two app-m-frontend pods, 0.15 for app-o-frontend and 0.12 for app-n-frontend, in metrics/cpu_throttle_ratio_5m.json. Each container has `requests.cpu: 10m` and `limits.cpu: 200m`, in objects/deployments.json. The 7-day p95 CPU is 0.017 cores for app-m-frontend, 0.003 for app-o-frontend and 0.002 for app-n-frontend, in metrics/cpu_p95_7d_cores.json. The prometheus pod `prometheus-kube-prometheus-stack-prometheus-0` is at 0.27, in the same file.
+Check: describe-target-health on k8s-app-svc-032c25d752 and k8s-app-svc-36f816b829 shows State healthy.
 
-**Cause.** The request is 20 times smaller than the limit. A Node.js frontend bursts at startup and on each render, uses its 20 ms of quota early in the 100 ms period and waits for the remainder. The average stays near zero, so an autoscaler or a request tuned from averages never sees the problem. The same applies to Prometheus, whose scrape and rule evaluation run in bursts.
-
-**Action.** ① In the common frontend chart remove `limits.cpu` and raise `requests.cpu` to 50 m, keeping the memory limit; sync the three prod frontends through Argo CD. Expect about 30 minutes including the rollout. Effect: the stalls disappear and the extra request of 120 m in total fits on the current nodes, since `ip-10-0-1-62` has 29% of its CPU unrequested. ② For Prometheus raise `limits.cpu` from its current value to 2 cores or remove it in the kube-prometheus-stack values. Expect about 15 minutes. ③ After a day compare the ALB p95 of the three frontends with today's values in `aws/alb-metrics.json` to confirm the effect.
+**Rollback.** Each step is an Ingress annotation in git. Revert the commit, and the health check goes back to /. Nothing restarts.
 
 **Why this happens.**
-- Principle: The kernel CFS enforces a CPU limit as N ms of quota per 100 ms period. A multi-threaded or event-loop process that spends its quota early in the period stalls for the rest of it. Average CPU usage looks low while latency spikes; at a ratio of 0.25 a quarter of all periods were stalled. The HPA scales on request, not on limit, so a small request with a low limit gives throttling and no scale-out at the same time.
-- Cases: The check definition cites Buffer 2020 and Omio 2020, both of which removed CPU limits after tracing user-visible latency to CFS throttling (`https://erickhun.com/posts/kubernetes-faster-services-no-cpu-limits/`, `https://medium.com/omio-engineering/cpu-limits-and-aggressive-throttling-in-kubernetes-c5b20bd8a718`).
-- Read next: "CFS bandwidth control (kernel sched-bwc.txt)", "Kubernetes docs: Resource Management for Pods and Containers (CPU limits and throttling)", "container_cpu_cfs_throttled_periods_total".
 
-Evidence checks: `resources.cpu-throttling.prod-app-m/deploy/app-m-frontend:frontend`, `resources.cpu-throttling.prod-app-o/deploy/app-o-frontend:frontend`, `resources.cpu-throttling.prod-app-n/deploy/app-n-frontend:frontend`, `resources.cpu-throttling.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus`
+- Principle: The ALB sends traffic only to targets its own health check marks healthy. When all targets are unhealthy, it sends traffic to all of them. The result is not an outage but a check that filters nothing. The check runs apart from Kubernetes readiness, so a pod can be Ready and still fail it.
+- Read: the AWS Load Balancer Controller documentation, Ingress annotations. The Elastic Load Balancing documentation, Health checks for Application Load Balancer target groups.
 
-### 3. 28 of 42 prod pods still sit on one expired spot node with an 86% disk, and none of the five previous actions has started
-**Problem.** Node `ip-10-0-1-139` in the Karpenter `default` pool is a spot instance that is 54 hours past its 720-hour expiry and holds 28 of the 42 prod pods from 22 workloads. Karpenter cannot replace it because one pod, `prod-app-m/app-m-admin`, carries the `karpenter.sh/do-not-disrupt` annotation. Its root disk is 86.4% full and the kubelet has failed to free image space 900 times since 2026-10-23. CPU requests on the node are at 99.5% of allocatable while real use is 6%, so when the second app node was spot-reclaimed four times in the last 26 hours, every evicted pod had to wait for a new node and `prod-app-p/app-p-backend` went down each time. Nothing has changed since the 14:43 report: app-p-backend still has 1 replica and a Recreate strategy, the 12 Evicted pods from earlier disk-pressure evictions are still in the API, and the four prod ALB target groups still probe `/`.
+**Evidence.**
 
-**Evidence.** Prod pods on the node are 28 of 42, in summary.json resilience.placement.prod_by_node. NodeClaim `default-n44bh` is 774.3 h old, 54.3 h past expiry, with `DisruptionBlocked` 14,158 times by `app-m-admin-57f5fcc58d-khsh5`, in summary.json scaling.karpenter.nodeclaims. Root disk usage is 0.864, in metrics/disk_usage_ratio.json. `FreeDiskSpaceFailed` is at 900 occurrences, 19 more than 95 minutes ago, in events.json and diff.json. CPU requests over allocatable are 0.995, in metrics/node_cpu_request_ratio.json. Memory N+1 is not met: 46.0 GB allocatable without this node against 47.5 GB requested, in summary.json resilience.n_plus_one. 12 pods are in Failed state with reason Evicted, in objects/pods.json.
+| What | Value | Source |
+|---|---|---|
+| Healthy targets, prod-app-l-backend/app-l-backend | 0 of 2 | summary.json |
+| Healthy targets, prod-app-q/app-q-backend | 0 of 1 | summary.json |
+| Healthy targets, prod-app-o/app-o-frontend | 0 of 1 | summary.json |
+| Healthy targets, prod-app-n/app-n-frontend | 0 of 1 | summary.json |
+| Health check path and matcher | /, 200 | summary.json |
+| healthcheck-path annotation on the six Ingresses | none | objects/ingresses.networking.k8s.io.json |
 
-**Cause.** The `do-not-disrupt` annotation keeps the expired node alive; requests sized at 500 m for services that use 2 m fill the node on paper; a single replica with Recreate turns every reschedule into an outage. Likely: the annotation was added once to protect an admin session and never removed.
+## 3. app-q-ai OOM kills, no OOM alert
 
-**Action.** Unchanged from the 14:43 report, in this order. ① Lower CPU requests to the 7-day p95 in the shared prod chart: app-l-backend, app-l-embedding-server and app-p-backend 500 m → 150 m, app-l-neo4j 500 m → 50 m. Expect about 1 hour. ② app-p-backend: replicas 2, RollingUpdate with maxSurge 1 and maxUnavailable 0, preStop sleep 5 s. Expect about 20 minutes. ③ Add `topologySpreadConstraints` on hostname with maxSkew 1 to the shared prod chart, and PDBs with minAvailable 1 for app-o-ai and app-o-backend. Expect about 2 to 3 hours. ④ Delete the 12 Evicted pod objects with `kubectl get pods -A --field-selector status.phase=Failed` and `kubectl delete pod -n <ns> <pod>`. Expect about 5 minutes. ⑤ Remove `karpenter.sh/do-not-disrupt` from the app-m-admin template so Karpenter replaces the node; raise the EC2NodeClass root volume from 50 GB to 100 GB first. Expect about 30 minutes. Effect: evicted pods reschedule in seconds, the 1.5 GB N+1 memory gap closes, the disk loop stops, and the 12 stale `KubePodNotReady` alerts clear.
+**What is happening.** In the 7 days before collection, three app-q-ai pods were OOM-killed against their 768Mi memory limit. They all came from the 2026-11-02 releases. The service runs one replica, so each kill stopped it until the container came back.
+
+This has stopped for now. The pod of the 2026-11-04 release has run about 28 hours without a restart, at a working-set p95 of about 493 MiB. No alert fires on an OOM kill.
+
+- Affected: prod-app-q/app-q-ai. Three pods ended OOMKilled, with 13 restarts among them:
+  - app-q-ai-577d8cbd67-xvh58: 9 restarts
+  - app-q-ai-59dcc49fb6-mwj6t: 2 restarts
+  - app-q-ai-5df68778bf-gz2w8: 2 restarts
+  
+  13 is an upper bound, because a probe failure also restarts a container.
+
+- Checked and healthy:
+  - The current pod app-q-ai-59b948c9b5-6tchs has 0 restarts.
+  - The Deployment reports 1 of 1 replica available.
+- Changed for another reason: app-q-ai itself, through Argo CD rollouts from acme. It got ten new ReplicaSets between 2026-10-27 and 2026-11-04, revisions 27 to 36, each with a new image.
+- Not checked:
+  - The kernel OOM log of the nodes.
+  - Memory peaks of the replaced pods. Their series were not kept per pod.
+  - How many requests failed while the pod restarted.
+
+**Why.** In the 2026-11-02 releases, the container needed more than its 768Mi limit. Likely: the OOM-killed pods belong to ReplicaSets 577d8cbd67, 59dcc49fb6 and 5df68778bf, all created on 2026-11-02. It is unknown whether a leak in those images or the load at the time caused it.
+
+**Suggested fix.**
+
+① Watch the current pod's memory peak against its limit.
+
+```
+max_over_time(container_memory_working_set_bytes{namespace="prod-app-q",container="ai"}[24h]) / (768*1024*1024)
+```
+
+Also watch its restart count.
+
+```
+kubectl get pods -n prod-app-q -l app.kubernetes.io/name=ai
+```
+
+Both only read.
+
+Check: the ratio stays well under 1, and RESTARTS stays 0. This sees only the current pod, not the kernel log.
+
+② If the 24-hour peak passes 90% of the limit, or another OOM kill appears, raise the limit. In acme apps/prod/app-q, set limits.memory to 1Gi and keep the request at 256Mi.
+
+```yaml
+resources:
+  limits:
+    cpu: "1"
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+```
+
+Argo CD syncs, and the Deployment rolls out one new pod.
+
+Risks:
+
+- The rollout uses maxSurge 1 and maxUnavailable 0, so the new pod starts before the old one stops.
+- The request stays the same, so the pod lands on an app node as before. That node can become more overcommitted.
+- Argo CD selfHeal reverts kubectl changes, so make this change in git.
+
+Check: this prints 1Gi, and the pod is Ready.
+
+```
+kubectl get deploy -n prod-app-q app-q-ai -o jsonpath='{.spec.template.spec.containers[0].resources.limits.memory}'
+```
+
+③ Add an alert on any OOM kill. Apply it as a PrometheusRule in monitoring, with the release label Prometheus selects.
+
+```yaml
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: oomkill-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+    - name: oomkill
+      rules:
+        - alert: ContainerOOMKilled
+          expr: (increase(kube_pod_container_status_restarts_total[15m]) > 0) and on (namespace, pod, container) (kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1)
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} {{ $labels.container }} was OOM-killed"
+```
+
+The Prometheus operator loads the rule. When a container restarts after an OOM kill, the alert goes to Alertmanager.
+
+Risks:
+
+- Nothing restarts.
+- Where Alertmanager sends warning alerts was not read, so the alert may reach no one.
+- The other custom rules in monitoring were applied with kubectl, and Argo CD does not own them. Nothing reverts this rule.
+
+Check: ContainerOOMKilled appears under Status > Rules in Prometheus.
+
+**Rollback.** To undo the limit, revert the commit. To remove the alert rule, run this. Nothing is lost.
+
+```
+kubectl delete prometheusrule -n monitoring oomkill-alerts
+```
 
 **Why this happens.**
-- Principle: The scheduler places by requests, not usage, so requests 18 times above real use turn an idle node into a "full" one and every reclaim into a wait for new capacity. A spot interruption gives two minutes' notice; Karpenter drains at once and sizes the replacement for the pending pods only, so the gap users see equals node launch time plus pod start time unless the remaining nodes have request headroom.
-- Cases: The check definition records a first real run where one spot reclaim took a production service down for 2 minutes 7 seconds with 27 production pods, 64%, on the node, and a node that stayed more than 31 days because of one pod's do-not-disrupt annotation with 87% disk usage piled on it. Primary document: Kubernetes docs, "Node-pressure Eviction".
-- Read next: "Kubernetes docs: Pod Topology Spread Constraints", "Karpenter docs: Disruption (expiration, do-not-disrupt, consolidation)", "Kubernetes docs: Node-pressure Eviction (nodefs, imagefs thresholds)".
 
-Evidence checks: `resilience.prod-concentration.node-1-139`, `resilience.n-plus-one.cluster`, `scaling.karpenter-expired-not-replaced.default-n44bh`, `resources.node-request-usage-gap.node-1-139`, `resilience.single-replica-in-prod.prod-app-p/app-p-backend`, `resilience.recreate-strategy-serving.prod-app-p/deployment/app-p-backend`, `node.disk-usage.<ip>:9100:/`, `events.tracked-warning-reasons.FreeDiskSpaceFailed`, `hygiene.failed-pods-lingering.cluster`, `events.tracked-warning-reasons.FailedScheduling`
+- Principle: A workload that rolls out several times a day loses the OOM history of its old pods. If you look only at the live pod, you miss the repeated kills. Repeated OOM kills across one workload's pods mean the limit is too small or there is a leak, and requests drop between restarts.
+- Read: the Kubernetes documentation, Resource Management for Pods and Containers.
 
-Quick fix outside the list: the ExternalSecret `database/mysql-app-n-secret` has failed 1,637 times because key `dev/app-n-db` does not exist in AWS Secrets Manager; create the key or delete the ExternalSecret. Expect about 10 minutes.
+**Evidence.**
 
-## Since the previous daily run (2026-10-26 14:43 KST)
-The 95 minutes between the two runs were quiet. There was no spot reclaim, no node was added or removed, and no Deployment, StatefulSet or Helm release spec changed; the only object that disappeared is a finished CertificateSigningRequest. The 45 FailedScheduling, 10 Unhealthy and 2 SpotInterrupted events of the 14:17 KST reclaim have aged out of the 1-hour event window, which is why they show as "expired" in the diff rather than fixed. `FreeDiskSpaceFailed` on `ip-10-0-1-139` rose from 881 to 900 and the dev ExternalSecret failure count from 1,632 to 1,637. Four findings are new and all four are measurements: the app-q-backend latency hour and the app-p-backend p95 described in problem 1, and the CPU throttling of the app-o and app-n frontends in problem 2; app-m-frontend eased from a fail at 27% to a warn at 24%. Seven findings resolved: the five not-ready findings for the pods rescheduled at 14:17 KST aged under their threshold, the apiserver PATCH latency inflated by the back-to-back 14:43 and 14:52 collections returned to normal, and the app-l-frontend p95 fell to 0.06 s. The rubric moved from 0.1.49 to 0.1.50 with the same 300 checks evaluated and no finding added or removed by it, so there is no criteria change. 31 critical/high items persist unchanged, see details section 2.
+| What | Value | Source |
+|---|---|---|
+| Pods ended by OOM kill, 7 days | 3 | summary.json |
+| Restarts in those pods, upper bound | 13 | summary.json |
+| Memory limit and request | 768Mi, 256Mi | objects/deployments.json |
+| ReplicaSets of the killed pods | created 2026-11-02 | objects/replicasets.apps.json |
+| Working-set p95, current pod | 516747264 bytes | metrics/memory_p95_7d_bytes.json |
+| Start of the current pod | 2026-11-04T12:23:49Z | objects/pods.json |
 
-Progress on the previous report's problems: problem 1 (spot layout: request cuts, app-p-backend replicas 2, topology spread, remove the do-not-disrupt annotation) not started; app-p-backend still has replicas 1 and Recreate, 28 of 42 prod pods are on `ip-10-0-1-139`, and `DisruptionBlocked` rose from 14,111 to 14,158. Problem 2 (disk 86.4% and 12 Evicted pods) not started; disk 86.4%, 12 Evicted pods, `FreeDiskSpaceFailed` 881 → 900. Problem 3 (four prod ALB health checks on `/`) not started; the same four prod target groups show 0 healthy targets with codes 404 and 307.
+## Since the previous daily run
+
+daily run of 2026-10-27T15-58-44
+
+Work the previous report asked for: none
+
+**Appeared.**
+
+- The cluster no longer survives the loss of its largest node: the 32 pods that may only run on the app nodes would need 3.3 cores and 18.62 GB on the other app nodes, which have 1.62 cores and 8.61 GB free.
+- prod-app-q/app-q-ai: 3 pods ended by OOM kill in 7 days, 13 restarts in those pods.
+- argocd/argocd-application-controller-0 was OOM-killed again on 2026-10-30; its restart count went from 41 to 42.
+- Subnet acme-vpc-eks-private-us-east-1c has 61 of 251 IP addresses free.
+- Root disk of node <ip> is 79% full.
+- prod-app-l-backend/app-l-file-worker and app-l-graph-worker had a pod not ready for about 180 and 160 minutes in 24 hours.
+- Ingress p95 latency 2.32 s on app-q-ai.my-cluster and 2.51 s on monitor.my-cluster.
+
+**Went away.**
+
+- No FreeDiskSpaceFailed events any more.
+- The KubePodNotReady alerts that had been firing for days in dev-app-o, prod-app-r, prod-app-l-backend and app-s-prod stopped.
+- Subnet acme-vpc-eks-private-us-east-1a is no longer short of IP addresses.
+- The ALB target group of prod-app-p/app-p-backend no longer reports unhealthy targets.
+- The share of prod pods on node node-1-139 went from 62% (26 of 42) to 45% (20 of 44).
+
+**Changed because the checks changed, not the cluster.**
+
+- none
+
+## Serious, not today
+
+- No backup of any kind: no backup tool, no backup CronJob that ran in 7 days, no VolumeSnapshot. This waits for a decision on what to back up.
+- No SLO and no alert on a user symptom: 157 alert rules, none on 5xx or latency, none on scheduling failure or VPC CNI IP exhaustion.
+- Kubernetes 1.32 is past its upstream end of life on 2026-02-28, and the EKS cluster runs on extended support.
+- Karpenter 0.37.0 is documented for Kubernetes 1.23 to 1.30, but the cluster runs 1.32. Karpenter logged the unsupported version once.
+- The Karpenter EC2NodeClass default still uses Amazon Linux 2 with an AMI that is not pinned. Nodes run a mix of AL2 and AL2023.
+- The EKS API endpoint is public and open to 0.0.0.0/0.
+- middleware/kafka-controller-0-external is an internet-facing load balancer, and its security group opens port 9094 to 0.0.0.0/0.
+- prod-app-q, prod-app-p and app-s-prod each have a NetworkPolicy. Network policy enforcement is off in the VPC CNI, so none of them applies.
+- prod-app-l-backend/tts-proxy mounts /dev/net/tun from the host and adds NET_ADMIN, and its containers may run as root.
+- Alertmanager and Loki keep their data on emptyDir with one replica, so a rescheduled pod starts empty. Loki was also OOM-killed on 2026-10-25.
+- Kubernetes events are not kept anywhere beyond the API server's own short window.
+- argocd-application-controller, which syncs every prod application, was OOM-killed on 2026-10-30. It has 42 restarts in total.
+- Prometheus is CPU-throttled 26% of the time over 24 hours and uses 67% of its 1536Mi memory limit. It was OOM-killed on 2026-10-06.
+- dev-app-t/data-app-t-mysql-0 is 90% full, at 9.7 GB.
+- 194 FailedScheduling events since 2026-10-25, the latest around 07:55 UTC on 2026-11-05 while Karpenter replaced app nodes. This is likely the same room shortage as problem 1.
+
+7 more are in section 2 of report-details.md.
 
 ## What this run could not see
-This daily run skipped 33 collection steps and left 56 of 361 checks not collected, among them node OS internals, control-plane CloudWatch logs, ECR, cost, krr, polaris, pluto, kubent and Helm values; the last full run was 2026-10-26 14:52 KST. The profile expects a backup tool, event retention, SLO definitions, in-cluster certificate management and progressive delivery, and none is present. 10 controller-metrics commands failed: the ALB controller, Argo CD application controller, Grafana and Karpenter pods run on the two managed nodes `ip-10-0-1-117` and `ip-10-0-2-60` that are not registered in SSM, and one pod-proxy request timed out, so those controllers' own metrics come only from Prometheus. No required tool is missing. The apiserver 503 rate of 0.0037 per second was sampled one minute into this collection and likely includes kubegap's own requests, so it is not counted as user impact. Application logs are outside kubegap's scope, so the slow endpoint behind problem 1 is not identified here.
+
+- Inside the nodes: disk, kernel OOM log and kubelet settings. The SSM document kubegap-node-read is outdated. Run `kubegap setup --context my-cluster --install-ssm-document`, then `/kubegap full`.
+- Nodes node-1-117 and node-2-60 are not registered in SSM, so nothing reads them from the node side. Register them with an instance profile that has AmazonSSMManagedInstanceCore.
+- Node OS, EKS control-plane logs, ECR, cost, add-on versions and backup plans. A daily run does not read them. Run `/kubegap full`.
+- The Grafana datasource and dashboard lists, because there is no Grafana token. Create a Viewer service-account token in Grafana and add `grafana_api_token` to the config file.
+- Which path of the prod-app-o and prod-app-n frontends answers 200, and what /health answers to the ALB. Ask the owning teams, or call the path from inside the VPC.
 
 ## Numbers
+
 | Severity | fail | warn | vs. previous daily run |
 |---|---|---|---|
-| critical | 2 | 3 | unchanged |
-| high | 31 | 10 | fail −1 (app-m-frontend throttling fail → warn), warn −3 (two new prod throttling warns added, apiserver PATCH latency and five lowered items left) |
-| medium | 79 | 126 | fail −6, warn −14 (five pod-not-ready and the PATCH latency resolved, the rest moved by the adjustments listed in details 1-1) |
-| low | 16 | 154 | fail +6, warn +13 (lowered items land here) |
+| critical | 1 | 3 | fail 0, warn +1 |
+| high | 27 | 20 | fail -3, warn +2 |
+| medium | 99 | 134 | fail +12, warn -7 |
+| low | 8 | 134 | fail -2, warn +1 |
 
-Final critical+high is 46 against a first-pass 52 (1 + 2 + 32 + 17); the difference of 6 comes from the two dev target groups, two dev throttling warns, the Unhealthy and UpdateFailed event counters, the Prometheus OOM of 19 days ago and the tts-proxy capability lowered, against prod concentration, N+1, the expired NodeClaim, the request gap, the app-p-backend replica and strategy and the app-m-backend 5xx ratio raised, as listed in details section 1-1.
+Checks behind each problem:
 
-Details, every table and the full first-pass list: [`report-details.md`](report-details.md) · kubegap 1.0.15, rubric 0.1.50 · snapshot `~/.kubegap/snapshots/my-cluster/2026-10-26T16-18-11`
+- problem 1: `resilience.n-plus-one.cluster`, `resilience.prod-concentration.node-1-139`, `resilience.replicas-same-node.prod-app-r/deployment/app-r`, `resilience.replicas-same-node.prod-app-o/deployment/app-o-ai`, `resilience.replicas-same-node.prod-app-o/deployment/app-o-backend`, `resilience.replicas-same-node.prod-app-l-backend/deployment/app-l-frontend`
+- problem 2: `traffic.alb-unhealthy-targets.prod-app-q/app-q-backend`, `traffic.alb-unhealthy-targets.prod-app-l-backend/app-l-backend`, `traffic.alb-unhealthy-targets.prod-app-o/app-o-frontend`, `traffic.alb-unhealthy-targets.prod-app-n/app-n-frontend`, `traffic.alb-unhealthy-targets.dev-app-n/app-n-frontend`, `traffic.alb-unhealthy-targets.dev-app-t/app-t-backend`
+- problem 3: `resources.oomkilled-repeated.prod-app-q/deploy/app-q-ai:ai`, `observability.failure-mode-uncovered.OOMKill`
+
+Details and every table: [`report-details.md`](report-details.md) · kubegap 0.1.2, rubric 0.1.80 · snapshot `~/.kubegap/snapshots/my-cluster/2026-11-05T17-00-00`

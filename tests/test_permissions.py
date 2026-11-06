@@ -311,7 +311,7 @@ SERVICE_PREFIX = {
     "pricing": "pricing",
     "cloudwatch": "cloudwatch",
 }
-# setup --install-ssm-document runs with the user's own credentials; README says these four are not part of the audit policy
+# setup --install-ssm-document runs with the user's own credentials; docs/PERMISSIONS.md and docs/SETUP.md say these four are not part of the audit policy
 OUTSIDE_POLICY = {"ssm:CreateDocument", "ssm:UpdateDocument", "ssm:UpdateDocumentDefaultVersion", "ssm:ListDocumentVersions"}
 
 

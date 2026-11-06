@@ -12,37 +12,188 @@ th,td{border:1px solid #d0d7de;padding:6px 12px;text-align:left;vertical-align:t
 th{background:#f6f8fa}
 ul{padding-left:24px}
 strong{font-weight:600}
-</style></head><body><div class='wrap'><h1>my-cluster — full audit, 2026-10-26 16:27 KST</h1>
-<p>This is the EKS cluster <code>my-cluster</code> (kube context <code>my-cluster</code>, Kubernetes 1.32.13, region us-east-1, profile prod), 8 nodes, 25 namespaces, 157 pods, running 8 production services (app-r, app-q, app-m, app-o, app-l, app-p, app-n, app-s) in 8 prod namespaces and 4 dev namespaces. Nothing is on fire at the moment of collection, and the 95 minutes since the 14:52 full run were quiet: no spot reclaim, no node change, no deployment. That also means the five problems below are the same five as in the 14:52 and 05:14 reports, and none of their actions has been started, so the next spot reclaim will take the same six workloads down again. The one thing that moved is the CPU throttling of the app-m frontend, which crossed the 25% line. This collection started 9 minutes after the 16:18 daily collection, so the apiserver numbers include kubegap's own load and are not counted.</p>
-<h2>The 5 problems to work on</h2>
-<h3>1. 28 of 42 prod pods still sit on one expired spot node that AWS can take back with two minutes' notice, and the last four reclaims each stopped a production service</h3>
-<p><strong>Problem.</strong> Application pods can only run on nodes labelled <code>workload-type=app</code>, which today is two spot nodes in one availability zone: <code>ip-10-0-1-139</code> (r8gd.xlarge, 28 of 42 prod pods from 22 workloads) and <code>ip-10-0-1-62</code> (r8gd.large, 5 prod pods, created at 14:17 KST today when its predecessor was reclaimed). AWS has reclaimed the second app node four times in 26 hours. Each time the six pods on it were evicted and waited about 80 seconds for Karpenter to launch a new node, because the big node has no CPU request room left, and <code>prod-app-p/app-p-backend</code> with one replica and strategy Recreate was unreachable for the whole wait. Five 2-replica prod Deployments have both replicas on the big node, so when that node goes, app-r, app-o-ai, app-o-backend, app-l-backend and app-l-frontend go with it, and the cluster cannot absorb its loss on memory. The big node is 54 hours past its Karpenter expiry and is held in place by one <code>karpenter.sh/do-not-disrupt</code> annotation on <code>prod-app-m/app-m-admin</code>.</p>
-<p><strong>Evidence.</strong> 28 of 42 prod pods are on <code>ip-10-0-1-139</code>, 5 on <code>ip-10-0-1-62</code>, both in us-east-1. Source: summary.json resilience.placement. CPU requests on <code>ip-10-0-1-139</code> are 99.5% of allocatable while the 7-day p95 usage is 5.6%. Source: metrics/node_cpu_request_ratio.json and metrics/node_cpu_usage_ratio_p95_7d.json. Without that node the cluster has 46.0 GB of allocatable memory against 47.5 GB requested. Source: summary.json resilience.n_plus_one. The control-plane log holds 113 "no fit" scheduler lines in 24 hours, 23 each for app-m-backend, app-p-backend and app-l-embedding-server and 19 for app-m-api. Source: summary.json controlplane.scheduler. Karpenter logged "initiating delete from interruption message" at 2026-10-25T20:09:52Z, 2026-10-26T03:33:23Z and 05:17:28Z. Source: logs/pods/karpenter/karpenter_karpenter.log. The do-not-disrupt pod has blocked disruption of this node 14,163 times since 2026-10-06. Source: events.json. app-p-backend still has replicas 1 and strategy Recreate at generation 5. Source: objects/deployments.json.</p>
-<p><strong>Cause.</strong> Prod runs on two spot nodes in the Karpenter <code>default</code> pool with no spread rule, so pods pack onto whichever node has room. Requests 18 times above real use make the scheduler see the big node as full, so every evicted pod waits for a new node instead of rescheduling in seconds. Karpenter sizes the replacement for the six waiting pods only, so the new node is small and is reclaimed again as cheap spot capacity. The <code>app-amd64-fallback</code> pool that could hold on-demand capacity has 0 nodes and a 10% budget that has blocked 83,933 times. Likely: the do-not-disrupt annotation on app-m-admin was added once to protect a session and never removed.</p>
-<p><strong>Action.</strong> ① Lower CPU requests to the 7-day p95 in the shared prod chart: app-l-backend 500 m → 150 m, app-l-embedding-server 500 m → 160 m, app-p-backend 500 m → 150 m, app-l-neo4j 500 m → 50 m, and neo4j memory 4 Gi → 1 Gi. Effect: <code>ip-10-0-1-139</code> drops to roughly 60% requested, evicted pods reschedule in seconds, and the N+1 memory gap closes. Takes 1 hour. ② app-p-backend: replicas 2, RollingUpdate with maxSurge 1 and maxUnavailable 0, a 5-second preStop. Takes 20 minutes. ③ Add topologySpreadConstraints on hostname and on zone to the shared prod chart, plus a PDB with minAvailable 1 for app-o-ai and app-o-backend. Takes 2 to 3 hours including the Argo CD sync. ④ Remove <code>karpenter.sh/do-not-disrupt</code> from the app-m-admin template. Takes 10 minutes. Karpenter then replaces the expired node, which also clears problem 2. Do ① to ③ before ④, otherwise the pods regroup on whichever node replaces it. ⑤ Give the <code>app-amd64-fallback</code> pool a usable budget and an on-demand capacity-type requirement, and add a spread on <code>karpenter.sh/capacity-type</code> so prod is never spot-only. Takes half a day.</p>
-<pre><code class="language-yaml"># shared prod chart values -&gt; Deployment template.spec
-replicas: 2
-strategy: { type: RollingUpdate, rollingUpdate: { maxSurge: 1, maxUnavailable: 0 } }
-topologySpreadConstraints:
-
-- maxSkew: 1
-  topologyKey: kubernetes.io/hostname
-  whenUnsatisfiable: DoNotSchedule
-  labelSelector: { matchLabels: { app.kubernetes.io/name: &quot;{{ .name }}&quot; } }
-
-- maxSkew: 1
-  topologyKey: topology.kubernetes.io/zone
-  whenUnsatisfiable: ScheduleAnyway
-  labelSelector: { matchLabels: { app.kubernetes.io/name: &quot;{{ .name }}&quot; } }
-containers:
-
-- resources: { requests: { cpu: 150m } }
-  lifecycle: { preStop: { exec: { command: [&quot;sleep&quot;, &quot;5&quot;] } } }
+</style></head><body><div class='wrap'><h1>my-cluster — full audit, 2026-11-05 17:18</h1>
+<p>Urgent now: no</p>
+<p>Today's problems: ① No backups for 7 prod databases ② Prod pods piled on one spot node ③ Kafka listener open to the internet ④ 4 prod ALB health checks failing ⑤ Unsupported EKS, Karpenter and AL2</p>
+<p>Since the last run: The 2026-11-03 full run had no report, so there is no way to tell whether its work was done.</p>
+<p>Appeared: 7. They include the new idle spot node node-2-158 with 11 CreateNetworkInterface failures, node-1-62's root disk at 79%, and 80 5xx out of 54,991 requests in 24 hours (0.14%) on app-m-frontend. Most other status shifts, such as the new N+1 warning, come from changed rules, not from the cluster.</p>
+<p>Went away: 5. They include node node-2-144 leaving the cluster, Promtail no longer sitting at its memory limit, and kafka-exporter no longer Not Ready, though it has restarted 5 times.</p>
+<h2>The cluster at a glance</h2>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Nodes</td>
+<td>8 of 8 Ready</td>
+</tr>
+<tr>
+<td>Pods</td>
+<td>139 running, 0 pending, 0 failed</td>
+</tr>
+<tr>
+<td>Namespaces</td>
+<td>25, 8 production</td>
+</tr>
+<tr>
+<td>Components</td>
+<td>23: actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni</td>
+</tr>
+<tr>
+<td>Metrics and log stores</td>
+<td>prometheus 2.49.1 / loki 2.6.1</td>
+</tr>
+<tr>
+<td>Kubernetes</td>
+<td>v1.32.13-eks-577a51e (eks)</td>
+</tr>
+</tbody>
+</table>
+<h2>Coming up</h2>
+<table>
+<thead>
+<tr>
+<th>When</th>
+<th>What</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2026-11-07 21:31 KST</td>
+<td>system-ondemand 풀 노드 node-1-241(NodeClaim system-ondemand-mxf5q)이 expireAfter 720h에 닿아 교체돼요. prod-app-p/app-p-postgresql-0(레플리카 1, us-east-1a 볼륨)이 다른 노드로 옮겨지는 동안 멈춰요. emptyDir에 있는 loki-stack-0의 로그도 사라져요.</td>
+<td>summary.json</td>
+</tr>
+<tr>
+<td>2026-11-07 21:32 KST</td>
+<td>노드 node-2-218(NodeClaim system-ondemand-jvbnl)이 만료돼 교체돼요. prod-app-q/app-q-backend-postgresql-0(레플리카 1, us-east-1c 볼륨)과 emptyDir을 쓰는 Alertmanager가 옮겨져요. 풀 예산이 10%라 앞의 노드와 한 대씩 차례로 교체돼요.</td>
+<td>summary.json</td>
+</tr>
+<tr>
+<td>2026-11-08 15:28 KST</td>
+<td>노드 node-2-135(NodeClaim system-ondemand-db9bj)가 만료돼 교체돼요. middleware/kafka-controller-0(브로커 1대)과 prod-app-l-backend/app-l-neo4j-0이 옮겨지는 동안 멈춰요.</td>
+<td>summary.json</td>
+</tr>
+<tr>
+<td>2026-11-07</td>
+<td>지난달 지운 고아 PVC를 지우기 전에 떠 둔 EBS 스냅샷 12개에 delete-after 2026-11-07 태그가 붙어 있어요. 자동으로 지우는 정책은 없지만, 이 날짜에 누가 지우면 그 데이터의 마지막 사본이 없어져요.</td>
+<td>aws/ec2-snapshots-30d.json</td>
+</tr>
+<tr>
+<td>2026-12-03</td>
+<td>쓰이지 않는 ACM 인증서 acmeai.kr이 만료돼요. 갱신 대상이 아니에요.</td>
+<td>aws/acm-certificates.json</td>
+</tr>
+<tr>
+<td>2027-03-23</td>
+<td>EKS 1.32의 확장 지원이 끝나요. 표준 지원은 2026-03-23에 이미 끝나서 지금은 확장 지원 요금을 내고 있어요.</td>
+<td>aws/describe-cluster-versions.json</td>
+</tr>
+</tbody>
+</table>
+<h2>1. No backups for 7 prod databases</h2>
+<p><strong>What is happening.</strong> All 7 prod databases run as a single replica, with their data on one EBS volume each. There are 3 MySQL, 3 PostgreSQL and 1 Neo4j, and nothing backs any of them up. If a volume breaks or gets deleted, there is no copy to restore. It is ongoing, and three of these pods move to new nodes when nodes expire on the night of 2026-11-07 and the afternoon of 2026-11-08.</p>
+<ul>
+<li>Affected: the 7 prod DBs below. All 7 have reclaimPolicy Delete.</li>
+<li>prod-app-p/app-p-postgresql: vol-0123456789abcdef0, 10Gi, us-east-1a. It runs on node-1-241, which expires 2026-11-07 21:31 KST.</li>
+<li>prod-app-q/app-q-backend-postgresql: vol-0123456789abcdef0, 10Gi, us-east-1c. It runs on node-2-218, which expires 2026-11-07 21:32 KST.</li>
+<li>prod-app-l-backend/app-l-neo4j: vol-0123456789abcdef0, 20Gi, us-east-1c. It runs on node-2-135, which expires 2026-11-08 15:28 KST.</li>
+<li>prod-app-o/app-o-backend-mysql: vol-0123456789abcdef0, 50Gi, us-east-1a, on node-1-117.</li>
+<li>app-s-prod/app-s-backend-postgresql: vol-0123456789abcdef0, 10Gi, us-east-1a, on node-1-117.</li>
+<li>prod-app-m/app-m-backend-mysql: vol-0123456789abcdef0, 8Gi, us-east-1c, on node-2-60.</li>
+<li>prod-app-n/app-n-backend-prod-mysql: vol-0123456789abcdef0, 8Gi, us-east-1c, on node-2-60.</li>
+<li>Not among the 7, but also left out of steps ② and ③: the Kafka broker's volume middleware/data-kafka-controller-0 (vol-0123456789abcdef0, 20Gi, Delete) and another middleware PV (vol-0123456789abcdef0).</li>
+<li>Checked and healthy:</li>
+<li>EBS volumes live apart from nodes, so a node expiry alone does not lose data.</li>
+<li>The only snapshots are from 2026-10-06. They were taken before 12 orphan PVCs were deleted, and none are of live prod volumes. They carry a delete-after 2026-11-07 tag, and no policy deletes them automatically, but if someone deletes them on that date the last copy of that data is gone.</li>
+<li>Changed for another reason: Karpenter's 720h expiry replacement soon moves the DB pods on node-1-241, node-2-218 and node-2-135.</li>
+<li>Not checked:</li>
+<li>whether dumps run outside the cluster</li>
+<li>each DB's data size and write volume</li>
+<li>whether anyone has ever restored from a volume</li>
+</ul>
+<p><strong>Why.</strong> Nothing in the account or the cluster makes backups, and the volumes got the dynamic-provisioning default, reclaimPolicy Delete. Confirmed.</p>
+<p><strong>Suggested fix.</strong></p>
+<p>① Make sure the account really has no snapshot policy and no backup plan.</p>
+<pre><code>aws dlm get-lifecycle-policies --profile acme --region us-east-1
 </code></pre>
+<pre><code>aws backup list-backup-plans --profile acme --region us-east-1
+</code></pre>
+<p>These only read.</p>
+<p>Check: if both return empty lists, there is no backup. These commands do not see backups in other accounts or regions, or dump scripts running outside the cluster.</p>
+<p>② Before the node expiry at 2026-11-07 21:31 KST, take EBS snapshots of the 7 prod DB volumes.</p>
+<pre><code>for v in vol-0123456789abcdef0 vol-0123456789abcdef0 vol-0123456789abcdef0 vol-0123456789abcdef0 vol-0123456789abcdef0 vol-0123456789abcdef0 vol-0123456789abcdef0; do aws ec2 create-snapshot --profile acme --region us-east-1 --volume-id &quot;$v&quot; --description &quot;manual prod db backup 2026-11-06&quot; --tag-specifications 'ResourceType=snapshot,Tags=[{Key=purpose,Value=manual-prod-db-backup}]'; done
+</code></pre>
+<p>This creates 7 snapshots. Pods and volumes stay as they are, nothing restarts, and snapshot storage is billed.</p>
+<p>The DBs keep running during the snapshot, so it captures the disk as if the power had been cut. MySQL and PostgreSQL usually recover when they start. Whether Neo4j community opens from such a snapshot is unverified.</p>
+<p>The volumes are not encrypted, so the snapshots are not either. No one has tried a restore. The two Kafka volumes are not in this loop.</p>
+<p>Check: <code>aws ec2 describe-snapshots --profile acme --region us-east-1 --owner-ids self --filters Name=tag:purpose,Values=manual-prod-db-backup --query 'Snapshots[].[VolumeId,State]' --output table</code> shows 7 rows, all completed.</p>
+<p>③ Set reclaimPolicy to Retain on the 7 prod DB PVs.</p>
+<pre><code>for pv in pvc-1a304f49-fa2e-43ed-a996-df104613c88c pvc-5cccf1df-7624-45a2-833d-2191c5490713 pvc-8d1f15c7-e0e6-4410-bd40-64d7332aef0d pvc-9f1aab56-d94c-499d-8df6-2def93e79427 pvc-a50dcc70-b062-457a-b0e3-07a3e6da2ec6 pvc-ebc5618b-a1af-40d3-b15d-4969ed13487e pvc-f226562f-a020-4027-a0d4-1494585c8b6f; do kubectl --context my-cluster patch pv &quot;$pv&quot; -p '{&quot;spec&quot;:{&quot;persistentVolumeReclaimPolicy&quot;:&quot;Retain&quot;}}'; done
+</code></pre>
+<p>Only one line of each PV spec changes, and no pod restarts. From then on, a deleted PVC leaves its EBS volume behind.</p>
+<p>PVs carry no Argo CD tracking label, so selfHeal does not revert this. A volume left behind keeps billing until someone deletes it by hand.</p>
+<p>Check: <code>kubectl --context my-cluster get pv -o custom-columns=NAME:.metadata.name,CLAIM:.spec.claimRef.name,POLICY:.spec.persistentVolumeReclaimPolicy</code> shows Retain on all 7.</p>
+<p>④ Set up a backup that runs every day. This step is a plan, so it has no command.</p>
+<ul>
+<li>Snapshot the volumes tagged KubernetesCluster=my-cluster every day with a DLM policy or an AWS Backup plan, and keep them 7 to 14 days.</li>
+<li>For each DB, add a CronJob that sends a mysqldump, pg_dump or neo4j-admin dump to S3.</li>
+<li>Restore one snapshot to a new volume and test that the DB opens.</li>
+</ul>
+<p>Snapshots and dumps then pile up on a fixed schedule.</p>
+<p>A dump CronJob that saves only to the same node's disk is lost with the node. Neo4j community has no online backup, so a dump may need the DB stopped. That is unverified.</p>
+<p>Picking volumes by tag also snapshots other volumes, such as Prometheus and vm-single, which raises the bill.</p>
+<p>Check: <code>aws dlm get-lifecycle-policies</code> shows one ENABLED policy, and 7 or more snapshots appear the next day.</p>
+<p><strong>Rollback.</strong> Delete a snapshot with <code>aws ec2 delete-snapshot --profile acme --region us-east-1 --snapshot-id &lt;snapshot-id&gt;</code>. Undo step ③ by running the same loop with Delete instead of Retain, and set a DLM policy to DISABLED or delete it. No step deletes data.</p>
 <p><strong>Why this happens.</strong></p>
 <ul>
-<li>Principle: A spot interruption gives two minutes' notice. Karpenter drains the node at once and provisions a replacement sized for the pending pods, so the gap users see equals node launch time plus pod start time unless the remaining nodes have request headroom. The scheduler places by requests, not usage, so requests far above real use turn an idle node into a full one, and without a spread constraint the scheduler and Karpenter consolidation pack replicas onto the same node.</li>
-<li>Cases: No public case recorded for this check. The check definition records its own measurement: on its first real run a single spot reclaim stopped a production service for 2 minutes 7 seconds while that node held 27 production pods.</li>
-<li>Read next: "Kubernetes docs: Pod Topology Spread Constraints", "Karpenter docs: Disruption (expiration, consolidation, interruption)", "AWS docs: EC2 Spot Instance interruption notices".</li>
+<li>Principle: A volume survives its node dying. If it is wrongly deleted or broken, though, only a snapshot brings it back. With reclaimPolicy Delete, one namespace deletion or one Argo CD prune removes the volume at once.</li>
+<li>Case: In 2023 at InfluxData, automation produced a wrong Argo CD Application name and a whole production environment was deleted. Their volumes were Retain and their data was backed up, so they recovered without data loss in a little under 6 hours. Here, Argo CD also manages the 8 prod apps with prune and selfHeal, but the 7 prod DB volumes are Delete and have no backup.</li>
+<li>Read: the Amazon Data Lifecycle Manager user guide; the Kubernetes documentation on the Reclaim Policy of Persistent Volumes</li>
 </ul>
-<p>Evidence checks: <code>resilience.prod-concentration.node-1-139</code>, <code>resilience.n-plus-one.cluster</code>, <code>resilience.replicas-same-node.prod-app-r/deployment/app-r</code>, <code>resilience.replicas-same-node.prod-app-o/deployment/app-o-ai</code>, <code>resilience.replicas-same-node.prod-app-o/deployment/app-o-backend</code>, <code>resilience.replicas-same-node.prod-app-l-backend/deployment/app-l-backend</code>, <code>resilience.replicas-same-node.prod-app-l-backend/deployment/app-l-frontend</code>, <code>resilience.replicas-same-zone.*</code> ×9, <code>resilience.single-replica-in-prod.prod-app-p/app-p-backend</code>, <code>resilience.recreate-strategy-serving.prod-app-p/deployment/app-p-backend</code>, <code>resilience.no-pdb.prod-app-o/app-o-ai</code>, <code>resilience.no-pdb.prod-app-o/app-o-backend</code>, <code>controlplane.scheduler-unschedulable.prod-app-m/app-m-api</code>, <code>controlplane.scheduler-unschedulable.prod-app-m/app-m-backend</code>, <code>controlplane.scheduler-unschedulable.prod-app-l-backend/app-l-embedding-server</code>, <code>controlplane.scheduler-unschedulable.prod-app-p/app-p-backend</code>, <code>resources.node-request-usage-gap.node-1-139</code>, <code>resources.cpu-request-overprovisioned.*</code> (39), <code>resources.krr-recommendation.*</code> (31), <code>scaling.karpenter-expired-not-replaced.default-n44bh</code>, <code>karpenter.spot-to-spot-consolidation-off.cluster</code>, <code>resilience.priority-inversion.cluster</code>, <code>observability.failure-mode-uncovered.Scheduling failure</code></p></div></body></html>
+<p><strong>Evidence.</strong></p>
+<table>
+<thead>
+<tr>
+<th>What</th>
+<th>Value</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Backup CronJobs in the cluster, 7 days</td>
+<td>0</td>
+<td>summary.json</td>
+</tr>
+<tr>
+<td>DLM lifecycle policies, us-east-1</td>
+<td>none</td>
+<td>aws/dlm-lifecycle-policies.json</td>
+</tr>
+<tr>
+<td>AWS Backup plans, us-east-1</td>
+<td>none</td>
+<td>aws/backup-plans.json</td>
+</tr>
+<tr>
+<td>Prod DBs with no backup CronJob</td>
+<td>7</td>
+<td>summary.json</td>
+</tr>
+<tr>
+<td>DB workloads with a PVC, dev included</td>
+<td>17</td>
+<td>summary.json</td>
+</tr>
+<tr>
+<td>Snapshots of live prod volumes, 30 days</td>
+<td>0 of 12</td>
+<td>aws/ec2-snapshots-30d.json</td>
+</tr>
+</tbody>
+</table></div></body></html>

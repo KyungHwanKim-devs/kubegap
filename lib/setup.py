@@ -12,7 +12,7 @@ import json
 import platform
 from pathlib import Path
 
-from . import __version__, aws, kube, monitoring, nodecommands, paths, tools
+from . import __version__, aws, firstrun, kube, monitoring, nodecommands, paths, tools
 from . import discover as _discover
 from .config import Config
 from .runlog import RunLog
@@ -57,8 +57,11 @@ def check_tool_updates(only: list[str] | None = None) -> int:
     return 1 if behind else 0
 
 
-def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None, install: bool | list[str] = False, install_ssm_document: bool = False, snapshots_root: Path | None = None, verbose: bool = False) -> tuple[int, dict]:
-    """install=False: check only (default). True: install everything missing. List of names: install only those. install_ssm_document=True uploads the kubegap-node-read SSM document when it is missing or outdated (EKS). Both policies are decided by the caller (scripts/kubegap) from config and arguments."""
+def run_setup(
+    context: str | None, cfg: Config, *, kubeconfig: str | None = None, install: bool | list[str] = False, install_ssm_document: bool = False, snapshots_root: Path | None = None, verbose: bool = False, ask_again: bool = False
+) -> tuple[int, dict]:
+    """ask_again=True lists every first-run question again, including the ones answered before (`/kubegap setup`).
+    install=False: check only (default). True: install everything missing. List of names: install only those. install_ssm_document=True uploads the kubegap-node-read SSM document when it is missing or outdated (EKS). Both policies are decided by the caller (scripts/kubegap) from config and arguments."""
     started = _dt.datetime.now().astimezone()
     result: dict = {
         "kubegap": __version__,
@@ -154,6 +157,8 @@ def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None
             objs = {"nodes": nodes}
             cluster["platform"], cluster["platform_reasons"] = _discover.detect_platform(info, _discover._node_summary(items), _discover.detect_components(objs, None), objs)
             cluster["is_k3s"] = cluster["platform"] == "k3s"
+            # Running node-reader pods mean the user applied the node DaemonSet: collection uses it, and no node question is asked
+            cluster["node_reader_pods"] = len(_discover.node_reader_nodes(context, kubeconfig)) if cluster["platform"] != "eks" else 0
             _p(f"  {context}: server {cluster.get('server_version')}, {len(items)} nodes ({', '.join(versions)}), detected platform {cluster['platform']}, pods list permission {'yes' if cluster['can_list_pods'] else 'no'}")
             if cluster.get("is_eks"):
                 e = cluster.get("eks") or {}
@@ -229,12 +234,17 @@ def run_setup(context: str | None, cfg: Config, *, kubeconfig: str | None = None
     ok = not required_missing and bool(cluster.get("reachable")) and bool(cluster.get("can_list_pods", True))
     result["ready"] = ok
     result["finished"] = _dt.datetime.now().astimezone().isoformat(timespec="seconds")
+    # What is missing becomes questions for the user, each with an explanation, choices and a way to skip (lib/firstrun.py). SKILL.md asks them.
+    open_questions = firstrun.questions(result, cfg, ctx_dir, all_=ask_again) if ok else []
+    result["questions"] = [q["id"] for q in open_questions]
     if ctx_dir:
         write_private(ctx_dir / "setup.json", json.dumps(result, ensure_ascii=False, indent=2, default=str))
         result["path"] = str(ctx_dir / "setup.json")
     log.stage("setup", "end", ready=ok)
     _p("")
     if ok:
+        _p(firstrun.render(open_questions, context, firstrun.skipped(result, cfg, ctx_dir)))
+        _p("")
         _p(f"Ready. Collection can proceed. Result: {result.get('path')}")
     else:
         why = []
