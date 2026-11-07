@@ -629,6 +629,30 @@ def cmd_selftest(args) -> int:
     return 1 if r["failed"] or r["load_errors"] or r["audit_failed"] else 0
 
 
+def cmd_regress(args) -> int:
+    """End-to-end regression on the committed snapshot fixtures (lib/regress.py). --update rewrites the expectation, the one way it changes."""
+    import tempfile as _tf
+    from pathlib import Path as _P
+
+    from lib import regress as _rg
+
+    failed = 0
+    for variant, fixture, mutate in _rg.variants():
+        if args.fixture and not variant.startswith(args.fixture):
+            continue
+        with _tf.TemporaryDirectory() as td:
+            outputs = _rg.run(_rg.stage(fixture, _P(td), mutate))
+        if args.update:
+            print(f"{variant}: expectation written to {_rg.update(variant, outputs)}")
+            continue
+        diffs = _rg.compare(variant, outputs)
+        print(f"{variant}: {'same as the expectation' if not diffs else str(len(diffs)) + ' file(s) differ'}")
+        for d in diffs:
+            print(d)
+        failed += bool(diffs)
+    return 1 if failed else 0
+
+
 def cmd_snapshots(args) -> int:
     """List snapshot folders. Auxiliary debugging command."""
     ctx = _resolve_context(args)
@@ -832,6 +856,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--check", action="append", help="only this check id (repeatable)")
     s.add_argument("--snapshot", action="append", help="real snapshot folder (repeatable). Verifies that keys referenced by summary-type check expressions exist in that summary.json")
     s.set_defaults(func=cmd_selftest)
+
+    s = sub.add_parser("regress", help="run summarize, evaluate and render on the committed snapshot fixtures (tests/fixtures/snapshot-*) and compare with tests/fixtures/expected (no cluster needed)")
+    s.add_argument("--fixture", help="only the variants of this fixture (k3s, eks, …)")
+    s.add_argument("--update", action="store_true", help="rewrite the expectation from this run; the diff belongs in the pull request")
+    s.set_defaults(func=cmd_regress)
     return p
 
 
