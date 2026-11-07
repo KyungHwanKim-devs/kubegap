@@ -7,8 +7,8 @@ import json
 
 from lib import observability, resilience, traffic, vpccni
 from lib.evaluate import Context
-from lib.resilience import is_db_like
 from lib.traffic import _latest_hour
+from lib.workload import is_db_like
 
 # ---------- database-like ----------
 

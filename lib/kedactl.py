@@ -8,18 +8,13 @@ Output: the `kedactl` section of summary.json. Shape documented in SKILL.md.
 
 from __future__ import annotations
 
-import re
 from collections import Counter
 from pathlib import Path
 
 from . import podmetrics as _pm
 from .promtext import parse as _parse_prom
-from .snapshot import load_json, objects, parse_ts, taken_at
-
-
-def _ver(image: str | None):
-    m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
-    return m.group(1) if m else None
+from .snapshot import metric_rows, objects, parse_ts, taken_at
+from .versions import image_version
 
 
 def _deploy(snap: Path, name_sub: str) -> dict:
@@ -41,7 +36,7 @@ def _deploy(snap: Path, name_sub: str) -> dict:
         "namespace": d["metadata"]["namespace"],
         "replicas": sp.get("replicas"),
         "ready": st.get("readyReplicas") or 0,
-        "version": _ver(c0.get("image")),
+        "version": image_version(c0.get("image")),
         "args": args,
         "pdb": pdbs,
         "has_pdb": bool(pdbs),
@@ -81,7 +76,7 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
             for h in w.get("webhooks") or []:
                 webhooks.append({"name": h.get("name"), "failure_policy": h.get("failurePolicy"), "timeout_s": h.get("timeoutSeconds")})
     # set of Secret names (kube_secret_info metric — no values)
-    secret_names = {(x["metric"].get("namespace"), x["metric"].get("secret")) for x in ((load_json(snap / "metrics" / "secrets_by_name.json") or {}).get("result") or [])}
+    secret_names = {(lab.get("namespace"), lab.get("secret")) for lab, _ in metric_rows(snap, "secrets_by_name")}
     secrets_known = bool(secret_names)
     # TriggerAuthentication
     auths = []

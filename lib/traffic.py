@@ -16,9 +16,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from . import versions as _versions  # `versions` is a local name in this module
-from .controlplane import workload_of
-from .events import count_of
-from .snapshot import load_json, objects
+from .snapshot import event_count, load_json, metric_doc, metric_rows, objects
+from .workload import workload_of
 
 ADMIN_HOST_RE = re.compile(r"(^|[.-])(admin|grafana|argocd|argo|deploy|kibana|prometheus|alertmanager|minio|registry|pgadmin|phpmyadmin|console|dashboard|jenkins|vault|keycloak|portainer|longhorn|traefik)([.-]|$)", re.IGNORECASE)
 DB_PORTS = {5432, 3306, 6379, 27017, 9200, 9300, 5672, 9092, 9094, 11211, 7687, 2379, 1433, 1521, 8086, 9000}
@@ -34,19 +33,6 @@ AUTH_ANN = (
     "ingress.kubernetes.io/auth-type",
     "alb.ingress.kubernetes.io/inbound-cidrs",
 )
-
-
-def _metric_rows(snap: Path, qid: str) -> list[tuple[dict, float]]:
-    m = load_json(snap / "metrics" / f"{qid}.json")
-    out = []
-    for s in (m or {}).get("result") or []:
-        with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
-            out.append((s.get("metric") or {}, float(s["value"][1])))
-    return out
-
-
-def _wl(ns: str, pod: str) -> str:
-    return workload_of(f"{ns}/{pod}")
 
 
 def _selector_match(sel: dict, labels: dict) -> bool:
@@ -319,9 +305,9 @@ def _alb(snap: Path, objs: _Objects) -> dict:
 
 
 def _ingresses(snap: Path, objs: _Objects, alb: dict) -> list[dict]:
-    nginx_rps = {(ln.get("exported_namespace") or ln.get("namespace"), ln.get("ingress")): v for ln, v in _metric_rows(snap, "ingress_nginx_rps_1h")}
-    nginx_5xx = {(ln.get("exported_namespace") or ln.get("namespace"), ln.get("ingress")): v for ln, v in _metric_rows(snap, "ingress_nginx_5xx_ratio_1h")}
-    nginx_p95 = {(ln.get("exported_namespace") or ln.get("namespace"), ln.get("ingress")): v for ln, v in _metric_rows(snap, "ingress_nginx_p95_1h")}
+    nginx_rps = {(ln.get("exported_namespace") or ln.get("namespace"), ln.get("ingress")): v for ln, v in metric_rows(snap, "ingress_nginx_rps_1h")}
+    nginx_5xx = {(ln.get("exported_namespace") or ln.get("namespace"), ln.get("ingress")): v for ln, v in metric_rows(snap, "ingress_nginx_5xx_ratio_1h")}
+    nginx_p95 = {(ln.get("exported_namespace") or ln.get("namespace"), ln.get("ingress")): v for ln, v in metric_rows(snap, "ingress_nginx_p95_1h")}
     tg_by_svc: dict[tuple, list] = defaultdict(list)
     for t in alb.get("target_groups") or []:
         if t.get("namespace"):
@@ -570,10 +556,10 @@ def _db_note(db: bool, scheme, sg_state: str | None, *, from_ranges: bool = Fals
 def _pod_skew(snap: Path, objs: _Objects) -> dict:
     ds = {f"{w['namespace']}/{w['name']}" for w in objs.workloads if w["kind"] == "DaemonSet"}  # DaemonSets are excluded: node size differences show up as skew (node-exporter measured at 20x)
     by_wl: dict[str, list[tuple[str, float]]] = defaultdict(list)
-    for lab, v in _metric_rows(snap, "pod_network_rx_bytes_1h"):
+    for lab, v in metric_rows(snap, "pod_network_rx_bytes_1h"):
         ns, pod = lab.get("namespace"), lab.get("pod")
-        if ns and pod and _wl(ns, pod) not in ds:
-            by_wl[_wl(ns, pod)].append((pod, v))
+        if ns and pod and workload_of(f"{ns}/{pod}") not in ds:
+            by_wl[workload_of(f"{ns}/{pod}")].append((pod, v))
     rows = []
     for wl, pods in by_wl.items():
         if len(pods) < 2:
@@ -600,7 +586,7 @@ def _pod_skew(snap: Path, objs: _Objects) -> dict:
             }
         )
     rows.sort(key=lambda r: -(r["skew_ratio"] or 0))
-    return {"available": (snap / "metrics" / "pod_network_rx_bytes_1h.json").is_file(), "workloads_measured": len(rows), "rows": rows[:30]}
+    return {"available": metric_doc(snap, "pod_network_rx_bytes_1h") is not None, "workloads_measured": len(rows), "rows": rows[:30]}
 
 
 def _readiness(snap: Path, objs: _Objects) -> dict:
@@ -609,12 +595,12 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
         if e.get("reason") == "Unhealthy":
             io = e.get("involvedObject") or {}
             if io.get("kind") == "Pod":
-                unhealthy[_wl(io.get("namespace", ""), io.get("name", ""))] += count_of(e)
+                unhealthy[workload_of(f"{io.get('namespace', '')}/{io.get('name', '')}")] += event_count(e)
     by_wl: dict[str, list] = defaultdict(list)
-    for lab, v in _metric_rows(snap, "pod_ready_ratio_24h"):
+    for lab, v in metric_rows(snap, "pod_ready_ratio_24h"):
         ns, pod = lab.get("namespace"), lab.get("pod")
         if ns and pod:
-            by_wl[_wl(ns, pod)].append((pod, v))
+            by_wl[workload_of(f"{ns}/{pod}")].append((pod, v))
     rows = []
     for wl, pods in by_wl.items():
         worst = min(pods, key=lambda x: x[1])
@@ -634,8 +620,8 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
         if wl not in by_wl:
             rows.append({"workload": wl, "namespace": wl.split("/")[0], "pods_below_99": 0, "min_ready_ratio_24h": None, "worst_pod": None, "not_ready_minutes_24h": None, "unhealthy_events": n, "prod": wl.split("/")[0] in objs.prod})
     rows.sort(key=lambda r: (r["min_ready_ratio_24h"] if r["min_ready_ratio_24h"] is not None else 1, -r["unhealthy_events"]))
-    not_ready_eps = [{"namespace": ln.get("namespace"), "endpoint": ln.get("endpoint"), "not_ready_addresses": int(v)} for ln, v in _metric_rows(snap, "endpoint_not_ready_addresses")]
-    available = bool((load_json(snap / "metrics" / "pod_ready_ratio_24h.json") or {}).get("ok"))
+    not_ready_eps = [{"namespace": ln.get("namespace"), "endpoint": ln.get("endpoint"), "not_ready_addresses": int(v)} for ln, v in metric_rows(snap, "endpoint_not_ready_addresses")]
+    available = bool((metric_doc(snap, "pod_ready_ratio_24h") or {}).get("ok"))
     return {
         "available": available,
         "rows": rows[:40] if available else None,  # None, not []: without the readiness ratio the rows judge nothing (#141)
@@ -646,8 +632,8 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
 
 
 def _coredns(snap: Path) -> dict:
-    sf = _metric_rows(snap, "coredns_servfail_ratio_1h")
-    p99 = _metric_rows(snap, "coredns_p99_1h")
+    sf = metric_rows(snap, "coredns_servfail_ratio_1h")
+    p99 = metric_rows(snap, "coredns_p99_1h")
     return {"available": bool(sf or p99), "servfail_ratio_1h": round(sf[0][1], 5) if sf else None, "p99_s_1h": round(p99[0][1], 4) if p99 else None}
 
 

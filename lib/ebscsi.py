@@ -13,31 +13,11 @@ from __future__ import annotations
 
 import contextlib
 import datetime as _dt
-import math
-import re
 from collections import Counter
 from pathlib import Path
 
-from .events import count_of
-from .snapshot import load_json, objects, parse_ts, taken_at
-
-
-def _rows(snap: Path, qid: str) -> list[tuple[dict, float]]:
-    out = []
-    for s in (load_json(snap / "metrics" / f"{qid}.json") or {}).get("result") or []:
-        try:
-            v = float(s["value"][1])
-            if math.isnan(v) or math.isinf(v):
-                continue
-            out.append((s.get("metric") or {}, v))
-        except (KeyError, ValueError, TypeError, IndexError):
-            pass
-    return out
-
-
-def _ver(image: str | None):
-    m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
-    return m.group(1) if m else None
+from .snapshot import event_count, load_json, metric_rows, objects, parse_ts, taken_at
+from .versions import image_version
 
 
 def _controller(snap: Path, ctrl: dict | None) -> dict:
@@ -50,7 +30,7 @@ def _controller(snap: Path, ctrl: dict | None) -> dict:
     sidecars = {}
     plugin_args: list[str] = []
     for c in tpl.get("containers") or []:
-        sidecars[c["name"]] = {"version": _ver(c.get("image")), "args": [a for a in (c.get("args") or []) if any(k in a for k in ("timeout", "leader", "batching", "metrics", "worker", "retry", "kube-api", "modify", "feature"))]}
+        sidecars[c["name"]] = {"version": image_version(c.get("image")), "args": [a for a in (c.get("args") or []) if any(k in a for k in ("timeout", "leader", "batching", "metrics", "worker", "retry", "kube-api", "modify", "feature"))]}
         if c["name"] == "ebs-plugin":
             plugin_args = [str(a) for a in (c.get("args") or [])]
     timeouts = {n: next((a.split("=", 1)[1] for a in v["args"] if a.startswith("--timeout=")), None) for n, v in sidecars.items() if n.startswith("csi-")}
@@ -60,7 +40,7 @@ def _controller(snap: Path, ctrl: dict | None) -> dict:
             "ready": st.get("readyReplicas") or 0,
             "available": st.get("availableReplicas") or 0,
             "service_account": tpl.get("serviceAccountName"),
-            "version": _ver(next((c.get("image") for c in tpl.get("containers") or [] if c["name"] == "ebs-plugin"), None)),
+            "version": image_version(next((c.get("image") for c in tpl.get("containers") or [] if c["name"] == "ebs-plugin"), None)),
             "sidecars": sidecars,
             "sidecar_timeouts": timeouts,
             "batching": any(a == "--batching=true" for a in plugin_args),
@@ -91,7 +71,7 @@ def _node(node_ds: dict | None) -> dict:
         {
             "desired": st.get("desiredNumberScheduled"),
             "ready": st.get("numberReady"),
-            "version": _ver(next((c.get("image") for c in node_ds["spec"]["template"]["spec"].get("containers") or [] if c["name"] == "ebs-plugin"), None)),
+            "version": image_version(next((c.get("image") for c in node_ds["spec"]["template"]["spec"].get("containers") or [] if c["name"] == "ebs-plugin"), None)),
             "volume_attach_limit_arg": next((a.split("=", 1)[1] for a in args if a.startswith("--volume-attach-limit=")), None),
             "reserved_volume_attachments_arg": next((a.split("=", 1)[1] for a in args if a.startswith("--reserved-volume-attachments=")), None),
         }
@@ -204,7 +184,7 @@ def _storage_classes(snap: Path) -> list[dict]:
 def _metrics(snap: Path) -> dict:
     """kubelet CSI call success/p99, controller storage ops, API errors/throttles. Reads metrics/ebscsi_*.json."""
     ops = {}
-    for lab, v in _rows(snap, "ebscsi_node_ops_by_status_24h"):
+    for lab, v in metric_rows(snap, "ebscsi_node_ops_by_status_24h"):
         m = (lab.get("method_name") or "").split("/")[-1]
         d = ops.setdefault(m, {"ok": 0, "errors": 0, "by_code": {}})
         if lab.get("grpc_status_code") == "OK":
@@ -212,16 +192,16 @@ def _metrics(snap: Path) -> dict:
         else:
             d["errors"] += int(v)
             d["by_code"][lab.get("grpc_status_code")] = d["by_code"].get(lab.get("grpc_status_code"), 0) + int(v)
-    p99 = {(lab.get("method_name") or "").split("/")[-1]: round(v, 2) for lab, v in _rows(snap, "ebscsi_node_ops_p99_24h")}
+    p99 = {(lab.get("method_name") or "").split("/")[-1]: round(v, 2) for lab, v in metric_rows(snap, "ebscsi_node_ops_p99_24h")}
     sops = {}
-    for lab, v in _rows(snap, "ebscsi_storage_ops_by_status_24h"):
+    for lab, v in metric_rows(snap, "ebscsi_storage_ops_by_status_24h"):
         d = sops.setdefault(lab.get("operation_name"), {})
         d[lab.get("status")] = d.get(lab.get("status"), 0) + int(v)
-    sp99 = {lab.get("operation_name"): round(v, 2) for lab, v in _rows(snap, "ebscsi_storage_ops_p99_24h")}
-    ctrl_series = _rows(snap, "ebscsi_controller_metrics_series")
+    sp99 = {lab.get("operation_name"): round(v, 2) for lab, v in metric_rows(snap, "ebscsi_storage_ops_p99_24h")}
+    ctrl_series = metric_rows(snap, "ebscsi_controller_metrics_series")
     ctrl_metrics = int(ctrl_series[0][1]) if ctrl_series else 0
-    api_err = {lab.get("request"): round(v) for lab, v in _rows(snap, "ebscsi_api_errors_24h") if v > 0}
-    thr = _rows(snap, "ebscsi_api_throttles_24h")
+    api_err = {lab.get("request"): round(v) for lab, v in metric_rows(snap, "ebscsi_api_errors_24h") if v > 0}
+    thr = metric_rows(snap, "ebscsi_api_throttles_24h")
     return {
         "kubelet_available": bool(ops or sops),
         "node_ops_24h": ops,
@@ -248,7 +228,7 @@ def _events(snap: Path) -> Counter:
         if r in ("FailedAttachVolume", "FailedMount", "FailedMapVolume", "VolumeResizeFailed", "FileSystemResizeFailed", "ProvisioningFailed", "VolumeFailedDelete", "FailedDetachVolume") or (
             r == "ExternalExpanding" and e.get("type") == "Warning"
         ):
-            ev_counts[r] += count_of(e)
+            ev_counts[r] += event_count(e)
     return ev_counts
 
 

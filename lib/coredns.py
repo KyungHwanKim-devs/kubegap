@@ -10,34 +10,13 @@ metrics (qps, rcode distribution, NXDOMAIN ratio, type distribution, AAAA ratio,
 from __future__ import annotations
 
 import contextlib
-import math
 import re
 from collections import Counter
 from pathlib import Path
 
-from .snapshot import load_json, objects
-
-
-def _rows(snap: Path, qid: str) -> list[tuple[dict, float]]:
-    out = []
-    for s in (load_json(snap / "metrics" / f"{qid}.json") or {}).get("result") or []:
-        try:
-            v = float(s["value"][1])
-            if math.isnan(v):
-                continue
-            out.append((s.get("metric") or {}, v))
-        except (KeyError, ValueError, TypeError, IndexError):
-            pass
-    return out
-
-
-def _scalar(snap: Path, qid: str):
-    r = _rows(snap, qid)
-    return round(r[0][1], 4) if r else None
-
-
-def _r(x, n=3):
-    return None if x is None else round(x, n)
+from .quantity import rounded
+from .snapshot import load_json, metric_rows, metric_scalar, objects
+from .versions import image_version
 
 
 def _parse_corefile(text: str) -> dict:
@@ -105,7 +84,6 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     tpl = (sp.get("template") or {}).get("spec") or {}
     conts = tpl.get("containers") or []
     image = conts[0].get("image") if conts else None
-    m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
     sel = (sp.get("selector") or {}).get("matchLabels") or {}
     pods = [p for p in objects(snap, "pods") if p["metadata"]["namespace"] == "kube-system" and all((p["metadata"].get("labels") or {}).get(k) == v for k, v in sel.items())]
     pod_rows = [
@@ -136,7 +114,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     deployment = {
         "name": dep["metadata"]["name"],
         "image": image,
-        "version": m.group(1) if m else None,
+        "version": image_version(image),
         "addon_version": addon.get("addonVersion"),
         "addon_latest": latest,
         "addon_managed": bool(addon),
@@ -162,59 +140,59 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "priority_class": tpl.get("priorityClassName"),
         "restarts_total": sum(r["restarts"] for r in pod_rows),
         "max_unavailable": ((sp.get("strategy") or {}).get("rollingUpdate") or {}).get("maxUnavailable"),
-        "replicas_per_8_nodes": _r((sp.get("replicas") or 0) / max(nodes_total / 8, 1), 2),
+        "replicas_per_8_nodes": rounded((sp.get("replicas") or 0) / max(nodes_total / 8, 1), 2),
     }
     # --- Metrics
-    rc = {lab.get("rcode"): v for lab, v in _rows(snap, "coredns_responses_by_rcode_1h")}
-    types = {lab.get("type"): v for lab, v in _rows(snap, "coredns_requests_by_type_1h")}
+    rc = {lab.get("rcode"): v for lab, v in metric_rows(snap, "coredns_responses_by_rcode_1h")}
+    types = {lab.get("type"): v for lab, v in metric_rows(snap, "coredns_requests_by_type_1h")}
     total_resp = sum(rc.values())
     total_req = sum(types.values())
-    qps = {lab.get("pod"): round(v, 2) for lab, v in _rows(snap, "coredns_qps_by_pod")}
+    qps = {lab.get("pod"): round(v, 2) for lab, v in metric_rows(snap, "coredns_qps_by_pod")}
     fwd = {}
-    for lab, v in _rows(snap, "coredns_forward_by_upstream_rcode_1h"):
+    for lab, v in metric_rows(snap, "coredns_forward_by_upstream_rcode_1h"):
         fwd.setdefault(lab.get("to"), {})[lab.get("rcode")] = round(v, 1)
     fwd_total = sum(sum(d.values()) for d in fwd.values())
     fwd_nx = sum(d.get("NXDOMAIN", 0) for d in fwd.values())
     fwd_sf = sum(d.get("SERVFAIL", 0) for d in fwd.values())
-    rest_err = {lab.get("code"): round(v, 1) for lab, v in _rows(snap, "coredns_rest_client_errors_1h") if v > 0}
+    rest_err = {lab.get("code"): round(v, 1) for lab, v in metric_rows(snap, "coredns_rest_client_errors_1h") if v > 0}
     cache_entries = {}
-    for lab, v in _rows(snap, "coredns_cache_entries"):
+    for lab, v in metric_rows(snap, "coredns_cache_entries"):
         cache_entries[lab.get("pod")] = cache_entries.get(lab.get("pod"), 0) + int(v)
     available = bool(rc) or bool(types)
     qvals = sorted(qps.values())
     metrics = {
         "available": available,
-        "up_pods": _scalar(snap, "coredns_up"),
+        "up_pods": rounded(metric_scalar(snap, "coredns_up"), 4),
         "window": "1h",
         "requests_1h": round(total_req),
-        "qps_total": _r(total_req / 3600, 2) if total_req else None,
+        "qps_total": rounded(total_req / 3600, 2) if total_req else None,
         "qps_by_pod": qps,
-        "qps_skew": _r(qvals[-1] / qvals[0], 2) if len(qvals) >= 2 and qvals[0] > 0 else None,
+        "qps_skew": rounded(qvals[-1] / qvals[0], 2) if len(qvals) >= 2 and qvals[0] > 0 else None,
         "responses_by_rcode": {k: round(v) for k, v in rc.items()},
-        "nxdomain_ratio": _r(rc.get("NXDOMAIN", 0) / total_resp) if total_resp else None,
-        "servfail_ratio": _r(rc.get("SERVFAIL", 0) / total_resp) if total_resp else None,
-        "refused_ratio": _r(rc.get("REFUSED", 0) / total_resp) if total_resp else None,
+        "nxdomain_ratio": rounded(rc.get("NXDOMAIN", 0) / total_resp) if total_resp else None,
+        "servfail_ratio": rounded(rc.get("SERVFAIL", 0) / total_resp) if total_resp else None,
+        "refused_ratio": rounded(rc.get("REFUSED", 0) / total_resp) if total_resp else None,
         "requests_by_type": {k: round(v) for k, v in types.items()},
-        "aaaa_ratio": _r(types.get("AAAA", 0) / total_req) if total_req else None,
-        "a_ratio": _r(types.get("A", 0) / total_req) if total_req else None,
-        "cache_hit_ratio": _scalar(snap, "coredns_cache_hit_ratio_1h"),
+        "aaaa_ratio": rounded(types.get("AAAA", 0) / total_req) if total_req else None,
+        "a_ratio": rounded(types.get("A", 0) / total_req) if total_req else None,
+        "cache_hit_ratio": rounded(metric_scalar(snap, "coredns_cache_hit_ratio_1h"), 4),
         "cache_entries_by_pod": cache_entries,
-        "p50_s": _scalar(snap, "coredns_p50_1h"),
-        "p99_s": _scalar(snap, "coredns_p99_1h"),
+        "p50_s": rounded(metric_scalar(snap, "coredns_p50_1h"), 4),
+        "p99_s": rounded(metric_scalar(snap, "coredns_p99_1h"), 4),
         "forward": {
             "by_upstream_rcode": fwd,
             "total_1h": round(fwd_total),
-            "share_of_requests": _r(fwd_total / total_req) if total_req else None,
-            "nxdomain_ratio": _r(fwd_nx / fwd_total) if fwd_total else None,
-            "servfail_ratio": _r(fwd_sf / fwd_total) if fwd_total else None,
+            "share_of_requests": rounded(fwd_total / total_req) if total_req else None,
+            "nxdomain_ratio": rounded(fwd_nx / fwd_total) if fwd_total else None,
+            "servfail_ratio": rounded(fwd_sf / fwd_total) if fwd_total else None,
             "servfail_1h": round(fwd_sf),
-            "p99_s": _scalar(snap, "coredns_forward_p99_1h"),
-            "healthcheck_failures_1h": _scalar(snap, "coredns_forward_healthcheck_failures_1h"),
-            "max_concurrent_rejects_1h": _scalar(snap, "coredns_max_concurrent_rejects_1h"),
+            "p99_s": rounded(metric_scalar(snap, "coredns_forward_p99_1h"), 4),
+            "healthcheck_failures_1h": rounded(metric_scalar(snap, "coredns_forward_healthcheck_failures_1h"), 4),
+            "max_concurrent_rejects_1h": rounded(metric_scalar(snap, "coredns_max_concurrent_rejects_1h"), 4),
             "upstreams": sorted(fwd.keys()),
         },
-        "panics_1h": _scalar(snap, "coredns_panics_1h"),
-        "reload_failed_1h": _scalar(snap, "coredns_reload_failed_1h"),
+        "panics_1h": rounded(metric_scalar(snap, "coredns_panics_1h"), 4),
+        "reload_failed_1h": rounded(metric_scalar(snap, "coredns_reload_failed_1h"), 4),
         "rest_client_errors_1h": rest_err,
         "rest_client_errors_total_1h": round(sum(rest_err.values())),
     }

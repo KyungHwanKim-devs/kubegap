@@ -10,21 +10,13 @@ Result: the `albctl` section of summary.json. Shape is described in SKILL.md.
 
 from __future__ import annotations
 
-import re
 from collections import Counter
 from pathlib import Path
 
 from .promtext import parse as _parse_prom
+from .quantity import rounded
 from .snapshot import load_json, objects
-
-
-def _ver(image: str | None):
-    m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
-    return m.group(1) if m else None
-
-
-def _r(x, n=3):
-    return None if x is None else round(x, n)
+from .versions import image_version
 
 
 def _pod_metrics(snap: Path) -> dict:
@@ -69,7 +61,7 @@ def _pod_metrics(snap: Path) -> dict:
             "aws_api_calls_total": total_calls,
             "aws_api_top_ops": top_ops,
             "aws_api_slow_ops_avg_s": slow_ops,
-            "aws_api_retries_avg": _r(retries_sum / retries_cnt, 3) if retries_cnt else None,
+            "aws_api_retries_avg": rounded(retries_sum / retries_cnt, 3) if retries_cnt else None,
             "aws_api_retries_total": int(retries_sum),
             "webhook_requests": webhook,
             "webhook_5xx": sum(c for w in webhook.values() for code, c in w.items() if str(code).startswith("5")),
@@ -114,7 +106,7 @@ def analyze(snap: Path, inv: dict | None, traffic: dict | None = None) -> dict:
         "namespace": dep["metadata"]["namespace"],
         "replicas": sp.get("replicas"),
         "ready": st.get("readyReplicas") or 0,
-        "version": _ver(c0.get("image")),
+        "version": image_version(c0.get("image")),
         "image": c0.get("image"),
         "args": args,
         "cluster_name": arg("cluster-name"),

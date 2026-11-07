@@ -28,8 +28,8 @@ from pathlib import Path
 from . import versions
 from .mask import strip_control
 from .promtext import parse as _parse_prom
-from .resilience import eligible_nodes, selector_matches
-from .snapshot import load_json, objects
+from .snapshot import load_json, metric_doc, objects, series_present
+from .workload import eligible_nodes, selector_matches
 
 HTTPS_ONLY_SINCE = (0, 16, 0)
 # ServiceL2Status is written for every announced service from v0.14.6: the `--enable-l2-service-status` flag of v0.14.5 (speaker/main.go:90@v0.14.5, default false) is gone, so from there an empty list is an answer.
@@ -44,11 +44,6 @@ METRICS_SOURCE = "metrics/pod/metallb-speaker/*.prom (pod proxy GET)"
 L2_STATUS, BGP_STATUS, CONFIG_STATE = "servicel2statuses.metallb.io", "servicebgpstatuses.metallb.io", "configurationstates.metallb.io"
 COUNTERS = {"update_errors_total": "update_errors", "arp_requests_total": "arp_requests", "arp_responses_total": "arp_responses", "gratuitous_total": "gratuitous", "bgp_sessions": "bgp_sessions", "bgp_sessions_up": "bgp_sessions_up"}
 METRICS_NOT_READ = ["metallb_k8s_client_update_errors_total", "metallb_layer2_requests_received", "metallb_layer2_responses_sent", "metallb_layer2_gratuitous_sent", "metallb_bgp_session_up"]
-
-
-def _ver(image: str | None):
-    m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
-    return m.group(1) if m else None
 
 
 def _container(d: dict, role: str) -> dict:
@@ -315,8 +310,8 @@ def _bgp_sessions(snap: Path, texts: dict[str, str], node_of: dict[str, str | No
     if states:
         down = [{"node": s["node"], "peer": s["peer"], "state": s["bgp_status"]} for s in states if not s["up"]]
         return {"read": True, "source": f"objects/{BGP_SESSION_STATE}.json", "total": len(states), "down": down, "states": states}
-    m = load_json(snap / "metrics" / f"{BGP_SESSION_QUERY}.json") or {}
-    present = (load_json(snap / "metrics" / "series-present.json") or {}).get("names") or {}
+    m = metric_doc(snap, BGP_SESSION_QUERY) or {}
+    present = series_present(snap) or {}
     scraped = any(present.get(n) for n in ("metallb_bgp_session_up", "frrk8s_bgp_session_up"))
     if m.get("ok") and (m.get("result") or scraped):
         down = [{"node": lab.get("node") or lab.get("instance"), "peer": lab.get("peer"), "state": "down"} for s in m.get("result") or [] for lab in [s.get("metric") or {}]]
@@ -343,7 +338,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             "present": True,
             "namespace": d["metadata"]["namespace"],
             "name": d["metadata"]["name"],
-            "version": _ver(c0.get("image")),
+            "version": versions.image_version(c0.get("image")),
             "desired": st.get("desiredNumberScheduled", sp.get("replicas")),
             "ready": st.get("numberReady", st.get("readyReplicas")) or 0,
             "args": [str(a) for a in (c0.get("args") or [])],

@@ -10,38 +10,14 @@ ebs (cluster volume types, IOPS, unattached volumes, 30-day snapshots), snapshot
 
 from __future__ import annotations
 
-import contextlib
 import datetime as _dt
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .events import count_of
-from .snapshot import load_json, objects, parse_ts, taken_at
+from .quantity import parse as quantity
+from .snapshot import event_count, load_json, metric_by, objects, parse_ts, taken_at
 
 DB_HINT = ("postgres", "mysql", "mariadb", "mongo", "redis", "neo4j", "elastic", "kafka", "minio", "qdrant", "clickhouse", "influx", "etcd", "db", "data")
-
-
-def _metric(snap: Path, qid: str, keys: tuple[str, ...]) -> dict[tuple, float]:
-    out = {}
-    m = load_json(snap / "metrics" / f"{qid}.json")
-    for s in (m or {}).get("result") or []:
-        lab = s.get("metric") or {}
-        with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
-            out[tuple(lab.get(k) for k in keys)] = float(s["value"][1])
-    return out
-
-
-def _q(v) -> float:
-    if v is None:
-        return 0.0
-    s = str(v)
-    for u, mul in (("Ki", 1024), ("Mi", 1024**2), ("Gi", 1024**3), ("Ti", 1024**4), ("K", 1e3), ("M", 1e6), ("G", 1e9), ("T", 1e12)):
-        if s.endswith(u):
-            return float(s[: -len(u)]) * mul
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
 
 
 def _pvc_users(pods: list[dict]) -> dict[tuple, set]:
@@ -84,8 +60,7 @@ def _classes(scs: list[dict], sc_pvc: Counter, zones: set) -> list[dict]:
 def _pvc_rows(snap: Path, pvcs: list[dict], pvs: list[dict], pvc_users: dict[tuple, set], classes: list[dict], prod: set) -> list[dict]:
     """One row per PVC: capacity, usage, inodes, growth and days-to-full, consuming workloads, bound PV's zone and reclaim policy; sorted by usage. Reads metrics/pvc_usage_ratio, pvc_inode_ratio, pvc_capacity_bytes, pvc_available_bytes, pvc_growth_bytes_per_day_7d."""
     pv_by_name = {pv["metadata"]["name"]: pv for pv in pvs}
-    key = ("namespace", "persistentvolumeclaim")
-    usage, inode, cap, avail, growth = (_metric(snap, q, key) for q in ("pvc_usage_ratio", "pvc_inode_ratio", "pvc_capacity_bytes", "pvc_available_bytes", "pvc_growth_bytes_per_day_7d"))
+    usage, inode, cap, avail, growth = (metric_by(snap, q, "namespace", "persistentvolumeclaim") for q in ("pvc_usage_ratio", "pvc_inode_ratio", "pvc_capacity_bytes", "pvc_available_bytes", "pvc_growth_bytes_per_day_7d"))
     sc_prov = {c["name"]: c["provisioner"] for c in classes}
     rows = []
     for c in pvcs:
@@ -111,7 +86,7 @@ def _pvc_rows(snap: Path, pvcs: list[dict], pvs: list[dict], pvc_users: dict[tup
                 "prod": ns in prod,
                 "phase": st.get("phase"),
                 "storage_class": sp.get("storageClassName"),
-                "requested_gb": round(_q(((sp.get("resources") or {}).get("requests") or {}).get("storage")) / 1024**3, 1),
+                "requested_gb": round(quantity(((sp.get("resources") or {}).get("requests") or {}).get("storage")) / 1024**3, 1),
                 "capacity_gb": round(cap[k] / 1024**3, 1) if k in cap else None,
                 "used_ratio": round(usage[k], 3) if k in usage else None,
                 "inode_ratio": round(inode[k], 3) if k in inode else None,
@@ -138,7 +113,7 @@ def _pv_rows(pvs: list[dict]) -> list[dict]:
             "name": pv["metadata"]["name"],
             "phase": (pv.get("status") or {}).get("phase"),
             "reclaim_policy": (pv.get("spec") or {}).get("persistentVolumeReclaimPolicy"),
-            "capacity_gb": round(_q(((pv.get("spec") or {}).get("capacity") or {}).get("storage")) / 1024**3, 1),
+            "capacity_gb": round(quantity(((pv.get("spec") or {}).get("capacity") or {}).get("storage")) / 1024**3, 1),
             "claim": f"{((pv.get('spec') or {}).get('claimRef') or {}).get('namespace')}/{((pv.get('spec') or {}).get('claimRef') or {}).get('name')}",
             "storage_class": (pv.get("spec") or {}).get("storageClassName"),
         }
@@ -166,7 +141,7 @@ def _attach(snap: Path) -> dict:
                     "error": str(((va.get("status") or {}).get("attachError") or (va.get("status") or {}).get("detachError") or {}).get("message"))[:160],
                 }
             )
-    pvc_pods = _metric(snap, "node_pvc_pods_count", ("node",))
+    pvc_pods = {(node,): v for node, v in metric_by(snap, "node_pvc_pods_count", "node").items()}
     attach_rows = []
     for (node, driver), lim in limits.items():
         used = va_by_node.get(node, 0)
@@ -177,7 +152,7 @@ def _attach(snap: Path) -> dict:
     for e in (load_json(snap / "events.json") or {}).get("items") or []:
         r = e.get("reason")
         if r in ("FailedAttachVolume", "FailedMount", "ProvisioningFailed", "VolumeResizeFailed", "FailedBinding", "VolumeFailedDelete"):
-            ev_counts[r] += count_of(e)
+            ev_counts[r] += event_count(e)
             ev_samples.setdefault(r, f"{(e.get('involvedObject') or {}).get('namespace')}/{(e.get('involvedObject') or {}).get('name')}: {(e.get('message') or '')[:140]}")
     return {
         "nodes": attach_rows,

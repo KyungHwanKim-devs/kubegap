@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from lib import argocdctl, certmanager, diff, discover, ebscsi, esoctl, events, hygiene, karpenterctl, localpath, resilience, scaling, snapshot, summarize, tenancy, traffic, vpccni
+from lib import argocdctl, certmanager, diff, discover, ebscsi, esoctl, hygiene, karpenterctl, localpath, resilience, scaling, snapshot, summarize, tenancy, traffic, vpccni, workload
 from lib.k3s import _node_base
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -62,13 +62,13 @@ def test_cronjob_checks_see_the_cronjobs_discovery_wrote(tmp_path):
 
 
 def test_event_count_reads_series_count():
-    assert events.count_of({"count": 7}) == 7
-    assert events.count_of({"series": {"count": 12, "lastObservedTime": "2026-11-05T02:00:00Z"}}) == 12
-    assert events.count_of({"reason": "Scheduled"}) == 1
+    assert snapshot.event_count({"count": 7}) == 7
+    assert snapshot.event_count({"series": {"count": 12, "lastObservedTime": "2026-11-05T02:00:00Z"}}) == 12
+    assert snapshot.event_count({"reason": "Scheduled"}) == 1
 
 
 def test_no_reader_counts_events_without_the_helper():
-    """resilience, storage, ebscsi, traffic and scaling summed `count` only (K1-2, K3-6); they go through events.count_of now."""
+    """resilience, storage, ebscsi, traffic and scaling summed `count` only (K1-2, K3-6); they go through snapshot.event_count now."""
     for f in (ROOT / "lib").glob("*.py"):
         assert 'e.get("count") or 1' not in f.read_text(encoding="utf-8"), f.name
 
@@ -118,10 +118,10 @@ def test_pdb_row_carries_the_disruption_allowed_reason(tmp_path):
 
 def test_match_fields_compare_the_node_name_not_a_label():
     node = {"metadata": {"name": "worker-1", "labels": {"metadata.name": "other"}}, "spec": {}}
-    assert resilience._field_match({"key": "metadata.name", "operator": "In", "values": ["worker-1"]}, node)
-    assert not resilience._field_match({"key": "metadata.name", "operator": "In", "values": ["worker-2"]}, node)
+    assert workload._field_match({"key": "metadata.name", "operator": "In", "values": ["worker-1"]}, node)
+    assert not workload._field_match({"key": "metadata.name", "operator": "In", "values": ["worker-2"]}, node)
     pod = {"affinity": {"nodeAffinity": {"requiredDuringSchedulingIgnoredDuringExecution": {"nodeSelectorTerms": [{"matchFields": [{"key": "metadata.name", "operator": "In", "values": ["worker-1"]}]}]}}}}
-    assert resilience.eligible_nodes(pod, [node]) == ["worker-1"]
+    assert workload.eligible_nodes(pod, [node]) == ["worker-1"]
 
 
 def test_pv_node_pin_accepts_a_custom_affinity_key():

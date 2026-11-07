@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from lib import nodeos, resilience, summarize
+from lib import nodetext, resilience, summarize
 from lib.evaluate import Context, _eval_metric, _Run, oom_text
 
 KERNEL_LINE = (
@@ -20,23 +20,23 @@ V1_LINE = "2026-11-02T08:34:08+0000 n1 kernel: oom-kill:constraint=CONSTRAINT_ME
 
 
 def test_oom_kill_line_gives_pod_uid_time_and_task():
-    k = nodeos.parse_oom_kill(KERNEL_LINE)
+    k = nodetext.parse_oom_kill(KERNEL_LINE)
     assert k == {"time": "2026-11-02T08:34:08+0000", "pod_uid": "7605475d-cd56-4f83-a9a0-7fd8b226532c", "task": "uvicorn", "constraint": "CONSTRAINT_MEMCG", "node_level": False}
-    assert nodeos.parse_oom_kill(V1_LINE)["pod_uid"] == "2a2e36d9-6307-40b4-ab46-f44f16f5327b"  # cgroup v1 path, dashes
-    assert nodeos.parse_oom_kill(NODE_LEVEL_LINE)["node_level"] is True and nodeos.parse_oom_kill(NODE_LEVEL_LINE)["pod_uid"] is None
-    assert nodeos.parse_oom_kill(KILLED_LINE) is None
+    assert nodetext.parse_oom_kill(V1_LINE)["pod_uid"] == "2a2e36d9-6307-40b4-ab46-f44f16f5327b"  # cgroup v1 path, dashes
+    assert nodetext.parse_oom_kill(NODE_LEVEL_LINE)["node_level"] is True and nodetext.parse_oom_kill(NODE_LEVEL_LINE)["pod_uid"] is None
+    assert nodetext.parse_oom_kill(KILLED_LINE) is None
 
 
 def test_kernel_section_splits_samples_from_oom_samples():
     lines = ["source=journalctl", "lines=10", "c:oom_cgroup=1", "samples:", KILLED_LINE[:200], "oom_samples:", KERNEL_LINE, KILLED_LINE]
-    kern = nodeos._parse_kernel(lines)
+    kern = nodetext.parse_kernel(lines)
     assert kern["samples"] == [KILLED_LINE[:200]]
     assert kern["oom_samples"] == [KERNEL_LINE, KILLED_LINE]
     assert [k["pod_uid"] for k in kern["oom_kills"]] == ["7605475d-cd56-4f83-a9a0-7fd8b226532c"]
 
 
 def test_old_node_script_without_oom_samples_still_parses():
-    kern = nodeos._parse_kernel(["source=journalctl", "lines=3", "c:oom_cgroup=2", "samples:", KILLED_LINE])
+    kern = nodetext.parse_kernel(["source=journalctl", "lines=3", "c:oom_cgroup=2", "samples:", KILLED_LINE])
     assert kern["samples"] == [KILLED_LINE] and kern["oom_samples"] == [] and kern["oom_kills"] == [] and kern["oom_section"] is False
 
 

@@ -16,7 +16,23 @@ from pathlib import Path
 
 from . import __version__, paths
 from .runlog import RunLog, read_runlog
-from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, forget_reads, items, load_json, object_files, parse_ts, remove_stale_temp, taken_at, write_private
+from .snapshot import (
+    COMPONENT_LOGS_AGGREGATE,
+    COMPONENT_LOGS_DIR,
+    COMPONENT_LOGS_MARKER,
+    component_logs_removed,
+    event_count,
+    forget_reads,
+    items,
+    load_json,
+    metric_doc,
+    metric_value,
+    object_files,
+    parse_ts,
+    remove_stale_temp,
+    taken_at,
+    write_private,
+)
 
 WAITING_REASONS = ("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "CreateContainerConfigError", "CreateContainerError", "InvalidImageName", "RunContainerError")
 LABEL_KEEP = ("__name__", "namespace", "pod", "container", "node", "instance", "mountpoint", "qos_class", "reason", "job", "horizontalpodautoscaler", "endpoint", "kind", "phase", "poddisruptionbudget", "service", "deployment")
@@ -49,12 +65,12 @@ def summarize_events(snap: Path) -> dict:
         typ = e.get("type") or "?"
         inv = e.get("involvedObject") or {}
         obj = f"{inv.get('kind', '?')}/{inv.get('namespace', '') + '/' if inv.get('namespace') else ''}{inv.get('name', '?')}"
-        count = e.get("count") or ((e.get("series") or {}).get("count")) or 1
+        count = event_count(e)
         first = e.get("firstTimestamp") or e.get("eventTime") or (e.get("metadata") or {}).get("creationTimestamp")
         last = e.get("lastTimestamp") or ((e.get("series") or {}).get("lastObservedTime")) or first
         r = reasons.setdefault(reason, {"reason": reason, "type": typ, "events": 0, "occurrences": 0, "first": first, "last": last, "objects": Counter()})
         r["events"] += 1
-        r["occurrences"] += int(count) if isinstance(count, (int, float)) else 1
+        r["occurrences"] += count
         if first and (r["first"] is None or first < r["first"]):
             r["first"] = first
         if last and (r["last"] is None or last > r["last"]):
@@ -105,13 +121,8 @@ def summarize_metrics(snap: Path) -> dict:
             continue
         rows = []
         for r in d.get("result", []):
-            try:
-                val = float(r["value"][1])
-            except (KeyError, ValueError, TypeError, IndexError):
-                val = None
-            if val is not None and math.isnan(val):
-                val = None  # Prometheus answers "NaN" for a quantile over no samples; json.dumps would write a NaN token, which is not JSON
-            rows.append({"labels": _labels(r.get("metric", {})), "value": val})
+            # Prometheus answers "NaN" for a quantile over no samples; metric_value makes that None, which json.dumps can write (a NaN token is not JSON)
+            rows.append({"labels": _labels(r.get("metric", {})), "value": metric_value(r)})
         nums = [r["value"] for r in rows if r["value"] is not None]
         if nums:
             rec["stats"] = {"min": min(nums), "max": max(nums), "mean": math.fsum(nums) / len(nums), "n": len(nums)}  # fsum: the same digits on every Python (3.12 changed how sum() adds floats)
@@ -235,7 +246,7 @@ def summarize_objects(snap: Path, inv: dict | None) -> dict:
 def _nodes_gone_24h(snap: Path, nodes: list) -> dict:
     """Nodes that node-exporter saw in the last 24 hours but that are no longer in the cluster: the series a spot reclaim or a replacement leaves behind.
     From `metrics/nodes_seen_1d.json` (node_uname_info over 1d, value = time of the last sample) against objects/nodes.json by name and InternalIP."""
-    d = load_json(snap / "metrics" / "nodes_seen_1d.json") or {}
+    d = metric_doc(snap, "nodes_seen_1d") or {}
     if not d.get("ok"):
         return {"gone_24h": None, "seen_24h": None}
     current_names = {n["metadata"]["name"] for n in nodes}
@@ -248,10 +259,8 @@ def _nodes_gone_24h(snap: Path, nodes: list) -> dict:
         seen += 1
         if name in current_names or inst in current_ips:
             continue
-        try:
-            last = _dt.datetime.fromtimestamp(float(r["value"][1]), tz=_dt.UTC).isoformat(timespec="seconds")
-        except (KeyError, ValueError, TypeError, IndexError):
-            last = None
+        ts = metric_value(r)
+        last = _dt.datetime.fromtimestamp(ts, tz=_dt.UTC).isoformat(timespec="seconds") if ts is not None else None
         gone.append({"node": name, "internal_ip": inst or None, "last_seen": last})
     if seen and len(gone) == seen:
         # not one instance matches a node: node-exporter is not on the host network, so instance is a pod address and nodename a pod name. Nothing can be said about departed nodes.

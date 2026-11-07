@@ -14,7 +14,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
-from .snapshot import load_json, write_private
+from .snapshot import event_count, load_json, write_private
 
 # reason: (meaning, default severity)
 TRACKED: dict[str, tuple[str, str]] = {
@@ -57,17 +57,6 @@ def _event_key(e: dict) -> str:
     return (e.get("metadata") or {}).get("uid") or f"{e.get('reason')}|{(e.get('involvedObject') or {}).get('uid')}|{e.get('firstTimestamp')}"
 
 
-def count_of(e: dict) -> int:
-    """How many times the Event happened: `count` for events written through the legacy recorder, `series.count` for events written through the
-    events.k8s.io recorder (the scheduler's `Scheduled`, `FailedScheduling`, `Preempted`), which has no `count` in the core/v1 view and keeps the repeats in
-    `series.count` (kubernetes/kubernetes pkg/apis/events/v1/conversion.go:40-42@v1.37.2; staging/src/k8s.io/client-go/tools/events/event_broadcaster.go:181@v1.37.2); 1 when neither is there."""
-    c = e.get("count") or ((e.get("series") or {}).get("count")) or 1
-    return int(c) if isinstance(c, (int, float)) else 1
-
-
-_count = count_of
-
-
 def _obj(e: dict) -> str:
     inv = e.get("involvedObject") or {}
     ns = inv.get("namespace")
@@ -84,7 +73,7 @@ def build_history(context_root: Path, current: Path | None = None) -> dict:
         by_reason: dict[str, int] = defaultdict(int)
         for e in items:
             k = _event_key(e)
-            c = _count(e)
+            c = event_count(e)
             reason = e.get("reason") or "?"
             by_reason[reason] += c
             first = e.get("firstTimestamp") or e.get("eventTime") or (e.get("metadata") or {}).get("creationTimestamp")

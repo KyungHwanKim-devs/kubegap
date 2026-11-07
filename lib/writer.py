@@ -25,6 +25,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from . import paths, shell
+from .render import table
 from .snapshot import load_json, write_private
 
 REFERENCES = paths.ROOT / "references"
@@ -299,14 +300,6 @@ def pid_of(p: dict) -> str:
 # ---------- what code writes, and what it refuses
 
 
-def _cell(v) -> str:
-    return str(v if v is not None else "").replace("|", "\\|").replace("\n", " ")
-
-
-def _table(headers: list[str], rows: list[list]) -> str:
-    return "\n".join(["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers), *("| " + " | ".join(_cell(c) for c in r) + " |" for r in rows)])
-
-
 def _delta(row: dict) -> str:
     """`fail +2, warn -1` from the numbers in `delta`. The cell is the same in every language, which is why the analysis gives numbers and no words."""
     d = row.get("delta")
@@ -316,7 +309,7 @@ def _delta(row: dict) -> str:
 def _numbers_table(facts: dict, h: dict, mode: str) -> str:
     counts = facts.get("counts") or {}
     rows = [[s, (counts.get(s) or {}).get("fail", 0), (counts.get(s) or {}).get("warn", 0), _delta(counts.get(s) or {})] for s in ("critical", "high", "medium", "low")]
-    return _table([h["severity"], "fail", "warn", h["vs"].format(mode=mode)], rows)
+    return table([h["severity"], "fail", "warn", h["vs"].format(mode=mode)], rows)
 
 
 def _check_ids(facts: dict, h: dict) -> str:
@@ -342,12 +335,12 @@ def glance(snap: Path, h: dict) -> str:
         [h["stores"], f"{prom.get('kind') or h['no_store']} {prom.get('version') or ''}".strip() + " / " + (f"{loki.get('kind') or ''} {loki.get('version') or ''}".strip() if loki.get("ok") else h["no_store"])],
         [h["versions"], f"{cluster.get('server_version') or ''} ({cluster.get('platform') or ''})".strip()],
     ]
-    return f"## {h['glance']}\n\n" + _table([h["item"], h["value"]], rows)
+    return f"## {h['glance']}\n\n" + table([h["item"], h["value"]], rows)
 
 
 def upcoming(facts: dict, h: dict) -> str:
     rows = [[u.get("when"), u.get("what"), u.get("source_file") or ""] for u in facts.get("upcoming") or [] if isinstance(u, dict) and u.get("what")]
-    return f"## {h['upcoming']}\n\n" + (_table([h["when"], h["what"], h["source"]], rows) if rows else h["none"])
+    return f"## {h['upcoming']}\n\n" + (table([h["when"], h["what"], h["source"]], rows) if rows else h["none"])
 
 
 def criteria_changes(snap: Path, h: dict) -> list[str]:
@@ -373,7 +366,7 @@ def since_last(facts: dict, h: dict, mode: str, snap: Path | None = None) -> str
         out += [str(s["compared_with"]), ""]
     work = [[w.get("problem"), h["done"], w.get("proof") or ""] for w in s.get("done") or [] if isinstance(w, dict)]
     work += [[w.get("problem"), h["not_done"], w.get("proof") or ""] for w in s.get("not_done") or [] if isinstance(w, dict)]
-    out += [_table([h["prev_work"], h["state"], h["proof"]], work) if work else f"{h['prev_work']}: {h['none']}", ""]
+    out += [table([h["prev_work"], h["state"], h["proof"]], work) if work else f"{h['prev_work']}: {h['none']}", ""]
     for key, label in (("appeared", "appeared"), ("gone", "gone"), ("criteria_changed", "criteria")):
         items = [str(x) for x in s.get(key) or []]
         out += [f"**{h[label]}.**", *(f"- {x}" for x in items or [h["none"]]), ""]
@@ -385,7 +378,7 @@ def since_last(facts: dict, h: dict, mode: str, snap: Path | None = None) -> str
 def area_lines(facts: dict, h: dict) -> str:
     summary = (facts.get("analysis") or {}).get("area_summary") or {}
     rows = [[a, summary.get(a) or h["none"]] for a in AREAS] if isinstance(summary, dict) and summary else []
-    return f"## {h['areas']}\n\n" + (_table([h["area"], h["what"]], rows) if rows else h["none"])
+    return f"## {h['areas']}\n\n" + (table([h["area"], h["what"]], rows) if rows else h["none"])
 
 
 def insert_sections(body: str, snap: Path, facts: dict, language: str, mode: str) -> str:

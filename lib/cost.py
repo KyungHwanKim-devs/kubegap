@@ -16,29 +16,11 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from .snapshot import load_json
+from .quantity import parse as quantity
+from .snapshot import load_json, metric_by
 
 HOURS = 730
 RATE = {"eip_idle": 0.005, "nat": 0.059, "lb": 0.0225, "eks_cluster": 0.10, "eks_extended": 0.60}
-
-
-def _metric(snap: Path, qid: str, key: str) -> dict[str, float]:
-    out = {}
-    for s in (load_json(snap / "metrics" / f"{qid}.json") or {}).get("result") or []:
-        with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
-            out[(s.get("metric") or {}).get(key)] = float(s["value"][1])
-    return out
-
-
-def _q(v) -> float:
-    s = str(v or "0")
-    for u, mul in (("Ki", 1024), ("Mi", 1024**2), ("Gi", 1024**3), ("m", 0.001)):
-        if s.endswith(u):
-            return float(s[: -len(u)]) * mul
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
 
 
 def _ondemand_prices(snap: Path) -> dict[str, dict]:
@@ -78,9 +60,9 @@ def analyze(snap: Path, inv: dict | None, summary: dict | None) -> dict:
     platform = (inv.get("cluster") or {}).get("platform")
     prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
     nodes = (inv.get("nodes") or {}).get("nodes") or []
-    p95 = _metric(snap, "node_cpu_usage_ratio_p95_7d", "node")
-    req = _metric(snap, "node_cpu_request_ratio", "node")
-    mem_p95 = _metric(snap, "node_memory_usage_ratio_p95_7d", "node")
+    p95 = metric_by(snap, "node_cpu_usage_ratio_p95_7d", "node")
+    req = metric_by(snap, "node_cpu_request_ratio", "node")
+    mem_p95 = metric_by(snap, "node_memory_usage_ratio_p95_7d", "node")
     # ---- node efficiency (common) ----
     node_rows = []
     for n in nodes:
@@ -92,8 +74,8 @@ def analyze(snap: Path, inv: dict | None, summary: dict | None) -> dict:
                 "capacity_type": (n.get("capacity_type") or "").lower().replace("_", "-") or None,
                 "zone": n.get("zone"),
                 "pool": n.get("nodepool") or (("nodegroup:" + n["nodegroup"]) if n.get("nodegroup") else None),
-                "cpu": round(_q(alloc.get("cpu")), 2),
-                "memory_gb": round(_q(alloc.get("memory")) / 1024**3, 1),
+                "cpu": round(quantity(alloc.get("cpu")), 2),
+                "memory_gb": round(quantity(alloc.get("memory")) / 1024**3, 1),
                 "cpu_p95_ratio": p95.get(n["name"]),
                 "cpu_request_ratio": req.get(n["name"]),
                 "memory_p95_ratio": mem_p95.get(n["name"]),
@@ -216,7 +198,7 @@ def analyze(snap: Path, inv: dict | None, summary: dict | None) -> dict:
         if p.get("status", {}).get("phase") != "Running":
             continue
         for c in (p.get("spec") or {}).get("containers") or []:
-            ns_cpu[p["metadata"]["namespace"]] += _q(((c.get("resources") or {}).get("requests") or {}).get("cpu"))
+            ns_cpu[p["metadata"]["namespace"]] += quantity(((c.get("resources") or {}).get("requests") or {}).get("cpu"))
     tot_req = sum(ns_cpu.values())
     chargeback = [
         {"namespace": ns, "cpu_request": round(v, 2), "share": round(v / tot_req, 3) if tot_req else None, "monthly_usd_est": round(v / tot_req * compute, 2) if tot_req and compute else None, "prod": ns in prod}

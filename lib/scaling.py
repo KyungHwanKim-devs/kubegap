@@ -9,7 +9,6 @@ Output is the `scaling` section of summary.json (shape in SKILL.md). The first-p
 
 from __future__ import annotations
 
-import contextlib
 import datetime as _dt
 import re
 from collections import Counter, defaultdict
@@ -17,8 +16,7 @@ from pathlib import Path
 
 from . import versions
 from .durations import go_duration_s
-from .events import count_of
-from .snapshot import component_logs_aggregate, component_logs_removed, load_json, objects, parse_ts, taken_at
+from .snapshot import component_logs_aggregate, component_logs_removed, event_count, load_json, metric_by, metric_doc, metric_rows, objects, parse_ts, taken_at
 
 # The Karpenter disruption line, in the three shapes it has had (references/sources.md, "lib/scaling.py Karpenter log facts"; kubernetes-sigs/karpenter):
 # - through 0.37: `"message":"disrupting via <reason> <decision>, terminating N nodes (M pods) <node>/<type>/<capacity>, …"` (pkg/controllers/disruption/controller.go:188@v0.37.0,
@@ -73,25 +71,15 @@ def _dur_h(s: str | None) -> float | None:
     return round(secs / 3600, 3) if secs else None
 
 
-def _metric_map(snap: Path, qid: str, keys: tuple[str, ...]) -> dict[tuple, float]:
-    m = load_json(snap / "metrics" / f"{qid}.json")
-    out = {}
-    for s in (m or {}).get("result") or []:
-        lab = s.get("metric") or {}
-        with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
-            out[tuple(lab.get(k) for k in keys)] = float(s["value"][1])
-    return out
-
-
 # ---------- HPA ----------
 
 
 def _hpa(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
     items = objects(snap, "horizontalpodautoscalers.autoscaling")
     prod = set(((inv or {}).get("namespaces") or {}).get("prod_like") or [])
-    at_max = _metric_map(snap, "hpa_at_max_ratio_15d", ("namespace", "horizontalpodautoscaler"))
-    at_min = _metric_map(snap, "hpa_at_min_ratio_15d", ("namespace", "horizontalpodautoscaler"))
-    changes = _metric_map(snap, "hpa_desired_changes_7d", ("namespace", "horizontalpodautoscaler"))
+    at_max = metric_by(snap, "hpa_at_max_ratio_15d", "namespace", "horizontalpodautoscaler")
+    at_min = metric_by(snap, "hpa_at_min_ratio_15d", "namespace", "horizontalpodautoscaler")
+    changes = metric_by(snap, "hpa_desired_changes_7d", "namespace", "horizontalpodautoscaler")
     rows = []
     for h in items:
         md, sp, st = h["metadata"], h.get("spec") or {}, h.get("status") or {}
@@ -194,7 +182,7 @@ def _hpa(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
 def _keda(snap: Path) -> dict:
     sos = objects(snap, "scaledobjects.keda.sh")
     sjs = objects(snap, "scaledjobs.keda.sh")
-    errors = _metric_map(snap, "keda_scaler_errors_24h", ("namespace", "scaledObject"))
+    errors = metric_by(snap, "keda_scaler_errors_24h", "namespace", "scaledObject")
     rows = []
     for s in sos:
         md, sp, st = s["metadata"], s.get("spec") or {}, s.get("status") or {}
@@ -320,7 +308,7 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
             kind = "nominated for pending pods"
         else:
             kind = msg[:60]
-        blocked[f"{io.get('kind')}/{io.get('name')}"][kind] += count_of(e)
+        blocked[f"{io.get('kind')}/{io.get('name')}"][kind] += event_count(e)
     pool_rows = []
     claims_by_pool: Counter = Counter(((c["metadata"].get("labels") or {}).get("karpenter.sh/nodepool")) for c in claims)
     for p in pools:
@@ -443,9 +431,7 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
     for d in objects(snap, "deployments"):
         if d["metadata"]["name"] == "karpenter":
             for c in (d.get("spec") or {}).get("template", {}).get("spec", {}).get("containers", []):
-                m = re.search(r":v?(\d+\.\d+\.\d+)", c.get("image", ""))
-                if m:
-                    kver = m.group(1)
+                kver = versions.image_version(c.get("image")) or kver
     if not kver:
         for h in load_json(snap / "tools" / "helm-list.json") or []:
             if isinstance(h, dict) and h.get("name") == "karpenter":
@@ -501,14 +487,9 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
 
 
 def _pending(snap: Path) -> dict:
-    rows = []
-    m = load_json(snap / "metrics" / "pod_pending_seconds.json")
-    for s in (m or {}).get("result") or []:
-        lab = s.get("metric") or {}
-        with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
-            rows.append({"namespace": lab.get("namespace"), "pod": lab.get("pod"), "pending_s": round(float(s["value"][1]))})
+    rows = [{"namespace": lab.get("namespace"), "pod": lab.get("pod"), "pending_s": round(v)} for lab, v in metric_rows(snap, "pod_pending_seconds")]
     rows.sort(key=lambda r: -r["pending_s"])
-    return {"available": m is not None, "count": len(rows), "rows": rows[:30]}
+    return {"available": metric_doc(snap, "pod_pending_seconds") is not None, "count": len(rows), "rows": rows[:30]}
 
 
 # Karpenter keys computed from logs/pods/karpenter/*.log. summarize saves them to logs/pods/AGGREGATED.json before deleting the logs; analyze() restores them on a rerun.

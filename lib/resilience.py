@@ -16,95 +16,17 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .controlplane import workload_of
-from .events import count_of
-from .nodeos import kernel_oom_kills
-from .snapshot import load_json, objects, parse_ts, taken_at
+from .nodetext import kernel_oom_kills
+from .quantity import parse as quantity
+from .snapshot import event_count, load_json, metric_doc, metric_rows, objects, parse_ts, taken_at
+from .workload import eligible_nodes, image_repo, is_db_like, mounts_pvc, selector_matches, workload_of
+from .workload import key as wl_key
 
 SUSPECT_LIVENESS_RE = re.compile(r"(db|database|mysql|postgres|redis|mongo|kafka|ready|readiness|deps|dependenc|upstream|downstream|elastic|full=true)", re.IGNORECASE)
 DB_SELF_PROBE_RE = re.compile(
     r"(pg_isready|mysqladmin|mysql .*-e|redis-cli|valkey-cli|mongosh|mongo .*ping|cqlsh|nodetool|clickhouse-client|rabbitmq-diagnostics|rabbitmqctl|etcdctl endpoint|_cluster/health|minio.*health)", re.IGNORECASE
 )  # standard probes that check the DB's own response — not external dependencies (seen: 6 mysql false positives)
-DB_HINT_RE = re.compile(
-    r"(postgres|pgsql|mysql|mariadb|mongo|redis|valkey|elastic|opensearch|kafka|rabbit|clickhouse|qdrant|milvus|minio|etcd|cassandra|neo4j|influx|timescale"
-    r"|prometheus|thanos|loki|mimir|cortex|tempo|victoria|zookeeper|nats|pulsar|solr|couch|cockroach|tidb|scylla|memcache|weaviate|meili|typesense|vault)",
-    re.IGNORECASE,
-)
-# a whole name token that says the container is a helper next to a store, not the store itself; whole tokens so that quickstart does not trip ui or magento agent
-NOT_DB_TOKENS = frozenset({"exporter", "operator", "controller", "proxy", "ui", "insight", "insights", "commander", "express", "dashboards", "dashboard", "agent", "connect", "backup", "telegraf", "console", "init", "sidecar"})
-# a Helm release named after a monitoring store carries many pods that are not the store (kube-prometheus-stack-grafana, loki-stack-promtail, thanos-query): the workload name alone does not make those a store
-MONITORING_RELEASE_RE = re.compile(r"(prometheus|thanos|loki|mimir|cortex|tempo|victoria)", re.IGNORECASE)
-
-
-def image_repo(image: str | None) -> str:
-    """`public.ecr.aws/bitnami/redis:7.2.3` -> `redis`. The tag is left out: umami:postgresql-latest was once caught as a DB."""
-    return (image or "").split("@")[0].rsplit("/", 1)[-1].split(":")[0]
-
-
-def _tokens(*names: str | None) -> set[str]:
-    return {t for n in names if n for t in re.split(r"[^a-z0-9]+", n.lower()) if t}
-
-
-def is_db_like(container: str | None, image: str | None, workload: str | None, *, stateful: bool = False) -> bool:
-    """Does this container run a data store, whose rare peaks (a backup, a compaction, a recovery replay, a cache warm-up) sit far above its 7-day p95?
-    Two signals say yes. Structural: `stateful`, the workload is a StatefulSet that mounts a PersistentVolumeClaim, which is how Kubernetes itself marks a store, whatever the image is called.
-    By name: the container name or image repository, or else the workload name, carries a known store name. A helper next to the store is left out when its own name or image says so
-    in a whole token: exporter, operator, controller, proxy, ui, insight, commander, express, dashboards, agent, connect, backup, telegraf, console, init, sidecar, metrics.
-    Shared by the probe rows and the request checks in evaluate."""
-    c, repo = container or "", image_repo(image)
-    if _tokens(c, repo) & NOT_DB_TOKENS:
-        return False  # the exporter next to a Redis, the MongoDB operator's agent, the init container of a Postgres
-    if stateful:
-        return True
-    if DB_HINT_RE.search(f"{c} {repo}"):
-        return True  # a container named kafka running a kafka image is the broker even when the StatefulSet is called kafka-controller, as Bitnami names its KRaft nodes
-    wl = MONITORING_RELEASE_RE.sub("", workload or "")
-    return bool(DB_HINT_RE.search(wl)) and not (_tokens(workload) & NOT_DB_TOKENS)
-
-
-def mounts_pvc(spec: dict | None) -> bool:
-    """Does a pod spec, or a workload's pod template, mount a PersistentVolumeClaim?"""
-    return any(v.get("persistentVolumeClaim") for v in (spec or {}).get("volumes") or [])
-
-
 SHELLS = ("sh", "/bin/sh", "bash", "/bin/bash", "/usr/bin/bash", "ash", "/bin/ash")
-
-
-def _q(v) -> float:
-    """Kubernetes quantity → CPU cores or bytes."""
-    if v is None:
-        return 0.0
-    s = str(v)
-    units = {"Ki": 1024, "Mi": 1024**2, "Gi": 1024**3, "Ti": 1024**4, "K": 1e3, "M": 1e6, "G": 1e9, "T": 1e12, "k": 1e3}
-    if s.endswith("m"):
-        return float(s[:-1]) / 1000
-    for u, mul in units.items():
-        if s.endswith(u):
-            return float(s[: -len(u)]) * mul
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
-
-
-def selector_matches(sel: dict | None, labels: dict) -> bool:
-    """A label selector (`matchLabels`, `matchExpressions`, or a bare label map) against an object's labels. An empty selector matches nothing."""
-    if not sel:
-        return False
-    ml = sel.get("matchLabels") if ("matchLabels" in sel or "matchExpressions" in sel) else sel
-    if any(labels.get(k) != v for k, v in (ml or {}).items()):
-        return False
-    for e in sel.get("matchExpressions") or []:
-        k, op, vals = e.get("key"), e.get("operator"), e.get("values") or []
-        if op == "In" and labels.get(k) not in vals:
-            return False
-        if op == "NotIn" and labels.get(k) in vals:
-            return False
-        if op == "Exists" and k not in labels:
-            return False
-        if op == "DoesNotExist" and k in labels:
-            return False
-    return True
 
 
 def _cron_interval_h(expr: str | None) -> float | None:
@@ -172,9 +94,6 @@ class _Ctx:
             if own:
                 self.rs_owner[(rs["metadata"]["namespace"], rs["metadata"]["name"])] = (own.get("kind"), own.get("name"))
 
-    def wl_key(self, kind, o):
-        return f"{o['metadata']['namespace']}/{kind.lower()}/{o['metadata']['name']}"
-
     def tpl(self, o):
         return ((o.get("spec") or {}).get("template") or {}).get("spec") or {}
 
@@ -202,72 +121,6 @@ class _Ctx:
         if not any((c.get("ports") or []) for c in self.tpl(o).get("containers") or []):
             return False
         return any(s["metadata"]["namespace"] == o["metadata"]["namespace"] and (s.get("spec") or {}).get("selector") and all(labels.get(k) == v for k, v in s["spec"]["selector"].items()) for s in self.services)
-
-
-def _expr_match(e: dict, labels: dict) -> bool:
-    k, op, vals = e.get("key"), e.get("operator"), e.get("values") or []
-    has = k in labels
-    if op == "In":
-        return has and labels[k] in vals
-    if op == "NotIn":
-        return not has or labels[k] not in vals
-    if op == "Exists":
-        return has
-    if op == "DoesNotExist":
-        return not has
-    if op == "Gt":
-        try:
-            return has and float(labels[k]) > float(vals[0])
-        except (ValueError, IndexError):
-            return False
-    if op == "Lt":
-        try:
-            return has and float(labels[k]) < float(vals[0])
-        except (ValueError, IndexError):
-            return False
-    return True
-
-
-def _tolerates(tolerations: list, taints: list) -> bool:
-    for t in taints or []:
-        if t.get("effect") not in ("NoSchedule", "NoExecute"):
-            continue
-        ok = False
-        for tol in tolerations or []:
-            if tol.get("effect") and tol["effect"] != t.get("effect"):
-                continue
-            if tol.get("operator") == "Exists":
-                if not tol.get("key") or tol["key"] == t.get("key"):
-                    ok = True
-                    break
-            elif tol.get("key") == t.get("key") and (tol.get("value") or "") == (t.get("value") or ""):
-                ok = True
-                break
-        if not ok:
-            return False
-    return True
-
-
-def eligible_nodes(pod_spec: dict, nodes: list[dict], *, ignore_node_name: bool = False) -> list[str]:
-    """Node names this pod can land on, considering only nodeName, nodeSelector, required nodeAffinity and taints/tolerations (inter-pod affinity and resources excluded).
-    A real pod spec carries the scheduler-filled nodeName, so pass ignore_node_name=True when computing from pods (only the template's nodeName is a constraint)."""
-    out = []
-    if pod_spec.get("nodeName") and not ignore_node_name:
-        return [pod_spec["nodeName"]]
-    sel = pod_spec.get("nodeSelector") or {}
-    req = (((pod_spec.get("affinity") or {}).get("nodeAffinity") or {}).get("requiredDuringSchedulingIgnoredDuringExecution") or {}).get("nodeSelectorTerms") or []
-    for n in nodes:
-        if (n.get("spec") or {}).get("unschedulable"):
-            continue
-        labels = n["metadata"].get("labels") or {}
-        if any(labels.get(k) != v for k, v in sel.items()):
-            continue
-        if req and not any(all(_expr_match(e, labels) for e in (t.get("matchExpressions") or [])) and all(_field_match(f, n) for f in (t.get("matchFields") or [])) for t in req):
-            continue
-        if not _tolerates(pod_spec.get("tolerations") or [], (n.get("spec") or {}).get("taints") or []):
-            continue
-        out.append(n["metadata"]["name"])
-    return out
 
 
 def _probes(cx: _Ctx) -> dict:
@@ -314,7 +167,7 @@ def _probes(cx: _Ctx) -> dict:
                 flags.append(f"DB container liveness timeout {lv['timeout_s']}s (a 1s fsync/checkpoint stall restarts the DB → recovery loop)")
             rows.append(
                 {
-                    "workload": cx.wl_key(kind, o),
+                    "workload": wl_key(kind, o),
                     "kind": kind,
                     "namespace": ns,
                     "name": o["metadata"]["name"],
@@ -357,8 +210,8 @@ def _pdbs(cx: _Ctx) -> dict:
     for pdb in objects(cx.snap, "poddisruptionbudgets.policy"):
         md, sp, st = pdb["metadata"], pdb.get("spec") or {}, pdb.get("status") or {}
         ns = md["namespace"]
-        covered = [cx.wl_key(k, o) for k, o in cx.workloads if o["metadata"]["namespace"] == ns and selector_matches(sp.get("selector"), cx.tpl_labels(o))]
-        replicas = [((o.get("spec") or {}).get("replicas")) for k, o in cx.workloads if cx.wl_key(k, o) in covered and k != "DaemonSet"]
+        covered = [wl_key(k, o) for k, o in cx.workloads if o["metadata"]["namespace"] == ns and selector_matches(sp.get("selector"), cx.tpl_labels(o))]
+        replicas = [((o.get("spec") or {}).get("replicas")) for k, o in cx.workloads if wl_key(k, o) in covered and k != "DaemonSet"]
         rep = max([r for r in replicas if r is not None], default=None)
         mn, mx = sp.get("minAvailable"), sp.get("maxUnavailable")
         never = False
@@ -413,7 +266,7 @@ def _graceful(cx: _Ctx) -> dict:
         reasons = ([f"RWO PVC {rwo[:2]}"] if rwo else []) + ([f"extended resource {ext}"] if ext else [])
         rows.append(
             {
-                "workload": cx.wl_key(kind, o),
+                "workload": wl_key(kind, o),
                 "namespace": o["metadata"]["namespace"],
                 "prod": o["metadata"]["namespace"] in cx.prod,
                 "recreate_justified": bool(reasons),
@@ -458,7 +311,7 @@ def _placement(cx: _Ctx) -> dict:
         elig = eligible_nodes(tpl, cx.nodes)
         rows.append(
             {
-                "workload": cx.wl_key(kind, o),
+                "workload": wl_key(kind, o),
                 "namespace": o["metadata"]["namespace"],
                 "prod": o["metadata"]["namespace"] in cx.prod,
                 "replicas": rep,
@@ -523,7 +376,7 @@ def _placement(cx: _Ctx) -> dict:
             reasons = sorted(set(reasons))
             pinned.append(
                 {
-                    "workload": cx.wl_key(kind, o),
+                    "workload": wl_key(kind, o),
                     "namespace": o["metadata"]["namespace"],
                     "prod": o["metadata"]["namespace"] in cx.prod,
                     "replicas": (o.get("spec") or {}).get("replicas"),
@@ -607,7 +460,7 @@ def _single_node(cx: _Ctx) -> dict:
                 if e.get("key") == "kubernetes.io/hostname" and e.get("operator") == "In":
                     reasons.append(f"nodeAffinity hostname In {e.get('values')}")
         if reasons:
-            rows.append({"workload": cx.wl_key(kind, o), "namespace": o["metadata"]["namespace"], "prod": o["metadata"]["namespace"] in cx.prod, "reasons": reasons, "replicas": (o.get("spec") or {}).get("replicas")})
+            rows.append({"workload": wl_key(kind, o), "namespace": o["metadata"]["namespace"], "prod": o["metadata"]["namespace"] in cx.prod, "reasons": reasons, "replicas": (o.get("spec") or {}).get("replicas")})
     return {"rows": rows}
 
 
@@ -646,7 +499,7 @@ def _az_volumes(cx: _Ctx) -> dict:
             zset = set(zones.values())
             rows.append(
                 {
-                    "workload": cx.wl_key(kind, o),
+                    "workload": wl_key(kind, o),
                     "namespace": ns,
                     "prod": ns in cx.prod,
                     "claims": zones,
@@ -667,8 +520,8 @@ def _n_plus_one(cx: _Ctx) -> dict:
         nodes.append(
             {
                 "name": n["metadata"]["name"],
-                "cpu": _q(alloc.get("cpu")),
-                "memory": _q(alloc.get("memory")),
+                "cpu": quantity(alloc.get("cpu")),
+                "memory": quantity(alloc.get("memory")),
                 "role": "control-plane" if any(k.startswith(("node-role.kubernetes.io/control-plane", "node-role.kubernetes.io/master")) for k in (n["metadata"].get("labels") or {})) else "worker",
             }
         )
@@ -685,8 +538,8 @@ def _n_plus_one(cx: _Ctx) -> dict:
         c = m = 0.0
         for cont in p["spec"].get("containers") or []:
             r = (cont.get("resources") or {}).get("requests") or {}
-            c += _q(r.get("cpu"))
-            m += _q(r.get("memory"))
+            c += quantity(r.get("cpu"))
+            m += quantity(r.get("memory"))
         req_cpu += c
         req_mem += m
         per_pod.append((p["metadata"]["namespace"], p["metadata"]["name"], p["spec"].get("nodeName"), c, m))
@@ -724,8 +577,8 @@ def _n_plus_one(cx: _Ctx) -> dict:
         nd = p["spec"]["nodeName"]
         for cont in p["spec"].get("containers") or []:
             r = (cont.get("resources") or {}).get("requests") or {}
-            used_cpu[nd] = used_cpu.get(nd, 0.0) + _q(r.get("cpu"))
-            used_mem[nd] = used_mem.get(nd, 0.0) + _q(r.get("memory"))
+            used_cpu[nd] = used_cpu.get(nd, 0.0) + quantity(r.get("cpu"))
+            used_mem[nd] = used_mem.get(nd, 0.0) + quantity(r.get("memory"))
     pools: dict[tuple, dict] = {}
     for ns, pod, _nd, c, m in on_big:
         spec = pod_spec_by.get((ns, pod)) or {}
@@ -795,15 +648,11 @@ def _node_boot_times(cx: _Ctx) -> dict[str, _dt.datetime]:
             if a.get("type") == "InternalIP":
                 ip_to_node[a.get("address")] = n["metadata"]["name"]
     out = {}
-    m = load_json(cx.snap / "metrics" / "node_boot_time.json") or {}
-    for r in m.get("result") or []:
-        inst = (r.get("metric") or {}).get("instance", "").split(":")[0]
-        node = ip_to_node.get(inst) or (r.get("metric") or {}).get("node")
-        try:
-            if node:
-                out[node] = _dt.datetime.fromtimestamp(float(r["value"][1]), tz=_dt.UTC)
-        except (KeyError, ValueError, TypeError, IndexError):
-            pass
+    for lab, v in metric_rows(cx.snap, "node_boot_time"):
+        inst = lab.get("instance", "").split(":")[0]
+        node = ip_to_node.get(inst) or lab.get("node")
+        if node:
+            out[node] = _dt.datetime.fromtimestamp(v, tz=_dt.UTC)
     return out
 
 
@@ -814,10 +663,10 @@ def _restarts(cx: _Ctx) -> dict:
     for e in (load_json(cx.snap / "events.json") or {}).get("items") or []:
         io = e.get("involvedObject") or {}
         if e.get("reason") == "Unhealthy" and io.get("kind") == "Pod":
-            unhealthy[(io.get("namespace"), io.get("name"))] += count_of(e)
+            unhealthy[(io.get("namespace"), io.get("name"))] += event_count(e)
             msg = str(e.get("message") or "")
             kind_p = "startup" if msg.startswith("Startup") else ("readiness" if msg.startswith("Readiness") else ("liveness" if msg.startswith("Liveness") else "?"))
-            by_probe[(io.get("namespace"), io.get("name"), kind_p)] += count_of(e)
+            by_probe[(io.get("namespace"), io.get("name"), kind_p)] += event_count(e)
     rows = []
     for p in cx.pods:
         ns, name = p["metadata"]["namespace"], p["metadata"]["name"]
@@ -885,17 +734,6 @@ def _restarts(cx: _Ctx) -> dict:
 _KIND_SHORT = {"Deployment": "deploy", "StatefulSet": "sts", "DaemonSet": "ds", "Job": "job", "CronJob": "cronjob", "ReplicaSet": "rs", "ReplicationController": "rc"}
 
 
-def _metric_rows(snap: Path, qid: str) -> list[tuple[dict, float]]:
-    d = load_json(snap / "metrics" / f"{qid}.json") or {}
-    out = []
-    for r in d.get("result") or []:
-        try:
-            out.append((r.get("metric") or {}, float(r["value"][1])))
-        except (KeyError, ValueError, TypeError, IndexError):
-            continue
-    return out
-
-
 def _owner_of_pod(cx: _Ctx, ns: str, pod: str, created_by: tuple[str | None, str | None] | None) -> str:
     """`deploy/<name>`, `sts/<name>`, `cronjob/<name>` … for a pod, the same shape lib.evaluate.Context.workload gives a metric series. A live pod is read from its ownerReferences;
     a pod that is already gone is read from kube_pod_info's created_by, and a ReplicaSet is resolved to its Deployment through the ReplicaSets still in the snapshot, else by stripping the hash with a `?` mark."""
@@ -940,7 +778,7 @@ def oom_7d(cx: _Ctx) -> dict:
     cAdvisor's `container_oom_events_total` (`metrics/oom_events_7d.json`) is carried as `cadvisor_oom_events_7d` for the evidence only: on cgroup v2 nodes it stayed at 0 through five kernel kills."""
     rows: dict[str, dict] = {}
     info: dict[tuple[str, str], dict] = {}
-    for lab, _v in _metric_rows(cx.snap, "pod_info_7d"):
+    for lab, _v in metric_rows(cx.snap, "pod_info_7d"):
         info[(lab.get("namespace"), lab.get("pod"))] = lab
     by_uid: dict[str, tuple[str, str]] = {}
     for p in cx.pods:
@@ -984,7 +822,7 @@ def oom_7d(cx: _Ctx) -> dict:
             },
         )
 
-    for lab, v in _metric_rows(cx.snap, "oom_pods_7d"):
+    for lab, v in metric_rows(cx.snap, "oom_pods_7d"):
         ns, pod, c = lab.get("namespace"), lab.get("pod"), lab.get("container")
         if not ns or not pod:
             continue
@@ -999,7 +837,7 @@ def oom_7d(cx: _Ctx) -> dict:
             r["live_pod_restarts_max"] = max(r["live_pod_restarts_max"], rc)
         else:
             r["pods_replaced"] += 1
-    for lab, v in _metric_rows(cx.snap, "oom_events_7d"):
+    for lab, v in metric_rows(cx.snap, "oom_events_7d"):
         ns, pod, c = lab.get("namespace"), lab.get("pod"), lab.get("container")
         if ns and pod and v > 0:
             row_for(ns, pod, c)["cadvisor_oom_events_7d"] += round(v)
@@ -1046,8 +884,7 @@ def oom_7d(cx: _Ctx) -> dict:
         r["last_kill"] = r["kernel_kill_times"][-1] if r["kernel_kill_times"] else None
         r["pods"].sort(key=lambda p: (-p["restarts_7d"], p["pod"]))
     out_rows = sorted(rows.values(), key=lambda r: (-r["kernel_kills_24h"], -r["pods_oomkilled"], -r["restarts_of_those_pods"], r["target"]))
-    prom = load_json(cx.snap / "metrics" / "oom_pods_7d.json") or {}
-    prometheus_read = bool(prom.get("ok"))
+    prometheus_read = bool((metric_doc(cx.snap, "oom_pods_7d") or {}).get("ok"))
     return {
         "source": "metrics/oom_pods_7d.json + metrics/pod_info_7d.json + metrics/oom_events_7d.json + logs/node/<node>/os.txt oom_samples + objects/pods.json",
         "prometheus_read": prometheus_read,
@@ -1152,15 +989,6 @@ BACKUP_TARGET_RE = re.compile(r"(postgres|pgsql|mysql|mariadb|mongo|elastic|open
 OFFSITE_RE = re.compile(r"(s3://|s3\.|aws s3|rclone|restic|gs://|gsutil|b2 |backblaze|minio|mc cp|azcopy|rsync .*@|scp |sftp|wal-g|pgbackrest|borg|kopia)", re.IGNORECASE)
 
 
-def _field_match(f: dict, node: dict) -> bool:
-    """`matchFields` of a node selector term: the only field key the scheduler supports is `metadata.name` (kubernetes/kubernetes
-    staging/src/k8s.io/component-helpers/scheduling/corev1/nodeaffinity/nodeaffinity.go:159,180-182@v1.37.2), compared with the node's name, not its labels (#124 K1-5)."""
-    if f.get("operator") != "In":
-        return True
-    value = node["metadata"].get("name") if f.get("key") == "metadata.name" else None
-    return value in (f.get("values") or [])
-
-
 def _pv_node(pv: dict) -> str | None:
     """The node a PV is pinned to: a required term with one `In` expression and one value. `kubernetes.io/hostname` is the key the local-path
     provisioner (rancher/local-path-provisioner provisioner.go:526-529@v0.0.37, overridable by the StorageClass parameter `nodeAffinityKey`, :540-542)
@@ -1208,9 +1036,9 @@ def _backup_locality(cx: _Ctx) -> dict:
         if not claims:
             continue
         for c in sorted(set(claims)):
-            db_pvcs[ns].append((cx.wl_key(kind, o), c, pvc_node.get((ns, c))))
+            db_pvcs[ns].append((wl_key(kind, o), c, pvc_node.get((ns, c))))
         if not BACKUP_TARGET_RE.search(name_and_repos):
-            excluded.append(cx.wl_key(kind, o))
+            excluded.append(wl_key(kind, o))
             continue
         labels = cx.tpl_labels(o)
         databases.append(
@@ -1218,7 +1046,7 @@ def _backup_locality(cx: _Ctx) -> dict:
                 "namespace": ns,
                 "kind": kind.lower(),
                 "name": o["metadata"]["name"],
-                "target": cx.wl_key(kind, o),
+                "target": wl_key(kind, o),
                 "prod": ns in cx.prod,
                 "pvcs": sorted(set(claims)),
                 "services": sorted(sn for sn, sel in services.get(ns, []) if all(labels.get(k) == v for k, v in sel.items())),
@@ -1319,7 +1147,7 @@ def _priority(cx: _Ctx) -> dict:
             nonprod_max = max(nonprod_max, pr)
             if pr > 0:
                 offenders.append({"namespace": ns, "pod": p["metadata"]["name"], "priority": pr, "class": pc})
-    preempted = sum(count_of(e) for e in ((load_json(cx.snap / "events.json") or {}).get("items") or []) if e.get("reason") == "Preempted")
+    preempted = sum(event_count(e) for e in ((load_json(cx.snap / "events.json") or {}).get("items") or []) if e.get("reason") == "Preempted")
     inversion = [o for o in offenders if o["priority"] > prod_max] if prod_pods else []
     return {
         "classes": pcs,

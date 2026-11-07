@@ -19,35 +19,13 @@ from pathlib import Path
 
 from . import amconfig as _amconfig
 from . import podmetrics as _pm
-from . import versions
+from . import quantity, versions
 from .promtext import parse as _parse_prom
-from .snapshot import load_json, objects
-
-
-def _rows(snap: Path, qid: str) -> list[dict]:
-    d = load_json(snap / "metrics" / f"{qid}.json") or {}
-    return d.get("result", []) if d.get("ok") else []
+from .snapshot import load_json, metric_doc, metric_result, metric_scalar, metric_value, objects
 
 
 def _has(snap: Path, qid: str) -> bool:
-    return bool((load_json(snap / "metrics" / f"{qid}.json") or {}).get("ok"))
-
-
-def _v(row) -> float | None:
-    try:
-        return float(row["value"][1])
-    except (KeyError, TypeError, ValueError, IndexError):
-        return None
-
-
-def _scalar(snap: Path, qid: str) -> float | None:
-    r = _rows(snap, qid)
-    return _v(r[0]) if r else None
-
-
-def _ver(image: str | None):
-    m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
-    return m.group(1) if m else None
+    return bool((metric_doc(snap, qid) or {}).get("ok"))
 
 
 def _mib(b) -> float | None:
@@ -73,9 +51,9 @@ def _workload(snap: Path, pred) -> dict:
                     "name": w["metadata"]["name"],
                     "replicas": sp.get("replicas"),
                     "ready": st.get("readyReplicas") or 0,
-                    "version": _ver(main.get("image")),
+                    "version": versions.image_version(main.get("image")),
                     "memory_limit": lim.get("memory"),
-                    "memory_limit_mib": _parse_mem(lim.get("memory")),
+                    "memory_limit_mib": round(mem_b / quantity.MIB) if (mem_b := quantity.parse(lim.get("memory"), None)) is not None else None,
                     "cpu_limit": lim.get("cpu"),
                     "args": [str(a) for a in (main.get("args") or [])],
                     "storage": "pvc-template:" + ",".join(pvc)
@@ -83,16 +61,6 @@ def _workload(snap: Path, pred) -> dict:
                     else ("pvc:" + data_vol["persistentVolumeClaim"]["claimName"] if data_vol and "persistentVolumeClaim" in data_vol else ("emptyDir" if data_vol and "emptyDir" in data_vol else None)),
                 }
     return {"present": False}
-
-
-def _parse_mem(s) -> float | None:
-    m = re.match(r"^(\d+(?:\.\d+)?)([KMGT]i?)?$", str(s or ""))
-    if not m:
-        return None
-    n = float(m.group(1))
-    u = m.group(2) or ""
-    mult = {"": 1, "Ki": 1024, "Mi": 1024**2, "Gi": 1024**3, "Ti": 1024**4, "K": 1e3, "M": 1e6, "G": 1e9, "T": 1e12}[u]
-    return round(n * mult / 1024**2)
 
 
 _DUR = re.compile(r"(\d+)(ms|s|m|h|d|w|y)")
@@ -150,30 +118,30 @@ def _prometheus(snap: Path, inv: dict) -> dict:
     rt = (load_json(snap / "prometheus" / "runtimeinfo.json") or {}).get("data") or {}
     head = tsdb.get("headStats") or {}
     top_metrics = [{"name": x["name"], "series": x["value"]} for x in (tsdb.get("seriesCountByMetricName") or [])[:10]]
-    num_series = head.get("numSeries") or _scalar(snap, "prom_head_series") or store.get("head_series")
+    num_series = head.get("numSeries") or metric_scalar(snap, "prom_head_series") or store.get("head_series")
     top_share = round(top_metrics[0]["series"] / num_series, 3) if top_metrics and num_series else None
     bucket_series = sum(x["series"] for x in top_metrics if x["name"].endswith("_bucket"))
-    rss_ratio = _scalar(snap, "prom_rss_vs_limit")
-    pvc_rows = _rows(snap, "prom_pvc_used_ratio")
-    pvc_ratio = max([_v(r) or 0 for r in pvc_rows], default=None) if pvc_rows else None
-    retention_days = _scalar(snap, "prom_retention_days")
-    oldest_days = _scalar(snap, "prom_oldest_sample_days")
+    rss_ratio = metric_scalar(snap, "prom_rss_vs_limit")
+    pvc_rows = metric_result(snap, "prom_pvc_used_ratio")
+    pvc_ratio = max([metric_value(r) or 0 for r in pvc_rows], default=None) if pvc_rows else None
+    retention_days = metric_scalar(snap, "prom_retention_days")
+    oldest_days = metric_scalar(snap, "prom_oldest_sample_days")
     # Each job is judged against its own scrape interval (prometheus/targets.json). The query gives the longest configured interval, not the most
     # common one (one series per interval), so it is only the fallback when targets.json is missing.
     targets = _scrape_targets(snap)
-    fallback_interval = _scalar(snap, "prom_scrape_interval_s") or 30.0
+    fallback_interval = metric_scalar(snap, "prom_scrape_interval_s") or 30.0
     job_intervals = targets["job_intervals"]
     interval = Counter(job_intervals.values()).most_common(1)[0][0] if job_intervals else fallback_interval
-    slow = [{"job": r["metric"].get("job"), "seconds": round(_v(r) or 0, 2), "interval": job_intervals.get(r["metric"].get("job"), fallback_interval)} for r in _rows(snap, "prom_scrape_slow_jobs")]
+    slow = [{"job": r["metric"].get("job"), "seconds": round(metric_value(r) or 0, 2), "interval": job_intervals.get(r["metric"].get("job"), fallback_interval)} for r in metric_result(snap, "prom_scrape_slow_jobs")]
     slow_jobs = [s for s in slow if s["seconds"] >= s["interval"] * 0.5]
     # The counter has no target label (one Counter per Prometheus), so the total is a number and the targets come from targets.json
-    limit_exceeded = round(_scalar(snap, "prom_sample_limit_exceeded_1h") or 0)
-    notif_errors = {r["metric"].get("alertmanager"): round(_v(r) or 0) for r in _rows(snap, "prom_notifications_errors_1d")}
-    rule_ratio = [{"group": (r["metric"].get("rule_group") or "").split(";")[-1], "ratio": round(_v(r) or 0, 3)} for r in _rows(snap, "prom_rule_eval_ratio_top")]
-    restarts = {r["metric"].get("pod"): round(_v(r) or 0) for r in _rows(snap, "monitoring_restarts_7d")}
-    oom_rows = [f"{r['metric'].get('pod')}/{r['metric'].get('container')}" for r in _rows(snap, "monitoring_oomkilled") if (_v(r) or 0) >= 1]
+    limit_exceeded = round(metric_scalar(snap, "prom_sample_limit_exceeded_1h") or 0)
+    notif_errors = {r["metric"].get("alertmanager"): round(metric_value(r) or 0) for r in metric_result(snap, "prom_notifications_errors_1d")}
+    rule_ratio = [{"group": (r["metric"].get("rule_group") or "").split(";")[-1], "ratio": round(metric_value(r) or 0, 3)} for r in metric_result(snap, "prom_rule_eval_ratio_top")]
+    restarts = {r["metric"].get("pod"): round(metric_value(r) or 0) for r in metric_result(snap, "monitoring_restarts_7d")}
+    oom_rows = [f"{r['metric'].get('pod')}/{r['metric'].get('container')}" for r in metric_result(snap, "monitoring_oomkilled") if (metric_value(r) or 0) >= 1]
     oom_obj = _pod_last_oom(snap, "prometheus-")
-    reload_ok = _scalar(snap, "prom_reload_ok")
+    reload_ok = metric_scalar(snap, "prom_reload_ok")
     retention_size = flags.get("storage.tsdb.retention.size") or next((a.split("=", 1)[1] for a in wl.get("args", []) if a.startswith("--storage.tsdb.retention.size=")), None)
     pvc_size = next((a.split(":")[-1] for a in [wl.get("storage") or ""] if a.startswith("pvc-template")), None)
     metrics_available = _has(snap, "prom_head_series") or _has(snap, "prom_rss_vs_limit")
@@ -206,20 +174,20 @@ def _prometheus(snap: Path, inv: dict) -> dict:
         "pvc_used_ratio": round(pvc_ratio, 3) if pvc_ratio is not None else None,
         "pvc_size": pvc_size,
         "storage": wl.get("storage"),
-        "tsdb_bytes": _scalar(snap, "prometheus_storage_bytes"),
+        "tsdb_bytes": metric_scalar(snap, "prometheus_storage_bytes"),
         "scrape_interval_s": interval,
         "slow_scrape_jobs": slow_jobs,
         "scrape_top": slow[:5],
         "sample_limit_exceeded_1h": limit_exceeded,
         "sample_limit_targets": targets["sample_limit_targets"],
-        "notifications_dropped_1d": round(_scalar(snap, "prom_notifications_dropped_1d") or 0),
+        "notifications_dropped_1d": round(metric_scalar(snap, "prom_notifications_dropped_1d") or 0),
         "notifications_errors_1d": notif_errors,
         "rule_eval_ratio_top": rule_ratio,
         "rule_eval_ratio_max": max([x["ratio"] for x in rule_ratio], default=None),
-        "rule_iterations_missed_1d": round(_scalar(snap, "prom_rule_iterations_missed_1d") or 0),
-        "compactions_failed_7d": round(_scalar(snap, "prom_compactions_failed_7d") or 0),
-        "wal_corruptions": round(_scalar(snap, "prom_wal_corruptions") or 0),
-        "replicas_up": _scalar(snap, "prom_replicas"),
+        "rule_iterations_missed_1d": round(metric_scalar(snap, "prom_rule_iterations_missed_1d") or 0),
+        "compactions_failed_7d": round(metric_scalar(snap, "prom_compactions_failed_7d") or 0),
+        "wal_corruptions": round(metric_scalar(snap, "prom_wal_corruptions") or 0),
+        "replicas_up": metric_scalar(snap, "prom_replicas"),
         "monitoring_restarts_7d": restarts,
         "monitoring_oomkilled": oom_rows,
         "admin_api": flags.get("web.enable-admin-api"),
@@ -250,20 +218,20 @@ def _alertmanager(snap: Path, inv: dict) -> dict:
     inhibit_rules = len(cfg.get("inhibit_rules") or []) if cfg else 0
     time_intervals = _amconfig.has_time_intervals(cfg) if cfg else False
     retention = next((a.split("=", 1)[1] for a in wl.get("args", []) if a.startswith("--data.retention=")), None)
-    notif = {r["metric"].get("integration"): round(_v(r) or 0, 1) for r in _rows(snap, "am_notifications_1d")}
-    received = {r["metric"].get("status"): round(_v(r) or 0) for r in _rows(snap, "am_received_1d")}
+    notif = {r["metric"].get("integration"): round(metric_value(r) or 0, 1) for r in metric_result(snap, "am_notifications_1d")}
+    received = {r["metric"].get("status"): round(metric_value(r) or 0) for r in metric_result(snap, "am_received_1d")}
     silences = load_json(snap / "alertmanager" / "silences.json") or []
     cluster = status.get("cluster") or {}
-    reload_ok = _scalar(snap, "am_reload_ok")
+    reload_ok = metric_scalar(snap, "am_reload_ok")
     return {
         "present": True,
         "workload": wl,
         "version": ((status.get("versionInfo") or {}).get("version")) or store.get("version") or wl.get("version"),
         "cluster_status": cluster.get("status"),
         "cluster_peers": len(cluster.get("peers") or []),
-        "cluster_members_metric": _scalar(snap, "am_cluster_members"),
+        "cluster_members_metric": metric_scalar(snap, "am_cluster_members"),
         "reload_success": None if reload_ok is None else reload_ok == 1,
-        "invalid_alerts_1d": round(_scalar(snap, "am_invalid_alerts_1d") or 0),
+        "invalid_alerts_1d": round(metric_scalar(snap, "am_invalid_alerts_1d") or 0),
         "receivers": declared,
         "receivers_unused": unused,
         "inhibit_rules": max(inhibit_rules, 0),

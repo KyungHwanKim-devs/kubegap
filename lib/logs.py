@@ -21,12 +21,13 @@ from pathlib import Path
 
 from . import paths
 from . import podmetrics as _pm
-from .controlplane import _normalize_msg, workload_of
+from .logtext import normalize_message
 from .mask import mask_text, strip_control
 from .promtext import parse as _parse_prom
 from .signatures import Signature
 from .signatures import load as load_signatures
-from .snapshot import COMPONENT_LOGS_DIR, component_logs_aggregate, component_logs_removed, load_json, parse_ts, taken_at
+from .snapshot import COMPONENT_LOGS_DIR, component_logs_aggregate, component_logs_removed, load_json, metric_result, metric_rows, metric_sum, parse_ts, taken_at
+from .workload import workload_of
 
 ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})")
 KLOG_TS_RE = re.compile(r"\b[IWEF](\d{2})(\d{2}) (\d{2}:\d{2}:\d{2})")
@@ -113,13 +114,10 @@ def _node_boot_windows(snap: Path) -> dict[str, _dt.datetime]:
         for a in (n.get("status") or {}).get("addresses") or []:
             if a.get("type") == "InternalIP":
                 ip_to_node[a.get("address")] = name
-    for r in (load_json(snap / "metrics" / "node_boot_time.json") or {}).get("result") or []:
-        inst = (r.get("metric") or {}).get("instance", "").split(":")[0]
+    for lab, v in metric_rows(snap, "node_boot_time"):
+        inst = lab.get("instance", "").split(":")[0]
         name = ip_to_node.get(inst)
-        try:
-            bt = _dt.datetime.fromtimestamp(float(r["value"][1]), tz=_dt.UTC) + _dt.timedelta(seconds=BOOT_WINDOW_S)
-        except (KeyError, ValueError, TypeError, IndexError):
-            continue
+        bt = _dt.datetime.fromtimestamp(v, tz=_dt.UTC) + _dt.timedelta(seconds=BOOT_WINDOW_S)
         if name and (name not in out or bt > out[name]):
             out[name] = bt
     return out
@@ -156,12 +154,12 @@ def match_line(line: str, sigs: list[Signature]) -> set[str]:
 
 def normalize_unclassified(line: str) -> str:
     """The key under which an error line that matched no signature is counted: the kubectl and journal prefixes off, every timestamp the component wrote
-    replaced by `<ts>` (otherwise identical errors one second apart never collapse), then `_normalize_msg` (klog header off, numbers, ids and addresses blanked)."""
+    replaced by `<ts>` (otherwise identical errors one second apart never collapse), then `lib/logtext.normalize_message` (klog header off, numbers, ids and addresses blanked)."""
     body, _pod = _strip_prefix(line)
     body = TS_ANY_RE.sub("<ts>", body)
     body = re.sub(r'"(@?timestamp|ts|time|start time|end time)":\s*"[^"]*"', r'"\1":"<ts>"', body)  # time fields in JSON logs that TS_ANY_RE does not spell
     body = re.sub(r'"(ts|time)":\s*\d+(\.\d+)?', r'"\1":<ts>', body)  # zap EpochTimeEncoder (external-secrets `--zap-time-encoding=epoch`): seconds as a float
-    msg = _normalize_msg(body)
+    msg = normalize_message(body)
     return msg if len(msg) <= 140 else msg[:140].rsplit(" ", 1)[0] + " …"  # the table shows this, so a cut is visible and ends at a word
 
 
@@ -420,41 +418,30 @@ def analyze_loki(snap: Path, inv: dict) -> dict:
     return out
 
 
-def _metric_sum(snap: Path, qid: str) -> float | None:
-    d = load_json(snap / "metrics" / f"{qid}.json")
-    if not d or not d.get("ok") or not d.get("result"):
-        return None  # 0 series = that metric is not scraped (collector metrics not exposed). Distinct from 0
-    tot = 0.0
-    for s in d.get("result", []) or []:
-        with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
-            tot += float(s["value"][1])
-    return tot
-
-
 def analyze_agents(snap: Path, inv: dict) -> dict:
     comps = inv.get("components_present") or []
     out: dict = {}
     if "promtail" in comps:
-        scraped_p = any(((load_json(snap / "metrics" / f"{q}.json") or {}).get("result") or []) for q in ("promtail_dropped_1h", "promtail_targets_active", "promtail_request_errors_1h"))
+        scraped_p = any(metric_result(snap, q) for q in ("promtail_dropped_1h", "promtail_targets_active", "promtail_request_errors_1h"))
         out["promtail"] = {
-            "dropped_entries_1h": _metric_sum(snap, "promtail_dropped_1h"),
-            "targets_active": _metric_sum(snap, "promtail_targets_active"),
-            "request_errors_1h": _metric_sum(snap, "promtail_request_errors_1h"),
+            "dropped_entries_1h": metric_sum(snap, "promtail_dropped_1h"),
+            "targets_active": metric_sum(snap, "promtail_targets_active"),
+            "request_errors_1h": metric_sum(snap, "promtail_request_errors_1h"),
             "metrics_scraped": scraped_p,
             "note": None if scraped_p else "promtail metrics are not in Prometheus (no ServiceMonitor). Dropped lines 0 means not measured",
         }
     if "fluent-bit" in comps or "fluentd" in comps:
-        scraped = any(((load_json(snap / "metrics" / f"{q}.json") or {}).get("result") or []) for q in ("fluentbit_output_errors_1h", "fluentbit_retries_failed_1h", "fluentbit_input_records_1h", "fluentbit_dropped_records_1h"))
+        scraped = any(metric_result(snap, q) for q in ("fluentbit_output_errors_1h", "fluentbit_retries_failed_1h", "fluentbit_input_records_1h", "fluentbit_dropped_records_1h"))
         out["fluent-bit"] = {
-            "output_errors_1h": _metric_sum(snap, "fluentbit_output_errors_1h"),
-            "retries_failed_1h": _metric_sum(snap, "fluentbit_retries_failed_1h"),
-            "records_in_1h": _metric_sum(snap, "fluentbit_input_records_1h"),
-            "dropped_records_1h": _metric_sum(snap, "fluentbit_dropped_records_1h"),
+            "output_errors_1h": metric_sum(snap, "fluentbit_output_errors_1h"),
+            "retries_failed_1h": metric_sum(snap, "fluentbit_retries_failed_1h"),
+            "records_in_1h": metric_sum(snap, "fluentbit_input_records_1h"),
+            "dropped_records_1h": metric_sum(snap, "fluentbit_dropped_records_1h"),
             "metrics_scraped": scraped,  # False means fluent-bit exists but Prometheus does not scrape it, so the numbers above are all 'uncollected values that look like 0'
             "note": None if scraped else "fluent-bit metrics are not in Prometheus (no ServiceMonitor/PodMonitor). Output errors and drops 0 mean not measured",
         }
     if "loki" in comps:
-        out["loki_metrics"] = {"discarded_1h": _metric_sum(snap, "loki_discarded_1h"), "requests_5xx_1h": _metric_sum(snap, "loki_5xx_1h")}
+        out["loki_metrics"] = {"discarded_1h": metric_sum(snap, "loki_discarded_1h"), "requests_5xx_1h": metric_sum(snap, "loki_5xx_1h")}
     return out
 
 

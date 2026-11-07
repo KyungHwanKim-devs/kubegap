@@ -11,19 +11,7 @@ import contextlib
 import ipaddress
 from pathlib import Path
 
-from .snapshot import load_json
-
-
-def _rows(snap: Path, qid: str) -> list[dict]:
-    d = load_json(snap / "metrics" / f"{qid}.json") or {}
-    return d.get("result", []) if d.get("ok") else []
-
-
-def _v(row) -> float | None:
-    try:
-        return float(row["value"][1])
-    except (KeyError, TypeError, ValueError, IndexError):
-        return None
+from .snapshot import metric_doc, metric_result, metric_value
 
 
 def _node_by_instance(inv: dict) -> dict:
@@ -55,17 +43,17 @@ def analyze(snap: Path, inv: dict | None, k3s: dict | None) -> dict:
     up: dict[str, int] = {}
     mtu_ne: dict[str, int] = {}
     overlay_bytes: dict[str, int] = {}
-    for r in _rows(snap, "flannel_if_errors_1d"):
-        errs_1d.setdefault(node_of(r["metric"].get("instance")), {})[r["metric"].get("device")] = round(_v(r) or 0)
-    for r in _rows(snap, "flannel_if_drops_1d"):
-        drops_1d.setdefault(node_of(r["metric"].get("instance")), {})[r["metric"].get("device")] = round(_v(r) or 0)
-    for r in _rows(snap, "flannel_if_up"):
-        up[node_of(r["metric"].get("instance"))] = int(_v(r) or 0)
-    for r in _rows(snap, "flannel_if_mtu"):
-        mtu_ne[node_of(r["metric"].get("instance"))] = int(_v(r) or 0)
-    for r in _rows(snap, "flannel_overlay_bytes_1d"):
-        overlay_bytes[node_of(r["metric"].get("instance"))] = round(_v(r) or 0)
-    metrics_available = bool(load_json(snap / "metrics" / "flannel_if_up.json") and (load_json(snap / "metrics" / "flannel_if_up.json") or {}).get("ok"))
+    for r in metric_result(snap, "flannel_if_errors_1d"):
+        errs_1d.setdefault(node_of(r["metric"].get("instance")), {})[r["metric"].get("device")] = round(metric_value(r) or 0)
+    for r in metric_result(snap, "flannel_if_drops_1d"):
+        drops_1d.setdefault(node_of(r["metric"].get("instance")), {})[r["metric"].get("device")] = round(metric_value(r) or 0)
+    for r in metric_result(snap, "flannel_if_up"):
+        up[node_of(r["metric"].get("instance"))] = int(metric_value(r) or 0)
+    for r in metric_result(snap, "flannel_if_mtu"):
+        mtu_ne[node_of(r["metric"].get("instance"))] = int(metric_value(r) or 0)
+    for r in metric_result(snap, "flannel_overlay_bytes_1d"):
+        overlay_bytes[node_of(r["metric"].get("instance"))] = round(metric_value(r) or 0)
+    metrics_available = bool((metric_doc(snap, "flannel_if_up") or {}).get("ok"))
     # --- node rows (k3s node record + counters)
     nodes = []
     subnets = set()

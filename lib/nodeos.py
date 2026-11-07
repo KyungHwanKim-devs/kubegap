@@ -12,150 +12,37 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .controlplane import workload_of
-from .snapshot import load_json
+from . import quantity
+from .nodetext import key_values, parse_kernel, parse_sections
+from .quantity import to_float, to_int
+from .snapshot import load_json, node_os_text
+from .workload import workload_of
 
 # `stat -fc %T /sys/fs/cgroup`: cgroup2fs is the unified hierarchy, tmpfs the v1 mount systemd makes; coreutils before 8.26 (Amazon Linux 2 ships 8.22) has no name for the cgroup2 magic and prints it as UNKNOWN (references/sources.md, #127)
 CGROUP_FS = {"cgroup2fs": "v2", "tmpfs": "v1", "UNKNOWN (0x63677270)": "v2"}
 
-# source: kubegap's own format, written by collectors/core/node-os.sh (`### <section>` and `key=value` lines)
-SECTION_RE = re.compile(r"^### (\S+)\s*$")
-# source: kubegap's own format, written by collectors/core/node-os.sh (`### <section>` and `key=value` lines)
-KV_RE = re.compile(r"^([A-Za-z0-9_.:-]+)=(.*)$")
 # source: kubernetes/kubernetes pkg/kubelet/kuberuntime/helpers.go:198-200@v1.30.14; :223-225@v1.37.2 (a pod's log directory is `<namespace>_<name>_<uid>` under /var/log/pods)
 POD_LOG_DIR_RE = re.compile(r"^([a-z0-9-]+)_([a-z0-9.-]+)_([0-9a-f-]{36})$")
 
 
-def _num(v, default=None):
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return default
-
-
-def _int(v, default=0) -> int:
-    f = _num(v)
-    return int(f) if f is not None else default
-
-
-def parse_sections(text: str) -> dict[str, list[str]]:
-    out: dict[str, list[str]] = defaultdict(list)
-    cur = "_head"
-    for line in text.splitlines():
-        m = SECTION_RE.match(line)
-        if m:
-            cur = m.group(1)
-            out.setdefault(cur, [])
-            continue
-        out[cur].append(line.rstrip("\n"))
-    return dict(out)
-
-
-def _kv(lines: list[str]) -> dict[str, str]:
-    d = {}
-    for ln in lines:
-        m = KV_RE.match(ln.strip())
-        if m:
-            d[m.group(1)] = m.group(2).strip()
-    return d
-
-
-# The kernel's oom-kill summary line (mm/oom_kill.c dump_oom_summary): `oom-kill:constraint=CONSTRAINT_MEMCG,...,oom_memcg=/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod<uid>.slice,...,task=<comm>,pid=<n>,uid=<n>`
-# cgroup v2 writes the pod uid with underscores inside the slice name; cgroup v1 writes `/kubepods/burstable/pod<uid>/<container id>` with dashes.
-# source: torvalds/linux mm/oom_kill.c:441-451@v5.10; :443-453@v6.12 (dump_oom_summary: `oom-kill:constraint=%s,nodemask=%*pbl,cpuset=%s,mems_allowed=%*pbl,oom_memcg=<path>,task_memcg=<path>,task=%s,pid=%d,uid=%d`; `global_oom` in place of oom_memcg for a node-level kill)
-_OOM_KILL_RE = re.compile(r"oom-kill:(?P<fields>.*)")
-# source: kubernetes/kubernetes pkg/kubelet/cm/cgroup_manager_linux.go:73-74, 86@v1.30.14; :70-71, 83@v1.37.2 (the systemd driver writes `-` of the pod uid as `_` in the slice name); pkg/kubelet/cm/pod_container_manager_linux.go:37@v1.30.14; :38@v1.37.2 (the `pod` prefix)
-_OOM_POD_UID_RE = re.compile(r"pod(?P<uid>[0-9a-f]{8}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{4}[_-][0-9a-f]{12})")
-# source: torvalds/linux mm/oom_kill.c:441-451@v5.10; :443-453@v6.12 (comma-separated key=value fields; nodemask and mems_allowed may hold commas themselves, which only splits those two)
-_OOM_FIELD_RE = re.compile(r"(?P<k>[a-z_]+)=(?P<v>[^,]*)")
-# source: systemd/systemd src/shared/logs-show.c:379@v249; :404@v252 (`journalctl -o short-iso` starts the line with `%Y-%m-%dT%H:%M:%S%z`; a `dmesg -T` fallback line has a bracketed ctime instead, so the time stays None)
-_OOM_TS_RE = re.compile(r"^(?P<ts>\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[+-]\d{4}|Z)?)")
-
-
-def parse_oom_kill(line: str) -> dict | None:
-    """One kernel `oom-kill:` line → {time, pod_uid, task, constraint, memcg}. None for any other line. The pod uid comes from oom_memcg, the cgroup that ran out, so a kill inside a pod's cgroup is attributed to that pod even when the victim task name says nothing about it."""
-    m = _OOM_KILL_RE.search(line)
-    if not m:
-        return None
-    fields = dict(_OOM_FIELD_RE.findall(m.group("fields")))
-    memcg = fields.get("oom_memcg") or fields.get("task_memcg") or ""
-    um = _OOM_POD_UID_RE.search(memcg)
-    ts = _OOM_TS_RE.match(line.strip())
-    return {
-        "time": ts.group("ts") if ts else None,
-        "pod_uid": um.group("uid").replace("_", "-") if um else None,
-        "task": fields.get("task"),
-        "constraint": fields.get("constraint"),
-        "node_level": fields.get("constraint") not in (None, "CONSTRAINT_MEMCG"),  # CONSTRAINT_NONE is the whole node running out, the subject of node.kernel-oom-node-level
-    }
-
-
-def _parse_kernel(lines: list[str]) -> dict:
-    stripped = [ln.strip() for ln in lines]
-    kv = _kv([ln for ln in lines if not ln.startswith(" ") and "samples:" not in ln])
-    counts = {k[2:]: _int(v) for k, v in kv.items() if k.startswith("c:")}
-    samples: list[str] = []
-    oom_samples: list[str] = []
-    if "samples:" in stripped:
-        idx = stripped.index("samples:")
-        end = stripped.index("oom_samples:") if "oom_samples:" in stripped else len(lines)
-        samples = [ln for ln in lines[idx + 1 : end] if ln.strip()]
-    if "oom_samples:" in stripped:
-        idx = stripped.index("oom_samples:")
-        oom_samples = [ln for ln in lines[idx + 1 :] if ln.strip()]
-    src = kv.get("source")
-    window = "24 hours (journalctl -k)" if src == "journalctl" else ("since boot (dmesg; journald does not hold 24 hours)" if src == "dmesg" else "unreadable")
-    kills = [k for k in (parse_oom_kill(ln) for ln in oom_samples) if k]
-    return {
-        "source": src,
-        "window": window,
-        "lines": _int(kv.get("lines")),
-        "counts": counts,
-        "samples": samples[-40:],
-        "oom_samples": oom_samples[-60:],
-        "oom_section": "oom_samples:" in stripped,  # False for an os.txt written by the node script before rubric 0.1.66, which kept no oom-kill lines
-        "oom_kills": kills,  # one entry per kernel oom-kill line, with the pod uid when the cgroup path carries one. An older node script has no oom_samples section, so this stays empty and the counts above are all there is
-        "total_events": sum(v for k, v in counts.items() if k != "oom_cgroup"),
-    }
-
-
-def kernel_oom_kills(snap: Path, nodes: list[str]) -> dict:
-    """The container-level OOM kills of the kernel logs of every node whose os.txt was collected: {node: {source, kills[]}}. Shared with lib.resilience, which maps the pod uids to workloads."""
-    out: dict = {}
-    for name in nodes:
-        path = snap / "logs" / "node" / name / "os.txt"
-        if not path.is_file():
-            continue
-        sec = parse_sections(path.read_text(encoding="utf-8", errors="replace"))
-        kern = _parse_kernel(sec.get("kernel", []))
-        out[name] = {
-            "source": kern["source"],
-            "window": kern["window"],
-            "oom_section": kern["oom_section"],
-            "oom_cgroup_count": kern["counts"].get("oom_cgroup") or 0,  # the count the older script already had, for nodes whose lines cannot be attributed
-            "kills": [k for k in kern["oom_kills"] if not k["node_level"]],
-        }
-    return out
-
-
 def _sysctl_issues(v: dict[str, str], has_search_engine: bool) -> list[str]:
     issues = []
-    inst = _int(v.get("fs.inotify.max_user_instances"), -1)
+    inst = to_int(v.get("fs.inotify.max_user_instances"), -1)
     if 0 <= inst < 512:
         issues.append(f"fs.inotify.max_user_instances={inst} (recommended ≥ 512, k3s docs 8192; nodes with many pods/log collectors hit 'too many open files')")
-    watches = _int(v.get("fs.inotify.max_user_watches"), -1)
+    watches = to_int(v.get("fs.inotify.max_user_watches"), -1)
     if 0 <= watches < 524288:
         issues.append(f"fs.inotify.max_user_watches={watches} (recommended ≥ 524288)")
-    som = _int(v.get("net.core.somaxconn"), -1)
+    som = to_int(v.get("net.core.somaxconn"), -1)
     if 0 <= som < 1024:
         issues.append(f"net.core.somaxconn={som} (recommended ≥ 1024; kernel 5.4+ default 4096)")
     pr = (v.get("net.ipv4.ip_local_port_range") or "").split()
-    if len(pr) == 2 and _int(pr[1]) - _int(pr[0]) < 28000:
-        issues.append(f"net.ipv4.ip_local_port_range={' '.join(pr)} (range {_int(pr[1]) - _int(pr[0])}, recommended ≥ 28000)")
+    if len(pr) == 2 and to_int(pr[1]) - to_int(pr[0]) < 28000:
+        issues.append(f"net.ipv4.ip_local_port_range={' '.join(pr)} (range {to_int(pr[1]) - to_int(pr[0])}, recommended ≥ 28000)")
     nr = (v.get("fs.file-nr") or "").split()
-    if len(nr) == 3 and _int(nr[2]) > 0 and _int(nr[0]) / _int(nr[2]) > 0.5:
-        issues.append(f"fs.file-nr in use {_int(nr[0])}/{_int(nr[2])} ({_int(nr[0]) * 100 // _int(nr[2])}%)")
-    mm = _int(v.get("vm.max_map_count"), -1)
+    if len(nr) == 3 and to_int(nr[2]) > 0 and to_int(nr[0]) / to_int(nr[2]) > 0.5:
+        issues.append(f"fs.file-nr in use {to_int(nr[0])}/{to_int(nr[2])} ({to_int(nr[0]) * 100 // to_int(nr[2])}%)")
+    mm = to_int(v.get("vm.max_map_count"), -1)
     if has_search_engine and 0 <= mm < 262144:
         issues.append(f"vm.max_map_count={mm} (Elasticsearch/OpenSearch runs in this cluster; requires 262144. Without an init container raising it, bootstrap checks fail or it falls back to single-node mode)")
     if v.get("net.ipv4.ip_forward") not in (None, "absent", "1"):
@@ -168,7 +55,7 @@ def _sysctl_issues(v: dict[str, str], has_search_engine: bool) -> list[str]:
 
 
 def _parse_cri(lines: list[str]) -> dict:
-    kv = _kv(lines)
+    kv = key_values(lines)
     cmd = kv.get("cmd", "none")
     out: dict = {"available": cmd != "none", "cmd": cmd}
     if cmd == "none":
@@ -179,13 +66,13 @@ def _parse_cri(lines: list[str]) -> dict:
     out["version"] = m.group(2) if m else None
     cv = re.search(r"v?(\d+\.\d+\.\d+)", kv.get("crictl", ""))  # `crictl version v1.33.0`, the binary; absent from an os.txt written before rubric 0.1.82
     out["crictl_version"] = cv.group(1) if cv else None
-    out["states"] = {k[6:]: _int(v) for k, v in kv.items() if k.startswith("state:")}
-    out["images"] = _int(kv.get("images"))
+    out["states"] = {k[6:]: to_int(v) for k, v in kv.items() if k.startswith("state:")}
+    out["images"] = to_int(kv.get("images"))
     fs = _load_json_str(kv.get("imagefs"))
     try:
         ifs = (fs or {}).get("status", {}).get("imageFilesystems", [])[0]
-        out["imagefs_used_gb"] = round(_int(ifs.get("usedBytes", {}).get("value")) / 1024**3, 1)
-        out["imagefs_inodes"] = _int(ifs.get("inodesUsed", {}).get("value"))
+        out["imagefs_used_gb"] = round(to_int(ifs.get("usedBytes", {}).get("value")) / 1024**3, 1)
+        out["imagefs_inodes"] = to_int(ifs.get("inodesUsed", {}).get("value"))
         out["imagefs_mount"] = ifs.get("fsId", {}).get("mountpoint")
     except (IndexError, AttributeError, TypeError):
         pass
@@ -227,9 +114,9 @@ def _parse_cri(lines: list[str]) -> dict:
             continue
         if mode:
             parts = s.split("\t") if "\t" in s else s.split(None, 1)
-            if len(parts) == 2 and _num(parts[0]) is not None and parts[1].count("/") == 2:
+            if len(parts) == 2 and to_float(parts[0]) is not None and parts[1].count("/") == 2:
                 ns, pod, c = parts[1].split("/")
-                layers.append({"namespace": ns, "pod": pod, "container": c, "workload": workload_of(f"{ns}/{pod}"), "mb": _int(parts[0])})
+                layers.append({"namespace": ns, "pod": pod, "container": c, "workload": workload_of(f"{ns}/{pod}"), "mb": to_int(parts[0])})
             elif "=" in s:
                 mode = False
     out["writable_layers_top"] = layers
@@ -273,9 +160,9 @@ def _parse_disk(lines: list[str], uid_to_pod: dict[str, str]) -> tuple[dict, lis
                 mounts[mnt] = {
                     "mount": mnt,
                     "dev": kv.get("dev"),
-                    "size_gb": round(_int(kv.get("size_kb")) / 1024**2, 1),
-                    "avail_gb": round(_int(kv.get("avail_kb")) / 1024**2, 1),
-                    "used_pct": _int((kv.get("use") or "").rstrip("%")),
+                    "size_gb": round(to_int(kv.get("size_kb")) / 1024**2, 1),
+                    "avail_gb": round(to_int(kv.get("avail_kb")) / 1024**2, 1),
+                    "used_pct": to_int((kv.get("use") or "").rstrip("%")),
                     "paths": [s.split()[0][3:]],
                 }
             elif mnt:
@@ -285,7 +172,7 @@ def _parse_disk(lines: list[str], uid_to_pod: dict[str, str]) -> tuple[dict, lis
             kv = dict(p.split("=", 1) for p in s.split()[1:] if "=" in p)
             for m in mounts.values():
                 if s.split()[0][6:] in m["paths"] and "inode_pct" not in m:
-                    m["inode_pct"] = _int((kv.get("iuse") or "").rstrip("%"))
+                    m["inode_pct"] = to_int((kv.get("iuse") or "").rstrip("%"))
             continue
         if s == "pod_logs_mb:":
             mode = "logs"
@@ -294,18 +181,18 @@ def _parse_disk(lines: list[str], uid_to_pod: dict[str, str]) -> tuple[dict, lis
             mode = "dirs"
             continue
         if s.startswith("containerd_mb="):
-            containerd_mb = _int(s.split("=", 1)[1], None) if s.split("=", 1)[1] else None
+            containerd_mb = to_int(s.split("=", 1)[1], None) if s.split("=", 1)[1] else None
             mode = None
             continue
         if s.startswith("docker_mb="):
             v = s.split("=", 1)[1]
-            docker_mb = None if v in ("", "?") else _int(v, None)
+            docker_mb = None if v in ("", "?") else to_int(v, None)
             docker_du_denied = v == "?"
             mode = None
             continue
         parts = s.split("\t") if "\t" in s else s.split(None, 1)
-        if mode and len(parts) == 2 and _num(parts[0]) is not None:
-            mb, path = _int(parts[0]), parts[1]
+        if mode and len(parts) == 2 and to_float(parts[0]) is not None:
+            mb, path = to_int(parts[0]), parts[1]
             base = path.rstrip("/").rsplit("/", 1)[-1]
             if mode == "logs":
                 if path.rstrip("/") == "/var/log/pods":
@@ -339,21 +226,21 @@ def _parse_services(lines: list[str]) -> list[dict]:
         for tok in re.findall(r"(\w+)=((?:(?!\s\w+=).)*)", parts[1]):
             kv[tok[0]] = tok[1].strip()
         since = kv.get("since") or None
-        out.append({"unit": parts[0], "active": kv.get("active"), "restarts": _int(kv.get("restarts"), None) if kv.get("restarts", "?") != "?" else None, "since": None if since == "n/a" else since})
+        out.append({"unit": parts[0], "active": kv.get("active"), "restarts": to_int(kv.get("restarts"), None) if kv.get("restarts", "?") != "?" else None, "since": None if since == "n/a" else since})
     return out
 
 
 def _parse_updates(lines: list[str]) -> dict:
-    kv = _kv(lines)
+    kv = key_values(lines)
     upd = kv.get("ubuntu_updates", "")
     total = re.search(r"(\d+) updates? can be applied", upd)
     sec = re.search(r"(\d+) of these updates (?:are|is) (?:a )?standard security", upd)
     rc = kv.get("needs_restarting_rc")
     return {
         "reboot_required": kv.get("reboot_required") == "yes" or rc == "1",
-        "updates_total": _int(total.group(1)) if total else None,
-        "security_updates": _int(sec.group(1)) if sec else None,
-        "needs_restarting_rc": _int(rc, None) if rc else None,
+        "updates_total": to_int(total.group(1)) if total else None,
+        "security_updates": to_int(sec.group(1)) if sec else None,
+        "needs_restarting_rc": to_int(rc, None) if rc else None,
         "ami_release": kv.get("ami_release") or None,
     }
 
@@ -367,7 +254,7 @@ def _parse_time(lines: list[str]) -> dict:
             sync = s.split(":", 1)[1].strip().lower() == "yes"
         elif s.startswith(("NTP service:", "NTP enabled:")):
             ntp = s.split(":", 1)[1].strip()
-    kv = _kv(lines)
+    kv = key_values(lines)
     return {"synchronized": sync, "ntp": ntp, "chrony": kv.get("chrony") or None}
 
 
@@ -379,9 +266,9 @@ def _kubelet(path: Path) -> dict:
     eh = cfg.get("evictionHard") or {}
     kr, sr = cfg.get("kubeReserved") or {}, cfg.get("systemReserved") or {}
     size = str(cfg.get("containerLogMaxSize") or "10Mi")
-    files = _int(cfg.get("containerLogMaxFiles"), 5)
-    m = re.match(r"(\d+)(Mi|Gi|Ki)?", size)
-    size_mb = _int(m.group(1)) * {"Ki": 1 / 1024, "Mi": 1, "Gi": 1024, None: 1}[m.group(2)] if m else 10
+    files = to_int(cfg.get("containerLogMaxFiles"), 5)
+    size_b = quantity.parse(size, None)
+    size_mb = size_b / quantity.MIB if size_b is not None else 10
     return {
         "available": True,
         "eviction_hard": eh,
@@ -442,20 +329,19 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     sysctl_vals: dict[str, dict[str, list[str]]] = defaultdict(lambda: defaultdict(list))
     for n in nodes_inv:
         name = n["name"]
-        path = snap / "logs" / "node" / name / "os.txt"
+        text = node_os_text(snap, name)
         run = runs.get(name) or {}
-        if not path.is_file():
+        if text is None:
             reason = run.get("skipped") or run.get("error") or ("node-os step not run" if not step else "os.txt missing")
             out["not_collected"].append({"node": name, "reason": str(reason)[:200]})
             out["nodes"].append({"node": name, "collected": False, "reason": str(reason)[:200]})  # the row stays so the node checks skip this node by name (rule.needs) instead of seeing no node at all
             continue
-        text = path.read_text(encoding="utf-8", errors="replace")
         sec = parse_sections(text)
-        meta = _kv(sec.get("meta", []))
-        kern = _parse_kernel(sec.get("kernel", []))
-        sysv = _kv(sec.get("sysctl", []))
+        meta = key_values(sec.get("meta", []))
+        kern = parse_kernel(sec.get("kernel", []))
+        sysv = key_values(sec.get("sysctl", []))
         cri = _parse_cri(sec.get("cri", []))
-        cg = _kv(sec.get("cgroup", []))
+        cg = key_values(sec.get("cgroup", []))
         cg_ver = CGROUP_FS.get(cg.get("fs", ""), "unknown")
         disk, pod_logs, pod_dirs = _parse_disk(sec.get("disk", []), uid_to_pod)
         services = _parse_services(sec.get("services", []))
@@ -498,17 +384,17 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "hostname": meta.get("hostname"),
                 "kernel": meta.get("kernel"),
                 "os": meta.get("os"),
-                "uptime_days": round(_num(meta.get("uptime_s"), 0) / 86400, 1),
+                "uptime_days": round(to_float(meta.get("uptime_s"), 0) / 86400, 1),
                 "loadavg": meta.get("loadavg"),
-                "nproc": _int(meta.get("nproc"), None),
-                "mem_total_gb": round(_int(meta.get("mem_total_kb")) / 1024**2, 1),
+                "nproc": to_int(meta.get("nproc"), None),
+                "mem_total_gb": round(to_int(meta.get("mem_total_kb")) / 1024**2, 1),
                 # `containerd github.com/containerd/containerd 1.7.29 <sha>` (an rpm build) or `containerd github.com/containerd/containerd/v2 v2.1.4-k3s1 <sha>` (git describe keeps the v)
                 "containerd_version": (re.search(r"(?<![\w.])v?(\d+\.\d+\.\d+)", meta.get("containerd", "")) or [None, None])[1] if meta.get("containerd") else cri.get("version"),
                 "k3s_version": meta.get("k3s") or None,
-                "zombies": _int(meta.get("zombies")),
-                "kubelet_rss_mb": round(_int(meta.get("kubelet_rss_kb")) / 1024) if meta.get("kubelet_rss_kb") else None,
-                "containerd_rss_mb": round(_int(meta.get("containerd_rss_kb")) / 1024) if meta.get("containerd_rss_kb") else None,
-                "k3s_rss_mb": round(_int(meta.get("k3s_rss_kb")) / 1024) if meta.get("k3s_rss_kb") else None,
+                "zombies": to_int(meta.get("zombies")),
+                "kubelet_rss_mb": round(to_int(meta.get("kubelet_rss_kb")) / 1024) if meta.get("kubelet_rss_kb") else None,
+                "containerd_rss_mb": round(to_int(meta.get("containerd_rss_kb")) / 1024) if meta.get("containerd_rss_kb") else None,
+                "k3s_rss_mb": round(to_int(meta.get("k3s_rss_kb")) / 1024) if meta.get("k3s_rss_kb") else None,
             },
             "kernel": kern,
             "sysctl": {"values": sysv, "issues": _sysctl_issues(sysv, has_search)},

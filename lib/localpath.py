@@ -9,27 +9,10 @@ root filesystem free space and days until full, provisioner Deployment status/ve
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
-from .snapshot import load_json, objects
-
-
-def _rows(snap: Path, qid: str) -> list[dict]:
-    d = load_json(snap / "metrics" / f"{qid}.json") or {}
-    return d.get("result", []) if d.get("ok") else []
-
-
-def _v(row) -> float | None:
-    try:
-        return float(row["value"][1])
-    except (KeyError, TypeError, ValueError, IndexError):
-        return None
-
-
-def _ver(image: str | None):
-    m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
-    return m.group(1) if m else None
+from .snapshot import metric_result, metric_value, objects
+from .versions import image_version
 
 
 def analyze(snap: Path, inv: dict | None, k3s: dict | None) -> dict:
@@ -51,7 +34,7 @@ def analyze(snap: Path, inv: dict | None, k3s: dict | None) -> dict:
     if dep:
         sp, st = dep.get("spec") or {}, dep.get("status") or {}
         c0 = ((sp.get("template") or {}).get("spec") or {}).get("containers", [{}])[0]
-        prov = {"present": True, "namespace": dep["metadata"]["namespace"], "replicas": sp.get("replicas"), "ready": st.get("readyReplicas") or 0, "version": _ver(c0.get("image")), "image": (c0.get("image") or "").split("/")[-1]}
+        prov = {"present": True, "namespace": dep["metadata"]["namespace"], "replicas": sp.get("replicas"), "ready": st.get("readyReplicas") or 0, "version": image_version(c0.get("image")), "image": (c0.get("image") or "").split("/")[-1]}
     cm = next((c for c in objects(snap, "configmaps") if c["metadata"]["name"] == "local-path-config"), None)
     paths: dict[str, list[str]] = {}
     if cm:
@@ -111,12 +94,12 @@ def analyze(snap: Path, inv: dict | None, k3s: dict | None) -> dict:
                 orphan.append({"node": rec.get("node"), "dir": f"{v['pv']}_{v.get('namespace')}_{v.get('pvc')}", "namespace": v.get("namespace"), "pvc": v.get("pvc"), "mb": v.get("mb")})
     # --- filesystem free space
     fs = {}
-    for r in _rows(snap, "localpath_fs_avail_ratio"):
-        fs.setdefault(node_of(r["metric"].get("instance")), {})["avail_ratio"] = round(_v(r) or 0, 3)
-    for r in _rows(snap, "localpath_fs_size_bytes"):
-        fs.setdefault(node_of(r["metric"].get("instance")), {})["size_gib"] = round((_v(r) or 0) / 1024**3, 1)
-    for r in _rows(snap, "localpath_fs_growth_bytes_per_day"):
-        fs.setdefault(node_of(r["metric"].get("instance")), {})["growth_gib_per_day"] = round((_v(r) or 0) / 1024**3, 2)
+    for r in metric_result(snap, "localpath_fs_avail_ratio"):
+        fs.setdefault(node_of(r["metric"].get("instance")), {})["avail_ratio"] = round(metric_value(r) or 0, 3)
+    for r in metric_result(snap, "localpath_fs_size_bytes"):
+        fs.setdefault(node_of(r["metric"].get("instance")), {})["size_gib"] = round((metric_value(r) or 0) / 1024**3, 1)
+    for r in metric_result(snap, "localpath_fs_growth_bytes_per_day"):
+        fs.setdefault(node_of(r["metric"].get("instance")), {})["growth_gib_per_day"] = round((metric_value(r) or 0) / 1024**3, 2)
     for n, d in fs.items():
         avail_gib = (d.get("size_gib") or 0) * (d.get("avail_ratio") or 0)
         g = d.get("growth_gib_per_day") or 0

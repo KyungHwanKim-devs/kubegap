@@ -9,7 +9,7 @@ import re
 import pytest
 
 from lib import logs
-from lib.controlplane import KLOG_RE, _normalize_msg
+from lib.logtext import KLOG_RE, normalize_message
 from lib.signatures import Signature
 
 P = "[pod/x-7d9f8c6b5-abcde/main] 2026-11-05T00:10:15.100000000Z "
@@ -113,7 +113,7 @@ def test_klog_header_with_digits_in_the_file_name_is_normalized():
     # observed: 21 copies of one cronjob_controllerv2.go line filled the top-30 list because the old KLOG_RE refused digits in the file name
     line = 'E1103 18:15:54.813376  707592 cronjob_controllerv2.go:174] "Unhandled Error" err="error syncing CronJobController a/b-123, requeuing"'
     assert KLOG_RE.match(line)
-    assert _normalize_msg(line).startswith('"Unhandled Error" err=')
+    assert normalize_message(line).startswith('"Unhandled Error" err=')
 
 
 @pytest.mark.parametrize(
