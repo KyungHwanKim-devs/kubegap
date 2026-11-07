@@ -8,6 +8,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | Run time / mode | 2026-11-07T10:33:37+09:00 / full (collection 300.7 s, 0 steps skipped by mode, 40 failed) |
 | Profile | `prod` (detected) |
 | kubegap / rubric / signatures | <kubegap> / 0.1.85 / 1.1.0 |
+| Verified against | Kubernetes v1.32.13-eks-577a51e (verified 1.30 to 1.37) · Loki 2.6.1 (verified 2.6 to 3.7) · Grafana 10.2.3 (verified 10.2 to 13.3) |
 | Nodes / namespaces / pods / CRDs | 9 (Ready 9) / 26 / 154 / 47 |
 | Components (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
 | Metrics store | none |

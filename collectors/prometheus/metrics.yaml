@@ -32,11 +32,15 @@
 - id: http_metric_namespaces
   why: Namespaces with application-level HTTP/gRPC server metrics (the latency, traffic and error inputs of the 4 golden signals). Without them you depend on ingress/ALB metrics
   query: >
-    count by (namespace) ({__name__=~"http_request_duration_seconds_(bucket|count)|http_requests_total|http_server_requests_seconds_(count|bucket)|http_server_duration_milliseconds_(count|bucket)|grpc_server_handled_total|grpc_server_handling_seconds_(count|bucket)|django_http_requests_total_by_method_total|flask_http_request_duration_seconds_(count|bucket)|nginx_http_requests_total|express_http_request_duration_seconds_(count|bucket)|fastapi_requests_total|starlette_requests_total|aspnetcore_requests_total"})
+    count by (namespace) ({__name__=~"http_request_duration_seconds_(bucket|count)|http_requests_total|http_server_requests_seconds_(count|bucket)|http_server_duration_milliseconds_(count|bucket)|http_server_request_duration_seconds_(count|bucket)|grpc_server_handled_total|grpc_server_handling_seconds_(count|bucket)|django_http_requests_total_by_method_total|flask_http_request_duration_seconds_(count|bucket)|nginx_http_requests_total|starlette_requests_total|http_requests_received_total|rails_requests_total|[a-z0-9_]*_prom_ex_phoenix_http_request_duration_milliseconds_(count|bucket)"})
+  source:
+    - "the names and their libraries: collectors/prometheus/golden-signal-names.yaml (#143); tests/test_sources.py rebuilds this regex from it"
 - id: saturation_metric_namespaces
   why: Namespaces with saturation metrics (queue length, connection pool, thread pool, in-flight). The golden signal most often missing
   query: >
-    count by (namespace) ({__name__=~".*(queue_length|queue_size|queue_depth|pool_(active|idle|size|usage|used|pending)|connections_(active|open|in_use|idle)|threads_(active|busy|current)|inflight|in_flight|consumergroup_lag|consumer_lag).*"})
+    count by (namespace) ({__name__=~".*(connections_(active|idle|pending)|(open|in_use|idle)_connections|threads_(busy|current|live)|executor_(active|queued|pool_size)|queue_(backlog|latency)|consumergroup_lag|eventloop_lag|in_flight).*|nodejs_active_requests_total"})
+  source:
+    - "the fragments and their libraries: collectors/prometheus/golden-signal-names.yaml (#143); tests/test_sources.py rebuilds this regex from it"
 - id: ingress_controller_requests
   why: Ingress controller request metrics (ingress-nginx, Traefik). Per-ingress latency, traffic and errors without app metrics. EKS ALB goes through CloudWatch instead
   query: >

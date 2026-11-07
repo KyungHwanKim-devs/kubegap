@@ -58,6 +58,54 @@ kubectl로 읽을 수 있는 클러스터라면 어디서든 돌아갑니다. �
 
 EKS와 k3s부터 만들어서 이 둘을 가장 깊이 봅니다. GKE와 AKS는 아직 전용 수집기가 없어서 클라우드 쪽을 못 보는데, 앞으로 볼 수 있는 범위를 늘려 가려고 합니다. 노드 안까지 보려면 접속을 허락해 줘야 하는데, 이 내용은 [처음 돌릴 때](#처음-돌릴-때)에 적었습니다.
 
+### 검증한 버전
+
+kubegap 이 기대는 사실은 아래 구성 요소의 소스를 아래 버전에서 읽은 것입니다. 기준 클러스터 둘은 유지보수자가 운영하는 것입니다. 범위 밖이어도 kubegap 은 돌고, 리포트 머리가 그렇다고 말합니다. 마지막 열의 설명은 영문 그대로입니다(코드 안의 가정을 옮긴 문장입니다). `references/verified-versions.yaml` 에서 `scripts/kubegap verified --markdown --language ko` 로 생성하며, 인용 전체는 `references/sources.md` 에 있습니다.
+
+<!-- verified-table:begin -->
+| 구성 요소 | 소스로 읽은 버전 | 기준 클러스터 (EKS / k3s) | 가정한 설치 방식과 그 밖에서 일어나는 일 (영문) |
+|---|---|---|---|
+| Kubernetes (kube-apiserver, kubelet, kube-proxy, kube-scheduler, controller-manager) | v1.30.14 ~ v1.37.2 | v1.32.13 (EKS 1.32) / v1.33.5 (v1.33.5+k3s1) | the apiserver series are read under the job label kube-prometheus-stack gives them (`apiserver`), else a detected one — an older minor is read as is; a metric name that moved is caught by the series-presence record and the check skips naming it; the apiserver job comes from config key `apiserver_job` when detection fails |
+| k3s (the embedded apiserver, kubelet, kube-proxy, flannel, kine, etcd) | v1.33.5+k3s1 ~ v1.37.2+k3s1 | — / v1.33.5+k3s1 | node access over SSH; the k3s-platform collector runs when the platform is k3s or rke2 — a cluster that is not k3s skips every `platform.k3s-*` check |
+| containerd | v1.7.27 ~ v2.4.2 | v1.7.29, v2.1.5 (the two node images) / v2.1.4-k3s1 | the log signatures match the texts read at these versions; another runtime writes nothing they know |
+| CoreDNS | v1.10.1 ~ v1.15.0 | v1.11.3 / v1.12.3 | scraped by Prometheus (`coredns_*` series) — the forward metrics moved to `coredns_proxy_*` at 1.11.0 and the queries read both spellings |
+| metrics-server | v0.8.0 ~ v0.9.1 | v0.8.0 / v0.8.0 | — |
+| node-exporter | v1.7.0 ~ v1.12.1 | v1.7.0 / v1.10.2 | scraped by Prometheus with the host network (the node checks join on `instance`) — a collector that is off by default (processes) is not read; the series-presence record makes the check skip |
+| kube-state-metrics | v2.10.1 ~ v2.20.0 | v2.10.1 / v2.17.0 | scraped by Prometheus — `kube_endpoint_address` changed shape at 2.14.0 and the queries count per address |
+| cAdvisor (in the kubelet) | v0.51.0 ~ v0.60.5 | v0.51.0 (kubelet 1.32) / v0.52.1 (kubelet 1.33) | scraped through the kubelet's cadvisor endpoint |
+| Prometheus | v2.49.1 ~ v3.15.1 | v2.49.1 / v3.7.3 | a Service kubegap can port-forward to (kube-prometheus-stack's, or `prometheus_url` in config) — no Prometheus: every metric check skips with the reason, the report says so in section 7 |
+| Alertmanager | v0.26.0 ~ v0.34.2 | v0.26.0 / v0.29.0 | a Service kubegap can port-forward to — no Alertmanager: the alerting checks skip |
+| kube-prometheus-stack / prometheus-operator | kube-prometheus-stack-56.0.0 ~ kube-prometheus-stack-92.18.0 | chart 56.0.0, operator v0.71.0 / chart 79.5.0, operator v0.86.2 | the chart's job labels (`apiserver`, `kubelet`, `node-exporter`, `kube-state-metrics`) and Service names — other job names: the apiserver job is detected or set in `apiserver_job`; other Service names: `prometheus_url` in config |
+| Grafana | v10.2.3 ~ v13.3.0 | v10.2.3 / v12.2.1 | dashboards and datasources read from the sidecar ConfigMaps, or from the API with `grafana_api_token` |
+| Loki and promtail | v2.6.1 ~ v3.7.9 | Loki v2.6.1, promtail v2.9.2 / — | a Loki Service kubegap can port-forward to; promtail or Fluent Bit as the agent — no Loki: the log-volume checks skip; another agent is detected or not |
+| Fluent Bit | v3.0.4 ~ v5.1.5 | — / v3.0.4 | scraped by Prometheus (`fluentbit_*`) |
+| ingress-nginx | controller-v1.12.1 ~ controller-v1.15.1 | — / controller-v1.14.0 | metrics scraped by Prometheus (`nginx_ingress_controller_*`) — without the scrape the per-Ingress traffic checks skip (ingress metrics not read) |
+| Traefik | v1.7.34 ~ v3.7.17 | — / — | no Traefik runs on either reference cluster; metrics scraped by Prometheus when it does |
+| MetalLB | v0.12.1 ~ v0.16.2 | — / v0.14.5 | speaker metrics read from the pods — BGP status is read only where Prometheus scrapes it |
+| Argo CD | v2.13.0 ~ v3.6.1 | v2.13.0 / v3.2.0 | controller metrics read from the pods; ConfigMap keys `argocd-cm`, `argocd-cmd-params-cm`, `argocd-rbac-cm` |
+| cert-manager | v1.14.4 ~ v1.21.3 | — / v1.14.4 | controller metrics read from the pod |
+| External Secrets Operator | v0.9.13 ~ v2.14.0 | v0.9.13 / v2.1.0 | controller metrics read from the pod |
+| KEDA | v2.12.0 ~ v2.21.0 | v2.17.2 / v2.19.0 | operator metrics read from the pod (`--enable-prometheus-metrics`) — metrics off: the KEDA metric checks skip, the step says why |
+| Reloader | v1.4.23 | — / v1.4.14 | — |
+| Elasticsearch / OpenSearch / Kibana | v7.10.2 ~ v9.5.6 | — / Elasticsearch v7.10.2 | log signatures only |
+| Karpenter | v0.37.0 ~ v1.15.1 | v0.37.0 / — | NodePools and NodeClaims through the API, controller metrics from the pod — no Karpenter: the `karpenter.*` checks skip (kind not served) |
+| AWS Load Balancer Controller | v2.7.2 ~ v3.6.2 | v2.7.2 / — | TargetGroupBindings through the API; ALB metrics from CloudWatch (`elasticloadbalancing:Describe*`, `cloudwatch:GetMetricData`) — AWS calls refused: the ALB checks skip naming the call |
+| EBS CSI driver | v1.37.0 ~ v1.67.2 | v1.37.0 / local-path-provisioner v0.0.31 | controller metrics scraped by Prometheus — the `aws_ebs_csi_*` names exist since v1.38.0; before that the `cloudprovider_aws_*` names, and the queries read both |
+| VPC CNI (aws-node) | v1.19.0 ~ v1.23.2 | v1.19.0 / — | ipamd metrics read from the pods or through the node; the add-on configuration from `eks:DescribeAddon` — metrics not read: the IP-exhaustion checks skip |
+| external-dns | v0.14.0 ~ v0.24.0 | v0.14.0 / — | log signatures only |
+| Actions Runner Controller | gha-runner-scale-set-0.10.1 ~ gha-runner-scale-set-0.15.1 | gha-runner-scale-set-0.10.1 / summerwind actions-runner-controller v0.27.6 (the legacy controller) | component detection only |
+| cluster-autoscaler | cluster-autoscaler-chart-9.60.0 | — / — | component detection only |
+| Operating system of the nodes (systemd, kernel, glibc, coreutils, procps, smartmontools) | systemd v255, kernel v6.12 | Amazon Linux 2 (systemd 219, kernel 5.10) and Amazon Linux 2023 (systemd 252, kernel 6.1) / Ubuntu 22.04 (systemd 249, kernel 5.15) | the node scripts run over SSM or SSH — no node access: the 36 `node.*` checks skip |
+| Go runtime and standard library (strings every Go component relays) | go1.21.0 ~ go1.26.10 | go1.24.13 (kubernetes 1.32) / go1.24.6 (kubernetes 1.33) | — |
+| krr | v1.31.1 (the pin of `kubegap setup`) | v1.31.1 / v1.31.1 | installed by `kubegap setup`, pinned with a sha256 — not installed: the `resources.*` KRR checks report tool-missing |
+| polaris | v10.2.6 (the pin of `kubegap setup`) | v10.2.6 / v10.2.6 | installed by `kubegap setup`, pinned with a sha256 — not installed: tool-missing |
+| pluto | v5.24.5 | v5.24.5 / v5.24.5 | installed by `kubegap setup`, pinned with a sha256 — not installed: tool-missing |
+| kubent | 0.7.3 | 0.7.3 / 0.7.3 | installed by `kubegap setup`, pinned with a sha256 — not installed: tool-missing |
+| helm | v3.22.1 ~ v4.3.1 | v4.3.1 / v4.3.1 | installed by `kubegap setup`; `helm list` needs the Secrets the shipped ClusterRole does not grant — the two Helm checks skip with the reason |
+
+references/sources.md 의 사실 71개는 unverified 로 표시되어 있습니다. 기준 클러스터에서 관찰했을 뿐 소스로 읽지 않은 것입니다.
+<!-- verified-table:end -->
+
 ## 설치하고 돌려 보기
 
 준비할 것은 이렇습니다.
