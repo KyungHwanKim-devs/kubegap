@@ -23,7 +23,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import ClassVar
 
-from . import __version__, paths, rubric, versions
+from . import __version__, metricnames, paths, rubric, versions
 from .config import Config
 from .resilience import is_db_like, mounts_pvc
 from .snapshot import dump_record, load_json, missing_reason, object_file_status, taken_at, write_private
@@ -186,6 +186,19 @@ class Context:
 
     def metric(self, qid: str) -> dict | None:
         return load_json(self.snap / "metrics" / f"{qid}.json")
+
+    @functools.cached_property
+    def series_present(self) -> dict[str, int] | None:
+        """metrics/series-present.json (lib/prom.record_series_present): metric name → series count at collection time, 0 for a name Prometheus has no series of. None when the file was not written."""
+        doc = load_json(self.snap / "metrics" / "series-present.json")
+        return doc.get("names") if isinstance(doc, dict) and isinstance(doc.get("names"), dict) else None
+
+    def names_without_series(self, qids: list[str]) -> list[str] | None:
+        """Of the metric names the queries `qids` cite (lib/metricnames), those collection found no series of. Empty when every name has series; None when presence was not recorded."""
+        present = self.series_present
+        if present is None:
+            return None
+        return [n for qid in qids for n in metricnames.names_by_query().get(qid, []) if present.get(n) == 0]
 
     @functools.cached_property
     def _node_ids(self) -> set[str]:
@@ -810,6 +823,23 @@ def _metric_target(cx: Context, labels: dict, fallback: str) -> str:
     return fallback
 
 
+def _empty_result(cx: Context, check: dict, run: _Run, qids: list[str]) -> dict:
+    """A query that answered with no series (#141). "The situation did not occur" and "the series does not exist" look the same in the result, so the
+    verdict comes from elsewhere: the names the query cites (its `source:` entries) against metrics/series-present.json. A name with no series at all is
+    not scraped, renamed or removed, and the check is skipped with the name; every name present is a pass with nothing to show, counted as `empty`
+    so section 7-5 can say so. `rule.empty: skip` makes a check skip on any empty result (`empty_reason` says why); `rule.empty: pass` makes it a pass
+    whatever the names say, for a counter that has no series until its first event (the kube-proxy restore-failure counters since 1.33)."""
+    if run.rule.get("empty") == "skip":
+        return run.skip(run.rule.get("empty_reason") or "the query returned no series")
+    missing = cx.names_without_series(qids) if run.rule.get("empty") != "pass" else []
+    if missing is None:
+        return run.skip("the query returned no series and the series presence was not recorded (metrics/series-present.json missing: the promql.series-present query failed or did not run)")
+    if missing:
+        return run.skip("no series of " + ", ".join(f"`{n}`" for n in missing) + " (not scraped, or the exporter renamed or removed it)")
+    run.counts["empty"] += 1
+    return run.done()
+
+
 def _eval_metric(cx: Context, check: dict, run: _Run) -> dict:
     inputs = check.get("inputs") or []
     if len(inputs) == 1:
@@ -818,6 +848,8 @@ def _eval_metric(cx: Context, check: dict, run: _Run) -> dict:
             return run.skip(f"metrics/{inputs[0]}.json missing (not collected or no Prometheus)")
         if not m.get("ok"):
             return run.skip(f"query failed: {m.get('error')}")
+        if not m.get("result"):
+            return _empty_result(cx, check, run, inputs)
         for s in m.get("result", []):
             try:
                 value = float(s["value"][1])
@@ -856,6 +888,8 @@ def _eval_metric(cx: Context, check: dict, run: _Run) -> dict:
                 joined.setdefault(k, {})[qid] = float(s["value"][1])
     if join_any and not present:
         return run.skip("metrics/" + ",".join(inputs) + " all missing or failed")
+    if not joined:
+        return _empty_result(cx, check, run, present)
     for k, v in joined.items():
         if primary not in v and not join_any:
             continue
@@ -906,8 +940,13 @@ def _eval_object(cx: Context, check: dict, run: _Run) -> dict:
 def _eval_summary(cx: Context, check: dict, run: _Run) -> dict:
     seq = _get_path(cx.summary, check["each"]) if check.get("each") else None
     if seq is None:
-        parent = _get_path(cx.summary, str(check.get("each")).rpartition(".")[0]) if "." in str(check.get("each")) else None
-        return run.skip((parent or {}).get("skip_reason") if isinstance(parent, dict) and parent.get("skip_reason") else f"summary.{check.get('each')} missing")
+        path = str(check.get("each"))
+        while "." in path:  # the nearest ancestor that says why its part of the summary is missing (a section set to None by its module, #141)
+            path = path.rpartition(".")[0]
+            parent = _get_path(cx.summary, path)
+            if isinstance(parent, dict) and parent.get("skip_reason"):
+                return run.skip(parent["skip_reason"])
+        return run.skip(f"summary.{check.get('each')} missing")
     if check.get("cluster_level") or isinstance(seq, dict):
         seq = [seq]  # If the path is a single dict, it is the one item (cluster level)
     for item in seq:

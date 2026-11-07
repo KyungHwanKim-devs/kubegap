@@ -1,12 +1,14 @@
 # VPC CNI (aws-node) checks. summary.vpccni — lib/vpccni.py. Network policy enforcement and add-on versions are covered by the core security and eks-platform checks.
 - id: vpccni.node-ip-exhaustion
-  name: Node pod IPs near the limit or "no available IP" has already occurred
+  name: Node pod IPs near the limit of its instance type
   area: traffic
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: vpccni.nodes
   rule:
-    expr: "item['metrics_available'] and ((item['no_available_ip_events'] or 0) > 0 or (item['ip_usage_ratio'] or 0) >= 0.9)"
+    needs: "item['ip_usage_ratio'] is not None"
+    needs_reason: "pod IP usage not read (no ipamd metrics and the instance type's limits not read: ec2:DescribeInstanceTypes)"
+    expr: "(item['ip_usage_ratio'] or 0) >= 0.9"
     warn_expr: "(item['ip_usage_ratio'] or 0) >= 0.75 or (item['ip_headroom'] is not None and item['ip_headroom'] <= 4)"
   target: "item['node']"
   evidence: "f\"node {item['node']} ({item['instance_type']}, pool {item['pool']}): pod IPs {item['ip_used']}/{item['ip_max']} ({item['ip_usage_ratio']}), ENI {item['metrics'].get('eni_allocated')}/{item['metrics'].get('eni_max')} (at limit {item['eni_at_max']}), 'no available IP' events {item['no_available_ip_events']}, max-pods {item['max_pods']}, prod pods {item['prod_pods']}. prefix delegation {item['prefix_delegation']}\""
@@ -28,7 +30,12 @@
   profiles: [prod]
   test:
     cases:
-      - expect: "fail"
+      - expect: "skip"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          ip_usage_ratio: null
+          ip_headroom: null
+      - expect: "warn"
         item:
           node: "ip-10-0-1-139.us-east-1.compute.internal"
           instance_type: "r8gd.xlarge"
@@ -205,6 +212,68 @@
           metrics_available: true
           prefix_delegation: false
           hypervisor: null
+- id: vpccni.no-available-ip
+  name: ipamd has already answered "no available IP" on a node
+  area: traffic
+  modes: [full]   # needs inputs the daily run does not collect
+  type: summary
+  each: vpccni.nodes
+  rule:
+    needs: "item['metrics_available']"
+    needs_reason: "VPC CNI metrics not read (awscni_no_available_ip_addresses)"
+    expr: "(item['no_available_ip_events'] or 0) > 0"
+  target: "item['node']"
+  evidence: "f\"node {item['node']} ({item['instance_type']}, pool {item['pool']}): ipamd answered 'no available IP' {item['no_available_ip_events']} times since it started; pod IPs {item['ip_used']}/{item['ip_max']} ({item['ip_usage_ratio']}), ENI {item['metrics'].get('eni_allocated')}/{item['metrics'].get('eni_max')}, max-pods {item['max_pods']}\""
+  severity_default: high
+  symptom_linked: true
+  why: >
+    `awscni_no_available_ip_addresses` counts the times ipamd had no IP to give a pod since the process started, so any non-zero value means a pod on this node has already stalled in ContainerCreating with "failed to assign an IP address", whatever the usage ratio reads now (a burst that has passed, or max-pods above the IP capacity so the kubelet keeps scheduling into a full node). The companion check `vpccni.node-ip-exhaustion` judges the usage ratio from the API and runs without metrics; this one needs the ipamd metrics and skips without them.
+  measured: >
+    Measured on a 7-node EKS cluster: an r8gd.xlarge node at ENI 4/4 and IP 42/56 had 4 'no available IP' events while its usage ratio read 0.75.
+  cases:
+    - { who: Neon 2025, url: https://neon.com/blog/aws-cni-lessons-from-a-production-outage }
+    - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-21-vpc-cni-not-allocating-ip-addresses.html }
+  suggest: "Find the pods that stalled (kubectl get events -A --field-selector reason=FailedCreatePodSandBox), then give the node room: prefix delegation (ENABLE_PREFIX_DELEGATION=true) or a max-pods that matches the IP capacity (vpccni.max-pods-exceeds-ip-capacity), and spread the pods that packed onto it."
+  verify:
+    - "on the node: curl -s localhost:61678/metrics | grep awscni_no_available_ip_addresses"
+    - "kubectl get events -A --field-selector reason=FailedCreatePodSandBox | grep -i 'assign'"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "skip"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          metrics_available: false
+          no_available_ip_events: null
+      - expect: "fail"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_pods: 58
+          metrics:
+            eni_allocated: 4
+            eni_max: 4
+          ip_max: 56
+          ip_used: 42
+          ip_usage_ratio: 0.75
+          no_available_ip_events: 4
+          metrics_available: true
+      - expect: "pass"
+        item:
+          node: "ip-10-0-1-137.us-east-1.compute.internal"
+          instance_type: "m5.large"
+          pool: "default"
+          max_pods: 29
+          metrics:
+            eni_allocated: 2
+            eni_max: 3
+          ip_max: 27
+          ip_used: 10
+          ip_usage_ratio: 0.37
+          no_available_ip_events: 0
+          metrics_available: true
+
 - id: vpccni.max-pods-exceeds-ip-capacity
   name: Node max-pods is larger than the number of IPs the CNI can hand out
   area: traffic
@@ -312,6 +381,8 @@
   each: vpccni.warm.summary
   cluster_level: true
   rule:
+    needs: "item.get('capacity_read')"
+    needs_reason: "pod IP usage of no node read (no ipamd metrics and the instance types' limits not read: ec2:DescribeInstanceTypes)"
     expr: "not item['prefix_delegation'] and item['nitro_nodes'] > 0 and len(item['nodes_no_available_ip']) > 0"
     warn_expr: "not item['prefix_delegation'] and item['nitro_nodes'] > 0 and len(item['nodes_near_ip_limit']) > 0"
   target: "'cluster'"
@@ -329,8 +400,16 @@
   profiles: [prod]
   test:
     cases:
+      - expect: "skip"
+        item:
+          capacity_read: false
+          prefix_delegation: false
+          nitro_nodes: 2
+          nodes_no_available_ip: []
+          nodes_near_ip_limit: []
       - expect: "fail"
         item:
+          capacity_read: true
           policy: "whole_eni"
           warm_eni_target: 1
           warm_ip_target: null
@@ -354,6 +433,7 @@
             - "ip-10-0-2-83.us-east-1.compute.internal"
       - expect: "warn"
         item:
+          capacity_read: true
           policy: "whole_eni"
           warm_eni_target: 1
           warm_ip_target: null
@@ -376,6 +456,7 @@
             - "ip-10-0-2-83.us-east-1.compute.internal"
       - expect: "pass"
         item:
+          capacity_read: true
           policy: "whole_eni"
           warm_eni_target: 1
           warm_ip_target: null
@@ -397,6 +478,7 @@
             - "ip-10-0-2-83.us-east-1.compute.internal"
       - expect: "pass"
         item:
+          capacity_read: true
           policy: "whole_eni"
           warm_eni_target: 1
           warm_ip_target: null

@@ -283,8 +283,9 @@ def _deprecated(cx: _Ctx) -> dict:
         )
     called = [{"group": ln.get("group"), "version": ln.get("version"), "resource": ln.get("resource"), "removed_release": ln.get("removed_release"), "calls": v} for ln, v in _metric_rows(cx.snap, "apiserver_requested_deprecated_apis")]
     insights = []
-    ins = load_json(cx.snap / "aws" / "list-insights.json") or {}
-    for i in ins.get("insights") or []:
+    ins = load_json(cx.snap / "aws" / "list-insights.json")
+    insights_read = ins is not None  # eks:ListInsights answered; refused, the list means nothing (#141)
+    for i in (ins or {}).get("insights") or []:
         insights.append(
             {
                 "name": i.get("name"),
@@ -312,8 +313,12 @@ def _deprecated(cx: _Ctx) -> dict:
         "pluto_present": (cx.snap / "tools" / "pluto.json").is_file(),
         "kubent_present": (cx.snap / "tools" / "kubent.json").is_file(),
         "called_deprecated_apis": called,
-        "eks_insights": insights,
-        "eks_insights_failing": [i for i in insights if i["status"] in ("ERROR", "WARNING")],
+        "eks_insights": {
+            "read": insights_read,
+            "rows": insights if insights_read else None,
+            "failing": [i for i in insights if i["status"] in ("ERROR", "WARNING")] if insights_read else None,
+            "skip_reason": None if insights_read else "EKS upgrade insights not read (aws/list-insights.json missing: eks:ListInsights refused or not an EKS cluster)",
+        },
         "target": pl.get("target-versions"),
         "target_minor": target,
     }
@@ -560,6 +565,7 @@ def _orphans(cx: _Ctx) -> dict:
     # Secrets (name and type only, from metrics)
     types = {(ln.get("namespace"), ln.get("secret")): ln.get("type") for ln, _ in _metric_rows(cx.snap, "secret_types")}
     orphan_sec = []
+    secrets_read = bool((load_json(cx.snap / "metrics" / "secrets_by_name.json") or {}).get("ok"))  # kube_secret_info through Prometheus; without it the orphan list means nothing (#141)
     secret_names = {(ln.get("namespace"), ln.get("secret")) for ln, _ in _metric_rows(cx.snap, "secrets_by_name")}
     for ns, name in sorted(secret_names, key=lambda x: (str(x[0]), str(x[1]))):
         if not ns or not name or (ns, name) in sec_refs or ns.startswith("kube-"):
@@ -627,8 +633,9 @@ def _orphans(cx: _Ctx) -> dict:
         "configmaps_total": len(cms),
         "orphan_configmaps": orphan_cm,
         "large_configmaps": big_cm,
-        "secrets_total": len(secret_names),
-        "orphan_secrets": orphan_sec,
+        "secrets_read": secrets_read,
+        "secrets_total": len(secret_names) if secrets_read else None,
+        "orphan_secrets": orphan_sec if secrets_read else None,
         "pvc_unbound": pvc_unbound,
         "pvc_unused": pvc_unused,
         "pv_released": pv_released,

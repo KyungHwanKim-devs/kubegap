@@ -4,7 +4,7 @@
   "source": "detected",
   "missing_file": false
  },
- "rubric_version": "0.1.83",
+ "rubric_version": "0.1.84",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -191,8 +191,8 @@
   },
   {
    "id": "observability.alerts-always-firing",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)",
    "counts": {}
   },
   {
@@ -440,11 +440,9 @@
   },
   {
    "id": "controlplane.etcd-slow",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "pass": 1
-   }
+   "status": "skip",
+   "reason": "no k3s server journal read (logs/node/<node>/ missing: no node access)",
+   "counts": {}
   },
   {
    "id": "platform.k8s-version-eol",
@@ -728,10 +726,10 @@
   },
   {
    "id": "cost.k3s-node-efficiency",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: node CPU usage metrics not read (node_cpu_usage_ratio_p95_7d)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
@@ -802,18 +800,18 @@
   },
   {
    "id": "security.networkpolicy-not-enforced",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
    "id": "security.no-default-deny",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)",
    "counts": {
-    "warn": 1
+    "skipped": 1
    }
   },
   {
@@ -985,10 +983,10 @@
   },
   {
    "id": "hygiene.orphan-secrets",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: Secret names not read (kube_secret_info through Prometheus)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
@@ -1292,18 +1290,18 @@
   },
   {
    "id": "traffic.ingress-5xx-ratio",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)",
    "counts": {
-    "pass": 29
+    "skipped": 29
    }
   },
   {
    "id": "traffic.ingress-p95-latency",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)",
    "counts": {
-    "pass": 29
+    "skipped": 29
    }
   },
   {
@@ -1366,8 +1364,8 @@
   },
   {
    "id": "traffic.pod-not-ready",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "pod readiness ratio not read (metrics/pod_ready_ratio_24h.json missing or failed)",
    "counts": {}
   },
   {
@@ -1380,10 +1378,10 @@
   },
   {
    "id": "traffic.coredns-latency",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: CoreDNS metrics not read (coredns_dns_request_duration_seconds)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
@@ -1416,10 +1414,10 @@
   },
   {
    "id": "scaling.hpa-never-scaled",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: HPA metrics not read (hpa_at_min_ratio_15d) (11)",
    "counts": {
-    "pass": 11
+    "skipped": 11
    }
   },
   {
@@ -1582,10 +1580,10 @@
   },
   {
    "id": "tenancy.burst-tenant-unbounded",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: namespace CPU metrics not read (namespace_cpu_max_7d, namespace_cpu_median_7d) (26)",
    "counts": {
-    "pass": 26
+    "skipped": 26
    }
   },
   {
@@ -1738,8 +1736,10 @@
    "status": "done",
    "reason": null,
    "counts": {
-    "pass": 2
-   }
+    "pass": 1,
+    "skipped": 1
+   },
+   "skipped_reason": "k3s server platform file not read (logs/node/<node>/k3s-platform.txt)"
   },
   {
    "id": "platform.k3s-server-url-stale",
@@ -1759,10 +1759,10 @@
   },
   {
    "id": "platform.k3s-check-config-missing",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: no k3s server's platform file read (logs/node/<node>/k3s-platform.txt)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
@@ -1778,8 +1778,10 @@
    "status": "done",
    "reason": null,
    "counts": {
-    "pass": 2
-   }
+    "pass": 1,
+    "skipped": 1
+   },
+   "skipped_reason": "k3s server platform file not read (logs/node/<node>/k3s-platform.txt)"
   },
   {
    "id": "platform.k3s-certificate-expiring",
@@ -1807,10 +1809,10 @@
   },
   {
    "id": "platform.k3s-apiserver-bind-all",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: no k3s server's platform file read (logs/node/<node>/k3s-platform.txt)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
@@ -1831,10 +1833,10 @@
   },
   {
    "id": "platform.k3s-datastore-slow",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: k3s datastore not read (no server node's k3s-platform.txt)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
@@ -2406,8 +2408,8 @@
   },
   {
    "id": "storage.local-path-over-capacity",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "node directory sizes not read (the k3s-platform node step's du section: no node access)",
    "counts": {}
   },
   {
@@ -4170,13 +4172,6 @@
    "status": "warn",
    "evidence": "memory request under by 155 MB: CPU request 0.05 → 0.01 cores, CPU limit 0.5 → none, memory request 128 → 283 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req OK, memory limit OK)",
    "source": "summary.json:resources.krr.workloads"
-  },
-  {
-   "check": "security.no-default-deny",
-   "target": "cluster",
-   "status": "warn",
-   "evidence": "Namespaces with default-deny (ingress, empty podSelector) [], prod without one ['app-a-prod', 'app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']. Enforced True",
-   "source": "summary.json:security.networkpolicy"
   },
   {
    "check": "security.psa-not-enforced",

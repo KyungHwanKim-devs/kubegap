@@ -420,6 +420,7 @@ def _ingresses(snap: Path, objs: _Objects, alb: dict) -> list[dict]:
                 "endpoints_not_ready": sum((e or {}).get("not_ready", 0) for e in ep),
                 "prod": ns in objs.prod,
                 "metrics": metrics,
+                "metrics_read": metrics.get("source") is not None,  # ALB CloudWatch metrics or the ingress controller's series reached this Ingress; without them its traffic checks skip (#141)
             }
         )
     rows.sort(key=lambda r: (-(r["metrics"].get("errors_ratio") or 0), -(r["metrics"].get("requests") or 0)))
@@ -634,7 +635,14 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
             rows.append({"workload": wl, "namespace": wl.split("/")[0], "pods_below_99": 0, "min_ready_ratio_24h": None, "worst_pod": None, "not_ready_minutes_24h": None, "unhealthy_events": n, "prod": wl.split("/")[0] in objs.prod})
     rows.sort(key=lambda r: (r["min_ready_ratio_24h"] if r["min_ready_ratio_24h"] is not None else 1, -r["unhealthy_events"]))
     not_ready_eps = [{"namespace": ln.get("namespace"), "endpoint": ln.get("endpoint"), "not_ready_addresses": int(v)} for ln, v in _metric_rows(snap, "endpoint_not_ready_addresses")]
-    return {"available": (snap / "metrics" / "pod_ready_ratio_24h.json").is_file(), "rows": rows[:40], "unhealthy_events_total": sum(unhealthy.values()), "endpoints_not_ready": not_ready_eps}
+    available = bool((load_json(snap / "metrics" / "pod_ready_ratio_24h.json") or {}).get("ok"))
+    return {
+        "available": available,
+        "rows": rows[:40] if available else None,  # None, not []: without the readiness ratio the rows judge nothing (#141)
+        "skip_reason": None if available else "pod readiness ratio not read (metrics/pod_ready_ratio_24h.json missing or failed)",
+        "unhealthy_events_total": sum(unhealthy.values()),
+        "endpoints_not_ready": not_ready_eps,
+    }
 
 
 def _coredns(snap: Path) -> dict:

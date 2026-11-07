@@ -225,6 +225,9 @@ class _Ctx:
         # --- metrics ---
         self.cpu_p95 = _metric_by(snap, "namespace_cpu_p95_7d")
         self.cpu_max = _metric_by(snap, "namespace_cpu_max_7d")
+        self.cpu_metrics_read = all(
+            bool((load_json(snap / "metrics" / f"{q}.json") or {}).get("ok")) for q in ("namespace_cpu_max_7d", "namespace_cpu_median_7d")
+        )  # the burst ratio needs both; a namespace without samples is "no usage", a missing file is "not read" (#141)
         self.cpu_med = _metric_by(snap, "namespace_cpu_median_7d")
         self.mem_p95 = _metric_by(snap, "namespace_memory_p95_7d_bytes")
         self.throttled = _metric_by(snap, "namespace_cpu_throttled_ratio_7d")
@@ -603,6 +606,7 @@ def _namespace_row(cx: _Ctx, ns: str, plist: list[dict], nodes_out: list[dict], 
         "pools": dict(pools_c.most_common()),
         "shares_nodes_with_prod": shares_prod,
         "cpu_p95_7d": _r(p95, 3),
+        "cpu_metrics_read": cx.cpu_metrics_read,
         "cpu_max_7d": _r(mx, 3),
         "cpu_median_7d": _r(med, 3),
         "burst_ratio_7d": _r(burst, 1),

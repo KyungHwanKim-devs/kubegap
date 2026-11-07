@@ -7,6 +7,8 @@
   each: k3s.nodes
   profiles: [lab]
   rule:
+    needs: "item.get('role') != 'server' or item.get('server') is not None"
+    needs_reason: "k3s server platform file not read (logs/node/<node>/k3s-platform.txt)"
     expr: "item.get('role') == 'server' and str(((item.get('server') or {}).get('secrets_encryption') or '')).startswith('Disabled')"
   target: "item['node']"
   evidence: "f\"k3s secrets-encrypt status: {(item.get('server') or {}).get('secrets_encryption')}. Datastore {(item.get('server') or {}).get('db_kind')} {(item.get('server') or {}).get('db_mb')}MB\""
@@ -20,6 +22,11 @@
   test:
     profile: "k3s"
     cases:
+      - expect: "skip"
+        item:
+          node: "n1"
+          role: "server"
+          server: null
       - expect: "fail"
         item:
           node: "node-b"
@@ -320,6 +327,8 @@
   cluster_level: true
   profiles: [lab]
   rule:
+    needs: "item.get('servers_read')"
+    needs_reason: "no k3s server's platform file read (logs/node/<node>/k3s-platform.txt)"
     warn_expr: "len(item.get('check_config_missing') or []) > 0"
   target: "'cluster'"
   evidence: "f\"missing: {item.get('check_config_missing')}\""
@@ -332,8 +341,12 @@
   test:
     profile: "k3s"
     cases:
+      - expect: "skip"
+        item:
+          servers_read: false
       - expect: "warn"
         item:
+          servers_read: true
           servers:
             - "node-b"
           agents:
@@ -363,6 +376,7 @@
           gaps: {}
       - expect: "pass"
         item:
+          servers_read: true
           servers:
             - "node-b"
           agents:
@@ -746,6 +760,8 @@
   each: k3s.nodes
   profiles: [lab]
   rule:
+    needs: "item.get('role') != 'server' or item.get('server') is not None"
+    needs_reason: "k3s server platform file not read (logs/node/<node>/k3s-platform.txt)"
     expr: "item.get('role') == 'server' and bool((item.get('server') or {}).get('etcd_snapshots')) and not (item.get('server') or {}).get('snapshots_offsite')"
   target: "item['node']"
   evidence: "f\"all {len((item.get('server') or {}).get('etcd_snapshots') or [])} snapshots at file:///var/lib/rancher/k3s/server/db/snapshots (same node, same disk). No S3 config (--etcd-s3)\""
@@ -758,6 +774,11 @@
   test:
     profile: "k3s"
     cases:
+      - expect: "skip"
+        item:
+          node: "n1"
+          role: "server"
+          server: null
       - expect: "fail"
         item:
           node: "node-b"
@@ -1431,6 +1452,8 @@
   cluster_level: true
   profiles: [lab]
   rule:
+    needs: "item.get('servers_read')"
+    needs_reason: "no k3s server's platform file read (logs/node/<node>/k3s-platform.txt)"
     warn_expr: "len((item.get('apiserver') or {}).get('bind_all_nodes') or []) > 0"
   target: "'cluster'"
   evidence: "f\"servers binding 6443 to *: {item['apiserver'].get('bind_all_nodes')}, --tls-san {item['apiserver'].get('tls_san')}, node-external-ip {item['apiserver'].get('external_ips')}\""
@@ -1443,8 +1466,12 @@
   test:
     profile: "k3s"
     cases:
+      - expect: "skip"
+        item:
+          servers_read: false
       - expect: "warn"
         item:
+          servers_read: true
           servers:
             - "node-b"
           agents:
@@ -1475,6 +1502,7 @@
           gaps: {}
       - expect: "pass"
         item:
+          servers_read: true
           servers:
             - "node-b"
           agents:
@@ -1958,8 +1986,10 @@
   each: k3s.cluster.datastore
   cluster_level: true
   rule:
-    expr: "item['kind'] is not None and ((item['leader_changes'] or 0) > 0 or (item['fdatasync_slow'] or 0) > 0 or (item['apply_over_1s'] or 0) >= 10 or ((item['capped'] or False) and (item['apply_slow'] or 0) >= 100))"
-    warn_expr: "item['kind'] is not None and (item['lines_24h'] or 0) > 0"
+    needs: "item['kind'] is not None"
+    needs_reason: "k3s datastore not read (no server node's k3s-platform.txt)"
+    expr: "((item['leader_changes'] or 0) > 0 or (item['fdatasync_slow'] or 0) > 0 or (item['apply_over_1s'] or 0) >= 10 or ((item['capped'] or False) and (item['apply_slow'] or 0) >= 100))"
+    warn_expr: "(item['lines_24h'] or 0) > 0"
   target: "'cluster'"
   evidence: "f\"datastore {item['kind']} (servers {item['servers']}), warn lines in 24h {item['lines_24h']}{' (hit the 200-line cap - there were more)' if item['capped'] else ''}: slow apply {item['apply_slow']} (max {item['max_apply_ms']}ms, over 1s {item['apply_over_1s']}), slow fdatasync {item['fdatasync_slow']}, leader changes {item['leader_changes']}, request stats {item['request_stats']}, DB {item['db_mb']}MB\""
   severity_default: high
@@ -1974,6 +2004,9 @@
   profiles: [lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          kind: null
       - expect: "fail"
         item:
           kind: "etcd"
@@ -2129,7 +2162,7 @@
           leader_changes: 0
           request_stats: 97
           note: "Slow-request logs are the last 200 warn lines of journalctl -u k3s over 24 h (capped means there were more). etcd expects apply within 100 ms. DB size is the data directory under /var/lib/rancher/k3s/server/db."
-      - expect: "pass"
+      - expect: "skip"
         item:
           kind: null
           servers:

@@ -10094,6 +10094,8 @@
   each: cost.compute
   cluster_level: true
   rule:
+    needs: "item.get('pricing_read') and item.get('node_metrics_read')"
+    needs_reason: "pricing (pricing:GetProducts) or node CPU usage metrics (node_cpu_usage_ratio_p95_7d) not read"
     expr: "(item.get('idle_ratio') or 0) >= 0.8 and (item.get('idle_monthly_usd') or 0) >= 100"
     warn_expr: "(item.get('idle_ratio') or 0) >= 0.5 and (item.get('idle_monthly_usd') or 0) >= 50"
   target: "'cluster'"
@@ -10111,8 +10113,14 @@
   profiles: [prod]
   test:
     cases:
+      - expect: "skip"
+        item:
+          pricing_read: true
+          node_metrics_read: false
       - expect: "fail"
         item:
+          node_metrics_read: true
+          pricing_read: true
           monthly_usd: 421.95
           spot_monthly_usd: 95.41
           ondemand_monthly_usd: 326.54
@@ -10127,6 +10135,8 @@
           on_demand_in_spot_pool: []
       - expect: "warn"
         item:
+          node_metrics_read: true
+          pricing_read: true
           monthly_usd: 421.95
           spot_monthly_usd: 95.41
           ondemand_monthly_usd: 326.54
@@ -10141,6 +10151,8 @@
           on_demand_in_spot_pool: []
       - expect: "pass"
         item:
+          node_metrics_read: true
+          pricing_read: true
           monthly_usd: 421.95
           spot_monthly_usd: 95.41
           ondemand_monthly_usd: 326.54
@@ -10162,6 +10174,8 @@
   each: cost.request_waste
   cluster_level: true
   rule:
+    needs: "item.get('monthly_usd_est') is not None"
+    needs_reason: "pricing (pricing:GetProducts) or the KRR totals not read"
     expr: "(item.get('monthly_usd_est') or 0) >= 100"
     warn_expr: "(item.get('monthly_usd_est') or 0) >= 30"
   target: "'cluster'"
@@ -10175,6 +10189,9 @@
   profiles: [prod]
   test:
     cases:
+      - expect: "skip"
+        item:
+          monthly_usd_est: null
       - expect: "fail"
         item:
           krr_saving_cores: 5.23
@@ -10193,7 +10210,7 @@
           monthly_usd_est: 5.0
           requests_cpu_total: 2.0
           recommended_cpu_total: 1.8
-      - expect: "pass"
+      - expect: "skip"
         item:
           krr_saving_cores: null
           monthly_usd_est: null
@@ -10256,6 +10273,8 @@
   each: cost.fixed
   cluster_level: true
   rule:
+    needs: "item.get('addresses_read')"
+    needs_reason: "EC2 addresses not read (ec2:DescribeAddresses)"
     expr: "(item.get('eip_unused') or 0) > 0"
   target: "'cluster'"
   evidence: "f\"{item.get('eip_unused')} of {item.get('eips_total')} EIPs unattached ~ {item.get('eip_unused_monthly_usd')} USD/month\""
@@ -10268,8 +10287,12 @@
   profiles: [prod]
   test:
     cases:
+      - expect: "skip"
+        item:
+          addresses_read: false
       - expect: "fail"
         item:
+          addresses_read: true
           eip_unused: 2
           eip_unused_monthly_usd: 7.3
           eips_total: 4
@@ -10283,6 +10306,7 @@
           eks_extended_surcharge_monthly_usd: 0.0
       - expect: "pass"
         item:
+          addresses_read: true
           eip_unused: 0
           eip_unused_monthly_usd: 0.0
           eips_total: 4
@@ -10302,6 +10326,8 @@
   each: cost.fixed
   cluster_level: true
   rule:
+    needs: "item.get('load_balancers_read')"
+    needs_reason: "load balancers not read (elasticloadbalancing:Describe*)"
     warn_expr: "len(item.get('idle_load_balancers') or []) > 0"
   target: "'cluster'"
   evidence: "f\"Of {item.get('load_balancers')} LBs (base charge {item.get('lb_monthly_usd_base')} USD/month), zero requests and bytes in 24h: {item.get('idle_load_balancers')}. NAT gateways {item.get('nat_gateways')} ({item.get('nat_monthly_usd_base')} USD/month + data)\""
@@ -10316,8 +10342,12 @@
   profiles: [prod]
   test:
     cases:
+      - expect: "skip"
+        item:
+          load_balancers_read: false
       - expect: "warn"
         item:
+          load_balancers_read: true
           eip_unused: 0
           eip_unused_monthly_usd: 0.0
           eips_total: 4
@@ -10332,6 +10362,7 @@
           eks_extended_surcharge_monthly_usd: 0.0
       - expect: "pass"
         item:
+          load_balancers_read: true
           eip_unused: 0
           eip_unused_monthly_usd: 0.0
           eips_total: 4
@@ -10381,6 +10412,8 @@
   each: cost.efficiency
   cluster_level: true
   rule:
+    needs: "item.get('metrics_read')"
+    needs_reason: "node CPU usage metrics not read (node_cpu_usage_ratio_p95_7d)"
     warn_expr: "(item.get('p95_util_ratio') or 1) < 0.1 and (item.get('request_over_usage') or 0) >= 5"
   target: "'cluster'"
   evidence: "f\"{item.get('nodes')} nodes, allocatable {item.get('allocatable_cpu')} cores, 7-day p95 actual use {item.get('p95_used_cpu')} cores ({item.get('p95_util_ratio')}), request total {item.get('requested_cpu')} cores ({item.get('request_over_usage')}x actual use). Would requests still fit without the largest node: {item.get('can_drop_largest_node')}\""
@@ -10395,8 +10428,12 @@
   profiles: [lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          metrics_read: false
       - expect: "warn"
         item:
+          metrics_read: true
           nodes: 2
           allocatable_cpu: 18.0
           p95_used_cpu: 0.92
@@ -10407,6 +10444,7 @@
           can_drop_largest_node: false
       - expect: "pass"
         item:
+          metrics_read: true
           nodes: 2
           allocatable_cpu: 18.0
           p95_used_cpu: 0.92
@@ -10916,6 +10954,8 @@
   each: security.networkpolicy
   cluster_level: true
   rule:
+    needs: "item['policies'] is not None"
+    needs_reason: "NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)"
     expr: "item['policies_but_not_enforced']"
     warn_expr: "item['enforced'] is None and item['policies'] > 0"
   target: "'cluster'"
@@ -10933,6 +10973,9 @@
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          policies: null
       - expect: "fail"
         item:
           policies: 3
@@ -10985,6 +11028,8 @@
   each: security.networkpolicy
   cluster_level: true
   rule:
+    needs: "item['policies'] is not None"
+    needs_reason: "NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)"
     warn_expr: "item['enforced'] is not False and len(item['prod_without_default_deny']) > 0"
   target: "'cluster'"
   evidence: "f\"Namespaces with default-deny (ingress, empty podSelector) {item['default_deny_ingress_namespaces']}, prod without one {item['prod_without_default_deny']}. Enforced {item['enforced']}\""
@@ -10997,6 +11042,9 @@
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          policies: null
       - expect: "warn"
         item:
           policies: 3
@@ -11040,8 +11088,8 @@
   each: security.aws
   cluster_level: true
   rule:
-    needs: "item.get('applicable')"
-    needs_reason: "aws not applicable"
+    needs: "item.get('applicable') and item.get('instances_source')"
+    needs_reason: "not EKS, or EC2 instance list not read (ec2:DescribeInstances)"
     expr: "any(x.get('tokens') != 'required' for x in (item.get('imds_hop_limit_gt1') or []))"  # only IMDSv1 allowed (tokens optional) fails -- hop 2 + tokens required is the EKS managed node group default, so warn
     warn_expr: "len(item.get('imds_hop_limit_gt1') or []) > 0"
   target: "'cluster'"
@@ -11059,6 +11107,10 @@
   profiles: [prod]
   test:
     cases:
+      - expect: "skip"
+        item:
+          applicable: true
+          instances_source: null
       - expect: "fail"
         item:
           applicable: true
@@ -11160,8 +11212,10 @@
   type: summary
   each: storage.pvcs.rows
   rule:
-    expr: "item['metrics'] and not item['host_fs'] and (item['used_ratio'] or 0) >= 0.85"
-    warn_expr: "item['metrics'] and not item['host_fs'] and (item['used_ratio'] or 0) >= 0.75"
+    needs: "item['metrics'] or item['host_fs']"
+    needs_reason: "PVC usage metrics not read (kubelet_volume_stats_*)"
+    expr: "not item['host_fs'] and (item['used_ratio'] or 0) >= 0.85"
+    warn_expr: "not item['host_fs'] and (item['used_ratio'] or 0) >= 0.75"
   target: "item['target']"
   evidence: "f\"Usage {item['used_ratio']} (capacity {item['capacity_gb']}GB, inodes {item['inode_ratio']}), growth {item['growth_gb_per_day']}GB/day, {item['days_to_full']} days to full, workloads {item['workloads']}, StorageClass {item['storage_class']}\""
   severity_default: high
@@ -11179,6 +11233,13 @@
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          namespace: "prod-a"
+          name: "data-0"
+          target: "prod-a/pvc/data-0"
+          metrics: false
+          host_fs: false
       - expect: "fail"
         item:
           namespace: "prod-a"
@@ -12184,7 +12245,7 @@
   area: hygiene
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  each: hygiene.deprecated.eks_insights_failing
+  each: hygiene.deprecated.eks_insights.failing
   rule:
     expr: "item['status'] == 'ERROR'"
     warn_expr: "True"
@@ -12999,6 +13060,8 @@
   each: hygiene.orphans
   cluster_level: true
   rule:
+    needs: "item.get('secrets_read')"
+    needs_reason: "Secret names not read (kube_secret_info through Prometheus)"
     expr: "len(item['orphan_secrets']) >= 50"
     warn_expr: "len(item['orphan_secrets']) >= 5"
   target: "'cluster'"
@@ -13014,8 +13077,12 @@
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          secrets_read: false
       - expect: "fail"
         item:
+          secrets_read: true
           configmaps_total: 100
           orphan_configmaps: []
           secrets_total: 100
@@ -13250,6 +13317,7 @@
             10: 20
       - expect: "warn"
         item:
+          secrets_read: true
           configmaps_total: 100
           orphan_configmaps: []
           secrets_total: 100
@@ -13296,6 +13364,7 @@
             10: 20
       - expect: "pass"
         item:
+          secrets_read: true
           configmaps_total: 100
           orphan_configmaps: []
           secrets_total: 100
@@ -16113,6 +16182,8 @@
   type: summary
   each: traffic.ingresses
   rule:
+    needs: "item['metrics_read']"
+    needs_reason: "ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series)"
     expr: "(item['metrics'].get('errors_ratio') or 0) >= 0.01 and ((item['metrics'].get('requests_24h_equiv') if item['metrics'].get('requests_24h_equiv') is not None else item['metrics'].get('requests') or 0) >= 100 or (item['metrics'].get('errors_5xx') or 0) >= 10)"
     warn_expr: "((item['metrics'].get('errors_ratio') or 0) >= 0.001 and (item['metrics'].get('requests_24h_equiv') if item['metrics'].get('requests_24h_equiv') is not None else item['metrics'].get('requests') or 0) >= 100) or (item['metrics'].get('errors_ratio') or 0) >= 0.05"
   target: "item['target']"
@@ -16129,8 +16200,16 @@
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          metrics_read: false
+          metrics: {}
       - expect: "fail"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16172,6 +16251,7 @@
               - "tg"
       - expect: "warn"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16213,6 +16293,7 @@
               - "tg"
       - expect: "warn"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16254,6 +16335,7 @@
               - "tg"
       - expect: "pass"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16284,6 +16366,7 @@
             source: null
       - expect: "warn"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16325,6 +16408,7 @@
               - "tg"
       - expect: "pass"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16366,6 +16450,7 @@
               - "tg"
       - expect: "warn"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16410,6 +16495,8 @@
   type: summary
   each: traffic.ingresses
   rule:
+    needs: "item['metrics_read']"
+    needs_reason: "ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series)"
     expr: "(item['metrics'].get('p95_s_weighted') if item['metrics'].get('p95_s_weighted') is not None else item['metrics'].get('p95_s_avg') or 0) >= 2.0 and (item['metrics'].get('requests_24h_equiv') if item['metrics'].get('requests_24h_equiv') is not None else item['metrics'].get('requests') or 0) >= 100"
     warn_expr: "(item['metrics'].get('p95_s_weighted') if item['metrics'].get('p95_s_weighted') is not None else item['metrics'].get('p95_s_avg') or 0) >= 1.0"
   target: "item['target']"
@@ -16427,8 +16514,16 @@
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/web"
+          metrics_read: false
+          metrics: {}
       - expect: "fail"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16471,6 +16566,7 @@
               - "tg"
       - expect: "warn"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16513,6 +16609,7 @@
               - "tg"
       - expect: "pass"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16555,6 +16652,7 @@
               - "tg"
       - expect: "warn"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16597,6 +16695,7 @@
               - "tg"
       - expect: "warn"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -16639,6 +16738,7 @@
               - "tg"
       - expect: "pass"
         item:
+          metrics_read: true
           namespace: "prod-a"
           name: "web"
           target: "prod-a/web"
@@ -17113,6 +17213,8 @@
   type: summary
   each: traffic.db_exposed
   rule:
+    needs: "item.get('sg_exposure') != 'not-read'"
+    needs_reason: "load balancer security groups not read (elasticloadbalancing:Describe*, ec2:DescribeSecurityGroups)"
     expr: "item.get('sg_exposure') not in ('allow-list', 'blocked')"
     warn_expr: "item.get('sg_exposure') == 'allow-list'"
   target: "item['target']"
@@ -17137,6 +17239,10 @@
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          target: "prod-a/db"
+          sg_exposure: "not-read"
       - expect: "fail"
         item:
           type: "nodeport"
@@ -17206,7 +17312,7 @@
           open_ports: []
           note: "NLB created outside Kubernetes; 2 TargetGroupBindings bind it to prod-a/mysql, prod-b/postgresql. DB port on an external address, limited by the security group to listed addresses"
       # the security groups could not be read: fail, with "not read" in the evidence
-      - expect: "fail"
+      - expect: "skip"
         item:
           type: "nlb (defined outside the cluster)"
           namespace: null
@@ -17709,6 +17815,8 @@
   each: traffic.coredns
   cluster_level: true
   rule:
+    needs: "item['available']"
+    needs_reason: "CoreDNS metrics not read (coredns_dns_request_duration_seconds)"
     expr: "(item.get('p99_s_1h') or 0) >= 0.5"
     warn_expr: "(item.get('p99_s_1h') or 0) >= 0.05"
   target: "'cluster'"
@@ -17729,6 +17837,9 @@
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          available: false
       - expect: "fail"
         item:
           available: true
@@ -17991,6 +18102,8 @@
   type: summary
   each: scaling.hpa.rows
   rule:
+    needs: "item['at_min_ratio_15d'] is not None"
+    needs_reason: "HPA metrics not read (hpa_at_min_ratio_15d)"
     expr: "bool(item['never_scaled_15d']) and item['prod'] and not item['keda_owned']"
     warn_expr: "bool(item['never_scaled_15d']) and not item['keda_owned']"
   target: "item['target']"
@@ -18006,6 +18119,12 @@
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          namespace: "prod-a"
+          name: "web"
+          target: "prod-a/deployment/web"
+          at_min_ratio_15d: null
       - expect: "fail"
         item:
           namespace: "prod-a"
@@ -21302,6 +21421,8 @@
   type: summary
   each: tenancy.namespaces.rows
   rule:
+    needs: "item.get('cpu_metrics_read')"
+    needs_reason: "namespace CPU metrics not read (namespace_cpu_max_7d, namespace_cpu_median_7d)"
     expr: "(item['burst_ratio_7d'] or 0) >= 10 and (item['cpu_max_7d'] or 0) >= 1.0 and not item['has_quota'] and item['shares_nodes_with_prod'] and not item['system']"
     warn_expr: "(item['burst_ratio_7d'] or 0) >= 5 and (item['cpu_max_7d'] or 0) >= 0.5 and not item['has_quota'] and not item['system']"
   target: "item['namespace']"
@@ -21318,8 +21439,13 @@
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          namespace: "prod-a"
+          cpu_metrics_read: false
       - expect: "fail"
         item:
+          cpu_metrics_read: true
           namespace: "prod-d"
           kind: "prod"
           prod: true
@@ -21364,6 +21490,7 @@
           separation_possible: true
       - expect: "warn"
         item:
+          cpu_metrics_read: true
           namespace: "app-l-prod"
           kind: "prod"
           prod: true
@@ -21408,6 +21535,7 @@
           separation_possible: true
       - expect: "pass"
         item:
+          cpu_metrics_read: true
           namespace: "prod-a"
           kind: "prod"
           prod: true
@@ -21452,6 +21580,7 @@
           separation_possible: true
       - expect: "pass"
         item:
+          cpu_metrics_read: true
           namespace: "prod-a"
           kind: "prod"
           prod: true
@@ -21496,6 +21625,7 @@
           separation_possible: true
       - expect: "pass"
         item:
+          cpu_metrics_read: true
           namespace: "monitoring"
           kind: "system"
           prod: false

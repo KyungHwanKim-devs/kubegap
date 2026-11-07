@@ -651,7 +651,7 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
         else:
             echo(
                 f"observability: alerting rules {ob['rules']['alerting']} (symptom {ob['rules']['by_class'].get('symptom', 0)}, cause {ob['rules']['by_class'].get('cause', 0)}, app {ob['rules']['by_class'].get('app', 0)}), "
-                f"never fired in 15d {ob['alerts']['never_fired_count']}, firing all of 7d {len(ob['alerts']['always_firing_7d'])}, failure modes covered {ob['failure_modes']['covered_count']}/{ob['failure_modes']['applicable_count']}, "
+                f"never fired in 15d {ob['alerts']['never_fired_count']}, firing all of 7d {len(ob['alerts']['always_firing_7d'] or [])}, failure modes covered {ob['failure_modes']['covered_count']}/{ob['failure_modes']['applicable_count']}, "
                 f"default receiver {ob['alertmanager'].get('default_receiver')}{' (null!)' if ob['alertmanager'].get('default_is_null') else ''}, silences {len(ob['alertmanager'].get('silences_active', []))}, "
                 f"ingresses without latency/traffic/error metrics {len(ob['golden_signals']['missing_lte'])} of {ob['golden_signals']['ingresses']}, targets down {len(ob['targets']['down'])}"
             )
@@ -666,7 +666,7 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
                 + (
                     f", log lines 24h {sum(cp['log_volume_24h'].values()):,}, slow traces {cp['apiserver']['slow_traces_total']}"
                     if cp["platform"] == "eks"
-                    else f", etcd slow apply {cp['etcd']['apply_took_too_long']}, slow request {cp['etcd']['request_stats_slow']} (max {cp['etcd']['max_ms']:.0f}ms)"
+                    else (f", etcd slow apply {cp['etcd']['apply_took_too_long']}, slow request {cp['etcd']['request_stats_slow']} (max {cp['etcd']['max_ms']:.0f}ms)" if cp.get("etcd") else ", etcd not read (no server journal)")
                 )
             )
         else:

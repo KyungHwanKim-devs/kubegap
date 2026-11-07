@@ -60,6 +60,26 @@ def test_a_degraded_run_skips_with_a_reason_and_records_the_loss(runs, variant):
     assert "no prometheus connection" in section and "no node command backend" in section, "the http steps of the gone store and the node steps are skipped with the reason collect writes"
 
 
+@pytest.mark.parametrize("variant", [v for v, _, _ in VARIANTS if v.endswith("-degraded")])
+def test_a_degraded_run_never_turns_a_fail_or_warn_into_a_pass(runs, variant):
+    """The verdict level (#98, #141): a check that still ran (`done`) on the degraded copy and lost fail or warn findings must have skipped the targets it could not
+    judge (`skipped_reason`, counted in section 7-5). One check loses findings for a reason that is not a missing judgement and is named here with it:
+    `logs.signatures` scans fewer lines when the node logs are gone."""
+    full = json.loads(runs[variant.removesuffix("-degraded")]["findings.json"])
+    degraded = json.loads(runs[variant]["findings.json"])
+    before = {r["id"]: r for r in full["check_results"]}
+    after = {r["id"]: r for r in degraded["check_results"]}
+    lost_without_a_word = []
+    for cid in before:
+        if before[cid]["status"] != "done" or after[cid]["status"] != "done":
+            continue
+        fw_before = sum(1 for f in full["findings"] if f["check"] == cid and f["status"] in ("fail", "warn"))
+        fw_after = sum(1 for f in degraded["findings"] if f["check"] == cid and f["status"] in ("fail", "warn"))
+        if fw_after < fw_before and not after[cid].get("skipped_reason") and cid != "logs.signatures":
+            lost_without_a_word.append((cid, fw_before, fw_after))
+    assert lost_without_a_word == [], lost_without_a_word
+
+
 def test_summary_shape_doc_matches_the_summaries(runs):
     summaries = [json.loads(runs[v]["summary.json"]) for v, _, _ in VARIANTS if not v.endswith("-degraded")]
     assert regress.shape_mismatches(summaries) == []

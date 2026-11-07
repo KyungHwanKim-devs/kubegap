@@ -7,7 +7,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | kube context / cluster | `default` / default (k3s, v1.33.5+k3s1) |
 | Run time / mode | 2026-11-07T10:22:59+09:00 / full (collection 262.7 s, 0 steps skipped by mode, 0 failed) |
 | Profile | `lab` (detected) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.83 / 1.1.0 |
+| kubegap / rubric / signatures | <kubegap> / 0.1.84 / 1.1.0 |
 | Nodes / namespaces / pods / CRDs | 2 (Ready 2) / 26 / 153 / 64 |
 | Components (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
 | Metrics store | prometheus 3.7.3 retention 30d / size 0B via port-forward |
@@ -25,7 +25,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | low | 9 | 122 | no previous run of this mode |
 | info | 0 | 0 | no previous run of this mode |
 
-Checks 347: evaluated 295, disabled by profile 41, skipped 9, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
+Checks 347: evaluated 293, disabled by profile 41, skipped 11, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
 
 ### 1-1. Final judgment vs. first pass (adjustments)
 
@@ -99,8 +99,9 @@ Expected families missing (inventory): backup, slo.
 - Suppression expired 0: none
 - Tool missing 0: none
 - Not collected in full mode 0: none
-- Skipped or errored 9: `observability.log-volume-change` (skip: summary.logs.loki.volume_change missing), `security.no-secrets-manager` (skip: profile lab does not require family secrets-manager), `scaling.no-node-autoscaler` (skip: profile lab does not require family node-autoscaler), `observability.log-coverage-gap` (skip: summary.logs.loki.coverage missing), `observability.loki-not-ready` (skip: nothing to judge: loki not present), `observability.loki-ingest-discarded` (skip: summary.logs.agents.loki_metrics missing), `observability.promtail-dropped` (skip: summary.logs.agents.promtail missing), `observability.log-error-ratio-high` (skip: summary.logs.loki.namespaces_1h missing), `observability.unstructured-logs` (skip: summary.logs.loki.namespaces_1h missing)
+- Skipped or errored 11: `observability.log-volume-change` (skip: summary.logs.loki.volume_change missing), `security.no-secrets-manager` (skip: profile lab does not require family secrets-manager), `scaling.no-node-autoscaler` (skip: profile lab does not require family node-autoscaler), `observability.log-coverage-gap` (skip: summary.logs.loki.coverage missing), `observability.loki-not-ready` (skip: nothing to judge: loki not present), `observability.loki-ingest-discarded` (skip: summary.logs.agents.loki_metrics missing), `observability.promtail-dropped` (skip: summary.logs.agents.promtail missing), `observability.log-error-ratio-high` (skip: summary.logs.loki.namespaces_1h missing), `observability.unstructured-logs` (skip: summary.logs.loki.namespaces_1h missing), `traffic.ingress-5xx-ratio` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)), `traffic.ingress-p95-latency` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29))
 - Judged in part 0 (some targets lacked what the rule needs; those are not judged, not passed): none
+- Query returned no series 6 (every metric name the query reads has series, so nothing happened; a name with no series would be a skip): `resources.oomkilled`, `resources.large-request-binpacking`, `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `node.network-errors`, `scaling.pod-pending-long`
 
 ## 7. Appendix
 
@@ -143,7 +144,7 @@ Deprecated-API tools: kubent 28 of 41 Lists answered (13 refused or not served);
 
 ### 7-2. Checks evaluated
 
-347 checks: disabled 41, done 295, llm 2, skip 9. Load errors: none.
+347 checks: disabled 41, done 293, llm 2, skip 11. Load errors: none.
 
 ### 7-3. Signature matches and unclassified errors
 
@@ -8663,6 +8664,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 {
  "default_deny_ingress_namespaces": [],
  "enforced": true,
+ "policies": 8,
  "prod_without_default_deny": [
   "app-a-prod",
   "app-b-prod",
@@ -9555,6 +9557,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "cpu_limits": 8.2,
  "cpu_max_7d": 0.589,
  "cpu_median_7d": 0.028,
+ "cpu_metrics_read": true,
  "cpu_p95_7d": 0.102,
  "has_quota": false,
  "kind": "prod",
@@ -9741,6 +9744,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 
 ```json
 {
+ "available": true,
  "p99_s_1h": 0.1457,
  "servfail_ratio_1h": 0.0
 }
@@ -10584,6 +10588,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 {
  "allocatable_cpu": 18.0,
  "can_drop_largest_node": false,
+ "metrics_read": true,
  "nodes": 2,
  "p95_used_cpu": 0.92,
  "p95_util_ratio": 0.051,
@@ -10888,6 +10893,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "prod": false
   }
  ],
+ "secrets_read": true,
  "secrets_total": 139
 }
 ```
@@ -12483,7 +12489,8 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "192.168.90.101",
    "192.168.90.102"
   ]
- }
+ },
+ "servers_read": true
 }
 ```
 
@@ -12495,7 +12502,8 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "check_config_missing": [
   "CONFIG_INET_XFRM_MODE_TRANSPORT",
   "CONFIG_RT_GROUP_SCHED"
- ]
+ ],
+ "servers_read": true
 }
 ```
 

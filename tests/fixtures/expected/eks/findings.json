@@ -4,7 +4,7 @@
   "source": "detected",
   "missing_file": false
  },
- "rubric_version": "0.1.83",
+ "rubric_version": "0.1.84",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -262,7 +262,9 @@
    "id": "observability.alertmanager-notification-failed",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "empty": 1
+   }
   },
   {
    "id": "observability.silence-forgotten",
@@ -329,7 +331,9 @@
    "id": "observability.scrape-targets-down",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "empty": 1
+   }
   },
   {
    "id": "resilience.no-backup",
@@ -1280,7 +1284,9 @@
    "id": "controlplane.apiserver-401-rate",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "empty": 1
+   }
   },
   {
    "id": "controlplane.etcd-db-size",
@@ -1715,7 +1721,9 @@
    "id": "scaling.pod-pending-long",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "empty": 1
+   }
   },
   {
    "id": "scaling.karpenter-nodeclaim-slow",
@@ -2143,6 +2151,14 @@
   },
   {
    "id": "albctl.tgb-stale-or-orphan",
+   "status": "done",
+   "reason": null,
+   "counts": {
+    "pass": 1
+   }
+  },
+  {
+   "id": "albctl.target-group-without-tgb",
    "status": "done",
    "reason": null,
    "counts": {
@@ -2915,9 +2931,19 @@
    "reason": null,
    "counts": {
     "warn": 4,
-    "pass": 4,
-    "fail": 1
+    "pass": 5
    }
+  },
+  {
+   "id": "vpccni.no-available-ip",
+   "status": "done",
+   "reason": null,
+   "counts": {
+    "pass": 6,
+    "skipped": 2,
+    "fail": 1
+   },
+   "skipped_reason": "VPC CNI metrics not read (awscni_no_available_ip_addresses) (2)"
   },
   {
    "id": "vpccni.max-pods-exceeds-ip-capacity",
@@ -3260,10 +3286,10 @@
    "source": "summary.json:traffic.db_exposed"
   },
   {
-   "check": "vpccni.node-ip-exhaustion",
+   "check": "vpccni.no-available-ip",
    "target": "ip-10-0-1-139.ap-northeast-2.compute.internal",
    "status": "fail",
-   "evidence": "node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): pod IPs 36/56 (0.643), ENI 4/4 (at limit True), 'no available IP' events 4, max-pods 58, prod pods 23. prefix delegation False",
+   "evidence": "node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): ipamd answered 'no available IP' 4 times since it started; pod IPs 36/56 (0.643), ENI 4/4, max-pods 58",
    "source": "summary.json:vpccni.nodes"
   },
   {
@@ -3579,7 +3605,7 @@
    "target": "Amazon Linux 2 compatibility",
    "status": "fail",
    "evidence": "Amazon Linux 2 compatibility (UPGRADE_READINESS, k8s 1.33): ERROR — Amazon EKS stopped publishing EKS-optimized Amazon Linux 2 (AL2) AMIs on November 26, 2025. AL2023 and Bottlerocket based AMIs for Amazon EKS are available for all supported Kubernetes versions includ",
-   "source": "summary.json:hygiene.deprecated.eks_insights_failing"
+   "source": "summary.json:hygiene.deprecated.eks_insights.failing"
   },
   {
    "check": "hygiene.mutable-image-tag",
@@ -4303,13 +4329,6 @@
    "target": "cluster",
    "status": "warn",
    "evidence": "reconcile errors since leader start 41, apiserver 429/503 responses 126, max workqueue depth 0.0, Ingresses without an LB address [], stale TargetGroupBindings []",
-   "source": "summary.json:albctl.summary"
-  },
-  {
-   "check": "albctl.tgb-stale-or-orphan",
-   "target": "cluster",
-   "status": "warn",
-   "evidence": "TargetGroupBindings 52 (targetType {'ip': 52}), generation lagging [], Service missing [], hand-made TGBs 9, target groups without a binding (traffic section) 1",
    "source": "summary.json:albctl.summary"
   },
   {
@@ -5620,6 +5639,13 @@
    "target": "cluster",
    "status": "warn",
    "evidence": "AWS API calls since leader start 242614, top [['Elastic Load Balancing v2/DescribeTargetHealth', 76055], ['Elastic Load Balancing v2/DescribeTargetGroupAttributes', 43347], ['EC2/DescribeInstances', 38801], ['EC2/DescribeSecurityGroups', 24999], ['Elastic Load Balancing v2/RegisterTargets', 11793]], average retries per call 0.0, slowest by average latency [['Shield/GetSubscriptionState', 0.759], ['EC2/RevokeSecurityGroupIngress', 0.317], ['EC2/AuthorizeSecurityGroupIngress', 0.295]], apiserver 429/503 126",
+   "source": "summary.json:albctl.summary"
+  },
+  {
+   "check": "albctl.target-group-without-tgb",
+   "target": "cluster",
+   "status": "warn",
+   "evidence": "target groups the controller does not own 1 (TargetGroupBindings 52, hand-made 9)",
    "source": "summary.json:albctl.summary"
   },
   {

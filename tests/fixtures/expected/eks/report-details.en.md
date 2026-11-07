@@ -7,7 +7,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | kube context / cluster | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
 | Run time / mode | 2026-11-07T10:33:37+09:00 / full (collection 300.7 s, 0 steps skipped by mode, 6 failed) |
 | Profile | `prod` (detected) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.83 / 1.1.0 |
+| kubegap / rubric / signatures | <kubegap> / 0.1.84 / 1.1.0 |
 | Nodes / namespaces / pods / CRDs | 9 (Ready 9) / 26 / 154 / 47 |
 | Components (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
 | Metrics store | prometheus 2.49.1 retention 15d / size 0B via port-forward |
@@ -21,11 +21,11 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 |---|---|---|---|
 | critical | 1 | 3 | no previous run of this mode |
 | high | 35 | 29 | no previous run of this mode |
-| medium | 117 | 166 | no previous run of this mode |
-| low | 17 | 144 | no previous run of this mode |
+| medium | 117 | 165 | no previous run of this mode |
+| low | 17 | 145 | no previous run of this mode |
 | info | 2 | 0 | no previous run of this mode |
 
-Checks 365: evaluated 358, disabled by profile 2, skipped 3, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
+Checks 367: evaluated 360, disabled by profile 2, skipped 3, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
 
 ### 1-1. Final judgment vs. first pass (adjustments)
 
@@ -74,7 +74,7 @@ Checks 365: evaluated 358, disabled by profile 2, skipped 3, not collected in th
 | `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | high |  | Target group k8s-prodinse-insertoo-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0 … |
 | `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | high |  | Target group k8s-prodrhem-appnbac-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0 … |
 | `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | high |  | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com'], sourceRanges None … |
-| `vpccni.node-ip-exhaustion.ip-10-0-1-139.ap-northeast-2.compute.internal` | high |  | node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): pod IPs 36/56 (0.643), ENI 4/4 (at limit True), 'no available IP' events 4, max-pods 58, prod pods 23. prefix delegation False |
+| `vpccni.no-available-ip.ip-10-0-1-139.ap-northeast-2.compute.internal` | high |  | node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): ipamd answered 'no available IP' 4 times since it started; pod IPs 36/56 (0.643), ENI 4/4, max-pods 58 |
 
 (consecutive-run counts need diff.json; none for this snapshot)
 
@@ -109,7 +109,8 @@ Expected families missing (inventory): backup, event-retention, slo, certificate
 - Tool missing 0: none
 - Not collected in full mode 0: none
 - Skipped or errored 3: `observability.fluentbit-output-errors` (skip: summary.logs.agents.fluent-bit missing), `traffic.ingress-nginx-vulnerable-version` (skip: summary.traffic.nginx missing), `traffic.ingress-nginx-retired` (skip: summary.traffic.nginx missing)
-- Judged in part 22 (some targets lacked what the rule needs; those are not judged, not passed): `node.kernel-oom-node-level` (2 not judged: node not read (2)), `node.kernel-lockup` (2 not judged: node not read (2)), `node.kernel-io-fs-errors` (2 not judged: node not read (2)), `node.kernel-nic-events` (2 not judged: node not read (2)), `node.conntrack-table-full` (2 not judged: node not read (2)), `node.kernel-net-mem-pressure` (2 not judged: node not read (2)), `node.cgroup-v1` (2 not judged: node not read (2)), `node.sysctl-tuning` (2 not judged: node not read (2)), `node.cri-not-ready` (2 not judged: node not read, or cri not read (2)), `node.cri-exited-containers` (2 not judged: node not read (2)), `node.service-restarts` (2 not judged: node not read (2)), `node.reboot-required` (2 not judged: node not read (2)), `node.os-updates-pending` (2 not judged: node not read (2)), `node.kubelet-reserved-missing` (2 not judged: node not read, or kubelet not read (2)), `node.kubelet-eviction-memory-missing` (2 not judged: node not read, or kubelet not read (2)), `node.clock-unsynced-os` (2 not judged: node not read (2)), `node.zombie-processes` (2 not judged: node not read (2)), `node.kubelet-api-qps-low` (2 not judged: node not read, or kubelet not read (2)), `node.docker-and-containerd` (2 not judged: node not read (2)), `node.container-writable-layer-large` (2 not judged: node not read (2)), `node.large-images` (2 not judged: node not read (2)), `vpccni.ec2-api-errors` (2 not judged: metrics not read (2))
+- Judged in part 23 (some targets lacked what the rule needs; those are not judged, not passed): `node.kernel-oom-node-level` (2 not judged: node not read (2)), `node.kernel-lockup` (2 not judged: node not read (2)), `node.kernel-io-fs-errors` (2 not judged: node not read (2)), `node.kernel-nic-events` (2 not judged: node not read (2)), `node.conntrack-table-full` (2 not judged: node not read (2)), `node.kernel-net-mem-pressure` (2 not judged: node not read (2)), `node.cgroup-v1` (2 not judged: node not read (2)), `node.sysctl-tuning` (2 not judged: node not read (2)), `node.cri-not-ready` (2 not judged: node not read, or cri not read (2)), `node.cri-exited-containers` (2 not judged: node not read (2)), `node.service-restarts` (2 not judged: node not read (2)), `node.reboot-required` (2 not judged: node not read (2)), `node.os-updates-pending` (2 not judged: node not read (2)), `node.kubelet-reserved-missing` (2 not judged: node not read, or kubelet not read (2)), `node.kubelet-eviction-memory-missing` (2 not judged: node not read, or kubelet not read (2)), `node.clock-unsynced-os` (2 not judged: node not read (2)), `node.zombie-processes` (2 not judged: node not read (2)), `node.kubelet-api-qps-low` (2 not judged: node not read, or kubelet not read (2)), `node.docker-and-containerd` (2 not judged: node not read (2)), `node.container-writable-layer-large` (2 not judged: node not read (2)), `node.large-images` (2 not judged: node not read (2)), `vpccni.no-available-ip` (2 not judged: VPC CNI metrics not read (awscni_no_available_ip_addresses) (2)), `vpccni.ec2-api-errors` (2 not judged: metrics not read (2))
+- Query returned no series 4 (every metric name the query reads has series, so nothing happened; a name with no series would be a skip): `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `controlplane.apiserver-401-rate`, `scaling.pod-pending-long`
 
 ## 7. Appendix
 
@@ -152,7 +153,7 @@ Deprecated-API tools: kubent 28 of 41 Lists answered (13 refused or not served);
 
 ### 7-2. Checks evaluated
 
-365 checks: disabled 2, done 358, llm 2, skip 3. Load errors: none.
+367 checks: disabled 2, done 360, llm 2, skip 3. Load errors: none.
 
 ### 7-3. Signature matches and unclassified errors
 
@@ -248,7 +249,7 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | fail | high | Target group k8s-prodinse-insertoo-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-y-frontend'] |
 | `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | fail | high | Target group k8s-prodrhem-appnbac-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0, health check / expected codes 200, backends ['deployment/app-z-backend'] |
 | `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | fail | high | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to the internet by the … |
-| `vpccni.node-ip-exhaustion.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | high | node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): pod IPs 36/56 (0.643), ENI 4/4 (at limit True), 'no available IP' events 4, max-pods 58, prod pods 23. prefix delegation False |
+| `vpccni.no-available-ip.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | high | node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): ipamd answered 'no available IP' 4 times since it started; pod IPs 36/56 (0.643), ENI 4/4, max-pods 58 |
 | `controlplane.apiserver-5xx.cluster` | warn | high | 5xx per second 0.004 (code 503) |
 | `controlplane.scheduler-unschedulable.arc-runners/self-hosted-arm64-8msc5-runner` | warn | high | 24h 'Unable to schedule pod; no fit' 36 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
 | `controlplane.scheduler-unschedulable.prod-app-r/app-r-backend` | warn | high | 24h 'Unable to schedule pod; no fit' 4 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
@@ -396,7 +397,6 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `traffic.shared-alb-group.alb-group/app-u-prod-lb` | fail | medium | ALB group app-u-prod-lb: 41 ingresses, 48 hosts, 16 namespaces ['app-ab-prod', 'argocd', 'dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y', 'middleware', 'monitoring', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend'], kinds … |
 | `vpccni.prefix-delegation-off.cluster` | fail | medium | ENABLE_PREFIX_DELEGATION false, nitro nodes 9/9. nodes above 50% IP usage ['ip-10-0-2-218.ap-northeast-2.compute.internal', 'ip-10-0-1-245.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal' … |
 | `albctl.reconcile-errors.cluster` | warn | medium | reconcile errors since leader start 41, apiserver 429/503 responses 126, max workqueue depth 0.0, Ingresses without an LB address [], stale TargetGroupBindings [] |
-| `albctl.tgb-stale-or-orphan.cluster` | warn | medium | TargetGroupBindings 52 (targetType {'ip': 52}), generation lagging [], Service missing [], hand-made TGBs 9, target groups without a binding (traffic section) 1 |
 | `argocd.admin-account-no-sso.cluster` | warn | medium | admin.enabled True, SSO (dex/oidc) False, anonymous False, RBAC policy.default '' / policy.csv 0 lines, exec.enabled False, URL https://deploy.lab-k.example |
 | `argocd.components-not-ha.cluster` | warn | medium | components (ready/replicas) {'applicationset-controller': '1/1', 'dex-server': '1/1', 'notifications-controller': '1/1', 'redis': '1/1', 'repo-server': '1/1', 'server': '1/1', 'application-controller': '1/1'}, not ready [], single replica (server, repo-server) ['repo-server', 'server'], version … |
 | `controlplane.authenticator-failures.cluster` | warn | medium | 24h authentication failures 8: [{'message': 'access denied', 'count': 8}] |
@@ -579,6 +579,7 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `tenancy.dev-shares-prod-nodes.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | low | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default): prod pods 23 (['app-ab-prod', 'prod-app-s', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend']) together with dev pods 10 (['dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y']). Memory limit … |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-218.ap-northeast-2.compute.internal` | fail | low | Node ip-10-0-2-218.ap-northeast-2.compute.internal (pool system-ondemand): prod pods 2 (['prod-app-t', 'prod-app-x']) together with dev pods 1 (['dev-app-aa']). Memory limit total/allocatable 1.79, CPU limit total/allocatable 1.81, containers without a memory limit 1 |
 | `albctl.aws-api-churn.cluster` | warn | low | AWS API calls since leader start 242614, top [['Elastic Load Balancing v2/DescribeTargetHealth', 76055], ['Elastic Load Balancing v2/DescribeTargetGroupAttributes', 43347], ['EC2/DescribeInstances', 38801], ['EC2/DescribeSecurityGroups', 24999], ['Elastic Load Balancing v2/RegisterTargets' … |
+| `albctl.target-group-without-tgb.cluster` | warn | low | target groups the controller does not own 1 (TargetGroupBindings 52, hand-made 9) |
 | `alertmanager.single-instance.monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager` | warn | low | replicas 1 (ready 1), cluster disabled (peers 0), data storage emptyDir (silence/notification state preserved 120h) |
 | `argocd.notifications-not-configured.cluster` | warn | low | service.* in argocd-notifications-cm False (triggers 0), prod apps 9, and no Argo CD metrics flow to Alertmanager either (no ServiceMonitor) |
 | `argocd.prod-tracks-moving-ref.cluster` | warn | low | prod apps 9, apps whose targetRevision is a branch or HEAD 9 ['argocd/application/app-w-prod', 'argocd/application/app-t-prod', 'argocd/application/app-x-prod', 'argocd/application/app-s-prod', 'argocd/application/app-y-prod', 'argocd/application/app-ab-prod' … |
@@ -1539,11 +1540,10 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>vpccni.node-ip-exhaustion.ip-10-0-1-139.ap-northeast-2.compute.internal</code></summary>
+<details><summary><code>vpccni.no-available-ip.ip-10-0-1-139.ap-northeast-2.compute.internal</code></summary>
 
 ```json
 {
- "eni_at_max": true,
  "instance_type": "r8gd.xlarge",
  "ip_max": 56,
  "ip_usage_ratio": 0.643,
@@ -1572,9 +1572,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "metrics_available": true,
  "no_available_ip_events": 4,
  "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
- "pool": "default",
- "prefix_delegation": false,
- "prod_pods": 23
+ "pool": "default"
 }
 ```
 
@@ -2156,6 +2154,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   }
  ],
  "instances": 9,
+ "instances_source": "aws/ec2-instances-imds.json",
  "irsa_service_accounts": [
   "external-secrets/external-secrets",
   "karpenter/karpenter",
@@ -2252,7 +2251,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "eni-0d0af8b43930463eb": 2
   }
  },
- "metrics_available": true,
  "no_available_ip_events": 0,
  "node": "ip-10-0-1-137.ap-northeast-2.compute.internal",
  "pool": "default",
@@ -2292,7 +2290,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "eni-0a62cc4b92b77e4a5": 3
   }
  },
- "metrics_available": true,
  "no_available_ip_events": 0,
  "node": "ip-10-0-1-241.ap-northeast-2.compute.internal",
  "pool": "system-ondemand",
@@ -2330,7 +2327,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "eni-0d8e25582fc66ea27": 3
   }
  },
- "metrics_available": true,
  "no_available_ip_events": 0,
  "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
  "pool": "default",
@@ -2369,7 +2365,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "eni-0f0988076936759ab": 5
   }
  },
- "metrics_available": true,
  "no_available_ip_events": 0,
  "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
  "pool": "system-ondemand",
@@ -2406,6 +2401,8 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "idle_monthly_usd": 431.52,
  "idle_ratio": 0.94,
  "monthly_usd": 459.83,
+ "node_metrics_read": true,
+ "pricing_read": true,
  "spot_node_share": 0.44,
  "spot_savings_monthly_usd": 365.92,
  "usd_per_core_month": 23.74
@@ -4127,6 +4124,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "cpu_limits": 12.2,
  "cpu_max_7d": 3.931,
  "cpu_median_7d": 0.011,
+ "cpu_metrics_read": true,
  "cpu_p95_7d": 0.904,
  "has_quota": false,
  "kind": "prod",
@@ -4510,6 +4508,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "k8s-prodillu-appi-c50edbe2df"
   ]
  },
+ "metrics_read": true,
  "target": "prod-app-s/app-s-api"
 }
 ```
@@ -4560,6 +4559,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 
 ```json
 {
+ "capacity_read": true,
  "nitro_nodes": 9,
  "nodes": 9,
  "nodes_near_ip_limit": [
@@ -4591,32 +4591,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "rest_client_429_503": 126,
  "tgb_stale": [],
  "workqueue_depth_max": 0.0
-}
-```
-
-</details>
-<details><summary><code>albctl.tgb-stale-or-orphan.cluster</code></summary>
-
-```json
-{
- "tgb_by_target_type": {
-  "ip": 52
- },
- "tgb_count": 52,
- "tgb_manual": [
-  "dev-app-s/app-s-dev-mysql-tgb",
-  "dev-app-y/app-y-dev-mysql-tgb",
-  "dev-app-v/app-v-dev-mysql-tgb",
-  "prod-app-t/app-t-prod-postgresql-tgb",
-  "prod-app-s/app-s-prod-mysql-tgb",
-  "prod-app-y/app-y-prod-mysql-tgb",
-  "prod-app-z-backend/app-z-prod-neo4j-tgb",
-  "prod-app-z-backend/app-z-prod-pg-proxy-tgb",
-  "prod-app-v/app-v-prod-mysql-tgb"
- ],
- "tgb_service_missing": [],
- "tgb_stale": [],
- "traffic_target_groups_without_tgb": 1
 }
 ```
 
@@ -8426,6 +8400,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "k8s-prodillu-appi-d65740e6d5"
   ]
  },
+ "metrics_read": true,
  "target": "prod-app-s/app-s-backend"
 }
 ```
@@ -8460,6 +8435,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "k8s-prodtoot-appkf-36f816b829"
   ]
  },
+ "metrics_read": true,
  "target": "prod-app-v/app-v-frontend"
 }
 ```
@@ -8493,6 +8469,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "k8s-prodsoro-appmba-f68effe430"
   ]
  },
+ "metrics_read": true,
  "target": "prod-app-r/app-r-backend"
 }
 ```
@@ -8526,6 +8503,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "k8s-prodcurt-curtainc-fc2d368787"
   ]
  },
+ "metrics_read": true,
  "target": "prod-app-t/app-t-ai"
 }
 ```
@@ -9044,6 +9022,28 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  ],
  "metrics_available": true,
  "rest_client_429_503": 126
+}
+```
+
+</details>
+<details><summary><code>albctl.target-group-without-tgb.cluster</code></summary>
+
+```json
+{
+ "target_groups_read": true,
+ "tgb_count": 52,
+ "tgb_manual": [
+  "dev-app-s/app-s-dev-mysql-tgb",
+  "dev-app-y/app-y-dev-mysql-tgb",
+  "dev-app-v/app-v-dev-mysql-tgb",
+  "prod-app-t/app-t-prod-postgresql-tgb",
+  "prod-app-s/app-s-prod-mysql-tgb",
+  "prod-app-y/app-y-prod-mysql-tgb",
+  "prod-app-z-backend/app-z-prod-neo4j-tgb",
+  "prod-app-z-backend/app-z-prod-pg-proxy-tgb",
+  "prod-app-v/app-v-prod-mysql-tgb"
+ ],
+ "traffic_target_groups_without_tgb": 1
 }
 ```
 

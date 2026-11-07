@@ -95,6 +95,8 @@ LABELS: dict[str, dict[str, str]] = {
         "some targets lacked what the rule needs; those are not judged, not passed": "판정에 필요한 자료가 없는 대상은 판정하지 않았고 통과로 세지 않았어요",
         "until": "기한",
         "not judged": "판정 안 함",
+        "Query returned no series": "질의 결과가 빈 항목",
+        "every metric name the query reads has series, so nothing happened; a name with no series would be a skip": "질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻이에요. 이름 자체가 없으면 건너뜀으로 처리해요",
         "## 7. Appendix": "## 7. 부록",
         "### 7-1. Collectors and steps run": "### 7-1. 실행한 수집기와 단계",
         "Collector": "수집기",
@@ -459,6 +461,8 @@ def render_details(snap: Path, language: str = "en") -> Path:
         f"- {L('Judged in part')} {len(part)} ({L('some targets lacked what the rule needs; those are not judged, not passed')}): "
         + (", ".join(f"`{r['id']}` ({(r.get('counts') or {}).get('skipped')} {L('not judged')}: {r['skipped_reason']})" for r in part) if part else none)
     )
+    emp = [r for r in results if r.get("status") == "done" and (r.get("counts") or {}).get("empty")]
+    w(f"- {L('Query returned no series')} {len(emp)} ({L('every metric name the query reads has series, so nothing happened; a name with no series would be a skip')}): " + (", ".join(f"`{r['id']}`" for r in emp) if emp else none))
     w("")
 
     # ---- 7. appendix

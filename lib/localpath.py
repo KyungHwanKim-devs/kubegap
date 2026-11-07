@@ -157,7 +157,8 @@ def analyze(snap: Path, inv: dict | None, k3s: dict | None) -> dict:
         "provisioner": prov,
         "storage_classes": sc_rows,
         "pvs": pv_rows,
-        "over_capacity": over,
+        "over_capacity": over if lp.get("du_read") else None,  # None, not []: the node du list was not read (#141)
+        "skip_reason": None if lp.get("du_read") else "node directory sizes not read (the k3s-platform node step's du section: no node access)",
         "summary": summary,
         "note": "local-path volumes are plain directories, so PVC capacity is not a limit (du usage can exceed it). Directory usage and orphan directories come from the node script's (SSH) du list (top 30). Filesystem free space comes from node-exporter",
     }
