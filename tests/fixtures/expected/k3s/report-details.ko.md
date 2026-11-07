@@ -7,7 +7,7 @@
 | kube context / 클러스터 | `default` / default (k3s, v1.33.5+k3s1) |
 | 실행 시각 / 모드 | 2026-11-07T10:22:59+09:00 / full (수집 262.7초, 모드 때문에 건너뛴 단계 0개, 실패 0개) |
 | 프로파일 | `lab` (detected) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | 0.1.4 / 0.1.85 / 1.1.0 |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | 0.1.4 / 0.1.86 / 1.1.0 |
 | 검증한 버전 범위 | Kubernetes v1.33.5+k3s1 (검증 범위 안 1.30 ~ 1.37) · Prometheus 3.7.3 (검증 범위 안 2.49 ~ 3.15) · Alertmanager 0.29.0 (검증 범위 안 0.26 ~ 0.34) · Grafana 12.2.1 (검증 범위 안 10.2 ~ 13.3) |
 | 노드 / 네임스페이스 / 파드 / CRD | 2 (Ready 2) / 26 / 153 / 64 |
 | 컴포넌트 (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
@@ -26,7 +26,7 @@
 | low | 9 | 122 | 같은 모드의 지난 점검 없음 |
 | info | 0 | 0 | 같은 모드의 지난 점검 없음 |
 
-점검 항목 347개 중 판정 293개, 프로파일에서 끈 것 41개, 건너뜀 11개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개예요. 숨긴 항목은 0개예요.
+점검 항목 349개 중 판정 295개, 프로파일에서 끈 것 41개, 건너뜀 11개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개예요. 숨긴 항목은 0개예요.
 
 ### 1-1. 자동 판정과 최종 판정이 다른 곳
 
@@ -145,7 +145,7 @@
 
 ### 7-2. 판정한 점검 항목
 
-점검 항목 347개: disabled 41, done 293, llm 2, skip 11. 불러오기 오류: 없음.
+점검 항목 349개: disabled 41, done 295, llm 2, skip 11. 불러오기 오류: 없음.
 
 ### 7-3. 로그 시그니처 일치와 분류 안 된 오류
 

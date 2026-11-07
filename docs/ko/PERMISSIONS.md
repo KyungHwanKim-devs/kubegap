@@ -171,7 +171,8 @@ PromQL로 판정하는 모든 항목이 이 연결에 기댑니다. `type: metri
 | `argoproj.io` | Application, ApplicationSet, AppProject | `argocd.*` 13개 |
 | `cert-manager.io` | Certificate, CertificateRequest, Issuer, ClusterIssuer | `certmanager.*` 9개 |
 | `acme.cert-manager.io` | Order, Challenge | `certmanager.acme-challenge-failing` |
-| `metallb.io` | IPAddressPool, L2Advertisement, BGPPeer | `traffic.metallb-pool-near-full`, `traffic.metallb-l2-leader-concentration`, `traffic.metallb-config-stale`, `traffic.metallb-single-lb-service`, `traffic.metallb-version-old`, `traffic.metallb-speaker-not-ready` |
+| `metallb.io` | IPAddressPool, L2Advertisement, BGPAdvertisement, BGPPeer, ServiceL2Status, ServiceBGPStatus, ConfigurationState | `traffic.metallb-pool-near-full`, `traffic.metallb-l2-leader-concentration`, `traffic.metallb-config-stale`, `traffic.metallb-single-lb-service`, `traffic.metallb-version-old`, `traffic.metallb-speaker-not-ready`, `traffic.metallb-service-ip-not-announced`, `traffic.metallb-bgp-session-down` |
+| `frrk8s.metallb.io` | BGPSessionState (MetalLB 0.15.2 이상의 frr-k8s 모드가 노드·피어마다 씀) | `traffic.metallb-bgp-session-down` (frr-k8s 모드) |
 | `elbv2.k8s.aws` | TargetGroupBinding, IngressClassParams | `albctl.tgb-stale-or-orphan`, `traffic.*`의 ALB 행 |
 | `networking.k8s.aws` | PolicyEndpoint | VPC CNI 네트워크 정책을 보는 `security.networkpolicy-not-enforced` |
 | `crd.k8s.amazonaws.com` | ENIConfig | `vpccni.*`의 커스텀 네트워킹 행 |

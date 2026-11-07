@@ -7,7 +7,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | kube context / cluster | `default` / default (k3s, v1.33.5+k3s1) |
 | Run time / mode | 2026-11-07T10:22:59+09:00 / full (collection 262.7 s, 0 steps skipped by mode, 0 failed) |
 | Profile | `lab` (detected) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.85 / 1.1.0 |
+| kubegap / rubric / signatures | <kubegap> / 0.1.86 / 1.1.0 |
 | Verified against | Kubernetes v1.33.5+k3s1 (verified 1.30 to 1.37) · Prometheus 3.7.3 (verified 2.49 to 3.15) · Alertmanager 0.29.0 (verified 0.26 to 0.34) · Grafana 12.2.1 (verified 10.2 to 13.3) |
 | Nodes / namespaces / pods / CRDs | 2 (Ready 2) / 26 / 153 / 64 |
 | Components (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
@@ -26,7 +26,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | low | 9 | 122 | no previous run of this mode |
 | info | 0 | 0 | no previous run of this mode |
 
-Checks 347: evaluated 293, disabled by profile 41, skipped 11, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
+Checks 349: evaluated 295, disabled by profile 41, skipped 11, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
 
 ### 1-1. Final judgment vs. first pass (adjustments)
 
@@ -145,7 +145,7 @@ Deprecated-API tools: kubent 28 of 41 Lists answered (13 refused or not served);
 
 ### 7-2. Checks evaluated
 
-347 checks: disabled 41, done 293, llm 2, skip 11. Load errors: none.
+349 checks: disabled 41, done 295, llm 2, skip 11. Load errors: none.
 
 ### 7-3. Signature matches and unclassified errors
 

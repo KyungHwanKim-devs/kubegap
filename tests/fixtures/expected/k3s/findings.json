@@ -4,7 +4,7 @@
   "source": "detected",
   "missing_file": false
  },
- "rubric_version": "0.1.85",
+ "rubric_version": "0.1.86",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -2596,6 +2596,22 @@
   },
   {
    "id": "traffic.metallb-version-old",
+   "status": "done",
+   "reason": null,
+   "counts": {
+    "pass": 1
+   }
+  },
+  {
+   "id": "traffic.metallb-service-ip-not-announced",
+   "status": "done",
+   "reason": null,
+   "counts": {
+    "pass": 1
+   }
+  },
+  {
+   "id": "traffic.metallb-bgp-session-down",
    "status": "done",
    "reason": null,
    "counts": {

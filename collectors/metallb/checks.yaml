@@ -1744,3 +1744,156 @@
           config_errors: []
           config_not_reported: []
           update_errors_read: true
+
+- id: traffic.metallb-service-ip-not-announced
+  name: MetalLB gave a Service an IP that no node announces
+  area: traffic
+  type: summary
+  each: metallb.pools.services
+  profiles: [prod, lab]
+  rule:
+    needs: "item.get('pending') or item.get('announcers_read') or item.get('pool_advertised') == []"
+    needs_reason: "the announcing nodes were not read (speaker metrics from only some speakers, status objects not written before 0.14.6, ServiceBGPStatus not before 0.15.0) and the pool has an advertisement or the IP is in no IPAddressPool, so the config alone does not decide"
+    expr: "not item.get('pending') and ((item.get('announcers_read') and not item.get('announced_by')) or item.get('pool_advertised') == [])"
+  target: "f\"{item['namespace']}/{item['name']}\""
+  evidence: "f\"Service {item['namespace']}/{item['name']} holds {item.get('ips')} from pool {item.get('pool')}; advertisements reaching the pool {item.get('pool_advertised')}; announcing nodes {[(a['node'], a['protocol']) for a in item.get('announced_by') or []]}\" + ('' if item.get('announcers_read') else ' (announcing nodes not read: judged on the advertisements alone)')"
+  severity_default: high
+  symptom_linked: true
+  why: >
+    The controller allocates the IP from the pool and writes it into the Service, so `kubectl get svc` shows an EXTERNAL-IP, but only a speaker that has an L2Advertisement or BGPAdvertisement
+    reaching that pool answers ARP for it or announces it to a router. With none, or with one that names other pools, the IP is unreachable from outside while every object looks fine: the most
+    common MetalLB misconfiguration. The same symptom with an advertisement in place is a speaker not running on the eligible nodes or a nodeSelector that matches no node. Through 0.15 the
+    announcing nodes are `metallb_speaker_announced` on every speaker; from 0.14.6 they are the ServiceL2Status and ServiceBGPStatus objects; a pool no advertisement reaches is decided from the
+    objects on any version. A dual-stack Service passes when one of its IPs is announced. Whether the router has taken the announcement is `traffic.metallb-bgp-session-down`: a ServiceBGPStatus
+    is written for a Service with peers configured, Idle or not.
+  measured: >
+    Measured with the summary built from a 0.16.2 install on kind with speakers 2 of 2, no L2Advertisement, empty status lists and two Services with IPs, and from a 0.14.5 install whose two speakers
+    were read and printed no `metallb_speaker_announced`: no MetalLB check reported anything before this one (#162).
+  suggest: "Create an L2Advertisement or BGPAdvertisement that reaches the pool (an empty `ipAddressPools` list reaches every pool), or fix the pool names and selectors of the existing one; if the advertisement is right, check that a speaker runs on a node its nodeSelectors admit."
+  verify:
+    - "kubectl get l2advertisements,bgpadvertisements -A -o yaml; kubectl get ipaddresspools -A"
+    - "kubectl get servicel2statuses,servicebgpstatuses -A   # 0.14.6 and later: one object per announcing node and Service"
+    - "arping -c 3 <EXTERNAL-IP>   # L2 mode, from a host on the same network"
+  test:
+    profile: "lab"
+    cases:
+      - expect: "fail"   # announcers read, nobody announces
+        item:
+          namespace: "default"
+          name: "web"
+          ips: ["172.18.255.200"]
+          pending: false
+          pool: "lab"
+          pool_advertised: ["L2Advertisement/lab"]
+          announced_by: []
+          announcers_read: true
+      - expect: "fail"   # announcers not read, but no advertisement reaches the pool
+        item:
+          namespace: "default"
+          name: "web"
+          ips: ["172.18.255.200"]
+          pending: false
+          pool: "lab"
+          pool_advertised: []
+          announced_by: []
+          announcers_read: false
+      - expect: "pass"
+        item:
+          namespace: "default"
+          name: "web"
+          ips: ["172.18.255.200"]
+          pending: false
+          pool: "lab"
+          pool_advertised: ["L2Advertisement/lab"]
+          announced_by:
+            - node: "kind-worker"
+              protocol: "layer2"
+          announcers_read: true
+      - expect: "pass"   # no IP yet: traffic.metallb-pool-near-full reports Pending
+        item:
+          namespace: "default"
+          name: "web"
+          ips: []
+          pending: true
+          pool: null
+          pool_advertised: null
+          announced_by: []
+          announcers_read: false
+      - expect: "skip"   # announcers not read and the pool has an advertisement
+        item:
+          namespace: "default"
+          name: "web"
+          ips: ["172.18.255.200"]
+          pending: false
+          pool: "lab"
+          pool_advertised: ["L2Advertisement/lab"]
+          announced_by: []
+          announcers_read: false
+
+- id: traffic.metallb-bgp-session-down
+  name: A MetalLB BGP session with a router is down
+  area: traffic
+  type: summary
+  each: metallb.summary
+  cluster_level: true
+  profiles: [prod, lab]
+  rule:
+    needs: "not item.get('bgp_peers') or item.get('bgp_sessions_read')"
+    needs_reason: "BGP peers are configured but no session state was read: the speaker metrics answer in native mode through 0.15 when every speaker was read, BGPSessionState objects in frr-k8s mode from 0.15.2 (group frrk8s.metallb.io), Prometheus when it scrapes metallb_bgp_session_up or frrk8s_bgp_session_up"
+    expr: "len(item.get('bgp_sessions_down') or []) > 0"
+  target: "'cluster'"
+  evidence: "f\"BGP backend {item.get('bgp_backend')}, peers {item.get('bgp_peers')}, sessions read from {item.get('bgp_session_source')}: {len(item.get('bgp_sessions_down') or [])} down {[(d['node'], d['peer'], d['state']) for d in item.get('bgp_sessions_down') or []]}\" + (f\" of {item['bgp_sessions_total']}\" if item.get('bgp_sessions_total') is not None else '')"
+  severity_default: high
+  symptom_linked: true
+  why: >
+    In BGP mode the router learns the Service IPs only through the session; while a session is down that router has no route to them, and with one peer every LoadBalancer Service is
+    unreachable from outside. The speaker keeps the IPs assigned and the Services look healthy. Where the session state is read depends on the install: native mode through 0.15 prints
+    `metallb_bgp_session_up{peer}` on the speaker (not in FRR mode, where the gauge is the sidecar's), frr-k8s mode from MetalLB 0.15.2 writes one BGPSessionState per node and peer whose
+    `bgpStatus` is the FRR state (`Established` is the session, anything else is not), and a Prometheus that scrapes either exporter has `metallb_bgp_session_up` or `frrk8s_bgp_session_up`.
+    Native mode on 0.16 and later, and FRR mode at any version, are read only through Prometheus; without it the check skips and says so.
+  measured: >
+    Measured with the summary built from a 0.14.5 native install whose speaker printed `metallb_bgp_session_up` 1 for one peer and 0 for the other: no MetalLB check reported it, although the
+    summary already carried the two numbers (#162).
+  suggest: "On the speaker node: check reachability of the peer on TCP 179 and the peer's configuration (ASN, password, the node's address in its neighbor list); `kubectl get bgpsessionstates -A` in frr-k8s mode shows the FRR state per node and peer."
+  verify:
+    - "kubectl get bgpsessionstates -A   # frr-k8s mode, 0.15.2 and later"
+    - "kubectl logs -n metallb-system -l component=speaker --since=1h | grep -i 'bgp'"
+    - "metallb_bgp_session_up == 0 or frrk8s_bgp_session_up == 0   # in Prometheus, when it scrapes MetalLB"
+  test:
+    profile: "lab"
+    cases:
+      - expect: "fail"
+        item:
+          bgp_backend: "frr-k8s"
+          bgp_peers: 2
+          bgp_sessions_read: true
+          bgp_session_source: "objects/bgpsessionstates.frrk8s.metallb.io.json"
+          bgp_sessions_total: 4
+          bgp_sessions_down:
+            - node: "kind-worker"
+              peer: "10.0.0.2"
+              state: "Idle"
+      - expect: "pass"
+        item:
+          bgp_backend: "native"
+          bgp_peers: 1
+          bgp_sessions_read: true
+          bgp_session_source: "metrics/pod/metallb-speaker/*.prom (pod proxy GET)"
+          bgp_sessions_total: 2
+          bgp_sessions_down: []
+      - expect: "pass"   # no BGP: nothing to judge
+        item:
+          bgp_backend: "native"
+          bgp_peers: 0
+          bgp_sessions_read: true
+          bgp_session_source: "metrics/pod/metallb-speaker/*.prom (pod proxy GET)"
+          bgp_sessions_total: 0
+          bgp_sessions_down: []
+      - expect: "skip"   # peers, no source
+        item:
+          bgp_backend: "frr"
+          bgp_peers: 1
+          bgp_sessions_read: false
+          bgp_session_source: null
+          bgp_sessions_total: null
+          bgp_sessions_down: null

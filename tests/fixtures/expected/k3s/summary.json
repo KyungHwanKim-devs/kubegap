@@ -63832,7 +63832,18 @@
      "ips": [
       "192.168.90.201"
      ],
-     "pending": false
+     "pending": false,
+     "pool": "primary-pool",
+     "pool_advertised": [
+      "L2Advertisement/default-advertisement"
+     ],
+     "announced_by": [
+      {
+       "node": "node-b",
+       "protocol": "layer2"
+      }
+     ],
+     "announcers_read": true
     }
    ],
    "other_class_services": 0,
@@ -63937,6 +63948,7 @@
    }
   },
   "config_states": [],
+  "bgp_session_states": null,
   "summary": {
    "present": true,
    "mode": "layer2",
@@ -63978,6 +63990,11 @@
    "bgp_sessions": 0,
    "bgp_sessions_up": 0,
    "bgp_peers": 0,
+   "bgp_backend": "native",
+   "bgp_sessions_read": true,
+   "bgp_session_source": "metrics/pod/metallb-speaker/*.prom (pod proxy GET)",
+   "bgp_sessions_total": 0,
+   "bgp_sessions_down": [],
    "webhooks_fail": [
     "bgppeersvalidationwebhook.metallb.io",
     "bfdprofilevalidationwebhook.metallb.io",

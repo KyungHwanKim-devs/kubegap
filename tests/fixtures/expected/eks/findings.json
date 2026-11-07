@@ -4,7 +4,7 @@
   "source": "detected",
   "missing_file": false
  },
- "rubric_version": "0.1.85",
+ "rubric_version": "0.1.86",
  "check_results": [
   {
    "id": "resources.cpu-throttling",

@@ -7,7 +7,7 @@
 | kube context / 클러스터 | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
 | 실행 시각 / 모드 | 2026-11-07T10:33:37+09:00 / full (수집 300.7초, 모드 때문에 건너뛴 단계 0개, 실패 6개) |
 | 프로파일 | `prod` (detected) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | 0.1.4 / 0.1.85 / 1.1.0 |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | 0.1.4 / 0.1.86 / 1.1.0 |
 | 검증한 버전 범위 | Kubernetes v1.32.13-eks-577a51e (검증 범위 안 1.30 ~ 1.37) · Prometheus 2.49.1 (검증 범위 안 2.49 ~ 3.15) · Alertmanager 0.26.0 (검증 범위 안 0.26 ~ 0.34) · Loki 2.6.1 (검증 범위 안 2.6 ~ 3.7) · Grafana 10.2.3 (검증 범위 안 10.2 ~ 13.3) |
 | 노드 / 네임스페이스 / 파드 / CRD | 9 (Ready 9) / 26 / 154 / 47 |
 | 컴포넌트 (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
