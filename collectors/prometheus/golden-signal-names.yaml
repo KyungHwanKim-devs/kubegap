@@ -1,0 +1,86 @@
+# The metric names behind the two golden-signal queries of metrics.yaml (#143): http_metric_namespaces (a namespace exposes an HTTP or gRPC server
+# metric: the latency, traffic and error signals) and saturation_metric_namespaces (a queue, pool, thread or in-flight measure). No one project defines
+# these lists, so every pattern names the library that emits it and the line of its source where the name is set, at the tag read. tests/test_sources.py
+# rebuilds each query's regex from this file and fails when the two differ or when a pattern has no source. A name without a library (a hand-written
+# convention) is kept only with the document that states it. Excluded on purpose: `promhttp_metric_handler_requests_total` (prometheus/client_golang
+# prometheus/promhttp/http.go:277@v1.20.5) counts the scrapes of /metrics, not the application's traffic.
+http:
+  - pattern: "http_request_duration_seconds_(bucket|count)"
+    library: "prometheus-fastapi-instrumentator (default metric), express-prom-bundle (default httpDurationMetricName)"
+    source: "trallnag/prometheus-fastapi-instrumentator src/prometheus_fastapi_instrumentator/metrics.py:114@v7.1.0, jochen-schweizer/express-prom-bundle src/index.js:93@8.0.0"
+  - pattern: "http_requests_total"
+    library: "the Prometheus naming guide's counter example (the hand-written convention many applications follow; no library sets this exact name)"
+    source: "prometheus/docs docs/practices/naming.md:87@410443d27be8 (the naming guide's `api_http_requests_total` example, the commit that last touched the page)"
+  - pattern: "http_server_requests_seconds_(count|bucket)"
+    library: "Spring Framework server observation (`http.server.requests`), rendered with the `_seconds` suffix by Micrometer's Prometheus naming convention"
+    source: "spring-projects/spring-framework spring-web/src/main/java/org/springframework/http/server/observation/DefaultServerRequestObservationConvention.java:42@v6.2.1, micrometer-metrics/micrometer implementations/micrometer-registry-prometheus/src/main/java/io/micrometer/prometheusmetrics/PrometheusNamingConvention.java:70-73@v1.14.2"
+  - pattern: "http_server_duration_milliseconds_(count|bucket)"
+    library: "OpenTelemetry `http.server.duration` (semantic conventions up to 1.20, unit ms) as the collector's Prometheus exporter spells it"
+    source: "open-telemetry/opentelemetry-specification semantic_conventions/metrics/http.yaml:2-4@v1.20.0, open-telemetry/opentelemetry-collector-contrib pkg/translator/prometheus/normalize_name.go:19-25,107@v0.115.0"
+  - pattern: "http_server_request_duration_seconds_(count|bucket)"
+    library: "OpenTelemetry `http.server.request.duration` (semantic conventions since 1.21, unit s) as the collector's Prometheus exporter spells it"
+    source: "open-telemetry/semantic-conventions model/http/metrics.yaml:39-41@v1.29.0, open-telemetry/opentelemetry-collector-contrib pkg/translator/prometheus/normalize_name.go:19-25,107@v0.115.0"
+  - pattern: "grpc_server_handled_total"
+    library: "go-grpc-prometheus server interceptor"
+    source: "grpc-ecosystem/go-grpc-prometheus server_metrics.go:36@v1.2.0"
+  - pattern: "grpc_server_handling_seconds_(count|bucket)"
+    library: "go-grpc-prometheus server interceptor (histogram, off by default)"
+    source: "grpc-ecosystem/go-grpc-prometheus server_metrics.go:51@v1.2.0"
+  - pattern: "django_http_requests_total_by_method_total"
+    library: "django-prometheus middleware (Counter `django_http_requests_total_by_method`, the client appends `_total`)"
+    source: "korfuri/django-prometheus django_prometheus/middleware.py:75@v2.3.1"
+  - pattern: "flask_http_request_duration_seconds_(count|bucket)"
+    library: "prometheus_flask_exporter (default prefix `flask`)"
+    source: "rycus86/prometheus_flask_exporter prometheus_flask_exporter/__init__.py:115,430@0.23.1"
+  - pattern: "nginx_http_requests_total"
+    library: "NGINX Prometheus exporter (namespace `nginx`)"
+    source: "nginx/nginx-prometheus-exporter collector/nginx.go:32@v1.4.1"
+  - pattern: "starlette_requests_total"
+    library: "starlette_exporter (default prefix `starlette`)"
+    source: "stephenhillier/starlette_exporter starlette_exporter/middleware.py:90,167@v0.23.0"
+  - pattern: "http_requests_received_total"
+    library: "prometheus-net ASP.NET Core request counter"
+    source: "prometheus-net/prometheus-net Prometheus.AspNetCore/HttpMetrics/HttpRequestCountMiddleware.cs:35@v8.2.1"
+  - pattern: "rails_requests_total"
+    library: "yabeda-rails (group `rails`, counter `requests_total`)"
+    source: "yabeda-rb/yabeda-rails lib/yabeda/rails.rb:36,63@v0.10.0"
+  - pattern: "[a-z0-9_]*_prom_ex_phoenix_http_request_duration_milliseconds_(count|bucket)"
+    library: "PromEx Phoenix plugin (prefix `<otp_app>_prom_ex_phoenix`, duration unit millisecond by default)"
+    source: "akoutmos/prom_ex lib/prom_ex/plugins/phoenix.ex:10-13,193,290-292@1.12.0, lib/prom_ex.ex:575-577@1.12.0"
+saturation:
+  - pattern: "connections_(active|idle|pending)"
+    kind: fragment
+    library: "HikariCP Micrometer tracker (`hikaricp.connections.*`)"
+    source: "brettwooldridge/HikariCP src/main/java/com/zaxxer/hikari/metrics/micrometer/MicrometerMetricsTracker.java:53,56-64@HikariCP-7.1.0"
+  - pattern: "(open|in_use|idle)_connections"
+    kind: fragment
+    library: "client_golang DBStatsCollector (`go_sql_*`)"
+    source: "prometheus/client_golang prometheus/collectors/dbstats_collector.go:52-62@v1.20.5"
+  - pattern: "threads_(busy|current|live)"
+    kind: fragment
+    library: "Micrometer Tomcat (`tomcat.threads.busy`) and JVM (`jvm.threads.live`) binders, client_java JVM metrics (`jvm_threads_current`)"
+    source: "micrometer-metrics/micrometer micrometer-core/src/main/java/io/micrometer/core/instrument/binder/tomcat/TomcatMetrics.java:157@v1.14.2, micrometer-core/src/main/java/io/micrometer/core/instrument/binder/jvm/JvmThreadMetrics.java:70@v1.14.2, prometheus/client_java prometheus-metrics-instrumentation-jvm/src/main/java/io/prometheus/metrics/instrumentation/jvm/JvmThreadsMetrics.java:64@v1.3.5"
+  - pattern: "executor_(active|queued|pool_size)"
+    kind: fragment
+    library: "Micrometer ExecutorServiceMetrics (`executor.active`, `executor.queued`, `executor.pool.size`)"
+    source: "micrometer-metrics/micrometer micrometer-core/src/main/java/io/micrometer/core/instrument/binder/jvm/ExecutorServiceMetrics.java:359,365,380@v1.14.2"
+  - pattern: "queue_(backlog|latency)"
+    kind: fragment
+    library: "prometheus_exporter (Discourse) Sidekiq queue collector"
+    source: "discourse/prometheus_exporter lib/prometheus_exporter/server/sidekiq_queue_collector.rb:7-8@v2.3.1"
+  - pattern: "consumergroup_lag"
+    kind: fragment
+    library: "kafka_exporter (`kafka_consumergroup_lag`)"
+    source: "danielqsj/kafka_exporter kafka_exporter.go:922@v1.9.0"
+  - pattern: "eventloop_lag"
+    kind: fragment
+    library: "prom-client default metrics (`nodejs_eventloop_lag_seconds`)"
+    source: "siimon/prom-client lib/metrics/eventLoopLag.js:14@v15.1.3"
+  - pattern: "in_flight"
+    kind: fragment
+    library: "client_golang promhttp (InstrumentHandlerInFlight wraps the gauge an application names; the handler's own is `promhttp_metric_handler_requests_in_flight`)"
+    source: "prometheus/client_golang prometheus/promhttp/instrument_server.go:51-56@v1.20.5, prometheus/promhttp/http.go:296@v1.20.5"
+  - pattern: "nodejs_active_requests_total"
+    kind: name
+    library: "prom-client default metrics (libuv requests in flight)"
+    source: "siimon/prom-client lib/metrics/processRequests.js:7@v15.1.3"

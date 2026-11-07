@@ -13,8 +13,9 @@ from lib import metricnames, paths, signatures, yamlite
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "references" / "sources.md"
 # .cpp (smartmontools), .xml (systemd man pages), .rst (kernel Documentation), .asciidoc (Elasticsearch docs) and .y (gnulib parse-datetime) came with #127
+# .ex (PromEx), .rb (yabeda, prometheus_exporter), .cs (prometheus-net) and .js (express-prom-bundle, prom-client) came with the golden-signal libraries (#143)
 CITATION = re.compile(
-    r"(?:[\w./-]+\.(?:go|py|rego|toml|yaml|yml|txt|pdf|md|adoc|tpl|json|ini|sh|c|h|java|properties|gradle|proto|cpp|xml|rst|asciidoc|y)|(?:[\w./-]+/)?(?:Makefile(?:\.common)?|Dockerfile)):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+"
+    r"(?:[\w./-]+\.(?:go|py|rego|toml|yaml|yml|txt|pdf|md|adoc|tpl|json|ini|sh|c|h|java|properties|gradle|proto|cpp|xml|rst|asciidoc|y|ex|rb|cs|js)|(?:[\w./-]+/)?(?:Makefile(?:\.common)?|Dockerfile)):\d+(?:-\d+)?(?:, ?\d+(?:-\d+)?)*@[\w.+-]+"
 )
 DOC_CITATION = re.compile(r"https://docs\.aws\.amazon\.com/\S+ read \d{4}-\d{2}-\d{2}")  # #125: CloudWatch metric names and quota codes live in no source tree, only in the AWS documentation; the page and the day it was read
 KUBEGAP_LOCATION = re.compile(r"`(lib/[\w/]+\.py|collectors/[\w-]+/[\w.-]+\.(?:sh|yaml))(?::(\w+))?`|step `([\w.-]+)`|check `([\w.-]+)`|`([A-Za-z_]\w*)`")
@@ -759,3 +760,71 @@ def test_every_camel_case_key_the_summaries_read_is_documented():
                 continue
             missing.setdefault(k, []).append(module)
     assert not missing, f"keys read with no row in references/sources.md (cite the type line, or list under NOT_OBJECT_FIELD_KEYS with a reason): {missing}"
+
+
+# ---------- the golden-signal name lists (#143) ----------
+
+GOLDEN = ROOT / "collectors" / "prometheus" / "golden-signal-names.yaml"
+
+
+def _golden():
+    return yamlite.load_file(GOLDEN) or {}
+
+
+def test_every_golden_signal_pattern_names_its_library_and_source():
+    d = _golden()
+    assert len(d["http"]) >= 12 and len(d["saturation"]) >= 8
+    for section in ("http", "saturation"):
+        for e in d[section]:
+            assert e.get("pattern") and e.get("library"), (section, e)
+            assert CITATION.search(str(e.get("source") or "")) or DOC_CITATION.search(str(e.get("source") or "")), (section, e["pattern"], "every pattern cites the library's source line, file:line@tag, or the document and the day read")
+            re.compile(e["pattern"])
+    assert {e.get("kind") for e in d["saturation"]} <= {"fragment", "name"} and all(e.get("kind") for e in d["saturation"])
+
+
+def test_the_two_queries_are_the_regex_the_name_file_builds():
+    d = _golden()
+    http = "|".join(e["pattern"] for e in d["http"])
+    frags = [e["pattern"] for e in d["saturation"] if e["kind"] == "fragment"]
+    names = [e["pattern"] for e in d["saturation"] if e["kind"] == "name"]
+    sat = ".*(" + "|".join(frags) + ").*" + "".join("|" + n for n in names)
+    assert _query_text("http_metric_namespaces") == 'count by (namespace) ({__name__=~"' + http + '"})'
+    assert _query_text("saturation_metric_namespaces") == 'count by (namespace) ({__name__=~"' + sat + '"})'
+
+
+def test_golden_signal_patterns_match_the_names_their_libraries_emit():
+    d = _golden()
+    http = re.compile("^(?:" + "|".join(e["pattern"] for e in d["http"]) + ")$")
+    for name in (
+        "http_request_duration_seconds_bucket",
+        "http_server_requests_seconds_count",
+        "http_server_request_duration_seconds_bucket",
+        "grpc_server_handled_total",
+        "django_http_requests_total_by_method_total",
+        "flask_http_request_duration_seconds_count",
+        "nginx_http_requests_total",
+        "starlette_requests_total",
+        "http_requests_received_total",
+        "rails_requests_total",
+        "my_app_prom_ex_phoenix_http_request_duration_milliseconds_count",
+    ):
+        assert http.match(name), name
+    assert not http.match("promhttp_metric_handler_requests_total") and not http.match("express_http_request_duration_seconds_count")
+    frags = [e["pattern"] for e in d["saturation"] if e["kind"] == "fragment"]
+    names = [e["pattern"] for e in d["saturation"] if e["kind"] == "name"]
+    sat = re.compile("^(?:.*(" + "|".join(frags) + ").*" + "".join("|" + n for n in names) + ")$")
+    for name in (
+        "hikaricp_connections_active",
+        "go_sql_idle_connections",
+        "tomcat_threads_busy",
+        "jvm_threads_current",
+        "jvm_threads_live_threads",
+        "executor_queued_tasks",
+        "sidekiq_queue_backlog",
+        "kafka_consumergroup_lag",
+        "nodejs_eventloop_lag_seconds",
+        "in_flight_requests",
+        "nodejs_active_requests_total",
+    ):
+        assert sat.match(name), name
+    assert not sat.match("kube_pod_container_resource_requests") and not sat.match("container_threads")
