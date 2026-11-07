@@ -3,7 +3,7 @@ name: kubegap
 description: Kubernetes cluster operations gap audit — /kubegap [daily|full|setup|focus <area>|explain <finding-id>] [--context <name>] [--profile <name>] [--namespace <ns>] [--snapshot <date>] [--compare <A> <B>]. Collects, summarizes and first-pass evaluates the cluster of the current kube context, then the LLM analyzes the result and writes a Markdown report. daily (default) is a short run compared with the previous daily run; full collects everything and writes the full report; setup only asks the first-run questions again. Also use this skill for "audit my cluster", "operations audit", "what changed since last run", "explain this finding". EKS is the baseline; a small k3s cluster is a variant.
 compatibility: "Tested with Claude Code and Codex; usable in any Agent Skills host with a shell tool. Requires kubectl and python3 (3.11+). Optional: aws (EKS), ssh (k3s nodes), krr, polaris, pluto. Uses read-only cluster access (no command that changes the cluster; no Secret values read, except Helm's own release records via helm list, metadata only); node access via SSM or SSH. Snapshots are stored under ~/.kubegap/"
 metadata:
-  version: "0.1.4"
+  version: "0.1.5"
   author: KyungHwanKim-devs
   rubric_version: "0.1.86"
 ---
