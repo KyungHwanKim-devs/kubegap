@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import datetime as _dt
 import json
 import threading
@@ -9,9 +10,10 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from . import http, monitoring, yamlite
+from . import metricnames as _metricnames
 from .portfwd import PortForward
 from .runlog import RunLog
-from .snapshot import write_private
+from .snapshot import load_json, write_private
 
 PROMQL_WORKERS = 3  # concurrent instant queries. Heavy 7-day range queries compete for Prometheus CPU: at 6 they took 20-29 s each on a real cluster (3-6 s when serial), so keep this low
 
@@ -21,6 +23,7 @@ class Prometheus:
 
     def __init__(self, base_url: str, access: str, service: dict | None = None, pf: PortForward | None = None):
         self.base = base_url.rstrip("/")
+        self._present_lock = threading.Lock()  # record_series_present: collectors run in parallel and every metrics.yaml merges into one file
         self.access = access
         self.service = service
         self._pf = pf
@@ -90,6 +93,49 @@ class Prometheus:
                 write_private(out_dir / "apiserver_job.json", json.dumps(self._apiserver_job, ensure_ascii=False, indent=1))
             return self._apiserver_job
 
+    def record_series_present(self, items: list[dict], out_dir: Path, *, log: RunLog | None = None, collector: str | None = None, timeout: float = 30, echo=None) -> dict | None:
+        """One query per metrics file: how many series each metric name the file's queries cite has right now, merged into metrics/series-present.json
+        (`{"names": {<name>: <series>}}`, 0 for a name Prometheus has no series of). lib/evaluate reads it when a query comes back empty (#141): a name
+        with no series is "not scraped, renamed or removed", a skip; every name present is "the situation did not occur", a pass. The selector is a
+        `__name__` regex matcher inside the braces (prometheus/prometheus promql/parser/parse.go:427-430,846-856@v3.7.3: a metric name may be given as
+        a label matcher on `__name__` instead of outside the braces), aggregated with `count by (__name__)`."""
+        names = sorted({n for it in items for n in _metricnames.names_of(it)})
+        if not names:
+            return None
+        expr = 'count by (__name__) ({__name__=~"' + "|".join(names) + '"})'
+        t0 = _dt.datetime.now()
+        res = self.query(expr, timeout=timeout)
+        secs = (_dt.datetime.now() - t0).total_seconds()
+        if log:
+            log.command(
+                id="promql.series-present",
+                cmd=["promql", f"count by (__name__) of {len(names)} names"],
+                code=0 if res["ok"] else 1,
+                seconds=secs,
+                out_path="metrics/series-present.json" if res["ok"] else None,
+                error=res.get("error"),
+                collector=collector,
+            )
+        if not res["ok"]:
+            if echo:
+                echo(f"    {'series-present':<32} failed: {str(res.get('error'))[:120]}")
+            return None
+        counts = dict.fromkeys(names, 0)
+        for r in res["result"]:
+            n = (r.get("metric") or {}).get("__name__")
+            if n in counts:
+                with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
+                    counts[n] = int(float(r["value"][1]))
+        path = out_dir / "series-present.json"
+        with self._present_lock:  # read, merge, write as one step: two collectors finishing together would otherwise drop each other's names
+            doc = load_json(path) or {"names": {}}
+            doc["names"].update(counts)
+            doc["names"] = dict(sorted(doc["names"].items()))
+            write_private(path, json.dumps(doc, ensure_ascii=False, indent=1))
+        if echo:
+            echo(f"    {'series-present':<32} {sum(1 for v in counts.values() if v)} of {len(counts)} names have series")
+        return doc
+
     def run_file(self, path: Path, out_dir: Path, log: RunLog | None = None, collector: str | None = None, timeout: float = 30, echo=None, vars: dict | None = None) -> dict:
         """Read metrics.yaml and run/save each query. `vars` fills the `{apiserver_job}` placeholder (config value, or None to detect). Returns a summary (series count per query, failures)."""
         items = yamlite.load_file(path) or []
@@ -114,6 +160,7 @@ class Prometheus:
         # Instant queries are independent; a few at a time shortens a 170-query list without turning into a load test of Prometheus
         with ThreadPoolExecutor(max_workers=min(PROMQL_WORKERS, max(1, len(items))), thread_name_prefix="promql") as pool:
             done = list(pool.map(run, items))
+        self.record_series_present(items, out_dir, log=log, collector=collector, timeout=timeout, echo=echo)
         for it, expr, res, secs in done:
             qid = it["id"]
             rec = {"id": qid, "query": expr, "why": it.get("why"), "taken_at": now, **res}

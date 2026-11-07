@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from lib import paths, signatures, yamlite
+from lib import metricnames, paths, signatures, yamlite
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "references" / "sources.md"
@@ -353,9 +353,7 @@ GONE = {
 
 
 def _queries():
-    for f in sorted((ROOT / "collectors").glob("*/metrics.yaml")):
-        for it in yamlite.load_file(f) or []:
-            yield f.parent.name, it
+    yield from metricnames.queries()  # the one walk of collectors/*/metrics.yaml (lib/metricnames.py); lib/prom and lib/evaluate read the same list
 
 
 def _query_names(query: str) -> tuple[set[str], list[str]]:
