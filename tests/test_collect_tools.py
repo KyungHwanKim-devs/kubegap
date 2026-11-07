@@ -158,16 +158,16 @@ def test_a_partial_discovery_reaches_the_numbers_pluto_reports(tmp_path, monkeyp
         10,
         None,
         inv={"cluster": {"server_version": "v1.32.0"}},
-        objects_dump={"kinds": 5, "skipped": [], "failed": {}, "not_permitted": [], "discovery_error": "metrics.k8s.io down"},
+        objects_dump={"kinds": 5, "fetched_by_discovery": [], "failed": {}, "not_permitted": [], "discovery_error": "metrics.k8s.io down"},
     )
     assert (res["lists_ok"], res["lists_failed"]) == (5, 1)
 
 
 def test_discovery_resources_stay_the_discovery_kinds():
-    """Three hand-kept lists of one fact: a kind added to OBJECT_KINDS alone would be fetched again by the dump, and pluto would see every object twice."""
-    from lib import discover, snapshot
+    """Two hand-kept lists of one fact: a kind added to OBJECT_KINDS alone would be fetched again by the dump, and pluto would see every object twice."""
+    from lib import discover
 
-    assert {r.split(".", 1)[0] for r in collect.DISCOVERY_RESOURCES} == set(discover.OBJECT_KINDS) == set(snapshot.DISCOVERY_STEMS)
+    assert {r.split(".", 1)[0] for r in collect.DISCOVERY_RESOURCES} == set(discover.OBJECT_KINDS)
 
 
 def test_a_crd_with_the_plural_of_a_discovery_kind_is_fetched(tmp_path, monkeypatch):
@@ -187,4 +187,4 @@ def test_a_crd_with_the_plural_of_a_discovery_kind_is_fetched(tmp_path, monkeypa
 
     monkeypatch.setattr(collect.kube, "kubectl_json", fake_json)
     out = collect.dump_all("ctx", None, tmp_path, [], 10, RunLog(None), "core")
-    assert out["skipped"] == ["services"] and asked == ["services.serving.knative.dev"] and (tmp_path / "objects" / "services.serving.knative.dev.json").is_file()
+    assert out["fetched_by_discovery"] == ["services"] and asked == ["services.serving.knative.dev"] and (tmp_path / "objects" / "services.serving.knative.dev.json").is_file()

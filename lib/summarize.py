@@ -14,8 +14,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from . import __version__, paths
-from .runlog import read_runlog
-from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, items, load_json, remove_stale_temp, taken_at, write_private
+from .runlog import RunLog, read_runlog
+from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, forget_reads, items, load_json, object_files, remove_stale_temp, taken_at, write_private
 
 WAITING_REASONS = ("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "CreateContainerConfigError", "CreateContainerError", "InvalidImageName", "RunContainerError")
 LABEL_KEEP = ("__name__", "namespace", "pod", "container", "node", "instance", "mountpoint", "qos_class", "reason", "job", "horizontalpodautoscaler", "endpoint", "kind", "phase", "poddisruptionbudget", "service", "deployment")
@@ -555,6 +555,7 @@ def remove_component_logs(snap: Path, summary: dict | None = None) -> int:
 def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> dict:
     """Build summary.json. Unless keep_component_logs is true the component pod logs are deleted afterwards, with their log-derived aggregates saved to logs/pods/AGGREGATED.json; lib/logs.py and lib/scaling.py read that file on a rerun, so the result does not change."""
     remove_stale_temp(snap)
+    forget_reads(snap)
     inv = load_json(snap / "inventory.json")
     now = taken_at(inv)  # the one clock of a summary: every age, window and expiry below is measured from the snapshot time (#165)
     s = {
@@ -612,6 +613,12 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
             "eks": ({k: inv["cluster"]["eks"].get(k) for k in ("version", "support_type", "control_plane_logging_off", "public_access_cidrs", "secrets_encryption", "addons")} if inv["cluster"].get("eks") else None),
             "ssm_unregistered": [x["node"] for x in inv["node_access"].get("ssm_unregistered") or []],
         }
+    # every objects/<stem>.json a summary module asked for, with why it is missing when it is (#160). `unlisted` is a kubegap defect: the cluster serves
+    # the kind and the reader spells the file name differently, so its checks passed on nothing; run.log and report section 7-1 name those stems
+    s["collection"]["object_files"] = object_files(snap)
+    unlisted = sorted(stem for stem, st in s["collection"]["object_files"].items() if st == "unlisted")
+    if unlisted:
+        RunLog(snap / "run.log").note("object files a reader asked for that the cluster serves but the snapshot does not have (the reader's stem and the file name disagree)", stems=unlisted)
     removed = 0 if keep_component_logs else remove_component_logs(snap, s)
     if isinstance(s.get("logs"), dict):
         s["logs"]["component_logs_removed"] = component_logs_removed(snap)  # from the marker, so a later keep_component_logs: true does not claim the logs are there

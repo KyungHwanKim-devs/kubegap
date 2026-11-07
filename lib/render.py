@@ -102,6 +102,8 @@ LABELS: dict[str, dict[str, str]] = {
         "Failed": "실패",
         "Skipped (reason)": "건너뜀 (이유)",
         "Kinds the ClusterRole does not grant ({n}; a check that needs one of them is skipped, not passed): ": "ClusterRole에 없는 종류 {n}개예요. 이 종류가 필요한 점검 항목은 통과가 아니라 건너뜀으로 처리해요: ",
+        "Object files the summary asked for that this cluster does not serve ({n}; the kind is not installed, so those checks judge nothing): ": "요약이 찾았지만 이 클러스터가 제공하지 않는 오브젝트 종류 {n}개예요. 설치되지 않은 종류라 그 점검 항목은 판단하지 않아요: ",
+        "Object files the summary asked for that the cluster serves but the snapshot does not have ({n}; the reader's file name is wrong, a kubegap defect, and the checks that read them judged nothing): ": "클러스터가 제공하는데 수집 폴더에 그 이름의 파일이 없는 오브젝트 종류 {n}개예요. 독자가 파일 이름을 잘못 적은 kubegap 결함이고, 그 파일을 읽는 점검 항목은 아무것도 판단하지 않았어요: ",
         "{commands} commands, {seconds} s. Failed steps: {n}": "명령 {commands}개, {seconds}초. 실패한 단계 {n}개",
         "Commands that failed inside a step that still succeeded (run.log): {n}: ": "단계는 성공했지만 그 안에서 실패한 명령 {n}개 (run.log): ",
         "{tool} {ok} of {total} Lists answered ({failed} refused or not served)": "{tool} List {total}번 중 {ok}번 응답 ({failed}번은 거부되었거나 없는 API)",
@@ -483,6 +485,16 @@ def render_details(snap: Path, language: str = "en") -> Path:
     if npk:
         w("")
         w(L("Kinds the ClusterRole does not grant ({n}; a check that needs one of them is skipped, not passed): ", n=len(npk)) + ", ".join(f"`{k}`" for k in npk))
+    # summary.collection.object_files (#160): every objects/<stem>.json a summary module asked for and why it is missing when it is
+    object_files = coll.get("object_files") or {}
+    for status, text in (
+        ("not-served", "Object files the summary asked for that this cluster does not serve ({n}; the kind is not installed, so those checks judge nothing): "),
+        ("unlisted", "Object files the summary asked for that the cluster serves but the snapshot does not have ({n}; the reader's file name is wrong, a kubegap defect, and the checks that read them judged nothing): "),
+    ):
+        stems = sorted(k for k, v in object_files.items() if v == status)
+        if stems:
+            w("")
+            w(L(text, n=len(stems)) + ", ".join(f"`{k}`" for k in stems))
     run = summary.get("run") or {}
     w("")
     # Until #132 this line counted run.log exit codes while the table above read collect-result.json, and the two disagreed for a tool that exits 0 without

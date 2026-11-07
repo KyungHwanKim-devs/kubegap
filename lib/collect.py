@@ -106,7 +106,11 @@ DISCOVERY_RESOURCES = {
 def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: list[str], timeout: float, log: RunLog, collector: str, echo=None) -> dict:
     resources, discovery_error = api_resources(context, kubeconfig, log)
     done = {p.stem for p in (snap / "objects").glob("*.json")}
-    summary = {"kinds": 0, "items": 0, "skipped": [], "failed": {}, "excluded": [], "not_permitted": [], "discovery_error": discovery_error}
+    # `served` is every kind the API listed and `written` every file stem this step wrote; with `fetched_by_discovery` (the kinds lib/discover.py had saved, by full
+    # name), `excluded`, `not_permitted` and `failed` they let a reader of a missing objects file tell "the cluster has no such kind" from "the file is named
+    # differently" (#160). The key is not `skipped`: in a step record that word is the reason the whole step did not run, and `_summary.skipped` and report
+    # section 7-1 listed this step as skipped with the eleven kinds as its reason.
+    summary = {"kinds": 0, "items": 0, "written": [], "served": [res["full"] for res in resources], "fetched_by_discovery": [], "failed": {}, "excluded": [], "not_permitted": [], "discovery_error": discovery_error}
     hard_exclude = ["secrets", "secrets.*"]
     for res in resources:
         full, name = res["full"], res["name"]
@@ -120,7 +124,7 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
         core_group = not res.get("apiversion", "").count("/")
         file_stem = name if core_group else full
         if full in done or (full in DISCOVERY_RESOURCES and name in done):  # `name` alone would also match a CRD of the same plural (services.serving.knative.dev), which was then never fetched
-            summary["skipped"].append(full)
+            summary["fetched_by_discovery"].append(full)
             continue
         args = ["get", full] + (["-A"] if res["namespaced"] else [])
         data, r = kube.kubectl_json(args, context=context, timeout=timeout, id=f"collect.get-{full}", log=log, kubeconfig=kubeconfig, collector=collector)
@@ -138,11 +142,12 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
             continue
         write_private(snap / "objects" / f"{file_stem}.json", json.dumps(data, ensure_ascii=False))
         n = len(data.get("items", []) or [])
+        summary["written"].append(file_stem)
         summary["kinds"] += 1
         summary["items"] += n
     if echo:
         echo(
-            f"    {summary['kinds']} kinds, {summary['items']} objects saved. skipped (fetched by discovery) {len(summary['skipped'])}, excluded {len(summary['excluded'])}, not permitted by the ClusterRole {len(summary['not_permitted'])}, failed {len(summary['failed'])}"
+            f"    {summary['kinds']} kinds, {summary['items']} objects saved. fetched by discovery already {len(summary['fetched_by_discovery'])}, excluded {len(summary['excluded'])}, not permitted by the ClusterRole {len(summary['not_permitted'])}, failed {len(summary['failed'])}"
         )
         for k, v in summary["failed"].items():
             echo(f"      failed {k}: {v[:100]}")
@@ -472,7 +477,7 @@ def _run_tool_step(st: dict, sid: str, name: str, context: str | None, kubeconfi
     if st.get("stdin") == "last-applied":
         # What pluto sees is what the dump saw: kinds saved or already fetched by discovery, and kinds the server refused or that failed. No kind saved, no judgement: an empty input would read as a clean cluster.
         dump = objects_dump or {}
-        counts = {"lists_ok": int(dump.get("kinds") or 0) + len(dump.get("skipped") or []), "lists_failed": len(dump.get("failed") or {}) + len(dump.get("not_permitted") or []) + (1 if dump.get("discovery_error") else 0)}
+        counts = {"lists_ok": int(dump.get("kinds") or 0) + len(dump.get("fetched_by_discovery") or []), "lists_failed": len(dump.get("failed") or {}) + len(dump.get("not_permitted") or []) + (1 if dump.get("discovery_error") else 0)}
         if not counts["lists_ok"]:
             error = f"{tool}: API resources not confirmed read; objects.dump-all saved no kind"
             log.skip(id=f"{name}.{sid}", reason=error, collector=name)

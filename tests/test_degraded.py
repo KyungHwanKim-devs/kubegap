@@ -242,7 +242,7 @@ def test_ssm_list_not_read_makes_ssm_unregistered_skip(tmp_path):
     assert r["status"] == "skip" and "ssm_unregistered missing" in r["reason"]
 
 
-SAVED_KINDS = {"kinds": 110, "skipped": ["pods"], "failed": {"foos.example.com": "boom"}, "not_permitted": ["csrs.certificates.k8s.io"]}  # what objects.dump-all returns; pluto reads what it saved
+SAVED_KINDS = {"kinds": 110, "fetched_by_discovery": ["pods"], "failed": {"foos.example.com": "boom"}, "not_permitted": ["csrs.certificates.k8s.io"]}  # what objects.dump-all returns; pluto reads what it saved
 
 
 # The pinned binaries can exit 0 without reading the cluster (#117).
