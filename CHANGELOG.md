@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Fixed
+
+- The regression harness compared the Korean report header with the kubegap version left in it: `lib/regress.normalise` replaced the version only under the English label `kubegap / rubric / signatures`, so the first release after the expectation was written (0.1.5) failed `tests/test_regress.py` on the four Korean reports. The row is matched under its label in every report language, from `lib/render.LABELS`.
+
 ## [0.1.5] - 2026-11-07
 
 The results-you-can-trust milestone (11) is complete. This release is about a verdict meaning what it says: an end-to-end regression test runs summarize, evaluate and render on two committed reference snapshots and fails CI on a moved key, a dropped finding or a changed sentence; every age is measured from the snapshot's time, so one snapshot gives one result whenever it is read; a check never passes on an input it did not read, whether a Prometheus series that does not exist, a Kubernetes kind the account may not list, or a summary section that was not built; the snapshot carries its format version and nothing reads another; a README table says at which upstream versions every fact was read and the report header says where the audited cluster sits in that range. New checks: a MetalLB Service IP nobody announces and a BGP session that is down. The backup check judges each database, and one deprecated object is one finding. 411 checks, rubric 0.1.86. Snapshots of earlier versions are not read: collect again.
