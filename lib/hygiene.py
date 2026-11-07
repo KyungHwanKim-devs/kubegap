@@ -220,6 +220,40 @@ def _polaris(cx: _Ctx) -> dict:
 # ---------- Deprecated API ----------
 
 
+def _merge_tool_rows(items: list[dict]) -> list[dict]:
+    """One row per object and API when pluto and kubent both report it (#164). pluto names the namespace of the saved object; kubent names the manifest's, which is
+    `<undefined>` (None here) when the manifest had none, so the two targets differed and the report counted one problem twice. Rows with the same kind, name and
+    API merge when their namespaces agree or one side has none; a kubent row without a namespace stays apart, with a note, when pluto saw that name in more than
+    one namespace. A cluster-scoped object has no namespace on either side and merges on the name alone."""
+    by_key: dict[tuple, list[dict]] = {}
+    for it in items:
+        by_key.setdefault((str(it.get("kind") or "").lower(), it.get("name"), it.get("api")), []).append(it)
+    out: list[dict] = []
+    for rows in by_key.values():
+        named = {r["namespace"] for r in rows if r.get("namespace")}
+        groups: dict[str | None, list[dict]] = {}
+        for r in rows:
+            ns = r.get("namespace")
+            if ns is None and len(named) == 1:
+                ns = next(iter(named))  # the one namespace pluto saw the object in
+            groups.setdefault(ns, []).append(r)
+        for ns, grp in groups.items():
+            first = dict(grp[0])
+            first["namespace"] = ns
+            first["tools"] = sorted({r["source"] for r in grp})
+            for k in ("deprecated_in", "removed_in", "replacement", "rule"):
+                vals = [r.get(k) for r in grp if r.get(k) is not None]
+                if vals:
+                    first[k] = vals[0]
+            first["deprecated"] = any(r.get("deprecated") for r in grp)
+            first["removed"] = any(r.get("removed") for r in grp)
+            first["source"] = "+".join(first["tools"])
+            if ns is None and len(named) > 1:
+                first["note"] = f"kubent gives no namespace for this object and pluto saw the name in {len(named)} namespaces ({', '.join(sorted(named))}); not merged"
+            out.append(first)
+    return out
+
+
 def _next_minor(server_version, pluto_target: dict | None) -> str | None:
     """The minor the two tools were asked about: the one after the server's (what collect passes as {k8s_next_minor}), else pluto's recorded k8s target."""
     return versions.next_minor_text(server_version) or versions.minor_text((pluto_target or {}).get("k8s"))
@@ -296,6 +330,7 @@ def _deprecated(cx: _Ctx) -> dict:
                 "last_transition": i.get("lastTransitionTime"),
             }
         )
+    items = _merge_tool_rows(items)
     for item in items:
         item.update(read)
     seen = [manifests[f"{tool}_manifests"] for tool in ("pluto", "kubent") if read[f"{tool}_read"]]
