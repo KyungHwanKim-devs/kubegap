@@ -21,7 +21,7 @@ rules:
     resources: ["*"]
     verbs: ["get", "list"]
   # Component CRDs (only installed ones are read; missing groups are ignored)
-  - apiGroups: ["monitoring.coreos.com", "karpenter.sh", "karpenter.k8s.aws", "keda.sh", "external-secrets.io", "argoproj.io", "cert-manager.io", "acme.cert-manager.io", "metallb.io", "elbv2.k8s.aws", "networking.k8s.aws", "crd.k8s.amazonaws.com", "snapshot.storage.k8s.io", "k3s.cattle.io", "actions.github.com", "actions.summerwind.dev"]
+  - apiGroups: ["monitoring.coreos.com", "karpenter.sh", "karpenter.k8s.aws", "keda.sh", "external-secrets.io", "argoproj.io", "cert-manager.io", "acme.cert-manager.io", "metallb.io", "frrk8s.metallb.io", "elbv2.k8s.aws", "networking.k8s.aws", "crd.k8s.amazonaws.com", "snapshot.storage.k8s.io", "k3s.cattle.io", "actions.github.com", "actions.summerwind.dev"]
     resources: ["*"]
     verbs: ["get", "list"]
   - nonResourceURLs: ["/version", "/api", "/api/*", "/apis", "/apis/*"]   # kubectl version and API discovery; the default system:discovery binding already grants these to every authenticated user, they are listed so the role reads complete on its own
