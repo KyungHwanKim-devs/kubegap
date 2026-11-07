@@ -4,7 +4,7 @@
   "source": "detected",
   "missing_file": false
  },
- "rubric_version": "0.1.84",
+ "rubric_version": "0.1.85",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -1763,7 +1763,8 @@
    "status": "done",
    "reason": null,
    "counts": {
-    "warn": 1
+    "pass": 9,
+    "warn": 3
    }
   },
   {
@@ -4432,10 +4433,24 @@
   },
   {
    "check": "resilience.prod-db-without-backup-cronjob",
-   "target": "cluster",
+   "target": "app-c-prod/statefulset/app-c-postgres",
    "status": "warn",
-   "evidence": "Of 16 DB workloads with a PVC, production DBs without a backup CronJob in the same namespace: ['app-c-prod/statefulset/app-c-postgres', 'app-l-prod/deployment/app-l-postgres']. Backup CronJobs 7 (local only 7, same node as source 5)",
-   "source": "summary.json:resilience.backup"
+   "evidence": "statefulset app-c-postgres (Service app-c-postgres, PVC postgres-data-app-c-postgres-0): no backup CronJob names it; the namespace has no backup CronJob",
+   "source": "summary.json:resilience.backup.databases"
+  },
+  {
+   "check": "resilience.prod-db-without-backup-cronjob",
+   "target": "app-h-prod/statefulset/app-h-qdrant",
+   "status": "warn",
+   "evidence": "statefulset app-h-qdrant (Service app-h-qdrant, PVC app-h-qdrant-data-app-h-qdrant-0): no backup CronJob names it; the namespace's backup CronJobs dump other databases: app-h-mysql-backup -> app-h-mysql",
+   "source": "summary.json:resilience.backup.databases"
+  },
+  {
+   "check": "resilience.prod-db-without-backup-cronjob",
+   "target": "app-l-prod/deployment/app-l-postgres",
+   "status": "warn",
+   "evidence": "deployment app-l-postgres (Service app-l-postgres, PVC app-l-postgres-data): no backup CronJob names it; the namespace has no backup CronJob",
+   "source": "summary.json:resilience.backup.databases"
   },
   {
    "check": "resilience.single-node-dependency",

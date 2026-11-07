@@ -7,7 +7,7 @@
 | kube context / 클러스터 | `default` / default (k3s, v1.33.5+k3s1) |
 | 실행 시각 / 모드 | 2026-11-07T10:22:59+09:00 / full (수집 262.7초, 모드 때문에 건너뛴 단계 0개, 실패 7개) |
 | 프로파일 | `lab` (detected) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | 0.1.4 / 0.1.84 / 1.1.0 |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | 0.1.4 / 0.1.85 / 1.1.0 |
 | 노드 / 네임스페이스 / 파드 / CRD | 2 (Ready 2) / 26 / 153 / 64 |
 | 컴포넌트 (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
 | 메트릭 저장소 | 없음 |
@@ -21,7 +21,7 @@
 |---|---|---|---|
 | critical | 2 | 2 | 같은 모드의 지난 점검 없음 |
 | high | 23 | 60 | 같은 모드의 지난 점검 없음 |
-| medium | 50 | 106 | 같은 모드의 지난 점검 없음 |
+| medium | 50 | 108 | 같은 모드의 지난 점검 없음 |
 | low | 4 | 107 | 같은 모드의 지난 점검 없음 |
 | info | 0 | 0 | 같은 모드의 지난 점검 없음 |
 
@@ -388,7 +388,9 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
 | `resilience.db-probe-timeout.app-g-api/statefulset/app-g-postgres:postgres` | warn | medium | app-g-api/statefulset/app-g-postgres container postgres: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent |
 | `resilience.db-probe-timeout.app-k/deployment/app-k-postgres:postgres` | warn | medium | app-k/deployment/app-k-postgres container postgres: liveness exec timeout 1s, period 20s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent |
 | `resilience.priority-inversion.cluster` | warn | medium | User-defined PriorityClasses [], pod distribution {'(none, 0)': 91, 'system-cluster-critical': 1, 'system-node-critical': 3}, prod pods without a class 48 of 48, prod max priority 0, non-prod max 0, inversions [], Preempted events 0 |
-| `resilience.prod-db-without-backup-cronjob.cluster` | warn | medium | Of 16 DB workloads with a PVC, production DBs without a backup CronJob in the same namespace: ['app-c-prod/statefulset/app-c-postgres', 'app-l-prod/deployment/app-l-postgres']. Backup CronJobs 7 (local only 7, same node as source 5) |
+| `resilience.prod-db-without-backup-cronjob.app-c-prod/statefulset/app-c-postgres` | warn | medium | statefulset app-c-postgres (Service app-c-postgres, PVC postgres-data-app-c-postgres-0): no backup CronJob names it; the namespace has no backup CronJob |
+| `resilience.prod-db-without-backup-cronjob.app-h-prod/statefulset/app-h-qdrant` | warn | medium | statefulset app-h-qdrant (Service app-h-qdrant, PVC app-h-qdrant-data-app-h-qdrant-0): no backup CronJob names it; the namespace's backup CronJobs dump other databases: app-h-mysql-backup -> app-h-mysql |
+| `resilience.prod-db-without-backup-cronjob.app-l-prod/deployment/app-l-postgres` | warn | medium | deployment app-l-postgres (Service app-l-postgres, PVC app-l-postgres-data): no backup CronJob names it; the namespace has no backup CronJob |
 | `resilience.single-node-dependency.registry/statefulset/registry` | warn | medium | ['nodeSelector kubernetes.io/hostname=node-b'], replicas 1 |
 | `resources.krr-recommendation.app-a-prod/daemonset/app-a-sandbox-prepull:hold-adk` | warn | medium | memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD) |
 | `resources.krr-recommendation.app-a-prod/daemonset/app-a-sandbox-prepull:hold-c` | warn | medium | memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD) |
@@ -5640,32 +5642,70 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
 ```
 
 </details>
-<details><summary><code>resilience.prod-db-without-backup-cronjob.cluster</code></summary>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.app-c-prod/statefulset/app-c-postgres</code></summary>
 
 ```json
 {
- "count": 7,
- "db_workloads_with_pvc": 16,
- "local_only": [
-  "app-a-prod/app-a-postgres-backup",
-  "app-f-prod/app-f-postgres-backup",
-  "app-f-prod/app-f-postgres-mx-backup",
-  "app-f-prod/app-f-postgres-vn-backup",
-  "app-g-api/app-g-postgres-backup",
-  "app-h-prod/app-h-mysql-backup",
-  "app-i-prod/app-i-postgres-backup"
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-c-postgres",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "postgres-data-app-c-postgres-0"
  ],
- "prod_db_without_backup_cronjob": [
-  "app-c-prod/statefulset/app-c-postgres",
-  "app-l-prod/deployment/app-l-postgres"
+ "services": [
+  "app-c-postgres"
  ],
- "same_node": [
-  "app-f-prod/app-f-postgres-backup",
-  "app-f-prod/app-f-postgres-vn-backup",
-  "app-g-api/app-g-postgres-backup",
-  "app-h-prod/app-h-mysql-backup",
-  "app-i-prod/app-i-postgres-backup"
- ]
+ "target": "app-c-prod/statefulset/app-c-postgres"
+}
+```
+
+</details>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.app-h-prod/statefulset/app-h-qdrant</code></summary>
+
+```json
+{
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-h-qdrant",
+ "other_backup_cronjobs_in_namespace": [
+  {
+   "name": "app-h-mysql-backup",
+   "suspend": false,
+   "targets_db": [
+    "app-h-prod/statefulset/app-h-mysql"
+   ]
+  }
+ ],
+ "prod": true,
+ "pvcs": [
+  "app-h-qdrant-data-app-h-qdrant-0"
+ ],
+ "services": [
+  "app-h-qdrant"
+ ],
+ "target": "app-h-prod/statefulset/app-h-qdrant"
+}
+```
+
+</details>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.app-l-prod/deployment/app-l-postgres</code></summary>
+
+```json
+{
+ "backup_cronjobs": [],
+ "kind": "deployment",
+ "name": "app-l-postgres",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "app-l-postgres-data"
+ ],
+ "services": [
+  "app-l-postgres"
+ ],
+ "target": "app-l-prod/deployment/app-l-postgres"
 }
 ```
 

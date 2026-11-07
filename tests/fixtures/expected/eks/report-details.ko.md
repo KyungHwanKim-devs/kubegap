@@ -7,7 +7,7 @@
 | kube context / 클러스터 | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
 | 실행 시각 / 모드 | 2026-11-07T10:33:37+09:00 / full (수집 300.7초, 모드 때문에 건너뛴 단계 0개, 실패 6개) |
 | 프로파일 | `prod` (detected) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | 0.1.4 / 0.1.84 / 1.1.0 |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | 0.1.4 / 0.1.85 / 1.1.0 |
 | 노드 / 네임스페이스 / 파드 / CRD | 9 (Ready 9) / 26 / 154 / 47 |
 | 컴포넌트 (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
 | 메트릭 저장소 | prometheus 2.49.1 retention 15d / size 0B via port-forward |
@@ -21,7 +21,7 @@
 |---|---|---|---|
 | critical | 1 | 3 | 같은 모드의 지난 점검 없음 |
 | high | 35 | 29 | 같은 모드의 지난 점검 없음 |
-| medium | 117 | 165 | 같은 모드의 지난 점검 없음 |
+| medium | 117 | 172 | 같은 모드의 지난 점검 없음 |
 | low | 17 | 145 | 같은 모드의 지난 점검 없음 |
 | info | 2 | 0 | 같은 모드의 지난 점검 없음 |
 
@@ -438,7 +438,14 @@
 | `resilience.db-probe-timeout.dev-app-y/statefulset/app-y-backend-mysql:mysql` | warn | medium | dev-app-y/statefulset/app-y-backend-mysql container mysql: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe present |
 | `resilience.db-probe-timeout.monitoring/statefulset/loki-stack:loki` | warn | medium | monitoring/statefulset/loki-stack container loki: liveness httpGet timeout 1s, period 10s, failureThreshold 3, readiness httpGet timeout 1s, startupProbe absent |
 | `resilience.priority-inversion.cluster` | warn | medium | User-defined PriorityClasses [], pod distribution {'(none, 0)': 111, 'system-cluster-critical': 9, 'system-node-critical': 27}, prod pods without a class 45 of 45, prod max priority 0, non-prod max 0, inversions [], Preempted events 0 |
-| `resilience.prod-db-without-backup-cronjob.cluster` | warn | medium | Of 18 DB workloads with a PVC, production DBs without a backup CronJob in the same namespace: ['app-ab-prod/statefulset/app-ab-backend-postgresql', 'prod-app-r/statefulset/app-r-postgresql', 'prod-app-s/statefulset/app-s-backend-mysql', 'prod-app-t/statefulset/app-t-backend-postgresql' … |
+| `resilience.prod-db-without-backup-cronjob.app-ab-prod/statefulset/app-ab-backend-postgresql` | warn | medium | statefulset app-ab-backend-postgresql (Service app-ab-backend-postgresql, app-ab-backend-postgresql-hl, PVC data-app-ab-backend-postgresql-0): no backup CronJob names it; the namespace has no backup CronJob |
+| `resilience.prod-db-without-backup-cronjob.prod-app-r/statefulset/app-r-postgresql` | warn | medium | statefulset app-r-postgresql (Service app-r-postgresql, app-r-postgresql-hl, PVC data-app-r-postgresql-0): no backup CronJob names it; the namespace has no backup CronJob |
+| `resilience.prod-db-without-backup-cronjob.prod-app-s/statefulset/app-s-backend-mysql` | warn | medium | statefulset app-s-backend-mysql (Service app-s-backend-mysql, app-s-backend-mysql-headless, PVC data-app-s-backend-mysql-0): no backup CronJob names it; the namespace has no backup CronJob |
+| `resilience.prod-db-without-backup-cronjob.prod-app-t/statefulset/app-t-backend-postgresql` | warn | medium | statefulset app-t-backend-postgresql (Service app-t-backend-postgresql, app-t-backend-postgresql-hl, PVC data-app-t-backend-postgresql-0): no backup CronJob names it; the namespace has no backup CronJob |
+| `resilience.prod-db-without-backup-cronjob.prod-app-v/statefulset/app-v-backend-prod-mysql` | warn | medium | statefulset app-v-backend-prod-mysql (Service app-v-backend-prod-mysql, app-v-backend-prod-mysql-headless, PVC data-app-v-backend-prod-mysql-0): no backup CronJob names it; the namespace has no backup CronJob |
+| `resilience.prod-db-without-backup-cronjob.prod-app-x/statefulset/app-x-postgresql` | warn | medium | statefulset app-x-postgresql (Service app-x-postgresql, app-x-postgresql-hl, PVC data-app-x-postgresql-0): no backup CronJob names it; the namespace has no backup CronJob |
+| `resilience.prod-db-without-backup-cronjob.prod-app-y/statefulset/app-y-backend-mysql` | warn | medium | statefulset app-y-backend-mysql (Service app-y-backend-mysql, app-y-backend-mysql-headless, PVC data-app-y-backend-mysql-0): no backup CronJob names it; the namespace has no backup CronJob |
+| `resilience.prod-db-without-backup-cronjob.prod-app-z-backend/statefulset/app-z-neo4j` | warn | medium | statefulset app-z-neo4j (Service app-z-neo4j, PVC data-app-z-neo4j-0): no backup CronJob names it; the namespace has no backup CronJob |
 | `resilience.recreate-strategy-serving.monitoring/deployment/vmauth` | warn | medium | strategy Recreate (justification none), replicas 1, preStop False, grace 30s |
 | `resilience.shell-pid1-no-prestop.middleware/statefulset/redis-master` | warn | medium | Containers whose command is sh -c ['redis', 'metrics'], no preStop, terminationGracePeriodSeconds 30 |
 | `resources.cpu-request-overprovisioned.app-ab-prod/deploy/app-ab-backend:backend` | warn | medium | pod app-ab-backend-6dd8fcbf96-nshrh: 7d CPU p95 0.014 cores / request 0.10 cores = 0.14 |
@@ -5531,24 +5538,169 @@
 ```
 
 </details>
-<details><summary><code>resilience.prod-db-without-backup-cronjob.cluster</code></summary>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.app-ab-prod/statefulset/app-ab-backend-postgresql</code></summary>
 
 ```json
 {
- "count": 0,
- "db_workloads_with_pvc": 18,
- "local_only": [],
- "prod_db_without_backup_cronjob": [
-  "app-ab-prod/statefulset/app-ab-backend-postgresql",
-  "prod-app-r/statefulset/app-r-postgresql",
-  "prod-app-s/statefulset/app-s-backend-mysql",
-  "prod-app-t/statefulset/app-t-backend-postgresql",
-  "prod-app-v/statefulset/app-v-backend-prod-mysql",
-  "prod-app-x/statefulset/app-x-postgresql",
-  "prod-app-y/statefulset/app-y-backend-mysql",
-  "prod-app-z-backend/statefulset/app-z-neo4j"
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-ab-backend-postgresql",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "data-app-ab-backend-postgresql-0"
  ],
- "same_node": []
+ "services": [
+  "app-ab-backend-postgresql",
+  "app-ab-backend-postgresql-hl"
+ ],
+ "target": "app-ab-prod/statefulset/app-ab-backend-postgresql"
+}
+```
+
+</details>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.prod-app-r/statefulset/app-r-postgresql</code></summary>
+
+```json
+{
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-r-postgresql",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "data-app-r-postgresql-0"
+ ],
+ "services": [
+  "app-r-postgresql",
+  "app-r-postgresql-hl"
+ ],
+ "target": "prod-app-r/statefulset/app-r-postgresql"
+}
+```
+
+</details>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.prod-app-s/statefulset/app-s-backend-mysql</code></summary>
+
+```json
+{
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-s-backend-mysql",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "data-app-s-backend-mysql-0"
+ ],
+ "services": [
+  "app-s-backend-mysql",
+  "app-s-backend-mysql-headless"
+ ],
+ "target": "prod-app-s/statefulset/app-s-backend-mysql"
+}
+```
+
+</details>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.prod-app-t/statefulset/app-t-backend-postgresql</code></summary>
+
+```json
+{
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-t-backend-postgresql",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "data-app-t-backend-postgresql-0"
+ ],
+ "services": [
+  "app-t-backend-postgresql",
+  "app-t-backend-postgresql-hl"
+ ],
+ "target": "prod-app-t/statefulset/app-t-backend-postgresql"
+}
+```
+
+</details>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.prod-app-v/statefulset/app-v-backend-prod-mysql</code></summary>
+
+```json
+{
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-v-backend-prod-mysql",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "data-app-v-backend-prod-mysql-0"
+ ],
+ "services": [
+  "app-v-backend-prod-mysql",
+  "app-v-backend-prod-mysql-headless"
+ ],
+ "target": "prod-app-v/statefulset/app-v-backend-prod-mysql"
+}
+```
+
+</details>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.prod-app-x/statefulset/app-x-postgresql</code></summary>
+
+```json
+{
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-x-postgresql",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "data-app-x-postgresql-0"
+ ],
+ "services": [
+  "app-x-postgresql",
+  "app-x-postgresql-hl"
+ ],
+ "target": "prod-app-x/statefulset/app-x-postgresql"
+}
+```
+
+</details>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.prod-app-y/statefulset/app-y-backend-mysql</code></summary>
+
+```json
+{
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-y-backend-mysql",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "data-app-y-backend-mysql-0"
+ ],
+ "services": [
+  "app-y-backend-mysql",
+  "app-y-backend-mysql-headless"
+ ],
+ "target": "prod-app-y/statefulset/app-y-backend-mysql"
+}
+```
+
+</details>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.prod-app-z-backend/statefulset/app-z-neo4j</code></summary>
+
+```json
+{
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-z-neo4j",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "data-app-z-neo4j-0"
+ ],
+ "services": [
+  "app-z-neo4j"
+ ],
+ "target": "prod-app-z-backend/statefulset/app-z-neo4j"
 }
 ```
 

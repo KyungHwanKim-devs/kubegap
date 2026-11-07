@@ -21332,6 +21332,12 @@
      "prod": true,
      "schedule": "15 3 * * *",
      "suspend": false,
+     "targets_db": [
+      {
+       "target": "app-a-prod/statefulset/app-a-postgres",
+       "matched_by": "app-a-postgres"
+      }
+     ],
      "dest_pvcs": [
       "app-a-postgres-backup-pvc"
      ],
@@ -21366,6 +21372,12 @@
      "prod": true,
      "schedule": "30 3 * * *",
      "suspend": false,
+     "targets_db": [
+      {
+       "target": "app-f-prod/statefulset/app-f-postgres",
+       "matched_by": "app-f-postgres"
+      }
+     ],
      "dest_pvcs": [
       "app-f-postgres-backup-pvc"
      ],
@@ -21410,6 +21422,12 @@
      "prod": true,
      "schedule": "30 3 * * *",
      "suspend": false,
+     "targets_db": [
+      {
+       "target": "app-f-prod/statefulset/app-f-postgres-mx",
+       "matched_by": "app-f-postgres-mx"
+      }
+     ],
      "dest_pvcs": [
       "app-f-postgres-mx-backup-pvc"
      ],
@@ -21454,6 +21472,12 @@
      "prod": true,
      "schedule": "30 3 * * *",
      "suspend": false,
+     "targets_db": [
+      {
+       "target": "app-f-prod/statefulset/app-f-postgres-vn",
+       "matched_by": "app-f-postgres-vn"
+      }
+     ],
      "dest_pvcs": [
       "app-f-postgres-vn-backup-pvc"
      ],
@@ -21498,6 +21522,12 @@
      "prod": false,
      "schedule": "50 3 * * *",
      "suspend": false,
+     "targets_db": [
+      {
+       "target": "app-g-api/statefulset/app-g-postgres",
+       "matched_by": "app-g-postgres"
+      }
+     ],
      "dest_pvcs": [
       "app-g-postgres-backup-pvc"
      ],
@@ -21532,6 +21562,12 @@
      "prod": true,
      "schedule": "50 2 * * *",
      "suspend": false,
+     "targets_db": [
+      {
+       "target": "app-h-prod/statefulset/app-h-mysql",
+       "matched_by": "app-h-mysql"
+      }
+     ],
      "dest_pvcs": [
       "mysql-backup-app-h-mysql-0"
      ],
@@ -21572,6 +21608,12 @@
      "prod": true,
      "schedule": "0 3 * * *",
      "suspend": false,
+     "targets_db": [
+      {
+       "target": "app-i-prod/statefulset/app-i-postgres",
+       "matched_by": "app-i-postgres"
+      }
+     ],
      "dest_pvcs": [
       "app-i-postgres-backup-pvc"
      ],
@@ -21612,11 +21654,287 @@
     "app-h-prod/app-h-mysql-backup",
     "app-i-prod/app-i-postgres-backup"
    ],
-   "prod_db_without_backup_cronjob": [
-    "app-c-prod/statefulset/app-c-postgres",
-    "app-l-prod/deployment/app-l-postgres"
+   "databases": [
+    {
+     "namespace": "app-k",
+     "kind": "deployment",
+     "name": "app-k-postgres",
+     "target": "app-k/deployment/app-k-postgres",
+     "prod": false,
+     "pvcs": [
+      "app-k-postgres-data"
+     ],
+     "services": [
+      "app-k-postgres"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "app-l-prod",
+     "kind": "deployment",
+     "name": "app-l-postgres",
+     "target": "app-l-prod/deployment/app-l-postgres",
+     "prod": true,
+     "pvcs": [
+      "app-l-postgres-data"
+     ],
+     "services": [
+      "app-l-postgres"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "app-a-prod",
+     "kind": "statefulset",
+     "name": "app-a-postgres",
+     "target": "app-a-prod/statefulset/app-a-postgres",
+     "prod": true,
+     "pvcs": [
+      "data-app-a-postgres-0"
+     ],
+     "services": [
+      "app-a-postgres"
+     ],
+     "backup_cronjobs": [
+      {
+       "name": "app-a-postgres-backup",
+       "matched_by": "app-a-postgres"
+      }
+     ],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "app-c-prod",
+     "kind": "statefulset",
+     "name": "app-c-postgres",
+     "target": "app-c-prod/statefulset/app-c-postgres",
+     "prod": true,
+     "pvcs": [
+      "postgres-data-app-c-postgres-0"
+     ],
+     "services": [
+      "app-c-postgres"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "app-f-prod",
+     "kind": "statefulset",
+     "name": "app-f-postgres",
+     "target": "app-f-prod/statefulset/app-f-postgres",
+     "prod": true,
+     "pvcs": [
+      "app-f-postgres-data-app-f-postgres-0"
+     ],
+     "services": [
+      "app-f-postgres",
+      "app-f-postgres-external"
+     ],
+     "backup_cronjobs": [
+      {
+       "name": "app-f-postgres-backup",
+       "matched_by": "app-f-postgres"
+      }
+     ],
+     "other_backup_cronjobs_in_namespace": [
+      {
+       "name": "app-f-postgres-mx-backup",
+       "suspend": false,
+       "targets_db": [
+        "app-f-prod/statefulset/app-f-postgres-mx"
+       ]
+      },
+      {
+       "name": "app-f-postgres-vn-backup",
+       "suspend": false,
+       "targets_db": [
+        "app-f-prod/statefulset/app-f-postgres-vn"
+       ]
+      }
+     ]
+    },
+    {
+     "namespace": "app-f-prod",
+     "kind": "statefulset",
+     "name": "app-f-postgres-mx",
+     "target": "app-f-prod/statefulset/app-f-postgres-mx",
+     "prod": true,
+     "pvcs": [
+      "app-f-postgres-mx-data-app-f-postgres-mx-0"
+     ],
+     "services": [
+      "app-f-postgres-mx",
+      "app-f-postgres-mx-external"
+     ],
+     "backup_cronjobs": [
+      {
+       "name": "app-f-postgres-mx-backup",
+       "matched_by": "app-f-postgres-mx"
+      }
+     ],
+     "other_backup_cronjobs_in_namespace": [
+      {
+       "name": "app-f-postgres-backup",
+       "suspend": false,
+       "targets_db": [
+        "app-f-prod/statefulset/app-f-postgres"
+       ]
+      },
+      {
+       "name": "app-f-postgres-vn-backup",
+       "suspend": false,
+       "targets_db": [
+        "app-f-prod/statefulset/app-f-postgres-vn"
+       ]
+      }
+     ]
+    },
+    {
+     "namespace": "app-f-prod",
+     "kind": "statefulset",
+     "name": "app-f-postgres-vn",
+     "target": "app-f-prod/statefulset/app-f-postgres-vn",
+     "prod": true,
+     "pvcs": [
+      "app-f-postgres-vn-data-app-f-postgres-vn-0"
+     ],
+     "services": [
+      "app-f-postgres-vn",
+      "app-f-postgres-vn-external"
+     ],
+     "backup_cronjobs": [
+      {
+       "name": "app-f-postgres-vn-backup",
+       "matched_by": "app-f-postgres-vn"
+      }
+     ],
+     "other_backup_cronjobs_in_namespace": [
+      {
+       "name": "app-f-postgres-backup",
+       "suspend": false,
+       "targets_db": [
+        "app-f-prod/statefulset/app-f-postgres"
+       ]
+      },
+      {
+       "name": "app-f-postgres-mx-backup",
+       "suspend": false,
+       "targets_db": [
+        "app-f-prod/statefulset/app-f-postgres-mx"
+       ]
+      }
+     ]
+    },
+    {
+     "namespace": "app-g-api",
+     "kind": "statefulset",
+     "name": "app-g-postgres",
+     "target": "app-g-api/statefulset/app-g-postgres",
+     "prod": false,
+     "pvcs": [
+      "app-g-postgres-data-app-g-postgres-0"
+     ],
+     "services": [
+      "app-g-postgres"
+     ],
+     "backup_cronjobs": [
+      {
+       "name": "app-g-postgres-backup",
+       "matched_by": "app-g-postgres"
+      }
+     ],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "app-h-prod",
+     "kind": "statefulset",
+     "name": "app-h-mysql",
+     "target": "app-h-prod/statefulset/app-h-mysql",
+     "prod": true,
+     "pvcs": [
+      "mysql-backup-app-h-mysql-0",
+      "mysql-data-app-h-mysql-0"
+     ],
+     "services": [
+      "app-h-mysql"
+     ],
+     "backup_cronjobs": [
+      {
+       "name": "app-h-mysql-backup",
+       "matched_by": "app-h-mysql"
+      }
+     ],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "app-h-prod",
+     "kind": "statefulset",
+     "name": "app-h-qdrant",
+     "target": "app-h-prod/statefulset/app-h-qdrant",
+     "prod": true,
+     "pvcs": [
+      "app-h-qdrant-data-app-h-qdrant-0"
+     ],
+     "services": [
+      "app-h-qdrant"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": [
+      {
+       "name": "app-h-mysql-backup",
+       "suspend": false,
+       "targets_db": [
+        "app-h-prod/statefulset/app-h-mysql"
+       ]
+      }
+     ]
+    },
+    {
+     "namespace": "logging",
+     "kind": "statefulset",
+     "name": "elasticsearch",
+     "target": "logging/statefulset/elasticsearch",
+     "prod": false,
+     "pvcs": [
+      "data-elasticsearch-0"
+     ],
+     "services": [
+      "elasticsearch-master"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "app-i-prod",
+     "kind": "statefulset",
+     "name": "app-i-postgres",
+     "target": "app-i-prod/statefulset/app-i-postgres",
+     "prod": true,
+     "pvcs": [
+      "app-i-postgres-data-app-i-postgres-0"
+     ],
+     "services": [
+      "app-i-postgres",
+      "app-i-postgres-external"
+     ],
+     "backup_cronjobs": [
+      {
+       "name": "app-i-postgres-backup",
+       "matched_by": "app-i-postgres"
+      }
+     ],
+     "other_backup_cronjobs_in_namespace": []
+    }
    ],
-   "db_workloads_with_pvc": 16
+   "excluded_stores": [
+    "app-a-prod/statefulset/app-a-redis",
+    "app-f-prod/statefulset/app-f-redis",
+    "app-g-api/statefulset/app-g-minio"
+   ],
+   "note": "databases: every store that needs a dump (BACKUP_TARGET_RE) with a PVC, and the backup CronJobs whose command, args or env name its Service, its workload or its first pod; excluded_stores: caches, queues, monitoring stores and MinIO with a PVC, which this check does not ask a dump of"
   }
  },
  "storage": {

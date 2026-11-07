@@ -45014,17 +45014,221 @@
    "count": 0,
    "local_only": [],
    "same_node": [],
-   "prod_db_without_backup_cronjob": [
-    "app-ab-prod/statefulset/app-ab-backend-postgresql",
-    "prod-app-r/statefulset/app-r-postgresql",
-    "prod-app-s/statefulset/app-s-backend-mysql",
-    "prod-app-t/statefulset/app-t-backend-postgresql",
-    "prod-app-v/statefulset/app-v-backend-prod-mysql",
-    "prod-app-x/statefulset/app-x-postgresql",
-    "prod-app-y/statefulset/app-y-backend-mysql",
-    "prod-app-z-backend/statefulset/app-z-neo4j"
+   "databases": [
+    {
+     "namespace": "dev-app-s",
+     "kind": "statefulset",
+     "name": "app-s-backend-mysql",
+     "target": "dev-app-s/statefulset/app-s-backend-mysql",
+     "prod": false,
+     "pvcs": [
+      "data-app-s-backend-mysql-0"
+     ],
+     "services": [
+      "app-s-backend-mysql",
+      "app-s-backend-mysql-headless"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "dev-app-y",
+     "kind": "statefulset",
+     "name": "app-y-backend-mysql",
+     "target": "dev-app-y/statefulset/app-y-backend-mysql",
+     "prod": false,
+     "pvcs": [
+      "data-app-y-backend-mysql-0"
+     ],
+     "services": [
+      "app-y-backend-mysql",
+      "app-y-backend-mysql-headless"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "dev-app-v",
+     "kind": "statefulset",
+     "name": "app-v-backend-dev-mysql",
+     "target": "dev-app-v/statefulset/app-v-backend-dev-mysql",
+     "prod": false,
+     "pvcs": [
+      "data-app-v-backend-dev-mysql-0"
+     ],
+     "services": [
+      "app-v-backend-dev-mysql",
+      "app-v-backend-dev-mysql-headless"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "dev-app-aa",
+     "kind": "statefulset",
+     "name": "app-aa-mysql",
+     "target": "dev-app-aa/statefulset/app-aa-mysql",
+     "prod": false,
+     "pvcs": [
+      "data-app-aa-mysql-0"
+     ],
+     "services": [
+      "app-aa-mysql",
+      "app-aa-mysql-headless"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "dev-app-aa",
+     "kind": "statefulset",
+     "name": "app-aa-postgres",
+     "target": "dev-app-aa/statefulset/app-aa-postgres",
+     "prod": false,
+     "pvcs": [
+      "data-app-aa-postgres-0"
+     ],
+     "services": [
+      "app-aa-postgres"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "prod-app-t",
+     "kind": "statefulset",
+     "name": "app-t-backend-postgresql",
+     "target": "prod-app-t/statefulset/app-t-backend-postgresql",
+     "prod": true,
+     "pvcs": [
+      "data-app-t-backend-postgresql-0"
+     ],
+     "services": [
+      "app-t-backend-postgresql",
+      "app-t-backend-postgresql-hl"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "prod-app-x",
+     "kind": "statefulset",
+     "name": "app-x-postgresql",
+     "target": "prod-app-x/statefulset/app-x-postgresql",
+     "prod": true,
+     "pvcs": [
+      "data-app-x-postgresql-0"
+     ],
+     "services": [
+      "app-x-postgresql",
+      "app-x-postgresql-hl"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "prod-app-s",
+     "kind": "statefulset",
+     "name": "app-s-backend-mysql",
+     "target": "prod-app-s/statefulset/app-s-backend-mysql",
+     "prod": true,
+     "pvcs": [
+      "data-app-s-backend-mysql-0"
+     ],
+     "services": [
+      "app-s-backend-mysql",
+      "app-s-backend-mysql-headless"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "prod-app-y",
+     "kind": "statefulset",
+     "name": "app-y-backend-mysql",
+     "target": "prod-app-y/statefulset/app-y-backend-mysql",
+     "prod": true,
+     "pvcs": [
+      "data-app-y-backend-mysql-0"
+     ],
+     "services": [
+      "app-y-backend-mysql",
+      "app-y-backend-mysql-headless"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "prod-app-z-backend",
+     "kind": "statefulset",
+     "name": "app-z-neo4j",
+     "target": "prod-app-z-backend/statefulset/app-z-neo4j",
+     "prod": true,
+     "pvcs": [
+      "data-app-z-neo4j-0"
+     ],
+     "services": [
+      "app-z-neo4j"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "prod-app-r",
+     "kind": "statefulset",
+     "name": "app-r-postgresql",
+     "target": "prod-app-r/statefulset/app-r-postgresql",
+     "prod": true,
+     "pvcs": [
+      "data-app-r-postgresql-0"
+     ],
+     "services": [
+      "app-r-postgresql",
+      "app-r-postgresql-hl"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "prod-app-v",
+     "kind": "statefulset",
+     "name": "app-v-backend-prod-mysql",
+     "target": "prod-app-v/statefulset/app-v-backend-prod-mysql",
+     "prod": true,
+     "pvcs": [
+      "data-app-v-backend-prod-mysql-0"
+     ],
+     "services": [
+      "app-v-backend-prod-mysql",
+      "app-v-backend-prod-mysql-headless"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    },
+    {
+     "namespace": "app-ab-prod",
+     "kind": "statefulset",
+     "name": "app-ab-backend-postgresql",
+     "target": "app-ab-prod/statefulset/app-ab-backend-postgresql",
+     "prod": true,
+     "pvcs": [
+      "data-app-ab-backend-postgresql-0"
+     ],
+     "services": [
+      "app-ab-backend-postgresql",
+      "app-ab-backend-postgresql-hl"
+     ],
+     "backup_cronjobs": [],
+     "other_backup_cronjobs_in_namespace": []
+    }
    ],
-   "db_workloads_with_pvc": 18
+   "excluded_stores": [
+    "middleware/statefulset/kafka-controller",
+    "middleware/statefulset/redis-master",
+    "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus",
+    "monitoring/statefulset/vm-single"
+   ],
+   "note": "databases: every store that needs a dump (BACKUP_TARGET_RE) with a PVC, and the backup CronJobs whose command, args or env name its Service, its workload or its first pod; excluded_stores: caches, queues, monitoring stores and MinIO with a PVC, which this check does not ask a dump of"
   }
  },
  "storage": {
