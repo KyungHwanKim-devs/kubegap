@@ -15,7 +15,7 @@
     - "aws eks describe-cluster --name {cluster} --query cluster.logging"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         inventory:
@@ -73,7 +73,7 @@
     - "aws eks describe-cluster --name {cluster} --query cluster.resourcesVpcConfig"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         inventory:
@@ -150,7 +150,7 @@
     - "aws eks describe-addon-versions --addon-name <name> --kubernetes-version {k8s_version} --query 'addons[].addonVersions[0].addonVersion'"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         inventory:
@@ -258,7 +258,7 @@
     - "kubectl get ec2nodeclass -o jsonpath='{.items[*].spec.amiFamily}'"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         inventory:
@@ -363,7 +363,7 @@
     - "aws ssm describe-instance-information --query 'InstanceInformationList[].{id:InstanceId,ping:PingStatus}'"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         inventory:
@@ -430,7 +430,7 @@
     - "aws eks describe-cluster-versions --cluster-versions {k8s_version}"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         inventory:
@@ -529,7 +529,7 @@
     - "aws backup list-backup-plans"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         inventory:

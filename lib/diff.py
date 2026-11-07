@@ -138,37 +138,27 @@ def diff_findings(a: Path, b: Path) -> dict:
     cb = {c["id"]: c for c in db.get("check_results") or []}
     # A finding appears or disappears for one of two reasons: the cluster changed, or the criteria did. The criteria are known from check_results:
     # whether the check existed and was allowed to run on each side (absent, disabled, not-collected, tool-missing, error), the rule_hash of its verdict-deciding
-    # parts (recorded since rubric 0.1.66) and the thresholds in force. A check that was `skip` on one side (its inputs were absent, as when Argo CD was installed
-    # between the runs) is a cluster change, and the row carries both statuses and the skip reason so the report can say so. When a side has no rule_hash the finding
-    # stays a cluster change marked `rule_known: false`; the report reads the check's notes for those only.
+    # parts and the thresholds in force. A check that was `skip` on one side (its inputs were absent, as when Argo CD was installed between the runs) is a cluster
+    # change, and the row carries both statuses and the skip reason so the report can say so.
     crit: dict[str, list] = {"new_checks": [], "dropped_checks": [], "rule_changed": [], "thresholds_changed": []}
-    unknown_checks: set[str] = set()
     GATED = ("disabled", "not-collected", "tool-missing", "error")
 
     def gate(c: dict | None) -> bool:
         """True when the check could not produce findings on this side for a reason that is not the cluster: it did not exist or a gate kept it out."""
         return not c or c.get("status") in GATED
 
-    def classify(check_id: str) -> tuple[str | None, bool]:
-        """(bucket or None for a cluster change, rule_known)."""
+    def classify(check_id: str) -> str | None:
+        """The criteria bucket, or None for a cluster change."""
         x, y = ca.get(check_id), cb.get(check_id)
-        if not ca or not cb:
-            return None, True  # a findings-draft.json from before check_results existed: nothing to say, the old behaviour
         if gate(x):
-            return "new_checks", True
+            return "new_checks"
         if gate(y):
-            return "dropped_checks", True
-        hx, hy = x.get("rule_hash"), y.get("rule_hash")
-        if hx and hy:
-            if hx != hy:
-                return "rule_changed", True
-            if (x.get("thresholds") or {}) != (y.get("thresholds") or {}):
-                return "thresholds_changed", True
-            return None, True
-        if da.get("rubric_version") != db.get("rubric_version"):
-            unknown_checks.add(check_id)
-            return None, False
-        return None, True
+            return "dropped_checks"
+        if x.get("rule_hash") != y.get("rule_hash"):
+            return "rule_changed"
+        if (x.get("thresholds") or {}) != (y.get("thresholds") or {}):
+            return "thresholds_changed"
+        return None
 
     def crit_row(f: dict, kind: str, bucket: str) -> dict:
         x, y = ca.get(f["check"]) or {}, cb.get(f["check"]) or {}
@@ -188,36 +178,30 @@ def diff_findings(a: Path, b: Path) -> dict:
             row["thresholds"] = [x.get("thresholds"), y.get("thresholds")]
         return row
 
-    def cluster_row(f: dict, known: bool, with_evidence: bool) -> dict:
+    def cluster_row(f: dict, with_evidence: bool) -> dict:
         x, y = ca.get(f["check"]) or {}, cb.get(f["check"]) or {}
-        row = {"id": f["id"], "status": f["status"], "severity_default": f["severity_default"]}
+        row = {"id": f["id"], "status": f["status"], "severity_default": f["severity_default"], "check_status": [x.get("status"), y.get("status")]}
         if with_evidence:
             row["evidence"] = f.get("evidence")
-        if ca and cb:
-            row["check_status"] = [x.get("status"), y.get("status")]
-            if x.get("status") == "skip" or y.get("status") == "skip":
-                row["check_reason"] = [x.get("reason"), y.get("reason")]  # the inputs appeared or vanished: an installation or removal, which is a cluster change
-        if not known:
-            row["rule_known"] = False
+        if x.get("status") == "skip" or y.get("status") == "skip":
+            row["check_reason"] = [x.get("reason"), y.get("reason")]  # the inputs appeared or vanished: an installation or removal, which is a cluster change
         return row
 
     new, resolved, changed = [], [], []
     for i in sorted(set(fb) - set(fa)):
-        b, known = classify(fb[i]["check"])
-        (crit[b].append(crit_row(fb[i], "new", b)) if b else new.append(cluster_row(fb[i], known, True)))
+        b = classify(fb[i]["check"])
+        (crit[b].append(crit_row(fb[i], "new", b)) if b else new.append(cluster_row(fb[i], True)))
     for i in sorted(set(fa) - set(fb)):
-        b, known = classify(fa[i]["check"])
-        (crit[b].append(crit_row(fa[i], "resolved", b)) if b else resolved.append(cluster_row(fa[i], known, False)))
+        b = classify(fa[i]["check"])
+        (crit[b].append(crit_row(fa[i], "resolved", b)) if b else resolved.append(cluster_row(fa[i], False)))
     for i in sorted(set(fa) & set(fb)):
         x, y = fa[i], fb[i]
         if x["status"] != y["status"] or x["severity_default"] != y["severity_default"]:
-            b, known = classify(y["check"])
+            b = classify(y["check"])
             row = {"id": i, "status": [x["status"], y["status"]], "severity_default": [x["severity_default"], y["severity_default"]]}
             if b:
                 crit[b].append({**crit_row(y, "changed", b), **row})
             else:
-                if not known:
-                    row["rule_known"] = False
                 changed.append(row)
     # Rename suspects: within the same check and namespace one finding disappeared and one appeared
     rename_suspects = []
@@ -242,10 +226,9 @@ def diff_findings(a: Path, b: Path) -> dict:
         "rename_suspects": rename_suspects,
         "criteria_changes": {
             **crit,
-            "rule_unknown_checks": sorted(unknown_checks),
-            "note": "Findings whose check did not exist or was gated off on one side (new_checks, dropped_checks), whose rule_hash differs (rule_changed) or whose thresholds in force differ (thresholds_changed) are criteria changes and are kept out of new, resolved and changed. rule_unknown_checks are checks that predate rule hashes while the rubric version differs; their findings stay in new, resolved and changed with rule_known: false, and the report reads those checks' notes.",
+            "note": "Findings whose check did not exist or was gated off on one side (new_checks, dropped_checks), whose rule_hash differs (rule_changed) or whose thresholds in force differ (thresholds_changed) are criteria changes and are kept out of new, resolved and changed.",
         },
-        "summary": {"new": len(new), "resolved": len(resolved), "changed": len(changed), "criteria_changes": sum(len(v) for v in crit.values()), "rule_unknown_checks": len(unknown_checks)},
+        "summary": {"new": len(new), "resolved": len(resolved), "changed": len(changed), "criteria_changes": sum(len(v) for v in crit.values())},
     }
 
 
@@ -304,6 +287,15 @@ def diff_events(a: Path, b: Path) -> dict:
     }
 
 
+def diff_metric_queries(a: Path, b: Path) -> dict:
+    """The query ids one side has and the other has not: a query added, removed or renamed between the two kubegap versions (a failed query still has its
+    file, so it is not here). diff_metrics compares the intersection only, so without this list a renamed query would vanish from the comparison without a word (#147)."""
+    not_queries = {"series-present", "apiserver_job"}  # the two files under metrics/ that are not a query's result (lib/prom.py)
+    ma = {p.stem for p in (a / "metrics").glob("*.json")} - not_queries if (a / "metrics").is_dir() else set()
+    mb = {p.stem for p in (b / "metrics").glob("*.json")} - not_queries if (b / "metrics").is_dir() else set()
+    return {"only_in_a": sorted(ma - mb), "only_in_b": sorted(mb - ma)}
+
+
 def diff_metrics(a: Path, b: Path, top: int = 10) -> dict:
     out: dict = {}
     ma = {p.stem: p for p in (a / "metrics").glob("*.json")} if (a / "metrics").is_dir() else {}
@@ -334,6 +326,7 @@ def diff_metrics(a: Path, b: Path, top: int = 10) -> dict:
 
 
 def diff(a: Path, b: Path, write: bool = True) -> dict:
+    ia, ib = load_json(a / "inventory.json") or {}, load_json(b / "inventory.json") or {}
     d = {
         "kubegap": __version__,
         "generated_at": _dt.datetime.now().astimezone().isoformat(timespec="seconds"),
@@ -341,11 +334,14 @@ def diff(a: Path, b: Path, write: bool = True) -> dict:
         "b": str(b),
         "a_name": a.name,
         "b_name": b.name,
+        # the versions the two runs were made with: a key or a query renamed between them is a difference of the tool, not of the cluster (#147)
+        "versions": {k: [ia.get(k), ib.get(k)] for k in ("kubegap", "schema", "rubric_version", "signatures_version")},
         "inventory": diff_inventory(a, b),
         "objects": diff_objects(a, b),
         "findings": {**diff_findings(a, b), "persisted": persisted_findings(b)},
         "events": diff_events(a, b),
         "metrics": diff_metrics(a, b),
+        "metrics_queries": diff_metric_queries(a, b),
     }
     if write:
         write_private(b / "diff.json", json.dumps(d, ensure_ascii=False, indent=1, default=str))

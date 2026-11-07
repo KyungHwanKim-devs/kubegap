@@ -558,6 +558,7 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
         RunLog(snap / "run.log").note("inventory.json has no taken_at; the ages of this summary are measured from the wall clock and change on a rerun")
     s = {
         "kubegap": __version__,
+        "schema": paths.SCHEMA_VERSION,
         "snapshot": str(snap),
         "generated_at": _dt.datetime.now().astimezone().isoformat(timespec="seconds"),
         "inventory": None,

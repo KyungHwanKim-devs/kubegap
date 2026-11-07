@@ -10,6 +10,8 @@ that no check changed its status or finding count. The procedure and the degrade
 | `snapshot-k3s` | k3s v1.33.5+k3s1, two nodes | 2026-11-07T10:22:59+09:00 | lab | 2 | 26 | ssh | prometheus, alertmanager, grafana, loki (loki not reachable) | 18.8 MB, 1.55 MB compressed |
 | `snapshot-eks` | EKS v1.32.13, Karpenter | 2026-11-07T10:33:37+09:00 | prod | 9 | 26 | ssm | prometheus, alertmanager, grafana, loki | 17.8 MB, 1.45 MB compressed |
 
+Both inventories carry `schema: 1` (the snapshot format version of #97, written by discovery since 0.1.5); it was added to these two by hand when the key was introduced, as a collection of this version would write it.
+
 `expected/<name>/` and `expected/<name>-degraded/` hold `summary.json`, `findings.json` (check results and findings without `details`), and
 `report-details.en.md` / `report-details.ko.md`. They change only through `scripts/kubegap regress --update`.
 

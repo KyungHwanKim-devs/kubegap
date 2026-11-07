@@ -91,7 +91,8 @@ def test_readers_work_on_scrubbed_and_unscrubbed_objects():
     raw = copy.deepcopy(APP)
     scrubbed = scrub.scrub_configmap(copy.deepcopy(APP))
     assert scrub.configmap_chars(raw) == scrub.configmap_chars(scrubbed)
-    assert scrub.configmap_secret_like_keys(raw) == scrub.configmap_secret_like_keys(scrubbed) == ["DB_PASSWORD", "config.ini:password"]
+    assert scrub.secret_like_keys(raw["data"]) == scrub.configmap_secret_like_keys(scrubbed) == ["DB_PASSWORD", "config.ini:password"]
+    assert scrub.configmap_secret_like_keys(raw) == []  # a ConfigMap that did not go through the scrub has no record; every one in a snapshot has
 
 
 def test_secret_like_detection_skips_templates_and_paths():
@@ -103,13 +104,13 @@ def test_argocd_helpers_accept_scrubbed_and_raw_values():
     from lib import argocdctl
 
     assert argocdctl._csv_lines({"lines": 4, "len": 100}) == 4
-    assert argocdctl._csv_lines("a\n\nb\n") == 2
+    assert argocdctl._csv_lines("a\n\nb\n") == 0  # the text form does not reach a snapshot (lib/scrub.py LINE_COUNT_ONLY)
     assert argocdctl._csv_lines(None) == 0
     assert argocdctl._non_empty({"present": True, "len": 40}) is True
     assert argocdctl._non_empty({"present": False, "len": 0}) is False
     assert argocdctl._non_empty({"len": 0, "shape": "empty"}) is False
     assert argocdctl._non_empty({"len": 3, "shape": "word"}) is True
-    assert argocdctl._non_empty("") is False and argocdctl._non_empty("x") is True
+    assert argocdctl._non_empty("") is False and argocdctl._non_empty("x") is False  # a plain string is not a scrubbed value
 
 
 def test_presence_only_is_false_for_empty_values_and_keys_are_deduped():

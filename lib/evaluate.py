@@ -419,9 +419,8 @@ class Context:
 
     def eks_version_status(self):
         """`versionStatus` of describe-cluster-versions (UNSUPPORTED / STANDARD_SUPPORT / EXTENDED_SUPPORT: awscli/botocore/data/eks/2017-11-01/service-2.json:2774,8206-8210@2.39.3).
-        The sibling `status` is deprecated and spelled `extended-support` (:2770-2772,2798-2802), so the rule's value never matched it; an older snapshot that holds only `status` is mapped to the same spelling."""
-        row = self.eks_version_dates()
-        return row.get("versionStatus") or ((row.get("status") or "").upper().replace("-", "_") or None)
+        The sibling `status` is deprecated and spelled `extended-support` (:2770-2772,2798-2802), so the rule's value never matched it; `versionStatus` is the one read."""
+        return self.eks_version_dates().get("versionStatus")
 
     def karpenter_pool_nodes(self, pool: str) -> int:
         """Number of NodeClaims in the NodePool (label karpenter.sh/nodepool)."""
@@ -1004,7 +1003,6 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
     inv = load_json(snap / "inventory.json") or {}
     summary = load_json(snap / "summary.json") or {}
     pname = profile_override or cfg.get("profile") or (inv.get("profile") or {}).get("name") or "prod"
-    pname = rubric.PROFILE_ALIASES.get(pname, pname)  # snapshots taken before the rename still say "homelab"
     profile = rubric.load_profile(pname)
     collectors = inv.get("collectors_enabled") or ["core"]
     checks, errors = rubric.load_checks(collectors)
@@ -1080,6 +1078,7 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
 
     out = {
         "kubegap": __version__,
+        "schema": paths.SCHEMA_VERSION,
         "rubric_version": paths.rubric_version(),
         "generated_at": _dt.datetime.now().astimezone().isoformat(timespec="seconds"),
         "snapshot": str(snap),

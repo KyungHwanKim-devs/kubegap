@@ -20,7 +20,7 @@
     - "sudo k3s secrets-encrypt status"
   notes: k3s secrets encryption
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "skip"
         item:
@@ -231,7 +231,7 @@
   verify:
     - "systemctl cat k3s | grep -A1 -- --server"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:
@@ -258,7 +258,7 @@
   verify:
     - "kubectl get nodes -o wide"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:
@@ -339,7 +339,7 @@
   verify:
     - "k3s check-config"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "skip"
         item:
@@ -423,7 +423,7 @@
   verify:
     - "sudo k3s etcd-snapshot ls"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:
@@ -772,7 +772,7 @@
   verify:
     - "sudo k3s etcd-snapshot ls; sudo ls -la /var/lib/rancher/k3s/server/db/snapshots"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "skip"
         item:
@@ -933,7 +933,7 @@
   verify:
     - "sudo k3s certificate check"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:
@@ -1163,7 +1163,7 @@
   verify:
     - "journalctl --disk-usage; cat /etc/systemd/journald.conf"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "warn"
         item:
@@ -1381,7 +1381,7 @@
   verify:
     - "kubectl get svc -A | grep -i pending; kubectl get ingressclass"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:
@@ -1464,7 +1464,7 @@
   verify:
     - "sudo ss -ltnp | grep 6443; curl -sk https://<public-ip>:6443/version"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "skip"
         item:
@@ -1550,7 +1550,7 @@
   verify:
     - "sudo smartctl -H /dev/sda"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "warn"
         item:
@@ -1773,7 +1773,7 @@
   verify:
     - "cat /sys/class/thermal/thermal_zone*/temp; sensors"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:

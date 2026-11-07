@@ -19,9 +19,9 @@ def write_snapshot(folder, deployments, pods, findings, taken_at, nodes=("n1",),
     (folder / "objects").mkdir(parents=True)
     (folder / "objects" / "deployments.apps.json").write_text(json.dumps({"items": deployments}))
     (folder / "objects" / "pods.json").write_text(json.dumps({"items": pods}))
-    draft = {"rubric_version": rubric_version, "profile": {"name": "prod"}, "findings": findings}
-    if check_results is not None:
-        draft["check_results"] = check_results
+    if check_results is None:  # every findings-draft.json carries check_results; one row per check the findings name, evaluated under one rule hash
+        check_results = [{"id": c, "status": "done", "rule_hash": "aaaaaaaaaaaa"} for c in sorted({f["check"] for f in findings})]
+    draft = {"rubric_version": rubric_version, "profile": {"name": "prod"}, "findings": findings, "check_results": check_results}
     (folder / "findings-draft.json").write_text(json.dumps(draft))
     inv = {
         "taken_at": taken_at,
@@ -80,7 +80,7 @@ def test_diff_findings(snapshots):
     assert out["new"][0]["evidence"] == {"v": 1}
     assert [f["id"] for f in out["resolved"]] == ["resilience.no-pdb.default/gone"]
     assert out["changed"] == [{"id": "hygiene.x.default/flip", "status": ["warn", "fail"], "severity_default": ["low", "low"]}]
-    assert out["summary"] == {"new": 1, "resolved": 1, "changed": 1, "criteria_changes": 0, "rule_unknown_checks": 0}
+    assert out["summary"] == {"new": 1, "resolved": 1, "changed": 1, "criteria_changes": 0}
     assert out["counts_before"] == {"fail": {"high": 2}, "warn": {"low": 1}}
     assert out["counts_after"] == {"fail": {"high": 2, "low": 1}, "warn": {}}
     assert out["profile"] == ["prod", "prod"] and out["rubric_version"] == ["0.1.0", "0.1.0"]
@@ -197,15 +197,8 @@ def test_criteria_changes_sort_new_checks_rule_changes_and_unknowns_out_of_clust
     assert [r["id"] for r in crit["new_checks"]] == ["new.check.default/n"] and crit["new_checks"][0]["check_status"] == ["not-collected", "done"]
     assert [r["id"] for r in crit["dropped_checks"]] == ["dropped.check.default/z"]
     assert [(r["id"], r["kind"]) for r in crit["rule_changed"]] == [("rule.moved.default/y", "changed")] and crit["rule_changed"][0]["status"] == ["fail", "warn"]
-    # no hash on either side and the rubric moved: the findings stay cluster changes, marked, and the check is named once
-    assert crit["rule_unknown_checks"] == ["old.check"]
-    assert [(f["id"], f.get("rule_known")) for f in d["new"]] == [("old.check.default/w2", False), ("same.rule.default/x2", None)]
-    assert d["summary"] == {"new": 2, "resolved": 2, "changed": 0, "criteria_changes": 3, "rule_unknown_checks": 1}
-
-
-def test_without_check_results_everything_is_a_cluster_change(snapshots):
-    d = diffmod.diff_findings(*snapshots)
-    assert d["summary"]["criteria_changes"] == 0 and len(d["new"]) == 1 and len(d["resolved"]) == 1
+    assert [f["id"] for f in d["new"]] == ["old.check.default/w2", "same.rule.default/x2"]
+    assert d["summary"] == {"new": 2, "resolved": 2, "changed": 0, "criteria_changes": 3}
 
 
 def test_skip_to_done_is_a_cluster_change_with_the_reason(tmp_path):

@@ -17,7 +17,7 @@
   verify:
     - "ip -d link show flannel.1 | grep mtu; ping -M do -s 1400 <pod IP on another node>"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:
@@ -231,7 +231,7 @@
   verify:
     - "ip -s link show flannel.1"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:
@@ -453,7 +453,7 @@
   verify:
     - "kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'; kubectl get pods -A -o wide --field-selector spec.nodeName=<node> | wc -l"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:

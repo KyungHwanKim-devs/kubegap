@@ -28,7 +28,7 @@ from pathlib import Path
 
 from . import __version__, collect, evaluate, paths, render, summarize
 from .config import Config
-from .snapshot import load_json, write_private
+from .snapshot import check_schema, load_json, write_private
 
 FIXTURES = paths.ROOT / "tests" / "fixtures"
 EXPECTED = FIXTURES / "expected"
@@ -111,6 +111,7 @@ def stage(fixture: Path, workdir: Path, mutate: Callable[[Path], None] | None = 
     """Copy the fixture to <workdir>/<context>/<snapshot> and apply the mutation. The context folder is where summarize keeps cross-run state."""
     snap = workdir / "context" / "snapshot"
     shutil.copytree(fixture, snap)
+    check_schema(snap)  # a fixture is a snapshot of the current format version, as the CLI would demand (#97)
     if mutate:
         mutate(snap)
     return snap

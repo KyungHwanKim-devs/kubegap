@@ -32,11 +32,13 @@ def collect_steps() -> list[tuple[str, dict]]:
 
 
 SIGNATURES_DIR = ROOT / "signatures"
+# The snapshot's own format version (#97): the layout of the files a collection writes. Bump it when a top-level snapshot file is renamed or removed or a key a reader
+# requires is added, and say so in the CHANGELOG; a snapshot of another version is not read (lib/snapshot.check_schema), it is collected again. 1 since 0.1.5.
+SCHEMA_VERSION = 1
 TEMPLATES_DIR = ROOT / "templates"
-# Data and personal config live outside the skill folder (~/.kubegap/) so that cluster data and AWS profiles do not accumulate in the skill repository. The old location (inside the skill folder) is still read for compatibility.
+# Data and personal config live outside the skill folder (~/.kubegap/) so that cluster data and AWS profiles do not accumulate in the skill repository.
 USER_DIR = Path(os.environ.get("KUBEGAP_HOME") or (Path.home() / ".kubegap")).expanduser()
 DEFAULT_SNAPSHOTS_ROOT = USER_DIR / "snapshots"
-LEGACY_SNAPSHOTS_ROOT = ROOT / "snapshots"
 DEFAULT_CONFIG = (USER_DIR / "config.yaml") if (USER_DIR / "config.yaml").is_file() or not (ROOT / "config.yaml").is_file() else ROOT / "config.yaml"
 
 _TS_FMT = "%Y-%m-%dT%H-%M-%S"
@@ -133,8 +135,6 @@ def snapshots_root(override: str | os.PathLike | None = None, config_value: str 
         return Path(env).expanduser().resolve()
     if config_value:
         return Path(config_value).expanduser().resolve()
-    if not DEFAULT_SNAPSHOTS_ROOT.is_dir() and LEGACY_SNAPSHOTS_ROOT.is_dir() and any(LEGACY_SNAPSHOTS_ROOT.iterdir()):
-        return LEGACY_SNAPSHOTS_ROOT
     return DEFAULT_SNAPSHOTS_ROOT
 
 

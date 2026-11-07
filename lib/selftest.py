@@ -7,7 +7,7 @@ before they cause an outage.
 
 Shape of the `test:` section:
   test:
-    profile: eks            # defaults to the first value of profiles
+    profile: prod           # defaults to the first value of profiles
     cases:
       - expect: fail        # fail | warn | pass | none (zero findings)
         item: {…}           # type summary: one item to place at the `each` path (for cluster_level, the dict itself)
@@ -225,6 +225,11 @@ def run(check_ids: list[str] | None = None, echo=print, snapshots: list[Path] | 
             continue
         profile_name = t.get("profile") or (c.get("profiles") or ["prod"])[0]
         profile = rubric.load_profile(profile_name)
+        if profile.get("missing"):  # a case under a profile that does not exist would run with the check's defaults and say nothing
+            results["failed"].append(f"{c['id']}: test.profile {profile_name!r} is not a file of rubric/profiles/")
+            if echo:
+                echo(f"  failed {c['id']}: test.profile {profile_name!r} is not a profile")
+            continue
         for i, case in enumerate(t["cases"]):
             expect = case.get("expect", "fail")
             label = f"{c['id']} #{i + 1} expect={expect}"

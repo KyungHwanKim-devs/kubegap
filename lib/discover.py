@@ -413,6 +413,7 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
 
     inv = {
         "kubegap": __version__,
+        "schema": paths.SCHEMA_VERSION,
         "rubric_version": paths.rubric_version(),
         "signatures_version": paths.signatures_version(),
         "context": context,

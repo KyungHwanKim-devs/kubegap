@@ -39,17 +39,15 @@ def _prom_dir(snap: Path, name: str) -> dict:
 
 
 def _csv_lines(v) -> int:
-    """policy.csv line count. The snapshot holds {lines, len} for it (lib/scrub.py); older snapshots hold the text."""
-    if isinstance(v, dict):
-        return int(v.get("lines") or 0)
-    return len([ln for ln in (v or "").splitlines() if ln.strip()])
+    """policy.csv line count: the snapshot holds {lines, len} for it (lib/scrub.py LINE_COUNT_ONLY)."""
+    return int(v.get("lines") or 0) if isinstance(v, dict) else 0
 
 
 def _non_empty(v) -> bool:
-    """Whether a ConfigMap value is set. Scrubbed values are {len, shape} or {present, len}; older snapshots hold the string."""
+    """Whether a ConfigMap value is set: scrubbed values are {len, shape} or {present, len} (lib/scrub.py)."""
     if isinstance(v, dict):
         return bool(v.get("present")) if "present" in v else int(v.get("len") or 0) > 0
-    return bool(v)
+    return False
 
 
 def analyze(snap: Path, inv: dict | None) -> dict:
