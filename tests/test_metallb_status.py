@@ -251,7 +251,7 @@ def test_every_metallb_check_runs_wherever_metallb_is_present():
     from lib import yamlite
 
     checks = yamlite.load_file(ROOT / "collectors/metallb/checks.yaml")
-    assert len(checks) == 6 and all(set(c["profiles"]) == {"prod", "lab"} for c in checks)
+    assert len(checks) == 8 and all(set(c["profiles"]) == {"prod", "lab"} for c in checks)
 
 
 def test_a_metric_file_without_a_metallb_series_is_not_a_read(tmp_path):
@@ -522,3 +522,159 @@ def test_a_single_dash_lb_class_is_read(tmp_path):
 def test_the_rule_reads_no_removed_key():
     text = (ROOT / "collectors/metallb/checks.yaml").read_text(encoding="utf-8")
     assert "speakers_pinned" not in text and "kept off tainted nodes" not in text
+
+
+# ---------- #162: a Service IP nobody announces, and a BGP session that is down ----------
+
+STATES_ONE_DOWN = [
+    {"metadata": {"name": "kind-worker-10.0.0.1"}, "status": {"node": "kind-worker", "peer": "10.0.0.1", "vrf": "default", "bgpStatus": "Established", "bfdStatus": "N/A"}},
+    {"metadata": {"name": "kind-worker-10.0.0.2"}, "status": {"node": "kind-worker", "peer": "10.0.0.2", "vrf": "default", "bgpStatus": "Idle", "bfdStatus": "N/A"}},
+]
+SESSIONS = "bgpsessionstates__frrk8s__metallb__io"
+PEERS = [{"metadata": {"name": "p1"}, "spec": {"peerAddress": "10.0.0.1"}}, {"metadata": {"name": "p2"}, "spec": {"peerAddress": "10.0.0.2"}}]
+
+
+def sub(p, name):
+    d = p / name
+    d.mkdir()
+    return d
+
+
+def with_env(wl, value):
+    wl["spec"]["template"]["spec"]["containers"][0]["env"] = [{"name": "METALLB_BGP_TYPE", "value": value}]
+    return wl
+
+
+def rows(out):
+    return {s["name"]: (s["pool"], s["pool_advertised"], s["announced_by"], s["announcers_read"]) for s in out["pools"]["services"]}
+
+
+def test_the_issue_s_fixture_is_two_services_nobody_announces(tmp_path):
+    """#162: 0.16.2, speakers 2 of 2, no L2Advertisement, empty status lists, two Services with IPs. Every row says so: the pool is known, nothing reaches it, nobody announces, and the announcers were read (0.16 writes the status objects)."""
+    out = metallbctl.analyze(snap(tmp_path, **{"l2advertisements__metallb__io": [], L2: [], BGP: [], STATE: [STATE_VALID]}), INV)
+    assert rows(out) == {"web": ("lab", [], [], True), "web2": ("lab", [], [], True)}
+
+
+def test_an_announced_service_names_its_nodes_and_the_advertisement_that_reaches_the_pool(tmp_path):
+    out = metallbctl.analyze(snap(tmp_path, **{L2: [L2_WEB], BGP: [], STATE: [STATE_VALID]}), INV)
+    assert rows(out) == {"web": ("lab", ["L2Advertisement/lab"], [{"node": "kind-worker", "protocol": "layer2"}], True), "web2": ("lab", ["L2Advertisement/lab"], [], True)}
+
+
+def test_an_advertisement_reaches_pools_by_name_by_selector_or_all(tmp_path):
+    """internal/config/config.go:699-700,738-739@v0.16.2: both lists empty reaches every pool; else the names and the label-selector matches."""
+    pools = [
+        {"metadata": {"name": "a", "labels": {"tier": "edge"}}, "spec": {"addresses": ["172.18.255.200-172.18.255.201"]}},
+        {"metadata": {"name": "b", "labels": {"tier": "core"}}, "spec": {"addresses": ["172.18.255.202/31"]}},
+        {"metadata": {"name": "c"}, "spec": {"addresses": ["172.18.255.204/32"]}},
+    ]
+    l2 = [{"metadata": {"name": "all"}, "spec": {}}, {"metadata": {"name": "named"}, "spec": {"ipAddressPools": ["b"]}}]
+    bgp = [
+        {"metadata": {"name": "edge"}, "spec": {"ipAddressPoolSelectors": [{"matchLabels": {"tier": "edge"}}]}},
+        {"metadata": {"name": "nomatch"}, "spec": {"ipAddressPoolSelectors": [{"matchExpressions": [{"key": "tier", "operator": "In", "values": ["none"]}]}]}},
+    ]
+    s = snap(tmp_path, **{"ipaddresspools__metallb__io": pools, "l2advertisements__metallb__io": l2, "bgpadvertisements__metallb__io": bgp, L2: [], BGP: [], STATE: []})
+    assert metallbctl._advertised_pools(s, pools) == {"a": ["L2Advertisement/all", "BGPAdvertisement/edge"], "b": ["L2Advertisement/all", "L2Advertisement/named"], "c": ["L2Advertisement/all"]}
+    services = [service("w", "172.18.255.203"), service("x", "172.18.255.204"), service("y", "192.0.2.9")]
+    s2 = snap(sub(tmp_path, "2"), **{"ipaddresspools__metallb__io": pools, "l2advertisements__metallb__io": [], "bgpadvertisements__metallb__io": [], "services": services, L2: [], BGP: [], STATE: []})
+    assert {r: v[:2] for r, v in rows(metallbctl.analyze(s2, INV)).items()} == {"w": ("b", []), "x": ("c", []), "y": (None, None)}
+
+
+def test_an_empty_status_list_is_an_answer_from_0_14_6(tmp_path):
+    """The `--enable-l2-service-status` flag of v0.14.5 (speaker/main.go:90) is gone at v0.14.6: from there the speaker writes ServiceL2Status for every announced Service, so an empty saved list means nobody announces (STATUS_ALWAYS_SINCE)."""
+    step = {"ok": True, "pods": {"speaker-a": {"ok": False, "node": "kind-worker", "error": "502"}}}
+    out = metallbctl.analyze(snap(tmp_path, version="v0.14.6", step=step, daemonsets=[workload("v0.14.6", ("monitoring", 7472))], **{L2: []}), INV)
+    assert out["l2"]["available"] is True and out["l2"]["source"].startswith("objects/") and out["l2"]["announced_total"] == 0
+    assert rows(out)["web"] == ("lab", ["L2Advertisement/lab"], [], True)
+    older = metallbctl.analyze(snap(sub(tmp_path, "old"), version="v0.14.5", step=step, daemonsets=[workload("v0.14.5", ("monitoring", 7472))], **{L2: []}), INV)
+    assert older["l2"]["available"] is False and rows(older)["web"] == ("lab", ["L2Advertisement/lab"], [], False)
+
+
+def test_unread_speakers_leave_the_announcers_unread(tmp_path):
+    """One speaker of two read on 0.14.5 and no status objects: its rows are a part, so no Service is judged on them (partial), only on its pool's advertisements."""
+    step = {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}, "speaker-b": {"ok": False, "node": "kind-control-plane", "error": "502"}}}
+    prom = 'metallb_speaker_announced{ip="172.18.255.200",node="kind-worker",protocol="layer2",service="default/web"} 1\nmetallb_k8s_client_config_loaded_bool 1\n'
+    out = metallbctl.analyze(snap(tmp_path, version="v0.14.5", step=step, metrics=prom, daemonsets=[workload("v0.14.5", ("monitoring", 7472))]), INV)
+    assert out["l2"]["partial"] is True and rows(out)["web2"] == ("lab", ["L2Advertisement/lab"], [], False)
+
+
+def test_bgp_sessions_come_from_the_speaker_metrics_in_native_mode(tmp_path):
+    step = {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}}}
+    prom = 'metallb_bgp_session_up{peer="10.0.0.1:179"} 1\nmetallb_bgp_session_up{peer="10.0.0.2:179"} 0\nmetallb_k8s_client_config_loaded_bool 1\n'
+    s = metallbctl.analyze(snap(tmp_path, version="v0.14.5", step=step, metrics=prom, daemonsets=[workload("v0.14.5", ("monitoring", 7472))], bgppeers__metallb__io=PEERS), INV)["summary"]
+    assert (s["bgp_backend"], s["bgp_sessions_read"], s["bgp_session_source"], s["bgp_sessions_total"]) == ("native", True, metallbctl.METRICS_SOURCE, 2)
+    assert s["bgp_sessions_down"] == [{"node": "kind-worker", "peer": "10.0.0.2:179", "state": "down"}]
+
+
+def test_bgp_sessions_come_from_bgpsessionstate_in_frr_k8s_mode(tmp_path):
+    """frr-k8s mode from 0.15.2: one BGPSessionState per node and peer, `Established` is the session (metallb/frr-k8s internal/frr/parse.go:41@v0.0.27)."""
+    s = metallbctl.analyze(snap(tmp_path, daemonsets=[with_env(workload("v0.16.2"), "frr-k8s")], **{"bgppeers__metallb__io": PEERS, SESSIONS: STATES_ONE_DOWN, L2: [], BGP: [], STATE: []}), INV)
+    assert s["bgp_session_states"][1] == {"name": "kind-worker-10.0.0.2", "node": "kind-worker", "peer": "10.0.0.2", "vrf": "default", "bgp_status": "Idle", "bfd_status": "N/A", "up": False}
+    sm = s["summary"]
+    assert (sm["bgp_backend"], sm["bgp_sessions_read"], sm["bgp_session_source"], sm["bgp_sessions_total"]) == ("frr-k8s", True, f"objects/{metallbctl.BGP_SESSION_STATE}.json", 2)
+    assert sm["bgp_sessions_down"] == [{"node": "kind-worker", "peer": "10.0.0.2", "state": "Idle"}]
+
+
+def prometheus(tmp_path, result, present):
+    d = tmp_path / "metrics"
+    d.mkdir(exist_ok=True)
+    (d / "metallb_bgp_session_down.json").write_text(json.dumps({"ok": True, "result": result}))
+    if present is not None:
+        (d / "series-present.json").write_text(json.dumps({"names": present}))
+
+
+def test_bgp_sessions_come_from_prometheus_when_nothing_else_answers(tmp_path):
+    """Native mode on 0.16 (TLS metrics, no BGPSessionState): the session state is Prometheus' when it scrapes the speaker. An empty answer is "all up" only when series-present.json saw the name."""
+    down = [{"metric": {"__name__": "metallb_bgp_session_up", "peer": "10.0.0.2:179", "pod": "speaker-x", "node": "kind-worker"}, "value": [0, "0"]}]
+    kinds = {"bgppeers__metallb__io": PEERS, L2: [], BGP: [], STATE: []}
+    s = snap(tmp_path, **kinds)
+    prometheus(s, down, {"metallb_bgp_session_up": 2})
+    sm = metallbctl.analyze(s, INV)["summary"]
+    assert (sm["bgp_backend"], sm["bgp_sessions_read"], sm["bgp_session_source"], sm["bgp_sessions_total"]) == ("native", True, "metrics/metallb_bgp_session_down.json", None)
+    assert sm["bgp_sessions_down"] == [{"node": "kind-worker", "peer": "10.0.0.2:179", "state": "down"}]
+    s2 = snap(sub(tmp_path, "allup"), **kinds)
+    prometheus(s2, [], {"frrk8s_bgp_session_up": 4})
+    assert metallbctl.analyze(s2, INV)["summary"]["bgp_sessions_down"] == []
+    s3 = snap(sub(tmp_path, "unscraped"), **kinds)
+    prometheus(s3, [], {"metallb_bgp_session_up": 0})
+    sm3 = metallbctl.analyze(s3, INV)["summary"]
+    assert sm3["bgp_sessions_read"] is False and sm3["bgp_sessions_down"] is None and sm3["bgp_session_source"] is None
+
+
+def test_peers_with_no_session_source_are_not_read(tmp_path):
+    """FRR mode: the speaker prints no session gauge (it is the sidecar's), no BGPSessionState, no Prometheus. Not read, never 0 down."""
+    step = {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}}}
+    sm = metallbctl.analyze(snap(tmp_path, version="v0.15.3", step=step, metrics="metallb_k8s_client_config_loaded_bool 1\n", daemonsets=[with_env(workload("v0.15.3", ("monitoring", 7472)), "frr")], bgppeers__metallb__io=PEERS), INV)[
+        "summary"
+    ]
+    assert (sm["bgp_backend"], sm["bgp_sessions_read"], sm["bgp_sessions_down"], sm["bgp_sessions"]) == ("frr", False, None, None)
+
+
+def test_no_peers_is_nothing_to_judge(tmp_path):
+    step = {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}}}
+    sm = metallbctl.analyze(snap(tmp_path, version="v0.14.5", step=step, metrics="metallb_k8s_client_config_loaded_bool 1\n", daemonsets=[workload("v0.14.5", ("monitoring", 7472))]), INV)["summary"]
+    assert (sm["bgp_peers"], sm["bgp_sessions_read"], sm["bgp_sessions_total"], sm["bgp_sessions_down"]) == (0, True, 0, [])
+
+
+def test_an_empty_selector_reaches_every_pool(tmp_path):
+    """metav1.LabelSelectorAsSelector of an empty selector is labels.Everything() (config.go:1335@v0.16.2)."""
+    pools = [{"metadata": {"name": "a"}, "spec": {"addresses": ["172.18.255.200/32"]}}]
+    s = snap(tmp_path, ipaddresspools__metallb__io=pools, l2advertisements__metallb__io=[{"metadata": {"name": "any"}, "spec": {"ipAddressPoolSelectors": [{}]}}])
+    assert metallbctl._advertised_pools(s, pools) == {"a": ["L2Advertisement/any"]}
+
+
+def test_a_bgp_advertised_service_is_not_read_from_the_status_objects_before_0_15(tmp_path):
+    """0.14.6 to 0.14.9: ServiceL2Status is written, ServiceBGPStatus does not exist yet. Speakers unreadable, BGP mode: the empty L2 list is not "nobody announces" for a BGP-advertised Service (review of #162)."""
+    step = {"ok": True, "pods": {"speaker-a": {"ok": False, "node": "kind-worker", "error": "502"}}}
+    kinds = {"l2advertisements__metallb__io": [], "bgpadvertisements__metallb__io": [{"metadata": {"name": "bgp"}, "spec": {}}], "bgppeers__metallb__io": PEERS, L2: []}
+    out = metallbctl.analyze(snap(tmp_path, version="v0.14.9", step=step, daemonsets=[workload("v0.14.9", ("monitoring", 7472))], **kinds), INV)
+    assert out["l2"]["available"] is True and rows(out)["web"] == ("lab", ["BGPAdvertisement/bgp"], [], False)
+    newer = metallbctl.analyze(snap(sub(tmp_path, "15"), version="v0.15.0", step=step, daemonsets=[workload("v0.15.0", ("monitoring", 7472))], **{**kinds, BGP: []}), INV)
+    assert rows(newer)["web"] == ("lab", ["BGPAdvertisement/bgp"], [], True)
+
+
+def test_bgp_sessions_of_a_speaker_nobody_read_are_not_read(tmp_path):
+    """Native mode, one speaker of two read and printing its session up: the other speaker's session was not read, so the metrics do not answer (review of #162)."""
+    step = {"ok": True, "pods": {"speaker-a": {"ok": True, "node": "kind-worker"}, "speaker-b": {"ok": False, "node": "kind-control-plane", "error": "502"}}}
+    prom = 'metallb_bgp_session_up{peer="10.0.0.1:179"} 1\nmetallb_k8s_client_config_loaded_bool 1\n'
+    sm = metallbctl.analyze(snap(tmp_path, version="v0.14.5", step=step, metrics=prom, daemonsets=[workload("v0.14.5", ("monitoring", 7472))], bgppeers__metallb__io=PEERS), INV)["summary"]
+    assert (sm["bgp_sessions_read"], sm["bgp_session_source"], sm["bgp_sessions_down"]) == (False, None, None)

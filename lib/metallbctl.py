@@ -10,6 +10,10 @@ the step skips. What the checks need is published as objects anyway, readable wi
 - ServiceL2Status and ServiceBGPStatus: the node announcing a service (api/v1beta1/servicel2status_types.go:29,32,35@v0.16.2, servicebgpstatus_types.go:29,33,37@v0.16.2), one object per announcing node. Written only while the node announces
   (internal/k8s/controllers/layer2_status_controller.go:85-94@v0.16.2, bgp_status_controller.go:76-87@v0.16.2). ServiceL2Status was behind a flag that defaults to off at v0.14.5 (speaker/main.go:90@v0.14.5), so an empty list says nothing before 0.16.
 - ConfigurationState: one object per component with `status.result` Valid, Invalid or Unknown and `status.errorSummary` (api/v1beta1/configurationstate_types.go:29,31,33,40,45@v0.16.2). First in v0.15.3.
+- BGPSessionState (group frrk8s.metallb.io): one object per node and peer with `status.bgpStatus`, the FRR session state (metallb/frr-k8s api/v1beta1/bgp_session_state_types.go:35-41@v0.0.27), written by the frr-status
+  container of the frr-k8s DaemonSet (cmd/status/controller/bgpsessionstate_controller.go:98-108,216-240@v0.0.27) that the MetalLB frr-k8s manifest ships from v0.15.2 (config/manifests/metallb-frr-k8s.yaml of v0.15.2 and later runs
+  /etc/frr_status/frr-status; v0.14.9 does not). frr-k8s is the chart's default BGP backend from 0.16.0 (charts/metallb/values.yaml:367@v0.16.0, :396@v0.16.2; false at :376@v0.15.3) and what the manifest sets (metallb-frr-k8s.yaml:3748-3749@v0.16.2).
+  The speaker itself is native without METALLB_BGP_TYPE (speaker/main.go:117-120@v0.16.2). ServiceBGPStatus is not a session: it is written for a service with peers configured, Idle or not (bgp_status_controller.go:76-87@v0.16.2).
 Metrics stay the source for what they say when every speaker was read; the objects answer for a speaker that was not, and an Invalid state counts either way. Lost on 0.16+: the update error counter and the ARP and BGP counters, which exist only in /metrics: they are null, not 0, `metrics_not_read` names them and the step's skip reason says so in the report.
 """
 
@@ -24,10 +28,18 @@ from pathlib import Path
 from . import versions
 from .mask import strip_control
 from .promtext import parse as _parse_prom
-from .resilience import eligible_nodes
+from .resilience import eligible_nodes, selector_matches
 from .snapshot import load_json, objects
 
 HTTPS_ONLY_SINCE = (0, 16, 0)
+# ServiceL2Status is written for every announced service from v0.14.6: the `--enable-l2-service-status` flag of v0.14.5 (speaker/main.go:90@v0.14.5, default false) is gone, so from there an empty list is an answer.
+# ServiceBGPStatus exists from v0.15.0 (api/v1beta1/servicebgpstatus_types.go is absent at v0.14.9): before it the status objects say nothing about a BGP-advertised Service.
+STATUS_ALWAYS_SINCE = (0, 14, 6)
+BGP_STATUS_SINCE = (0, 15, 0)
+BGP_SESSION_STATE = "bgpsessionstates.frrk8s.metallb.io"
+BGP_UP = "Established"  # the one FRR state that is a session: frr-k8s judges connection by it (metallb/frr-k8s internal/frr/parse.go:41,144@v0.0.27); the others are Idle, Connect, Active, OpenSent, OpenConfirm, Clearing, Deleted (FRRouting/frr bgpd/bgp_debug.c:97-105@frr-10.5.3)
+BGP_SESSION_QUERY = "metallb_bgp_session_down"  # collectors/metallb/metrics.yaml: the sessions Prometheus sees down, when it scrapes the speaker or the FRR exporter
+ADVERTISEMENTS = (("l2advertisements.metallb.io", "L2Advertisement"), ("bgpadvertisements.metallb.io", "BGPAdvertisement"))
 METRICS_SOURCE = "metrics/pod/metallb-speaker/*.prom (pod proxy GET)"
 L2_STATUS, BGP_STATUS, CONFIG_STATE = "servicel2statuses.metallb.io", "servicebgpstatuses.metallb.io", "configurationstates.metallb.io"
 COUNTERS = {"update_errors_total": "update_errors", "arp_requests_total": "arp_requests", "arp_responses_total": "arp_responses", "gratuitous_total": "gratuitous", "bgp_sessions": "bgp_sessions", "bgp_sessions_up": "bgp_sessions_up"}
@@ -150,9 +162,9 @@ def _announced_from_status(snap: Path, lb: list[dict], node_names: list[str]) ->
     return rows
 
 
-def _l2(snap: Path, lb: list[dict], node_names: list[str], texts: dict[str, str], step: dict, tls_only: bool, https_only_version: bool) -> dict:
+def _l2(snap: Path, lb: list[dict], node_names: list[str], texts: dict[str, str], step: dict, tls_only: bool, status_always: bool) -> dict:
     """Which node advertises (leads) which service IP in L2 mode, from the speaker metrics when they were read, else from the status resources. available is false when neither says.
-    An empty status list is an answer only where the resources are always written and were saved: 0.16+ with the file in the snapshot, and a BGP row says nothing about L2. L2Advertisement nodeSelectors are included too."""
+    An empty status list is an answer only where the resources are always written and were saved: 0.14.6+ (STATUS_ALWAYS_SINCE) with the file in the snapshot, and a BGP row says nothing about L2. L2Advertisement nodeSelectors are included too."""
     errors = []
     if not tls_only:
         for pod, r in (step.get("pods") or {}).items():
@@ -167,7 +179,7 @@ def _l2(snap: Path, lb: list[dict], node_names: list[str], texts: dict[str, str]
         announced, source = _announced_from_metrics(texts), METRICS_SOURCE
     else:
         announced = status_rows
-        if any(r["protocol"] == "layer2" for r in announced) or (https_only_version and (snap / "objects" / f"{L2_STATUS}.json").is_file()):
+        if any(r["protocol"] == "layer2" for r in announced) or (status_always and (snap / "objects" / f"{L2_STATUS}.json").is_file()):
             source = status_source
     advs = []
     for a in objects(snap, "l2advertisements.metallb.io"):
@@ -222,6 +234,96 @@ def _not_reported(states: list[dict], speakers_desired: int | None, controller_d
     return out
 
 
+def _ip_in(ip: str, spec: str) -> bool:
+    """Whether an address is inside one IPAddressPool `addresses` entry, a range `a-b` or a CIDR (api/v1beta1/ipaddresspool_types.go:29@v0.16.2)."""
+    try:
+        a = ipaddress.ip_address(ip)
+        if "-" in spec:
+            lo, hi = (ipaddress.ip_address(x.strip()) for x in spec.split("-", 1))
+            return lo.version == a.version and lo <= a <= hi
+        return a in ipaddress.ip_network(spec.strip(), strict=False)
+    except ValueError:
+        return False
+
+
+def _advertised_pools(snap: Path, pool_objs: list[dict]) -> dict[str, list[str]]:
+    """Pool name -> the L2Advertisements and BGPAdvertisements that reach it. An advertisement with neither `ipAddressPools` nor `ipAddressPoolSelectors` reaches every pool; otherwise the pools it
+    names and the pools its label selectors match (metallb/metallb internal/config/config.go:699-700,738-739@v0.16.2, :646,677@v0.14.5). A pool nothing reaches is allocated from but announced by nobody."""
+    out: dict[str, list[str]] = {p["metadata"]["name"]: [] for p in pool_objs}
+    for stem, kind in ADVERTISEMENTS:
+        for a in objects(snap, stem):
+            sp = a.get("spec") or {}
+            names, selectors = sp.get("ipAddressPools") or [], sp.get("ipAddressPoolSelectors") or []
+            for p in pool_objs:
+                labels = (p.get("metadata") or {}).get("labels") or {}
+                if (
+                    (not names and not selectors) or p["metadata"]["name"] in names or any(not s or selector_matches(s, labels) for s in selectors)
+                ):  # an empty selector is labels.Everything() (LabelSelectorAsSelector, config.go:1335@v0.16.2)
+                    out[p["metadata"]["name"]].append(f"{kind}/{a['metadata']['name']}")
+    return out
+
+
+def _announcers(services: list[dict], l2: dict, pool_objs: list[dict], advertised: dict[str, list[str]], bgp_status: bool) -> None:
+    """Per Service MetalLB handles: the pool its IP came from, the advertisements that reach that pool, and the nodes announcing its IPs (from `l2.announced`, both protocols). `announcers_read` is
+    whether the announcing nodes were read for every speaker; a Service with an IP and no announcer, or whose pool no advertisement reaches, is unreachable from outside (#162). When the status objects are
+    the source, a Service whose pool a BGPAdvertisement reaches is read only where ServiceBGPStatus exists (`bgp_status`, 0.15.0+): before that the empty list says nothing about it."""
+    read = bool(l2.get("available")) and not l2.get("partial")
+    from_status = read and l2.get("source") != METRICS_SOURCE
+    for s in services:
+        pool = next((p["metadata"]["name"] for p in pool_objs for spec in ((p.get("spec") or {}).get("addresses") or []) for ip in s["ips"] if _ip_in(ip, spec)), None)
+        s["pool"] = pool
+        s["pool_advertised"] = advertised.get(pool) if pool else None
+        s["announced_by"] = sorted({(r["node"], r["protocol"]) for r in l2.get("announced") or [] if r["ip"] in s["ips"] and r["node"]})
+        s["announced_by"] = [{"node": n, "protocol": p} for n, p in s["announced_by"]]
+        s["announcers_read"] = read and not (from_status and not bgp_status and any(a.startswith("BGPAdvertisement/") for a in s["pool_advertised"] or []))
+
+
+def _bgp_backend(speaker: dict) -> str | None:
+    """`native`, `frr` or `frr-k8s`: the speaker's METALLB_BGP_TYPE, native when the variable is absent (speaker/main.go:117-120@v0.16.2, :96-98@v0.14.5; the manifests set it, metallb-frr-k8s.yaml:3748-3749,
+    metallb-frr.yaml:2313-2314@v0.16.2). None when the value comes from elsewhere (valueFrom)."""
+    for e in speaker.get("env") or []:
+        if e.get("name") == "METALLB_BGP_TYPE":
+            return e.get("value") or None
+    return "native"
+
+
+def _session_states(snap: Path) -> list[dict] | None:
+    """The BGPSessionState objects, one per node and peer (status.node, peer, vrf, bgpStatus, bfdStatus: metallb/frr-k8s api/v1beta1/bgp_session_state_types.go:35-41@v0.0.27). None when the file was not saved
+    (the group is not served, or the ClusterRole lacks frrk8s.metallb.io). bfdStatus is "N/A" with no BFD (cmd/status/controller/bgpsessionstate_controller.go:30@v0.0.27)."""
+    if not (snap / "objects" / f"{BGP_SESSION_STATE}.json").is_file():
+        return None
+    rows = []
+    for o in objects(snap, BGP_SESSION_STATE):
+        st = o.get("status") or {}
+        rows.append({"name": o["metadata"]["name"], "node": st.get("node"), "peer": st.get("peer"), "vrf": st.get("vrf"), "bgp_status": st.get("bgpStatus"), "bfd_status": st.get("bfdStatus"), "up": st.get("bgpStatus") == BGP_UP})
+    return rows
+
+
+def _bgp_sessions(snap: Path, texts: dict[str, str], node_of: dict[str, str | None], bgp_unread: bool, partial: bool, states: list[dict] | None) -> dict:
+    """The BGP sessions and which are down, from the first source that answers: the speaker metrics (`metallb_bgp_session_up{peer}`, native mode through 0.15: the speaker registers it in native mode only,
+    internal/bgp/native/stats.go:11,50@v0.16.2), the BGPSessionState objects (frr-k8s mode from MetalLB 0.15.2), or Prometheus when it scrapes the speaker or the FRR exporter (collectors/metallb/metrics.yaml,
+    `metallb_bgp_session_up` or `frrk8s_bgp_session_up`; an empty answer is "all up" only when metrics/series-present.json saw one of the names). The speaker metrics answer only when every speaker was read
+    (`partial`: a speaker nobody read has sessions nobody read). None of the three: `read` false, the check skips (#162)."""
+    if texts and not bgp_unread and not partial:
+        down, total = [], 0
+        for pod, text in texts.items():
+            for labels, v in _parse_prom(text)["labeled"].get("metallb_bgp_session_up", []):
+                total += 1
+                if v < 1:
+                    down.append({"node": node_of.get(pod), "peer": labels.get("peer"), "state": "down"})
+        return {"read": True, "source": METRICS_SOURCE, "total": total, "down": down, "states": states}
+    if states:
+        down = [{"node": s["node"], "peer": s["peer"], "state": s["bgp_status"]} for s in states if not s["up"]]
+        return {"read": True, "source": f"objects/{BGP_SESSION_STATE}.json", "total": len(states), "down": down, "states": states}
+    m = load_json(snap / "metrics" / f"{BGP_SESSION_QUERY}.json") or {}
+    present = (load_json(snap / "metrics" / "series-present.json") or {}).get("names") or {}
+    scraped = any(present.get(n) for n in ("metallb_bgp_session_up", "frrk8s_bgp_session_up"))
+    if m.get("ok") and (m.get("result") or scraped):
+        down = [{"node": lab.get("node") or lab.get("instance"), "peer": lab.get("peer"), "state": "down"} for s in m.get("result") or [] for lab in [s.get("metric") or {}]]
+        return {"read": True, "source": f"metrics/{BGP_SESSION_QUERY}.json", "total": None, "down": down, "states": states}
+    return {"read": False, "source": None, "total": None, "down": None, "states": states}
+
+
 def analyze(snap: Path, inv: dict | None) -> dict:
     inv = inv or {}
     pools = bool(objects(snap, "ipaddresspools.metallb.io"))
@@ -255,10 +357,12 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     # --- what the speaker can be asked: an https metrics port (the step skipped and says why), or a version with nothing else (a disabled port, `--port=0`, speaker/main.go:99@v0.16.2, leaves no port to find)
     version = sp_.get("version") or ct_.get("version")
     step = _step(snap)
-    https_only_version = (versions.triple(version) or (0, 0, 0)) >= HTTPS_ONLY_SINCE
-    tls_only = https_only_version or bool(step.get("skipped") and (step.get("target") or {}).get("skip"))
+    triple = versions.triple(version) or (0, 0, 0)
+    tls_only = triple >= HTTPS_ONLY_SINCE or bool(step.get("skipped") and (step.get("target") or {}).get("skip"))
     texts = _metric_texts(snap)
-    base["l2"] = _l2(snap, base["services"], [n["name"] for n in (inv.get("nodes") or {}).get("nodes") or []], texts, step, tls_only, https_only_version)
+    base["l2"] = _l2(snap, base["services"], [n["name"] for n in (inv.get("nodes") or {}).get("nodes") or []], texts, step, tls_only, triple >= STATUS_ALWAYS_SINCE)
+    pool_objs = objects(snap, "ipaddresspools.metallb.io")
+    _announcers(base["services"], base["l2"], pool_objs, _advertised_pools(snap, pool_objs), triple >= BGP_STATUS_SINCE)
     # --- speaker metrics
     per_pod = {}
     for pod, text in texts.items():
@@ -290,6 +394,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         counters.update(bgp_sessions=None, bgp_sessions_up=None)
         for v in per_pod.values():
             v.update(bgp_sessions=None, bgp_sessions_up=None)
+    node_of = {pod: r.get("node") for pod, r in (step.get("pods") or {}).items()}
+    sessions = _bgp_sessions(snap, texts, node_of, bgp_unread, bool(l2.get("partial")), _session_states(snap))
     # Where this DaemonSet can run answers "are speakers missing", whatever keeps it off a node: a selector, required affinity, a taint it does not tolerate, an OS. A cordoned node counts as not eligible, which only makes the comparison lenient.
     nodes = objects(snap, "nodes")
     template = ((speaker or {}).get("spec") or {}).get("template", {}).get("spec") or {}
@@ -330,6 +436,11 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "update_errors_read": bool(texts),
         **counters,  # null when not read: a counter nobody read is not a measured zero
         "bgp_peers": len(bgp_peers),
+        "bgp_backend": _bgp_backend(_container(speaker, "speaker")) if speaker else None,
+        "bgp_sessions_read": sessions["read"],
+        "bgp_session_source": sessions["source"],
+        "bgp_sessions_total": sessions["total"],
+        "bgp_sessions_down": sessions["down"],
         "webhooks_fail": [w["name"] for w in webhooks if w["failure_policy"] == "Fail"],
         "webhooks": len(webhooks),
         "metrics_available": bool(texts),
@@ -345,6 +456,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "l2": l2,
         "speaker_metrics": per_pod,
         "config_states": states,
+        "bgp_session_states": sessions["states"],
         "summary": summary,
         "note": "L2 leaders and config state come from the speaker metrics when read (pod proxy or node curl, metrics/pod/metallb-speaker), else from ServiceL2Status, ServiceBGPStatus and ConfigurationState. The webhook only blocks creation of MetalLB CRs (pools, advertisements), not ordinary Services",
     }

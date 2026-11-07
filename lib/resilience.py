@@ -87,7 +87,8 @@ def _q(v) -> float:
         return 0.0
 
 
-def _match(sel: dict | None, labels: dict) -> bool:
+def selector_matches(sel: dict | None, labels: dict) -> bool:
+    """A label selector (`matchLabels`, `matchExpressions`, or a bare label map) against an object's labels. An empty selector matches nothing."""
     if not sel:
         return False
     ml = sel.get("matchLabels") if ("matchLabels" in sel or "matchExpressions" in sel) else sel
@@ -356,7 +357,7 @@ def _pdbs(cx: _Ctx) -> dict:
     for pdb in objects(cx.snap, "poddisruptionbudgets.policy"):
         md, sp, st = pdb["metadata"], pdb.get("spec") or {}, pdb.get("status") or {}
         ns = md["namespace"]
-        covered = [cx.wl_key(k, o) for k, o in cx.workloads if o["metadata"]["namespace"] == ns and _match(sp.get("selector"), cx.tpl_labels(o))]
+        covered = [cx.wl_key(k, o) for k, o in cx.workloads if o["metadata"]["namespace"] == ns and selector_matches(sp.get("selector"), cx.tpl_labels(o))]
         replicas = [((o.get("spec") or {}).get("replicas")) for k, o in cx.workloads if cx.wl_key(k, o) in covered and k != "DaemonSet"]
         rep = max([r for r in replicas if r is not None], default=None)
         mn, mx = sp.get("minAvailable"), sp.get("maxUnavailable")
