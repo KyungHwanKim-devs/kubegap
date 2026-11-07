@@ -40,7 +40,7 @@ def _record(served: list[str], **more) -> dict:
 
 
 def _snap(tmp_path: Path, rec: dict | None, files: list[str] = ()) -> Path:
-    (tmp_path / "objects").mkdir(exist_ok=True)
+    (tmp_path / "objects").mkdir(parents=True, exist_ok=True)
     for stem in files:
         (tmp_path / "objects" / f"{stem}.json").write_text('{"items": []}', encoding="utf-8")
     if rec is not None:
@@ -74,7 +74,8 @@ def test_object_file_status_names_every_reason(tmp_path):
     assert st("nodes.metrics.k8s.io") == "failed"
     assert st("bgppeers.metallb.io") == "unlisted", "served, not excluded, not denied, not failed, and no file: the reader's name and the file name disagree"
     assert st("cronjobs.batch") == "unlisted", "#124: discovery wrote cronjobs.json; the readers opened cronjobs.batch.json and passed on nothing for a day"
-    assert st("jobs") == "not-served", "the short name of a kind outside the core group is not a file either"
+    assert st("jobs") == "unlisted", "the short name of a served kind outside the core group: the reader must spell jobs.batch"
+    assert st("cronjobs") == "ok" and snapshot.object_file_status(_snap(tmp_path / "b", rec, ["pods"]), "cronjobs", rec) == "unlisted", "the discovery kind by its short name"
     assert set(snapshot.OBJECT_FILE_STATUS) == {"ok", "not-served", "excluded", "denied", "failed", "unlisted", "no-record"}
 
 
@@ -82,8 +83,9 @@ def test_a_snapshot_without_a_dump_record_says_so(tmp_path):
     snap = _snap(tmp_path, None, ["pods"])
     assert snapshot.object_file_status(snap, "pods", snapshot.dump_record(snap)) == "ok"
     assert snapshot.object_file_status(snap, "jobs.batch", snapshot.dump_record(snap)) == "no-record"
-    assert snapshot.object_file_status(snap, "jobs.batch", _record([]) | {"served": None}) == "no-record", "a record without the served list cannot judge"
-    assert snapshot.missing_reason("jobs.batch", "no-record") == "objects/jobs.batch.json missing: the snapshot has no dump-all record"
+    assert snapshot.object_file_status(snap, "jobs.batch", _record([], discovery_error="kubectl api-resources: timed out after 60s")) == "no-record", "a failed discovery lists nothing; not-served would be a lie"
+    assert snapshot.object_file_status(snap, "jobs.batch", _record(["pods"], discovery_error="metrics.k8s.io: the server is currently unable to handle the request")) == "not-served", "a partial discovery still lists what it saw"
+    assert snapshot.missing_reason("jobs.batch", "no-record") == "objects/jobs.batch.json missing: the snapshot has no dump-all record, or its API discovery failed"
 
 
 def test_objects_records_what_it_was_asked_for(tmp_path):
@@ -103,6 +105,7 @@ def test_dump_all_records_served_and_written(tmp_path, monkeypatch):
     (tmp_path / "objects" / "pods.json").write_text('{"items": []}')
     res = [
         {"name": "pods", "full": "pods", "namespaced": True, "kind": "Pod", "apiversion": "v1"},
+        {"name": "cronjobs", "full": "cronjobs.batch", "namespaced": True, "kind": "CronJob", "apiversion": "batch/v1"},
         {"name": "jobs", "full": "jobs.batch", "namespaced": True, "kind": "Job", "apiversion": "batch/v1"},
         {"name": "secrets", "full": "secrets", "namespaced": True, "kind": "Secret", "apiversion": "v1"},
         {"name": "leases", "full": "leases.coordination.k8s.io", "namespaced": True, "kind": "Lease", "apiversion": "coordination.k8s.io/v1"},
@@ -120,8 +123,10 @@ def test_dump_all_records_served_and_written(tmp_path, monkeypatch):
 
     monkeypatch.setattr(collect.kube, "kubectl_json", fake_json)
     out = collect.dump_all("ctx", None, tmp_path, [], 10, RunLog(None), "core")
-    assert out["served"] == ["pods", "jobs.batch", "secrets", "leases.coordination.k8s.io"]
-    assert out["written"] == ["jobs.batch"] and out["fetched_by_discovery"] == ["pods"] and out["excluded"] == ["secrets"] and out["not_permitted"] == ["leases.coordination.k8s.io"]
+    assert out["served"] == ["pods", "cronjobs.batch", "jobs.batch", "secrets", "leases.coordination.k8s.io"]
+    assert out["written"] == ["cronjobs", "jobs.batch"] and out["fetched_by_discovery"] == ["pods"], "discovery did not save CronJobs this time; the dump saves them under the one name every reader spells"
+    assert (tmp_path / "objects" / "cronjobs.json").is_file() and not (tmp_path / "objects" / "cronjobs.batch.json").exists()
+    assert snapshot.object_file_status(tmp_path, "cronjobs", out) == "ok" and out["excluded"] == ["secrets"] and out["not_permitted"] == ["leases.coordination.k8s.io"]
     assert snapshot.object_file_status(tmp_path, "jobs.batch", out) == "ok" and snapshot.object_file_status(tmp_path, "leases.coordination.k8s.io", out) == "denied"
 
 
@@ -182,7 +187,7 @@ def test_object_checks_skip_with_the_reason(tmp_path):
     assert by_id["security.networkpolicy-coverage"]["status"] == "skip" and by_id["security.networkpolicy-coverage"]["reason"] == "objects/networkpolicies.networking.k8s.io.json missing: the ClusterRole does not grant list on this kind"
     (snap / "collect-result.json").unlink()
     out = evaluate.evaluate(snap, {}, echo=None)
-    assert {r["id"]: r for r in out["check_results"]}["scaling.karpenter-budget-zero"]["reason"] == "objects/nodepools.karpenter.sh.json missing: the snapshot has no dump-all record"
+    assert {r["id"]: r for r in out["check_results"]}["scaling.karpenter-budget-zero"]["reason"] == "objects/nodepools.karpenter.sh.json missing: the snapshot has no dump-all record, or its API discovery failed"
 
 
 def test_report_section_7_1_names_the_stems(tmp_path):
@@ -193,11 +198,11 @@ def test_report_section_7_1_names_the_stems(tmp_path):
     summ["collection"]["object_files"] = {"pods": "ok", "bgppeers.metallb.io": "not-served", "ipaddresspools.metallb.io": "not-served", "cronjobs.batch": "unlisted"}
     (s / "summary.json").write_text(json.dumps(summ))
     text = render.render_details(s).read_text()
-    assert "Object files the summary asked for that this cluster does not serve (2; the kind is not installed, so those checks judge nothing): `bgppeers.metallb.io`, `ipaddresspools.metallb.io`" in text
-    assert "Object files the summary asked for that the cluster serves but the snapshot does not have (1; the reader's file name is wrong, a kubegap defect, and the checks that read them judged nothing): `cronjobs.batch`" in text
+    assert "Kinds this cluster does not serve (2; a check that needs one of them is skipped, not passed): `bgppeers.metallb.io`, `ipaddresspools.metallb.io`" in text
+    assert "Kinds this cluster serves but the snapshot has no file for (1; kubegap looked for the wrong file name, a kubegap defect, and the checks that read them judged nothing): `cronjobs.batch`" in text
     assert "`pods`" not in text.split("### 7-1")[1].split("###")[0]
     ko = render.render_details(s, language="ko").read_text()
-    assert "클러스터가 제공하는데 수집 폴더에 그 이름의 파일이 없는 오브젝트 종류 1개예요" in ko and "`cronjobs.batch`" in ko
+    assert "이 클러스터가 제공하는데 수집 폴더에 파일이 없는 종류 1개예요" in ko and "`cronjobs.batch`" in ko
 
 
 # ---------- every literal stem against two real clusters ----------

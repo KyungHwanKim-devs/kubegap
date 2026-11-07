@@ -120,9 +120,10 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
         if _glob_match(name, exclude) or _glob_match(full, exclude):
             summary["excluded"].append(full)
             continue
-        # Kinds discovery already fetched (nodes, pods, deployments ...) are not fetched again. File name: core group = name only, others = name.group
+        # Kinds discovery already fetched (nodes, pods, deployments ...) are not fetched again. File name: core group and discovery's kinds = name only, others = name.group.
+        # A discovery kind keeps its short name even when discovery failed to save it and this step fetches it, so a kind has one file name whoever wrote it (#160)
         core_group = not res.get("apiversion", "").count("/")
-        file_stem = name if core_group else full
+        file_stem = name if core_group or full in DISCOVERY_RESOURCES else full
         if full in done or (full in DISCOVERY_RESOURCES and name in done):  # `name` alone would also match a CRD of the same plural (services.serving.knative.dev), which was then never fetched
             summary["fetched_by_discovery"].append(full)
             continue

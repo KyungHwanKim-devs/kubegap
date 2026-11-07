@@ -167,7 +167,7 @@ OBJECT_FILE_STATUS = {
     "denied": "the ClusterRole does not grant list on this kind",
     "failed": "the kubectl get or the scrub failed (the dump-all record carries the error)",
     "unlisted": "the cluster serves this kind but the snapshot has no file of that name",
-    "no-record": "the snapshot has no dump-all record",
+    "no-record": "the snapshot has no dump-all record, or its API discovery failed",
 }
 
 
@@ -177,19 +177,20 @@ def object_file_status(snap: Path, stem: str, rec: dict | None) -> str:
     `not-served` is the normal reason for a missing file: a CRD that is not installed (no Karpenter on k3s), and a check that reads it skips as
     "not served". `unlisted` is a defect in kubegap: `kubectl api-resources` listed the kind, nothing excluded or denied it, and still no file of that
     name exists, so the reader's stem and the file name disagree (#124 found CronJob readers opening `cronjobs.batch.json` while discovery wrote
-    `cronjobs.json`, and every CronJob check passed on an empty list). The kinds discovery fetched are in `fetched_by_discovery` by their full name and
-    on disk by their short name, so a short stem is served when its name heads one of those entries."""
+    `cronjobs.json`, and every CronJob check passed on an empty list). A stem is served when it is a full name in `served` or the resource name of
+    one (`jobs` for `jobs.batch`): the file of a discovery kind carries the short name, every other file the full name, so either spelling of a served
+    kind without a file is `unlisted`. A `kubectl api-resources` that failed leaves `served` empty with `discovery_error` set; nothing can be judged then."""
     if (snap / "objects" / f"{stem}.json").is_file():
         return "ok"
-    if rec is None or not isinstance(rec.get("served"), list):
+    if rec is None or (rec["discovery_error"] and not rec["served"]):
         return "no-record"
-    if stem in (rec.get("excluded") or []):
+    if stem in rec["excluded"]:
         return "excluded"
-    if stem in (rec.get("not_permitted") or []):
+    if stem in rec["not_permitted"]:
         return "denied"
-    if stem in (rec.get("failed") or {}):
+    if stem in rec["failed"]:
         return "failed"
-    if stem in rec["served"] or stem in {str(full).split(".", 1)[0] for full in rec.get("fetched_by_discovery") or []}:
+    if stem in rec["served"] or stem in {str(full).split(".", 1)[0] for full in rec["served"]}:
         return "unlisted"
     return "not-served"
 
