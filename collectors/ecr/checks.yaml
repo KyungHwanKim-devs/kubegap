@@ -1781,7 +1781,7 @@
     expr: "(item['stale_pull_gib'] or 0) >= 100"
     warn_expr: "(item['stale_pull_gib'] or 0) >= 10 or (item['unused_gib'] or 0) >= 10"
   target: "'ecr/registry/' + str(item['account'])"
-  evidence: "f\"repositories with no pull for more than {item['stale_pull_days']} days: {'; '.join(str(r['name']) + ' ' + str(r['gib']) + ' GiB' + (', never pulled' if r['days_since_pull'] is None else ', last pull ' + str(r['days_since_pull']) + ' days ago') for r in item['repos_stale_pull'][:8])} (total {item['stale_pull_gib']} GiB), repositories not used by the cluster {item['repos_unused_by_cluster']} (total {item['unused_gib']} GiB), empty repositories {item['repos_empty']}, largest repositories by stored size {', '.join(str(r['name']) + ' ' + str(r['gib']) + ' GiB' for r in item['largest_repos'])}\""
+  evidence: "_ecr_stale_storage_text(item)"
   severity_default: low
   symptom_linked: false
   why: >

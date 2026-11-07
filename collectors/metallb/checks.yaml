@@ -289,7 +289,7 @@
     expr: "(item['speaker_ready'] or 0) < (item['speaker_desired'] or 0) or (item['controller_ready'] or 0) < (item['controller_replicas'] or 0) or (item['speaker_desired'] == 0 and (item['lb_services'] or 0) > 0)"
     warn_expr: "item['speaker_desired'] is None or (item.get('speaker_eligible') is not None and (item['speaker_ready'] or 0) < item['speaker_eligible']) or (item.get('speaker_eligible') is None and item['speaker_all_nodes'] is False) or (item['controller_replicas'] is None and item.get('deployments_read')) or len(item['speakers_unreadable']) > 0 or (item['metrics_available'] is False and not item.get('metrics_tls_only') and (item['lb_services'] or 0) > 0)"
   target: "'cluster'"
-  evidence: "('no speaker DaemonSet found: ' if item['speaker_desired'] is None else '') + ('no MetalLB controller found: ' if item['controller_replicas'] is None else '') + f\"{item['lb_services']} LoadBalancer services, speaker ready {item['speaker_ready']}/{item['speaker_desired']} ({item['nodes_total']} nodes, all nodes {item['speaker_all_nodes']}, nodes it can run on {item.get('speaker_eligible')}), controller {item['controller_ready']}/{item['controller_replicas']}, speakers with metrics read {item['speakers_read']}, unreadable {item['speakers_unreadable']}, version {item['version']}, mode {item['mode']}\""
+  evidence: "_metallb_speaker_text(item)"
   severity_default: high
   symptom_linked: true
   why: >
@@ -910,7 +910,7 @@
     expr: "len(item['config_stale_pods']) > 0"
     warn_expr: "(item['update_errors_total'] or 0) > 0 or len(item.get('config_not_reported') or []) > 0"
   target: "'cluster'"
-  evidence: "f\"source {item['config_source']}: components with stale/unloaded config {item['config_stale_pods']}, errors {item['config_errors']}, not reported {item['config_not_reported']}, k8s client update errors {item['update_errors_total'] if item['update_errors_read'] else 'not read'}, ARP requests/responses {item['arp_requests_total'] if item['update_errors_read'] else 'not read'}/{item['arp_responses_total'] if item['update_errors_read'] else 'not read'}, gratuitous ARP {item['gratuitous_total'] if item['update_errors_read'] else 'not read'}, BGP sessions up {item['bgp_sessions_up'] if item['bgp_sessions'] is not None else 'not read'}/{item['bgp_sessions'] if item['bgp_sessions'] is not None else 'not read'}\""
+  evidence: "_metallb_config_text(item)"
   severity_default: high
   symptom_linked: true
   why: >

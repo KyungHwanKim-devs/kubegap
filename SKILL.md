@@ -5,7 +5,7 @@ compatibility: "Tested with Claude Code and Codex; usable in any Agent Skills ho
 metadata:
   version: "0.1.5"
   author: KyungHwanKim-devs
-  rubric_version: "0.1.86"
+  rubric_version: "0.1.87"
 ---
 
 # /kubegap — cluster operations gap audit
@@ -133,4 +133,4 @@ Tone and content rules are the "Writing rules" section of `references/report-wri
 
 ## 10. Changing checks and the rubric (development note)
 
-A report session does not change code (section 9). The procedure for adding or editing checks, selftest and version bumps is in [references/development.md](references/development.md).
+A report session does not change code (section 9). The procedure for adding or editing checks, the commands and the review checklist are in [CONTRIBUTING.md](CONTRIBUTING.md); the mechanics behind them are in [references/development.md](references/development.md).

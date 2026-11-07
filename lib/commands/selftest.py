@@ -110,7 +110,7 @@ def audit_against_snapshot(checks: list[dict], snap: Path) -> list[dict]:
         items = [i for i in items if isinstance(i, dict) and i.get("present") is not False and i.get("available") is not False]  # absent targets (no Loki, etc.) legitimately have empty keys
         if not items:
             continue
-        texts = " ".join(str(c.get(k) or "") for k in ("rule", "target", "evidence"))
+        texts = _rules.expression_texts(c)  # the evidence helpers' source included, so their keys are audited too
         for key in sorted(set(KEY_HARD_RE.findall(texts))):
             if not any(key in it for it in items):
                 out.append({"case": f"{c['id']} ↔ {snap.name}", "reason": f"item['{key}'] in the expression is missing from the real summary.{c['each']} items"})
