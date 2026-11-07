@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Added
+
+- `lib/` has six named layers (foundations, collection, summaries, judgement, output, commands) and a stated import direction, written in `references/development.md` and enforced by `tests/test_boundaries.py`, which reads the imports of every module (inside functions and summarize's by-name dispatch included) against a module-to-layer map; the 22 imports that still cross the rule are listed there with the issue that removes each (#150, #151). Discovery no longer imports the first-run module: the command passes the SSH decision in. (#149)
+
 ### Fixed
 
 - The regression harness compared the Korean report header with the kubegap version left in it: `lib/regress.normalise` replaced the version only under the English label `kubegap / rubric / signatures`, so the first release after the expectation was written (0.1.5) failed `tests/test_regress.py` on the four Korean reports. The row is matched under its label in every report language, from `lib/render.LABELS`.

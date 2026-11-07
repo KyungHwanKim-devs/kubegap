@@ -33,13 +33,13 @@ from pathlib import Path
 
 from . import paths, rubric, tools
 from .config import Config
+from .discover import SSH_PLATFORMS
 from .snapshot import load_json, write_private
 
 MAX_PER_WINDOW = 3
 ANSWERS_FILE = "answers.json"
 NODE_ACCESS_FILE = "node-access.json"
 STORES = ("prometheus", "alertmanager", "loki", "grafana")
-SSH_PLATFORMS = ("k3s", "rke2", "unknown")  # the platforms read over SSH; lib/discover._node_access uses this tuple
 SKIP = "skip"
 PARTIAL = "partial"  # node-ssh: go on with the nodes that answer
 
