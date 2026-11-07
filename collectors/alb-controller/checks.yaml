@@ -1477,7 +1477,6 @@
   cluster_level: true
   rule:
     expr: "len(item['tgb_stale']) > 0 or len(item['tgb_service_missing']) > 0"
-    warn_expr: "item['traffic_target_groups_without_tgb'] > 0"
   target: "'cluster'"
   evidence: "f\"TargetGroupBindings {item['tgb_count']} (targetType {item['tgb_by_target_type']}), generation lagging {item['tgb_stale']}, Service missing {item['tgb_service_missing']}, hand-made TGBs {len(item['tgb_manual'])}, target groups without a binding (traffic section) {item['traffic_target_groups_without_tgb']}\""
   severity_default: medium
@@ -1644,81 +1643,6 @@
           traffic_target_groups_without_tgb: 1
           traffic_unhealthy_target_groups: 6
           cluster_name_arg: "my-cluster-eks"
-      - expect: "warn"
-        item:
-          present: true
-          version: "2.7.2"
-          replicas: 2
-          ready: 2
-          all_same_node: false
-          has_pdb: true
-          anti_affinity: true
-          has_dedicated_role: true
-          irsa_role: "arn:aws:iam::<account>:role/AmazonEKSLoadBalancerControllerRole-my-cluster-eks"
-          pod_identity: false
-          nodes_total: 7
-          webhooks: 6
-          webhooks_fail_policy: 6
-          webhook_pod_scope_fail: false
-          webhook_no_endpoints: []
-          webhook_5xx: 0
-          ingress_classes:
-            - "alb"
-          ingress_class_default: false
-          ingress_class_params: 1
-          alb_ingresses: 40
-          ingresses_without_lb: []
-          ingress_annotations_top:
-            group.name: 40
-            listen-ports: 40
-            scheme: 40
-            target-type: 40
-            healthcheck-path: 21
-            healthy-threshold-count: 12
-            success-codes: 12
-            unhealthy-threshold-count: 12
-          tgb_count: 51
-          tgb_by_target_type:
-            ip: 51
-          tgb_stale: []
-          tgb_service_missing: []
-          tgb_manual:
-            - "dev-app-b/app-b-dev-mysql-tgb"
-            - "dev-app-d/app-d-dev-mysql-tgb"
-            - "dev-app-c/app-c-dev-mysql-tgb"
-            - "prod-app-e/app-e-prod-postgresql-tgb"
-            - "prod-app-b/app-b-prod-mysql-tgb"
-            - "prod-app-d/app-d-prod-mysql-tgb"
-            - "prod-app-a-backend/app-a-prod-neo4j-tgb"
-            - "prod-app-a-backend/app-a-prod-pg-proxy-tgb"
-            - "prod-app-c/app-c-prod-mysql-tgb"
-          lb_services: 1
-          lb_services_intree: []
-          metrics_available: true
-          leader_found: true
-          reconcile_errors_total: 41
-          aws_api_calls_total: 232463
-          aws_api_retries_avg: 0.0
-          aws_api_slow_ops_avg_s:
-            - "('Shield/GetSubscriptionState', 0.76)"
-            - "('EC2/RevokeSecurityGroupIngress', 0.317)"
-            - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
-            - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
-            - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
-            - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
-            - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
-            - "('EC2/DescribeInstances', 36913)"
-            - "('EC2/DescribeSecurityGroups', 24255)"
-            - "('Elastic Load Balancing v2/RegisterTargets', 11483)"
-            - "('Elastic Load Balancing v2/DeregisterTargets', 11350)"
-            - "('Elastic Load Balancing v2/DescribeTags', 8684)"
-            - "('Elastic Load Balancing v2/DescribeLoadBalancers', 3536)"
-          rest_client_429_503: 123
-          workqueue_depth_max: 0.0
-          traffic_target_groups_without_tgb: 2
-          traffic_unhealthy_target_groups: 6
-          cluster_name_arg: "my-cluster-eks"
       - expect: "pass"
         item:
           present: true
@@ -1794,6 +1718,47 @@
           traffic_target_groups_without_tgb: 0
           traffic_unhealthy_target_groups: 6
           cluster_name_arg: "my-cluster-eks"
+- id: albctl.target-group-without-tgb
+  name: Target group in AWS that no TargetGroupBinding owns
+  area: traffic
+  type: summary
+  each: albctl.summary
+  cluster_level: true
+  rule:
+    needs: "item.get('target_groups_read')"
+    needs_reason: "ALB target groups not read (elasticloadbalancing:Describe*)"
+    warn_expr: "(item['traffic_target_groups_without_tgb'] or 0) > 0"
+  target: "'cluster'"
+  evidence: "f\"target groups the controller does not own {item['traffic_target_groups_without_tgb']} (TargetGroupBindings {item['tgb_count']}, hand-made {len(item['tgb_manual'])})\""
+  severity_default: low
+  why: >
+    Every target group the controller manages has a TargetGroupBinding; one without a binding is a leftover of a deleted Ingress or Service (its targets drift and its health checks keep running against nothing) or a load balancer somebody made by hand that the cluster knows nothing about. This was the warn side of `albctl.tgb-stale-or-orphan`; it reads the AWS listing, which that check does not need, so it skips on its own when the listing was not read.
+  suggest: "Compare `aws elbv2 describe-target-groups` with `kubectl get targetgroupbindings -A`; delete the target groups and listeners nobody owns, or write the TargetGroupBinding that should own them."
+  verify:
+    - "aws elbv2 describe-target-groups --query 'TargetGroups[].TargetGroupName'"
+    - "kubectl get targetgroupbindings -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ARN:.spec.targetGroupARN"
+  profiles: [prod]
+  test:
+    cases:
+      - expect: "skip"
+        item:
+          target_groups_read: false
+          traffic_target_groups_without_tgb: null
+          tgb_count: 0
+          tgb_manual: []
+      - expect: "warn"
+        item:
+          target_groups_read: true
+          traffic_target_groups_without_tgb: 2
+          tgb_count: 51
+          tgb_manual: []
+      - expect: "pass"
+        item:
+          target_groups_read: true
+          traffic_target_groups_without_tgb: 0
+          tgb_count: 51
+          tgb_manual: []
+
 - id: albctl.ingress-without-lb
   name: Ingress of class ALB has no load balancer address (provisioning failed)
   area: traffic

@@ -136,8 +136,10 @@
   type: inventory
   each: cluster.eks.addons
   rule:
-    expr: "addon_latest(key) is not None and item.get('version') != addon_latest(key) and addon_minor_gap(item.get('version'), addon_latest(key)) >= 2"
-    warn_expr: "addon_latest(key) is not None and item.get('version') != addon_latest(key)"
+    needs: "addon_latest(key) is not None"
+    needs_reason: "add-on versions not read (eks:DescribeAddonVersions)"
+    expr: "item.get('version') != addon_latest(key) and addon_minor_gap(item.get('version'), addon_latest(key)) >= 2"
+    warn_expr: "item.get('version') != addon_latest(key)"
   target: "key"
   evidence: "f\"installed {item.get('version')}, latest available {addon_latest(key)}, default {addon_default(key)}\""
   severity_default: medium

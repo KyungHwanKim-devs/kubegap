@@ -6,9 +6,9 @@
 
 I built kubegap while running three clusters on my own, each on a different platform: a small k3s cluster, an EKS cluster, and Kubernetes on Azure. Alerts and dashboards catch only what someone set them up to catch. Anything else you find by digging through the cluster by hand, and I did not have time to do that on three clusters every day. So I gave that job to an AI agent.
 
-Type `/kubegap` in Claude Code, or `$kubegap` in Codex, and the agent reads the state of the cluster, evaluates it against 407 checks in 12 areas, picks the problems that need attention now, and writes a report. Each problem comes with its evidence, its cause and how to fix it. On one EKS cluster, it found that a spot reclaim had stopped a backend for two minutes without a single alert firing.
+Type `/kubegap` in Claude Code, or `$kubegap` in Codex, and the agent reads the state of the cluster, evaluates it against 409 checks in 12 areas, picks the problems that need attention now, and writes a report. Each problem comes with its evidence, its cause and how to fix it. On one EKS cluster, it found that a spot reclaim had stopped a backend for two minutes without a single alert firing.
 
-Of the 407 checks, 112 link to public incident reports and postmortems, 207 write-ups in total, including some from Airbnb and Buffer. The links for each check are in [`docs/CHECKS.md`](docs/CHECKS.md). The remaining checks are configuration rules, and for those the report says there is no public case rather than making one up. Every problem in a report has a "Why this happens" part with the principle behind it, public cases, and official documents or books to read next, such as the Kubernetes documentation, the AWS documentation and Google's *Site Reliability Engineering*. The [EKS sample report](samples/en/eks/full/report.md) shows what this looks like.
+Of the 409 checks, 113 link to public incident reports and postmortems, 209 write-ups in total, including some from Airbnb and Buffer. The links for each check are in [`docs/CHECKS.md`](docs/CHECKS.md). The remaining checks are configuration rules, and for those the report says there is no public case rather than making one up. Every problem in a report has a "Why this happens" part with the principle behind it, public cases, and official documents or books to read next, such as the Kubernetes documentation, the AWS documentation and Google's *Site Reliability Engineering*. The [EKS sample report](samples/en/eks/full/report.md) shows what this looks like.
 
 kubegap depends on facts about other tools, such as metric names, log messages and API fields. I looked these up in each tool's source code, version by version, and cited them in [`references/sources.md`](references/sources.md). Those tables now run to more than 1,500 rows.
 
@@ -44,7 +44,7 @@ A daily audit does not count what only the full audit collects as a problem or a
 
 Each audit produces two files. `report.md` is the report for people to read, and `report-details.md` has every verdict in tables. In a full audit, `report-details.md` also has the details of all 12 areas.
 
-Scripts judge 405 of the 407 checks, so the same data gives the same result. The agent judges the other 2. It then reads the results, decides what is most urgent and writes the report. If it changes a script's verdict, it records the change and the reason in `report-details.md`.
+Scripts judge 407 of the 409 checks, so the same data gives the same result. The agent judges the other 2. It then reads the results, decides what is most urgent and writes the report. If it changes a script's verdict, it records the change and the reason in `report-details.md`.
 
 ## Which clusters it works on
 
@@ -139,14 +139,14 @@ For `--compare`, A and B are folder names such as `2026-11-05T08-30-12`. Each au
 
 ## What it checks
 
-There are 407 checks in 12 areas. Each check is one condition that counts as a problem. The full list is in [`docs/CHECKS.md`](docs/CHECKS.md), which also links to the public incidents behind a check where there are any.
+There are 409 checks in 12 areas. Each check is one condition that counts as a problem. The full list is in [`docs/CHECKS.md`](docs/CHECKS.md), which also links to the public incidents behind a check where there are any.
 
 | Area | `focus` name | Checks | Examples |
 |---|---|---|---|
 | Resources | `resources` | 15 | containers requesting more than 3x their 7-day p95 usage, repeated OOMKills, nodes full of requests but with single-digit utilization |
 | Scaling | `scaling` | 27 | HPAs stuck at their minimum for 15 days, expired Karpenter nodes that are not replaced, KEDA external triggers without a fallback |
 | Observability | `observability` | 64 | no symptom-based alerts, alerts firing for 7 days straight, a monitoring stack on emptyDir, ingress controller metrics that are not scraped |
-| Traffic | `traffic` | 57 | database ports open to the internet, unhealthy ALB targets, a deregistration delay longer than the termination grace period |
+| Traffic | `traffic` | 59 | database ports open to the internet, unhealthy ALB targets, a deregistration delay longer than the termination grace period |
 | Resilience | `resilience` | 43 | replicas packed onto one node, no PDB, backup dumps on the same disk as the data, workloads that can run on only one node |
 | Hygiene | `hygiene` | 35 | `latest` tags, deprecated APIs, Helm releases stuck in pending or failed, dependence on hand-applied node labels |
 | Storage | `storage` | 25 | unencrypted EBS volumes, StorageClasses with expansion turned off, local-path volumes over capacity |
@@ -158,7 +158,7 @@ There are 407 checks in 12 areas. Each check is one condition that counts as a p
 
 Of the 37 Node OS checks, 26 can be seen only by reaching the nodes.
 
-Not all 407 apply to every cluster. Checks for a component such as Karpenter, Argo CD or cert-manager run only when that component is installed. A daily audit covers at most 326, leaving out the 81 that are full-only.
+Not all 409 apply to every cluster. Checks for a component such as Karpenter, Argo CD or cert-manager run only when that component is installed. A daily audit covers at most 327, leaving out the 82 that are full-only.
 
 What is expected depends on the kind and size of the cluster. EKS is held to the production baseline. k3s, RKE2 and clusters of 3 nodes or fewer get the small-cluster baseline, which still expects backups, SLOs and an alert router, but not multi-zone spread or PDBs. You can change this with `--profile`.
 

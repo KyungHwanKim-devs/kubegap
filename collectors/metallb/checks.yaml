@@ -284,8 +284,8 @@
   each: metallb.summary
   cluster_level: true
   rule:
-    needs: "item['speaker_desired'] is not None or item.get('daemonsets_read')"
-    needs_reason: "DaemonSets not read"
+    needs: "(item['speaker_desired'] is not None or item.get('daemonsets_read')) and (item['controller_replicas'] is not None or item.get('deployments_read'))"
+    needs_reason: "DaemonSets or Deployments not read"
     expr: "(item['speaker_ready'] or 0) < (item['speaker_desired'] or 0) or (item['controller_ready'] or 0) < (item['controller_replicas'] or 0) or (item['speaker_desired'] == 0 and (item['lb_services'] or 0) > 0)"
     warn_expr: "item['speaker_desired'] is None or (item.get('speaker_eligible') is not None and (item['speaker_ready'] or 0) < item['speaker_eligible']) or (item.get('speaker_eligible') is None and item['speaker_all_nodes'] is False) or (item['controller_replicas'] is None and item.get('deployments_read')) or len(item['speakers_unreadable']) > 0 or (item['metrics_available'] is False and not item.get('metrics_tls_only') and (item['lb_services'] or 0) > 0)"
   target: "'cluster'"
@@ -302,6 +302,12 @@
   profiles: [prod, lab]
   test:
     cases:
+      - expect: "skip"
+        item:
+          speaker_desired: 1
+          daemonsets_read: true
+          controller_replicas: null
+          deployments_read: false
       - expect: "fail"
         item:
           present: true
