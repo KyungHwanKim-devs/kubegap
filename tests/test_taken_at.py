@@ -64,7 +64,6 @@ def test_no_summary_module_reads_the_wall_clock():
     (a stamp, a query window, a timeout), never an age a check judges. lib/summaries/karpenterctl.py measured the controller's uptime with `__import__("time").time()` until #145."""
     collection_time = {
         "albmetrics.py",
-        "collect.py",
         "cwlogs.py",
         "cwmetrics.py",
         "discover.py",
@@ -83,12 +82,12 @@ def test_no_summary_module_reads_the_wall_clock():
     clock = re.compile(r"datetime\.now\(|date\.today\(|utcnow\(|time\.time\(|__import__\(\"time\"\)|monotonic\(")
     left = []
     for f in sorted((ROOT / "lib").rglob("*.py")):
-        if f.name in collection_time:
-            continue
+        if f.name in collection_time or f.parent.name == "collect":
+            continue  # lib/collection/collect/: the runner and its steps time commands and the AWS date placeholders, collection-time by nature
         for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
             if not clock.search(line):
                 continue
-            if f.name in ("evaluate.py", "summarize.py") and ("generated_at" in line or "removed_at" in line):
+            if (f.name == "summarize.py" or f.parent.name == "evaluate") and ("generated_at" in line or "removed_at" in line):
                 continue  # when this file was written
             if f.name == "snapshot.py" and "taken_at" in line:
                 continue  # the one fallback, for an inventory without the key
@@ -167,7 +166,7 @@ def test_configmap_age_is_measured_from_the_snapshot_time(tmp_path):
         ("persistentvolumeclaims", []),
     ):
         (tmp_path / "objects" / f"{stem}.json").write_text(json.dumps({"items": objs}), encoding="utf-8")
-    cx = hygiene._Ctx(tmp_path, {"taken_at": TAKEN, "namespaces": {"prod_like": ["p"]}})
+    cx = hygiene.Ctx(tmp_path, {"taken_at": TAKEN, "namespaces": {"prod_like": ["p"]}})
     assert cx.now == snapshot.parse_ts(TAKEN)
     row = next(r for r in hygiene._orphans(cx)["orphan_configmaps"] if r["name"] == "old")
     assert row["age_days"] == 30

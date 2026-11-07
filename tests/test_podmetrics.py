@@ -63,7 +63,7 @@ def _snap(tmp_path, folder, text):
 
 def _keep(area, sid):
     st = next(s for s in yamlite.load_file(ROOT / "collectors" / area / "collect.yaml") if s.get("id") == sid)
-    return collect._metrics_filter(st.get("keep"))
+    return collect.k8s_steps.metrics_filter(st.get("keep"))
 
 
 def test_karpenter_both_spellings_give_the_same_summary(tmp_path):
@@ -157,7 +157,7 @@ def test_every_table_name_passes_its_step_keep_filter():
         steps = [s for s in yamlite.load_file(ROOT / "collectors" / area / "collect.yaml") if s.get("type") == "pod-metrics"]
         if not steps:
             continue  # the area's /metrics text is saved whole by an http step (Loki), nothing is filtered
-        keeps = [collect._metrics_filter(s.get("keep")) for s in steps]
+        keeps = [collect.k8s_steps.metrics_filter(s.get("keep")) for s in steps]
         for e in entries:
             labels = ",".join(f'{k}="404"' for k in (e.get("labels") or [])) or 'grpc_code="OK"'
             for n in e.get("names") or []:

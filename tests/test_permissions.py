@@ -75,7 +75,7 @@ def _kubectl_literals(source: str, filename: str) -> list[tuple[str, str]]:
 
 def test_lib_kubectl_calls_use_read_verbs_and_never_exec():
     calls = []
-    for f in sorted(ROOT.glob("lib/*/*.py")):
+    for f in sorted(ROOT.glob("lib/**/*.py")):
         calls += _kubectl_literals(f.read_text(encoding="utf-8"), f.name)
     assert calls, "no kubectl calls found; the scanner is broken"
     bad = [c for c in calls if c[0] not in KUBECTL_LIB_VERBS]
@@ -86,7 +86,7 @@ def test_lib_kubectl_calls_use_read_verbs_and_never_exec():
 
 def test_raw_paths_in_lib_are_the_pod_proxy_only():
     raws = []
-    for f in sorted(ROOT.glob("lib/*/*.py")):
+    for f in sorted(ROOT.glob("lib/**/*.py")):
         for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
             if '"--raw"' in line:
                 raws.append(f"{f.name}:{n}: {line.strip()}")
@@ -106,7 +106,7 @@ def test_tool_steps_do_not_read_helm_release_secrets():
 
 def test_port_forward_and_popen_live_in_portfwd_only():
     """kubectl port-forward is the one call behind the pods/portforward rule; it runs through subprocess.Popen in lib/collection/portfwd.py and nowhere else."""
-    texts = {f.name: f.read_text(encoding="utf-8") for f in ROOT.glob("lib/*/*.py")}
+    texts = {f.name: f.read_text(encoding="utf-8") for f in ROOT.glob("lib/**/*.py")}
     runners = {n for n, t in texts.items() if '"port-forward"' in t and "subprocess" in t}  # monitoring.py and prom.py only name the access method
     popen = {n for n, t in texts.items() if "subprocess.Popen" in t}
     assert runners == {"portfwd.py"} and popen == {"portfwd.py"}
@@ -190,7 +190,7 @@ def _reads_in_module(source: str) -> set[str]:
 
 def _kinds_the_code_reads() -> set[str]:
     kinds: set[str] = set()
-    for f in sorted(ROOT.glob("lib/*/*.py")):
+    for f in sorted(ROOT.glob("lib/**/*.py")):
         kinds |= _reads_in_module(f.read_text(encoding="utf-8"))
     for f in sorted(ROOT.glob("collectors/*/checks.yaml")):
         kinds |= set(re.findall(r"objects/([a-z0-9.-]+)\.json", f.read_text(encoding="utf-8")))
@@ -261,8 +261,8 @@ def test_kinds_read_count_is_sane():
 
 # Grants that are not object reads: what in the code needs each one
 GRANT_READERS = {
-    "pods/log": "lib/collection/collect.py component logs: kubectl logs",
-    "pods/proxy": "lib/collection/collect.py pod-metrics: GET .../pods/<pod>:<port>/proxy/metrics",
+    "pods/log": "lib/collection/collect component logs: kubectl logs",
+    "pods/proxy": "lib/collection/collect pod-metrics: GET .../pods/<pod>:<port>/proxy/metrics",
     "nodes/proxy": "collectors/core/collect.yaml kubelet-configz: GET /api/v1/nodes/<node>/proxy/configz",
     "pods/portforward": "lib/collection/portfwd.py: kubectl port-forward svc/<store>",
     "events": "collectors/core/collect.yaml events: kubectl get events -A",
@@ -314,7 +314,7 @@ def _aws_calls_in_code() -> set[str]:
             args = [str(a) for a in st.get("args") or []]
             actions.add(_action(args[0], args[1]))
     pat = re.compile(r"""aws(?:_json)?\(\s*\[\s*"([a-z0-9-]+)",\s*"([a-z0-9-]+)\"""")
-    for f in sorted(ROOT.glob("lib/*/*.py")):
+    for f in sorted(ROOT.glob("lib/**/*.py")):
         for service, op in pat.findall(f.read_text(encoding="utf-8")):
             actions.add(_action(service, op))
     actions.add("logs:StartQuery")  # lib/collection/cwlogs.py run_query passes a prebuilt args list to aws_json, not a literal
@@ -379,7 +379,7 @@ def test_dump_all_lists_forbidden_kinds_as_not_permitted(tmp_path, fake_kubectl_
     from lib.collection import collect
     from lib.foundations.runlog import RunLog
 
-    s = collect.dump_all(None, None, tmp_path, [], 10, RunLog(tmp_path / "run.log"), "core")
+    s = collect.k8s_steps.dump_all(None, None, tmp_path, [], 10, RunLog(tmp_path / "run.log"), "core")
     assert s["kinds"] == 1 and s["failed"] == {} and s["not_permitted"] == ["podtemplates"]
     assert (tmp_path / "objects" / "pods.json").is_file() and not (tmp_path / "objects" / "podtemplates.json").exists()
 
@@ -526,6 +526,6 @@ def test_permissions_doc_tables_parse_as_expected():
 
 def test_no_module_asks_kubectl_for_a_secret():
     """kubegap reads no Secret value: `helm list` (Helm's own release records) is the one documented exception, and it is a tool step, not a kubectl call in lib/."""
-    texts = {f.name: f.read_text(encoding="utf-8") for f in ROOT.glob("lib/*/*.py")}
+    texts = {f.name: f.read_text(encoding="utf-8") for f in ROOT.glob("lib/**/*.py")}
     askers = {n for n, t in texts.items() if '"get", "secret"' in t or "get secret" in t or '["get", "secrets"' in t}
     assert askers == set(), askers

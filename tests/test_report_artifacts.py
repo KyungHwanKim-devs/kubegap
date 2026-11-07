@@ -5,7 +5,9 @@ from __future__ import annotations
 import json
 
 from lib.foundations import paths, rubric
-from lib.judgement.evaluate import Context, _details, _eval_summary, _Run, referenced_keys
+from lib.judgement.evaluate import Context
+from lib.judgement.evaluate.rules import Run, details, referenced_keys
+from lib.judgement.evaluate.types import eval_summary
 
 CHECK = {
     "id": "resilience.prod-concentration",
@@ -30,8 +32,8 @@ def test_details_keeps_the_whole_list_the_evidence_cut(tmp_path):
     item = {"node": "n1", "share": 0.48, "prod_pods": 20, "prod_workloads": workloads, "huge": list(range(10000)), "pool": "app"}
     summary = {"resilience": {"placement": {"prod_by_node": [item]}}}
     cx = Context(tmp_path, {}, summary, {"name": "prod"})
-    run = _Run(CHECK, cx, {})
-    r = _eval_summary(cx, CHECK, run)
+    run = Run(CHECK, cx, {})
+    r = eval_summary(cx, CHECK, run)
     f = r["findings"][0]
     assert "prod/app-19" not in str(f["evidence"]) and "prod/app-9" in str(f["evidence"])  # the one-line evidence cuts at 10
     assert f["details"]["prod_workloads"] == workloads  # the whole list lives on the finding
@@ -66,26 +68,26 @@ def test_details_keeps_what_a_helper_read(tmp_path):
         "nodes": ["n1"],
     }
     cx = Context(tmp_path, {}, {"resilience": {"oom_7d": {"rows": [item]}}}, {"name": "prod"})
-    run = _Run(check, cx, {})
-    f = _eval_summary(cx, check, run)["findings"][0]
+    run = Run(check, cx, {})
+    f = eval_summary(cx, check, run)["findings"][0]
     assert {"last_kill", "pods_replaced", "cadvisor_oom_events_7d", "kernel_nodes_total"} <= set(f["details"])
     assert "pods" not in f["details"] and "nodes" not in f["details"]  # read by nobody
 
 
 def test_details_for_metric_object_and_inventory_items():
-    assert _details({}, {"labels": {"pod": "p", "namespace": "a"}, "value": 0.3}) == {"labels": {"pod": "p", "namespace": "a"}, "value": 0.3}
-    assert _details({}, {"labels": {"node": "n"}, "v": {"x": 1, "y": 2}, "value": 1}) == {"labels": {"node": "n"}, "values": {"x": 1, "y": 2}}
-    assert _details({}, {"obj": {"kind": "Deployment"}, "ns": "a", "name": "web"}) == {"namespace": "a", "name": "web", "kind": "Deployment"}
-    assert _details({}, {"item": {"a": 1}, "key": "k"}) == {"key": "k", "item": {"a": 1}}
-    assert _details({}, {"prod": False}) is None  # absence and cluster-level checks carry nothing
+    assert details({}, {"labels": {"pod": "p", "namespace": "a"}, "value": 0.3}) == {"labels": {"pod": "p", "namespace": "a"}, "value": 0.3}
+    assert details({}, {"labels": {"node": "n"}, "v": {"x": 1, "y": 2}, "value": 1}) == {"labels": {"node": "n"}, "values": {"x": 1, "y": 2}}
+    assert details({}, {"obj": {"kind": "Deployment"}, "ns": "a", "name": "web"}) == {"namespace": "a", "name": "web", "kind": "Deployment"}
+    assert details({}, {"item": {"a": 1}, "key": "k"}) == {"key": "k", "item": {"a": 1}}
+    assert details({}, {"prod": False}) is None  # absence and cluster-level checks carry nothing
 
 
 def test_details_merge_into_a_list_when_instances_merge(tmp_path):
     check = {**CHECK, "target": "'cluster'"}
     items = [{"node": "n1", "share": 0.5, "prod_pods": 3, "prod_workloads": ["a"]}, {"node": "n2", "share": 0.6, "prod_pods": 4, "prod_workloads": ["b"]}]
     cx = Context(tmp_path, {}, {"resilience": {"placement": {"prod_by_node": items}}}, {"name": "prod"})
-    run = _Run(check, cx, {})
-    f = _eval_summary(cx, check, run)["findings"][0]
+    run = Run(check, cx, {})
+    f = eval_summary(cx, check, run)["findings"][0]
     assert f["instances"] == 2 and [d["prod_pods"] for d in f["details"]] == [3, 4] and "node" not in f["details"][0]  # the target no longer reads node, so details does not carry it
 
 

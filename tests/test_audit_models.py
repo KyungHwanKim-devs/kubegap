@@ -69,8 +69,8 @@ def test_n_plus_one_fails_per_pool_when_the_cluster_sum_fits(tmp_path):
     _write(tmp_path, "pods", pods)
     for stem in ("deployments", "statefulsets", "daemonsets", "services"):
         _write(tmp_path, stem, [])
-    cx = resilience._Ctx(tmp_path, {"components": {"cluster-autoscaler": {"present": True}}})
-    out = resilience._n_plus_one(cx)
+    cx = resilience.Ctx(tmp_path, {"components": {"cluster-autoscaler": {"present": True}}})
+    out = resilience.n_plus_one(cx)
     assert out["total_ok"] is True  # 6 cores of requests against 20 cores elsewhere
     assert out["ok"] is False and out["pools_short"][0]["eligible_nodes"] == ["app2"]  # but the app pods may only go to app2, which has 1 core left
     assert out["pools_short"][0]["free_cpu"] == 1.0  # 4 cores minus 2.5 of the app pod minus 0.5 of the DaemonSet pod

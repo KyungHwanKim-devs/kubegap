@@ -34,6 +34,8 @@ from pathlib import Path
 from ..foundations import paths, rubric
 from ..foundations.snapshot import write_private
 from ..judgement import evaluate as _ev
+from ..judgement.evaluate import rules as _rules
+from ..judgement.evaluate.context import get_path
 
 BASE_INV = {
     "context": "selftest",
@@ -84,8 +86,8 @@ def _build_snapshot(root: Path, check: dict, case: dict, profile_name: str):
     return inv, summary
 
 
-KEY_HARD_RE = _ev.KEY_HARD_RE  # the same regexes build a finding's `details`
-KEY_SOFT_RE = _ev.KEY_SOFT_RE
+KEY_HARD_RE = _rules.KEY_HARD_RE  # the same regexes build a finding's `details`
+KEY_SOFT_RE = _rules.KEY_SOFT_RE
 
 
 def audit_against_snapshot(checks: list[dict], snap: Path) -> list[dict]:
@@ -101,7 +103,7 @@ def audit_against_snapshot(checks: list[dict], snap: Path) -> list[dict]:
             continue
         if profile not in (c.get("profiles") or []):
             continue  # check disabled for this snapshot's profile (e.g. Karpenter checks on a small k3s cluster)
-        seq = _ev._get_path(summary, c["each"])
+        seq = get_path(summary, c["each"])
         if seq is None:
             continue  # this snapshot has no such section; cannot judge
         items = [seq] if (c.get("cluster_level") or isinstance(seq, dict)) else list(seq)
@@ -190,7 +192,7 @@ def audit_each_paths(checks: list[dict], snaps: list[Path]) -> list[dict]:
         applicable = [(sn, sm) for sn, prof, sm in loaded if prof in (c.get("profiles") or [])]
         if not applicable:
             continue
-        if all(_ev._get_path(sm, c["each"]) is None for _, sm in applicable):
+        if all(get_path(sm, c["each"]) is None for _, sm in applicable):
             if len(applicable) < 2:
                 # with a single snapshot this may be an optional component absent from that environment (e.g. no Loki on a small k3s cluster), so it is a note, not a failure
                 out.append(

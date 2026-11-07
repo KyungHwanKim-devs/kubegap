@@ -104,7 +104,7 @@ def test_a_fixture_stays_within_the_budget(fixture):
 
 
 def test_details_keys_are_sorted_whatever_the_hash_seed():
-    rec = evaluate.ItemRecorder({"zeta": 1, "alpha": 2, "mid": 3, "unused": 4})
+    rec = evaluate.rules.ItemRecorder({"zeta": 1, "alpha": 2, "mid": 3, "unused": 4})
     rec["zeta"], rec.get("mid"), "alpha" in rec
     assert list(rec.kept()) == ["alpha", "mid", "zeta"]
 

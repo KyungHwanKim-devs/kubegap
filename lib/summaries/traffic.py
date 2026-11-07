@@ -686,8 +686,8 @@ def nginx_vulnerable(version: str | None) -> bool | None:
 def _webhook_netpol(snap: Path, rows: list[dict], netpol: dict | None) -> dict:
     """Is the controller's admission webhook port closed to pods by a NetworkPolicy that the CNI enforces? A policy counts when it selects the controller pods
         (matchLabels inside the controller's pod template labels), has Ingress in policyTypes or ingress rules, and every ingress rule that opens port 8443 (or the
-        webhook port) names a source: no rule with an empty `from`. Enforcement comes from the security summary written earlier in the same run when present,
-    read the way lib/summaries/security.py reads it: the VPC CNI node agent's flag on EKS, kube-router on k3s; a policy mitigates only when enforcement is known to be on."""
+        webhook port) names a source: no rule with an empty `from`. Enforcement is `summary.security.networkpolicy`, built before this section and passed in by summarize:
+    the VPC CNI node agent's flag on EKS, kube-router on k3s; a policy mitigates only when enforcement is known to be on."""
     tpl_labels = {}
     for stem in ("deployments", "daemonsets"):
         for o in objects(snap, stem):

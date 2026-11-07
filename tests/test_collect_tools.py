@@ -29,7 +29,7 @@ def test_tool_gets_the_kubeconfig_as_environment(tmp_path, monkeypatch):
     _fake_tool(tmp_path, monkeypatch)
     monkeypatch.setenv("KUBECONFIG", "/session/kc")
     snap = tmp_path / "snap"
-    res = collect._run_tool_step(STEP, "audit", "core", "ctx-x", "/x/kc", snap, RunLog(None), None, 30, None)
+    res = collect.tool_steps.run_tool_step(STEP, "audit", "core", "ctx-x", "/x/kc", snap, RunLog(None), None, 30, None)
     assert res["ok"], res
     out = (snap / "tools" / "audit.json").read_text()
     assert '"kubeconfig": "/x/kc"' in out and '"args": "audit --context ctx-x"' in out
@@ -39,11 +39,11 @@ def test_without_a_kubeconfig_the_session_environment_is_left_alone(tmp_path, mo
     _fake_tool(tmp_path, monkeypatch)
     monkeypatch.setenv("KUBECONFIG", "/session/a:/session/b")
     snap = tmp_path / "snap"
-    res = collect._run_tool_step(STEP, "audit", "core", "ctx-x", None, snap, RunLog(None), None, 30, None)
+    res = collect.tool_steps.run_tool_step(STEP, "audit", "core", "ctx-x", None, snap, RunLog(None), None, 30, None)
     assert res["ok"], res
     assert '"kubeconfig": "/session/a:/session/b"' in (snap / "tools" / "audit.json").read_text()
     monkeypatch.delenv("KUBECONFIG")
-    res = collect._run_tool_step(STEP, "audit", "core", "ctx-x", None, snap, RunLog(None), None, 30, None)
+    res = collect.tool_steps.run_tool_step(STEP, "audit", "core", "ctx-x", None, snap, RunLog(None), None, 30, None)
     assert '"kubeconfig": "unset"' in (snap / "tools" / "audit.json").read_text()
 
 
@@ -53,7 +53,7 @@ def test_per_item_tool_runs_get_it_too(tmp_path, monkeypatch):
     (snap / "tools").mkdir(parents=True)
     (snap / "tools" / "list.json").write_text('[{"name": "r1"}, {"name": "r2"}]')
     step = {**STEP, "cmd": ["faketool", "get", "{item.name}"], "out": "tools/values/{item_safe}.json", "for_each_file": {"path": "tools/list.json", "key": ["name"]}}
-    res = collect._run_tool_step(step, "audit", "core", "ctx-x", "/x/kc", snap, RunLog(None), None, 30, None)
+    res = collect.tool_steps.run_tool_step(step, "audit", "core", "ctx-x", "/x/kc", snap, RunLog(None), None, 30, None)
     assert res["ok"] and res["runs"] == 2, res
     for n in ("r1", "r2"):
         assert '"kubeconfig": "/x/kc"' in (snap / "tools" / "values" / f"{n}.json").read_text()
@@ -88,7 +88,7 @@ def test_krr_config_block_is_dropped_from_the_saved_file(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
     step = {"id": "krr", "type": "tool", "tool": "krr", "cmd": ["krr", "simple", "-c", "{context}", "-f", "json", "--fileoutput", "{out}"], "writes_out": True, "out": "tools/krr.json"}
     snap = tmp_path / "snap"
-    res = collect._run_tool_step(step, "krr", "core", "ctx", None, snap, RunLog(None), None, 30, None)
+    res = collect.tool_steps.run_tool_step(step, "krr", "core", "ctx", None, snap, RunLog(None), None, 30, None)
     assert res["ok"], res
     saved = json.loads((snap / "tools" / "krr.json").read_text())
     assert "config" not in saved and saved["strategy"]["settings"]["history_duration"] == 336.0
@@ -101,9 +101,9 @@ def test_deprecation_tools_are_skipped_without_a_server_version(tmp_path, monkey
     _fake_tool(tmp_path, monkeypatch)
     step = {"id": "pluto", "type": "tool", "tool": "faketool", "cmd": ["faketool", "--target-versions", "k8s={k8s_next_minor}"], "out": "tools/pluto.json"}
     snap = tmp_path / "snap"
-    res = collect._run_tool_step(step, "pluto", "core", "ctx", None, snap, RunLog(None), None, 30, None, inv={"cluster": {"server_version": None}})
+    res = collect.tool_steps.run_tool_step(step, "pluto", "core", "ctx", None, snap, RunLog(None), None, 30, None, inv={"cluster": {"server_version": None}})
     assert res["ok"] is False and res["skipped"].startswith("server version unknown") and not (snap / "tools" / "pluto.json").exists()
-    res = collect._run_tool_step(step, "pluto", "core", "ctx", None, snap, RunLog(None), None, 30, None, inv={"cluster": {"server_version": "v1.32.13-eks-abc"}})
+    res = collect.tool_steps.run_tool_step(step, "pluto", "core", "ctx", None, snap, RunLog(None), None, 30, None, inv={"cluster": {"server_version": "v1.32.13-eks-abc"}})
     assert res["ok"] and '"args": "--target-versions k8s=v1.33.0"' in (snap / "tools" / "pluto.json").read_text()
 
 
@@ -114,8 +114,8 @@ def _api_resources(tmp_path, monkeypatch, stdout, ok, timed_out=False):
     r = R()
     r.timed_out = timed_out
     r.ok, r.stdout, r.stderr, r.error = ok, stdout, "unable to retrieve the complete list of server APIs: metrics.k8s.io/v1beta1: the server is currently unable to handle the request", None
-    monkeypatch.setattr(collect.kube, "kubectl", lambda *a, **k: r)
-    return collect.api_resources("ctx", None, RunLog(None))
+    monkeypatch.setattr(collect.k8s_steps.kube, "kubectl", lambda *a, **k: r)
+    return collect.k8s_steps.api_resources("ctx", None, RunLog(None))
 
 
 TABLE = "NAME          SHORTNAMES   APIVERSION   NAMESPACED   KIND         VERBS\ndeployments   deploy       apps/v1      true         Deployment   get,list\n"
@@ -147,7 +147,7 @@ def test_a_partial_discovery_reaches_the_numbers_pluto_reports(tmp_path, monkeyp
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
     (tmp_path / "objects").mkdir()
     step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == "pluto")
-    res = collect._run_tool_step(
+    res = collect.tool_steps.run_tool_step(
         step,
         "pluto",
         "core",
@@ -168,7 +168,7 @@ def test_discovery_resources_stay_the_discovery_kinds():
     """Two hand-kept lists of one fact: a kind added to OBJECT_KINDS alone would be fetched again by the dump, and pluto would see every object twice."""
     from lib.collection import discover
 
-    assert {r.split(".", 1)[0] for r in collect.DISCOVERY_RESOURCES} == set(discover.OBJECT_KINDS)
+    assert {r.split(".", 1)[0] for r in collect.k8s_steps.DISCOVERY_RESOURCES} == set(discover.OBJECT_KINDS)
 
 
 def test_a_crd_with_the_plural_of_a_discovery_kind_is_fetched(tmp_path, monkeypatch):
@@ -179,13 +179,13 @@ def test_a_crd_with_the_plural_of_a_discovery_kind_is_fetched(tmp_path, monkeypa
         {"name": "services", "full": "services", "namespaced": True, "kind": "Service", "apiversion": "v1"},
         {"name": "services", "full": "services.serving.knative.dev", "namespaced": True, "kind": "Service", "apiversion": "serving.knative.dev/v1"},
     ]
-    monkeypatch.setattr(collect, "api_resources", lambda *a: (res, None))
+    monkeypatch.setattr(collect.k8s_steps, "api_resources", lambda *a: (res, None))
     asked = []
 
     def fake_json(args, **k):
         asked.append(args[1])
         return {"items": []}, None
 
-    monkeypatch.setattr(collect.kube, "kubectl_json", fake_json)
-    out = collect.dump_all("ctx", None, tmp_path, [], 10, RunLog(None), "core")
+    monkeypatch.setattr(collect.k8s_steps.kube, "kubectl_json", fake_json)
+    out = collect.k8s_steps.dump_all("ctx", None, tmp_path, [], 10, RunLog(None), "core")
     assert out["fetched_by_discovery"] == ["services"] and asked == ["services.serving.knative.dev"] and (tmp_path / "objects" / "services.serving.knative.dev.json").is_file()

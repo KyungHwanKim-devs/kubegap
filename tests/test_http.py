@@ -116,7 +116,7 @@ def test_redirect_target_host():
     ],
 )
 def test_plain_http_token_host(base, host):
-    assert collect.plain_http_token_host(base) == host
+    assert collect.http_steps.plain_http_token_host(base) == host
 
 
 def _stores(url: str, tmp_path):
@@ -129,7 +129,7 @@ def _stores(url: str, tmp_path):
 def _grafana_step(stores, log, tmp_path, echo, monkeypatch):
     monkeypatch.setattr(khttp, "get", lambda url, params=None, timeout=15, headers=None: khttp.HttpResult(url, 200, "[]"))
     st = {"id": "datasources", "type": "http", "store": "grafana", "path": "/api/datasources", "out": "grafana/datasources.json", "auth": "grafana_api_token"}
-    return collect._run_http_step(st, "datasources", "grafana", stores.cfg, tmp_path, log, stores, 5, echo)
+    return collect.http_steps.run_http_step(st, "datasources", "grafana", stores.cfg, tmp_path, log, stores, 5, echo)
 
 
 def test_token_over_plain_http_is_warned_once_per_host(tmp_path, monkeypatch):
@@ -278,7 +278,7 @@ def test_for_each_file_items_record_their_error_and_a_runlog_line(tmp_path, monk
         "out": "grafana/dashboards/{item_safe}.json",
         "auth": "grafana_api_token",
     }
-    res = collect._run_http_step(st, "dashboards-json", "grafana", stores.cfg, tmp_path, log, stores, 5, None)
+    res = collect.http_steps.run_http_step(st, "dashboards-json", "grafana", stores.cfg, tmp_path, log, stores, 5, None)
     assert res["ok"] is True and res["runs"] == 2
     recs = [x for x in read_runlog(tmp_path / "run.log") if x.get("kind") == "command"]
     assert [(x["id"], x["code"], x["error"]) for x in recs] == [("grafana.dashboards-json.ok1", 0, None), ("grafana.dashboards-json.big", 200, "response larger than 64 MiB")]

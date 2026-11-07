@@ -1,5 +1,8 @@
 """Dependency tool list and installation. Used by `kubegap setup`.
 
+This module stays in one file on purpose (#151): the tool table, the download and checksum steps and the krr virtualenv are one responsibility, the pinned
+dependency tools, and a change to one of them is read next to the others.
+
 Supported environments: macOS (Apple Silicon and Intel), Linux (amd64 and arm64), Windows via WSL2 (= Linux).
 Native Windows is not supported.
 

@@ -204,7 +204,7 @@ def test_source_ranges_that_are_not_cidrs_are_ignored(tmp_path):
 
 
 def test_sg_text_widths():
-    from lib.judgement.evaluate import sg_text
+    from lib.judgement.evaluate.evidence import sg_text
 
     assert sg_text({"sg_exposure": "allow-list", "allowed_sources": {"3306": 4, "5432": 2}, "widest_prefix": {"3306": 32, "5432": 24}}) == "allow-list, at most 4 sources per port, widest /24"
     assert (

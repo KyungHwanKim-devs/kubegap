@@ -257,7 +257,7 @@ def forget_reads(snap: Path) -> None:
 
 def dump_record(snap: Path) -> dict | None:
     """The `objects.dump-all` step record of collect-result.json: `{kinds, items, written[], served[], fetched_by_discovery[], failed{}, excluded[], not_permitted[], discovery_error}`
-    (lib/collection/collect.py dump_all). None when the snapshot has none (the step did not run)."""
+    (lib/collection/collect/k8s_steps.py dump_all). None when the snapshot has none (the step did not run)."""
     cr = load_json(snap / "collect-result.json") or {}
     rec = ((cr.get("core") or {}).get("steps") or {}).get("objects.dump-all") if isinstance(cr, dict) else None
     return rec if isinstance(rec, dict) else None

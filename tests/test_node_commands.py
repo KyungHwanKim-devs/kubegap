@@ -26,7 +26,7 @@ def test_ssm_document_is_current():
 
 
 def test_every_node_command_is_a_document_step():
-    """Whatever collect.py can send (type: node steps, pod-metrics fallbacks, the two probes) must be selectable in the document, otherwise the SSM backend fails for that step."""
+    """Whatever lib/collection/collect can send (type: node steps, pod-metrics fallbacks, the two probes) must be selectable in the document, otherwise the SSM backend fails for that step."""
     doc = yamlite.load_file(nodecommands.DOCUMENT_PATH)
     allowed = set(doc["parameters"]["step"]["allowedValues"])
     assert allowed == set(nodecommands.step_keys())
@@ -56,7 +56,7 @@ def test_document_script_is_valid_shell():
 
 
 def test_pod_metrics_cmd_matches_collect_py():
-    """collect.py sends exactly this text over SSH, and the document embeds it with {{ podIp }}; the two must be the same function."""
+    """lib/collection/collect sends exactly this text over SSH, and the document embeds it with {{ podIp }}; the two must be the same function."""
     assert nodecommands.pod_metrics_cmd("10.1.2.3", 8080, "/metrics", None) == "curl -s -m 8 http://10.1.2.3:8080/metrics | grep -vE '^#|_bucket\\{'"
     assert nodecommands.pod_metrics_cmd("10.1.2.3", 9402, "/metrics", "^certmanager_").endswith(" | grep -E '^certmanager_'")
 

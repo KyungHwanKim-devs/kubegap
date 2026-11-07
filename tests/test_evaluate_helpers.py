@@ -1,4 +1,4 @@
-"""lib/judgement/evaluate.py pure helpers: the sandboxed expression evaluator and the static helpers checks.yaml expressions call."""
+"""lib/judgement/evaluate pure helpers: the sandboxed expression evaluator and the static helpers checks.yaml expressions call."""
 
 import datetime as dt
 import json
@@ -7,37 +7,39 @@ from pathlib import Path
 import pytest
 
 from lib.judgement import evaluate
-from lib.judgement.evaluate import SAFE_BUILTINS, Context, _eval, _excluded, _get_path, _status
+from lib.judgement.evaluate import Context
+from lib.judgement.evaluate.context import get_path
+from lib.judgement.evaluate.rules import SAFE_BUILTINS, eval_expr, excluded, status
 
 # ---------- sandboxed eval ----------
 
 
 def test_eval_allows_arithmetic_comparison_and_safe_builtins():
     env = {"v": 0.9, "t": 0.8, "items": [1, 2, 3]}
-    assert _eval("v > t", env) is True
-    assert _eval("len(items) * 2 + 1", env) == 7
-    assert _eval("max(items) - min(items)", env) == 2
-    assert _eval("round(v * 100)", env) == 90
-    assert _eval("re.match(r'^v1\\.(\\d+)', 'v1.31.2').group(1)", env) == "31"
+    assert eval_expr("v > t", env) is True
+    assert eval_expr("len(items) * 2 + 1", env) == 7
+    assert eval_expr("max(items) - min(items)", env) == 2
+    assert eval_expr("round(v * 100)", env) == 90
+    assert eval_expr("re.match(r'^v1\\.(\\d+)', 'v1.31.2').group(1)", env) == "31"
 
 
 def test_eval_blocks_import_and_other_builtins():
     with pytest.raises(NameError):
-        _eval("__import__('os').system('true')", {})
+        eval_expr("__import__('os').system('true')", {})
     with pytest.raises(NameError):
-        _eval("open('/etc/passwd')", {})
+        eval_expr("open('/etc/passwd')", {})
     with pytest.raises(NameError):
-        _eval("eval('1')", {})
+        eval_expr("eval('1')", {})
     assert "__import__" not in SAFE_BUILTINS and "open" not in SAFE_BUILTINS
 
 
 def test_status_fail_beats_warn_and_defaults_to_pass():
     env = {"v": 5}
-    assert _status({"expr": "v > 3", "warn_expr": "v > 1"}, env) == "fail"
-    assert _status({"expr": "v > 10", "warn_expr": "v > 1"}, env) == "warn"
-    assert _status({"expr": "v > 10"}, env) == "pass"
-    assert _status({}, env) == "pass"
-    assert _status({"warn_expr": "v > 1"}, env) == "warn"  # warn-only rule
+    assert status({"expr": "v > 3", "warn_expr": "v > 1"}, env) == "fail"
+    assert status({"expr": "v > 10", "warn_expr": "v > 1"}, env) == "warn"
+    assert status({"expr": "v > 10"}, env) == "pass"
+    assert status({}, env) == "pass"
+    assert status({"warn_expr": "v > 1"}, env) == "warn"  # warn-only rule
 
 
 # ---------- small pure helpers ----------
@@ -45,19 +47,19 @@ def test_status_fail_beats_warn_and_defaults_to_pass():
 
 def test_get_path():
     d = {"a": {"b": {"c": 1}}, "x": [1]}
-    assert _get_path(d, "a.b.c") == 1
-    assert _get_path(d, "a.b") == {"c": 1}
-    assert _get_path(d, "a.missing.c") is None
-    assert _get_path(d, "x.0") is None  # lists are not traversed
+    assert get_path(d, "a.b.c") == 1
+    assert get_path(d, "a.b") == {"c": 1}
+    assert get_path(d, "a.missing.c") is None
+    assert get_path(d, "x.0") is None  # lists are not traversed
 
 
 def test_excluded_uses_case_sensitive_globs():
     prof = {"exclude": {"traffic.endpoint-zero": ["kube-system/kube-prometheus-stack-*", "monitoring/exact"]}}
-    assert _excluded("traffic.endpoint-zero", "kube-system/kube-prometheus-stack-kube-etcd", prof)
-    assert _excluded("traffic.endpoint-zero", "monitoring/exact", prof)
-    assert not _excluded("traffic.endpoint-zero", "monitoring/Exact", prof)
-    assert not _excluded("other.check", "monitoring/exact", prof)
-    assert not _excluded("traffic.endpoint-zero", "x", {})
+    assert excluded("traffic.endpoint-zero", "kube-system/kube-prometheus-stack-kube-etcd", prof)
+    assert excluded("traffic.endpoint-zero", "monitoring/exact", prof)
+    assert not excluded("traffic.endpoint-zero", "monitoring/Exact", prof)
+    assert not excluded("other.check", "monitoring/exact", prof)
+    assert not excluded("traffic.endpoint-zero", "x", {})
 
 
 def _ctx(inv: dict) -> Context:
@@ -122,9 +124,9 @@ def test_selector_matches():
 
 
 def test_symptom_metric_regex():
-    assert evaluate.SYMPTOM_METRIC_RE.search("sum(rate(http_requests_total[5m]))")
-    assert evaluate.SYMPTOM_METRIC_RE.search("probe_success == 0")
-    assert not evaluate.SYMPTOM_METRIC_RE.search("node_memory_MemAvailable_bytes")
+    assert evaluate.context.SYMPTOM_METRIC_RE.search("sum(rate(http_requests_total[5m]))")
+    assert evaluate.context.SYMPTOM_METRIC_RE.search("probe_success == 0")
+    assert not evaluate.context.SYMPTOM_METRIC_RE.search("node_memory_MemAvailable_bytes")
 
 
 # ---------- database-like containers ----------

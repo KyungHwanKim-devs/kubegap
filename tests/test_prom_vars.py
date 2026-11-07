@@ -1,5 +1,5 @@
 """The `{apiserver_job}` placeholder of the apiserver queries (#140): filled from config, else detected once per run from the job values of
-apiserver_request_total, and when no such series exists the queries are saved as failed with the reason, which lib/judgement/evaluate.py turns into a skip."""
+apiserver_request_total, and when no such series exists the queries are saved as failed with the reason, which lib/judgement/evaluate turns into a skip."""
 
 from __future__ import annotations
 

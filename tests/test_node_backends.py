@@ -36,7 +36,7 @@ STEP = {"id": "os", "type": "node", "cmd": "uname -r", "out": "logs/node/{node}/
 @pytest.mark.parametrize("method", ["ssh", "ssm"])
 def test_node_step_runs_on_every_backend(tmp_path, method):
     runner = _runner(method)
-    rec = collect._run_node_step(STEP, "os", "core", {}, {}, tmp_path, RunLog(None), runner, 30, None)
+    rec = collect.node_steps.run_node_step(STEP, "os", "core", {}, {}, tmp_path, RunLog(None), runner, 30, None)
     assert rec["ok"] and rec["nodes"]["n1"]["ok"], rec
     assert runner.na.calls == [("n1", "uname -r", "core/os")]
     assert (tmp_path / "logs/node/n1/os.txt").read_text() == "line1\nline2\n"
@@ -44,10 +44,10 @@ def test_node_step_runs_on_every_backend(tmp_path, method):
 
 def test_node_step_skipped_without_backend(tmp_path):
     runner = _runner("none")
-    rec = collect._run_node_step(STEP, "os", "core", {}, {}, tmp_path, RunLog(None), runner, 30, None)
+    rec = collect.node_steps.run_node_step(STEP, "os", "core", {}, {}, tmp_path, RunLog(None), runner, 30, None)
     assert rec == {"ok": False, "skipped": "no node command backend"}
     assert runner.na.calls == []
-    assert collect._run_node_step(STEP, "os", "core", {}, {}, tmp_path, RunLog(None), None, 30, None)["skipped"]
+    assert collect.node_steps.run_node_step(STEP, "os", "core", {}, {}, tmp_path, RunLog(None), None, 30, None)["skipped"]
 
 
 @pytest.mark.parametrize("method,ok", [("ssh", True), ("ssm", True), ("none", False)])
@@ -114,10 +114,10 @@ def _fake_kubectl(pods):
 
 def test_pod_metrics_fallback_curls_only_the_running_pod_with_a_pod_address(tmp_path, monkeypatch):
     pods = [_pod("ok", "Running", "10.0.0.5"), _pod("pending", "Pending", None), _pod("imds", "Running", "169.254.169.254"), _pod("v6", "Running", "fd00::5"), _pod("lo", "Running", "127.0.0.1")]
-    monkeypatch.setattr(collect.kube, "kubectl", _fake_kubectl(pods))
+    monkeypatch.setattr(collect.k8s_steps.kube, "kubectl", _fake_kubectl(pods))
     na = _FakeNA("ssh")
     log = RunLog(tmp_path / "run.log")
-    res = collect._step_pod_metrics(_pm_ctx(tmp_path, na, log), PM_STEP)
+    res = collect.k8s_steps.step_pod_metrics(_pm_ctx(tmp_path, na, log), PM_STEP)
     assert [c[0] for c in na.calls] == ["n1"] and "http://10.0.0.5:7472/metrics" in na.calls[0][1], na.calls
     assert res["ok"] is True and "skipped" not in res
     p = res["pods"]
@@ -134,9 +134,9 @@ def test_pod_metrics_fallback_curls_only_the_running_pod_with_a_pod_address(tmp_
 
 def test_pod_metrics_step_reports_skipped_when_every_pod_was_skipped(tmp_path, monkeypatch):
     pods = [_pod("a", "Succeeded", "10.0.0.9"), _pod("b", "Running", "169.254.1.1")]
-    monkeypatch.setattr(collect.kube, "kubectl", _fake_kubectl(pods))
+    monkeypatch.setattr(collect.k8s_steps.kube, "kubectl", _fake_kubectl(pods))
     na = _FakeNA("ssm")
-    res = collect._step_pod_metrics(_pm_ctx(tmp_path, na), PM_STEP)
+    res = collect.k8s_steps.step_pod_metrics(_pm_ctx(tmp_path, na), PM_STEP)
     assert na.calls == [] and res["ok"] is False
     assert res["skipped"] == "a: pod not Running (Succeeded); b: node fallback refused: link-local (podIP 169.254.1.1)"
 
@@ -152,9 +152,9 @@ def test_pod_metrics_refusal_after_a_real_proxy_error_stays_a_failure(tmp_path, 
             return shell.Result(cmd=["kubectl"], code=0, stdout=json.dumps({"items": [_pod("pub", "Running", "203.0.113.9"), _pod("noip", "Running", None)]}))
         return shell.Result(cmd=["kubectl"], code=1, stderr='Error from server (Forbidden): pods "x" is forbidden')
 
-    monkeypatch.setattr(collect.kube, "kubectl", kubectl)
+    monkeypatch.setattr(collect.k8s_steps.kube, "kubectl", kubectl)
     na = _FakeNA("ssh")
-    res = collect._step_pod_metrics(_pm_ctx(tmp_path, na, blocked=False), PM_STEP)
+    res = collect.k8s_steps.step_pod_metrics(_pm_ctx(tmp_path, na, blocked=False), PM_STEP)
     assert na.calls == [] and res["ok"] is False and "skipped" not in res
     e = res["pods"]["pub"]
     assert "skipped" not in e and e["error"].startswith('Error from server (Forbidden): pods "x" is forbidden; node fallback refused: not in a pod address range')

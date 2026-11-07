@@ -744,9 +744,10 @@ def _camel_keys(module: str) -> set[str]:
     """String-literal keys read with .get("k"), ["k"] or `"k" in x` that carry an upper-case letter and no separator: the camelCase of a Kubernetes field."""
     import ast
 
-    tree = ast.parse(next((ROOT / "lib").rglob(f"{module}.py")).read_text(encoding="utf-8"))
+    files = [*(ROOT / "lib").rglob(f"{module}.py"), *(ROOT / "lib").rglob(f"{module}/*.py")]  # a module, or a package split into parts
+    assert files, module
     keys = set()
-    for node in ast.walk(tree):
+    for node in (n for f in files for n in ast.walk(ast.parse(f.read_text(encoding="utf-8")))):
         k = None
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "get" and node.args and isinstance(node.args[0], ast.Constant):
             k = node.args[0].value

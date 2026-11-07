@@ -87,7 +87,7 @@ def test_step_feeds_the_saved_objects_and_counts_what_the_dump_saw(tmp_path, mon
     _fake_pluto(tmp_path, monkeypatch, f'cat > {shlex.quote(str(stdin_file))}\nprintf \'%s\\n\' \'{{"target-versions": {{"k8s": "v1.33.0"}}}}\'\n')
     save(tmp_path, "deployments", obj("Deployment", "web", applied={"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": "web"}}))
     dump = {"kinds": 110, "fetched_by_discovery": ["pods"], "failed": {"foos.example.com": "boom"}, "not_permitted": ["csrs.certificates.k8s.io"]}
-    res = collect._run_tool_step(_step(), "pluto", "core", "ctx", None, tmp_path, RunLog(None), None, 10, None, inv=INV, objects_dump=dump)
+    res = collect.tool_steps.run_tool_step(_step(), "pluto", "core", "ctx", None, tmp_path, RunLog(None), None, 10, None, inv=INV, objects_dump=dump)
     assert res["ok"] is True and res["api_read"] is True
     assert (res["lists_ok"], res["lists_failed"], res["manifests"]) == (111, 2, 1)
     assert [i["metadata"]["name"] for i in json.loads(stdin_file.read_text())["items"]] == ["web"]
@@ -99,11 +99,11 @@ def test_a_failed_dump_never_reads_as_a_clean_cluster(tmp_path, monkeypatch):
     _fake_pluto(tmp_path, monkeypatch, f"touch {shlex.quote(str(ran))}\nprintf '%s\\n' '{{}}'\n")
     (tmp_path / "objects").mkdir()
     for dump in (None, {"kinds": 0, "fetched_by_discovery": [], "failed": {"x": "y"}, "not_permitted": []}):
-        res = collect._run_tool_step(_step(), "pluto", "core", "ctx", None, tmp_path, RunLog(None), None, 10, None, inv=INV, objects_dump=dump)
+        res = collect.tool_steps.run_tool_step(_step(), "pluto", "core", "ctx", None, tmp_path, RunLog(None), None, 10, None, inv=INV, objects_dump=dump)
         assert res["ok"] is False and res["api_read"] is False and "objects.dump-all saved no kind" in res["error"]
     assert not ran.exists()
     (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {"pluto": res}}}))
-    summary = hygiene._deprecated(hygiene._Ctx(tmp_path, {}))
+    summary = hygiene.deprecated(hygiene.Ctx(tmp_path, {}))
     assert summary["pluto_read"] is False and summary["items"] is None
 
 
@@ -111,7 +111,7 @@ def test_a_cluster_with_no_annotation_is_read_with_zero_manifests(tmp_path, monk
     """A cluster managed by Helm or server-side apply: the dump saved kinds, nothing carries the annotation, and the answer is an honest clean result, not a failure."""
     _fake_pluto(tmp_path, monkeypatch, 'cat > /dev/null\nprintf \'%s\\n\' \'{"target-versions": {"k8s": "v1.33.0"}}\'\n')
     save(tmp_path, "services", obj("Service", "plain", applied=None))
-    res = collect._run_tool_step(_step(), "pluto", "core", "ctx", None, tmp_path, RunLog(None), None, 10, None, inv=INV, objects_dump=SAVED)
+    res = collect.tool_steps.run_tool_step(_step(), "pluto", "core", "ctx", None, tmp_path, RunLog(None), None, 10, None, inv=INV, objects_dump=SAVED)
     assert res["ok"] is True and res["api_read"] is True and res["manifests"] == 0
 
 
@@ -123,8 +123,8 @@ def test_the_pluto_step_runs_after_the_dump_it_reads():
 def test_dump_result_reaches_the_tool_step(tmp_path, monkeypatch):
     """collect.yaml steps share nothing but StepContext.state: the pluto handler must see what the dump handler returned in the same run."""
     seen = {}
-    monkeypatch.setattr(collect, "dump_all", lambda *a, **k: SAVED)
-    monkeypatch.setattr(collect, "_run_tool_step", lambda *a, **k: seen.update(k) or {"ok": True})
+    monkeypatch.setattr(collect.k8s_steps, "dump_all", lambda *a, **k: SAVED)
+    monkeypatch.setattr(collect.tool_steps, "run_tool_step", lambda *a, **k: seen.update(k) or {"ok": True})
     state = collect.CollectState()
     ctx = collect.StepContext("core", tmp_path, "ctx", None, {}, tmp_path, RunLog(None), None, None, None, None, None, state)
     collect.STEP_HANDLERS["kubectl-dump-all"](ctx, {"id": "objects.dump-all"})

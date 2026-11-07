@@ -114,7 +114,7 @@ def test_dump_all_records_served_and_written(tmp_path, monkeypatch):
         {"name": "secrets", "full": "secrets", "namespaced": True, "kind": "Secret", "apiversion": "v1"},
         {"name": "leases", "full": "leases.coordination.k8s.io", "namespaced": True, "kind": "Lease", "apiversion": "coordination.k8s.io/v1"},
     ]
-    monkeypatch.setattr(collect, "api_resources", lambda *a: (res, None))
+    monkeypatch.setattr(collect.k8s_steps, "api_resources", lambda *a: (res, None))
 
     class R:
         def __init__(self, err):
@@ -125,8 +125,8 @@ def test_dump_all_records_served_and_written(tmp_path, monkeypatch):
             return None, R('Error from server (Forbidden): leases.coordination.k8s.io is forbidden: User "x" cannot list resource')
         return {"items": []}, None
 
-    monkeypatch.setattr(collect.kube, "kubectl_json", fake_json)
-    out = collect.dump_all("ctx", None, tmp_path, [], 10, RunLog(None), "core")
+    monkeypatch.setattr(collect.k8s_steps.kube, "kubectl_json", fake_json)
+    out = collect.k8s_steps.dump_all("ctx", None, tmp_path, [], 10, RunLog(None), "core")
     assert out["served"] == ["pods", "cronjobs.batch", "jobs.batch", "secrets", "leases.coordination.k8s.io"]
     assert out["written"] == ["cronjobs", "jobs.batch"] and out["fetched_by_discovery"] == ["pods"], "discovery did not save CronJobs this time; the dump saves them under the one name every reader spells"
     assert (tmp_path / "objects" / "cronjobs.json").is_file() and not (tmp_path / "objects" / "cronjobs.batch.json").exists()

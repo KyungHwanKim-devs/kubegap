@@ -168,7 +168,7 @@ def _mkdir_calls(source: str, filename: str) -> list[str]:
 def test_no_other_module_creates_folders():
     """Every folder under a snapshot, the user dir or .tools/ comes from paths.ensure_private_dir (lib/commands/tools.py included since #88)."""
     offenders = []
-    for f in [*sorted(ROOT.glob("lib/*/*.py")), ROOT / "scripts" / "kubegap"]:
+    for f in [*sorted(ROOT.glob("lib/**/*.py")), ROOT / "scripts" / "kubegap"]:
         if f.name == "paths.py":
             continue
         offenders += _mkdir_calls(f.read_text(encoding="utf-8"), str(f.relative_to(ROOT)))

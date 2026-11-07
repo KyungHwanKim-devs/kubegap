@@ -102,7 +102,7 @@ def test_no_other_module_writes_files():
     """Every file write in lib/ and scripts/kubegap goes through write_private or write_private_bytes. The one exception: run.log is appended line by line (runlog.py).
     Tool binaries went through Path.write_bytes in tools.py until #88; they are placed with write_private_bytes now."""
     offenders = []
-    for f in [*sorted(ROOT.glob("lib/*/*.py")), ROOT / "scripts" / "kubegap"]:
+    for f in [*sorted(ROOT.glob("lib/**/*.py")), ROOT / "scripts" / "kubegap"]:
         if f.name in ("snapshot.py", "runlog.py"):
             continue
         offenders += _write_calls(f.read_text(encoding="utf-8"), str(f.relative_to(ROOT)))

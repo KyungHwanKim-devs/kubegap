@@ -138,8 +138,8 @@ def test_the_step_lists_pods_and_proxies_where_discovery_said(tmp_path, monkeypa
         "source": {"namespace": "discovered", "selector": "discovered", "port": "discovered"},
     }
     calls: list = []
-    monkeypatch.setattr(collect.kube, "kubectl", _kubectl_recording(calls, [{"metadata": {"name": "repo-1"}, "spec": {"nodeName": "n1"}, "status": {"phase": "Running", "podIP": "10.0.0.9"}}]))
-    res = collect._step_pod_metrics(_ctx(tmp_path, {"pod_metrics_targets": {"argocd.repo-server-metrics": tgt}}), step)
+    monkeypatch.setattr(collect.k8s_steps.kube, "kubectl", _kubectl_recording(calls, [{"metadata": {"name": "repo-1"}, "spec": {"nodeName": "n1"}, "status": {"phase": "Running", "podIP": "10.0.0.9"}}]))
+    res = collect.k8s_steps.step_pod_metrics(_ctx(tmp_path, {"pod_metrics_targets": {"argocd.repo-server-metrics": tgt}}), step)
     assert calls[0][:6] == ["get", "pods", "-n", "gitops", "-l", "app.kubernetes.io/name=argocd-repo-server"]
     assert calls[1][:3] == ["get", "--raw", "/api/v1/namespaces/gitops/pods/repo-1:8085/proxy/metrics"]
     assert res["ok"] is True and res["target"] == tgt and res["pods"]["repo-1"]["ok"]
@@ -147,8 +147,8 @@ def test_the_step_lists_pods_and_proxies_where_discovery_said(tmp_path, monkeypa
 
 def test_no_pod_behind_the_target_names_the_target_and_its_source(tmp_path, monkeypatch):
     step = next(s for f, s in podmetrics.pod_metrics_steps() if f == "argocd" and s["id"] == "repo-server-metrics")
-    monkeypatch.setattr(collect.kube, "kubectl", _kubectl_recording([], []))
-    res = collect._step_pod_metrics(_ctx(tmp_path, {}), step)  # an inventory from before #136: the defaults apply
+    monkeypatch.setattr(collect.k8s_steps.kube, "kubectl", _kubectl_recording([], []))
+    res = collect.k8s_steps.step_pod_metrics(_ctx(tmp_path, {}), step)  # an inventory from before #136: the defaults apply
     assert res["ok"] is False and res["target"]["source"] == {"namespace": "default", "selector": "default", "port": "default"}
     assert (
         res["error"]
@@ -160,10 +160,10 @@ def test_a_https_target_is_a_skip_not_a_failure(tmp_path, monkeypatch):
     step = next(s for f, s in podmetrics.pod_metrics_steps() if f == "metallb")
     tgt = {**podmetrics.default_target(step), "skip": "daemonset metallb-system/speaker serves its metrics on port 9120 (metricshttps), over TLS with authentication, which the pod proxy and the node curl cannot read"}
     calls: list = []
-    monkeypatch.setattr(collect.kube, "kubectl", _kubectl_recording(calls, []))
+    monkeypatch.setattr(collect.k8s_steps.kube, "kubectl", _kubectl_recording(calls, []))
     log = RunLog(tmp_path / "run.log")
     ctx = collect.StepContext("metallb", Path("collectors/metallb"), "ctx", Config(), {"pod_metrics_targets": {"metallb.metallb-speaker-metrics": tgt}}, tmp_path, log, None, None, None, None, None, collect.CollectState())
-    res = collect._step_pod_metrics(ctx, step)
+    res = collect.k8s_steps.step_pod_metrics(ctx, step)
     assert res["skipped"] == tgt["skip"] and res["ok"] is True and res["note"] == tgt["skip"] and calls == []  # the reason: section 7-1 prints this field, and True printed "(True)"
     assert "metricshttps" in (tmp_path / "run.log").read_text()
 
@@ -182,7 +182,7 @@ def test_the_node_fallback_sends_the_discovered_port(tmp_path, monkeypatch):
             return SimpleNamespace(ok=True, stdout="argocd_git_request_total 1\n", error=None)
 
     monkeypatch.setattr(
-        collect.kube,
+        collect.k8s_steps.kube,
         "kubectl",
         lambda args, **kw: (
             shell.Result(cmd=["kubectl"], code=0, stdout=json.dumps({"items": [{"metadata": {"name": "repo-1"}, "spec": {"nodeName": "n1"}, "status": {"phase": "Running", "podIP": "10.0.0.9"}}]}))
@@ -194,7 +194,7 @@ def test_the_node_fallback_sends_the_discovered_port(tmp_path, monkeypatch):
     state = collect.CollectState()
     state.proxy_blocked.add("ctx")
     ctx = collect.StepContext("argocd", Path("collectors/argocd"), "ctx", Config(), inv, tmp_path, RunLog(None), None, None, None, SimpleNamespace(na=NA()), None, state)
-    res = collect._step_pod_metrics(ctx, step)
+    res = collect.k8s_steps.step_pod_metrics(ctx, step)
     assert res["pods"]["repo-1"]["via"] == "node:n1"
     assert sent[0][2] == "argocd/repo-server-metrics" and sent[0][3] == {"podIp": "10.0.0.9", "port": 8085} and "http://10.0.0.9:8085/metrics" in sent[0][1]
 

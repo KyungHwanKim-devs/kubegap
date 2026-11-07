@@ -85,7 +85,7 @@ def test_step_kubectl_scrubs_before_the_file_exists(tmp_path, fake_kubectl, monk
     real = shell.write_private
     monkeypatch.setattr(shell, "write_private", lambda path, text, **kw: (writes.append((path, text)), real(path, text, **kw)))
     ctx = _ctx(tmp_path)
-    res = collect._step_kubectl(ctx, {"id": "events", "type": "kubectl", "args": ["get", "events", "-A", "-o", "json"], "out": "events.json"})
+    res = collect.k8s_steps.step_kubectl(ctx, {"id": "events", "type": "kubectl", "args": ["get", "events", "-A", "-o", "json"], "out": "events.json"})
     assert res == {"ok": True, "items": 1, "error": None}
     assert len(writes) == 1 and CANARY not in writes[0][1], "exactly one write, and it is the scrubbed text"
     doc = json.loads((tmp_path / "events.json").read_text())
@@ -99,7 +99,7 @@ def test_step_kubectl_writes_nothing_when_scrubbing_raises(tmp_path, fake_kubect
 
     monkeypatch.setattr(scrub, "scrub_objects", boom)
     ctx = _ctx(tmp_path)
-    res = collect._step_kubectl(ctx, {"id": "events", "type": "kubectl", "args": ["get", "events", "-A", "-o", "json"], "out": "events.json"})
+    res = collect.k8s_steps.step_kubectl(ctx, {"id": "events", "type": "kubectl", "args": ["get", "events", "-A", "-o", "json"], "out": "events.json"})
     assert res["ok"] is False and res["items"] is None
     assert res["error"] == "scrub failed: RuntimeError: boom"
     assert not (tmp_path / "events.json").exists() and _canary_on_disk(tmp_path) == []
@@ -110,14 +110,14 @@ def test_step_kubectl_writes_nothing_when_scrubbing_raises(tmp_path, fake_kubect
 
 def test_step_kubectl_per_node_json_is_scrubbed_too(tmp_path, fake_kubectl):
     ctx = _ctx(tmp_path, inv={"nodes": {"nodes": [{"name": "n1"}]}})
-    res = collect._step_kubectl(ctx, {"id": "kubelet-configz", "type": "kubectl", "for_each": "nodes", "args": ["get", "--raw", "/api/v1/nodes/{item}/proxy/configz"], "out": "logs/node/{item}/kubelet-configz.json"})
+    res = collect.k8s_steps.step_kubectl(ctx, {"id": "kubelet-configz", "type": "kubectl", "for_each": "nodes", "args": ["get", "--raw", "/api/v1/nodes/{item}/proxy/configz"], "out": "logs/node/{item}/kubelet-configz.json"})
     assert res["ok"] and res["nodes"]["n1"]["out"] == "logs/node/n1/kubelet-configz.json"
     assert _canary_on_disk(tmp_path) == []
 
 
 def test_step_kubectl_text_output_is_written_as_is(tmp_path, fake_kubectl):
     ctx = _ctx(tmp_path)
-    res = collect._step_kubectl(ctx, {"id": "top.nodes", "type": "kubectl", "args": ["top", "nodes"], "out": "metrics/top-nodes.txt"})
+    res = collect.k8s_steps.step_kubectl(ctx, {"id": "top.nodes", "type": "kubectl", "args": ["top", "nodes"], "out": "metrics/top-nodes.txt"})
     assert res["ok"] and res["items"] is None
     assert CANARY in (tmp_path / "metrics" / "top-nodes.txt").read_text()  # not JSON-scrubbed: a text table carries no Secret the scrubber knows
 
@@ -171,10 +171,10 @@ def test_json_scrubber_counts_items_and_scrubs():
 
 def test_metrics_filter_drops_comments_buckets_and_keeps_matches():
     text = '# HELP x\nfoo_total 1\nfoo_bucket{le="1"} 2\nbar_total 3\n'
-    assert collect._metrics_filter(None)(text) == "foo_total 1\nbar_total 3\n"
-    assert collect._metrics_filter("^bar")(text) == "bar_total 3\n"
-    assert collect._metrics_filter("(")(text) == "foo_total 1\nbar_total 3\n"  # invalid regex: keep every non-comment line
-    assert collect._metrics_filter(None)("# only\n") == ""
+    assert collect.k8s_steps.metrics_filter(None)(text) == "foo_total 1\nbar_total 3\n"
+    assert collect.k8s_steps.metrics_filter("^bar")(text) == "bar_total 3\n"
+    assert collect.k8s_steps.metrics_filter("(")(text) == "foo_total 1\nbar_total 3\n"  # invalid regex: keep every non-comment line
+    assert collect.k8s_steps.metrics_filter(None)("# only\n") == ""
 
 
 # ---------- dump_all ----------
@@ -183,7 +183,7 @@ def test_metrics_filter_drops_comments_buckets_and_keeps_matches():
 def test_dump_all_scrubs_in_memory(tmp_path, fake_kubectl):
     log = RunLog(tmp_path / "run.log")
     (tmp_path / "objects").mkdir()
-    s = collect.dump_all(None, None, tmp_path, [], 10, log, "core")
+    s = collect.k8s_steps.dump_all(None, None, tmp_path, [], 10, log, "core")
     assert s["kinds"] == 1 and s["failed"] == {}
     assert (tmp_path / "objects" / "configmaps.json").is_file() and _canary_on_disk(tmp_path) == []
 
@@ -195,7 +195,7 @@ def test_dump_all_records_a_scrub_failure_and_writes_nothing(tmp_path, fake_kube
     monkeypatch.setattr(scrub, "scrub_objects", boom)
     log = RunLog(tmp_path / "run.log")
     (tmp_path / "objects").mkdir()
-    s = collect.dump_all(None, None, tmp_path, [], 10, log, "core")
+    s = collect.k8s_steps.dump_all(None, None, tmp_path, [], 10, log, "core")
     assert s["kinds"] == 0 and s["failed"] == {"configmaps": "scrub failed: RuntimeError: boom"} and s["ok"] is False
     assert list((tmp_path / "objects").iterdir()) == [] and _canary_on_disk(tmp_path) == []
     assert [x["id"] for x in summarize.summarize_run(tmp_path)["failed"]] == ["core.scrub-configmaps"]

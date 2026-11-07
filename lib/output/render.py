@@ -496,7 +496,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w(L("### 7-1. Collectors and steps run"))
     w("")
     rows = []
-    # The one list of failed steps is `_summary.failed`, written by lib/collection/collect.py (ok false and not skipped); the header row reads it through
+    # The one list of failed steps is `_summary.failed`, written by lib/collection/collect (ok false and not skipped); the header row reads it through
     # summary.collection.failed_steps, and the Failed column and the count below it read it here, so no second copy of the predicate exists (#132).
     sm = cr.get("_summary") or {}
     failed_ids = [str(x) for x in sm.get("failed") or []]

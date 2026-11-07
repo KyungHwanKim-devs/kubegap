@@ -101,7 +101,7 @@ def test_logs_step_finds_the_workloads_of_present_components_with_the_shared_mat
             out.write_text("line\n")
         return shell.Result(cmd=["kubectl"], code=0, stdout="line\n")
 
-    monkeypatch.setattr(collect.kube, "kubectl", fake_kubectl)
-    res = collect._run_component_logs_step({"id": "component-logs", "type": "component-logs"}, "component-logs", "core", {"components_present": ["argocd"]}, None, None, tmp_path, RunLog(None), 10, None)
+    monkeypatch.setattr(collect.k8s_steps.kube, "kubectl", fake_kubectl)
+    res = collect.k8s_steps.run_component_logs_step({"id": "component-logs", "type": "component-logs"}, "component-logs", "core", {"components_present": ["argocd"]}, None, None, tmp_path, RunLog(None), 10, None)
     assert res["targets"] == 1 and res["components"]["argocd"]["gitops/argo-cd-argocd-server"]["ok"] is True
     assert calls[0][:5] == ["logs", "-n", "gitops", "-l", "app.kubernetes.io/name=argocd-server"]

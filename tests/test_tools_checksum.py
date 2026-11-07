@@ -295,7 +295,7 @@ def test_tool_output_written_by_the_tool_itself_is_made_owner_only(tmp_path, mon
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
     snap = tmp_path / "snap"
     st = {"id": "krr", "type": "tool", "tool": "faketool", "cmd": ["faketool", "{out}"], "out": "tools/krr.json", "writes_out": True}
-    res = collect._run_tool_step(st, "krr", "core", None, None, snap, RunLog(None), None, 30, None)
+    res = collect.tool_steps.run_tool_step(st, "krr", "core", None, None, snap, RunLog(None), None, 30, None)
     assert res["ok"], res
     assert stat.S_IMODE((snap / "tools" / "krr.json").stat().st_mode) == 0o600
 

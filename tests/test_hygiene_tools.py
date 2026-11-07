@@ -30,7 +30,7 @@ KUBENT_ROWS = [
 
 def test_kubent_removed_minor_comes_from_the_rule_set_and_is_judged_against_the_target(tmp_path):
     snap = _snap(tmp_path, kubent=KUBENT_ROWS)
-    d = hygiene._deprecated(hygiene._Ctx(snap, {"cluster": {"server_version": "v1.24.17-eks-abc"}}))
+    d = hygiene.deprecated(hygiene.Ctx(snap, {"cluster": {"server_version": "v1.24.17-eks-abc"}}))
     assert d["target_minor"] == "1.25"
     by_name = {i["name"]: i for i in d["items"]}
     psp, pdb, fs, future = by_name["restricted"], by_name["web"], by_name["fs"], by_name["x"]
@@ -44,13 +44,13 @@ def test_kubent_removed_minor_comes_from_the_rule_set_and_is_judged_against_the_
 
 def test_kubent_rows_are_never_removed_without_a_target(tmp_path):
     snap = _snap(tmp_path, kubent=KUBENT_ROWS)
-    d = hygiene._deprecated(hygiene._Ctx(snap, {}))
+    d = hygiene.deprecated(hygiene.Ctx(snap, {}))
     assert d["target_minor"] is None and all(i["removed"] is False for i in d["items"])
 
 
 def test_pluto_target_versions_supply_the_minor_when_the_inventory_has_none(tmp_path):
     snap = _snap(tmp_path, kubent=KUBENT_ROWS, pluto={"target-versions": {"k8s": "v1.32.0"}})
-    d = hygiene._deprecated(hygiene._Ctx(snap, {}))
+    d = hygiene.deprecated(hygiene.Ctx(snap, {}))
     assert d["target_minor"] == "1.32"
     assert {i["name"] for i in d["removed_next"]} == {"restricted", "web", "fs"}
 
@@ -60,7 +60,7 @@ def test_the_check_fails_on_a_kubent_row_removed_by_the_target(tmp_path):
     from tests.test_degraded import _all_checks, _ctx
 
     snap = _snap(tmp_path, kubent=KUBENT_ROWS[:1])
-    summary = hygiene._deprecated(hygiene._Ctx(snap, {"cluster": {"server_version": "v1.24.0"}}))
+    summary = hygiene.deprecated(hygiene.Ctx(snap, {"cluster": {"server_version": "v1.24.0"}}))
     check = next(c for c in _all_checks() if c["id"] == "hygiene.deprecated-api")
     r = evaluate.evaluate_check(check, _ctx(snap, {"hygiene": {"deprecated": summary}}), {})
     assert r["status"] == "done" and r["counts"] == {"fail": 1}
@@ -102,7 +102,7 @@ def test_polaris_counts_every_audited_object_and_skips_the_successes(tmp_path):
         ],
     }
     snap = _snap(tmp_path, polaris=doc)
-    p = hygiene._polaris(hygiene._Ctx(snap, {"namespaces": {"prod_like": ["prod-a"]}}))
+    p = hygiene.polaris(hygiene.Ctx(snap, {"namespaces": {"prod_like": ["prod-a"]}}))
     assert p["audited"] == 4 and p["with_failures"] == 3 and p["controllers"] == 25 and p["score"] == 81
     assert sorted(w["target"] for w in p["workloads"]) == ["prod-a/deployment/api", "prod-a/deployment/web", "prod-a/ingress/ing"]
     assert next(w for w in p["workloads"] if w["name"] == "web")["failed"][0]["where"] == "container:app"
@@ -128,7 +128,7 @@ def test_pluto_rows_take_the_kind_from_the_api_block(tmp_path):
     }  # the output of the pinned binary on a Deployment annotated with apps/v1beta2, observed on kind 2026-11-05
     (tmp_path / "tools" / "pluto.json").write_text(json.dumps(doc))
     (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {"pluto": {"ok": True, "api_read": True}}}}))
-    row = hygiene._deprecated(hygiene._Ctx(tmp_path, {}))["items"][0]
+    row = hygiene.deprecated(hygiene.Ctx(tmp_path, {}))["items"][0]
     assert (row["kind"], row["name"], row["namespace"], row["api"], row["removed_in"], row["replacement"]) == ("Deployment", "web", "default", "apps/v1beta2", "v1.16.0", "apps/v1")
 
 
@@ -140,7 +140,7 @@ KUBENT_WEB = {"Name": "web", "Namespace": "<undefined>", "Kind": "Deployment", "
 
 def _rows(tmp_path, pluto_items, kubent_rows):
     snap = _snap(tmp_path, pluto={"items": pluto_items, "target-versions": {"k8s": "v1.33.0"}}, kubent=kubent_rows)
-    return hygiene._deprecated(hygiene._Ctx(snap, {"cluster": {"server_version": "v1.32.0"}}))["items"]
+    return hygiene.deprecated(hygiene.Ctx(snap, {"cluster": {"server_version": "v1.32.0"}}))["items"]
 
 
 def test_a_manifest_without_a_namespace_is_one_row_with_plutos_namespace(tmp_path):
@@ -174,7 +174,7 @@ def test_the_check_target_is_one_per_object(tmp_path):
     snap = _snap(tmp_path, pluto={"items": [PLUTO_WEB], "target-versions": {"k8s": "v1.33.0"}}, kubent=[KUBENT_WEB])
     inv = {"cluster": {"platform": "eks", "server_version": "v1.32.0"}, "namespaces": {"prod_like": []}, "profile": {"name": "prod"}}
     (snap / "inventory.json").write_text(json.dumps(inv))
-    summary = {"hygiene": {"deprecated": hygiene._deprecated(hygiene._Ctx(snap, inv))}}
+    summary = {"hygiene": {"deprecated": hygiene.deprecated(hygiene.Ctx(snap, inv))}}
     check = next(c for c in rubric.load_checks(["core"])[0] if c["id"] == "hygiene.deprecated-api")
     r = evaluate.evaluate_check(check, evaluate.Context(snap, inv, summary, rubric.load_profile("prod")), rubric.resolve_thresholds(check, rubric.load_profile("prod"), {}))
     assert [f["target"] for f in r["findings"]] == ["default/deployment/web"] and "[kubent+pluto]" in r["findings"][0]["evidence"]
