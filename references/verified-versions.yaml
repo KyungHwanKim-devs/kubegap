@@ -354,6 +354,7 @@ components:
   - name: "MetalLB"
     repos:
       - metallb/metallb
+      - metallb/frr-k8s
     read:
       - "v0.12.1"
       - "v0.13.0"
@@ -363,13 +364,15 @@ components:
       - "v0.14.9"
       - "v0.15.2"
       - "v0.15.3"
+      - "v0.16.0"
       - "v0.16.1"
       - "v0.16.2"
+      - "v0.0.27"
     eks: null
     k3s: "v0.14.5"
     newest: "v0.16.2"
-    assumes: "speaker metrics read from the pods"
-    outside: "BGP status is read only where Prometheus scrapes it"
+    assumes: "speaker metrics read from the pods through 0.15; status objects (ServiceL2Status from 0.14.6, BGPSessionState of frr-k8s mode from 0.15.2) after"
+    outside: "native mode on 0.16+ and FRR mode: the BGP session state is read only where Prometheus scrapes it"
   - name: "Argo CD"
     repos:
       - argoproj/argo-cd
@@ -718,6 +721,7 @@ components:
     assumes: "installed by `kubegap setup`; `helm list` needs the Secrets the shipped ClusterRole does not grant"
     outside: "the two Helm checks skip with the reason"
 libraries:
+  - FRRouting/frr
   - VictoriaMetrics/helm-charts
   - VictoriaMetrics/operator
   - akoutmos/prom_ex
