@@ -67,6 +67,21 @@ def remove_stale_temp(root: Path) -> int:
     return n
 
 
+def schema_of(snap: Path) -> int:
+    """The format version inventory.json records (`schema`); 0 when the key or the file is missing (a snapshot from before the key existed)."""
+    inv = load_json(Path(snap) / "inventory.json")
+    v = inv.get("schema") if isinstance(inv, dict) else None
+    return v if type(v) is int else 0  # not isinstance: True is an int to isinstance and would read as version 1
+
+
+def check_schema(snap: Path) -> None:
+    """Refuse a snapshot of another format version (#97). Raises SystemExit with the message; the readers behind it would otherwise fail on a missing key or,
+    worse, read a renamed file as absent and judge nothing. There is no reading of an older version: it is collected again."""
+    v = schema_of(snap)
+    if v != paths.SCHEMA_VERSION:
+        raise SystemExit(f"kubegap: snapshot {snap} has format version {v}; this kubegap reads version {paths.SCHEMA_VERSION}. A snapshot of another format version is not read: collect again with this version.")
+
+
 def load_json(path: Path) -> Any:
     """Parse one JSON file. Returns None when the file is missing or not valid JSON."""
     try:

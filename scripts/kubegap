@@ -30,7 +30,7 @@ from lib import (  # noqa: E402  lib is importable only after the skill folder i
 )
 from lib import rubric as _rubric  # noqa: E402
 from lib import yamlite as _yamlite  # noqa: E402
-from lib.snapshot import write_private  # noqa: E402
+from lib.snapshot import check_schema, schema_of, write_private  # noqa: E402
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -213,7 +213,7 @@ def cmd_contexts(args) -> int:
 
 
 def _root(args):
-    """Snapshot root: --snapshots-root > $KUBEGAP_SNAPSHOTS > config snapshots_root > ~/.kubegap/snapshots (legacy location)."""
+    """Snapshot root: --snapshots-root > $KUBEGAP_SNAPSHOTS > config snapshots_root > ~/.kubegap/snapshots."""
     from lib.config import load_config as _lc
 
     cfg_val = None
@@ -305,7 +305,9 @@ def cmd_collect(args) -> int:
 def _resolve_snapshot_arg(args, spec: str):
     ctx = getattr(args, "context", None) or kube.current_context(getattr(args, "kubeconfig", None))
     root = _root(args)
-    return paths.resolve_snapshot(spec, ctx, root, mode=getattr(args, "mode", None))
+    snap = paths.resolve_snapshot(spec, ctx, root, mode=getattr(args, "mode", None))
+    check_schema(snap)  # a snapshot of another format version is refused here, before any reader opens it (#97)
+    return snap
 
 
 def _mode(args, cfg) -> str:
@@ -358,6 +360,9 @@ def cmd_diff(args) -> int:
         a = _resolve_snapshot_arg(args, args.snapshot_a)
     else:
         a = paths.previous_snapshot(b)
+        if a is not None and schema_of(a) != paths.SCHEMA_VERSION:
+            print(f"kubegap diff: the earlier {paths.snapshot_mode(b)} snapshot {a.name} has format version {schema_of(a)}, this kubegap reads version {paths.SCHEMA_VERSION}: not compared (the next run will be). Only history.csv is updated.", file=sys.stderr)
+            a = None
         if a is None:
             print(f"kubegap diff: no earlier {paths.snapshot_mode(b)} snapshot to compare {b.name} with (daily compares with daily, full with full). Only history.csv is updated.", file=sys.stderr)
             hp = _diff.append_history(b)
