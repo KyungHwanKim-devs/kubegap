@@ -35,6 +35,8 @@ EXPECTED = FIXTURES / "expected"
 OUTPUTS = ("summary.json", "findings.json", "report-details.en.md", "report-details.ko.md")
 FORBIDDEN = 'Error from server (Forbidden): events is forbidden: User "kubegap" cannot list resource "events" in API group "" at the cluster scope'
 GONE_STORES = ("prometheus", "alertmanager")
+AWS_STEP_TYPES = ("aws", "cwlogs", "cw-metrics", "alb-metrics")
+AWS_DENIED = "An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the degraded fixture: no IAM policy)"
 DENIED_STEM = "networkpolicies.networking.k8s.io"  # the kind the degraded variant takes away: judged by an object-type check (security.networkpolicy-coverage), so the skip reason shows
 
 
@@ -45,7 +47,8 @@ def fixtures() -> list[Path]:
 def degrade(snap: Path) -> None:
     """Take away what a degraded run does not have, and record it the way collect records it (lib/collect.py: a forbidden List is a failed
     step; a promql step without Prometheus is `error: no Prometheus connection`; an http step without its store is `skipped: no <store> connection`;
-    a node step without a backend is `skipped: no node command backend`; a kind the account may not list is `not_permitted` of the dump-all record)."""
+    an AWS call refused is a failed step with the AccessDenied text; a node step without a backend is `skipped: no node command backend`; a kind the
+    account may not list is `not_permitted` of the dump-all record)."""
     cr = load_json(snap / "collect-result.json")
     inv = load_json(snap / "inventory.json")
     # 1. a forbidden List: the step fails, its file is not written
@@ -67,10 +70,25 @@ def degrade(snap: Path) -> None:
         f.unlink()
     for k in GONE_STORES:
         inv["stores"].pop(k, None)
-    # 3. no node access
+    # 3. every AWS call refused (the identity reads the cluster and holds no IAM policy, docs/PERMISSIONS.md): the aws, cwlogs, cw-metrics and alb-metrics steps fail
+    #    the way lib/collect._run_aws_step records a refusal, and their outputs are gone; discovery's describe-cluster is left as read, so the EKS facts stay
+    for collector, st in paths.collect_steps():
+        rec = (cr.get(collector) or {}).get("steps") or {}
+        if st["id"] in rec and st["type"] in AWS_STEP_TYPES:
+            rec[st["id"]] = {"ok": False, "out": None, "error": AWS_DENIED}
+    shutil.rmtree(snap / "aws", ignore_errors=True)
+    shutil.rmtree(snap / "logs" / "cloudwatch", ignore_errors=True)
+    # 4. no node access
     shutil.rmtree(snap / "logs" / "node", ignore_errors=True)
-    inv["node_access"] = {"method": "none", "source": "detected", "reasons": ["degraded fixture: no node access"], "ssm_registered": [], "ssm_unregistered": []}
-    # 4. an object kind the account may not list: dump-all records it as not permitted and writes no file
+    inv["node_access"] = {
+        "method": "none",
+        "source": "detected",
+        "reasons": ["degraded fixture: no node access"],
+        "ssm_registered": [],
+        "ssm_unregistered": None,
+        "ssm_error": "AccessDeniedException: ssm:DescribeInstanceInformation",
+    }  # the list is None when it was not read (lib/discover.py), so eks.ssm-unregistered skips
+    # 5. an object kind the account may not list: dump-all records it as not permitted and writes no file
     rec = cr["core"]["steps"]["objects.dump-all"]
     (snap / "objects" / f"{DENIED_STEM}.json").unlink()
     rec["written"] = [s for s in rec["written"] if s != DENIED_STEM]
