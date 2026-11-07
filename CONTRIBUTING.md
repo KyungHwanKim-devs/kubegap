@@ -7,6 +7,7 @@
 - `checks.yaml` expressions are Python evaluated by `lib/evaluate.py`. They are code: review them like code.
 - The YAML files here are read by `lib/yamlite.py`, which supports only a subset of YAML; the subset is listed at the top of [`lib/yamlite.py`](lib/yamlite.py). Anchors, aliases, tags and plain strings continued on the next line raise an error with the line number. Keep a plain string on one line, or use a `>` block or quotes for long text.
 - Unit tests live in `tests/` (pytest; the YAML parser, rubric resolution, snapshot diff, platform detection and the evaluate helpers); add a test when you touch `lib/`.
+- `tests/test_regress.py` runs summarize, evaluate and render on the committed snapshots in `tests/fixtures/snapshot-*/` and compares the result with `tests/fixtures/expected/`. When your change is meant to alter a summary, a verdict or the report, run `scripts/kubegap regress --update` and commit the new expectation in the same pull request; the diff shows the reviewer what moved. The procedure, the fixture builder and the degraded variant are described in `references/development.md`.
 - Open a pull request against `main` from a branch; one topic per pull request, with a short description of what changed and why. Everything below must pass before you submit.
 - When a parser needs the value of a ConfigMap key, add that key to `KEEP_VALUES` in `lib/scrub.py`. Every other ConfigMap value is replaced by its length and shape before the snapshot is written, so the parser would otherwise see a dict. The same happens to the two annotations that carry a copy of the object, `kubectl.kubernetes.io/last-applied-configuration` and `objectset.rio.cattle.io/applied`.
 - When a tool of `lib/tools.py` changes (a tool added or removed, its `checks`, `modes`, install method or pin), regenerate the table a test compares against: `scripts/kubegap tools --markdown` and `scripts/kubegap tools --markdown --language ko`, pasted between the `tools-table` markers of `docs/SETUP.md` and `docs/ko/SETUP.md`. Every entry of `checks` must be a check id of the catalog, `<area>.*`, `<area>.*@full` (the full-mode-only checks of that area) or `*`.
@@ -16,6 +17,7 @@
 uvx ruff check . && uvx ruff format --check .   # line length is 240 on purpose (one dict per line in summary modules)
 uvx pytest -q                                          # unit tests in tests/ (no cluster needed)
 scripts/kubegap selftest                                   # embedded test cases of every check: 0 failures
+scripts/kubegap regress                                    # the committed snapshots give the committed summaries, findings and report details
 scripts/kubegap selftest --snapshot <snapshot path>        # optional, with a real snapshot: also 0 key mismatches
 uvx --from skills-ref agentskills validate "$PWD"      # run from the parent directory if your folder is not named kubegap
 ```
