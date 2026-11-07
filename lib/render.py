@@ -175,8 +175,8 @@ def _evidence(f: dict, limit: int) -> str:
 _TAG_START = re.compile(r"<(?!(?:masked|account|ip|none|unknown|unset|nil|invalid|n|ts|id|uuid|hex|addr)>)(?=[A-Za-z/!?])")
 
 
-def _cell(v) -> str:
-    """A table cell from a cluster string. No code path writes Markdown in a cell, so every piece of syntax that could make the cell live in a viewer is
+def cell(v) -> str:
+    """A table cell from a cluster string, for every Markdown table code writes (lib/writer uses it too). No code path writes Markdown in a cell, so every piece of syntax that could make the cell live in a viewer is
     broken: pipes and newlines (the table itself), `[x](target)` links and `![x](target)` images whatever the target (javascript:, file:, data:, a
     remote image a viewer would fetch), and `<` starting a tag or an autolink (`<a href=…>`, `<script>`, `<javascript:…>`). A bare https://… stays
     plain text, which GFM viewers autolink on their own; the placeholders that mask.py and kubectl write in angle brackets are kept as they are."""
@@ -193,9 +193,9 @@ def _fence(text: str) -> str:
     return "`" * max(3, longest + 1)
 
 
-def _table(headers: list[str], rows: list[list], none: str = "none") -> str:
+def table(headers: list[str], rows: list[list], none: str = "none") -> str:
     out = ["| " + " | ".join(headers) + " |", "|" + "---|" * len(headers)]
-    out += ["| " + " | ".join(_cell(c) for c in r) + " |" for r in rows]
+    out += ["| " + " | ".join(cell(c) for c in r) + " |" for r in rows]
     return "\n".join(out) if rows else "\n".join(out) + f"\n| ({none}) |" + " |" * (len(headers) - 1)
 
 
@@ -277,8 +277,8 @@ def render_details(snap: Path, language: str = "en") -> Path:
 
     none = L("none")
 
-    def table(headers: list[str], rows: list[list]) -> str:
-        return _table([L(h) for h in headers], rows, none=none)
+    def ltable(headers: list[str], rows: list[list]) -> str:
+        return table([L(h) for h in headers], rows, none=none)
 
     missing = L("(not written this run)")
     inv = load_json(snap / "inventory.json") or {}
@@ -309,7 +309,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
     prom = stores.get("prometheus") or {}
     logs = stores.get("loki") or {}
     w(
-        table(
+        ltable(
             ["Item", "Value"],
             [
                 [L("kube context / cluster"), f"`{inv.get('context')}` / {cluster.get('cluster_name')} ({cluster.get('platform')}, {cluster.get('server_version')})"],
@@ -344,7 +344,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
     for s in SEVERITIES:
         bf, bw = (before.get("fail") or {}).get(s), (before.get("warn") or {}).get(s)
         rows.append([s, fails[s], warns[s], f"fail {fails[s] - bf:+d} · warn {warns[s] - bw:+d}" if isinstance(bf, int) and isinstance(bw, int) else L("no previous run of this mode")])
-    w(table(["Severity (default)", "fail", "warn", "vs. previous run of this mode"], rows))
+    w(ltable(["Severity (default)", "fail", "warn", "vs. previous run of this mode"], rows))
     w("")
     bs = (fd.get("checks") or {}).get("by_status") or {}
     w(
@@ -377,7 +377,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w("")
     persisted = _persisted(diff)
     ch = [f for f in findings if f.get("status") == "fail" and f.get("severity_default") in ("critical", "high")]
-    w(table(["Finding", "Severity", "Consecutive runs", "Evidence"], [[f"`{f['id']}`", f.get("severity_default"), persisted.get(f["id"], "") or "", _evidence(f, 220)] for f in ch]))
+    w(ltable(["Finding", "Severity", "Consecutive runs", "Evidence"], [[f"`{f['id']}`", f.get("severity_default"), persisted.get(f["id"], "") or "", _evidence(f, 220)] for f in ch]))
     if not persisted:
         w("")
         w(L("(consecutive-run counts need diff.json; none for this snapshot)"))
@@ -411,7 +411,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
             + (": " + ", ".join(f"`{c.get('kind')}/{c.get('name')}` {','.join(c.get('changed_fields') or [])}" for c in (ob.get("changed") or [])[:12]) if ob.get("changed") else "")
         )
         evc = [e for e in ((diff.get("events") or {}).get("changed") or []) if e.get("type") == "Warning"]
-        w(f"- **{L('Warning events')}**: " + (", ".join(f"{_cell(e.get('reason'))} {e.get('delta'):+d} ({_cell((e.get('objects_top_after') or [''])[0])})" for e in evc[:10]) if evc else L("no change")))
+        w(f"- **{L('Warning events')}**: " + (", ".join(f"{cell(e.get('reason'))} {e.get('delta'):+d} ({cell((e.get('objects_top_after') or [''])[0])})" for e in evc[:10]) if evc else L("no change")))
         crit = df.get("criteria_changes") or {}
         n_crit = sum(len(v) for k, v in crit.items() if isinstance(v, list))
         if n_crit:
@@ -462,7 +462,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w(L("## 5. Absence list"))
     w("")
     absent = [f for f in findings if f.get("type") == "absence" and f.get("status") in ("fail", "warn")]
-    w(table(["Finding", "Status", "Severity", "Why it should exist", "Proposal"], [[f"`{f['id']}`", f.get("status"), f.get("severity_default"), _cut(f.get("why"), 200), _cut(f.get("suggest"), 200)] for f in absent]))
+    w(ltable(["Finding", "Status", "Severity", "Why it should exist", "Proposal"], [[f"`{f['id']}`", f.get("status"), f.get("severity_default"), _cut(f.get("why"), 200), _cut(f.get("suggest"), 200)] for f in absent]))
     w("")
     w(L("Expected families missing (inventory): {families}.", families=", ".join(inv.get("missing_families") or []) or none))
     w("")
@@ -508,7 +508,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
         failed_steps += [(f"{name}.{sid}", str((steps.get(sid) or {}).get("error") or "")) for sid in failed]
         skipped = [f"{sid} ({st.get('note') if st.get('skipped') is True else st.get('skipped')})" for sid, st in steps.items() if isinstance(st, dict) and st.get("skipped")]  # True: a snapshot taken before the step wrote its reason here
         rows.append([name, len(steps), ", ".join(failed) or "", "; ".join(skipped) or (c.get("skipped") or "")])
-    w(table(["Collector", "Steps", "Failed", "Skipped (reason)"], rows))
+    w(ltable(["Collector", "Steps", "Failed", "Skipped (reason)"], rows))
     npk = ((cr.get("core") or {}).get("steps") or {}).get("objects.dump-all", {}).get("not_permitted") or []
     if npk:
         w("")
@@ -529,14 +529,14 @@ def render_details(snap: Path, language: str = "en") -> Path:
     # reading the cluster (kubent, pluto): the step is failed, its command is not.
     w(
         L("{commands} commands, {seconds} s. Failed steps: {n}", commands=run.get("commands") or "?", seconds=sm.get("seconds_total"), n=len(failed_steps))
-        + (": " + "; ".join(f"`{sid}` {_cell(_cut(err, 120))}" for sid, err in failed_steps[:20]) if failed_steps else "")
+        + (": " + "; ".join(f"`{sid}` {cell(_cut(err, 120))}" for sid, err in failed_steps[:20]) if failed_steps else "")
     )
     # A command can fail inside a step that still succeeded (one pod of a per-pod metrics step, one release of `helm get values`); run.log has it and the step does not.
     failed_ids = {sid for sid, _ in failed_steps}
     inside = [f for f in run.get("failed") or [] if str(f.get("id")) not in failed_ids and not any(str(f.get("id")).startswith(sid + ".") for sid in failed_ids)]
     if inside:
         w("")
-        w(L("Commands that failed inside a step that still succeeded (run.log): {n}: ", n=len(inside)) + "; ".join(f"`{f.get('id')}` {_cell(_cut(f.get('error'), 120))}" for f in inside[:20]))
+        w(L("Commands that failed inside a step that still succeeded (run.log): {n}: ", n=len(inside)) + "; ".join(f"`{f.get('id')}` {cell(_cut(f.get('error'), 120))}" for f in inside[:20]))
     # How much of the API the deprecated-API tools saw (#132). kubent swallows a forbidden List, so its Lists answered and refused are counted from its log; pluto reads the saved objects, so what it saw is what objects.dump-all saved.
     dep = (summary.get("hygiene") or {}).get("deprecated") or {}
     wording = {"kubent": ("Lists answered", "refused or not served"), "pluto": ("Lists answered", "refused or not served")}
@@ -585,30 +585,30 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w("")
     sigs = lg.get("signatures") or []
     w(
-        table(
+        ltable(
             ["Signature", "Component", "Area", "Severity", "Status", "Count", "First, last", "Sample"],
             [[s.get("id"), s.get("component"), s.get("area"), s.get("severity"), s.get("status"), s.get("count"), f"{s.get('first') or ''} , {s.get('last') or ''}", _cut((s.get("samples") or [""])[0], 160)] for s in sigs],
         )
     )
     w("")
     un = lg.get("unclassified_errors") or []
-    w(table(["Normalized message", "Count", "Files"], [[_cut(u.get("pattern"), 200), u.get("count"), ", ".join(list((u.get("files") or {}).keys())[:3]) if isinstance(u.get("files"), dict) else ""] for u in un[:30]]))
+    w(ltable(["Normalized message", "Count", "Files"], [[_cut(u.get("pattern"), 200), u.get("count"), ", ".join(list((u.get("files") or {}).keys())[:3]) if isinstance(u.get("files"), dict) else ""] for u in un[:30]]))
     w("")
     w(L("### 7-4. Raw files the LLM read directly"))
     w("")
     files_read = [str(f) for f in analysis.get("files_read") or []]
-    w("\n".join(f"- `{_cell(f)}`" for f in files_read) if files_read else missing)
+    w("\n".join(f"- `{cell(f)}`" for f in files_read) if files_read else missing)
     outside = [c for c in analysis.get("commands_outside_snapshot") or [] if isinstance(c, dict)]
     if outside:
         w("")
         w(L("Read-only commands run outside the snapshot") + ":")
         w("")
-        w(table(["Command", "Saved as"], [[f"`{_cell(c.get('command'))}`", f"`{_cell(c.get('saved_as'))}`"] for c in outside]))
+        w(ltable(["Command", "Saved as"], [[f"`{cell(c.get('command'))}`", f"`{cell(c.get('saved_as'))}`"] for c in outside]))
     w("")
     w(L("### 7-5. Full first-pass status (every fail and warn, code results as-is)"))
     w("")
     fw = sorted((f for f in findings if f.get("status") in ("fail", "warn")), key=lambda f: (SEVERITIES.index(f.get("severity_default", "info")) if f.get("severity_default") in SEVERITIES else 9, f.get("status") != "fail", f.get("id", "")))
-    w(table(["id", "Status", "Default severity", "Evidence"], [[f"`{f['id']}`", f.get("status"), f.get("severity_default"), _evidence(f, 300)] for f in fw]))
+    w(ltable(["id", "Status", "Default severity", "Evidence"], [[f"`{f['id']}`", f.get("status"), f.get("severity_default"), _evidence(f, 300)] for f in fw]))
     w("")
     w(L("The table cuts each evidence at 300 characters and a check may cut a list in its evidence; nothing is lost. Every finding below carries, folded, the material its rule judged, taken from `findings-draft.json` `details`."))
     w("")
@@ -628,7 +628,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w(L("### 7-6. Tool notes (about kubegap itself)"))
     w("")
     tool_notes = [t for t in analysis.get("tool_notes") or [] if isinstance(t, dict) and t.get("text")]
-    w("\n".join(f"{t.get('n', i + 1)}. {_cell(t['text'])}" + (" (" + L("still open from note {n}", n=t["still_open_from"]) + ")" if t.get("still_open_from") else "") for i, t in enumerate(tool_notes)) if tool_notes else missing)
+    w("\n".join(f"{t.get('n', i + 1)}. {cell(t['text'])}" + (" (" + L("still open from note {n}", n=t["still_open_from"]) + ")" if t.get("still_open_from") else "") for i, t in enumerate(tool_notes)) if tool_notes else missing)
     w("")
     p = snap / "report-details.md"
     write_private(p, "\n".join(out))

@@ -12,7 +12,6 @@ repository's own checks.yaml and rubric profiles, never from user config: config
 
 from __future__ import annotations
 
-import contextlib
 import datetime as _dt
 import fnmatch
 import functools
@@ -25,9 +24,9 @@ from typing import ClassVar
 
 from . import __version__, metricnames, paths, rubric, versions
 from .config import Config
-from .resilience import is_db_like, mounts_pvc
-from .snapshot import dump_record, load_json, missing_reason, object_file_status, taken_at, write_private
+from .snapshot import dump_record, load_json, metric_doc, metric_sample, missing_reason, object_file_status, series_present, taken_at, write_private
 from .snapshot import objects as snapshot_objects
+from .workload import is_db_like, mounts_pvc
 
 SAFE_BUILTINS = {
     "len": len,
@@ -137,7 +136,7 @@ class Context:
 
     def db_like(self, labels: dict) -> bool:
         """Does the metric's container run a database, cache or message queue? Looks the pod up in objects/pods.json and judges the container named in
-        `labels['container']` by its name, image repository and owning workload, with lib.resilience.is_db_like. Init containers count, since a native sidecar reports its own series.
+        `labels['container']` by its name, image repository and owning workload, with lib.workload.is_db_like. Init containers count, since a native sidecar reports its own series.
         Without a container label every container of the pod must be database-like, so a pod-level series of a Redis with an exporter sidecar is not.
         A pod that is already gone from the snapshot is judged from the pod and container names alone."""
         ns, pod, container = labels.get("namespace"), labels.get("pod"), labels.get("container")
@@ -185,13 +184,12 @@ class Context:
         return missing_reason(stem, object_file_status(self.snap, stem, self.dump_record))
 
     def metric(self, qid: str) -> dict | None:
-        return load_json(self.snap / "metrics" / f"{qid}.json")
+        return metric_doc(self.snap, qid)
 
     @functools.cached_property
     def series_present(self) -> dict[str, int] | None:
-        """metrics/series-present.json (lib/prom.record_series_present): metric name → series count at collection time, 0 for a name Prometheus has no series of. None when the file was not written."""
-        doc = load_json(self.snap / "metrics" / "series-present.json")
-        return doc.get("names") if isinstance(doc, dict) and isinstance(doc.get("names"), dict) else None
+        """lib/snapshot.series_present, read once per run."""
+        return series_present(self.snap)
 
     def names_without_series(self, qids: list[str]) -> list[str] | None:
         """Of the metric names the queries `qids` cite (lib/metricnames), those collection found no series of. Empty when every name has series; None when presence was not recorded."""
@@ -850,9 +848,8 @@ def _eval_metric(cx: Context, check: dict, run: _Run) -> dict:
         if not m.get("result"):
             return _empty_result(cx, check, run, inputs)
         for s in m.get("result", []):
-            try:
-                value = float(s["value"][1])
-            except (KeyError, ValueError, TypeError, IndexError):
+            value = metric_sample(s)  # NaN stays NaN: a check says `value == value` when it wants to pass over one
+            if value is None:
                 continue
             labels = s.get("metric", {})
             if gone := cx.node_gone(labels, check.get("area")):
@@ -883,8 +880,8 @@ def _eval_metric(cx: Context, check: dict, run: _Run) -> dict:
             k = tuple(lab.get(x) for x in keys)
             if any(x is None for x in k):
                 continue
-            with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
-                joined.setdefault(k, {})[qid] = float(s["value"][1])
+            if (v := metric_sample(s)) is not None:
+                joined.setdefault(k, {})[qid] = v
     if join_any and not present:
         return run.skip("metrics/" + ",".join(inputs) + " all missing or failed")
     if not joined:

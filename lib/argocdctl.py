@@ -17,11 +17,7 @@ from pathlib import Path
 from .durations import go_duration_s
 from .promtext import parse as _parse_prom
 from .snapshot import load_json, objects, parse_ts, taken_at
-
-
-def _ver(image: str | None):
-    m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
-    return m.group(1) if m else None
+from .versions import image_version
 
 
 def _dur_s(s) -> float | None:
@@ -65,7 +61,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         comps[w["metadata"]["name"].replace("argocd-", "")] = {
             "replicas": sp.get("replicas"),
             "ready": st.get("readyReplicas") or 0,
-            "version": _ver(c0.get("image")),
+            "version": image_version(c0.get("image")),
             "kind": "StatefulSet" if "volumeClaimTemplates" in sp or (w["metadata"]["name"].endswith("controller") and "serviceName" in sp) else "Deployment",
         }
     version = next((comps[k]["version"] for k in ("server", "application-controller", "repo-server", "applicationset-controller", "dex-server", "notifications-controller") if (comps.get(k) or {}).get("version")), None)

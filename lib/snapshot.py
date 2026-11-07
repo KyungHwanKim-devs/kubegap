@@ -15,6 +15,7 @@ from __future__ import annotations
 import contextlib
 import datetime as _dt
 import json
+import math
 import os
 import re
 import tempfile
@@ -93,6 +94,93 @@ def load_json(path: Path) -> Any:
 def items(doc: Any) -> list:
     """The "items" list of a kubectl list document. Empty list for None, a non-dict or a document without items."""
     return (doc.get("items") or []) if isinstance(doc, dict) else []
+
+
+def event_count(e: dict) -> int:
+    """How many times the Event happened: `count` for events written through the legacy recorder, `series.count` for events written through the
+    events.k8s.io recorder (the scheduler's `Scheduled`, `FailedScheduling`, `Preempted`), which has no `count` in the core/v1 view and keeps the repeats in
+    `series.count` (kubernetes/kubernetes pkg/apis/events/v1/conversion.go:40-42@v1.37.2; staging/src/k8s.io/client-go/tools/events/event_broadcaster.go:181@v1.37.2); 1 when neither is there."""
+    c = e.get("count") or ((e.get("series") or {}).get("count")) or 1
+    return int(c) if isinstance(c, (int, float)) else 1
+
+
+# ---------- metrics/<query id>.json, written by lib/prom.run_queries: {"ok": true, "resultType", "result": [...]} or {"ok": false, "error": ...} ----------
+# Twenty-one private readers of this file in fifteen summary modules disagreed on whether to look at `ok` and whether to drop NaN (#150). This is the one reading:
+# a query that did not run has no rows, and a value Prometheus could not compute is not a value.
+
+
+def metric_doc(snap: Path, qid: str) -> dict | None:
+    """The whole result document of one query, `ok` and `error` included; None when the query was not run (lib/evaluate reads the error)."""
+    doc = load_json(snap / "metrics" / f"{qid}.json")
+    return doc if isinstance(doc, dict) else None
+
+
+def metric_result(snap: Path, qid: str) -> list[dict]:
+    """The `result` rows of a query that ran (`{"metric": {...}, "value": [ts, "text"]}` each); empty when it failed or was not run."""
+    doc = metric_doc(snap, qid)
+    return (doc.get("result") or []) if doc and doc.get("ok") else []
+
+
+def metric_sample(row: dict) -> float | None:
+    """The sample of one result row exactly as Prometheus wrote it, NaN and infinities included; None when the row has no readable sample. For the
+    evaluator and the diff, whose rules say themselves what a NaN means (`value == value` in a check expression)."""
+    try:
+        return float(row["value"][1])
+    except (KeyError, TypeError, ValueError, IndexError):
+        return None
+
+
+def metric_value(row: dict) -> float | None:
+    """The sample of one result row as a measured number: None when the row has none or it is NaN or infinite, which a summary cannot report."""
+    v = metric_sample(row)
+    return None if v is None or math.isnan(v) or math.isinf(v) else v
+
+
+def metric_rows(snap: Path, qid: str) -> list[tuple[dict, float]]:
+    """(labels, value) per result row of a query that ran, rows without a usable value left out."""
+    out = []
+    for row in metric_result(snap, qid):
+        v = metric_value(row)
+        if v is not None:
+            out.append((row.get("metric") or {}, v))
+    return out
+
+
+def metric_by(snap: Path, qid: str, *keys: str) -> dict:
+    """The rows of a query keyed by label: `{label value: sample}` for one key, `{(value, value, ...): sample}` for several; a row missing one of the
+    labels is left out (it cannot be addressed)."""
+    out: dict = {}
+    for lab, v in metric_rows(snap, qid):
+        vals = tuple(lab.get(k) for k in keys)
+        if any(x is None for x in vals):
+            continue
+        out[vals[0] if len(keys) == 1 else vals] = v
+    return out
+
+
+def series_present(snap: Path) -> dict[str, int] | None:
+    """metrics/series-present.json (lib/prom.record_series_present): metric name → series count at collection time, 0 for a name Prometheus has no series of.
+    None when the file was not written."""
+    doc = load_json(snap / "metrics" / "series-present.json")
+    return doc.get("names") if isinstance(doc, dict) and isinstance(doc.get("names"), dict) else None
+
+
+def node_os_text(snap: Path, node: str) -> str | None:
+    """`logs/node/<node>/os.txt`, the node script's output (collectors/core/node-os.sh), or None when the node was not read."""
+    path = snap / "logs" / "node" / node / "os.txt"
+    return path.read_text(encoding="utf-8", errors="replace") if path.is_file() else None
+
+
+def metric_sum(snap: Path, qid: str) -> float | None:
+    """The sum of every row's value; None when the query has no rows (a series nobody scrapes is not a zero)."""
+    rows = metric_rows(snap, qid)
+    return sum(v for _, v in rows) if rows else None
+
+
+def metric_scalar(snap: Path, qid: str) -> float | None:
+    """The value of the first row of a query that returns one series (a sum, a ratio); None without one."""
+    rows = metric_rows(snap, qid)
+    return rows[0][1] if rows else None
 
 
 _HELM_TS_RE = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?:\.\d+)?(?: ([+-]\d{4}))?")  # Go time.String(): 2025-12-29 02:07:42.385466 +0900 KST

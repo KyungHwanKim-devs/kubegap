@@ -11,34 +11,12 @@ nodes[per node: mode, healthz, iptables rule count, sync p99, pending, last sync
 
 from __future__ import annotations
 
-import math
 import re
 from pathlib import Path
 
 from . import versions
-from .snapshot import load_json, objects
-
-
-def _rows(snap: Path, qid: str) -> list[tuple[dict, float]]:
-    out = []
-    for s in (load_json(snap / "metrics" / f"{qid}.json") or {}).get("result") or []:
-        try:
-            v = float(s["value"][1])
-            if math.isnan(v) or math.isinf(v):
-                continue
-            out.append((s.get("metric") or {}, v))
-        except (KeyError, ValueError, TypeError, IndexError):
-            pass
-    return out
-
-
-def _scalar(snap: Path, qid: str):
-    r = _rows(snap, qid)
-    return round(r[0][1], 4) if r else None
-
-
-def _r(x, n=3):
-    return None if x is None else round(x, n)
+from .quantity import rounded
+from .snapshot import load_json, metric_rows, metric_scalar, objects
 
 
 def _parse_config(text: str) -> dict:
@@ -100,14 +78,14 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     if ds:
         st = ds.get("status") or {}
         c0 = (ds["spec"]["template"]["spec"].get("containers") or [{}])[0]
-        m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", c0.get("image", ""))
+        v = versions.image_version(c0.get("image"))
         dsinfo.update(
             {
                 "desired": st.get("desiredNumberScheduled"),
                 "ready": st.get("numberReady"),
                 "available": st.get("numberAvailable"),
                 "image": c0.get("image"),
-                "version": m.group(1) if m else None,
+                "version": v,
                 "args": (c0.get("command") or []) + (c0.get("args") or []),
                 "resources": c0.get("resources") or {},
             }
@@ -140,7 +118,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     per: dict[str, dict] = {}
 
     def put(qid, key, agg=max):
-        for lab, v in _rows(snap, qid):
+        for lab, v in metric_rows(snap, qid):
             nd = node_of(lab.get("instance", ""))
             d = per.setdefault(nd, {})
             d[key] = agg(d[key], v) if key in d else v
@@ -158,18 +136,18 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             d["restore_failures_24h"] = sum(parts)
     # a gauge of Services per node and traffic policy (internal, external): add the policies of one instance, keep the max over the scrape ports of one node (k3s serves the embedded proxy twice)
     by_instance: dict[str, float] = {}
-    for lab, v in _rows(snap, "kubeproxy_no_local_endpoint_services"):
+    for lab, v in metric_rows(snap, "kubeproxy_no_local_endpoint_services"):
         by_instance[lab.get("instance", "")] = by_instance.get(lab.get("instance", ""), 0.0) + v
     for inst, v in by_instance.items():
         d = per.setdefault(node_of(inst), {})
         d["no_local_endpoint_services"] = max(d.get("no_local_endpoint_services", 0.0), v)
     put("kubeproxy_ct_invalid_dropped_1h", "ct_invalid_dropped_1h")
-    for lab, v in _rows(snap, "kubeproxy_iptables_rules"):
+    for lab, v in metric_rows(snap, "kubeproxy_iptables_rules"):
         nd = node_of(lab.get("instance", ""))
         d = per.setdefault(nd, {})
         tbl = d.setdefault("iptables_rules", {})
         tbl[lab.get("table")] = max(tbl.get(lab.get("table"), 0), int(v))
-    targets = {node_of(lab.get("instance", "")): int(v) for lab, v in _rows(snap, "kubeproxy_targets")}
+    targets = {node_of(lab.get("instance", "")): int(v) for lab, v in metric_rows(snap, "kubeproxy_targets")}
     nodes = []
     gaps = []
     for n in inv_nodes:
@@ -193,16 +171,16 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "metrics_local_http": local.get("metrics_local"),
                 "scrape_up": targets.get(name),
                 "metrics_available": bool(d),
-                "sync_p99_s": _r(d.get("sync_p99_s"), 4),
-                "syncs_1h": _r(d.get("syncs_1h"), 1),
-                "rules_pending_s": _r(max(d["rules_pending_s"], 0.0), 1) if "rules_pending_s" in d else None,
-                "last_sync_age_s": _r(d.get("last_sync_age_s"), 0),
+                "sync_p99_s": rounded(d.get("sync_p99_s"), 4),
+                "syncs_1h": rounded(d.get("syncs_1h"), 1),
+                "rules_pending_s": rounded(max(d["rules_pending_s"], 0.0), 1) if "rules_pending_s" in d else None,
+                "last_sync_age_s": rounded(d.get("last_sync_age_s"), 0),
                 "iptables_rules": rules,
                 "iptables_rules_total": sum(rules.values()) if rules else None,
                 "nat_rules": rules.get("nat"),
-                "restore_failures_24h": _r(d.get("restore_failures_24h"), 0),
-                "no_local_endpoint_services": _r(d.get("no_local_endpoint_services"), 0),
-                "ct_invalid_dropped_1h": _r(d.get("ct_invalid_dropped_1h"), 0),
+                "restore_failures_24h": rounded(d.get("restore_failures_24h"), 0),
+                "no_local_endpoint_services": rounded(d.get("no_local_endpoint_services"), 0),
+                "ct_invalid_dropped_1h": rounded(d.get("ct_invalid_dropped_1h"), 0),
             }
         )
     modes = sorted({x["mode"] for x in nodes if x["mode"]})
@@ -231,16 +209,16 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     metrics_loopback_only = bind.startswith(("127.0.0.1", "localhost"))
     up_n = sum(1 for v in targets.values() if v == 1)
     down_n = sum(1 for v in targets.values() if v == 0)
-    any_metrics = any(x["metrics_available"] for x in nodes) or bool(_rows(snap, "kubeproxy_sync_p99_1h"))
-    rest_err = {lab.get("code"): round(v, 1) for lab, v in _rows(snap, "kubeproxy_rest_client_errors_1h")}
+    any_metrics = any(x["metrics_available"] for x in nodes) or bool(metric_rows(snap, "kubeproxy_sync_p99_1h"))
+    rest_err = {lab.get("code"): round(v, 1) for lab, v in metric_rows(snap, "kubeproxy_rest_client_errors_1h")}
     metrics = {
         "available": any_metrics,
         "source": ("job=kube-proxy" if targets else ("embedded in kubelet scrape" if embedded and any_metrics else None)),
         "targets_up": up_n,
         "targets_down": down_n,
         "targets_down_nodes": [k for k, v in targets.items() if v == 0],
-        "sync_p99_s": _scalar(snap, "kubeproxy_sync_p99_1h"),
-        "programming_p99_s": _scalar(snap, "kubeproxy_programming_p99_1h"),
+        "sync_p99_s": rounded(metric_scalar(snap, "kubeproxy_sync_p99_1h"), 4),
+        "programming_p99_s": rounded(metric_scalar(snap, "kubeproxy_programming_p99_1h"), 4),
         "rest_client_errors_1h": rest_err,
         "rest_client_errors_total_1h": round(sum(rest_err.values())),
     }

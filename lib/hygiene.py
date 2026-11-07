@@ -17,8 +17,9 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from . import scrub, versions
-from .controlplane import workload_of
-from .snapshot import load_json, objects, parse_ts, taken_at
+from .snapshot import load_json, metric_doc, metric_rows, objects, parse_ts, taken_at
+from .workload import key as wl_key
+from .workload import workload_of
 
 OPERATOR_PREFIXES = (
     "argocd-",
@@ -59,15 +60,6 @@ SECRET_TYPES_SKIP = {"kubernetes.io/service-account-token", "helm.sh/release.v1"
 SECURITY_CATEGORY = "Security"
 
 
-def _metric_rows(snap: Path, qid: str):
-    m = load_json(snap / "metrics" / f"{qid}.json")
-    for s in (m or {}).get("result") or []:
-        try:
-            yield (s.get("metric") or {}), float(s["value"][1])
-        except (KeyError, ValueError, TypeError, IndexError):
-            continue
-
-
 class _Ctx:
     def __init__(self, snap: Path, inv: dict | None):
         self.snap = snap
@@ -90,9 +82,6 @@ class _Ctx:
         if kind == "CronJob":
             return ((((o.get("spec") or {}).get("jobTemplate") or {}).get("spec") or {}).get("template") or {}).get("spec") or {}
         return ((o.get("spec") or {}).get("template") or {}).get("spec") or {}
-
-    def key(self, kind, o) -> str:
-        return f"{o['metadata']['namespace']}/{kind.lower()}/{o['metadata']['name']}"
 
 
 WELL_KNOWN_NODE_LABEL_RE = re.compile(
@@ -127,7 +116,7 @@ def _node_labels(cx: _Ctx) -> dict:
                 keys.add(t["topologyKey"])
         for k in keys:
             d = used.setdefault(k, {"key": k, "workloads": [], "prod_workloads": 0, "nodes_with_label": node_keys.get(k, 0), "nodes_total": len(nodes), "well_known": bool(WELL_KNOWN_NODE_LABEL_RE.match(k))})
-            d["workloads"].append(cx.key(kind, o))
+            d["workloads"].append(wl_key(kind, o))
             d["prod_workloads"] += 1 if o["metadata"]["namespace"] in cx.prod else 0
     rows = sorted(used.values(), key=lambda r: (r["well_known"], -r["prod_workloads"], r["key"]))  # full key: deterministic output
     for r in rows:
@@ -315,7 +304,7 @@ def _deprecated(cx: _Ctx) -> dict:
                 "rule": it.get("RuleSet"),
             }
         )
-    called = [{"group": ln.get("group"), "version": ln.get("version"), "resource": ln.get("resource"), "removed_release": ln.get("removed_release"), "calls": v} for ln, v in _metric_rows(cx.snap, "apiserver_requested_deprecated_apis")]
+    called = [{"group": ln.get("group"), "version": ln.get("version"), "resource": ln.get("resource"), "removed_release": ln.get("removed_release"), "calls": v} for ln, v in metric_rows(cx.snap, "apiserver_requested_deprecated_apis")]
     insights = []
     ins = load_json(cx.snap / "aws" / "list-insights.json")
     insights_read = ins is not None  # eks:ListInsights answered; refused, the list means nothing (#141)
@@ -433,7 +422,7 @@ def _images(cx: _Ctx) -> dict:
             if kind_tag in ("latest", "untagged") or (pull == "Always" and kind_tag == "tag"):
                 rows.append(
                     {
-                        "workload": cx.key(kind, o),
+                        "workload": wl_key(kind, o),
                         "namespace": o["metadata"]["namespace"],
                         "prod": o["metadata"]["namespace"] in cx.prod,
                         "container": c.get("name"),
@@ -469,9 +458,9 @@ def _labels(cx: _Ctx) -> dict:
         labels = md.get("labels") or {}
         tl = (((o.get("spec") or {}).get("template") or {}).get("metadata") or {}).get("labels") or {} if kind != "CronJob" else {}
         if not any(k.startswith("app.kubernetes.io/") for k in list(labels) + list(tl)):
-            no_std.append({"workload": cx.key(kind, o), "namespace": md["namespace"], "prod": md["namespace"] in cx.prod, "labels": dict(list(labels.items())[:5])})
+            no_std.append({"workload": wl_key(kind, o), "namespace": md["namespace"], "prod": md["namespace"] in cx.prod, "labels": dict(list(labels.items())[:5])})
         if md["namespace"] == "default":
-            default_ns.append({"workload": cx.key(kind, o), "prod": md["namespace"] in cx.prod})
+            default_ns.append({"workload": wl_key(kind, o), "prod": md["namespace"] in cx.prod})
     ns_names = [n["metadata"]["name"] for n in objects(cx.snap, "namespaces")]
     return {
         "workloads": total,
@@ -598,10 +587,10 @@ def _orphans(cx: _Ctx) -> dict:
             }
         )
     # Secrets (name and type only, from metrics)
-    types = {(ln.get("namespace"), ln.get("secret")): ln.get("type") for ln, _ in _metric_rows(cx.snap, "secret_types")}
+    types = {(ln.get("namespace"), ln.get("secret")): ln.get("type") for ln, _ in metric_rows(cx.snap, "secret_types")}
     orphan_sec = []
-    secrets_read = bool((load_json(cx.snap / "metrics" / "secrets_by_name.json") or {}).get("ok"))  # kube_secret_info through Prometheus; without it the orphan list means nothing (#141)
-    secret_names = {(ln.get("namespace"), ln.get("secret")) for ln, _ in _metric_rows(cx.snap, "secrets_by_name")}
+    secrets_read = bool((metric_doc(cx.snap, "secrets_by_name") or {}).get("ok"))  # kube_secret_info through Prometheus; without it the orphan list means nothing (#141)
+    secret_names = {(ln.get("namespace"), ln.get("secret")) for ln, _ in metric_rows(cx.snap, "secrets_by_name")}
     for ns, name in sorted(secret_names, key=lambda x: (str(x[0]), str(x[1]))):
         if not ns or not name or (ns, name) in sec_refs or ns.startswith("kube-"):
             continue
@@ -730,7 +719,7 @@ def _templating(cx: _Ctx) -> dict:
         # EKS add-ons carry the labels `app.kubernetes.io/managed-by: EKS` and `eks.amazonaws.com/component` (observed on the add-on workloads; no public manifest, #124 K2-4)
         if labels.get("app.kubernetes.io/managed-by") in ("eks", "EKS") or "eks.amazonaws.com/component" in labels or md["namespace"] == "kube-system":
             managed = managed or "platform"
-        rows.append({"workload": cx.key(kind, o), "namespace": md["namespace"], "prod": md["namespace"] in cx.prod, "managed_by": managed, "last_applied": "kubectl.kubernetes.io/last-applied-configuration" in ann})
+        rows.append({"workload": wl_key(kind, o), "namespace": md["namespace"], "prod": md["namespace"] in cx.prod, "managed_by": managed, "last_applied": "kubectl.kubernetes.io/last-applied-configuration" in ann})
     apps = cx.argo_apps
     return {
         "workloads": len(rows),
@@ -975,7 +964,7 @@ def _ephemeral(cx: _Ctx) -> dict:
     for kind, o in cx.workloads:
         ns = o["metadata"]["namespace"]
         tpl = cx.tpl(kind, o)
-        wl = cx.key(kind, o)
+        wl = wl_key(kind, o)
         for c in tpl.get("containers") or []:
             containers += 1
             res = c.get("resources") or {}

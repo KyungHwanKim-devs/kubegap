@@ -14,7 +14,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import amconfig
-from .snapshot import items, load_json, parse_ts, taken_at
+from .snapshot import items, load_json, metric_doc, metric_result, metric_rows, parse_ts, taken_at
 
 # Symptom/cause classification heuristic. If the expr has any symptom metric it is a symptom; if every metric is infrastructure it is a cause; otherwise (the app's own metrics) it is "app (assumed symptom)".
 SYMPTOM_RE = re.compile(
@@ -245,11 +245,6 @@ def _rules_from_api(snap: Path) -> tuple[list[dict], list[dict], str | None]:
     return alerting, recording, "objects/prometheusrules.monitoring.coreos.com.json" if alerting or recording else None
 
 
-def _metric_rows(snap: Path, qid: str) -> list[dict]:
-    d = load_json(snap / "metrics" / f"{qid}.json") or {}
-    return d.get("result", []) if d.get("ok") else []
-
-
 def _rules(alerting: list[dict], recording: list[dict], src: str | None) -> dict:
     """Rule classification (symptom/cause/app), severity counts and unhealthy rules; sets r["class"] on each alerting rule. Reads nothing (rules come from _rules_from_api)."""
     for r in alerting:
@@ -274,20 +269,19 @@ def _rules(alerting: list[dict], recording: list[dict], src: str | None) -> dict
 
 def _alerts(snap: Path, alerting: list[dict]) -> dict:
     """Firing history: never-fired rules, always-firing rules, what fires now. Reads metrics/alerts_fired_15d, alerts_firing_samples_7d, alerts_firing_now."""
-    fired = {row["metric"].get("alertname") for row in _metric_rows(snap, "alerts_fired_15d")}
+    fired = {row["metric"].get("alertname") for row in metric_result(snap, "alerts_fired_15d")}
     names = {r["name"] for r in alerting}
     never = sorted(n for n in names - fired - EXPECTED_ALWAYS_FIRING)
     samples = []
-    for row in _metric_rows(snap, "alerts_firing_samples_7d"):
-        with contextlib.suppress(KeyError, ValueError, IndexError):
-            samples.append({"alertname": row["metric"].get("alertname"), "samples_7d": float(row["value"][1])})
+    for lab, v in metric_rows(snap, "alerts_firing_samples_7d"):
+        samples.append({"alertname": lab.get("alertname"), "samples_7d": v})
     samples.sort(key=lambda r: -r["samples_7d"])
     # evaluation interval estimate: Watchdog sample count = a value that fired for all 7 days
     wd = next((s["samples_7d"] for s in samples if s["alertname"] == "Watchdog"), None)
-    samples_read = bool((load_json(snap / "metrics" / "alerts_firing_samples_7d.json") or {}).get("ok"))
+    samples_read = bool((metric_doc(snap, "alerts_firing_samples_7d") or {}).get("ok"))
     always = [s for s in samples if wd and s["samples_7d"] >= 0.95 * wd and s["alertname"] not in EXPECTED_ALWAYS_FIRING] if samples_read else None  # None, not []: the list was not read (#141)
     firing_now = []
-    for row in _metric_rows(snap, "alerts_firing_now"):
+    for row in metric_result(snap, "alerts_firing_now"):
         m = row["metric"]
         firing_now.append({"alertname": m.get("alertname"), "severity": m.get("severity"), "namespace": m.get("namespace"), "pod": m.get("pod")})
     return {
@@ -407,16 +401,15 @@ def _alertmanager(snap: Path, now: _dt.datetime) -> dict:
             if (a.get("status") or {}).get("state") == "suppressed"
         ][:20]
         am["alerts_active_by_receiver"] = dict(Counter(r.get("name") for a in alerts if (a.get("status") or {}).get("state") == "active" for r in (a.get("receivers") or [])))
-    failed = _metric_rows(snap, "alertmanager_notifications_failed_1d")
-    am["notifications_failed_1d"] = [{"integration": r["metric"].get("integration"), "count": float(r["value"][1])} for r in failed]
+    am["notifications_failed_1d"] = [{"integration": lab.get("integration"), "count": v} for lab, v in metric_rows(snap, "alertmanager_notifications_failed_1d")]
     return am
 
 
 def _golden_signals(snap: Path, comps: set, platform: str | None) -> dict:
     """Golden signals per ingress backend: whether latency/traffic/errors and saturation metrics exist and from which source. Reads metrics/http_metric_namespaces, saturation_metric_namespaces, ingress_controller_requests, objects/ingresses.networking.k8s.io.json, aws/alb-metrics.json (via traffic)."""
-    http_ns = {r["metric"].get("namespace") for r in _metric_rows(snap, "http_metric_namespaces")}
-    sat_ns = {r["metric"].get("namespace") for r in _metric_rows(snap, "saturation_metric_namespaces")}
-    ic_rows = _metric_rows(snap, "ingress_controller_requests")
+    http_ns = {r["metric"].get("namespace") for r in metric_result(snap, "http_metric_namespaces")}
+    sat_ns = {r["metric"].get("namespace") for r in metric_result(snap, "saturation_metric_namespaces")}
+    ic_rows = metric_result(snap, "ingress_controller_requests")
     ic_keys = {(r["metric"].get("exported_namespace") or r["metric"].get("namespace"), r["metric"].get("ingress") or r["metric"].get("service")) for r in ic_rows}
     alb_cloudwatch = platform == "eks" and "alb-controller" in comps
     alb_error = None

@@ -19,12 +19,10 @@ from pathlib import Path
 
 from . import podmetrics as _pm
 from . import promtext, versions
-from .controlplane import workload_of  # noqa: F401  (used by the report to map pod -> workload name)
-from .events import count_of
-from .snapshot import load_json, objects
+from .snapshot import event_count, load_json, objects
 
 
-def _q(v) -> int:
+def _count(v) -> int:
     try:
         return int(str(v).rstrip("i"))
     except (TypeError, ValueError):
@@ -77,10 +75,10 @@ def _settings(snap: Path) -> dict:
         "addon_managed": bool(addon),
         "status": {"desired": (ds.get("status") or {}).get("desiredNumberScheduled"), "ready": (ds.get("status") or {}).get("numberReady"), "available": (ds.get("status") or {}).get("numberAvailable")},
         "prefix_delegation": flag("ENABLE_PREFIX_DELEGATION"),
-        "warm_eni_target": _q(env.get("WARM_ENI_TARGET", "1")),
-        "warm_ip_target": _q(env["WARM_IP_TARGET"]) if env.get("WARM_IP_TARGET") else None,
-        "minimum_ip_target": _q(env["MINIMUM_IP_TARGET"]) if env.get("MINIMUM_IP_TARGET") else None,
-        "warm_prefix_target": _q(env.get("WARM_PREFIX_TARGET", "0")),  # ipamd's default when the variable is unset is 0 (aws/amazon-vpc-cni-k8s pkg/ipamd/ipamd.go:150@v1.19.0, :153@v1.23.2); the chart sets 1 (#124 O-5)
+        "warm_eni_target": _count(env.get("WARM_ENI_TARGET", "1")),
+        "warm_ip_target": _count(env["WARM_IP_TARGET"]) if env.get("WARM_IP_TARGET") else None,
+        "minimum_ip_target": _count(env["MINIMUM_IP_TARGET"]) if env.get("MINIMUM_IP_TARGET") else None,
+        "warm_prefix_target": _count(env.get("WARM_PREFIX_TARGET", "0")),  # ipamd's default when the variable is unset is 0 (aws/amazon-vpc-cni-k8s pkg/ipamd/ipamd.go:150@v1.19.0, :153@v1.23.2); the chart sets 1 (#124 O-5)
         "custom_networking": flag("AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG"),
         "pod_eni": flag("ENABLE_POD_ENI"),
         "ipv6": flag("ENABLE_IPv6"),
@@ -245,7 +243,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             cap = max_eni * (per_eni - 1) * (16 if st["prefix_delegation"] else 1)
         else:
             cap = None
-        max_pods = _q((n.get("allocatable") or {}).get("pods"))
+        max_pods = _count((n.get("allocatable") or {}).get("pods"))
         prom = snap / "logs" / "node" / name / "awscni.prom"
         met: dict = {"available": False}
         if prom.is_file() and prom.stat().st_size > 0:
@@ -336,7 +334,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     sandbox = 0
     for e in (load_json(snap / "events.json") or {}).get("items") or []:
         if e.get("reason") == "FailedCreatePodSandBox":
-            sandbox += count_of(e)
+            sandbox += event_count(e)
     # warm pool: with only WARM_ENI_TARGET and no WARM_IP_TARGET, one whole ENI (= per_eni - 1 IPs) is kept empty on every node
     per_node_reserve = None
     if not st["prefix_delegation"] and st["warm_ip_target"] is None and st["warm_eni_target"] >= 1:

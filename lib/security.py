@@ -13,16 +13,13 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from . import scrub
-from .snapshot import dump_record, load_json, object_file_status, objects
+from .snapshot import dump_record, load_json, metric_rows, object_file_status, objects
+from .workload import key as wl_key
 
 SECRET_ENV_RE, ENV_SKIP_RE = scrub.SECRET_ENV_RE, scrub.ENV_SKIP_RE  # shared with the collection-time ConfigMap scan
 DANGEROUS_CAPS = {"SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE", "SYS_MODULE", "ALL", "NET_RAW", "SYS_RAWIO", "DAC_READ_SEARCH"}
 SYSTEM_NS_PREFIX = ("kube-", "karpenter", "monitoring", "cert-manager", "external-secrets", "ingress-nginx", "metallb-system", "keda", "argocd", "arc-system", "arc-systems", "logging", "reloader")
 SYSTEM_SUBJECTS = {("Group", "system:masters"), ("User", "eks:addon-manager"), ("Group", "system:nodes"), ("User", "system:kube-controller-manager"), ("User", "system:kube-scheduler")}
-
-
-def _wl(kind: str, o: dict) -> str:
-    return f"{o['metadata']['namespace']}/{kind.lower()}/{o['metadata']['name']}"
 
 
 def _tpl(kind: str, o: dict) -> dict:
@@ -183,7 +180,7 @@ def _pod_security(snap: Path, prod: set) -> dict:
         if flags or root_ok:
             rows.append(
                 {
-                    "workload": _wl(kind, o),
+                    "workload": wl_key(kind, o),
                     "kind": kind,
                     "namespace": ns,
                     "prod": ns in prod,
@@ -230,7 +227,7 @@ def _secrets(snap: Path, prod: set, platform: str | None) -> dict:
 
                 names = [e["name"] for e in c.get("env") or [] if "value" in e and suspicious(e)]
                 if names:
-                    plain.append({"workload": _wl(kind, o), "namespace": ns, "prod": ns in prod, "container": c["name"], "env_names": names[:8]})  # values are not recorded
+                    plain.append({"workload": wl_key(kind, o), "namespace": ns, "prod": ns in prod, "container": c["name"], "env_names": names[:8]})  # values are not recorded
     # A ConfigMap key is a candidate when its name looks secret-like and its value looks like a secret (key name only is recorded, never the value; e.g. fluent-bit HTTP_Passwd)
     cm_rows = []
     cm_used: dict[tuple, set] = {}
@@ -240,15 +237,15 @@ def _secrets(snap: Path, prod: set, platform: str | None) -> dict:
             tpl = _tpl(kind, o)
             for v in tpl.get("volumes") or []:
                 if v.get("configMap"):
-                    cm_used.setdefault((ns, v["configMap"].get("name")), set()).add(_wl(kind, o))
+                    cm_used.setdefault((ns, v["configMap"].get("name")), set()).add(wl_key(kind, o))
             for c in tpl.get("containers") or []:
                 for ef in c.get("envFrom") or []:
                     if ef.get("configMapRef"):
-                        cm_used.setdefault((ns, ef["configMapRef"].get("name")), set()).add(_wl(kind, o))
+                        cm_used.setdefault((ns, ef["configMapRef"].get("name")), set()).add(wl_key(kind, o))
                 for e in c.get("env") or []:
                     ref = (e.get("valueFrom") or {}).get("configMapKeyRef")
                     if ref:
-                        cm_used.setdefault((ns, ref.get("name")), set()).add(_wl(kind, o))
+                        cm_used.setdefault((ns, ref.get("name")), set()).add(wl_key(kind, o))
     for cm in objects(snap, "configmaps"):
         ns, name = cm["metadata"]["namespace"], cm["metadata"]["name"]
         if ns.startswith(SYSTEM_NS_PREFIX) or name.startswith("kube-root-ca") or ((cm["metadata"].get("annotations") or {}).get("meta.helm.sh/release-name") and name.endswith(("-dashboard", "-dashboards"))):
@@ -266,9 +263,8 @@ def _secrets(snap: Path, prod: set, platform: str | None) -> dict:
         if r.get("status") != "True":
             es_bad.append({"namespace": es["metadata"]["namespace"], "name": es["metadata"]["name"], "reason": r.get("reason"), "message": (r.get("message") or "")[:160], "prod": es["metadata"]["namespace"] in prod})
     types = Counter()
-    m = load_json(snap / "metrics" / "secret_types.json")
-    for s in (m or {}).get("result") or []:
-        types[(s.get("metric") or {}).get("type")] += 1
+    for lab, _ in metric_rows(snap, "secret_types"):
+        types[lab.get("type")] += 1
     kms = None
     dc = load_json(snap / "aws" / "describe-cluster.json")
     if dc:

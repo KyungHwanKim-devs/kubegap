@@ -15,13 +15,13 @@ rbac (subjects with edit/admin across several prod tenants), noisy (noisy-neighb
 
 from __future__ import annotations
 
-import contextlib
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .resilience import _q
-from .snapshot import load_json, objects
+from .quantity import parse as quantity
+from .quantity import rounded
+from .snapshot import metric_by, metric_doc, metric_rows, objects
 
 SYSTEM_NS = {
     "kube-system",
@@ -67,23 +67,6 @@ CI_NS_RE = re.compile(r"(runner|^ci$|^ci-|-ci$|jenkins|tekton|drone|buildkit|git
 CI_OWNER_KINDS = {"EphemeralRunner", "EphemeralRunnerSet", "AutoscalingRunnerSet", "AutoscalingListener", "Runner", "RunnerDeployment", "RunnerReplicaSet", "RunnerSet", "PipelineRun", "TaskRun"}
 NODE_TOLERATION_PREFIX = ("node.kubernetes.io/", "node.cloudprovider.kubernetes.io/", "kubernetes.io/", "CriticalAddonsOnly")
 BROAD_ROLES = {"admin", "edit", "cluster-admin"}
-
-
-def _metric_rows(snap: Path, qid: str) -> list[tuple[dict, float]]:
-    m = load_json(snap / "metrics" / f"{qid}.json")
-    out = []
-    for s in (m or {}).get("result") or []:
-        with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
-            out.append((s.get("metric") or {}, float(s["value"][1])))
-    return out
-
-
-def _metric_by(snap: Path, qid: str, key: str = "namespace") -> dict[str, float]:
-    return {lab.get(key): v for lab, v in _metric_rows(snap, qid) if lab.get(key)}
-
-
-def _r(x, n=2):
-    return None if x is None else round(x, n)
 
 
 def _owner_kind(pod: dict) -> str | None:
@@ -141,10 +124,10 @@ def _requests(pod: dict) -> tuple[float, float, float, float, int, int]:
             noreq += 1
         if not lm.get("memory"):
             nolim += 1
-        cr += _q(rq.get("cpu"))
-        mr += _q(rq.get("memory"))
-        cl += _q(lm.get("cpu"))
-        ml += _q(lm.get("memory"))
+        cr += quantity(rq.get("cpu"))
+        mr += quantity(rq.get("memory"))
+        cl += quantity(lm.get("cpu"))
+        ml += quantity(lm.get("memory"))
     return cr, mr, cl, ml, noreq, nolim
 
 
@@ -223,17 +206,17 @@ class _Ctx:
         self.karpenter = bool(objects(snap, "nodepools.karpenter.sh"))
         self.separation_possible = self.karpenter or self.nodes_total >= 3
         # --- metrics ---
-        self.cpu_p95 = _metric_by(snap, "namespace_cpu_p95_7d")
-        self.cpu_max = _metric_by(snap, "namespace_cpu_max_7d")
+        self.cpu_p95 = metric_by(snap, "namespace_cpu_p95_7d", "namespace")
+        self.cpu_max = metric_by(snap, "namespace_cpu_max_7d", "namespace")
         self.cpu_metrics_read = all(
-            bool((load_json(snap / "metrics" / f"{q}.json") or {}).get("ok")) for q in ("namespace_cpu_max_7d", "namespace_cpu_median_7d")
+            bool((metric_doc(snap, q) or {}).get("ok")) for q in ("namespace_cpu_max_7d", "namespace_cpu_median_7d")
         )  # the burst ratio needs both; a namespace without samples is "no usage", a missing file is "not read" (#141)
-        self.cpu_med = _metric_by(snap, "namespace_cpu_median_7d")
-        self.mem_p95 = _metric_by(snap, "namespace_memory_p95_7d_bytes")
-        self.throttled = _metric_by(snap, "namespace_cpu_throttled_ratio_7d")
-        self.sat_min = _metric_by(snap, "node_cpu_saturated_minutes_7d", "node")
+        self.cpu_med = metric_by(snap, "namespace_cpu_median_7d", "namespace")
+        self.mem_p95 = metric_by(snap, "namespace_memory_p95_7d_bytes", "namespace")
+        self.throttled = metric_by(snap, "namespace_cpu_throttled_ratio_7d", "namespace")
+        self.sat_min = metric_by(snap, "node_cpu_saturated_minutes_7d", "node")
         self.node_share: dict[str, dict[str, float]] = defaultdict(dict)
-        for lab, v in _metric_rows(snap, "namespace_node_cpu_share_p95_7d"):
+        for lab, v in metric_rows(snap, "namespace_node_cpu_share_p95_7d"):
             if lab.get("node") and lab.get("namespace"):
                 self.node_share[lab["node"]][lab["namespace"]] = v
         self.metrics_available = bool(self.cpu_p95)
@@ -249,9 +232,9 @@ def _quotas(cx: _Ctx) -> dict[str, list[dict]]:
         used = (q.get("status") or {}).get("used") or {}
         ratios = {}
         for k, hv in hard.items():
-            h = _q(hv)
-            u = _q(used.get(k))
-            ratios[k] = _r(u / h, 3) if h else None
+            h = quantity(hv)
+            u = quantity(used.get(k))
+            ratios[k] = rounded(u / h, 3) if h else None
         near = sorted([k for k, r in ratios.items() if r is not None and r >= 0.8], key=lambda k: -ratios[k])
         quotas_by_ns[ns].append(
             {
@@ -382,7 +365,7 @@ def _pod_aggregation(cx: _Ctx) -> tuple[dict[str, list[dict]], dict[str, dict]]:
         elif kind == "ci":
             nr["ci_namespaces"].add(ns)
             heavy = owner in CI_OWNER_KINDS or "runner" in p["metadata"]["name"] or cr >= 1.0
-            nr["ci_pods"].append({"pod": p["metadata"]["name"], "namespace": ns, "owner_kind": owner, "cpu_request": _r(cr, 3), "heavy": heavy})
+            nr["ci_pods"].append({"pod": p["metadata"]["name"], "namespace": ns, "owner_kind": owner, "cpu_request": rounded(cr, 3), "heavy": heavy})
     return ns_pods, node_rows
 
 
@@ -400,7 +383,7 @@ def _node_rows(cx: _Ctx, node_rows: dict[str, dict]) -> list[dict]:
     nodes_out = []
     for node, nr in sorted(node_rows.items()):
         alloc = (cx.node_alloc.get(node) or {}).get("allocatable") or {}
-        acpu, amem = _q(alloc.get("cpu")), _q(alloc.get("memory"))
+        acpu, amem = quantity(alloc.get("cpu")), quantity(alloc.get("memory"))
         share = cx.node_share.get(node) or {}
         dom = max(share.items(), key=lambda kv: kv[1]) if share else None
         tenants = dict(nr["tenants"])
@@ -421,20 +404,20 @@ def _node_rows(cx: _Ctx, node_rows: dict[str, dict]) -> list[dict]:
             "ci_namespaces": sorted(nr["ci_namespaces"]),
             "ci_pod_list": nr["ci_pods"][:10],
             "ci_heavy": any(c["heavy"] for c in nr["ci_pods"]),
-            "allocatable_cpu": _r(acpu, 2),
-            "allocatable_memory_gb": _r(amem / 1024**3, 1) if amem else None,
-            "cpu_requests": _r(nr["cpu_requests"], 2),
-            "cpu_limits": _r(nr["cpu_limits"], 2),
-            "memory_requests_gb": _r(nr["memory_requests"] / 1024**3, 1),
-            "memory_limits_gb": _r(nr["memory_limits"] / 1024**3, 1),
-            "memory_limit_overcommit": _r(nr["memory_limits"] / amem, 2) if amem else None,
-            "cpu_limit_overcommit": _r(nr["cpu_limits"] / acpu, 2) if acpu else None,
+            "allocatable_cpu": rounded(acpu, 2),
+            "allocatable_memory_gb": rounded(amem / 1024**3, 1) if amem else None,
+            "cpu_requests": rounded(nr["cpu_requests"], 2),
+            "cpu_limits": rounded(nr["cpu_limits"], 2),
+            "memory_requests_gb": rounded(nr["memory_requests"] / 1024**3, 1),
+            "memory_limits_gb": rounded(nr["memory_limits"] / 1024**3, 1),
+            "memory_limit_overcommit": rounded(nr["memory_limits"] / amem, 2) if amem else None,
+            "cpu_limit_overcommit": rounded(nr["cpu_limits"] / acpu, 2) if acpu else None,
             "containers_without_memory_limit": nr["containers_without_memory_limit"],
-            "cpu_saturated_minutes_7d": _r(cx.sat_min.get(node), 0) if node in cx.sat_min else None,
+            "cpu_saturated_minutes_7d": rounded(cx.sat_min.get(node), 0) if node in cx.sat_min else None,
             "dominant_namespace": dom[0] if dom else None,
-            "dominant_share_p95": _r(dom[1], 3) if dom else None,
+            "dominant_share_p95": rounded(dom[1], 3) if dom else None,
             "dominant_kind": cx.tn.kind(dom[0]) if dom else None,
-            "namespace_share_p95": {k: _r(v, 3) for k, v in sorted(share.items(), key=lambda kv: -kv[1])[:6]},
+            "namespace_share_p95": {k: rounded(v, 3) for k, v in sorted(share.items(), key=lambda kv: -kv[1])[:6]},
             "shares_ci_prod": tenants.get("prod", 0) > 0 and len(nr["ci_pods"]) > 0,
             "shares_dev_prod": tenants.get("prod", 0) > 0 and tenants.get("dev", 0) > 0,
             "separation_possible": cx.separation_possible,
@@ -512,8 +495,8 @@ def _ci_templates(cx: _Ctx, pools_out: list[dict]) -> list[dict]:
                     **cons,
                     "matching_pools": matched,
                     "dedicated_pool": next((p for p in matched if cx.pools[p].get("taints")), None),
-                    "cpu_request": _r(sum(_q(r.get("cpu")) for r in reqs), 2),
-                    "memory_request_gb": _r(sum(_q(r.get("memory")) for r in reqs) / 1024**3, 2),
+                    "cpu_request": rounded(sum(quantity(r.get("cpu")) for r in reqs), 2),
+                    "memory_request_gb": rounded(sum(quantity(r.get("memory")) for r in reqs) / 1024**3, 2),
                     "has_requests": any(r for r in reqs),
                 }
             )
@@ -585,10 +568,10 @@ def _namespace_row(cx: _Ctx, ns: str, plist: list[dict], nodes_out: list[dict], 
         "system": kind == "system",
         "pods": len(plist),
         "workloads": parts["workload_counts"].get(ns, 0),
-        "cpu_requests": _r(cr, 2),
-        "cpu_limits": _r(cl, 2),
-        "memory_requests_gb": _r(mr / 1024**3, 2),
-        "memory_limits_gb": _r(ml / 1024**3, 2),
+        "cpu_requests": rounded(cr, 2),
+        "cpu_limits": rounded(cl, 2),
+        "memory_requests_gb": rounded(mr / 1024**3, 2),
+        "memory_limits_gb": rounded(ml / 1024**3, 2),
         "containers_without_requests": noreq,
         "containers_without_memory_limit": nolim,
         "has_quota": ns in quotas_by_ns,
@@ -605,15 +588,15 @@ def _namespace_row(cx: _Ctx, ns: str, plist: list[dict], nodes_out: list[dict], 
         "node_count": len(nodes_c),
         "pools": dict(pools_c.most_common()),
         "shares_nodes_with_prod": shares_prod,
-        "cpu_p95_7d": _r(p95, 3),
+        "cpu_p95_7d": rounded(p95, 3),
         "cpu_metrics_read": cx.cpu_metrics_read,
-        "cpu_max_7d": _r(mx, 3),
-        "cpu_median_7d": _r(med, 3),
-        "burst_ratio_7d": _r(burst, 1),
-        "cpu_share_of_cluster_p95": _r(p95 / cx.cluster_p95_total, 3) if (p95 is not None and cx.cluster_p95_total) else None,
-        "memory_p95_7d_gb": _r(cx.mem_p95.get(ns, 0) / 1024**3, 2) if ns in cx.mem_p95 else None,
-        "throttled_ratio_7d": _r(cx.throttled.get(ns), 3) if ns in cx.throttled else None,
-        "node_share_p95_max": _r(node_share_max[1], 3) if node_share_max[1] is not None else None,
+        "cpu_max_7d": rounded(mx, 3),
+        "cpu_median_7d": rounded(med, 3),
+        "burst_ratio_7d": rounded(burst, 1),
+        "cpu_share_of_cluster_p95": rounded(p95 / cx.cluster_p95_total, 3) if (p95 is not None and cx.cluster_p95_total) else None,
+        "memory_p95_7d_gb": rounded(cx.mem_p95.get(ns, 0) / 1024**3, 2) if ns in cx.mem_p95 else None,
+        "throttled_ratio_7d": rounded(cx.throttled.get(ns), 3) if ns in cx.throttled else None,
+        "node_share_p95_max": rounded(node_share_max[1], 3) if node_share_max[1] is not None else None,
         "node_share_p95_max_node": node_share_max[0],
         "tenants_total": None,  # filled below
         "multi_org": parts["multi_org"],

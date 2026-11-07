@@ -8,17 +8,12 @@ Secret values (keys, certificate bodies) are never read. Result: the `certmanage
 
 from __future__ import annotations
 
-import re
 from collections import Counter
 from pathlib import Path
 
 from .promtext import parse as _parse_prom
 from .snapshot import objects, parse_ts, taken_at
-
-
-def _ver(image: str | None):
-    m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
-    return m.group(1) if m else None
+from .versions import image_version
 
 
 def _conds(obj) -> dict:
@@ -41,7 +36,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         comps[d["metadata"]["name"].replace("cert-manager-", "") if d["metadata"]["name"] != "cert-manager" else "controller"] = {
             "replicas": sp.get("replicas"),
             "ready": st.get("readyReplicas") or 0,
-            "version": _ver(c0.get("image")),
+            "version": image_version(c0.get("image")),
             "namespace": d["metadata"]["namespace"],
         }
     version = (comps.get("controller") or {}).get("version")

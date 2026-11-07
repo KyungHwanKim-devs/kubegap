@@ -16,29 +16,17 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .controlplane import workload_of
-from .nodeos import _int, _kv, _num, parse_sections
+from . import quantity
+from .nodetext import key_values, parse_sections
+from .quantity import to_float, to_int
 from .snapshot import items, load_json, parse_ts, taken_at
+from .workload import workload_of
 
 # source: k3s-io/k3s pkg/cli/cert/cert.go:106-122@v1.33.5+k3s1; :104-120@v1.37.2+k3s1 (`%s: certificate %s (%s) is ok, expires at %s` / `will expire within %d days at %s` / `expired at %s` / `is not valid before %s`, RFC3339 times); pkg/util/cert.go:12-15, 37@v1.33.5+k3s1 (usages CertSign, ServerAuth, ClientAuth, Unknown joined with commas)
 CERT_RE = re.compile(r'msg="([^:"]+): certificate ([^ ]+) \(([A-Za-z,]+)\) (is ok, expires at|will expire within \d+ days at|expired at|is not valid before) ([0-9T:Z+-]+)"')
 CERT_STATUS = {"is ok, expires at": "ok", "will expire within": "expiring", "expired at": "expired", "is not valid before": "not-yet-valid"}
 # source: rancher/local-path-provisioner provisioner.go:367, 378@v0.0.31; :408, 442@v0.0.37 (`<pvName>_<namespace>_<pvcName>` under the node path, pvName = pvc-<uid>)
 LOCAL_PATH_DIR_RE = re.compile(r"/storage/pvc-([0-9a-f-]{36})_([a-z0-9-]+)_(.+)$")
-# source: kubernetes/kubernetes staging/src/k8s.io/apimachinery/pkg/api/resource/suffix.go:113-116, 128-130@v1.30.14 (the binary Ki/Mi/Gi/Ti and decimal K/M/G/T suffixes of a Quantity)
-SIZE_RE = re.compile(r"^(\d+(?:\.\d+)?)([KMGT]i?)?$")
-
-
-def _size_mb(s: str | None) -> float | None:
-    if not s:
-        return None
-    m = SIZE_RE.match(str(s).strip())
-    if not m:
-        return None
-    n = float(m.group(1))
-    u = m.group(2) or ""
-    mult = {"Ki": 1 / 1024, "Mi": 1, "Gi": 1024, "Ti": 1024**2, "K": 1 / 1000, "M": 1, "G": 1000, "T": 1000**2, "": 1 / 1024**2}
-    return n * mult.get(u, 1)
 
 
 def _parse_args(args: list[str]) -> dict:
@@ -72,10 +60,10 @@ def _parse_args(args: list[str]) -> dict:
 
 
 def _parse_server(lines: list[str], now: _dt.datetime) -> dict:
-    kv = _kv([ln for ln in lines if "=" in ln and not ln.startswith(" ") and ":" not in ln.split("=")[0]])
+    kv = key_values([ln for ln in lines if "=" in ln and not ln.startswith(" ") and ":" not in ln.split("=")[0]])
     out: dict = {
         "secrets_encryption": kv.get("secrets_encrypt") or None,
-        "db_mb": _int(kv.get("db_mb"), None) if kv.get("db_mb") else None,
+        "db_mb": to_int(kv.get("db_mb"), None) if kv.get("db_mb") else None,
         "db_kind": kv.get("db_kind") or None,
         "etcd_snapshots": [],
         "certificates": [],
@@ -101,7 +89,7 @@ def _parse_server(lines: list[str], now: _dt.datetime) -> dict:
             if len(parts) >= 4:
                 created = parse_ts(parts[3])
                 age_h = round((now - created).total_seconds() / 3600, 1) if created else None
-                out["etcd_snapshots"].append({"name": parts[0], "location": parts[1], "size_mb": round(_int(parts[2]) / 1024**2, 1), "created": parts[3], "age_h": age_h, "offsite": not parts[1].startswith("file://")})
+                out["etcd_snapshots"].append({"name": parts[0], "location": parts[1], "size_mb": round(to_int(parts[2]) / 1024**2, 1), "created": parts[3], "age_h": age_h, "offsite": not parts[1].startswith("file://")})
         elif mode == "cert":
             out["certificates_raw_lines"] += 1
             m = CERT_RE.search(s)
@@ -127,15 +115,15 @@ def _parse_server(lines: list[str], now: _dt.datetime) -> dict:
 
 
 def _parse_local_path(lines: list[str]) -> dict:
-    kv = _kv(lines)
+    kv = key_values(lines)
     vols = []
     for ln in lines:
         parts = ln.strip().split("\t") if "\t" in ln else ln.strip().split(None, 1)
-        if len(parts) == 2 and _num(parts[0]) is not None and "/storage/" in parts[1]:
+        if len(parts) == 2 and to_float(parts[0]) is not None and "/storage/" in parts[1]:
             m = LOCAL_PATH_DIR_RE.search(parts[1])
             if m:
-                vols.append({"pv": "pvc-" + m.group(1), "namespace": m.group(2), "pvc": m.group(3), "mb": _int(parts[0])})
-    return {"total_mb": _int(kv.get("total_mb"), None) if kv.get("total_mb") else None, "volumes": vols}
+                vols.append({"pv": "pvc-" + m.group(1), "namespace": m.group(2), "pvc": m.group(3), "mb": to_int(parts[0])})
+    return {"total_mb": to_int(kv.get("total_mb"), None) if kv.get("total_mb") else None, "volumes": vols}
 
 
 def _parse_flannel(kv: dict) -> dict:
@@ -143,17 +131,17 @@ def _parse_flannel(kv: dict) -> dict:
     rx = re.search(r"rx: (\d+) (\d+) (\d+) (\d+)", st)
     tx = re.search(r"tx: (\d+) (\d+) (\d+) (\d+)", st)
     vx = re.search(r"local ([0-9.]+) dev ([a-z0-9]+)", kv.get("vxlan", ""))
-    mtu, under = _int(kv.get("mtu"), None) if kv.get("mtu") else None, _int(kv.get("underlay_mtu"), None) if kv.get("underlay_mtu") else None
+    mtu, under = to_int(kv.get("mtu"), None) if kv.get("mtu") else None, to_int(kv.get("underlay_mtu"), None) if kv.get("underlay_mtu") else None
     return {
         "mtu": mtu,
         "underlay_mtu": under,
         "mtu_ok": (under - mtu == 50) if (mtu and under) else None,
         "local_ip": vx.group(1) if vx else None,
         "underlay_dev": vx.group(2) if vx else None,
-        "rx_errors": _int(rx.group(3)) if rx else None,
-        "rx_dropped": _int(rx.group(4)) if rx else None,
-        "tx_errors": _int(tx.group(3)) if tx else None,
-        "tx_dropped": _int(tx.group(4)) if tx else None,
+        "rx_errors": to_int(rx.group(3)) if rx else None,
+        "rx_dropped": to_int(rx.group(4)) if rx else None,
+        "tx_errors": to_int(tx.group(3)) if tx else None,
+        "tx_dropped": to_int(tx.group(4)) if tx else None,
         "ip_forward": kv.get("ip_forward"),
         "br_netfilter": kv.get("br_netfilter"),
         "addrs": kv.get("addrs"),
@@ -253,7 +241,7 @@ def _node_base(n: dict, o: dict, node_ips: set[str]) -> dict:
 
 def _node_runtime(rec: dict, sec: dict) -> None:
     """Fills rec from the meta, unit, check-config, ports, flannel and journald sections of logs/node/<node>/k3s-platform.txt."""
-    meta = _kv(sec.get("meta", []))
+    meta = key_values(sec.get("meta", []))
     rec["version"] = meta.get("version") or None
     rec["config_file"] = meta.get("config_file")
     rec["smartctl"] = meta.get("smartctl") == "yes"
@@ -271,18 +259,18 @@ def _node_runtime(rec: dict, sec: dict) -> None:
         parts = ln.strip().split()
         if parts:
             addr, _, port = parts[0].rpartition(":")
-            ports.append({"addr": addr, "port": _int(port), "proc": parts[1] if len(parts) > 1 else None})
+            ports.append({"addr": addr, "port": to_int(port), "proc": parts[1] if len(parts) > 1 else None})
     rec["ports"] = ports
     rec["apiserver_bind"] = sorted({p["addr"] for p in ports if p["port"] == 6443}) or None
     rec["etcd_bind"] = sorted({p["addr"] for p in ports if p["port"] in (2379, 2380)}) or None
-    rec["flannel"] = _parse_flannel(_kv(sec.get("flannel", [])))
-    jd = _kv(sec.get("journald", []))
+    rec["flannel"] = _parse_flannel(key_values(sec.get("flannel", [])))
+    jd = key_values(sec.get("journald", []))
     disk = jd.get("disk", "")
     mdisk = re.match(r"([0-9.]+)([KMGT]?)", disk)  # systemd's format_bytes: one decimal and a K/M/G/T suffix, bare bytes under 1 KiB
     rec["journald"] = {
         "disk_mb": round(float(mdisk.group(1)) * {"": 1 / 1024**2, "K": 1 / 1024, "M": 1, "G": 1024, "T": 1024**2}[mdisk.group(2)]) if mdisk else None,
         "conf": jd.get("conf") or None,
-        "k3s_lines_24h": _int(jd.get("k3s_lines_24h"), None) if jd.get("k3s_lines_24h") else None,
+        "k3s_lines_24h": to_int(jd.get("k3s_lines_24h"), None) if jd.get("k3s_lines_24h") else None,
         "bounded": bool(jd.get("conf")),
     }
 
@@ -304,7 +292,7 @@ def _node_server_storage(rec: dict, sec: dict, now: _dt.datetime) -> None:
         "auth_configs": [ln.strip().rstrip(":") for i, ln in enumerate(reg) if ln.startswith("  ") and not ln.startswith("    ") and "configs" in "".join(reg[:i])],
         "present": bool(reg),
     }
-    ct = _kv([ln.strip().replace(" = ", "=") for ln in sec.get("containerd", []) if "=" in ln])
+    ct = key_values([ln.strip().replace(" = ", "=") for ln in sec.get("containerd", []) if "=" in ln])
     # registry credentials live in registries.yaml `configs:` (section registries); the containerd config.toml of k3s carries them only as table headers, and none on containerd 2.x
     rec["containerd"] = {"snapshotter": (ct.get("snapshotter") or "").strip('"') or None, "systemd_cgroup": ct.get("SystemdCgroup"), "private_registry_auth": bool(rec["registries"]["auth_configs"])}
     lp = _parse_local_path(sec.get("local-path", []))
@@ -399,7 +387,8 @@ def _local_path(snap: Path, recs: list[dict], pods: list[dict]) -> dict:
             for e in t.get("matchExpressions", []) or []:
                 if e.get("key") == "kubernetes.io/hostname" and e.get("values"):
                     node = e["values"][0]
-        cap_mb = _size_mb((spec.get("capacity") or {}).get("storage"))
+        cap_b = quantity.parse((spec.get("capacity") or {}).get("storage"), None)
+        cap_mb = cap_b / quantity.MIB if cap_b is not None else None
         um = used_mb.get((cr.get("namespace"), cr.get("name")))
         rec = {
             "pv": pv["metadata"]["name"],

@@ -9,18 +9,13 @@ provider API call success/failure, sync errors, reconcile errors). Result: the `
 from __future__ import annotations
 
 import json
-import re
 from collections import Counter
 from pathlib import Path
 
 from .durations import go_duration_s
 from .promtext import parse as _parse_prom
 from .snapshot import objects, parse_ts, taken_at
-
-
-def _ver(image: str | None):
-    m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
-    return m.group(1) if m else None
+from .versions import image_version
 
 
 def _interval_h(s) -> float | None:
@@ -41,7 +36,7 @@ def _deploy(snap: Path, name: str) -> dict:
         "namespace": d["metadata"]["namespace"],
         "replicas": sp.get("replicas"),
         "ready": st.get("readyReplicas") or 0,
-        "version": _ver(c0.get("image")),
+        "version": image_version(c0.get("image")),
         "args": [str(a) for a in (c0.get("args") or [])],
         "service_account": ((sp.get("template") or {}).get("spec") or {}).get("serviceAccountName"),
     }

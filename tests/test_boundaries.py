@@ -35,11 +35,14 @@ LAYERS: dict[str, str] = {
     "durations": FOUNDATIONS,
     "http": FOUNDATIONS,
     "lastapplied": FOUNDATIONS,
+    "logtext": FOUNDATIONS,
     "mask": FOUNDATIONS,
     "metricnames": FOUNDATIONS,
+    "nodetext": FOUNDATIONS,
     "paths": FOUNDATIONS,
     "podmetrics": FOUNDATIONS,
     "promtext": FOUNDATIONS,
+    "quantity": FOUNDATIONS,
     "rubric": FOUNDATIONS,
     "runlog": FOUNDATIONS,
     "scrub": FOUNDATIONS,
@@ -47,6 +50,7 @@ LAYERS: dict[str, str] = {
     "signatures": FOUNDATIONS,
     "snapshot": FOUNDATIONS,
     "versions": FOUNDATIONS,
+    "workload": FOUNDATIONS,
     "yamlite": FOUNDATIONS,
     # collection: touches the cluster, AWS, the nodes or Prometheus and writes the snapshot files
     "albmetrics": COLLECTION,
@@ -116,28 +120,8 @@ LAYERS: dict[str, str] = {
 ORCHESTRATORS = {"summarize"}
 
 # Imports against the rule that are known, dated and owned by the issue that removes them. Key: (importing module, imported module).
-# Shared helpers that a summary module lends to the others have no home below the summaries layer yet; #150 gives each one a home and deletes its row.
 # A summary that computes part of another section itself gets that section's result from summarize instead; #151 does that and deletes its row.
 EXCEPTIONS: dict[tuple[str, str], str] = {
-    ("evaluate", "resilience"): "2026-11-07 is_db_like, mounts_pvc have no home below the summaries → #150",
-    ("metallbctl", "resilience"): "2026-11-07 eligible_nodes, selector_matches have no home below the summaries → #150",
-    ("tenancy", "resilience"): "2026-11-07 _q (resource quantity) has no home below the summaries → #150",
-    ("hygiene", "controlplane"): "2026-11-07 workload_of has no home below the summaries → #150",
-    ("k3s", "controlplane"): "2026-11-07 workload_of has no home below the summaries → #150",
-    ("logs", "controlplane"): "2026-11-07 workload_of, _normalize_msg have no home below the summaries → #150",
-    ("nodeos", "controlplane"): "2026-11-07 workload_of has no home below the summaries → #150",
-    ("resilience", "controlplane"): "2026-11-07 workload_of has no home below the summaries → #150",
-    ("resources", "controlplane"): "2026-11-07 workload_of has no home below the summaries → #150",
-    ("traffic", "controlplane"): "2026-11-07 workload_of has no home below the summaries → #150",
-    ("vpccni", "controlplane"): "2026-11-07 workload_of has no home below the summaries → #150",
-    ("ebscsi", "events"): "2026-11-07 count_of has no home below the summaries → #150",
-    ("resilience", "events"): "2026-11-07 count_of has no home below the summaries → #150",
-    ("scaling", "events"): "2026-11-07 count_of has no home below the summaries → #150",
-    ("storage", "events"): "2026-11-07 count_of has no home below the summaries → #150",
-    ("traffic", "events"): "2026-11-07 count_of has no home below the summaries → #150",
-    ("vpccni", "events"): "2026-11-07 count_of has no home below the summaries → #150",
-    ("resilience", "nodeos"): "2026-11-07 kernel_oom_kills has no home below the summaries → #150",
-    ("k3s", "nodeos"): "2026-11-07 parse_sections, _kv, _int, _num have no home below the summaries → #150",
     ("security", "hygiene"): "2026-11-07 security runs hygiene's polaris reader itself; summarize passes the hygiene section instead → #151",
     ("traffic", "security"): "2026-11-07 traffic asks security whether NetworkPolicy is enforced; summarize passes the security section instead → #151",
     ("observability", "traffic"): "2026-11-07 observability asks traffic which Services ALB covers; summarize passes the traffic section instead → #151",

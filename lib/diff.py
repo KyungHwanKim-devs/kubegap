@@ -14,7 +14,6 @@ What is compared:
 
 from __future__ import annotations
 
-import contextlib
 import csv
 import datetime as _dt
 import hashlib
@@ -24,7 +23,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import __version__, paths
-from .snapshot import items, load_json, write_private
+from .snapshot import items, load_json, metric_sample, write_private
 
 COUNT_ONLY_KINDS = {
     "pods",
@@ -309,8 +308,8 @@ def diff_metrics(a: Path, b: Path, top: int = 10) -> dict:
             t = {}
             for s in d.get("result", []):
                 lab = tuple((k, v) for k, v in sorted(s.get("metric", {}).items()) if k in METRIC_DELTA_LABELS)
-                with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
-                    t[lab] = float(s["value"][1])
+                if (v := metric_sample(s)) is not None:
+                    t[lab] = v
             return t
 
         ta, tb = table(da), table(db)

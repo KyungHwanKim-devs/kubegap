@@ -12,21 +12,16 @@ Output: the `resources` section of summary.json. Shape documented in SKILL.md.
 
 from __future__ import annotations
 
-import contextlib
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from .controlplane import workload_of
-from .snapshot import load_json
+from . import quantity
+from .quantity import to_float
+from .snapshot import load_json, metric_rows
+from .workload import workload_of
 
 SEV_ORDER = {"CRITICAL": 0, "WARNING": 1, "OK": 2, "GOOD": 3, "UNKNOWN": 4}
-
-
-def _num(v):
-    if isinstance(v, (int, float)):
-        return float(v)
-    return None  # "?" (UNKNOWN) or None (no limit recommended)
 
 
 def _mb(b):
@@ -68,17 +63,17 @@ def analyze_krr(snap: Path) -> dict:
             "name": name,
             "container": cont,
             "severity": s.get("severity"),
-            "cpu_request": _cores(_num(cur_req.get("cpu"))),
-            "cpu_request_rec": _cores(_num((rec_req.get("cpu") or {}).get("value"))),
+            "cpu_request": _cores(to_float(cur_req.get("cpu"))),
+            "cpu_request_rec": _cores(to_float((rec_req.get("cpu") or {}).get("value"))),
             "cpu_request_sev": (rec_req.get("cpu") or {}).get("severity"),
-            "cpu_limit": _cores(_num(cur_lim.get("cpu"))),
-            "cpu_limit_rec": _cores(_num((rec_lim.get("cpu") or {}).get("value"))),
+            "cpu_limit": _cores(to_float(cur_lim.get("cpu"))),
+            "cpu_limit_rec": _cores(to_float((rec_lim.get("cpu") or {}).get("value"))),
             "cpu_limit_sev": (rec_lim.get("cpu") or {}).get("severity"),
-            "memory_request_mb": _mb(_num(cur_req.get("memory"))),
-            "memory_request_rec_mb": _mb(_num((rec_req.get("memory") or {}).get("value"))),
+            "memory_request_mb": _mb(to_float(cur_req.get("memory"))),
+            "memory_request_rec_mb": _mb(to_float((rec_req.get("memory") or {}).get("value"))),
             "memory_request_sev": (rec_req.get("memory") or {}).get("severity"),
-            "memory_limit_mb": _mb(_num(cur_lim.get("memory"))),
-            "memory_limit_rec_mb": _mb(_num((rec_lim.get("memory") or {}).get("value"))),
+            "memory_limit_mb": _mb(to_float(cur_lim.get("memory"))),
+            "memory_limit_rec_mb": _mb(to_float((rec_lim.get("memory") or {}).get("value"))),
             "memory_limit_sev": (rec_lim.get("memory") or {}).get("severity"),
             "info": {k: v for k, v in (rec.get("info") or {}).items() if v},
             "warnings": o.get("warnings") or [],
@@ -174,21 +169,12 @@ def analyze_krr(snap: Path) -> dict:
     }
 
 
-def _metric_rows(snap: Path, qid: str) -> list[tuple[dict, float]]:
-    m = load_json(snap / "metrics" / f"{qid}.json")
-    out = []
-    for s in (m or {}).get("result") or []:
-        with contextlib.suppress(KeyError, ValueError, TypeError, IndexError):
-            out.append((s.get("metric") or {}, float(s["value"][1])))
-    return out
-
-
 def analyze_p95(snap: Path, inv: dict | None) -> dict:
     """Group the 7-day p95 ratio metrics per workload and produce top lists (several pods are averaged)."""
 
     def by_workload(qid):
         acc: dict[str, list[float]] = defaultdict(list)
-        for lab, v in _metric_rows(snap, qid):
+        for lab, v in metric_rows(snap, qid):
             acc[f"{workload_of(lab.get('namespace', '') + '/' + lab.get('pod', ''))}:{lab.get('container', '')}"].append(v)
         return {k: round(sum(v) / len(v), 3) for k, v in acc.items()}
 
@@ -201,7 +187,7 @@ def analyze_p95(snap: Path, inv: dict | None) -> dict:
     def top(d, reverse, n=20):
         return [{"workload": k, "ratio": v} for k, v in sorted(d.items(), key=lambda kv: kv[1], reverse=reverse)[:n]]
 
-    large = [{"workload": f"{workload_of(lab.get('namespace', '') + '/' + lab.get('pod', ''))}:{lab.get('container', '')}", "ratio_of_median_node": round(v, 2)} for lab, v in _metric_rows(snap, "large_request_containers")]
+    large = [{"workload": f"{workload_of(lab.get('namespace', '') + '/' + lab.get('pod', ''))}:{lab.get('container', '')}", "ratio_of_median_node": round(v, 2)} for lab, v in metric_rows(snap, "large_request_containers")]
     return {
         "available": True,
         "window": "7d, 15m step, p95",
@@ -211,8 +197,8 @@ def analyze_p95(snap: Path, inv: dict | None) -> dict:
         "memory_overprovisioned_top": top({k: v for k, v in mem_req.items() if v < 0.35}, False),
         "memory_near_limit_top": top({k: v for k, v in mem_lim.items() if v >= 0.8}, True),
         "large_requests": sorted(large, key=lambda r: -r["ratio_of_median_node"]),
-        "node_cpu_p95": {lab.get("node"): round(v, 3) for lab, v in _metric_rows(snap, "node_cpu_usage_ratio_p95_7d")},
-        "node_memory_p95": {lab.get("node"): round(v, 3) for lab, v in _metric_rows(snap, "node_memory_usage_ratio_p95_7d")},
+        "node_cpu_p95": {lab.get("node"): round(v, 3) for lab, v in metric_rows(snap, "node_cpu_usage_ratio_p95_7d")},
+        "node_memory_p95": {lab.get("node"): round(v, 3) for lab, v in metric_rows(snap, "node_memory_usage_ratio_p95_7d")},
     }
 
 
@@ -222,13 +208,20 @@ _JAVA_HINT_RE = re.compile(r"java|jvm|kafka|elasticsearch|opensearch|logstash|zo
 _SIDECAR_RE = re.compile(r"exporter|proxy|sidecar|istio|envoy|linkerd|reloader|agent|collector|fluent|vector|tailscale|oauth2|log|metrics|init", re.IGNORECASE)
 
 
-def _parse_mem_mib(s) -> float | None:
-    m = re.match(r"^(\d+(?:\.\d+)?)([KMGT]i?|[kKmMgG])?$", str(s or ""))
+def _mem_mib(s) -> float | None:
+    """A container memory quantity in MiB, one decimal; None when unset or unreadable."""
+    b = quantity.parse(s, None)
+    return round(b / quantity.MIB, 1) if b is not None else None
+
+
+def _jvm_mem_mib(s) -> float | None:
+    """A JVM -Xmx size in MiB: the suffix is a letter in either case, k/m/g/t are binary and a bare number is bytes (java(1), -Xmx). Not a Kubernetes
+    quantity, where `M` is a million and `m` a thousandth."""
+    m = re.match(r"^(\d+(?:\.\d+)?)([kmgt])?$", str(s or "").lower())
     if not m:
         return None
     n = float(m.group(1))
-    u = (m.group(2) or "").lower()
-    mult = {"": 1 / 1024**2, "k": 1 / 1024, "ki": 1 / 1024, "m": 1, "mi": 1, "g": 1024, "gi": 1024, "t": 1024**2, "ti": 1024**2}.get(u, 1)
+    mult = {"": 1 / quantity.MIB, "k": 1 / 1024, "m": 1, "g": 1024, "t": 1024**2}[m.group(2) or ""]
     return round(n * mult, 1)
 
 
@@ -246,8 +239,8 @@ def analyze_containers(snap: Path, inv: dict | None) -> dict:
             reqs = []
             for c in conts:
                 txt = " ".join([f"{e.get('name', '')}={e.get('value', '')}" for e in (c.get("env") or [])] + [str(a) for a in (c.get("args") or [])] + [str(a) for a in (c.get("command") or [])])
-                lim = _parse_mem_mib(((c.get("resources") or {}).get("limits") or {}).get("memory"))
-                req = _parse_mem_mib(((c.get("resources") or {}).get("requests") or {}).get("memory")) or 0.0
+                lim = _mem_mib(((c.get("resources") or {}).get("limits") or {}).get("memory"))
+                req = _mem_mib(((c.get("resources") or {}).get("requests") or {}).get("memory")) or 0.0
                 reqs.append((c.get("name"), req))
                 mx = _XMX_RE.search(txt)
                 pct = _RAMPCT_RE.search(txt)
@@ -263,7 +256,7 @@ def analyze_containers(snap: Path, inv: dict | None) -> dict:
                     continue
                 xmx = None
                 if mx:
-                    xmx = _parse_mem_mib(mx.group(1) + (mx.group(2) or "m"))
+                    xmx = _jvm_mem_mib(mx.group(1) + (mx.group(2) or "m"))
                 ram_pct = float(pct.group(1)) if pct else None
                 heap_ratio = round(xmx / lim, 2) if (xmx and lim) else (round(ram_pct / 100, 2) if ram_pct else None)
                 jvm.append(

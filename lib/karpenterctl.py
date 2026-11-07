@@ -8,36 +8,15 @@ Output: the `karpenterctl` section of summary.json. Shape documented in SKILL.md
 
 from __future__ import annotations
 
-import re
 from collections import Counter
 from pathlib import Path
 
 from . import podmetrics as _pm
 from .promtext import parse as _parse_prom
+from .quantity import parse as quantity
+from .quantity import rounded
 from .snapshot import load_json, objects, taken_at
-
-
-def _ver(image: str | None):
-    m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
-    return m.group(1) if m else None
-
-
-def _r(x, n=3):
-    return None if x is None else round(x, n)
-
-
-def _q(v) -> float:
-    s = str(v or 0)
-    units = {"Ki": 1024, "Mi": 1024**2, "Gi": 1024**3, "Ti": 1024**4}
-    if s.endswith("m"):
-        return float(s[:-1]) / 1000
-    for u, mul in units.items():
-        if s.endswith(u):
-            return float(s[: -len(u)]) * mul
-    try:
-        return float(s)
-    except ValueError:
-        return 0.0
+from .versions import image_version
 
 
 def _int_map(m: dict | None) -> dict | None:
@@ -123,9 +102,9 @@ def _pod_metrics(snap: Path, version: str | None = None) -> dict:
             "cluster_state_synced": (synced == 1) if synced is not None else None,
             "consistency_errors": None if _pm.removed(pm, A, "consistency_errors", version) else (int(_pm.single(pm, A, "consistency_errors", 0)) if _pm.present(pm, A, "consistency_errors") else None),
             "consistency_errors_by_check": {k: int(v) for k, v in by("consistency_errors", "check").items()},
-            "pods_startup_avg_s": _r(startup_sum / startup_cnt, 1) if startup_cnt else None,
+            "pods_startup_avg_s": rounded(startup_sum / startup_cnt, 1) if startup_cnt else None,
             "pods_startup_count": int(startup_cnt),
-            "node_termination_avg_s": _r(term_sum / term_cnt, 1) if term_cnt else None,
+            "node_termination_avg_s": rounded(term_sum / term_cnt, 1) if term_cnt else None,
             "disruption_eligible_nodes": {k: int(v) for k, v in by("disruption_eligible_nodes", ("reason", "method")).items()},
             "disruption_budgets_allowed": budgets,
             "disruption_actions": {k: int(v) for k, v in by("disruption_actions", ("reason", "method")).items()},  # 0.x method and 1.x reason name the same thing
@@ -170,7 +149,7 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
                 "namespace": dep["metadata"]["namespace"],
                 "replicas": sp.get("replicas"),
                 "ready": st.get("readyReplicas") or 0,
-                "version": _ver(c0.get("image")),
+                "version": image_version(c0.get("image")),
                 "image": c0.get("image"),
                 "pods_by_node": dict(by_node),
                 "all_same_node": (sp.get("replicas") or 0) >= 2 and len(by_node) == 1,
@@ -212,7 +191,7 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
                 "instance_profile": sp.get("instanceProfile"),
                 "imds_hop_limit": md.get("httpPutResponseHopLimit"),
                 "imds_tokens": md.get("httpTokens"),
-                "root_volume_gb": _q(root.get("volumeSize")) / 1024**3 if root.get("volumeSize") else None,
+                "root_volume_gb": quantity(root.get("volumeSize")) / 1024**3 if root.get("volumeSize") else None,
                 "root_volume_type": root.get("volumeType"),
                 "root_encrypted": root.get("encrypted"),
                 "detailed_monitoring": sp.get("detailedMonitoring"),

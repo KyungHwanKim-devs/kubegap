@@ -166,22 +166,22 @@ def test_details_with_three_backticks_render_inside_a_longer_fence(tmp_path):
 
 
 def test_cell_breaks_every_link_image_and_tag_but_keeps_placeholders():
-    assert render._cell("[x](javascript:alert(1))") == "[x] (javascript:alert(1))"
-    assert render._cell("[x](file:///etc/passwd)") == "[x] (file:///etc/passwd)"
-    assert render._cell("[x](../relative)") == "[x] (../relative)"
-    assert render._cell("[x](https://ok)") == "[x] (https://ok)", "no code path writes a link into a cell; a remote target is a beacon in viewers that fetch"
-    assert render._cell("![img](https://host/p.png)") == "! [img] (https://host/p.png)"
-    assert render._cell("![img](data:image/svg+xml;base64,AAAA)") == "! [img] (data:image/svg+xml;base64,AAAA)"
-    assert render._cell("<javascript:alert(1)>") == "< javascript:alert(1)>"
-    assert render._cell('<a href="javascript:alert(1)">x</a>') == '< a href="javascript:alert(1)">x< /a>'
-    assert render._cell("<img src=x onerror=alert(1)>") == "< img src=x onerror=alert(1)>"
-    assert render._cell("<script>alert(1)</script>") == "< script>alert(1)< /script>"
-    assert render._cell("<!-- c --> <?xml?>") == "< !-- c --> < ?xml?>"
-    assert render._cell("<https://ok>") == "< https://ok>"
-    assert render._cell("<masked> <account> <ip> <none> <unknown> <unset> <nil> <invalid> a<b>c 1 < 2 <3") == "<masked> <account> <ip> <none> <unknown> <unset> <nil> <invalid> a< b>c 1 < 2 <3"
-    assert render._cell("https://plain.example/path stays") == "https://plain.example/path stays"
-    assert render._cell("a|b\nc") == "a\\|b c"
-    assert render._cell(None) == "" and render._cell(3) == "3"
+    assert render.cell("[x](javascript:alert(1))") == "[x] (javascript:alert(1))"
+    assert render.cell("[x](file:///etc/passwd)") == "[x] (file:///etc/passwd)"
+    assert render.cell("[x](../relative)") == "[x] (../relative)"
+    assert render.cell("[x](https://ok)") == "[x] (https://ok)", "no code path writes a link into a cell; a remote target is a beacon in viewers that fetch"
+    assert render.cell("![img](https://host/p.png)") == "! [img] (https://host/p.png)"
+    assert render.cell("![img](data:image/svg+xml;base64,AAAA)") == "! [img] (data:image/svg+xml;base64,AAAA)"
+    assert render.cell("<javascript:alert(1)>") == "< javascript:alert(1)>"
+    assert render.cell('<a href="javascript:alert(1)">x</a>') == '< a href="javascript:alert(1)">x< /a>'
+    assert render.cell("<img src=x onerror=alert(1)>") == "< img src=x onerror=alert(1)>"
+    assert render.cell("<script>alert(1)</script>") == "< script>alert(1)< /script>"
+    assert render.cell("<!-- c --> <?xml?>") == "< !-- c --> < ?xml?>"
+    assert render.cell("<https://ok>") == "< https://ok>"
+    assert render.cell("<masked> <account> <ip> <none> <unknown> <unset> <nil> <invalid> a<b>c 1 < 2 <3") == "<masked> <account> <ip> <none> <unknown> <unset> <nil> <invalid> a< b>c 1 < 2 <3"
+    assert render.cell("https://plain.example/path stays") == "https://plain.example/path stays"
+    assert render.cell("a|b\nc") == "a\\|b c"
+    assert render.cell(None) == "" and render.cell(3) == "3"
 
 
 def test_event_reason_and_failed_command_error_lines_cannot_open_a_block(tmp_path):
@@ -268,7 +268,7 @@ def test_a_cell_ends_at_a_word_and_keeps_short_text():
 def test_signature_line_counts_files_and_placeholders_survive(tmp_path):
     text = render.render_details(_snap(tmp_path, False), language="ko").read_text()
     assert "파일 1개" in text and "['logs" not in text
-    assert render._cell("argocd-tls-<n> at <ts>") == "argocd-tls-<n> at <ts>"
+    assert render.cell("argocd-tls-<n> at <ts>") == "argocd-tls-<n> at <ts>"
 
 
 def test_a_second_report_from_one_snapshot_keeps_the_first(tmp_path):
