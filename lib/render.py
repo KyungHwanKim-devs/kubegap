@@ -144,7 +144,9 @@ LABELS: dict[str, dict[str, str]] = {
         "Checks absent or gated off in this run": "이번 점검에 없거나 돌지 않은 항목",
         "Checks whose rule changed between the runs": "두 점검 사이에 판정 규칙이 바뀐 항목",
         "Checks whose thresholds in force changed": "적용된 임계값이 바뀐 항목",
-        "Checks from before rule hashes, under a different rubric version; their findings stay in the lists above marked `rule_known: false`, and the report reads these checks' notes:": "규칙 변경을 추적하기 전의 점검 항목이에요. 버전이 달라요. 이 항목은 위 목록에 `rule_known: false`로 남아 있고, 리포트는 항목의 notes를 보고 판단해요:",
+        "The two runs were made with different versions ({changes}); a key or a query renamed between them is a difference of the tool, not of the cluster.": "두 점검을 만든 버전이 달라요({changes}). 그 사이에 이름이 바뀐 키나 질의는 클러스터가 아니라 도구가 달라진 거예요.",
+        "Metric queries only in the previous run": "지난 점검에만 있는 메트릭 질의",
+        "Metric queries only in this run": "이번 점검에만 있는 메트릭 질의",
         "The table cuts each evidence at 300 characters and a check may cut a list in its evidence; nothing is lost. Every finding below carries, folded, the material its rule judged, taken from `findings-draft.json` `details`.": "표의 근거는 칸에 맞게 줄였어요. 판정에 쓴 자료 전체는 아래에 항목별로 접혀 있고, `findings-draft.json`의 `details`와 같아요.",
     },
 }
@@ -369,6 +371,13 @@ def render_details(snap: Path, language: str = "en") -> Path:
         df = diff.get("findings") or {}
         rv = df.get("rubric_version")
         w(L("Compared `{a}` → `{b}` (rubric {ra} → {rb}).", a=diff.get("a_name"), b=diff.get("b_name"), ra=rv[0] if isinstance(rv, list) and rv else rv, rb=rv[1] if isinstance(rv, list) and len(rv) > 1 else rv))
+        differing = [f"{k} {v[0]} → {v[1]}" for k, v in (diff.get("versions") or {}).items() if isinstance(v, list) and len(v) == 2 and v[0] != v[1]]
+        if differing:
+            w(L("The two runs were made with different versions ({changes}); a key or a query renamed between them is a difference of the tool, not of the cluster.", changes=", ".join(differing)))
+        mq = diff.get("metrics_queries") or {}
+        for key, label in (("only_in_a", "Metric queries only in the previous run"), ("only_in_b", "Metric queries only in this run")):
+            if mq.get(key):
+                w(f"- {L(label)} ({len(mq[key])}): " + ", ".join(f"`{q}`" for q in mq[key]))
         w("")
         for key, label in (("new", "New"), ("resolved", "Resolved"), ("changed", "Changed"), ("rename_suspects", "Rename suspects")):
             items = df.get(key) or []
@@ -385,7 +394,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
         evc = [e for e in ((diff.get("events") or {}).get("changed") or []) if e.get("type") == "Warning"]
         w(f"- **{L('Warning events')}**: " + (", ".join(f"{_cell(e.get('reason'))} {e.get('delta'):+d} ({_cell((e.get('objects_top_after') or [''])[0])})" for e in evc[:10]) if evc else L("no change")))
         crit = df.get("criteria_changes") or {}
-        n_crit = sum(len(v) for k, v in crit.items() if isinstance(v, list))  # rule_unknown_checks counts too: the section then explains the rule_known marks
+        n_crit = sum(len(v) for k, v in crit.items() if isinstance(v, list))
         if n_crit:
             w("")
             w(L("### 3-0. Criteria changes, not cluster changes"))
@@ -405,10 +414,6 @@ def render_details(snap: Path, language: str = "en") -> Path:
                 rows = crit.get(key) or []
                 if rows:
                     w(f"- **{L(label)} ({len(rows)})**: " + ", ".join(f"`{r.get('id')}` ({r.get('kind')}, {r.get('status')}/{r.get('severity_default')})" for r in rows))
-            unk = crit.get("rule_unknown_checks") or []
-            if unk:
-                w("")
-                w(L("Checks from before rule hashes, under a different rubric version; their findings stay in the lists above marked `rule_known: false`, and the report reads these checks' notes:") + " " + ", ".join(f"`{c}`" for c in unk))
         pers = df.get("persisted") or {}
         if pers:
             w(
