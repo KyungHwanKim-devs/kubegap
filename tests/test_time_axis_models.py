@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 
 from lib.foundations import nodetext
-from lib.judgement.evaluate import Context, _eval_metric, _Run, oom_text
+from lib.judgement.evaluate import Context
+from lib.judgement.evaluate.evidence import oom_text
+from lib.judgement.evaluate.rules import Run
+from lib.judgement.evaluate.types import eval_metric
 from lib.summaries import resilience, summarize
 
 KERNEL_LINE = (
@@ -93,7 +96,7 @@ def _oom_fixture(tmp_path, *, kernel=True):
 
 def test_oom_7d_counts_replaced_pods_and_kernel_kills_per_workload(tmp_path):
     snap = _oom_fixture(tmp_path)
-    out = resilience.oom_7d(resilience._Ctx(snap, {"namespaces": {"prod_like": ["prod-a"]}}))
+    out = resilience.oom_7d(resilience.Ctx(snap, {"namespaces": {"prod_like": ["prod-a"]}}))
     assert [r["target"] for r in out["rows"]] == ["prod-a/deploy/api:ai"]  # the gone pod's hash-stripped guess resolves to the confirmed Deployment name
     r = out["rows"][0]
     assert (r["pods_oomkilled"], r["pods_replaced"], r["restarts_of_those_pods"], r["live_pod_restarts_max"]) == (2, 1, 11, 9)
@@ -109,7 +112,7 @@ def test_oom_7d_old_node_script_counts_nothing_as_known(tmp_path):
         d = snap / "logs" / "node" / node
         d.mkdir(parents=True, exist_ok=True)
         (d / "os.txt").write_text("### meta\nuid=0\n### kernel\nsource=journalctl\nlines=5\nc:oom_cgroup=2\nsamples:\n" + KILLED_LINE + "\n### sysctl\n")
-    r = resilience.oom_7d(resilience._Ctx(snap, {}))["rows"][0]
+    r = resilience.oom_7d(resilience.Ctx(snap, {}))["rows"][0]
     assert r["kernel_log_read"] is False and r["kernel_nodes_old_script"] == 2 and r["kernel_cgroup_ooms_on_nodes"] == 4 and r["kernel_kills_24h"] == 0
     assert oom_text(r).startswith("kernel log read on 2 nodes with the older node script, which keeps no oom-kill lines, so kills are not attributed; 4 container OOMs counted")
 
@@ -117,12 +120,12 @@ def test_oom_7d_old_node_script_counts_nothing_as_known(tmp_path):
 def test_oom_7d_is_null_without_the_prometheus_side(tmp_path):
     _write_objects(tmp_path, "pods", [])
     _write_objects(tmp_path, "nodes", [])
-    assert resilience.oom_7d(resilience._Ctx(tmp_path, {}))["rows"] is None
+    assert resilience.oom_7d(resilience.Ctx(tmp_path, {}))["rows"] is None
 
 
 def test_oom_7d_without_node_logs_keeps_the_prometheus_side(tmp_path):
     snap = _oom_fixture(tmp_path, kernel=False)
-    r = resilience.oom_7d(resilience._Ctx(snap, {}))["rows"][0]
+    r = resilience.oom_7d(resilience.Ctx(snap, {}))["rows"][0]
     assert r["kernel_kills_24h"] == 0 and r["kernel_log_read"] is False and r["kernel_nodes_total"] == 2 and r["pods_oomkilled"] == 2
     assert oom_text(r).startswith("kernel log not read in this mode. Prometheus: 2 pods ended by OOM in 7 days, 1 already replaced, 11 restarts in those pods")
 
@@ -176,8 +179,8 @@ def test_metric_check_skips_gone_node_and_records_it(tmp_path):
         "evidence": 'f"{value:.0f}"',
         "severity_default": "medium",
     }
-    run = _Run(check, cx, {})
-    r = _eval_metric(cx, check, run)
+    run = Run(check, cx, {})
+    r = eval_metric(cx, check, run)
     assert [f["target"] for f in r["findings"]] == ["10.0.1.62:9100:eth0"]
     assert r["gone_nodes"] == ["10.0.1.203"] and r["counts"]["gone_node"] == 1
 
@@ -214,6 +217,6 @@ def test_join_any_judges_a_series_present_in_one_input_only(tmp_path):
         "evidence": "str(sorted(v))",
         "severity_default": "high",
     }
-    run = _Run(check, cx, {})
-    r = _eval_metric(cx, check, run)
+    run = Run(check, cx, {})
+    r = eval_metric(cx, check, run)
     assert r["status"] == "done" and [f["status"] for f in r["findings"]] == ["warn"] and r["findings"][0]["evidence"] == "['cpu_throttle_ratio_5m']"

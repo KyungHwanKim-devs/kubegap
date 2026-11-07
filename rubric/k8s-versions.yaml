@@ -2,7 +2,7 @@
 # Read in source (#130): the dates come from the files that render kubernetes.io/releases/patch-releases, `kubernetes/website data/releases/eol.yaml`
 # (minors already out of support) and `data/releases/schedule.yaml` (minors in support), at commit 32a3493 (2026-11-04); the release dates of 1.29 to
 # 1.34 from `kubernetes/sig-release releases/release-<minor>/README.md` at commit 49c673c, those of 1.35 and later from schedule.yaml. Cited per row.
-# `eol` is what platform.k8s-version-eol judges (lib/judgement/evaluate.py:k8s_support_ends); on EKS, describe-cluster-versions takes precedence. `released` is
+# `eol` is what platform.k8s-version-eol judges (lib/judgement/evaluate/context.py:k8s_support_ends); on EKS, describe-cluster-versions takes precedence. `released` is
 # informational. k3s, rke2 and kubeadm follow the upstream schedule. A new minor is one row; schedule.yaml also carries a maintenanceModeStartDate
 # (two months before end of life) that kubegap does not read.
 - { minor: "1.29", released: 2023-12-13, eol: 2025-02-28, source: "kubernetes/website data/releases/eol.yaml:19-21@32a3493; kubernetes/sig-release releases/release-1.29/README.md:56@49c673c" }

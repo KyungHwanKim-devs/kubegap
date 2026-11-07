@@ -12829,7 +12829,8 @@
   },
   "alb": {
    "available": false,
-   "note": "aws/alb-metrics.json missing (not EKS, or not collected yet)"
+   "note": "aws/alb-metrics.json missing (not EKS, or not collected yet)",
+   "covered_services": []
   },
   "nginx": null,
   "exposure": [

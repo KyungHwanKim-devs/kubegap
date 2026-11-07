@@ -11,7 +11,7 @@ has no read-only mode, so "read-only" has to be made visible and enforced on top
   command by name from a fixed list; the free values are `podIp`, limited to an IPv4 address, and `port`, limited to digits. `scripts/kubegap node-commands
   --ssm-document` writes it, and lib/collection/node.py compares the sha256 of this file with the document in the account before sending.
 
-The two files come from one walk over the collectors, so they cannot disagree with each other or with what collect.py sends.
+The two files come from one walk over the collectors, so they cannot disagree with each other or with what lib/collection/collect sends.
 """
 
 from __future__ import annotations
@@ -78,7 +78,7 @@ def pod_metrics_cmd(pod_ip: str, port: int | str, path: str, keep: str | None) -
 
 
 def normalize_cmd(cmd: str) -> str:
-    """collect.py sends `cmd:` steps with whitespace collapsed (YAML folded scalars arrive with newlines)."""
+    """lib/collection/collect sends `cmd:` steps with whitespace collapsed (YAML folded scalars arrive with newlines)."""
     return " ".join(str(cmd).split())
 
 

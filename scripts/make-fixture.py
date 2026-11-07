@@ -7,10 +7,10 @@ What it does, in this order:
 1. Copies the collected inputs and leaves out what summarize, evaluate and render produce (summary.json, findings-draft.json, report.md,
    report-details.md, diff.json, llm/, earlier-reports/, extra/, INCOMPLETE), so the fixture is an input, never an expectation.
 2. Trims what no reader uses, mechanically (no reader-specific key lists, so a new reader finds the fields a real snapshot has):
-   JSON is written compact; `metadata.managedFields` goes except on ConfigMaps (lib/summaries/hygiene.py reads their change times); CRD
+   JSON is written compact; `metadata.managedFields` goes except on ConfigMaps (lib/summaries/hygiene reads their change times); CRD
    `spec.versions[].schema` and `additionalPrinterColumns` go (readers take name, group and scope); a string over --max-string
    characters that is a PEM block or has no whitespace (certificates, CSRs, base64 blobs; never a config document, which readers parse)
-   becomes `<n chars>`; Polaris results that passed go (lib/summaries/hygiene.py reads failures); each entry of `droppedTargets` in
+   becomes `<n chars>`; Polaris results that passed go (lib/summaries/hygiene reads failures); each entry of `droppedTargets` in
    prometheus/targets.json becomes `{}` (lib/summaries/observability.py counts them, the count stays); KRR scan `labels` and `annotations` go
    (lib/summaries/resources.py reads object, recommended and warnings); with --log-lines, log files keep only that many lines (the default keeps
    them whole: a cut changes what the signature scan counts).

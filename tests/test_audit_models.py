@@ -69,8 +69,8 @@ def test_n_plus_one_fails_per_pool_when_the_cluster_sum_fits(tmp_path):
     _write(tmp_path, "pods", pods)
     for stem in ("deployments", "statefulsets", "daemonsets", "services"):
         _write(tmp_path, stem, [])
-    cx = resilience._Ctx(tmp_path, {"components": {"cluster-autoscaler": {"present": True}}})
-    out = resilience._n_plus_one(cx)
+    cx = resilience.Ctx(tmp_path, {"components": {"cluster-autoscaler": {"present": True}}})
+    out = resilience.n_plus_one(cx)
     assert out["total_ok"] is True  # 6 cores of requests against 20 cores elsewhere
     assert out["ok"] is False and out["pools_short"][0]["eligible_nodes"] == ["app2"]  # but the app pods may only go to app2, which has 1 core left
     assert out["pools_short"][0]["free_cpu"] == 1.0  # 4 cores minus 2.5 of the app pod minus 0.5 of the DaemonSet pod
@@ -184,7 +184,10 @@ def test_nginx_webhook_closed_by_network_policy(tmp_path):
     aws_node = {"metadata": {"namespace": "kube-system", "name": "aws-node"}, "spec": {"template": {"spec": {"containers": [{"name": "aws-eks-nodeagent", "args": ["--enable-network-policy=true"]}]}}}}
     _w(tmp_path, "daemonsets", [aws_node])
     _w(tmp_path, "validatingwebhookconfigurations.admissionregistration.k8s.io", [])
-    n = traffic._nginx(tmp_path, [], {"cluster": {"platform": "eks"}})
+    from lib.summaries import security
+
+    netpol = security._networkpolicy(tmp_path, set(), "eks", None)  # what summarize passes: the security section is built before traffic
+    n = traffic._nginx(tmp_path, [], {"cluster": {"platform": "eks"}}, netpol)
     wn = n["webhook_network_policy"]
     assert n["vulnerable"] is True and wn["policies"] == [f"{np['metadata']['namespace']}/webhook-apiserver-only"] and wn["enforced"] is True and wn["mitigated"] is True
     # the same policy on an EKS cluster whose CNI does not enforce policies mitigates nothing

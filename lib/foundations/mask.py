@@ -44,7 +44,7 @@ _CONTROL = re.compile(
 
 def strip_control(text: str) -> tuple[str, int]:
     """`text` without terminal control sequences and control characters (newline and tab stay), and how many were removed. The one place that knows the
-    ECMA-48 shapes; lib/collection/collect.py reads a tool's coloured stderr through it before matching log lines."""
+    ECMA-48 shapes; lib/collection/collect reads a tool's coloured stderr through it before matching log lines."""
     return _CONTROL.subn("", text)
 
 

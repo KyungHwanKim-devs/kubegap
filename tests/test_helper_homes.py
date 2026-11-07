@@ -66,8 +66,16 @@ HOMED: dict[str, str] = {
 }
 
 
+def _name(p: Path) -> str:
+    """`snapshot`, `resilience` (a sub-package's __init__) or `resilience.capacity` (a part): the name a module is known by below its layer."""
+    parts = list(p.relative_to(LIB).with_suffix("").parts[1:])
+    if parts and parts[-1] == "__init__":
+        parts = parts[:-1]
+    return ".".join(parts)
+
+
 def _modules() -> dict[str, ast.Module]:
-    return {p.stem: ast.parse(p.read_text(encoding="utf-8"), str(p)) for p in sorted(LIB.rglob("*.py")) if p.name != "__init__.py"}
+    return {_name(p): ast.parse(p.read_text(encoding="utf-8"), str(p)) for p in sorted(LIB.rglob("*.py")) if _name(p)}
 
 
 def _top_functions(tree: ast.Module):
@@ -110,7 +118,7 @@ def test_a_job_with_a_home_is_not_defined_elsewhere():
     offenders = []
     for mod, tree in _modules().items():
         for node in _top_functions(tree):
-            if node.name in HOMED and HOMED[node.name].split(".")[0] != mod:
+            if node.name in HOMED and HOMED[node.name].split(".")[0] != mod.split(".")[-1]:
                 offenders.append(f"{mod}.{node.name}: use {HOMED[node.name]}")
     assert sorted(offenders) == []
 
@@ -119,12 +127,12 @@ def test_every_home_in_the_table_exists():
     mods = _modules()
     for name, home in HOMED.items():
         mod, _, fn = home.split(" ")[0].partition(".")
-        assert mod in mods, (name, home)
+        assert mod in mods, (name, home)  # every home is a layer module, not a part
         assert any(f.name == fn for f in _top_functions(mods[mod])), (name, home)
 
 
 def _sources() -> dict[str, str]:
-    return {p.stem: p.read_text(encoding="utf-8") for p in sorted(LIB.rglob("*.py")) if p.name != "__init__.py"}
+    return {_name(p): p.read_text(encoding="utf-8") for p in sorted(LIB.rglob("*.py")) if _name(p)}
 
 
 def test_the_metrics_file_path_is_spelled_by_the_reader_and_the_writer_only():

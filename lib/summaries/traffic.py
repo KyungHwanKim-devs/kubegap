@@ -683,11 +683,11 @@ def nginx_vulnerable(version: str | None) -> bool | None:
     return t < NGINX_FIXED[1]
 
 
-def _webhook_netpol(snap: Path, rows: list[dict], inv: dict | None) -> dict:
+def _webhook_netpol(snap: Path, rows: list[dict], netpol: dict | None) -> dict:
     """Is the controller's admission webhook port closed to pods by a NetworkPolicy that the CNI enforces? A policy counts when it selects the controller pods
         (matchLabels inside the controller's pod template labels), has Ingress in policyTypes or ingress rules, and every ingress rule that opens port 8443 (or the
-        webhook port) names a source: no rule with an empty `from`. Enforcement comes from the security summary written earlier in the same run when present,
-    read the way lib/summaries/security.py reads it: the VPC CNI node agent's flag on EKS, kube-router on k3s; a policy mitigates only when enforcement is known to be on."""
+        webhook port) names a source: no rule with an empty `from`. Enforcement is `summary.security.networkpolicy`, built before this section and passed in by summarize:
+    the VPC CNI node agent's flag on EKS, kube-router on k3s; a policy mitigates only when enforcement is known to be on."""
     tpl_labels = {}
     for stem in ("deployments", "daemonsets"):
         for o in objects(snap, stem):
@@ -715,13 +715,11 @@ def _webhook_netpol(snap: Path, rows: list[dict], inv: dict | None) -> dict:
                 open_to_all = True  # no source, or every namespace: the webhook stays reachable from any pod
         if not open_to_all:
             policies.append(f"{ns}/{np['metadata']['name']}")
-    from .security import netpol_enforced
-
-    enforced, how = netpol_enforced(snap, ((inv or {}).get("cluster") or {}).get("platform"), (inv or {}).get("k3s"), policies)
+    enforced, how = (netpol or {}).get("enforced"), (netpol or {}).get("enforcement")  # summary.security.networkpolicy, built before this section
     return {"policies": policies, "enforced": enforced, "enforcement": how, "mitigated": bool(policies) and enforced is True}
 
 
-def _nginx(snap: Path, ingresses: list, inv: dict | None = None) -> dict | None:
+def _nginx(snap: Path, ingresses: list, inv: dict | None = None, netpol: dict | None = None) -> dict | None:
     """The ingress-nginx controller(s): image version, replicas, and whether the admission webhook is on. None when ingress-nginx is not deployed."""
     rows = []
     for stem, kind in (("deployments", "Deployment"), ("daemonsets", "DaemonSet")):
@@ -756,7 +754,7 @@ def _nginx(snap: Path, ingresses: list, inv: dict | None = None) -> dict | None:
                 vwc.append({"configuration": w["metadata"]["name"], "failure_policy": h.get("failurePolicy")})
     versions = [r["version"] for r in rows if r["version"]]
     oldest = min(versions, key=lambda v: _versions.triple(v) or (0, 0, 0)) if versions else None
-    mitigated = _webhook_netpol(snap, rows, inv)
+    mitigated = _webhook_netpol(snap, rows, netpol)
     unknown = [f"{r['namespace']}/{r['name']} ({r['image']})" for r in rows if not r["version"]]
     # A controller whose image tag carries no version (digest only, a prefixed tag the regex misses) cannot be cleared: vulnerable stays None for the whole set
     vulnerable = None if unknown else nginx_vulnerable(oldest)
@@ -777,9 +775,14 @@ def _nginx(snap: Path, ingresses: list, inv: dict | None = None) -> dict | None:
     }
 
 
-def analyze(snap: Path, inv: dict | None) -> dict:
+def analyze(snap: Path, inv: dict | None, security_summary: dict | None = None) -> dict:
     objs = _Objects(snap, inv)
     alb = _alb(snap, objs)
+    try:
+        alb["covered_services"] = sorted(list(x) for x in alb_covered_services(snap))  # (namespace, service) pairs with ALB request metrics; observability's golden-signal table reads them from this section
+    except Exception as e:  # a broken aws/alb-metrics.json must not stop the traffic section; observability shows the error in its table
+        alb["covered_services"] = None
+        alb["covered_services_error"] = f"{type(e).__name__}: {e}"
     ingresses = _ingresses(snap, objs, alb)
     exposure = _exposure(snap, objs, ingresses, alb)
     for lb in alb.get("lbs") or []:
@@ -791,7 +794,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "alb_groups": _alb_groups(ingresses),
         "ingress_metrics_source": dict(Counter(r["metrics"].get("source") or "none" for r in ingresses)),
         "alb": alb,
-        "nginx": _nginx(snap, ingresses, inv),
+        "nginx": _nginx(snap, ingresses, inv, (security_summary or {}).get("networkpolicy")),
         "exposure": exposure,
         "exposure_counts": dict(Counter(r["type"] for r in exposure)),
         "db_exposed": [r for r in exposure if r["db_port"] and "internal" not in str(r.get("scheme"))],

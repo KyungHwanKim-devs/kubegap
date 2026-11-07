@@ -16,13 +16,13 @@ platform is wired in at these points and nowhere else:
 2. `collectors/<platform>-platform/` (detect, collect.yaml, checks.yaml, signatures.yaml): `_collectors_enabled` turns it on
    by folder name alone. `PLATFORM_COLLECTOR_ALIASES` maps a platform onto another folder when they share one (rke2 -> k3s-platform).
 3. `_node_access` (this module): choose the node command backend; platforms with neither SSM nor SSH (gke, aks) get "none".
-4. `collect.py` `CLOUD_STEP_TYPES` / `_cloud_available`: register cloud-API step types and the inventory block they need
+4. `lib/collection/collect` `CLOUD_STEP_TYPES` / `_cloud_available`: register cloud-API step types and the inventory block they need
    (the counterpart of `cluster.eks`, which `_eks_facts` fills here).
 5. `components.py`: rules with `"platform": "<name>"` for the platform's add-ons (see its module docstring).
 6. `kube.context_info`: kubeconfig evidence (today only EKS: server suffix, ARN cluster name, `aws eks get-token`).
 7. Summary modules that branch on `inventory.cluster.platform`: `controlplane.py` (control plane log source), `security.py`
    (`_aws`, IRSA/pod identity), `cost.py` (pricing and spot facts), `observability.py` (`_failure_modes` applicability),
-   `resilience.py` (spot/AZ expectations), plus `storage.py`, `kubeproxy.py`, `hygiene.py` and `k3s.py` which read it.
+   `lib/summaries/resilience` (spot/AZ expectations), plus `storage`, `kubeproxy`, `hygiene` and `k3s` which read it.
 8. `rubric/profiles/<name>.yaml` + `_profile` here: a profile with the platform's expected families and disabled checks.
 """
 
@@ -410,7 +410,7 @@ def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfi
 
     present = {k: v for k, v in comps.items() if v["present"]}
     families_present = {v["family"] for v in present.values()}
-    # Expected families live in rubric/profiles/<name>.yaml (the same source evaluate.py uses); a profile with a base inherits from it
+    # Expected families live in rubric/profiles/<name>.yaml (the same source lib/judgement/evaluate uses); a profile with a base inherits from it
     prof = _rubric.load_profile(profile["name"])
     expected = prof.get("expected_families")
     if expected is None and prof.get("base"):

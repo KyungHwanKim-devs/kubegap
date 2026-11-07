@@ -4,7 +4,7 @@
 
 - To add or modify a check, follow the procedure in `references/development.md`. A check is one entry in `collectors/<collector>/checks.yaml` and must have `test.cases`.
 - When the rubric changes, bump `rubric/version` and the `rubric_version` line in the `SKILL.md` frontmatter in the same pull request and regenerate the catalog: `scripts/kubegap checks --markdown > docs/CHECKS.md` (a test checks that the catalog and the frontmatter are current). When signatures change, bump the version in `signatures/catalog.yaml`.
-- `checks.yaml` expressions are Python evaluated by `lib/judgement/evaluate.py`. They are code: review them like code.
+- `checks.yaml` expressions are Python evaluated by `lib/judgement/evaluate`. They are code: review them like code.
 - The YAML files here are read by `lib/foundations/yamlite.py`, which supports only a subset of YAML; the subset is listed at the top of [`lib/foundations/yamlite.py`](lib/foundations/yamlite.py). Anchors, aliases, tags and plain strings continued on the next line raise an error with the line number. Keep a plain string on one line, or use a `>` block or quotes for long text.
 - Unit tests live in `tests/` (pytest; the YAML parser, rubric resolution, snapshot diff, platform detection and the evaluate helpers); add a test when you touch `lib/`.
 - When you cite a project at a new tag, add the tag to its component in `references/verified-versions.yaml` and regenerate README's table: `scripts/kubegap verified --markdown` and `--language ko`, pasted between the `verified-table` markers of `README.md` and `README.ko.md` (a test compares).

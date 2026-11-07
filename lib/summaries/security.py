@@ -364,17 +364,16 @@ def _aws(snap: Path, inv: dict, sa_info: dict) -> dict:
     }
 
 
-def analyze(snap: Path, inv: dict | None, k3s_summary: dict | None = None) -> dict:
+def analyze(snap: Path, inv: dict | None, k3s_summary: dict | None = None, hygiene_summary: dict | None = None) -> dict:
     inv = inv or {}
     prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
     platform = (inv.get("cluster") or {}).get("platform")
     rbac = _rbac(snap, prod)
     sa = _service_accounts(snap, prod, set(rbac["bound_service_accounts"]))
-    try:
-        from .hygiene import _Ctx as _HCtx
-        from .hygiene import _polaris
-
-        pol = _polaris(_HCtx(snap, inv))
+    pol = (hygiene_summary or {}).get("polaris")  # summarize builds the hygiene section first and passes it: polaris is read once, here only its Security category
+    if not isinstance(pol, dict):
+        polaris: dict = {"present": None, "error": "hygiene section not available"}
+    else:
         polaris = {
             "present": pol.get("present"),
             "score": pol.get("score"),
@@ -388,8 +387,6 @@ def analyze(snap: Path, inv: dict | None, k3s_summary: dict | None = None) -> di
             "danger_workloads": [r["target"] for r in pol.get("workloads") or [] if r.get("security_danger")],
             "danger_check_counts": dict(Counter(c for r in pol.get("workloads") or [] for c in (r.get("security_danger") or []))),
         }
-    except Exception as e:
-        polaris = {"present": False, "error": f"{type(e).__name__}: {e}"}
     return {
         "rbac": rbac,
         "service_accounts": sa,

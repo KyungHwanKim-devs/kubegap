@@ -75,7 +75,7 @@ class Prometheus:
     # "kubelet", whose scrape serves the apiserver registry once per server node (#122), so the numbers are right there. The 14 apiserver
     # queries of collectors/core/metrics.yaml filter on `{apiserver_job}`; the name comes from config.yaml (apiserver_job) or is detected once per run from the
     # job values of apiserver_request_total. With no such series under any job the queries are not run: they are saved as failed with the reason, so the
-    # control-plane checks that read them are skipped (lib/judgement/evaluate.py skips a failed query) instead of passing on nothing.
+    # control-plane checks that read them are skipped (lib/judgement/evaluate skips a failed query) instead of passing on nothing.
     APISERVER_JOB_NAMES = ("apiserver", "kubernetes-apiservers", "kube-apiserver", "kubernetes")
 
     def resolve_apiserver_job(self, configured: str | None, out_dir: Path | None = None) -> dict:

@@ -268,7 +268,7 @@ def _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr, code=0, annotated
     fake.chmod(0o700)
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
     step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == tool)
-    result = collect._run_tool_step(step, tool, "core", "unreachable", None, tmp_path, RunLog(None), None, 10, None, inv={"cluster": {"server_version": "v1.32.0"}}, objects_dump=SAVED_KINDS)
+    result = collect.tool_steps.run_tool_step(step, tool, "core", "unreachable", None, tmp_path, RunLog(None), None, 10, None, inv={"cluster": {"server_version": "v1.32.0"}}, objects_dump=SAVED_KINDS)
     (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {tool: result}}}))
     return result
 
@@ -276,7 +276,7 @@ def _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr, code=0, annotated
 def _deprecated_result(tmp_path):
     from lib.summaries import hygiene
 
-    summary = hygiene._deprecated(hygiene._Ctx(tmp_path, {}))
+    summary = hygiene.deprecated(hygiene.Ctx(tmp_path, {}))
     check = next(c for c in _all_checks() if c["id"] == "hygiene.deprecated-api")
     return summary, evaluate.evaluate_check(check, _ctx(tmp_path, {"hygiene": {"deprecated": summary}}), {})
 
@@ -400,7 +400,7 @@ def test_pluto_error_printed_to_stdout_reaches_the_step_error(tmp_path, monkeypa
     fake.chmod(0o700)
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
     step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == "pluto")
-    result = collect._run_tool_step(step, "pluto", "core", "x", None, tmp_path, RunLog(None), None, 10, None, inv={"cluster": {"server_version": "v1.32.0"}}, objects_dump=SAVED_KINDS)
+    result = collect.tool_steps.run_tool_step(step, "pluto", "core", "x", None, tmp_path, RunLog(None), None, 10, None, inv={"cluster": {"server_version": "v1.32.0"}}, objects_dump=SAVED_KINDS)
     assert result["ok"] is False and result["api_read"] is False
     assert result["error"].startswith("Error checking for versions: yaml: did not find expected node content; I1104 root.go:259] assuming default targetVersion")
 
@@ -454,3 +454,19 @@ def test_pluto_findings_with_exit_three_would_be_dropped(tmp_path, monkeypatch):
     assert result["ok"] is False and result["api_read"] is False
     summary, verdict = _deprecated_result(tmp_path)
     assert summary["pluto_read"] is False and summary["items"] is None and verdict["status"] == "skip"
+
+
+def test_selftest_audits_a_real_summary_against_the_check_expressions(tmp_path):
+    """`scripts/kubegap selftest --snapshot <dir>` compares the keys summary-type expressions read with a real summary.json (#151: the two audit functions
+    reach lib/judgement/evaluate/context.get_path, which a package split once left unreachable with no test on the path)."""
+    from lib.commands import regress, selftest
+    from lib.foundations import rubric
+    from lib.summaries import summarize
+
+    snap = regress.stage(ROOT / "tests" / "fixtures" / "snapshot-k3s", tmp_path)
+    summarize.summarize(snap, echo=None)
+    checks = rubric.catalog()
+    mismatches = selftest.audit_against_snapshot(checks, snap)
+    assert isinstance(mismatches, list)
+    assert all({"check", "path"} <= set(m) or isinstance(m, dict) for m in mismatches)
+    assert isinstance(selftest.audit_each_paths(checks, [snap]), list)

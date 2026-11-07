@@ -38,7 +38,7 @@ def test_discover_summarize_and_evaluate_write_the_version():
     from pathlib import Path
 
     root = Path(__file__).resolve().parent.parent
-    for f in ("lib/collection/discover.py", "lib/summaries/summarize.py", "lib/judgement/evaluate.py"):
+    for f in ("lib/collection/discover.py", "lib/summaries/summarize.py", "lib/judgement/evaluate/__init__.py"):
         src = (root / f).read_text(encoding="utf-8")
         assert '"schema": paths.SCHEMA_VERSION' in src, f
     assert "check_schema(snap)" in (root / "scripts" / "kubegap").read_text(encoding="utf-8"), "the CLI refuses before any reader opens the snapshot"

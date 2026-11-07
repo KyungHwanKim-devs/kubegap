@@ -50,7 +50,7 @@ def fixtures() -> list[Path]:
 
 
 def degrade(snap: Path) -> None:
-    """Take away what a degraded run does not have, and record it the way collect records it (lib/collection/collect.py: a forbidden List is a failed
+    """Take away what a degraded run does not have, and record it the way collect records it (lib/collection/collect: a forbidden List is a failed
     step; a promql step without Prometheus is `error: no Prometheus connection`; an http step without its store is `skipped: no <store> connection`;
     an AWS call refused is a failed step with the AccessDenied text; a node step without a backend is `skipped: no node command backend`; a kind the
     account may not list is `not_permitted` of the dump-all record)."""
@@ -76,7 +76,7 @@ def degrade(snap: Path) -> None:
     for k in GONE_STORES:
         inv["stores"].pop(k, None)
     # 3. every AWS call refused (the identity reads the cluster and holds no IAM policy, docs/PERMISSIONS.md): the aws, cwlogs, cw-metrics and alb-metrics steps fail
-    #    the way lib/collection/collect._run_aws_step records a refusal, and their outputs are gone; discovery's describe-cluster is left as read, so the EKS facts stay
+    #    the way lib/collection/collect/cloud_steps.py run_aws_step records a refusal, and their outputs are gone; discovery's describe-cluster is left as read, so the EKS facts stay
     for collector, st in paths.collect_steps():
         rec = (cr.get(collector) or {}).get("steps") or {}
         if st["id"] in rec and st["type"] in AWS_STEP_TYPES:

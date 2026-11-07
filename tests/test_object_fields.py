@@ -57,8 +57,8 @@ def test_cronjob_checks_see_the_cronjobs_discovery_wrote(tmp_path):
     _write(tmp_path, "cronjobs", [{"metadata": {"namespace": "p", "name": "pg-backup"}, "spec": {"schedule": "0 3 * * *", "jobTemplate": {"spec": {"template": {"spec": {"containers": [{"name": "c", "image": "pg"}]}}}}}, "status": {}}])
     for stem in ("deployments", "statefulsets", "daemonsets", "pods", "nodes", "poddisruptionbudgets.policy", "jobs.batch"):
         _write(tmp_path, stem, [])
-    cx = resilience._Ctx(tmp_path, INV)
-    assert resilience._cronjobs(cx, NOW)["count"] == 1
+    cx = resilience.Ctx(tmp_path, INV)
+    assert resilience.cronjobs(cx, NOW)["count"] == 1
 
 
 # ---------- K1-2, K3-6: the Event count of an events.k8s.io recorder lives in series.count ----------
@@ -97,7 +97,7 @@ def test_statefulset_max_unavailable_is_read_from_update_strategy(tmp_path):
     _write(tmp_path, "services", [{"metadata": {"namespace": "p", "name": "db"}, "spec": {"selector": {"app": "db"}, "ports": [{"port": 5432}]}}])
     for stem in ("deployments", "daemonsets", "pods", "nodes", "cronjobs", "poddisruptionbudgets.policy", "namespaces", "persistentvolumeclaims"):
         _write(tmp_path, stem, [])
-    rows = resilience._graceful(resilience._Ctx(tmp_path, INV))["rows"]
+    rows = resilience._graceful(resilience.Ctx(tmp_path, INV))["rows"]
     assert rows[0]["strategy"] == "RollingUpdate" and rows[0]["max_unavailable"] == 2
 
 
@@ -115,7 +115,7 @@ def test_pdb_row_carries_the_disruption_allowed_reason(tmp_path):
     )
     for stem in ("deployments", "statefulsets", "daemonsets", "pods", "nodes", "cronjobs"):
         _write(tmp_path, stem, [])
-    row = resilience._pdbs(resilience._Ctx(tmp_path, INV))["rows"][0]
+    row = resilience._pdbs(resilience.Ctx(tmp_path, INV))["rows"][0]
     assert row["blocks_drain"] is True and row["disruption_allowed_reason"] == "SyncFailed"
 
 
@@ -131,9 +131,9 @@ def test_pv_node_pin_accepts_a_custom_affinity_key():
     def pv(key, values):
         return {"spec": {"nodeAffinity": {"required": {"nodeSelectorTerms": [{"matchExpressions": [{"key": key, "operator": "In", "values": values}]}]}}}}
 
-    assert resilience._pv_node(pv("kubernetes.io/hostname", ["kkh"])) == "kkh"
-    assert resilience._pv_node(pv("topology.example.com/node", ["kkh2"])) == "kkh2"  # local-path-provisioner's nodeAffinityKey parameter
-    assert resilience._pv_node(pv("topology.kubernetes.io/zone", ["a", "b"])) is None
+    assert resilience.backup.pv_node(pv("kubernetes.io/hostname", ["kkh"])) == "kkh"
+    assert resilience.backup.pv_node(pv("topology.example.com/node", ["kkh2"])) == "kkh2"  # local-path-provisioner's nodeAffinityKey parameter
+    assert resilience.backup.pv_node(pv("topology.kubernetes.io/zone", ["a", "b"])) is None
 
 
 # ---------- K2-1, K2-2, K2-4, K2-5, K2-6 ----------
@@ -167,7 +167,7 @@ def test_pvc_unused_counts_from_the_start_ordinal(tmp_path):
     _write(tmp_path, "persistentvolumeclaims", [{"metadata": {"namespace": "p", "name": f"data-db-{i}"}} for i in (5, 6)])
     for stem in ("deployments", "daemonsets", "cronjobs", "pods", "configmaps", "serviceaccounts", "services", "jobs.batch"):
         _write(tmp_path, stem, [])
-    assert hygiene._orphans(hygiene._Ctx(tmp_path, INV))["pvc_unused"] == []
+    assert hygiene._orphans(hygiene.Ctx(tmp_path, INV))["pvc_unused"] == []
 
 
 def test_templating_recognises_the_default_argocd_label_and_the_eks_component_label(tmp_path):
@@ -183,7 +183,7 @@ def test_templating_recognises_the_default_argocd_label_and_the_eks_component_la
     )
     for stem in ("statefulsets", "daemonsets", "cronjobs", "pods"):
         _write(tmp_path, stem, [])
-    out = hygiene._templating(hygiene._Ctx(tmp_path, INV))
+    out = hygiene._templating(hygiene.Ctx(tmp_path, INV))
     assert out["by_manager"] == {"argocd": 1, "platform": 1, "none": 1}
     assert [r["workload"] for r in out["unmanaged"]] == ["prod/deployment/loose"]
 

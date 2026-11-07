@@ -17,7 +17,7 @@ CITATION = re.compile(r"(?<![\w./])([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)\s+[A-Za-z0-
 CONTINUATION = re.compile(r"(?<![\w@])(?:[A-Za-z0-9_./-]+)?:[\d,-]+@([\w.+-]+(?:/[\w.+-]+)*)")
 # Where citations live: the check and query data, the signatures, the summary modules and their helpers, the node scripts, the rubric data, the deployed
 # documents and the sources register. Not scanned: tests, docs/, CHANGELOG, README (they repeat citations made elsewhere).
-CITED_IN = ("collectors/*/*.yaml", "collectors/*/*.sh", "signatures/*.yaml", "lib/*/*.py", "rubric/*.yaml", "deploy/**/*", "references/sources.md", "SKILL.md")
+CITED_IN = ("collectors/*/*.yaml", "collectors/*/*.sh", "signatures/*.yaml", "lib/**/*.py", "rubric/*.yaml", "deploy/**/*", "references/sources.md", "SKILL.md")
 LABELS = {
     "en": {
         "component": "Component",
