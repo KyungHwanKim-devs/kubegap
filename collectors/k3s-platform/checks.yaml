@@ -1,4 +1,4 @@
-# k3s platform checks. Input: summary.k3s (lib/k3s.py). All small k3s cluster profile; on EKS the collector itself is disabled.
+# k3s platform checks. Input: summary.k3s (lib/summaries/k3s.py). All small k3s cluster profile; on EKS the collector itself is disabled.
 - id: platform.k3s-secrets-encryption-off
   name: k3s Secret encryption at rest is off (--secrets-encryption)
   area: platform

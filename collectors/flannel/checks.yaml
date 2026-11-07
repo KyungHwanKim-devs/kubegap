@@ -1,4 +1,4 @@
-# flannel checks. summary.flannel — lib/flannelctl.py (node data from the flannel section of the k3s-platform node script, counters from node-exporter). The first three were moved from k3s-platform with their ids unchanged (history.csv continuity).
+# flannel checks. summary.flannel — lib/summaries/flannelctl.py (node data from the flannel section of the k3s-platform node script, counters from node-exporter). The first three were moved from k3s-platform with their ids unchanged (history.csv continuity).
 - id: traffic.flannel-mtu-mismatch
   name: flannel vxlan MTU is not the underlay interface MTU − 50
   area: traffic

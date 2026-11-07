@@ -1,4 +1,4 @@
-# External Secrets Operator checks. summary.esoctl.summary — lib/esoctl.py. The ExternalSecret Ready False list is covered by core security.externalsecret-not-ready. Secret values are never read anywhere.
+# External Secrets Operator checks. summary.esoctl.summary — lib/summaries/esoctl.py. The ExternalSecret Ready False list is covered by core security.externalsecret-not-ready. Secret values are never read anywhere.
 - id: eso.provider-api-errors
   name: Secret store (provider) API call failures accumulating (an ExternalSecret fails every cycle)
   area: security

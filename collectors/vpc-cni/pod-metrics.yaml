@@ -1,5 +1,5 @@
 # Metric names kubegap reads from the ipamd /metrics of aws-node (step vpc-cni.ipamd-metrics, a node step that curls 127.0.0.1:61678 from
-# inside the node; parsed by lib/vpccni.py through lib/podmetrics.py). Read in aws/amazon-vpc-cni-k8s at v1.19.0 and v1.23.2 (#127).
+# inside the node; parsed by lib/summaries/vpccni.py through lib/foundations/podmetrics.py). Read in aws/amazon-vpc-cni-k8s at v1.19.0 and v1.23.2 (#127).
 - key: assigned_ips
   names:
     - name: awscni_assigned_ip_addresses

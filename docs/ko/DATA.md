@@ -10,9 +10,9 @@ kubegap은 읽기 호출만 합니다. 어떤 Kubernetes 규칙과 AWS 액션을
 
 **Secret.** Secret 값은 읽지도 기록하지도 않습니다. 이름과 종류만 기록합니다. 예외가 하나 있습니다. Helm은 릴리스 기록을 Secret에 저장하기 때문에 `helm list`가 이 Secret을 읽습니다. kubegap은 `helm list`가 출력하는 릴리스 이름, 네임스페이스, 리비전, 업데이트 시각, 상태, 차트, 앱 버전만 남기고 릴리스의 values는 수집하지 않습니다. kubegap에 들어 있는 ClusterRole은 Secret을 제외하므로, 이 역할로 돌리면 `helm list`가 실패하고 Helm 점검 항목 2개를 건너뜁니다. pluto와 kubent는 Helm 릴리스를 읽지 않는 모드로 실행합니다.
 
-**kubeconfig.** `setup.json`에는 이 컨텍스트가 어떻게 인증하는지 적힙니다. exec 명령과 인자(EKS면 `aws eks get-token`), 그리고 `env` 블록에 있는 환경 변수의 이름입니다. 값은 `AWS_PROFILE`과 `AWS_REGION` 두 개만 남깁니다. kubegap이 AWS CLI를 부를 때 넘겨야 해서입니다. 테넌트 id나 다른 인증 플러그인의 토큰 같은 나머지 값은 전부 `<redacted>`로 적습니다(`lib/kube.py`, `tests/test_kube_context.py`).
+**kubeconfig.** `setup.json`에는 이 컨텍스트가 어떻게 인증하는지 적힙니다. exec 명령과 인자(EKS면 `aws eks get-token`), 그리고 `env` 블록에 있는 환경 변수의 이름입니다. 값은 `AWS_PROFILE`과 `AWS_REGION` 두 개만 남깁니다. kubegap이 AWS CLI를 부를 때 넘겨야 해서입니다. 테넌트 id나 다른 인증 플러그인의 토큰 같은 나머지 값은 전부 `<redacted>`로 적습니다(`lib/collection/kube.py`, `tests/test_kube_context.py`).
 
-**ConfigMap.** ConfigMap 값도 기록하지 않습니다. 점검 한 번에 모은 데이터를 담는 폴더를 스냅샷이라고 부르는데, 스냅샷에는 키마다 길이와 형태만 남깁니다. 실제 값을 남기는 키는 kubegap이 분석해야 하는 설정뿐이고, [`lib/scrub.py`](../../lib/scrub.py)의 `KEEP_VALUES`에 적혀 있습니다. CoreDNS Corefile, kube-proxy 설정, local-path-provisioner 경로, Argo CD 플래그 몇 개입니다. Grafana 사이드카가 읽어 들이는 ConfigMap 두 종류는 더 남깁니다. `grafana_dashboard` 라벨이 붙은 것은 대시보드 JSON을 그대로, `grafana_datasource` 라벨이 붙은 것은 데이터소스마다 name, type, url, isDefault만 남기고 비밀번호나 헤더 값이 있을 수 있는 나머지는 지웁니다.
+**ConfigMap.** ConfigMap 값도 기록하지 않습니다. 점검 한 번에 모은 데이터를 담는 폴더를 스냅샷이라고 부르는데, 스냅샷에는 키마다 길이와 형태만 남깁니다. 실제 값을 남기는 키는 kubegap이 분석해야 하는 설정뿐이고, [`lib/foundations/scrub.py`](../../lib/foundations/scrub.py)의 `KEEP_VALUES`에 적혀 있습니다. CoreDNS Corefile, kube-proxy 설정, local-path-provisioner 경로, Argo CD 플래그 몇 개입니다. Grafana 사이드카가 읽어 들이는 ConfigMap 두 종류는 더 남깁니다. `grafana_dashboard` 라벨이 붙은 것은 대시보드 JSON을 그대로, `grafana_datasource` 라벨이 붙은 것은 데이터소스마다 name, type, url, isDefault만 남기고 비밀번호나 헤더 값이 있을 수 있는 나머지는 지웁니다.
 
 **로그.** 컴포넌트 파드의 최근 24시간 로그는 스크립트가 읽습니다. 스크립트는 오류를 세어 요약에 넣고 마스킹한 샘플 줄을 남긴 뒤, 에이전트가 시작하기 전에 원본을 스냅샷에서 지웁니다. 원본 로그를 에이전트가 읽어도 괜찮을 때만 설정 파일에 `keep_component_logs: true`를 넣으세요.
 

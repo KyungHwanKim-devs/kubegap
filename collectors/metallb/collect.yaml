@@ -1,5 +1,5 @@
 # MetalLB collection (bare-metal counterpart of the ALB Controller, on any platform). Objects (IPAddressPool, L2Advertisement, BGPPeer, ServiceL2Status, LoadBalancer Services, speaker DaemonSet, controller Deployment, webhooks) come from core.
-# The speaker /metrics step was moved here from k3s-platform (lib/metallbctl.py reads the metallb collector result from collect-result).
+# The speaker /metrics step was moved here from k3s-platform (lib/summaries/metallbctl.py reads the metallb collector result from collect-result).
 - id: metallb-speaker-metrics
   # Prometheus usually does not scrape the MetalLB speaker (no metallb_* metrics). Read /metrics directly through the pod proxy (read-only GET) and use
   # metallb_speaker_announced{ip,node,service} to see "which node announces which IP" (the L2 leader).

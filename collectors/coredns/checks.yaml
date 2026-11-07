@@ -1,4 +1,4 @@
-# CoreDNS checks. summary.coredns.summary — lib/coredns.py. SERVFAIL ratio and p99 are covered by core traffic.coredns-servfail and coredns-latency.
+# CoreDNS checks. summary.coredns.summary — lib/summaries/coredns.py. SERVFAIL ratio and p99 are covered by core traffic.coredns-servfail and coredns-latency.
 - id: coredns.nxdomain-ratio-high
   name: More than half of DNS responses are NXDOMAIN (ndots:5 search path noise)
   area: traffic

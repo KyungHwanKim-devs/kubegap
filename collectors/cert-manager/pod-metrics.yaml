@@ -1,5 +1,5 @@
-# Metric names kubegap reads from cert-manager's controller /metrics (step cert-manager.controller-metrics, parsed by lib/certmanager.py through
-# lib/podmetrics.py). Read in cert-manager/cert-manager at v1.14.4 and v1.21.3: every name exists in both. v1.21 moved the certificate_* gauges
+# Metric names kubegap reads from cert-manager's controller /metrics (step cert-manager.controller-metrics, parsed by lib/summaries/certmanager.py through
+# lib/foundations/podmetrics.py). Read in cert-manager/cert-manager at v1.14.4 and v1.21.3: every name exists in both. v1.21 moved the certificate_* gauges
 # from pkg/metrics/metrics.go into a collector (internal/collectors/certificate_collector.go) and renamed the ACME request label path to action;
 # kubegap reads only status from that counter.
 - key: certificate_expiration

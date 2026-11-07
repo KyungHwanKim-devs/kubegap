@@ -1,4 +1,4 @@
-# ECR checks. summary.ecr.summary — lib/ecr.py. All EKS only (aws step), except pull-failures, which is event-based and also runs on a small k3s cluster. Repository and registry policies are never read.
+# ECR checks. summary.ecr.summary — lib/summaries/ecr.py. All EKS only (aws step), except pull-failures, which is event-based and also runs on a small k3s cluster. Repository and registry policies are never read.
 - id: ecr.scan-disabled
   name: ECR image vulnerability scanning disabled (no scanOnPush, no registry scan rules)
   area: security

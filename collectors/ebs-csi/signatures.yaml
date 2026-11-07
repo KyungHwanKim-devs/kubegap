@@ -1,6 +1,6 @@
 # ---------------- ebs-csi (collectors/ebs-csi/signatures.yaml) ----------------
 # `AttachVolume.Attach failed` and `Multi-Attach error` were dropped: they are kube-controller-manager/kubelet strings (kubernetes pkg/volume/util/operationexecutor/operation_generator.go:289,
-# pkg/controller/volume/attachdetach/reconciler/reconciler.go:392,397,433@v1.32.13) and pod Events (FailedAttachVolume, in lib/events.py TRACKED); they never appear in an ebs-csi container.
+# pkg/controller/volume/attachdetach/reconciler/reconciler.go:392,397,433@v1.32.13) and pod Events (FailedAttachVolume, in lib/summaries/events.py TRACKED); they never appear in an ebs-csi container.
 # What the ebs-csi pod prints: the csi-attacher sidecar's "Error processing" err="failed to attach: rpc error: code = ... desc = Could not attach volume ..." (V(2); the manifest runs --v=2),
 # carrying the EC2 code, and until v1.53.0 the driver's own "Error from AWS API" err="api error <code>: ..." (unconditional klog.ErrorS; V(3) from v1.54.0, below the default --v=2).
 - id: ebs-csi.attach-failed

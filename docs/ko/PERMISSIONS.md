@@ -49,7 +49,7 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 | 이름 | 뜻 |
 |---|---|
 | `core/objects.dump-all` | `collectors/core/collect.yaml`의 수집 단계 `objects.dump-all`입니다. ClusterRole이 허용하는 리소스 종류를 한 번씩 나열해 `objects/<kind>.json`에 저장합니다. Kubernetes 권한 대부분이 이 단계에서 쓰입니다 |
-| `lib/discover.py` | 수집 전에 몇 가지 종류를 읽어 클러스터의 플랫폼, 컴포넌트, 프로파일을 판단합니다. 프로파일은 kubegap이 클러스터에 적용할 기준입니다 |
+| `lib/collection/discover.py` | 수집 전에 몇 가지 종류를 읽어 클러스터의 플랫폼, 컴포넌트, 프로파일을 판단합니다. 프로파일은 kubegap이 클러스터에 적용할 기준입니다 |
 | daily, full | daily 점검과 full 점검입니다. 따로 적지 않은 권한은 둘 다 씁니다. full이라고 적은 것은 full 점검에서만 씁니다 |
 
 ## 점검 종류별로 쓰는 권한
@@ -84,7 +84,7 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 
 **`nodes`.** 플랫폼, 버전, 존, 용량 유형을 판단할 때 읽습니다. 복원력, 스토리지, 플랫폼, coredns, 관측성, 트래픽, 오퍼레이터, `node.*`에 걸쳐 82개 항목이 씁니다. 없으면 `setup`이 클러스터에 닿을 수 없다고 알리고 아무것도 돌지 않습니다.
 
-**`apps` 그룹.** 컴포넌트 탐지에 `deployments`와 `daemonsets`를 읽고, 복원력, 트래픽, 스케일링, 플랫폼, 모든 컴포넌트 영역의 205개 항목이 씁니다. 없으면 컴포넌트 탐지의 Deployment, DaemonSet, StatefulSet 규칙이 실패합니다. `lib/components.py`의 CRD 규칙과 이미지 규칙은 그대로 동작합니다. 워크로드 섹션이 전부 비어서 점검 항목 대부분이 `skip`이 됩니다.
+**`apps` 그룹.** 컴포넌트 탐지에 `deployments`와 `daemonsets`를 읽고, 복원력, 트래픽, 스케일링, 플랫폼, 모든 컴포넌트 영역의 205개 항목이 씁니다. 없으면 컴포넌트 탐지의 Deployment, DaemonSet, StatefulSet 규칙이 실패합니다. `lib/foundations/components.py`의 CRD 규칙과 이미지 규칙은 그대로 동작합니다. 워크로드 섹션이 전부 비어서 점검 항목 대부분이 `skip`이 됩니다.
 
 **API 디스커버리 URL.** `/api`, `/api/*`, `/apis`, `/apis/*`의 `get`입니다. 모든 `kubectl` 호출이 리소스 이름을 찾을 때 쓰고, `core/objects.dump-all`도 `kubectl api-resources --verbs=list`로 씁니다. 없으면 kubectl이 리소스 이름을 전혀 찾지 못합니다.
 
@@ -94,7 +94,7 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 
 ### 로그와 메트릭을 읽는 권한
 
-**`pods/log`.** 수집 단계 `core/component-logs`가 컴포넌트 파드의 최근 24시간 로그를 `kubectl logs`로 읽습니다. 요약 단계인 `summarize`가 끝나면 원본을 지우고, `keep_component_logs`를 설정하면 남깁니다. `logs.signatures`, `observability.unclassified-errors`, 그리고 `lib/scaling.py`가 `logs/pods/karpenter/`에서 읽는 Karpenter 로그 정보가 이 로그를 씁니다.
+**`pods/log`.** 수집 단계 `core/component-logs`가 컴포넌트 파드의 최근 24시간 로그를 `kubectl logs`로 읽습니다. 요약 단계인 `summarize`가 끝나면 원본을 지우고, `keep_component_logs`를 설정하면 남깁니다. `logs.signatures`, `observability.unclassified-errors`, 그리고 `lib/summaries/scaling.py`가 `logs/pods/karpenter/`에서 읽는 Karpenter 로그 정보가 이 로그를 씁니다.
 
 없으면 `logs.signatures`는 일치하는 로그가 없다고 보고, `observability.unclassified-errors`는 분류할 로그가 없습니다. 이 둘은 로그 파일이 없는 경우와 로그가 빈 경우를 구분하지 못해서, `skip` 없이 조용히 넘어갑니다. `observability.*`의 Loki와 로그 에이전트 점검 항목 9개는 Loki와 Prometheus를 읽으므로 영향이 없습니다.
 
@@ -110,7 +110,7 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 
 빼면 정확히 이 세 항목만 "kubelet not read"로 `skip`이 되고 다른 것은 바뀌지 않습니다. 단계는 노드마다 실패해서 7-1절에 나타나고, 노드 리포트에는 `kubelet configz (node proxy permission or kubelet not responding)`가 적힙니다.
 
-**`pods/portforward`.** `lib/portfwd.py`가 `kubectl port-forward svc/<store>`로 Prometheus, Alertmanager, Loki, Grafana에 연결합니다. 설정 파일에 `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url`을 넣으면 쓰지 않습니다.
+**`pods/portforward`.** `lib/collection/portfwd.py`가 `kubectl port-forward svc/<store>`로 Prometheus, Alertmanager, Loki, Grafana에 연결합니다. 설정 파일에 `prometheus_url`, `alertmanager_url`, `loki_url`, `grafana_url`을 넣으면 쓰지 않습니다.
 
 PromQL로 판정하는 모든 항목이 이 연결에 기댑니다. `type: metric` 항목 33개, Prometheus로 만드는 요약 섹션인 coredns, kube-proxy, 리소스, 스택 상태, daily의 `node.*` 메트릭, 그리고 prometheus, alertmanager, loki, grafana 영역입니다.
 
@@ -122,7 +122,7 @@ PromQL로 판정하는 모든 항목이 이 연결에 기댑니다. `type: metri
 
 | 리소스 | 어디에 쓰나 | 없으면 |
 |---|---|---|
-| `services` | `lib/monitoring.py`가 `get svc -A`로 네 모니터링 도구를 찾습니다. 트래픽, 복원력, 플랫폼, albctl, kubeproxy, 오퍼레이터의 80개 항목이 씁니다 | 설정에 URL이 없으면 모니터링 도구를 찾지 못합니다. `traffic.*`의 서비스 항목은 `skip`이 됩니다 |
+| `services` | `lib/collection/monitoring.py`가 `get svc -A`로 네 모니터링 도구를 찾습니다. 트래픽, 복원력, 플랫폼, albctl, kubeproxy, 오퍼레이터의 80개 항목이 씁니다 | 설정에 URL이 없으면 모니터링 도구를 찾지 못합니다. `traffic.*`의 서비스 항목은 `skip`이 됩니다 |
 | `endpoints` | `traffic.endpoint-zero`, `operators.webhook-no-endpoints` | 둘 다 `skip`이 됩니다. 이때 `summary.webhooks.no_endpoints`는 `None`입니다 |
 | `namespaces` | 네임스페이스 수, prod로 보이는 네임스페이스, 프로파일을 판단합니다. 복원력의 네임스페이스별 항목, `security.psa-not-enforced`, 멀티테넌시의 25개 항목이 씁니다 | 프로파일 탐지가 설정값을 쓰고, prod와 lab 분류가 비어 있습니다 |
 | `persistentvolumes` | 스토리지 18개, 복원력, ebscsi, k3s local-path 플랫폼 항목까지 64개 항목이 씁니다 | 스토리지 항목 `skip` |
@@ -134,7 +134,7 @@ PromQL로 판정하는 모든 항목이 이 연결에 기댑니다. `type: metri
 
 없으면 단계가 실패하고 `report-details.md`의 3절에 이벤트 변화가 나오지 않습니다. `ecr.pull-failures`는 `skip`이 됩니다. `events.tracked-warning-reasons`와 나머지 다섯 규칙의 이벤트 분기는 이벤트가 0건인 것으로 보고 조용히 넘어갑니다. 다른 분기는 그대로 판정합니다.
 
-**`configmaps`.** `core/objects.dump-all`이 읽되, 값은 수집할 때 버립니다. `lib/scrub.py`의 `KEEP_VALUES`에 있는 키만 값을 남기고 나머지는 길이와 형태로 저장합니다. `argocd.*` 13개, `coredns.*` 10개, `kubeproxy.*` 8개, local-path의 `storage.*` 6개, `security.plaintext-configmap-secret`까지 38개 항목이 씁니다. 없으면 이 항목들이 `skip`이 되고, CoreDNS Corefile, kube-proxy 모드, Argo CD 설정을 알 수 없습니다.
+**`configmaps`.** `core/objects.dump-all`이 읽되, 값은 수집할 때 버립니다. `lib/foundations/scrub.py`의 `KEEP_VALUES`에 있는 키만 값을 남기고 나머지는 길이와 형태로 저장합니다. `argocd.*` 13개, `coredns.*` 10개, `kubeproxy.*` 8개, local-path의 `storage.*` 6개, `security.plaintext-configmap-secret`까지 38개 항목이 씁니다. 없으면 이 항목들이 `skip`이 되고, CoreDNS Corefile, kube-proxy 모드, Argo CD 설정을 알 수 없습니다.
 
 ### 표준 API 그룹
 
@@ -155,7 +155,7 @@ PromQL로 판정하는 모든 항목이 이 연결에 기댑니다. `type: metri
 | `apiregistration.k8s.io` | APIService | `scaling.*`의 외부 메트릭 항목, `keda.*`, `platform.*` |
 
 - `admissionregistration.k8s.io`가 없으면 항목이 `skip`이 되거나 웹훅 행이 빠집니다. `traffic.ingress-nginx-vulnerable-version`은 admission 웹훅 포트가 NetworkPolicy로 막혀 있는지 볼 때 이 그룹을 씁니다.
-- `apiextensions.k8s.io`가 없으면 `lib/components.py`의 CRD 규칙이 아무것도 찾지 못합니다. Deployment, DaemonSet, StatefulSet, 이미지 규칙은 그대로 동작합니다. `hygiene.unused-crds`와 CRD로만 찾는 컴포넌트는 `skip`이 됩니다.
+- `apiextensions.k8s.io`가 없으면 `lib/foundations/components.py`의 CRD 규칙이 아무것도 찾지 못합니다. Deployment, DaemonSet, StatefulSet, 이미지 규칙은 그대로 동작합니다. `hygiene.unused-crds`와 CRD로만 찾는 컴포넌트는 `skip`이 됩니다.
 
 ### CRD 그룹
 
@@ -194,7 +194,7 @@ PromQL로 판정하는 모든 항목이 이 연결에 기댑니다. `type: metri
 
 예외는 Helm 하나입니다. full 점검의 `core/helm-list` 단계에서 `helm list`가 Helm이 Secret에 저장한 릴리스 기록을 읽고, kubegap은 이름, 네임스페이스, 상태, 리비전, 차트, 앱 버전을 남깁니다. 이 역할로는 `helm list`가 실패하고 Helm 점검 항목 2개가 `skip`이 됩니다. 이 두 항목이 필요할 때만 `secrets` 읽기 권한을 주세요.
 
-**ConfigMap 값.** `lib/scrub.py`가 수집할 때 값을 모두 버리고 길이와 형태를 저장합니다. 예외는 `KEEP_VALUES`의 키로, CoreDNS Corefile과 kube-proxy 설정 같은 컴포넌트 설정입니다.
+**ConfigMap 값.** `lib/foundations/scrub.py`가 수집할 때 값을 모두 버리고 길이와 형태를 저장합니다. 예외는 `KEEP_VALUES`의 키로, CoreDNS Corefile과 kube-proxy 설정 같은 컴포넌트 설정입니다.
 
 **쓰기 verb가 있는 것.** 역할에는 `get`, `list`와 `pods/portforward`의 `create` 하나만 있습니다. IAM 정책에는 Describe, List, Get 액션과 문서 하나로 제한한 `ssm:SendCommand`만 있습니다. `tests/test_permissions.py`가 코드의 모든 `kubectl`, `aws` 호출에서 verb를 검사합니다.
 
@@ -204,7 +204,7 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 
 ### 클러스터 정보
 
-**`sts:GetCallerIdentity`.** `lib/setup.py`가 AWS CLI를 쓸 수 있는지, 어느 계정인지 확인합니다. 결과는 `setup`에만 나옵니다. 없으면 `setup`이 AWS를 쓸 수 없다고 알립니다. 수집은 kubeconfig의 `cluster.eks`로 판단하므로 AWS 수집 단계는 그대로 돌고, 단계마다 자기 액션 권한에 따라 성공하거나 실패합니다.
+**`sts:GetCallerIdentity`.** `lib/commands/setup.py`가 AWS CLI를 쓸 수 있는지, 어느 계정인지 확인합니다. 결과는 `setup`에만 나옵니다. 없으면 `setup`이 AWS를 쓸 수 없다고 알립니다. 수집은 kubeconfig의 `cluster.eks`로 판단하므로 AWS 수집 단계는 그대로 돌고, 단계마다 자기 액션 권한에 따라 성공하거나 실패합니다.
 
 **`eks:Describe*`.** 클러스터, 노드 그룹, 애드온 정보를 읽습니다. 코드가 부르는 호출은 `describe-cluster`, `describe-nodegroup`, `describe-addon`, `describe-addon-versions`, `describe-cluster-versions`이고, 뒤의 두 호출은 full에서만 씁니다. `eks.audit-log-off`, `eks.public-endpoint-open`, `eks.extended-support`, `eks.addon-outdated`, `eks.nodegroup-ami-old`, `security.eks-secrets-encryption-off`, 애드온 설정을 보는 `vpccni.*`가 이 정보를 씁니다.
 
@@ -220,15 +220,15 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 
 ### 트래픽과 메트릭
 
-**`elasticloadbalancing:Describe*`.** `eks-platform/alb-metrics`가 `lib/albmetrics.py`로 로드밸런서, 속성, 리스너, 타깃 그룹과 그 속성, 타깃 상태를 읽습니다. 호출은 `describe-load-balancers`, `describe-load-balancer-attributes`, `describe-listeners`, `describe-target-groups`, `describe-target-group-attributes`, `describe-target-health`입니다. `traffic.db-exposed`, `traffic.ingress-*`의 ALB 행, `cost.idle-load-balancer`, `albctl.*`의 타깃 그룹 행이 쓰고, 없으면 이 항목들이 `skip`이 됩니다.
+**`elasticloadbalancing:Describe*`.** `eks-platform/alb-metrics`가 `lib/collection/albmetrics.py`로 로드밸런서, 속성, 리스너, 타깃 그룹과 그 속성, 타깃 상태를 읽습니다. 호출은 `describe-load-balancers`, `describe-load-balancer-attributes`, `describe-listeners`, `describe-target-groups`, `describe-target-group-attributes`, `describe-target-health`입니다. `traffic.db-exposed`, `traffic.ingress-*`의 ALB 행, `cost.idle-load-balancer`, `albctl.*`의 타깃 그룹 행이 쓰고, 없으면 이 항목들이 `skip`이 됩니다.
 
 **`cloudwatch:GetMetricData`.** `eks-platform/alb-metrics`가 ALB 요청, 5xx, 지연 메트릭을 읽고, full에서는 `eks-platform/quota-usage`와 `eks-platform/ebs-volume-metrics`도 씁니다. 없으면 `traffic.ingress-5xx-ratio`와 `traffic.ingress-p95-latency`의 ALB 행, `eks.service-quota-near-limit`, `storage.ebs-volume-io-saturated`가 `skip`이 됩니다.
 
 ### 컨트롤플레인 로그
 
-**`logs:DescribeLogGroups`.** `lib/setup.py`가 컨트롤플레인 로그 그룹이 있는지 확인합니다. 결과는 `setup`에만 나옵니다. 없으면 `setup`에 이 확인이 실패했다고 나올 뿐 다른 것은 바뀌지 않습니다.
+**`logs:DescribeLogGroups`.** `lib/commands/setup.py`가 컨트롤플레인 로그 그룹이 있는지 확인합니다. 결과는 `setup`에만 나옵니다. 없으면 `setup`에 이 확인이 실패했다고 나올 뿐 다른 것은 바뀌지 않습니다.
 
-**`logs:StartQuery`, `logs:GetQueryResults`.** full 점검에서 `eks-platform/controlplane-logs`가 `lib/cwlogs.py`로 최근 24시간을 Logs Insights로 조회하고 결과를 읽습니다. `controlplane.scheduler-unschedulable`, `controlplane.webhook-call-failures`, `controlplane.controller-error-repeat`, `controlplane.apiserver-slow-traces`, `controlplane.authenticator-failures`, `controlplane.etcd-slow` 여섯 항목이 씁니다. 둘 중 하나라도 없으면 EKS에서 이 여섯 항목이 `skip`이 됩니다. k3s에서는 이 항목들이 노드 접속으로 저널을 읽습니다.
+**`logs:StartQuery`, `logs:GetQueryResults`.** full 점검에서 `eks-platform/controlplane-logs`가 `lib/collection/cwlogs.py`로 최근 24시간을 Logs Insights로 조회하고 결과를 읽습니다. `controlplane.scheduler-unschedulable`, `controlplane.webhook-call-failures`, `controlplane.controller-error-repeat`, `controlplane.apiserver-slow-traces`, `controlplane.authenticator-failures`, `controlplane.etcd-slow` 여섯 항목이 씁니다. 둘 중 하나라도 없으면 EKS에서 이 여섯 항목이 `skip`이 됩니다. k3s에서는 이 항목들이 노드 접속으로 저널을 읽습니다.
 
 **`logs:StopQuery`.** 시간 초과로 쿼리를 포기할 때 부릅니다. 없으면 포기한 쿼리가 자체 시간 제한까지 AWS 쪽에서 계속 돌아갑니다.
 
@@ -236,15 +236,15 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 
 이 네 권한은 EKS에서 노드에 명령을 보낼 때 씁니다.
 
-**`ssm:DescribeInstanceInformation`.** `lib/setup.py`와 `lib/discover.py`가 어떤 노드가 SSM에 등록되어 있는지 확인해 `ssm_unregistered` 목록을 만듭니다. `eks-platform/ssm-instances`도 씁니다. `eks.ssm-unregistered`가 직접 쓰고, 등록되지 않은 노드에는 명령이 가지 않으므로 `node.*` 전체가 간접적으로 기댑니다. 없으면 `discover`가 오류를 기록하고 노드 접속 방식을 `none`으로 정해서 `send-command`를 보내지 않습니다. 노드 스크립트 항목 21개가 모든 노드를 "node not read"로 건너뛰고, 등록 목록이 `None`이므로 `eks.ssm-unregistered`는 `skip`이 됩니다.
+**`ssm:DescribeInstanceInformation`.** `lib/commands/setup.py`와 `lib/collection/discover.py`가 어떤 노드가 SSM에 등록되어 있는지 확인해 `ssm_unregistered` 목록을 만듭니다. `eks-platform/ssm-instances`도 씁니다. `eks.ssm-unregistered`가 직접 쓰고, 등록되지 않은 노드에는 명령이 가지 않으므로 `node.*` 전체가 간접적으로 기댑니다. 없으면 `discover`가 오류를 기록하고 노드 접속 방식을 `none`으로 정해서 `send-command`를 보내지 않습니다. 노드 스크립트 항목 21개가 모든 노드를 "node not read"로 건너뛰고, 등록 목록이 `None`이므로 `eks.ssm-unregistered`는 `skip`이 됩니다.
 
-**`ssm:DescribeDocument`.** `lib/setup.py`와 `lib/nodecommands.py`가 `kubegap-node-read`가 계정에 있고 최신인지 확인합니다. 쓰는 항목은 `ssm:SendCommand`와 같습니다. 없으면 kubegap이 SSM 문서가 저장소의 것과 같은지 확인할 수 없어서 노드 명령을 보내지 않습니다.
+**`ssm:DescribeDocument`.** `lib/commands/setup.py`와 `lib/collection/nodecommands.py`가 `kubegap-node-read`가 계정에 있고 최신인지 확인합니다. 쓰는 항목은 `ssm:SendCommand`와 같습니다. 없으면 kubegap이 SSM 문서가 저장소의 것과 같은지 확인할 수 없어서 노드 명령을 보내지 않습니다.
 
-**`ssm:SendCommand`.** `lib/node.py`가 `type: node` 수집 단계와, API 서버 프록시가 막혔을 때 파드 메트릭을 대신 읽는 동작에 씁니다. 수집 단계는 full 전용이고, 메트릭을 대신 읽는 curl은 daily와 full 모두에서 돌아갑니다.
+**`ssm:SendCommand`.** `lib/collection/node.py`가 `type: node` 수집 단계와, API 서버 프록시가 막혔을 때 파드 메트릭을 대신 읽는 동작에 씁니다. 수집 단계는 full 전용이고, 메트릭을 대신 읽는 curl은 daily와 full 모두에서 돌아갑니다.
 
 노드 스크립트와 kubelet configz를 읽는 `node.*` 항목 26개, `vpccni.*`의 ipamd 행, `vpc-cni.*` 로그 시그니처 셋(ipamd.log), `kubeproxy.*`의 모드 행, `*.metrics-unreadable`의 대체 경로가 씁니다. `node.*`의 나머지 10개는 Prometheus를 읽습니다. 없으면 이 노드 항목들은 daily에서 수집되지 않고, full에서는 읽지 못한 노드마다 `skip`이 됩니다. 파드 메트릭을 대신 읽을 수도 없어서 `metrics-unreadable`이 warn을 냅니다.
 
-**`ssm:GetCommandInvocation`.** `lib/node.py`가 모든 SSM 명령의 결과를 읽습니다. 쓰는 항목은 `ssm:SendCommand`와 같습니다. 없으면 명령은 가지만 출력을 읽지 못해서 노드 단계가 실패합니다.
+**`ssm:GetCommandInvocation`.** `lib/collection/node.py`가 모든 SSM 명령의 결과를 읽습니다. 쓰는 항목은 `ssm:SendCommand`와 같습니다. 없으면 명령은 가지만 출력을 읽지 못해서 노드 단계가 실패합니다.
 
 ### 수집 단계 하나만 쓰는 권한
 
@@ -264,7 +264,7 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 | `ce:GetCostAndUsage` | `eks-platform/ce-cost-30d` | `cost.*` 7개 |
 | `pricing:GetProducts` | `eks-platform/pricing-ondemand` | `cost.idle-compute-high`, `cost.request-waste`, `cost.on-demand-in-spot-pool`, `cost.idle-node` |
 
-**`ecr:DescribeRepositories`.** daily와 full 모두에서 `lib/discover.py`가 저장소 이름을 읽고, ECR 수집기는 이 목록의 저장소마다 돌아갑니다. `ecr.*` 8개가 기대는 권한입니다. 없으면 ECR 수집기가 살펴볼 저장소가 없어서 ECR 항목이 `skip`이 됩니다.
+**`ecr:DescribeRepositories`.** daily와 full 모두에서 `lib/collection/discover.py`가 저장소 이름을 읽고, ECR 수집기는 이 목록의 저장소마다 돌아갑니다. `ecr.*` 8개가 기대는 권한입니다. 없으면 ECR 수집기가 살펴볼 저장소가 없어서 ECR 항목이 `skip`이 됩니다.
 
 ## IAM 권한이 하나도 없을 때 (#22)
 
@@ -314,6 +314,6 @@ SSM 문서는 [`deploy/permissions/ssm-document.yaml`](../../deploy/permissions/
 
 명령은 접속 방식별로 [`deploy/node-access/COMMANDS.md`](../../deploy/node-access/COMMANDS.md)에 있습니다. 이 파일과 SSM 문서는 수집기 정의에서 생성하고, 둘 중 하나라도 최신이 아니면 테스트가 실패합니다.
 
-명령을 보내기 전에 `lib/node.py`가 로컬 SSM 문서와 계정에 있는 SSM 문서의 sha256을 비교하고, 다르면 보내지 않습니다.
+명령을 보내기 전에 `lib/collection/node.py`가 로컬 SSM 문서와 계정에 있는 SSM 문서의 sha256을 비교하고, 다르면 보내지 않습니다.
 
 SSM 문서를 올릴 때는 `ssm:CreateDocument`, `ssm:UpdateDocument`, `ssm:UpdateDocumentDefaultVersion`, `ssm:ListDocumentVersions`가 내 자격 증명에 한 번 필요합니다. `kubegap setup --install-ssm-document`로 올리고, 이 권한들은 점검 정책에 들어 있지 않습니다.

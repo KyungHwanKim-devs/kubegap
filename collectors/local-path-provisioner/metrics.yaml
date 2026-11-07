@@ -1,21 +1,21 @@
-# Free space of the filesystem that holds local-path volumes (/ or /var by default). node-exporter. Read by lib/localpath.py.
+# Free space of the filesystem that holds local-path volumes (/ or /var by default). node-exporter. Read by lib/summaries/localpath.py.
 - id: localpath_fs_avail_ratio
   why: Free ratio of the node root filesystem. local-path volumes have no capacity enforcement (capacity is nominal), so when this fills up kubelet eviction and k3s SQLite write failures come together
   query: min by (instance) (node_filesystem_avail_bytes{mountpoint=~"/|/var|/var/lib"} / node_filesystem_size_bytes{mountpoint=~"/|/var|/var/lib"})
   source:
     - "node_filesystem_avail_bytes: prometheus/node_exporter collector/filesystem_common.go:129@v1.7.0, :117@v1.10.2, :115@v1.12.1 (labels device, mountpoint, fstype collector/filesystem_common.go:63@v1.7.0; :70@v1.10.2 and :68@v1.12.1 add device_error; filesystem collector, on by default: collector/filesystem_common.go:87@v1.7.0, :97@v1.10.2, :95@v1.12.1)"
     - "node_filesystem_size_bytes: prometheus/node_exporter collector/filesystem_common.go:117@v1.7.0, :105@v1.10.2, :103@v1.12.1 (labels device, mountpoint, fstype collector/filesystem_common.go:63@v1.7.0; :70@v1.10.2 and :68@v1.12.1 add device_error; filesystem collector, on by default: collector/filesystem_common.go:87@v1.7.0, :97@v1.10.2, :95@v1.12.1)"
-    - "label instance: prometheus/prometheus scrape/target.go:507-510@v2.49.1, :519-522@v3.7.3 (Prometheus sets instance to the scrape target address when the target has none, so on node-exporter series it is <node IP>:9100, which lib/evaluate.py and the summaries map to the node by IP; a scrape config that relabels instance changes this)"
+    - "label instance: prometheus/prometheus scrape/target.go:507-510@v2.49.1, :519-522@v3.7.3 (Prometheus sets instance to the scrape target address when the target has none, so on node-exporter series it is <node IP>:9100, which lib/judgement/evaluate.py and the summaries map to the node by IP; a scrape config that relabels instance changes this)"
 - id: localpath_fs_size_bytes
   why: Node root filesystem size (bytes)
   query: max by (instance) (node_filesystem_size_bytes{mountpoint="/"})
   source:
     - "node_filesystem_size_bytes: prometheus/node_exporter collector/filesystem_common.go:117@v1.7.0, :105@v1.10.2, :103@v1.12.1 (labels device, mountpoint, fstype collector/filesystem_common.go:63@v1.7.0; :70@v1.10.2 and :68@v1.12.1 add device_error; filesystem collector, on by default: collector/filesystem_common.go:87@v1.7.0, :97@v1.10.2, :95@v1.12.1)"
-    - "label instance: prometheus/prometheus scrape/target.go:507-510@v2.49.1, :519-522@v3.7.3 (Prometheus sets instance to the scrape target address when the target has none, so on node-exporter series it is <node IP>:9100, which lib/evaluate.py and the summaries map to the node by IP; a scrape config that relabels instance changes this)"
+    - "label instance: prometheus/prometheus scrape/target.go:507-510@v2.49.1, :519-522@v3.7.3 (Prometheus sets instance to the scrape target address when the target has none, so on node-exporter series it is <node IP>:9100, which lib/judgement/evaluate.py and the summaries map to the node by IP; a scrape config that relabels instance changes this)"
 - id: localpath_fs_growth_bytes_per_day
   why: 7-day trend of root filesystem usage (bytes/day, deriv). If positive, the days until full can be computed
   query: max by (instance) (deriv((node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_avail_bytes{mountpoint="/"})[7d:1h]) * 86400)
   source:
     - "node_filesystem_size_bytes: prometheus/node_exporter collector/filesystem_common.go:117@v1.7.0, :105@v1.10.2, :103@v1.12.1 (labels device, mountpoint, fstype collector/filesystem_common.go:63@v1.7.0; :70@v1.10.2 and :68@v1.12.1 add device_error; filesystem collector, on by default: collector/filesystem_common.go:87@v1.7.0, :97@v1.10.2, :95@v1.12.1)"
     - "node_filesystem_avail_bytes: prometheus/node_exporter collector/filesystem_common.go:129@v1.7.0, :117@v1.10.2, :115@v1.12.1 (labels device, mountpoint, fstype collector/filesystem_common.go:63@v1.7.0; :70@v1.10.2 and :68@v1.12.1 add device_error; filesystem collector, on by default: collector/filesystem_common.go:87@v1.7.0, :97@v1.10.2, :95@v1.12.1)"
-    - "label instance: prometheus/prometheus scrape/target.go:507-510@v2.49.1, :519-522@v3.7.3 (Prometheus sets instance to the scrape target address when the target has none, so on node-exporter series it is <node IP>:9100, which lib/evaluate.py and the summaries map to the node by IP; a scrape config that relabels instance changes this)"
+    - "label instance: prometheus/prometheus scrape/target.go:507-510@v2.49.1, :519-522@v3.7.3 (Prometheus sets instance to the scrape target address when the target has none, so on node-exporter series it is <node IP>:9100, which lib/judgement/evaluate.py and the summaries map to the node by IP; a scrape config that relabels instance changes this)"

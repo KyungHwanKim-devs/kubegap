@@ -1,4 +1,4 @@
-# cert-manager checks (on EKS this is enabled when cert-manager is used instead of ACM). summary.certmanager.summary — lib/certmanager.py. Secret values are never read. Ingress exposure and authentication are covered by core traffic and security.
+# cert-manager checks (on EKS this is enabled when cert-manager is used instead of ACM). summary.certmanager.summary — lib/summaries/certmanager.py. Secret values are never read. Ingress exposure and authentication are covered by core traffic and security.
 - id: certmanager.certificate-not-ready
   name: Certificate not Ready (issuance or renewal is stuck)
   area: security

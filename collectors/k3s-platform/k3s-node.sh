@@ -1,7 +1,7 @@
 #!/bin/sh
 # kubegap k3s node platform read-only inspection. Writes nothing to the node.
 # Runs as the SSH login user; anything needing root is attempted only through the commands allowed by deploy/node-access/kubegap-sudoers via sudo -n. If that fails the section is empty and the parser records "no node access".
-# Output is a sequence of "### <section>" sections parsed by lib/k3s.py. Tokens and secrets are never printed (the --token value in the systemd unit and K10... tokens are removed with sed).
+# Output is a sequence of "### <section>" sections parsed by lib/summaries/k3s.py. Tokens and secrets are never printed (the --token value in the systemd unit and K10... tokens are removed with sed).
 S() { echo "### $1"; }
 if [ "$(id -u)" = 0 ]; then SUDO=""; else SUDO="sudo -n"; fi
 K3S=/usr/local/bin/k3s

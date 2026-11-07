@@ -1,5 +1,5 @@
-# Metric names kubegap reads from the MetalLB speaker /metrics (step metallb.metallb-speaker-metrics, parsed by lib/metallbctl.py and lib/k3s.py through
-# lib/podmetrics.py). Read in metallb/metallb at v0.14.5, v0.15.2 and v0.16.1: every name and label exists unchanged in the three.
+# Metric names kubegap reads from the MetalLB speaker /metrics (step metallb.metallb-speaker-metrics, parsed by lib/summaries/metallbctl.py and lib/summaries/k3s.py through
+# lib/foundations/podmetrics.py). Read in metallb/metallb at v0.14.5, v0.15.2 and v0.16.1: every name and label exists unchanged in the three.
 - key: speaker_announced
   labels: [service, protocol, node, ip]
   names:

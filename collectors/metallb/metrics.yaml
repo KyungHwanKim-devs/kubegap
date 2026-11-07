@@ -1,4 +1,4 @@
-# MetalLB PromQL, read only when Prometheus scrapes MetalLB (the chart's ServiceMonitor and PodMonitor are off by default, charts/metallb/values.yaml:58,95@v0.16.2). lib/metallbctl.py reads the
+# MetalLB PromQL, read only when Prometheus scrapes MetalLB (the chart's ServiceMonitor and PodMonitor are off by default, charts/metallb/values.yaml:58,95@v0.16.2). lib/summaries/metallbctl.py reads the
 # answer for the BGP session state when neither the speaker metrics (native mode through 0.15) nor BGPSessionState (frr-k8s mode from 0.15.2) say: native mode on 0.16 and later, FRR mode at any version.
 - id: metallb_bgp_session_down
   why: BGP sessions that are down right now, per peer, on the speaker (native mode) or the FRR exporter (frr and frr-k8s modes). An empty answer counts as "all up" only when metrics/series-present.json saw one of the two names

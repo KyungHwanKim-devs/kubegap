@@ -1,4 +1,4 @@
-# Argo CD checks. summary.argocdctl.summary — lib/argocdctl.py. The Application Sync/Health list is also in the core hygiene section (argocd_apps). Git credentials and Secret values are never read.
+# Argo CD checks. summary.argocdctl.summary — lib/summaries/argocdctl.py. The Application Sync/Health list is also in the core hygiene section (argocd_apps). Git credentials and Secret values are never read.
 - id: argocd.app-out-of-sync-or-unhealthy
   name: Application is OutOfSync or not Healthy (Git and the cluster differ)
   area: hygiene

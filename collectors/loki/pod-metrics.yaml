@@ -1,5 +1,5 @@
-# Metric names kubegap reads from Loki's own /metrics (step loki.metrics, the text saved as loki/metrics.txt and parsed by lib/stackhealth.py and
-# lib/logs.py through lib/podmetrics.py). Read in grafana/loki at v2.6.1, v2.9.2, v3.0.0 and v3.7.9 (#123). Loki 3.0.0 moved the retention run
+# Metric names kubegap reads from Loki's own /metrics (step loki.metrics, the text saved as loki/metrics.txt and parsed by lib/summaries/stackhealth.py and
+# lib/summaries/logs.py through lib/foundations/podmetrics.py). Read in grafana/loki at v2.6.1, v2.9.2, v3.0.0 and v3.7.9 (#123). Loki 3.0.0 moved the retention run
 # timestamp from the boltdb-shipper namespace to loki_compactor; every other name is the same in the four. The request histogram comes from the
 # server library Loki embeds (weaveworks/common up to 2.9, grafana/dskit since 3.0) under the namespace loki.
 - key: request_duration_count

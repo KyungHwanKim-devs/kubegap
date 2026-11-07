@@ -1,4 +1,4 @@
-# k3s platform collection. node items run read-only commands inside the node via lib/node.py.
+# k3s platform collection. node items run read-only commands inside the node via lib/collection/node.py.
 # node item: cmd, nodes(all|server|agent), out(logs/node/{node}/<name>), requires (entry of the permission table: journal|kernlog|dmesg|k3s-db|crictl|sudo-any). If requires is not satisfied the node is skipped as "no node access".
 # Control-plane logs (journal steps) and k3s-node.sh (config, ports, flannel, journald, datastore, certificates, registries, containerd, local-path, disk, temperature) plus the containerd log.
 - id: k3s-journal-errors
