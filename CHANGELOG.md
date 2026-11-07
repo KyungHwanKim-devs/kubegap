@@ -4,11 +4,14 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-07
+
+The safe-for-others-to-change milestone (12) is complete. This release is about the shape of the code rather than what it judges: `lib/` is six packages, one per layer, with an import direction a test enforces and no summary module importing another; the four modules that were over 1,000 lines are sub-packages split by responsibility; every shared small job has one home and a test that stops a second copy; the twelve longest evidence sentences are helpers instead of 1,000-character expressions in YAML; and `CONTRIBUTING.md` is the guide a contributor opens first, in English and Korean, with the procedure, the commands and the review checklist. Reports are unchanged apart from one new key, `traffic.alb.covered_services`, and three corrections named under Changed. 411 checks, rubric 0.1.87. Snapshots of earlier formats are not read: collect again.
+
 ### Added
 
 - `CONTRIBUTING.md` is the contributor's guide in English and Korean (#152): the check-addition procedure end to end, the five commands and what each proves, the pull request rules, the facts, helper and boundary rules, and the review checklist maintainers and the review agent go through. `references/development.md` keeps the mechanics and links to it; README and SKILL.md point to it. `tests/test_contributing.py` fails when the file names a command the CLI or CI does not have, or when the Korean half drifts from the English one.
 - Four foundations modules that give the shared small jobs one home each (#150): `lib/foundations/quantity.py` (Kubernetes quantities, `to_float`, `to_int`, `rounded`), `lib/foundations/workload.py` (`workload_of`, `key`, `is_db_like`, `image_repo`, `mounts_pvc`, `selector_matches`, `eligible_nodes`, moved from controlplane, resilience, security and traffic), `lib/foundations/nodetext.py` (the node script's section text and the kernel oom-kill line, moved from nodeos) and `lib/foundations/logtext.py` (klog normalisation, moved from controlplane); `lib/foundations/snapshot.py` gains `event_count` (from events) and the readers of `metrics/<query>.json` (`metric_doc`, `metric_result`, `metric_rows`, `metric_by`, `metric_value`, `metric_sample`, `metric_scalar`, `metric_sum`), `series_present` and `node_os_text`; `lib/foundations/versions.py` gains `image_version`. `tests/test_helper_homes.py` fails on a private helper with the same body in two modules, on a function named after a job that has a home, and on a unit table, an image-tag regex or a metrics-file path outside its home.
-
 - `lib/` has six named layers (foundations, collection, summaries, judgement, output, commands) and a stated import direction, written in `references/development.md` and enforced by `tests/test_boundaries.py`, which reads the imports of every module (inside functions and summarize's by-name dispatch included) against a module-to-layer map; the 22 imports that still cross the rule are listed there with the issue that removes each (#150, #151). Discovery no longer imports the first-run module: the command passes the SSH decision in. (#149)
 
 ### Changed
@@ -298,7 +301,8 @@ The first milestone, permissions and the read-only claim, is complete: issues #1
 - Expectation profiles `prod`, `lab`, `small-prod`, `multi-az-prod` and `dev`.
 - English and Korean README and sample reports.
 
-[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.5...HEAD
+[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.5...v0.2.0
 [0.1.5]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.2...v0.1.3
