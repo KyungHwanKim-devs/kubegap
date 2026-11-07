@@ -89,7 +89,7 @@
   tool: polaris
   # Not --only-show-failed-tests: it drops every controller whose only failures are controller-level checks (missingPodDisruptionBudget, deploymentMissingReplicas …),
   # because the filter keeps a controller only when its PodResult is non-empty (pkg/validator/output.go:180-185@v10.2.6; schema.go:245-249 always sets PodResult).
-  # lib/summaries/hygiene.py skips the Success entries itself.
+  # lib/summaries/hygiene skips the Success entries itself.
   cmd: [polaris, audit, --context, "{context}", --format, json]
   source: "polaris: cmd/polaris/root.go:47@v10.2.6 (--context), cmd/polaris/audit.go:62 (--format); exit 0 unless --set-exit-code-* (audit.go:127-134); shape in references/sources.md"
   out: tools/polaris.json
@@ -114,12 +114,12 @@
   type: tool
   tool: kubent
   # --log-level=debug: the per-List lines `Retrieving: <gvr>` and `Failed to retrieve: <gvr>: <err>` (pkg/collector/cluster.go:121,124@0.7.3) are Debug, the default level is Info
-  # (pkg/config/config.go:38); their difference is the read evidence lib/collection/collect.py counts (#132). The Helm v3 collector lists release Secrets, which the ClusterRole forbids; the cluster collector is enough.
+  # (pkg/config/config.go:38); their difference is the read evidence lib/collection/collect counts (#132). The Helm v3 collector lists release Secrets, which the ClusterRole forbids; the cluster collector is enough.
   cmd: [kubent, --context, "{context}", -o, json, -t, "{k8s_next_minor_short}", --helm3=false, --log-level=debug]
   source: "kubent: pkg/config/config.go:45@0.7.3 (--context), :51 (-o), :54 (-t), :48 (--helm3), :53 (--log-level); exit 0 with [] when nothing is found or read (cmd/kubent/main.go:49-56, pkg/collector/cluster.go:119-125); shape in references/sources.md"
   out: tools/kubent.json
   timeout: 300
-# Helm keeps each release record in a Secret (sh.helm.release.v1.<name>.v<n>), so `helm list` reads Secrets. kubegap stores only what list prints: name, namespace, status, revision, chart and app version, updated. User values (`helm get values`) are not collected: they often hold credentials. The shipped ClusterRole has no secrets permission, so with it this step fails and the Helm checks are skipped (lib/summaries/hygiene.py says why).
+# Helm keeps each release record in a Secret (sh.helm.release.v1.<name>.v<n>), so `helm list` reads Secrets. kubegap stores only what list prints: name, namespace, status, revision, chart and app version, updated. User values (`helm get values`) are not collected: they often hold credentials. The shipped ClusterRole has no secrets permission, so with it this step fails and the Helm checks are skipped (lib/summaries/hygiene says why).
 - id: helm-list
   modes: [full]   # skipped by the daily run
   type: tool

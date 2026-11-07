@@ -148,7 +148,7 @@ C clock "$P_CLK"
 echo "samples:"
 printf '%s\n' "$KLOG" | grep -E "$P_OOM_NODE|$P_OOM_CG|$P_LOCKUP|$P_IO|$P_FS|$P_NIC|$P_CT|$P_NET|$P_MEM|$P_BUG|$P_SEG|$P_CLK" \
   | grep -v '^$' | cut -c1-200 | tail -n 40
-# OOM lines in full, up to 400 characters: the kernel's oom-kill line carries the pod uid in oom_memcg (…kubepods-burstable-pod<uid>.slice), which is past column 200, and lib/summaries/resilience.py maps it to the workload
+# OOM lines in full, up to 400 characters: the kernel's oom-kill line carries the pod uid in oom_memcg (…kubepods-burstable-pod<uid>.slice), which is past column 200, and lib/summaries/resilience maps it to the workload
 echo "oom_samples:"
 printf '%s\n' "$KLOG" | grep -E "oom-kill:|$P_OOM_CG|$P_OOM_NODE" | grep -v '^$' | cut -c1-400 | tail -n 60
 

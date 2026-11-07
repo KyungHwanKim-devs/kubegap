@@ -12069,7 +12069,7 @@
           prod_db_pvcs_without_snapshot_path: []
           platform: "k3s"
 
-# ---------- Structure and hygiene. Source: summary.hygiene (lib/summaries/hygiene.py) ----------
+# ---------- Structure and hygiene. Source: summary.hygiene (lib/summaries/hygiene) ----------
 - id: hygiene.polaris-reliability-danger
   name: Polaris reliability/efficiency danger items (untagged images, hostPath, missing probes, etc.)
   area: hygiene
@@ -14590,7 +14590,7 @@
           last_applied: true
       - expect: "none"
 
-# ---------- Resilience. Material is summary.resilience (lib/summaries/resilience.py) ----------
+# ---------- Resilience. Material is summary.resilience (lib/summaries/resilience) ----------
 - id: resilience.liveness-dependency-path
   name: liveness probe checks dependencies (DB, ready) or shares its path with readiness
   area: resilience
