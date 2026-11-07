@@ -284,7 +284,8 @@ def _alerts(snap: Path, alerting: list[dict]) -> dict:
     samples.sort(key=lambda r: -r["samples_7d"])
     # evaluation interval estimate: Watchdog sample count = a value that fired for all 7 days
     wd = next((s["samples_7d"] for s in samples if s["alertname"] == "Watchdog"), None)
-    always = [s for s in samples if wd and s["samples_7d"] >= 0.95 * wd and s["alertname"] not in EXPECTED_ALWAYS_FIRING]
+    samples_read = bool((load_json(snap / "metrics" / "alerts_firing_samples_7d.json") or {}).get("ok"))
+    always = [s for s in samples if wd and s["samples_7d"] >= 0.95 * wd and s["alertname"] not in EXPECTED_ALWAYS_FIRING] if samples_read else None  # None, not []: the list was not read (#141)
     firing_now = []
     for row in _metric_rows(snap, "alerts_firing_now"):
         m = row["metric"]
@@ -298,6 +299,7 @@ def _alerts(snap: Path, alerting: list[dict]) -> dict:
         "firing_now_by_name": dict(Counter(a["alertname"] for a in firing_now)),
         "top_firing_7d": samples[:15],
         "always_firing_7d": always,
+        "skip_reason": None if samples_read else "alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)",
         "watchdog_samples_7d": wd,
         "note": "always_firing = 7-day sample count at or above 95% of Watchdog (always firing). On EKS, KubeControllerManagerDown and KubeSchedulerDown fire forever because the control plane is invisible — false positives",
     }

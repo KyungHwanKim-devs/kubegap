@@ -102,7 +102,9 @@ def analyze(snap: Path, inv: dict | None, summary: dict | None) -> dict:
     total_cpu = sum(r["cpu"] for r in node_rows)
     used_cpu = sum((r["cpu_p95_ratio"] or 0) * r["cpu"] for r in node_rows)
     req_cpu = sum((r["cpu_request_ratio"] or 0) * r["cpu"] for r in node_rows)
+    node_metrics_read = any(r["cpu_p95_ratio"] is not None for r in node_rows)  # node CPU usage through Prometheus; without it the used and idle figures are 0 for the wrong reason (#141)
     efficiency = {
+        "metrics_read": node_metrics_read,
         "nodes": len(node_rows),
         "allocatable_cpu": round(total_cpu, 2),
         "p95_used_cpu": round(used_cpu, 2),
@@ -182,16 +184,20 @@ def analyze(snap: Path, inv: dict | None, summary: dict | None) -> dict:
     krr_tot = ((summary.get("resources") or {}).get("krr") or {}).get("totals") or {}
     usd_per_core_month = compute / total_cpu if total_cpu and compute else None
     saving_cores = krr_tot.get("cpu_request_saving_cores")
-    request_waste = round(saving_cores * usd_per_core_month, 2) if (saving_cores and usd_per_core_month) else None
+    request_waste = round(max(saving_cores, 0) * usd_per_core_month, 2) if (saving_cores is not None and usd_per_core_month) else None  # 0 is a fact (nothing to save); None is "not read"
     # ---- EIP, NAT, LB, EKS charges ----
-    eips = [e for e in (load_json(snap / "aws" / "ec2-addresses.json") or []) if isinstance(e, dict)]
+    addresses = load_json(snap / "aws" / "ec2-addresses.json")
+    eips = [e for e in (addresses or []) if isinstance(e, dict)]
     eip_unused = [e["ip"] for e in eips if not e.get("association")]
     nats = [n for n in (load_json(snap / "aws" / "ec2-nat-gateways.json") or []) if isinstance(n, dict)]
-    lbs = ((summary.get("traffic") or {}).get("alb") or {}).get("lbs") or []
+    alb = (summary.get("traffic") or {}).get("alb") or {}
+    lbs = alb.get("lbs") or []
     idle_lbs = [ln["name"] for ln in lbs if (ln.get("type") == "application" and (ln.get("requests_24h") or 0) == 0) or (ln.get("type") == "network" and (ln.get("processed_bytes_24h") or 0) == 0)]
     support = ((inv.get("cluster") or {}).get("eks") or {}).get("support_type")
     eks_fee = RATE["eks_extended"] * HOURS if support == "EXTENDED" else RATE["eks_cluster"] * HOURS
     fixed = {
+        "addresses_read": isinstance(addresses, list),  # ec2:DescribeAddresses answered; without it eip_unused is 0 for the wrong reason (#141)
+        "load_balancers_read": bool(alb.get("available")),
         "eip_unused": len(eip_unused),
         "eip_unused_monthly_usd": round(len(eip_unused) * RATE["eip_idle"] * HOURS, 2),
         "eips_total": len(eips),
@@ -232,6 +238,8 @@ def analyze(snap: Path, inv: dict | None, summary: dict | None) -> dict:
         {
             "pricing": {"available": bool(od), "ondemand_types": od, "spot_latest": {f"{t}@{az}": p for (t, az), p in spot.items()}, "hours_per_month": HOURS, "rates": RATE},
             "compute": {
+                "pricing_read": bool(od),  # pricing:GetProducts answered; without it every monthly figure is 0 and idle_ratio None (#141)
+                "node_metrics_read": node_metrics_read,
                 "monthly_usd": round(compute, 2),
                 "spot_monthly_usd": round(spot_m, 2),
                 "ondemand_monthly_usd": round(od_m, 2),
@@ -241,7 +249,8 @@ def analyze(snap: Path, inv: dict | None, summary: dict | None) -> dict:
                 "usd_per_core_month": round(usd_per_core_month, 2) if usd_per_core_month else None,
                 "idle_monthly_usd": round(idle, 2),
                 "idle_ratio": round(idle / compute, 2) if compute else None,
-                "idle_nodes": idle_nodes,
+                "idle_nodes": idle_nodes if node_metrics_read else None,  # None, not []: no node CPU ratio was read (#141)
+                "skip_reason": None if node_metrics_read else "node CPU usage metrics not read (node_cpu_usage_ratio_p95_7d)",
                 "on_demand_in_spot_pool": on_demand_in_spot_pool,
             },
             "request_waste": {"krr_saving_cores": saving_cores, "monthly_usd_est": request_waste, "requests_cpu_total": krr_tot.get("cpu_request_current"), "recommended_cpu_total": krr_tot.get("cpu_request_recommended")},

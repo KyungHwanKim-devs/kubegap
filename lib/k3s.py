@@ -422,6 +422,7 @@ def _local_path(snap: Path, recs: list[dict], pods: list[dict]) -> dict:
         "by_node": dict(by_node),
         "pinned": sorted(pinned, key=lambda x: -(x["used_mb"] or 0)),
         "over_capacity": over,
+        "du_read": any(r.get("local_path") for r in recs),  # the du section of at least one node was read; without it over_capacity is empty for the wrong reason (#141)
         "node_total_mb": {r["node"]: (r.get("local_path") or {}).get("total_mb") for r in recs},
     }
 
@@ -457,6 +458,7 @@ def _cluster(snap: Path, inv: dict, recs: list[dict], node_ips: set[str], versio
     pods = items(load_json(snap / "objects" / "pods.json"))
     disabled = sorted({d for r in servers for d in r.get("disable", [])})
     return {
+        "servers_read": any(r.get("collected") for r in servers),  # at least one server's k3s-platform.txt was read; the apiserver and check-config fields below mean nothing without it (#141)
         "servers": [r["node"] for r in servers],
         "agents": [r["node"] for r in agents],
         "versions": dict(versions),

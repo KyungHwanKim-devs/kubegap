@@ -409,6 +409,9 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "nodes": len(nodes),
                 "prefix_delegation": st["prefix_delegation"],
                 "nitro_nodes": sum(1 for r in nodes if r["hypervisor"] == "nitro"),
+                "capacity_read": any(
+                    r["ip_usage_ratio"] is not None for r in nodes
+                ),  # the pod IP usage of at least one node is known (ipamd metrics, or the instance type's limits from ec2:DescribeInstanceTypes); without it the two node lists are empty for the wrong reason (#141)
                 "nodes_near_ip_limit": [r["node"] for r in nodes if (r["ip_usage_ratio"] or 0) >= 0.5],
                 "nodes_no_available_ip": [r["node"] for r in nodes if (r["no_available_ip_events"] or 0) > 0],
                 "metrics_unavailable_nodes": gaps,

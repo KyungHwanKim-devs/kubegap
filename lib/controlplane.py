@@ -133,6 +133,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         out["log_volume_24h"] = vol
         out["log_group"] = meta.get("log_group")
         out["available"] = bool(meta.get("ok"))
+        out["skip_reason"] = None if out["available"] else f"control plane logs not read (CloudWatch Logs Insights: {meta.get('error') or 'logs/cloudwatch/volume_by_stream.json missing'})"
         out["apiserver"] = {
             "errors_by_source": [{"level": r.get("lvl"), "source": r.get("src"), "count": _int(r.get("c"))} for r in _rows(snap, "apiserver_errors_by_source")],
             "slow_traces": [{"op": r.get("op"), "count": _int(r.get("c"))} for r in _rows(snap, "apiserver_slow_traces")],
@@ -159,6 +160,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             "reasons": [{"reason": k, "samples": v} for k, v in reasons.most_common(8)],
         }
         out["authenticator"] = {"failures": [{"message": r.get("msg"), "count": _int(r.get("c"))} for r in _rows(snap, "authenticator_failures")], "failures_total": sum(_int(r.get("c")) for r in _rows(snap, "authenticator_failures"))}
+        if not out["available"]:
+            out["apiserver"] = out["authenticator"] = out["controller_manager"] = out["scheduler"] = out["cloud_controller"] = None  # not zero errors: the queries did not run, so the checks that read them skip (#141)
         out["cloud_controller"] = {"errors_by_source": [{"level": r.get("lvl"), "source": r.get("src"), "count": _int(r.get("c"))} for r in _rows(snap, "cloud_controller_errors")]}
         out["audit_stream_lines"] = sum(_int(r.get("lines")) for r in _rows(snap, "audit_stream_present"))
         out["query_failures"] = [{"id": p.stem, "error": (load_json(p) or {}).get("error")} for p in (snap / "logs" / "cloudwatch").glob("*.json") if not (load_json(p) or {}).get("ok")] if (snap / "logs" / "cloudwatch").is_dir() else []
@@ -222,9 +225,10 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             nodes[nd.name] = rec
         out["nodes"] = nodes
         out["available"] = bool(nodes)
+        out["skip_reason"] = None if nodes else "no k3s server journal read (logs/node/<node>/ missing: no node access)"
         out["scheduler"] = {"unschedulable_total_24h": total_unsched, "by_workload": [{"workload": w, "namespace": w.split("/")[0], "count": c} for w, c in sorted(sched_by_wl.items(), key=lambda kv: -kv[1])]}
         out["webhook_failures_total"] = total_webhook
-        out["etcd"] = etcd
+        out["etcd"] = etcd if nodes else None  # None, not zeros: nothing was read (#141)
         out["controller_manager"] = {"note": "k3s runs as one process, so controller-manager errors are mixed into nodes[<server>].top_errors"}
     else:
         out["source"] = None

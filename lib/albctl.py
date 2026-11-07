@@ -287,7 +287,8 @@ def analyze(snap: Path, inv: dict | None, traffic: dict | None = None) -> dict:
         "aws_api_top_ops": metrics["aws_api_top_ops"],
         "rest_client_429_503": metrics["rest_client_429_503"],
         "workqueue_depth_max": metrics["workqueue_depth_max"],
-        "traffic_target_groups_without_tgb": len(traffic_alb.get("target_groups_without_tgb") or []),
+        "target_groups_read": bool(traffic_alb.get("available")),  # the ALB listing (elasticloadbalancing:Describe*) answered; without it the AWS-side counts below are 0 for the wrong reason (#141)
+        "traffic_target_groups_without_tgb": len(traffic_alb.get("target_groups_without_tgb") or []) if traffic_alb.get("available") else None,
         "traffic_unhealthy_target_groups": len(traffic_alb.get("unhealthy_target_groups") or []),
         "cluster_name_arg": controller["cluster_name"],
     }

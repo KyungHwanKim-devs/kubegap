@@ -13,7 +13,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from . import scrub
-from .snapshot import load_json, objects
+from .snapshot import dump_record, load_json, object_file_status, objects
 
 SECRET_ENV_RE, ENV_SKIP_RE = scrub.SECRET_ENV_RE, scrub.ENV_SKIP_RE  # shared with the collection-time ConfigMap scan
 DANGEROUS_CAPS = {"SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE", "SYS_MODULE", "ALL", "NET_RAW", "SYS_RAWIO", "DAC_READ_SEARCH"}
@@ -322,6 +322,8 @@ def netpol_enforced(snap: Path, platform: str | None, k3s: dict | None, nps: lis
 
 def _networkpolicy(snap: Path, prod: set, platform: str | None, k3s: dict | None) -> dict:
     nps = objects(snap, "networkpolicies.networking.k8s.io")
+    status = object_file_status(snap, "networkpolicies.networking.k8s.io", dump_record(snap))
+    read = status in ("ok", "not-served")  # a kind the API does not serve has no policies, truthfully; denied, failed or no record is "not read" (#141)
     by_ns: dict[str, list] = defaultdict(list)
     default_deny = set()
     for n in nps:
@@ -332,13 +334,15 @@ def _networkpolicy(snap: Path, prod: set, platform: str | None, k3s: dict | None
             default_deny.add(ns)
     enforced, how = netpol_enforced(snap, platform, k3s, nps)
     return {
-        "policies": len(nps),
+        "read": read,
+        "file_status": status,
+        "policies": len(nps) if read else None,
         "namespaces_with_policy": sorted(by_ns),
         "default_deny_ingress_namespaces": sorted(default_deny),
         "prod_without_default_deny": sorted(n for n in prod if n not in default_deny),
         "enforced": enforced,
         "enforcement": how,
-        "policies_but_not_enforced": bool(nps) and enforced is False,
+        "policies_but_not_enforced": (bool(nps) and enforced is False) if read else None,
     }
 
 
