@@ -28,3 +28,11 @@ def test_no_other_module_parses_a_version_with_its_own_regular_expression():
     pat = re.compile(r"v\?\(\\d\+\)\\\.\(\\d\+\)|v\?\\d\+\\\.\(\\d\+\)|v\?\(\\d\+\\\.\\d\+\)")
     offenders = [f.name for f in (ROOT / "lib").glob("*.py") if f.name != "versions.py" and pat.search(f.read_text(encoding="utf-8"))]
     assert offenders == [], offenders
+
+
+def test_image_version_reads_the_semver_triple_of_an_image_tag():
+    assert versions.image_version("quay.io/metallb/speaker:v0.16.2") == "0.16.2"
+    assert versions.image_version("602401143452.dkr.ecr.us-east-1.amazonaws.com/eks/coredns:v1.11.3-eksbuild.1") == "1.11.3"
+    assert versions.image_version("registry.k8s.io/kube-proxy:v1.31.0@sha256:abcd") == "1.31.0"
+    assert versions.image_version("grafana/grafana:latest") is None and versions.image_version("redis@sha256:abcd") is None
+    assert versions.image_version("nginx") is None and versions.image_version(None) is None and versions.image_version("x:1.2") is None
