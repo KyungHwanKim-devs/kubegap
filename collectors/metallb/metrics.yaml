@@ -1,0 +1,8 @@
+# MetalLB PromQL, read only when Prometheus scrapes MetalLB (the chart's ServiceMonitor and PodMonitor are off by default, charts/metallb/values.yaml:58,95@v0.16.2). lib/metallbctl.py reads the
+# answer for the BGP session state when neither the speaker metrics (native mode through 0.15) nor BGPSessionState (frr-k8s mode from 0.15.2) say: native mode on 0.16 and later, FRR mode at any version.
+- id: metallb_bgp_session_down
+  why: BGP sessions that are down right now, per peer, on the speaker (native mode) or the FRR exporter (frr and frr-k8s modes). An empty answer counts as "all up" only when metrics/series-present.json saw one of the two names
+  query: '{__name__=~"metallb_bgp_session_up|frrk8s_bgp_session_up"} == 0'
+  source:
+    - "metallb_bgp_session_up: metallb/metallb internal/bgp/metrics/metrics.go:11-15@v0.16.2 (gauge, label peer; the speaker registers it in native mode only, internal/bgp/native/stats.go:11,50@v0.16.2; the frr-metrics sidecar of FRR mode prints the same name, frr-tools/metrics/collector/bgp.go:21@v0.16.2, on port 9121 named frrmetricshttps, config/manifests/metallb-frr.yaml:2460-2461@v0.16.2; the chart's MetalLBBGPSessionDown alert is this expression, charts/metallb/templates/prometheusrules.yaml:72-76@v0.16.2)"
+    - "frrk8s_bgp_session_up: metallb/frr-k8s cmd/metrics/collector/metrics.go:11-15@v0.0.27 (gauge, labels peer and vrf, cmd/metrics/collector/bgp.go:14-18@v0.0.27; the frr-metrics container of the frr-k8s DaemonSet on port 9141, metallb/metallb config/manifests/metallb-frr-k8s.yaml:4042@v0.16.2)"
