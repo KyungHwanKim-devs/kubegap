@@ -31,12 +31,8 @@ MAY_IMPORT: dict[str, frozenset[str]] = {
 ORCHESTRATORS = {"summarize"}
 
 # Imports against the rule that are known, dated and owned by the issue that removes them. Key: (importing module, imported module).
-# A summary that computes part of another section itself gets that section's result from summarize instead; #151 does that and deletes its row.
-EXCEPTIONS: dict[tuple[str, str], str] = {
-    ("security", "hygiene"): "2026-11-07 security runs hygiene's polaris reader itself; summarize passes the hygiene section instead → #151",
-    ("traffic", "security"): "2026-11-07 traffic asks security whether NetworkPolicy is enforced; summarize passes the security section instead → #151",
-    ("observability", "traffic"): "2026-11-07 observability asks traffic which Services ALB covers; summarize passes the traffic section instead → #151",
-}
+# Empty since #151: the three summaries that computed part of another section get it from summarize as an argument.
+EXCEPTIONS: dict[tuple[str, str], str] = {}
 
 
 def layers() -> dict[str, str]:

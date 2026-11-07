@@ -566,6 +566,14 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
     now = taken_at(inv)  # the one clock of a summary: every age, window and expiry below is measured from the snapshot time (#165)
     if not (inv or {}).get("taken_at"):
         RunLog(snap / "run.log").note("inventory.json has no taken_at; the ages of this summary are measured from the wall clock and change on a rerun")
+    # Sections that another section reads are built first and passed in, so no section module imports a sibling (tests/test_boundaries.py):
+    # hygiene -> security (polaris), security -> traffic (NetworkPolicy enforcement), traffic -> observability (ALB-covered Services). The key order of summary.json below is unchanged.
+    webhooks = summarize_webhooks(snap)
+    k3s = _component("k3s", snap, inv, on_error={"present": None})
+    hygiene = _component("hygiene", snap, inv, webhooks)
+    security = _component("security", snap, inv, k3s, hygiene)
+    traffic = _component("traffic", snap, inv, security)
+    observability = _component("observability", snap, inv, traffic)
     s = {
         "kubegap": __version__,
         "schema": paths.SCHEMA_VERSION,
@@ -576,25 +584,25 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
         "metrics": summarize_metrics(snap),
         "objects": summarize_objects(snap, inv),
         "conditions": summarize_conditions(snap, now),
-        "webhooks": summarize_webhooks(snap),
-        "observability": _component("observability", snap, inv),
+        "webhooks": webhooks,
+        "observability": observability,
         "controlplane": _component("controlplane", snap, inv),
         "nodeos": _component("nodeos", snap, inv),
-        "k3s": _component("k3s", snap, inv, on_error={"present": None}),
+        "k3s": k3s,
         "recent_changes": summarize_recent_changes(snap, now),
         "logs": summarize_logs(snap, inv),
         "tools": summarize_tools(snap),
         "resources": _component("resources", snap, inv),
         "scaling": _component("scaling", snap, inv),
-        "traffic": _component("traffic", snap, inv),
+        "traffic": traffic,
         "resilience": _component("resilience", snap, inv),
         "storage": _component("storage", snap, inv),
         "run": summarize_run(snap),
         "collection": _collection_meta(snap),
     }
-    s["hygiene"] = _component("hygiene", snap, inv, s.get("webhooks"))
-    s["security"] = _component("security", snap, inv, s.get("k3s"))
-    s["tenancy"] = _component("tenancy", snap, inv, s.get("security"))
+    s["hygiene"] = hygiene
+    s["security"] = security
+    s["tenancy"] = _component("tenancy", snap, inv, security)
     collectors_enabled = (inv or {}).get("collectors_enabled") or []
     for key, module, enabled_by, depends_on in COMPONENT_SECTIONS:
         if not _component_enabled(key, enabled_by, snap, collectors_enabled):

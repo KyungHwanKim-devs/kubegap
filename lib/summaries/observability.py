@@ -405,21 +405,16 @@ def _alertmanager(snap: Path, now: _dt.datetime) -> dict:
     return am
 
 
-def _golden_signals(snap: Path, comps: set, platform: str | None) -> dict:
+def _golden_signals(snap: Path, comps: set, platform: str | None, alb: dict | None) -> dict:
     """Golden signals per ingress backend: whether latency/traffic/errors and saturation metrics exist and from which source. Reads metrics/http_metric_namespaces, saturation_metric_namespaces, ingress_controller_requests, objects/ingresses.networking.k8s.io.json, aws/alb-metrics.json (via traffic)."""
     http_ns = {r["metric"].get("namespace") for r in metric_result(snap, "http_metric_namespaces")}
     sat_ns = {r["metric"].get("namespace") for r in metric_result(snap, "saturation_metric_namespaces")}
     ic_rows = metric_result(snap, "ingress_controller_requests")
     ic_keys = {(r["metric"].get("exported_namespace") or r["metric"].get("namespace"), r["metric"].get("ingress") or r["metric"].get("service")) for r in ic_rows}
     alb_cloudwatch = platform == "eks" and "alb-controller" in comps
-    alb_error = None
-    try:
-        from .traffic import alb_covered_services
-
-        alb_covered = alb_covered_services(snap)  # (ns, service) pairs that have RequestCount in aws/alb-metrics.json
-    except Exception as e:  # a broken aws/alb-metrics.json must not stop the golden-signal table; the error is surfaced below
-        alb_covered = set()
-        alb_error = f"{type(e).__name__}: {e}"
+    covered = (alb or {}).get("covered_services")  # summary.traffic.alb, built before this section: (ns, service) pairs that have RequestCount in aws/alb-metrics.json
+    alb_covered = {tuple(x) for x in covered} if covered else set()
+    alb_error = (alb or {}).get("covered_services_error")
     rows = []
     for ing in items(load_json(snap / "objects" / "ingresses.networking.k8s.io.json")):
         ns, name = ing["metadata"]["namespace"], ing["metadata"]["name"]
@@ -554,7 +549,7 @@ def _provisioned(snap: Path) -> dict:
     return out
 
 
-def analyze(snap: Path, inv: dict | None) -> dict:
+def analyze(snap: Path, inv: dict | None, traffic_summary: dict | None = None) -> dict:
     inv = inv or {}
     comps = set(inv.get("components_present") or [])
     platform = (inv.get("cluster") or {}).get("platform")
@@ -566,7 +561,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "failure_modes": _failure_modes(alerting, comps, platform),
         "slo": _slo(alerting, recording, comps),
         "alertmanager": _alertmanager(snap, taken_at(inv)),
-        "golden_signals": _golden_signals(snap, comps, platform),
+        "golden_signals": _golden_signals(snap, comps, platform, (traffic_summary or {}).get("alb")),
         "targets": _targets(snap),
         "grafana": _grafana(snap, alerting),
     }

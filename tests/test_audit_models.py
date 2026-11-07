@@ -184,7 +184,10 @@ def test_nginx_webhook_closed_by_network_policy(tmp_path):
     aws_node = {"metadata": {"namespace": "kube-system", "name": "aws-node"}, "spec": {"template": {"spec": {"containers": [{"name": "aws-eks-nodeagent", "args": ["--enable-network-policy=true"]}]}}}}
     _w(tmp_path, "daemonsets", [aws_node])
     _w(tmp_path, "validatingwebhookconfigurations.admissionregistration.k8s.io", [])
-    n = traffic._nginx(tmp_path, [], {"cluster": {"platform": "eks"}})
+    from lib.summaries import security
+
+    netpol = security._networkpolicy(tmp_path, set(), "eks", None)  # what summarize passes: the security section is built before traffic
+    n = traffic._nginx(tmp_path, [], {"cluster": {"platform": "eks"}}, netpol)
     wn = n["webhook_network_policy"]
     assert n["vulnerable"] is True and wn["policies"] == [f"{np['metadata']['namespace']}/webhook-apiserver-only"] and wn["enforced"] is True and wn["mitigated"] is True
     # the same policy on an EKS cluster whose CNI does not enforce policies mitigates nothing
