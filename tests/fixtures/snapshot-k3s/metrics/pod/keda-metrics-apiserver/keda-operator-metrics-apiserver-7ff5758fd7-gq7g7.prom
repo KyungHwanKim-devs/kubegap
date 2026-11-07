@@ -1,0 +1,15 @@
+apiserver_current_inflight_requests{request_kind="mutating"} 0
+apiserver_current_inflight_requests{request_kind="readOnly"} 0
+apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/healthz",verb="GET",version=""} 1.028466e+06
+apiserver_request_total{code="200",component="",dry_run="",group="",resource="",scope="",subresource="/readyz",verb="GET",version=""} 3.428222e+06
+apiserver_request_total{code="200",component="apiserver",dry_run="",group="",resource="",scope="",subresource="apis",verb="GET",version=""} 6
+apiserver_request_total{code="304",component="apiserver",dry_run="",group="",resource="",scope="",subresource="apis",verb="GET",version=""} 205695
+registered_metrics_total{deprecated_version="",stability_level="ALPHA"} 126
+registered_metrics_total{deprecated_version="",stability_level="BETA"} 15
+registered_metrics_total{deprecated_version="",stability_level="STABLE"} 12
+registered_metrics_total{deprecated_version="1.27.0",stability_level="ALPHA"} 1
+registered_metrics_total{deprecated_version="1.28.0",stability_level="ALPHA"} 1
+registered_metrics_total{deprecated_version="1.30.0",stability_level="ALPHA"} 1
+registered_metrics_total{deprecated_version="1.31.0",stability_level="ALPHA"} 1
+process_resident_memory_bytes 4.3307008e+07
+process_start_time_seconds 1.78372964218e+09

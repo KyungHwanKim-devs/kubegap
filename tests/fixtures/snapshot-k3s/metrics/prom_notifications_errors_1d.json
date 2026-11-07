@@ -1,0 +1,1 @@
+{"id":"prom_notifications_errors_1d","query":"sum by (alertmanager) (increase(prometheus_notifications_errors_total[1d])) > 0","why":"Alerts that failed to send to Alertmanager (24h, per Alertmanager address)","taken_at":"2026-11-07T10:23:15+09:00","ok":true,"resultType":"vector","result":[],"series":0}

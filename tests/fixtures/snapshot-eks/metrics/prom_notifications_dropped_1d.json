@@ -1,0 +1,1 @@
+{"id":"prom_notifications_dropped_1d","query":"sum(increase(prometheus_notifications_dropped_total[1d]))","why":"Alerts dropped from the Prometheus → Alertmanager queue overflow (24h). Anything above 0 means alerts were lost","taken_at":"2026-11-07T10:35:07+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794015310.381,"0"]}],"series":1}

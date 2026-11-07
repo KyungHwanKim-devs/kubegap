@@ -1,0 +1,1 @@
+{"clusterVersions":[{"clusterVersion":"1.32","clusterType":"eks","defaultPlatformVersion":"eks.58","defaultVersion":false,"releaseDate":"2025-01-23T09:00:00+09:00","endOfStandardSupportDate":"2026-03-23T09:00:00+09:00","endOfExtendedSupportDate":"2027-03-23T09:00:00+09:00","status":"EXTENDED_SUPPORT","versionStatus":"EXTENDED_SUPPORT","kubernetesPatchVersion":"1.32.13"}]}

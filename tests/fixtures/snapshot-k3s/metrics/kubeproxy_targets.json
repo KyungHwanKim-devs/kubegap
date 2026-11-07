@@ -1,0 +1,1 @@
+{"id":"kubeproxy_targets","query":"up{job=~\".*kube-proxy.*\"}","why":"Scrape target status for job=kube-proxy (EKS). Empty on k3s, which has no such job","taken_at":"2026-11-07T10:23:04+09:00","ok":true,"resultType":"vector","result":[],"series":0}

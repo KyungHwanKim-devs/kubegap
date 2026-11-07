@@ -1,0 +1,1 @@
+{"id":"loki_5xx_1h","query":"sum by (route) (increase(loki_request_duration_seconds_count{status_code=~\"5..\"}[1h])) > 0","why":"5xx Loki requests. Query or ingest failures","taken_at":"2026-11-07T10:35:03+09:00","ok":true,"resultType":"vector","result":[],"series":0}

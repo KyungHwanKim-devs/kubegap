@@ -1,0 +1,1 @@
+{"id":"apiserver_watch_count","query":"sum(apiserver_longrunning_requests{job=\"apiserver\",verb=\"WATCH\"})","why":"Open WATCH count. Proportional to the number of controllers and agents. A spike is an informer restart storm","taken_at":"2026-11-07T10:23:13+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794014600.374,"637"]}],"series":1}

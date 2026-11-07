@@ -1,0 +1,1 @@
+[{"id":"nat-079605934ba12b4a5","subnet":"subnet-090c640b1f58ddf40","vpc":"vpc-0b24969e204d8b783","created":"2025-12-16T11:49:52+00:00","tags":[{"Key":"Environment","Value":"production"},{"Key":"Team","Value":"DevOps"},{"Key":"ManagedBy","Value":"Terraform"},{"Key":"Name","Value":"app-u-vpc-eks-ap-northeast-2a"}]}]

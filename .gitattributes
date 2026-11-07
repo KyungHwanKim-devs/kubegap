@@ -1,0 +1,2 @@
+# The committed snapshot fixtures are inputs, not review material: collapsed in a pull request. tests/fixtures/expected/ is the review material and stays open.
+tests/fixtures/snapshot-*/** linguist-generated=true

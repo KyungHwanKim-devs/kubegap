@@ -62,7 +62,9 @@ _PATTERNS: list[tuple[str, re.Pattern]] = [
     ("base64-long", re.compile(r"(?<![A-Za-z0-9+/=])[A-Za-z0-9+/]{40,}={0,2}(?![A-Za-z0-9+/=])")),
 ]
 _ARN_ACCOUNT = re.compile(r"(arn:aws[a-z-]*:[a-z0-9-]*:[a-z0-9-]*:)(\d{12})(:)")
-_PRIVATE_IP = re.compile(r"\b(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3})\b")
+_PRIVATE_IP = re.compile(
+    r"(?<![\d.])(?:10\.\d{1,3}\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3}\.\d{1,3})(?![\d.])"
+)  # not \b: in JSON text an escaped newline (`\n192.168…`) puts a letter right before the address
 # exceptions to avoid base64 false positives: sha256 hashes (64 hex chars), image digests and long tokens in URL paths are not masked
 _HEX = re.compile(r"^[0-9a-f]{40,}$")
 # A pure-ASCII camelCase identifier (k8s field name) with no digits, '+' or '/' and a lowercase→uppercase transition is not base64.

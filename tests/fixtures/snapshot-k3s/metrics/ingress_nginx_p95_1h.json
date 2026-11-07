@@ -1,0 +1,1 @@
+{"id":"ingress_nginx_p95_1h","query":"histogram_quantile(0.95, sum by (le, exported_namespace, ingress) (rate(nginx_ingress_controller_request_duration_seconds_bucket[1h])))","why":"1h p95 response time per ingress-nginx Ingress (seconds)","taken_at":"2026-11-07T10:23:13+09:00","ok":true,"resultType":"vector","result":[],"series":0}

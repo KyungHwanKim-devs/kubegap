@@ -1,0 +1,1 @@
+{"id":"apiserver_401_rate_1h","query":"sum(rate(apiserver_request_total{job=\"apiserver\",code=\"401\"}[1h]))","why":"1h average 401s (authentication failures) per second. A client retrying with an expired token or a wrong kubeconfig","taken_at":"2026-11-07T10:23:13+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794014600.474,"0"]}],"series":1}

@@ -1,0 +1,1 @@
+{"id":"ingress_nginx_5xx_ratio_1h","query":"sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests{status=~\"5..\"}[1h])) / sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests[1h]))","why":"1h 5xx ratio per ingress-nginx Ingress","taken_at":"2026-11-07T10:23:13+09:00","ok":true,"resultType":"vector","result":[],"series":0}

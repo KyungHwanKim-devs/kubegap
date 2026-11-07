@@ -1,0 +1,1 @@
+{"id":"fluentbit_input_records_1h","query":"sum(increase(fluentbit_input_records_total[1h]))","why":"Log records read in 1h. 0 means the agent has stopped","taken_at":"2026-11-07T10:23:13+09:00","ok":true,"resultType":"vector","result":[],"series":0}

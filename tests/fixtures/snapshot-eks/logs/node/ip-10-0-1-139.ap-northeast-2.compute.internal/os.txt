@@ -1,0 +1,157 @@
+### meta
+uid=0
+hostname=ip-10-0-1-139.ap-northeast-2.compute.internal
+kernel=5.10.245-245.983.amzn2.aarch64
+os=Amazon Linux 2
+uptime_s=3803666.70
+loadavg=1.19 0.48 0.29
+nproc=4
+mem_total_kb=32250820
+containerd=containerd github.com/containerd/containerd 1.7.29 442cb34bda9a6a0fed82a2ca7cade05c5c749582
+k3s=
+dmesg_restrict=0
+zombies=2
+kubelet_rss_kb=147044
+containerd_rss_kb=110100
+k3s_rss_kb=
+### kernel
+source=journalctl
+lines=21
+c:oom_node=0
+c:oom_cgroup=0
+c:oom_system_victim=0
+c:lockup=0
+c:io_error=0
+c:fs_error=0
+c:nic=0
+c:conntrack_full=0
+c:net_pressure=0
+c:mem_pressure=0
+c:bug=0
+c:segfault=0
+c:clock=0
+samples:
+oom_samples:
+### sysctl
+net.netfilter.nf_conntrack_max=131072
+net.netfilter.nf_conntrack_count=4851
+net.netfilter.nf_conntrack_tcp_timeout_established=86400
+fs.inotify.max_user_watches=524288
+fs.inotify.max_user_instances=8192
+fs.file-max=3216732
+fs.file-nr=3840 0 3216732
+fs.aio-max-nr=65536
+net.core.somaxconn=4096
+net.core.netdev_max_backlog=1000
+net.ipv4.ip_local_port_range=32768 60999
+net.ipv4.tcp_max_syn_backlog=2048
+net.ipv4.tcp_tw_reuse=2
+net.ipv4.ip_forward=1
+net.bridge.bridge-nf-call-iptables=1
+net.ipv4.neigh.default.gc_thresh3=16384
+vm.max_map_count=524288
+vm.swappiness=60
+vm.overcommit_memory=1
+vm.panic_on_oom=0
+kernel.panic=10
+kernel.panic_on_oops=1
+kernel.pid_max=4194304
+kernel.threads-max=251335
+kernel.dmesg_restrict=0
+### cri
+cmd=crictl
+version=Version: 0.1.0 RuntimeName: containerd RuntimeVersion: 1.7.29 RuntimeApiVersion: v1 
+crictl=Incorrect Usage: flag provided but not defined: -version
+state:Running=42
+state:Exited=3
+state:Created=0
+state:Unknown=0
+images=39
+images_top:
+1.89GB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-z-backend-eks-prod:9bb0a1809b3f49357689557d2d97a506da5a2e04
+850MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-s-admin-eks-prod:d36e6cca4516cd6a4aa402bfd3db00b4a91158da
+849MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-ab-frontend-eks-prod:0418b17168e739cfcf35b8c565a0430c13294ea5
+842MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-s-admin-dev:79faca0e787afe28793d827aa1c12238512fb61a
+767MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-y-frontend-eks-prod:d6eb914475007ea579c1d22567497f1afca5c799
+765MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-y-ai-prod:e8033ca8c7be3cda624f0945544a0394493ac060
+763MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-y-frontend-dev:dd645d56c00c6b9c49cd7dcdddac7c350799fb08
+742MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-y-ai-dev:6126f79bfe7c6c9713180de8fccfa7cfb9c7f16d
+635MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-ab-backend-eks-prod:7efb1264549c69386053686859b50ed604f1efbc
+606MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-s-frontend-eks-prod:a46a29009a1b52aec4bc789e720d850ca79432ba
+571MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-y-backend-eks-prod:646c10f472cb8cf439a78041341595e1e06cd3a8
+571MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-y-backend-dev:df2f410616f133e227e12b37a057ac73784d12e2
+566MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-x-api-eks-prod:3171e195c2249ee1cbadbcab265d1e482dfbd8ff
+386MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-y-admin-eks-prod:0844e37c2f18b324684f059c6c46511772eecddc
+386MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-y-admin-dev:0844e37c2f18b324684f059c6c46511772eecddc
+imagefs={"status":{"containerFilesystems":[],"imageFilesystems":[{"fsId":{"mountpoint":"/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs"},"inodesUsed":{"value":"1372076"},"timestamp":"1794015343402907067","usedBytes":{"value":"39839653888"}}]}}
+conditions="status":true,"type":"RuntimeReady" "status":true,"type":"NetworkReady" "status":true,"type":"ContainerdHasNoDeprecationWarnings" 
+systemd_cgroup=true
+snapshotter=overlayfs
+sandbox_image=602401143452.dkr.ecr.ap-northeast-2.amazonaws.com/eks/pause:3.5
+cni_error=OK
+writable_layers:
+465	prod-app-s/app-s-backend-7c46f75bf6-gvlh2/backend
+31	prod-app-w/app-w-dd59d5f64-nhjfl/backend
+29	prod-app-x/app-x-api-5755745bc7-2sjvd/api
+21	prod-app-y/app-y-backend-596479b6f8-nv9j2/backend
+21	prod-app-y/app-y-backend-596479b6f8-cx44t/backend
+21	dev-app-y/app-y-backend-69dbdf4f65-9x6jc/backend
+15	app-ab-prod/app-ab-backend-6dd8fcbf96-nshrh/backend
+3	prod-app-y/app-y-ai-55b7448547-mzrjj/ai
+3	prod-app-y/app-y-ai-55b7448547-mpj4r/ai
+3	prod-app-y/app-y-ai-55b7448547-f7f8g/ai
+### cgroup
+fs=tmpfs
+controllers=
+### time
+Time zone: n/a (UTC, +0000)
+NTP enabled: yes
+NTP synchronized: yes
+chrony=Stratum : 2;System time : 0.000000585 seconds slow of NTP time;Leap status : Normal;
+### disk
+fs:/ dev=/dev/nvme0n1p1 size_kb=52407276 used_kb=44467352 avail_kb=7939924 use=85% mount=/
+inode:/ inodes=17354728 iused=1442629 iuse=9%
+fs:/var/lib/containerd dev=/dev/nvme0n1p1 size_kb=52407276 used_kb=44467352 avail_kb=7939924 use=85% mount=/
+inode:/var/lib/containerd inodes=17354728 iused=1442629 iuse=9%
+fs:/var/lib/kubelet dev=/dev/nvme0n1p1 size_kb=52407276 used_kb=44467352 avail_kb=7939924 use=85% mount=/
+inode:/var/lib/kubelet inodes=17354728 iused=1442629 iuse=9%
+fs:/var/log dev=/dev/nvme0n1p1 size_kb=52407276 used_kb=44467352 avail_kb=7939924 use=85% mount=/
+inode:/var/log inodes=17354728 iused=1442629 iuse=9%
+fs:/run dev=tmpfs size_kb=16125408 used_kb=10556 avail_kb=16114852 use=1% mount=/run
+inode:/run inodes=4031352 iused=3533 iuse=1%
+fs:/tmp dev=/dev/nvme0n1p1 size_kb=52407276 used_kb=44467352 avail_kb=7939924 use=85% mount=/
+inode:/tmp inodes=17354728 iused=1442629 iuse=9%
+pod_logs_mb:
+321	/var/log/pods
+35	/var/log/pods/prod-app-s_app-s-backend-7c46f75bf6-gvlh2_75c6931b-29ef-4f0a-a883-370cddad3796
+29	/var/log/pods/app-ab-prod_app-ab-backend-6dd8fcbf96-nshrh_4d3b0b84-28ef-4147-8ef1-7c652818c63f
+25	/var/log/pods/dev-app-s_app-s-backend-76775dbdd-ttz69_841ee1a6-bf69-4194-a77e-1db8889ff5ce
+21	/var/log/pods/external-secrets_external-secrets-7859bcd5c-g8z4q_efc06ff8-dc16-4df9-a241-4622245765cf
+21	/var/log/pods/dev-app-v_app-v-backend-7cfd8c975-b9p48_bfddca1d-91c0-4aa3-8271-cc365c4e300a
+19	/var/log/pods/dev-app-y_app-y-ai-7cdbdc7544-szzcl_df4e6668-71df-4b3c-bf45-910b6d94d6bb
+18	/var/log/pods/dev-app-s_app-s-api-575d497d9b-5ttcv_35ba50f4-e944-4858-9190-376d984e7d1c
+16	/var/log/pods/prod-app-z-backend_app-z-backend-78679bf4b-lhhg4_2c2e8fbd-a44b-4b8e-9e51-85f02ba5e642
+16	/var/log/pods/prod-app-y_app-y-ai-55b7448547-mzrjj_ff688942-b889-459d-b1f6-bd90699bc194
+16	/var/log/pods/prod-app-y_app-y-ai-55b7448547-mpj4r_31151c80-0c71-4dca-9f5e-6d7cbd30da9e
+15	/var/log/pods/prod-app-y_app-y-ai-55b7448547-f7f8g_864b9a33-7509-494b-be62-e6b5f93d4eb1
+emptydir_mb:
+1322	/var/lib/kubelet/pods/357757d9-3663-4fe0-bbfc-c34b06041c65/volumes/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/ff688942-b889-459d-b1f6-bd90699bc194/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/ff3e0bee-f7af-4296-9926-29b350f29d58/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/efc06ff8-dc16-4df9-a241-4622245765cf/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/e39e6b6a-ddef-4174-9009-1104195cb7d6/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/df4e6668-71df-4b3c-bf45-910b6d94d6bb/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/d5e17bbb-0547-4398-9295-799925532f12/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/d4a7e242-b245-4f4a-86e8-abadf7bce849/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/d2e0ab1d-209b-4f94-a5fa-25ee436f1b47/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/d0314d15-95f0-4655-b476-3994b444f21a/plugins/kubernetes.io~empty-dir
+containerd_mb=38004
+### services
+kubelet active=active restarts=? since=Thu 2026-09-24 01:01:51 UTC
+containerd active=active restarts=? since=Thu 2026-09-24 01:01:43 UTC
+### updates
+reboot_required=no
+ubuntu_updates=
+needs_restarting_rc=0
+ami_release=BASE_AMI_ID="ami-035f5943cb248f373";BUILD_TIME="Tue Dec  9 18:12:22 UTC 2025";
+### end

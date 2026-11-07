@@ -1,0 +1,1 @@
+{"id":"coredns_up","query":"count(up{job=~\".*coredns.*\"} == 1)","why":"Number of CoreDNS pods being scraped","taken_at":"2026-11-07T10:23:03+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794014583.86,"1"]}],"series":1}

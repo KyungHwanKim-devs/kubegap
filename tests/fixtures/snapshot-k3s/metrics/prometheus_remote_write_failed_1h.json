@@ -1,0 +1,1 @@
+{"id":"prometheus_remote_write_failed_1h","query":"sum by (url) (increase(prometheus_remote_storage_samples_failed_total[1h])) > 0","why":"Failed remote-write samples (when configured). The path to long-term storage is broken","taken_at":"2026-11-07T10:23:15+09:00","ok":true,"resultType":"vector","result":[],"series":0}

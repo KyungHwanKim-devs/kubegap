@@ -1,0 +1,154 @@
+### meta
+uid=0
+hostname=ip-10-0-1-245.ap-northeast-2.compute.internal
+kernel=5.10.245-245.983.amzn2.aarch64
+os=Amazon Linux 2
+uptime_s=59851.60
+loadavg=0.00 0.05 0.07
+nproc=1
+mem_total_kb=7957180
+containerd=containerd github.com/containerd/containerd 1.7.29 442cb34bda9a6a0fed82a2ca7cade05c5c749582
+k3s=
+dmesg_restrict=0
+zombies=0
+kubelet_rss_kb=95504
+containerd_rss_kb=65580
+k3s_rss_kb=
+### kernel
+boot_window_excluded=2026-11-06 09:03:13
+source=dmesg
+lines=1072
+c:oom_node=0
+c:oom_cgroup=0
+c:oom_system_victim=0
+c:lockup=0
+c:io_error=0
+c:fs_error=0
+c:nic=0
+c:conntrack_full=0
+c:net_pressure=0
+c:mem_pressure=0
+c:bug=0
+c:segfault=0
+c:clock=0
+samples:
+oom_samples:
+### sysctl
+net.netfilter.nf_conntrack_max=131072
+net.netfilter.nf_conntrack_count=357
+net.netfilter.nf_conntrack_tcp_timeout_established=86400
+fs.inotify.max_user_watches=524288
+fs.inotify.max_user_instances=8192
+fs.file-max=787409
+fs.file-nr=1536 0 787409
+fs.aio-max-nr=65536
+net.core.somaxconn=4096
+net.core.netdev_max_backlog=1000
+net.ipv4.ip_local_port_range=32768 60999
+net.ipv4.tcp_max_syn_backlog=512
+net.ipv4.tcp_tw_reuse=2
+net.ipv4.ip_forward=1
+net.bridge.bridge-nf-call-iptables=1
+net.ipv4.neigh.default.gc_thresh3=16384
+vm.max_map_count=524288
+vm.swappiness=60
+vm.overcommit_memory=1
+vm.panic_on_oom=0
+kernel.panic=10
+kernel.panic_on_oops=1
+kernel.pid_max=4194304
+kernel.threads-max=61541
+kernel.dmesg_restrict=0
+### cri
+cmd=crictl
+version=Version: 0.1.0 RuntimeName: containerd RuntimeVersion: 1.7.29 RuntimeApiVersion: v1 
+crictl=Incorrect Usage: flag provided but not defined: -version
+state:Running=11
+state:Exited=1
+state:Created=0
+state:Unknown=0
+images=30
+images_top:
+602MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-s-frontend-dev:06bf6a32e37241d8bebcaaf1fd5098627d9e536a
+374MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-z-embedding-eks-prod:9bb0a1809b3f49357689557d2d97a506da5a2e04
+344MB	<account>.dkr.ecr.ap-northeast-2.amazonaws.com/ecr-app-t-backend-eks-prod:0f28d4fa381dabcb99a4a3b0b0e804535ecab0e2
+71.4MB	docker.io/grafana/promtail:2.9.2
+67MB	602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.20.4-eksbuild.2
+67MB	602401143452.dkr.ecr-fips.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.20.4-eksbuild.2
+66.1MB	602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.20.5-eksbuild.1
+66.1MB	602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.20.5
+66.1MB	602401143452.dkr.ecr-fips.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.20.5-eksbuild.1
+66.1MB	602401143452.dkr.ecr-fips.us-west-2.amazonaws.com/amazon-k8s-cni-init:v1.20.5
+60.2MB	602401143452.dkr.ecr.ap-northeast-2.amazonaws.com/amazon-k8s-cni-init:v1.19.0-eksbuild.1
+50.5MB	602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.20.5-eksbuild.1
+50.5MB	602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.20.5
+50.5MB	602401143452.dkr.ecr.us-west-2.amazonaws.com/amazon-k8s-cni:v1.20.4-eksbuild.2
+50.5MB	602401143452.dkr.ecr-fips.us-west-2.amazonaws.com/amazon-k8s-cni:v1.20.5-eksbuild.1
+imagefs={"status":{"containerFilesystems":[],"imageFilesystems":[{"fsId":{"mountpoint":"/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs"},"inodesUsed":{"value":"120463"},"timestamp":"1794015340174593752","usedBytes":{"value":"4246290432"}}]}}
+conditions="status":true,"type":"RuntimeReady" "status":true,"type":"NetworkReady" "status":true,"type":"ContainerdHasNoDeprecationWarnings" 
+systemd_cgroup=true
+snapshotter=overlayfs
+sandbox_image=602401143452.dkr.ecr.ap-northeast-2.amazonaws.com/eks/pause:3.5
+cni_error=OK
+writable_layers:
+0	prod-app-z-backend/app-z-embedding-server-8445d87f5-sbzpj/embedding
+0	prod-app-t/app-t-backend-5f6c75bd56-9mfgv/backend
+0	monitoring/loki-stack-promtail-znqtm/promtail
+0	monitoring/kube-prometheus-stack-prometheus-node-exporter-qq2lr/node-exporter
+0	kube-system/kube-proxy-46cc5/kube-proxy
+0	kube-system/ebs-csi-node-bdkzl/node-driver-registrar
+0	kube-system/ebs-csi-node-bdkzl/liveness-probe
+0	kube-system/ebs-csi-node-bdkzl/ebs-plugin
+0	kube-system/aws-node-hqzj5/aws-vpc-cni-init
+0	kube-system/aws-node-hqzj5/aws-node
+### cgroup
+fs=tmpfs
+controllers=
+### time
+Time zone: n/a (UTC, +0000)
+NTP enabled: yes
+NTP synchronized: yes
+chrony=Stratum : 2;System time : 0.000000147 seconds fast of NTP time;Leap status : Normal;
+### disk
+fs:/ dev=/dev/nvme0n1p1 size_kb=52407276 used_kb=8784208 avail_kb=43623068 use=17% mount=/
+inode:/ inodes=26208752 iused=186547 iuse=1%
+fs:/var/lib/containerd dev=/dev/nvme0n1p1 size_kb=52407276 used_kb=8784208 avail_kb=43623068 use=17% mount=/
+inode:/var/lib/containerd inodes=26208752 iused=186547 iuse=1%
+fs:/var/lib/kubelet dev=/dev/nvme0n1p1 size_kb=52407276 used_kb=8784208 avail_kb=43623068 use=17% mount=/
+inode:/var/lib/kubelet inodes=26208752 iused=186547 iuse=1%
+fs:/var/log dev=/dev/nvme0n1p1 size_kb=52407276 used_kb=8784208 avail_kb=43623068 use=17% mount=/
+inode:/var/log inodes=26208752 iused=186547 iuse=1%
+fs:/run dev=tmpfs size_kb=3978588 used_kb=2768 avail_kb=3975820 use=1% mount=/run
+inode:/run inodes=994647 iused=1131 iuse=1%
+fs:/tmp dev=/dev/nvme0n1p1 size_kb=52407276 used_kb=8784208 avail_kb=43623068 use=17% mount=/
+inode:/tmp inodes=26208752 iused=186547 iuse=1%
+pod_logs_mb:
+2	/var/log/pods
+1	/var/log/pods/prod-app-z-backend_app-z-embedding-server-8445d87f5-sbzpj_e1d4b385-4b22-438b-a967-0b2844c8761b
+1	/var/log/pods/prod-app-t_app-t-backend-5f6c75bd56-9mfgv_7d482aa8-28cf-4be8-818b-adc32f585a2a
+1	/var/log/pods/monitoring_loki-stack-promtail-znqtm_59fe8213-5dc5-4ba1-9751-b11d1190cd8c
+1	/var/log/pods/monitoring_kube-prometheus-stack-prometheus-node-exporter-qq2lr_ea53a752-95a7-4728-8257-2ad72265216c
+1	/var/log/pods/kube-system_kube-proxy-46cc5_511e6e79-af56-4f6f-b778-f2c572cc5ee0
+1	/var/log/pods/kube-system_ebs-csi-node-bdkzl_57532a03-8da3-4ab3-9015-d7e50586f6e3
+1	/var/log/pods/kube-system_aws-node-hqzj5_878fd07c-4aaa-4d11-9e65-805884c9dd71
+1	/var/log/pods/dev-app-s_app-s-frontend-999976975-nf4rv_86c7ad32-d10c-4573-b489-9049b55482b6
+emptydir_mb:
+1322	/var/lib/kubelet/pods/e1d4b385-4b22-438b-a967-0b2844c8761b/volumes/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/e1d4b385-4b22-438b-a967-0b2844c8761b/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/878fd07c-4aaa-4d11-9e65-805884c9dd71/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/86c7ad32-d10c-4573-b489-9049b55482b6/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/7d482aa8-28cf-4be8-818b-adc32f585a2a/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/59fe8213-5dc5-4ba1-9751-b11d1190cd8c/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/57532a03-8da3-4ab3-9015-d7e50586f6e3/volumes/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/57532a03-8da3-4ab3-9015-d7e50586f6e3/plugins/kubernetes.io~empty-dir
+0	/var/lib/kubelet/pods/511e6e79-af56-4f6f-b778-f2c572cc5ee0/plugins/kubernetes.io~empty-dir
+containerd_mb=4316
+### services
+kubelet active=active restarts=? since=Fri 2026-11-06 08:58:59 UTC
+containerd active=active restarts=? since=Fri 2026-11-06 08:58:50 UTC
+### updates
+reboot_required=no
+ubuntu_updates=
+needs_restarting_rc=0
+ami_release=BASE_AMI_ID="ami-035f5943cb248f373";BUILD_TIME="Tue Dec  9 18:12:22 UTC 2025";
+### end

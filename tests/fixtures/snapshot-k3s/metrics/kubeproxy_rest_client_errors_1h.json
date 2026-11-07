@@ -1,0 +1,1 @@
+{"id":"kubeproxy_rest_client_errors_1h","query":"sum by (code) (increase(rest_client_requests_total{job=~\".*kube-proxy.*\",code!~\"2..\"}[1h])) > 0","why":"Non-2xx responses from kube-proxy → apiserver calls (1h, EKS job)","taken_at":"2026-11-07T10:23:04+09:00","ok":true,"resultType":"vector","result":[],"series":0}

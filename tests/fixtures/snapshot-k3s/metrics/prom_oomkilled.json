@@ -1,0 +1,1 @@
+{"id":"prom_oomkilled","query":"kube_pod_container_status_last_terminated_reason{container=\"prometheus\",reason=\"OOMKilled\"}","why":"Whether the Prometheus container's last termination reason was OOMKilled (kube-state-metrics)","taken_at":"2026-11-07T10:23:15+09:00","ok":true,"resultType":"vector","result":[],"series":0}

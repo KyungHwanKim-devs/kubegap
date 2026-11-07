@@ -1,0 +1,9 @@
+argocd_info{version="v3.2.0+66b2f30"} 1
+argocd_redis_request_total{failed="false",initiator="argocd-server"} 52626
+grpc_server_handled_total{grpc_code="OK",grpc_method="Get",grpc_service="cluster.SettingsService",grpc_type="unary"} 27
+grpc_server_handled_total{grpc_code="OK",grpc_method="GetUserInfo",grpc_service="session.SessionService",grpc_type="unary"} 12
+grpc_server_handled_total{grpc_code="OK",grpc_method="Version",grpc_service="version.VersionService",grpc_type="unary"} 11
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="List",grpc_service="application.ApplicationService",grpc_type="unary"} 6
+grpc_server_handled_total{grpc_code="Unauthenticated",grpc_method="List",grpc_service="cluster.ClusterService",grpc_type="unary"} 7
+process_resident_memory_bytes 1.25485056e+08
+process_start_time_seconds 1.79322519418e+09

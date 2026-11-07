@@ -630,7 +630,7 @@ class ItemRecorder(dict):
     def kept(self) -> dict:
         if self.read_all:
             return dict(self)
-        return {k: super(ItemRecorder, self).__getitem__(k) for k in self.read if dict.__contains__(self, k)}
+        return {k: super(ItemRecorder, self).__getitem__(k) for k in sorted(self.read) if dict.__contains__(self, k)}  # sorted: `read` is a set, and its order would follow the hash seed into findings-draft.json and the report
 
 
 def _details(check: dict, env: dict) -> dict | None:

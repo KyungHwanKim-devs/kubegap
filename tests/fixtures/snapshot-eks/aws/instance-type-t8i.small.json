@@ -1,0 +1,1 @@
+[{"InstanceType":"t8i.small","MaximumNetworkInterfaces":3,"Ipv4AddressesPerInterface":4,"Hypervisor":"nitro","EfaSupported":false}]

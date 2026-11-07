@@ -1,0 +1,1 @@
+{"id":"fluentbit_retries_failed_1h","query":"sum by (name) (increase(fluentbit_output_retries_failed_total[1h])) > 0","why":"Chunks dropped after retries also failed. Those logs are a permanent gap","taken_at":"2026-11-07T10:23:13+09:00","ok":true,"resultType":"vector","result":[],"series":0}

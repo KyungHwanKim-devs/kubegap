@@ -1,0 +1,11 @@
+argocd_git_lsremote_fail_total{repo="/tmp/_argocd-repo/54b67e07-54db-4b56-99db-c7f5737aedaa",revision="main"} 26
+argocd_git_request_duration_seconds_sum{repo="https://github.com/example-org/iac",request_type="fetch"} 288.41774667899995
+argocd_git_request_duration_seconds_count{repo="https://github.com/example-org/iac",request_type="fetch"} 262
+argocd_git_request_duration_seconds_sum{repo="https://github.com/example-org/iac",request_type="ls-remote"} 4450.335158330985
+argocd_git_request_duration_seconds_count{repo="https://github.com/example-org/iac",request_type="ls-remote"} 13961
+argocd_git_request_total{repo="https://github.com/example-org/iac",request_type="fetch"} 262
+argocd_git_request_total{repo="https://github.com/example-org/iac",request_type="ls-remote"} 13961
+argocd_redis_request_total{failed="false",initiator="argocd-repo-server"} 1.471613e+06
+argocd_repo_pending_request_total{repo="https://github.com/example-org/iac"} 0
+process_resident_memory_bytes 1.15556352e+08
+process_start_time_seconds 1.79152738423e+09

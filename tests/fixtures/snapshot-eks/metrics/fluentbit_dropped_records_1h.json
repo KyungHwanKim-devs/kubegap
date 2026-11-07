@@ -1,0 +1,1 @@
+{"id":"fluentbit_dropped_records_1h","query":"sum by (name) (increase(fluentbit_output_dropped_records_total[1h])) > 0","why":"Records dropped at the output stage","taken_at":"2026-11-07T10:34:28+09:00","ok":true,"resultType":"vector","result":[],"series":0}

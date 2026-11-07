@@ -1,0 +1,1 @@
+{"id":"coredns_p50_1h","query":"histogram_quantile(0.5, sum by (le) (rate(coredns_dns_request_duration_seconds_bucket[1h])))","why":"Request p50 (seconds). p99 is in core. A p50 above 10ms means CoreDNS itself is slow","taken_at":"2026-11-07T10:23:03+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794014583.798,"0.00014020901447921532"]}],"series":1}

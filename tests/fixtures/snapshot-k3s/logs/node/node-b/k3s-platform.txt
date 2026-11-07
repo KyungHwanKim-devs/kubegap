@@ -1,0 +1,146 @@
+### meta
+role=server
+version=k3s version v1.33.5+k3s1 (fab4a5c3)
+config_file=absent
+smartctl=no
+sensors=no
+### unit
+ExecStart=/usr/local/bin/k3s \
+    server \
+	'--server' \
+	'https://192.168.90.160:6443' \
+	'--token' \
+	'<redacted>' \
+	'--disable' \
+	'traefik' \
+	'--disable' \
+	'servicelb' \
+	'--tls-san' \
+	'192.168.90.102' \
+	'--tls-san' \
+	'100.100.1.2' \
+	'--node-ip' \
+	'192.168.90.102' \
+	'--node-external-ip' \
+	'192.168.90.102' \
+
+unit:k3s NRestarts=5 ActiveEnterTimestamp=Wed 2026-10-28 19:25:12 UTC 
+### check-config
+- CONFIG_RT_GROUP_SCHED: missing
+- CONFIG_INET_XFRM_MODE_TRANSPORT: missing
+STATUS: pass
+### ports
+*:10250 k3s-server
+127.0.0.1:10257 k3s-server
+127.0.0.1:10259 k3s-server
+127.0.0.1:2379 k3s-server
+127.0.0.1:2380 k3s-server
+127.0.0.1:2381 k3s-server
+127.0.0.1:6444 k3s-server
+192.168.90.102:2379 k3s-server
+192.168.90.102:2380 k3s-server
+192.168.90.102:7946 speaker
+*:31564 k3s-server
+*:6443 k3s-server
+### flannel
+mtu=1450
+vxlan=vxlan id 1 local 192.168.90.102 dev br0
+stats=rx: 3534755217185 4093930841 0 0 0 0 tx: 2014328494812 2622776411 0 5 0 0 
+underlay_mtu=1500
+addrs=br0=192.168.90.102/24 flannel.1=10.42.5.0/32 tailscale0=100.100.1.2/32 
+ip_forward=1
+br_netfilter=1
+### journald
+disk=376.0M
+conf=
+k3s_lines_24h=12164
+### server
+secrets_encrypt=Disabled, no configuration file found
+etcd_snapshots:
+etcd-snapshot-node-b-1793836804 file:///var/lib/rancher/k3s/server/db/snapshots/etcd-snapshot-node-b-1793836804 39780384 2026-11-05T00:00:04Z
+etcd-snapshot-node-b-1793880005 file:///var/lib/rancher/k3s/server/db/snapshots/etcd-snapshot-node-b-1793880005 39931936 2026-11-05T12:00:05Z
+etcd-snapshot-node-b-1793923204 file:///var/lib/rancher/k3s/server/db/snapshots/etcd-snapshot-node-b-1793923204 39931936 2026-11-06T00:00:04Z
+etcd-snapshot-node-b-1793966404 file:///var/lib/rancher/k3s/server/db/snapshots/etcd-snapshot-node-b-1793966404 39931936 2026-11-06T12:00:04Z
+etcd-snapshot-node-b-1794009600 file:///var/lib/rancher/k3s/server/db/snapshots/etcd-snapshot-node-b-1794009600 39931936 2026-11-07T00:00:00Z
+db_mb=595
+db_ls:
+drwx------ 4096 Oct 28 .
+drwx------ 4096 Nov 30 ..
+drwx------ 4096 Oct 28 etcd
+drwx------ 4096 Nov 7 snapshots
+db_kind=etcd
+certificates:
+time="2026-11-07T01:23:12Z" level=info msg="client.crt: certificate etcd-client (ClientAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="client.crt: certificate etcd-server-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="server-client.crt: certificate etcd-server (ServerAuth,ClientAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="server-client.crt: certificate etcd-server-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="peer-server-client.crt: certificate etcd-peer (ServerAuth,ClientAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="peer-server-client.crt: certificate etcd-peer-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-scheduler.crt: certificate system:kube-scheduler (ClientAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-scheduler.crt: certificate k3s-client-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="kube-scheduler.crt: certificate kube-scheduler (ServerAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="kube-scheduler.crt: certificate k3s-server-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-k3s-controller.crt: certificate system:k3s-controller (ClientAuth) is ok, expires at 2027-10-28T19:24:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-k3s-controller.crt: certificate k3s-client-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-auth-proxy.crt: certificate system:auth-proxy (ClientAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-auth-proxy.crt: certificate k3s-request-header-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-controller.crt: certificate system:kube-controller-manager (ClientAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-controller.crt: certificate k3s-client-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="kube-controller-manager.crt: certificate kube-controller-manager (ServerAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="kube-controller-manager.crt: certificate k3s-server-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-supervisor.crt: certificate system:k3s-supervisor (ClientAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-supervisor.crt: certificate k3s-client-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-kube-proxy.crt: certificate system:kube-proxy (ClientAuth) is ok, expires at 2027-10-28T19:24:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-kube-proxy.crt: certificate k3s-client-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-kubelet.crt: certificate system:node:node-b (ClientAuth) is ok, expires at 2027-10-28T19:24:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-kubelet.crt: certificate k3s-client-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="serving-kubelet.crt: certificate node-b (ServerAuth) is ok, expires at 2027-10-28T19:24:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="serving-kubelet.crt: certificate k3s-server-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-kube-apiserver.crt: certificate system:apiserver (ClientAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-kube-apiserver.crt: certificate k3s-client-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="serving-kube-apiserver.crt: certificate kube-apiserver (ServerAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="serving-kube-apiserver.crt: certificate k3s-server-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-admin.crt: certificate system:admin (ClientAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-admin.crt: certificate k3s-client-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-k3s-cloud-controller.crt: certificate k3s-cloud-controller-manager (ClientAuth) is ok, expires at 2027-08-19T20:43:51Z"
+time="2026-11-07T01:23:12Z" level=info msg="client-k3s-cloud-controller.crt: certificate k3s-client-ca@1762754399 (CertSign) is ok, expires at 2035-11-08T05:59:59Z"
+### registries
+mirrors:
+  registry.lab-a.example:
+    endpoint:
+      - https://registry.lab-a.example
+configs:
+  registry.lab-a.example:
+    auth:
+### containerd
+snapshotter = "overlayfs"
+sandbox = "rancher/mirrored-pause:3.6"
+SystemdCgroup = true
+config_path = "/var/lib/rancher/k3s/agent/etc/containerd/certs.d"
+[plugins.'io.containerd.cri.v1.images'.registry.configs.'registry.lab-a.example'.auth]
+### local-path
+total_mb=144743
+volumes_mb:
+107797	/var/lib/rancher/k3s/storage/pvc-db50eb33-8393-45cd-93b3-042e019e1186_logging_data-elasticsearch-0
+32732	/var/lib/rancher/k3s/storage/pvc-1a2c9674-3fcb-4205-85f2-3f2d08fd1c92_registry_registry-data-registry-0
+2217	/var/lib/rancher/k3s/storage/pvc-d82daba5-58bf-4f2b-aa68-94278a5a33fd_app-a-prod_data-app-a-postgres-0
+795	/var/lib/rancher/k3s/storage/pvc-d15ad7cd-aea4-482d-8b3e-f0386a4f73a1_app-h-prod_mysql-data-app-h-mysql-0
+565	/var/lib/rancher/k3s/storage/pvc-b31ee6ea-3238-4ecc-a34d-877a14177ad5_app-g-api_app-g-minio-data-app-g-minio-0
+166	/var/lib/rancher/k3s/storage/pvc-b6f729e1-b443-4ed2-866f-8fc9825078ae_app-g-api_app-g-postgres-data-app-g-postgres-0
+87	/var/lib/rancher/k3s/storage/pvc-fedc8d18-9f78-48d0-91be-54dcece66bab_app-c-prod_postgres-data-app-c-postgres-0
+70	/var/lib/rancher/k3s/storage/pvc-d3dc33a5-26ca-4c1a-a9e7-526e2c0a0e7a_app-f-prod_app-f-postgres-data-app-f-postgres-0
+67	/var/lib/rancher/k3s/storage/pvc-5bef8ef5-dc76-48cf-8642-05c4099a8d95_app-f-prod_app-f-postgres-vn-data-app-f-postgres-vn-0
+64	/var/lib/rancher/k3s/storage/pvc-c57619eb-bdde-45d0-b9c0-0845856203af_app-f-prod_app-f-postgres-mx-data-app-f-postgres-mx-0
+63	/var/lib/rancher/k3s/storage/pvc-8729556f-dbf5-40ce-a48b-57eb4e27edc6_app-i-prod_app-i-postgres-data-app-i-postgres-0
+60	/var/lib/rancher/k3s/storage/pvc-a9a03cde-f245-4987-b4b8-e61763da9993_app-h-prod_mysql-backup-app-h-mysql-0
+47	/var/lib/rancher/k3s/storage/pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c_default_data-k-quiz-db-0
+17	/var/lib/rancher/k3s/storage/pvc-228da581-f434-4f84-ba50-d91df7133690_app-g-api_app-g-postgres-backup-pvc
+2	/var/lib/rancher/k3s/storage/pvc-e8064a22-b689-4d23-adef-de705d889c95_app-f-prod_app-f-postgres-backup-pvc
+1	/var/lib/rancher/k3s/storage/pvc-9fad0f20-f5fa-49ff-89f8-af0aaf8d55bd_app-f-prod_app-f-redis-data-app-f-redis-0
+1	/var/lib/rancher/k3s/storage/pvc-76170548-ef10-4112-9aaf-5332ae1eeeaa_app-f-prod_app-f-postgres-vn-backup-pvc
+1	/var/lib/rancher/k3s/storage/pvc-645a9c5d-9faa-4441-b506-436861a32ebf_app-a-prod_data-app-a-redis-0
+1	/var/lib/rancher/k3s/storage/pvc-4ce85409-5052-4afb-8c7c-fa0a912f7e09_app-i-prod_app-i-postgres-backup-pvc
+### disks
+sda disk 465.8G 0 Samsung SSD 870
+### thermal
+### end

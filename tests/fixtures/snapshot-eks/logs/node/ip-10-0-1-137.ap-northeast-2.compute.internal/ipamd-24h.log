@@ -1,0 +1,6 @@
+{"level":"warn","ts":"2026-11-06T09:44:52.723Z","caller":"awssession/session.go:66","msg":"HTTP_TIMEOUT env is not set or set to less than 10 seconds, defaulting to httpTimeout to 10sec"}
+{"level":"error","ts":"2026-11-06T09:44:52.729Z","caller":"awsutils/awsutils.go:1618","msg":"r8gd.medium: instance type does not exist"}
+{"level":"warn","ts":"2026-11-06T10:13:40.095Z","caller":"ipamd/rpc_handler.go:261","msg":"UnassignPodIPAddress: Failed to find sandbox _migrated-from-<masked>"}
+{"level":"warn","ts":"2026-11-06T10:13:40.109Z","caller":"ipamd/rpc_handler.go:261","msg":"UnassignPodIPAddress: Failed to find sandbox _migrated-from-<masked>"}
+{"level":"warn","ts":"2026-11-06T18:03:40.885Z","caller":"ipamd/rpc_handler.go:261","msg":"UnassignPodIPAddress: Failed to find sandbox _migrated-from-<masked>"}
+{"level":"warn","ts":"2026-11-06T18:03:40.899Z","caller":"ipamd/rpc_handler.go:261","msg":"UnassignPodIPAddress: Failed to find sandbox _migrated-from-<masked>"}

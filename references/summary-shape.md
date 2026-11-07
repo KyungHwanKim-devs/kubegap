@@ -12,7 +12,7 @@ The key shape of the summary file, moved here from SKILL.md section 5. One secti
 
 ## metrics
 
-`metrics{<query-id>: {source, why, ok, series, stats{min,max,mean,n}, top[{labels, value}], truncated}}`(`top-nodes` and `top-pods` use `head[]`)
+`metrics{<query-id>: {source, why, ok, series, stats{min,max,mean,n}, top[{labels, value}], truncated}}`(`top-nodes` and `top-pods` use `head[]`) (`value` is null when Prometheus answered `NaN`, a quantile over no samples; `stats` counts the numbers only)
 
 ## objects
 
@@ -156,9 +156,28 @@ The key shape of the summary file, moved here from SKILL.md section 5. One secti
 
 `certmanager{present, components{controller|webhook|cainjector: {replicas, ready, version, namespace}}, issuers[{kind, namespace, name, type, acme_server, staging, ready, reason, solvers[], certificates}], certificates{count, rows[{namespace, name, target, prod, secret, dns_names[], issuer, issuer_staging, ready, reason, message, issuing, issuing_reason, issuing_message, not_after, days_to_expiry, renewal_time, renewal_overdue_h, issuing_h(hours since the Issuing condition turned True), revision, duration, renew_before}]}, challenges[{namespace, name, type, dns, state, reason, age_h}], ingress_tls[{ingress, secret, hosts[], managed, prod}], webhooks[], summary{version, components{}, components_not_ready[], components_single_replica[], certificates, certificates_prod, not_ready[], not_ready_prod[], expiring_30d[[target, days]], expiring_14d[], expired[], min_days_to_expiry, renewal_overdue[[target, hours]], issuing_stuck[], staging_certs[], staging_certs_prod[], issuers, issuers_not_ready[], issuers_unused[], issuer_types{}, solvers[], certificaterequests, certificaterequests_failed[](Ready False with reason Failed or Denied), certificaterequests_pending_old[](Ready False with reason Pending for more than an hour), certificaterequests_denied[], orders, orders_by_state{}, orders_bad[], orders_pending_old[], challenges, challenges_bad[{challenge, type, dns, state, reason}], ingress_tls, ingress_tls_unmanaged[[ingress, secret]], ingress_tls_unmanaged_prod[], ingress_no_tls[], webhooks_fail[], webhook_replicas, metrics_available, acme_requests, acme_errors, acme_by_status{}, acme_error_ratio, sync_errors, sync_calls, not_ready_metric, min_days_to_expiry_metric}, note}`(cert-manager, small k3s cluster collector `collectors/cert-manager` — the controller's :9402 is read by pod-metrics. Secret values are not read), `tools`
 
-## run
+## kubegap
+
+`kubegap` (the kubegap version that wrote this summary), `snapshot` (the snapshot folder, absolute), `generated_at` (when summarize ran; the ages inside the summary are measured from `inventory.taken_at`, not from this)
+
+## snapshot
+
+see `kubegap`
+
+## generated_at
+
+see `kubegap`
+
+## tools
+
+`tools{source, files[]}` (the files under tools/: krr, polaris, pluto, kubent, helm-list; a `note` instead of `files` when there is no tools/ folder)
+
+## collection
 
 `collection{mode, mode_skipped_steps[], failed_steps[], seconds_total, object_files{<stem>: ok | not-served | excluded | denied | failed | unlisted | no-record}}` (`object_files` is every `objects/<stem>.json` a summary module asked `snapshot.objects` for, with why it is missing when it is, judged against the `objects.dump-all` record of collect-result.json (#160): `not-served` is a kind this cluster does not have, normal; `unlisted` is a kind the API serves without a file of that name, a reader's spelling mistake that report section 7-1 and run.log name; `no-record` when the step did not run or its `kubectl api-resources` failed).
+
+## run
+
 
 `run{commands, failed[], skipped[], seconds_total, by_collector}` (from run.log: `failed` is the commands that exited non-zero, timed out or could not run; a step that failed after its command exited 0, such as kubent or pluto with no confirmed read, is in `collection.failed_steps` and not here, and the report reads `collection.failed_steps`, #132).
 

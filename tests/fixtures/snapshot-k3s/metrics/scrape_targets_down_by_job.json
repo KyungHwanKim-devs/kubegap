@@ -1,0 +1,1 @@
+{"id":"scrape_targets_down_by_job","query":"count by (job) (up == 0)","why":"Targets with up==0 per job. A ServiceMonitor exists but the scrape fails","taken_at":"2026-11-07T10:23:15+09:00","ok":true,"resultType":"vector","result":[],"series":0}

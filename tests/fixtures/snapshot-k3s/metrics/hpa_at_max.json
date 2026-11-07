@@ -1,0 +1,1 @@
+{"id":"hpa_at_max","query":"kube_horizontalpodautoscaler_status_current_replicas >= on (namespace, horizontalpodautoscaler) kube_horizontalpodautoscaler_spec_max_replicas","why":"HPAs whose current replicas sit at maxReplicas. They cannot grow further, so scaling is effectively off","taken_at":"2026-11-07T10:23:13+09:00","ok":true,"resultType":"vector","result":[],"series":0}

@@ -1,0 +1,1 @@
+{"id":"prom_replicas","query":"count(prometheus_build_info)","why":"Number of Prometheus instances whose own metrics are scraped (one prometheus_build_info series each)","taken_at":"2026-11-07T10:35:07+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794015311.191,"1"]}],"series":1}

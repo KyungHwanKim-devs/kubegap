@@ -10,6 +10,7 @@ from __future__ import annotations
 import datetime as _dt
 import importlib
 import json
+import math
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -108,10 +109,12 @@ def summarize_metrics(snap: Path) -> dict:
                 val = float(r["value"][1])
             except (KeyError, ValueError, TypeError, IndexError):
                 val = None
+            if val is not None and math.isnan(val):
+                val = None  # Prometheus answers "NaN" for a quantile over no samples; json.dumps would write a NaN token, which is not JSON
             rows.append({"labels": _labels(r.get("metric", {})), "value": val})
-        nums = [r["value"] for r in rows if r["value"] is not None and r["value"] == r["value"]]
+        nums = [r["value"] for r in rows if r["value"] is not None]
         if nums:
-            rec["stats"] = {"min": min(nums), "max": max(nums), "mean": sum(nums) / len(nums), "n": len(nums)}
+            rec["stats"] = {"min": min(nums), "max": max(nums), "mean": math.fsum(nums) / len(nums), "n": len(nums)}  # fsum: the same digits on every Python (3.12 changed how sum() adds floats)
         rows.sort(key=lambda r: -(r["value"] if r["value"] is not None else float("-inf")))
         rec["top"] = rows[:30]
         rec["truncated"] = max(0, len(rows) - 30)

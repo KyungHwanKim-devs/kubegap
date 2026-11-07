@@ -1,0 +1,1 @@
+{"id":"alertmanager_notifications_failed_1d","query":"sum by (integration) (increase(alertmanager_notifications_failed_total[1d])) > 0","why":"Notifications Alertmanager failed to deliver to receivers (24h). Anything above 0 means alerts are being lost","taken_at":"2026-11-07T10:23:15+09:00","ok":true,"resultType":"vector","result":[],"series":0}

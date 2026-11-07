@@ -1,0 +1,1 @@
+2026-11-06T11:00:37+0000 ip-10-0-1-241.ap-northeast-2.compute.internal containerd[3595]: time="2026-11-06T11:00:37.715636302Z" level=warning msg="Failed to get podSandbox status for container event for sandboxID \"339b7df18f36628847a43d10d5f36a58710a4e316167d3009fbbfbc7abf2de7e\": an error occurred when try to find sandbox: not found. Sending the event with nil podSandboxStatus."

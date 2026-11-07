@@ -1,0 +1,1 @@
+{"id":"endpoint_not_ready_addresses","query":"count by (namespace, endpoint) (count by (namespace, endpoint, ip) (kube_endpoint_address{ready=\"false\"}))","why":"Endpoints with not-ready addresses behind a Service (pods failing readiness are out of traffic)","taken_at":"2026-11-07T10:34:28+09:00","ok":true,"resultType":"vector","result":[],"series":0}

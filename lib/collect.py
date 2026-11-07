@@ -1086,6 +1086,21 @@ def _write_incomplete(snap: Path, line: str) -> None:
     write_private(snap / "INCOMPLETE", line + "\nIf this file remains, the snapshot was interrupted.\n")
 
 
+def step_summary(results: dict, mode: str, seconds_total: float) -> dict:
+    """The `_summary` of collect-result.json from the per-collector step records. The key is not a collector name, so consumers skip keys starting with '_'.
+    lib/regress rebuilds it after it rewrites step records for the degraded fixture variant."""
+    steps = [(cn, sid, st) for cn, cr in results.items() if not cn.startswith("_") for sid, st in ((cr or {}).get("steps") or {}).items()]
+    return {
+        "mode": mode,
+        "collectors": [c for c in results if not c.startswith("_")],
+        "steps": len(steps),
+        "mode_skipped": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("mode_skipped")],
+        "failed": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("ok") is False and not st.get("skipped")],
+        "skipped": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("skipped") and not st.get("mode_skipped")],
+        "seconds_total": seconds_total,
+    }
+
+
 def collect(context: str, cfg: Config, inv: dict, snap: Path, log: RunLog, *, kubeconfig: str | None = None, only: list[str] | None = None, mode: str = paths.DEFAULT_MODE, echo=print) -> dict:
     if mode not in paths.MODES:
         raise ValueError(f"unknown collection mode {mode!r} (expected one of {', '.join(paths.MODES)})")
@@ -1145,16 +1160,7 @@ def collect(context: str, cfg: Config, inv: dict, snap: Path, log: RunLog, *, ku
         if prom:
             prom.close()
         stores.close()
-    steps = [(cn, sid, st) for cn, cr in results.items() for sid, st in ((cr or {}).get("steps") or {}).items()]
-    results["_summary"] = {  # top-level summary. The key is not a collector name, so consumers skip keys starting with '_'
-        "mode": mode,
-        "collectors": [c for c in results if not c.startswith("_")],
-        "steps": len(steps),
-        "mode_skipped": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("mode_skipped")],
-        "failed": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("ok") is False and not st.get("skipped")],
-        "skipped": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("skipped") and not st.get("mode_skipped")],
-        "seconds_total": round(_time.monotonic() - t_start, 1),
-    }
+    results["_summary"] = step_summary(results, mode, round(_time.monotonic() - t_start, 1))
     write_private(snap / "collect-result.json", json.dumps(results, ensure_ascii=False, indent=1, default=str))
     with contextlib.suppress(OSError):
         (snap / "INCOMPLETE").unlink()

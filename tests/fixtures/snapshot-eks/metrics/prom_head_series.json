@@ -1,0 +1,1 @@
+{"id":"prom_head_series","query":"max(prometheus_tsdb_head_series)","why":"Active series in memory. Above 1M, memory and rule evaluation both slow down (a small cluster is typically 100-200k)","taken_at":"2026-11-07T10:35:07+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794015309.869,"165689"]}],"series":1}

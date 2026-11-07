@@ -1,0 +1,1 @@
+{"id":"targets_down","query":"up == 0","why":"Failed scrape targets (up==0). What Prometheus cannot see, no metric check can see","taken_at":"2026-11-07T10:34:28+09:00","ok":true,"resultType":"vector","result":[],"series":0}

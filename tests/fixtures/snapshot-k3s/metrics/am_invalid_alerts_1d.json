@@ -1,0 +1,1 @@
+{"id":"am_invalid_alerts_1d","query":"sum(increase(alertmanager_alerts_invalid_total[1d]))","why":"Invalid alerts rejected by Alertmanager (24h)","taken_at":"2026-11-07T10:23:15+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794014598.59,"0"]}],"series":1}

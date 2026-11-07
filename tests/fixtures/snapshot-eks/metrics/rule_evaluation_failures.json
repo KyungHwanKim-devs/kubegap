@@ -1,0 +1,1 @@
+{"id":"rule_evaluation_failures","query":"sum by (rule_group) (increase(prometheus_rule_evaluation_failures_total[1h])) > 0","why":"Rule groups whose evaluation failed (syntax, missing metric). A failing rule is a rule that never fires","taken_at":"2026-11-07T10:35:07+09:00","ok":true,"resultType":"vector","result":[],"series":0}

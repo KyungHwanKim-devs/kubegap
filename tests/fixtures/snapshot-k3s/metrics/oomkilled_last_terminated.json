@@ -1,0 +1,1 @@
+{"id":"oomkilled_last_terminated","query":"kube_pod_container_status_last_terminated_reason{reason=\"OOMKilled\"} == 1","why":"Containers whose last termination reason was OOMKilled. Memory limit too small or a leak","taken_at":"2026-11-07T10:23:13+09:00","ok":true,"resultType":"vector","result":[],"series":0}
