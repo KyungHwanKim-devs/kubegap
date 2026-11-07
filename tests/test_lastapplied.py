@@ -13,7 +13,7 @@ from lib.runlog import RunLog
 ROOT = Path(__file__).resolve().parent.parent
 ANN = "kubectl.kubernetes.io/last-applied-configuration"
 INV = {"cluster": {"server_version": "v1.32.0"}}
-SAVED = {"kinds": 3, "skipped": ["pods"], "failed": {}, "not_permitted": []}
+SAVED = {"kinds": 3, "fetched_by_discovery": ["pods"], "failed": {}, "not_permitted": []}
 
 
 def obj(kind, name, namespace="prod-a", applied=None, **extra):
@@ -84,7 +84,7 @@ def test_step_feeds_the_saved_objects_and_counts_what_the_dump_saw(tmp_path, mon
     stdin_file = tmp_path / "stdin.json"
     _fake_pluto(tmp_path, monkeypatch, f'cat > {shlex.quote(str(stdin_file))}\nprintf \'%s\\n\' \'{{"target-versions": {{"k8s": "v1.33.0"}}}}\'\n')
     save(tmp_path, "deployments", obj("Deployment", "web", applied={"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": "web"}}))
-    dump = {"kinds": 110, "skipped": ["pods"], "failed": {"foos.example.com": "boom"}, "not_permitted": ["csrs.certificates.k8s.io"]}
+    dump = {"kinds": 110, "fetched_by_discovery": ["pods"], "failed": {"foos.example.com": "boom"}, "not_permitted": ["csrs.certificates.k8s.io"]}
     res = collect._run_tool_step(_step(), "pluto", "core", "ctx", None, tmp_path, RunLog(None), None, 10, None, inv=INV, objects_dump=dump)
     assert res["ok"] is True and res["api_read"] is True
     assert (res["lists_ok"], res["lists_failed"], res["manifests"]) == (111, 2, 1)
@@ -96,7 +96,7 @@ def test_a_failed_dump_never_reads_as_a_clean_cluster(tmp_path, monkeypatch):
     ran = tmp_path / "ran"
     _fake_pluto(tmp_path, monkeypatch, f"touch {shlex.quote(str(ran))}\nprintf '%s\\n' '{{}}'\n")
     (tmp_path / "objects").mkdir()
-    for dump in (None, {"kinds": 0, "skipped": [], "failed": {"x": "y"}, "not_permitted": []}):
+    for dump in (None, {"kinds": 0, "fetched_by_discovery": [], "failed": {"x": "y"}, "not_permitted": []}):
         res = collect._run_tool_step(_step(), "pluto", "core", "ctx", None, tmp_path, RunLog(None), None, 10, None, inv=INV, objects_dump=dump)
         assert res["ok"] is False and res["api_read"] is False and "objects.dump-all saved no kind" in res["error"]
     assert not ran.exists()

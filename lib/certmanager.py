@@ -8,20 +8,12 @@ Secret values (keys, certificate bodies) are never read. Result: the `certmanage
 
 from __future__ import annotations
 
-import datetime as _dt
 import re
 from collections import Counter
 from pathlib import Path
 
 from .promtext import parse as _parse_prom
-from .snapshot import objects
-
-
-def _ts(s):
-    try:
-        return _dt.datetime.fromisoformat(str(s))
-    except (ValueError, TypeError):
-        return None
+from .snapshot import objects, parse_ts, taken_at
 
 
 def _ver(image: str | None):
@@ -40,7 +32,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     deps = [d for d in objects(snap, "deployments") if d["metadata"]["name"].startswith("cert-manager")]
     if not certs and not deps:
         return {"present": False}
-    now = _ts(inv.get("taken_at")) or _dt.datetime.now(_dt.UTC)
+    now = taken_at(inv)
     prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
     comps = {}
     for d in deps:
@@ -88,8 +80,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         c = _conds(o)
         ready = c.get("Ready", (None, None, None, None))
         issuing = c.get("Issuing", (None, None, None, None))
-        issuing_since = _ts(issuing[3]) if issuing[0] == "True" else None
-        na, rt = _ts(st.get("notAfter")), _ts(st.get("renewalTime"))
+        issuing_since = parse_ts(issuing[3]) if issuing[0] == "True" else None
+        na, rt = parse_ts(st.get("notAfter")), parse_ts(st.get("renewalTime"))
         days = round((na - now).total_seconds() / 86400, 1) if na else None
         renew_overdue_h = round((now - rt).total_seconds() / 3600, 1) if rt and now > rt else None
         ref = sp.get("issuerRef") or {}
@@ -130,7 +122,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     cr_pending_old = [
         f"{o['metadata']['namespace']}/{o['metadata']['name']}"
         for o in crs
-        if _conds(o).get("Ready", (None, None))[:2] == ("False", "Pending") and _ts(o["metadata"].get("creationTimestamp")) and (now - _ts(o["metadata"]["creationTimestamp"])).total_seconds() > 3600
+        if _conds(o).get("Ready", (None, None))[:2] == ("False", "Pending") and parse_ts(o["metadata"].get("creationTimestamp")) and (now - parse_ts(o["metadata"]["creationTimestamp"])).total_seconds() > 3600
     ]
     cr_denied = [f"{o['metadata']['namespace']}/{o['metadata']['name']}" for o in crs if _conds(o).get("Denied", (None,))[0] == "True"]
     orders = objects(snap, "orders.acme.cert-manager.io")
@@ -143,7 +135,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     orders_pending_old = [
         f"{o['metadata']['namespace']}/{o['metadata']['name']}"
         for o in orders
-        if (o.get("status") or {}).get("state") in ("pending", "processing", None) and (_ts(o["metadata"].get("creationTimestamp")) and (now - _ts(o["metadata"]["creationTimestamp"])).total_seconds() > 3600)
+        if (o.get("status") or {}).get("state") in ("pending", "processing", None) and (parse_ts(o["metadata"].get("creationTimestamp")) and (now - parse_ts(o["metadata"]["creationTimestamp"])).total_seconds() > 3600)
     ]
     challenges = objects(snap, "challenges.acme.cert-manager.io")
     ch_rows = [
@@ -154,7 +146,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             "dns": (o.get("spec") or {}).get("dnsName"),
             "state": (o.get("status") or {}).get("state"),
             "reason": ((o.get("status") or {}).get("reason") or "")[:160],
-            "age_h": round((now - _ts(o["metadata"]["creationTimestamp"])).total_seconds() / 3600, 1) if _ts(o["metadata"].get("creationTimestamp")) else None,
+            "age_h": round((now - parse_ts(o["metadata"]["creationTimestamp"])).total_seconds() / 3600, 1) if parse_ts(o["metadata"].get("creationTimestamp")) else None,
         }
         for o in challenges
     ]

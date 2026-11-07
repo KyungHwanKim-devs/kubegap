@@ -14,7 +14,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import amconfig
-from .snapshot import items, load_json
+from .snapshot import items, load_json, parse_ts, taken_at
 
 # Symptom/cause classification heuristic. If the expr has any symptom metric it is a symptom; if every metric is infrastructure it is a cause; otherwise (the app's own metrics) it is "app (assumed symptom)".
 SYMPTOM_RE = re.compile(
@@ -371,18 +371,15 @@ def _am_config(snap: Path) -> dict:
     }
 
 
-def _alertmanager(snap: Path) -> dict:
+def _alertmanager(snap: Path, now: _dt.datetime) -> dict:
     """Alertmanager section: config (via _am_config), silences and forgotten silences, alert states, failed notifications. Reads alertmanager/silences.json, alerts.json, metrics/alertmanager_notifications_failed_1d."""
     am = {"source": "alertmanager/status.json, silences.json, alerts.json"}
     am.update(_am_config(snap))
     sil = load_json(snap / "alertmanager" / "silences.json") or []
-    now = _dt.datetime.now(_dt.UTC)
     sil_rows = []
     for s_ in sil if isinstance(sil, list) else []:
-        try:
-            ends = _dt.datetime.fromisoformat(str(s_.get("endsAt")))
-            starts = _dt.datetime.fromisoformat(str(s_.get("startsAt")))
-        except ValueError:
+        ends, starts = parse_ts(s_.get("endsAt")), parse_ts(s_.get("startsAt"))
+        if ends is None or starts is None:
             ends = starts = None
         sil_rows.append(
             {
@@ -573,7 +570,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "alerts": _alerts(snap, alerting),
         "failure_modes": _failure_modes(alerting, comps, platform),
         "slo": _slo(alerting, recording, comps),
-        "alertmanager": _alertmanager(snap),
+        "alertmanager": _alertmanager(snap, taken_at(inv)),
         "golden_signals": _golden_signals(snap, comps, platform),
         "targets": _targets(snap),
         "grafana": _grafana(snap, alerting),

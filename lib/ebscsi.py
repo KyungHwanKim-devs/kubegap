@@ -19,7 +19,7 @@ from collections import Counter
 from pathlib import Path
 
 from .events import count_of
-from .snapshot import load_json, objects
+from .snapshot import load_json, objects, parse_ts, taken_at
 
 
 def _rows(snap: Path, qid: str) -> list[tuple[dict, float]]:
@@ -33,13 +33,6 @@ def _rows(snap: Path, qid: str) -> list[tuple[dict, float]]:
         except (KeyError, ValueError, TypeError, IndexError):
             pass
     return out
-
-
-def _ts(s):
-    try:
-        return _dt.datetime.fromisoformat(str(s))
-    except (ValueError, TypeError):
-        return None
 
 
 def _ver(image: str | None):
@@ -158,7 +151,7 @@ def _volume_attachments(snap: Path, inv: dict, now: _dt.datetime) -> dict:
     va_rows = []
     for v in vas:
         st = v.get("status") or {}
-        created = _ts(v["metadata"].get("creationTimestamp"))
+        created = parse_ts(v["metadata"].get("creationTimestamp"))
         age_min = round((now - created).total_seconds() / 60, 1) if created else None
         pv = ((v.get("spec") or {}).get("source") or {}).get("persistentVolumeName")
         err = (st.get("attachError") or {}).get("message") or (st.get("detachError") or {}).get("message")
@@ -311,7 +304,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     driver = next((c for c in objects(snap, "csidrivers.storage.k8s.io") if c["metadata"]["name"] == "ebs.csi.aws.com"), None)
     if not (ctrl or node_ds or driver):
         return {"present": False}
-    now = _ts(inv.get("taken_at")) or _dt.datetime.now(_dt.UTC)
+    now = taken_at(inv)
     controller = _controller(snap, ctrl)
     node = _node(node_ds)
     windows = next((d for d in objects(snap, "daemonsets") if d["metadata"]["name"] == "ebs-csi-node-windows"), None)

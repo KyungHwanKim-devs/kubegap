@@ -16,7 +16,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from .events import count_of
-from .snapshot import load_json, objects
+from .snapshot import load_json, objects, parse_ts, taken_at
 
 DB_HINT = ("postgres", "mysql", "mariadb", "mongo", "redis", "neo4j", "elastic", "kafka", "minio", "qdrant", "clickhouse", "influx", "etcd", "db", "data")
 
@@ -42,13 +42,6 @@ def _q(v) -> float:
         return float(s)
     except ValueError:
         return 0.0
-
-
-def _ts(s):
-    try:
-        return _dt.datetime.fromisoformat(str(s)) if s else None
-    except ValueError:
-        return None
 
 
 def _pvc_users(pods: list[dict]) -> dict[tuple, set]:
@@ -205,7 +198,7 @@ def _ebs(snap: Path, now: _dt.datetime) -> dict:
     snaps = [s for s in (load_json(snap / "aws" / "ec2-snapshots-30d.json") or []) if isinstance(s, dict)]
 
     def age_days(s):
-        t = _ts(s)
+        t = parse_ts(s)
         return round((now - t).total_seconds() / 86400) if t else None
 
     def tag(v, k):
@@ -251,7 +244,7 @@ def _snapshots(snap: Path, now: _dt.datetime, ebs: dict, pvcs: list[dict], rows:
         "volumesnapshot_crd": "volumesnapshots.snapshot.storage.k8s.io" in crds,
         "volumesnapshots": len(vs),
         "volumesnapshotclasses": len(objects(snap, "volumesnapshotclasses.snapshot.storage.k8s.io")),
-        "recent_7d": sum(1 for v in vs if (_ts(v["metadata"].get("creationTimestamp")) or now - _dt.timedelta(days=99)) > now - _dt.timedelta(days=7)),
+        "recent_7d": sum(1 for v in vs if (parse_ts(v["metadata"].get("creationTimestamp")) or now - _dt.timedelta(days=99)) > now - _dt.timedelta(days=7)),
         "ebs_snapshots_30d": ebs.get("snapshots_30d") if ebs.get("available") else None,
         "ebs_snapshot_descriptions": ebs.get("snapshot_descriptions") if ebs.get("available") else None,
         "pvcs_total": len(pvcs),
@@ -265,7 +258,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     inv = inv or {}
     prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
     platform = (inv.get("cluster") or {}).get("platform")
-    now = _dt.datetime.now(_dt.UTC)
+    now = taken_at(inv)
     pvcs = objects(snap, "persistentvolumeclaims")
     pvs = objects(snap, "persistentvolumes")
     scs = objects(snap, "storageclasses")

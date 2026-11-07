@@ -14,8 +14,8 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from . import __version__, paths
-from .runlog import read_runlog
-from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, items, load_json, remove_stale_temp, write_private
+from .runlog import RunLog, read_runlog
+from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, forget_reads, items, load_json, object_files, parse_ts, remove_stale_temp, taken_at, write_private
 
 WAITING_REASONS = ("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "CreateContainerConfigError", "CreateContainerError", "InvalidImageName", "RunContainerError")
 LABEL_KEEP = ("__name__", "namespace", "pod", "container", "node", "instance", "mountpoint", "qos_class", "reason", "job", "horizontalpodautoscaler", "endpoint", "kind", "phase", "poddisruptionbudget", "service", "deployment")
@@ -265,13 +265,12 @@ BAD_TRUE = {"Degraded", "Stalled", "Failed", "Error", "Unhealthy", "Suspended", 
 SKIP_KINDS = {"pods", "nodes", "events", "jobs.batch", "replicasets.apps", "endpointslices.discovery.k8s.io", "leases.coordination.k8s.io"}
 
 
-def summarize_conditions(snap: Path) -> dict:
+def summarize_conditions(snap: Path, now: _dt.datetime) -> dict:
     """Scan status.conditions on every object and collect bad patterns (Ready=False, Degraded=True and the like). Operators without a dedicated collector get baseline coverage."""
     odir = snap / "objects"
     out: dict = {"source": "objects/*.json", "scanned_kinds": 0, "scanned_objects": 0, "unhealthy": [], "by_kind": {}}
     if not odir.is_dir():
         return out
-    now = _dt.datetime.now(_dt.UTC)
     for f in sorted(odir.glob("*.json")):
         if f.stem in SKIP_KINDS:
             continue
@@ -291,10 +290,8 @@ def summarize_conditions(snap: Path) -> dict:
                 if not bad:
                     continue
                 lt = c.get("lastTransitionTime")
-                try:
-                    age_h = round((now - _dt.datetime.fromisoformat(str(lt))).total_seconds() / 3600, 1) if lt else None
-                except ValueError:
-                    age_h = None
+                lt_dt = parse_ts(lt)
+                age_h = round((now - lt_dt).total_seconds() / 3600, 1) if lt_dt else None
                 ns = o["metadata"].get("namespace")
                 out["unhealthy"].append({"kind": f.stem, "namespace": ns, "name": o["metadata"]["name"], "condition": t, "status": st, "reason": c.get("reason"), "message": (c.get("message") or "")[:240], "since": lt, "age_hours": age_h})
                 out["by_kind"][f.stem] = out["by_kind"].get(f.stem, 0) + 1
@@ -374,21 +371,20 @@ def summarize_webhooks(snap: Path) -> dict:
     }
 
 
-def summarize_recent_changes(snap: Path, hours: int = 24, now: _dt.datetime | None = None) -> dict:
+def summarize_recent_changes(snap: Path, now: _dt.datetime, hours: int = 24) -> dict:
     """`recent_changes` of summary.json, read in every mode: workloads changed in the last N hours. A Deployment's change time is the `lastUpdateTime` of its
     conditions (the Progressing condition is refreshed on every rollout: kubernetes/kubernetes pkg/controller/deployment/progress.go:36@v1.37.2 `syncRolloutStatus`). StatefulSets and
     DaemonSets declare `status.conditions` but no controller writes them (0 writers in pkg/controller/statefulset and pkg/controller/daemon at v1.30.14 and v1.37.2;
     #124 K2-1), so their change time is the `creationTimestamp` of the newest ControllerRevision they own (the controllers create one per template change:
     pkg/controller/history/controller_history.go:293@v1.37.2 `CreateControllerRevision`). The targets of ScalingReplicaSet/SuccessfulCreate events are listed too; generation is recorded."""
     odir = snap / "objects"
-    since = (now or _dt.datetime.now(_dt.UTC)) - _dt.timedelta(hours=hours)
+    since = now - _dt.timedelta(hours=hours)
     changed: list[dict] = []
     revisions: dict[tuple[str, str, str], _dt.datetime] = {}  # (owner kind, namespace, owner name) -> newest ControllerRevision creation
     for cr in items(load_json(odir / "controllerrevisions.apps.json")):
         for ref in cr["metadata"].get("ownerReferences") or []:
-            try:
-                dt = _dt.datetime.fromisoformat(cr["metadata"].get("creationTimestamp") or "")
-            except ValueError:
+            dt = parse_ts(cr["metadata"].get("creationTimestamp"))
+            if dt is None:
                 continue
             k = (ref.get("kind"), cr["metadata"]["namespace"], ref.get("name"))
             if k not in revisions or dt > revisions[k]:
@@ -399,9 +395,8 @@ def summarize_recent_changes(snap: Path, hours: int = 24, now: _dt.datetime | No
             for cnd in (o.get("status") or {}).get("conditions") or []:
                 t = cnd.get("lastUpdateTime") or cnd.get("lastTransitionTime")
                 if t:
-                    try:
-                        dt = _dt.datetime.fromisoformat(t)
-                    except ValueError:
+                    dt = parse_ts(t)
+                    if dt is None:
                         continue
                     if latest is None or dt > latest:
                         latest = dt
@@ -420,10 +415,7 @@ def summarize_recent_changes(snap: Path, hours: int = 24, now: _dt.datetime | No
     for e in items(load_json(snap / "events.json")):
         if e.get("reason") in ("ScalingReplicaSet", "SuccessfulCreate", "Killing", "Scheduled"):
             t = e.get("lastTimestamp") or e.get("eventTime") or ((e.get("series") or {}).get("lastObservedTime"))
-            try:
-                dt = _dt.datetime.fromisoformat(str(t)) if t else None
-            except ValueError:
-                dt = None
+            dt = parse_ts(t)
             if dt and dt >= since:
                 inv = e.get("involvedObject") or {}
                 ev_targets.append(f"{inv.get('kind')}/{inv.get('namespace')}/{inv.get('name')}")
@@ -556,7 +548,11 @@ def remove_component_logs(snap: Path, summary: dict | None = None) -> int:
 def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> dict:
     """Build summary.json. Unless keep_component_logs is true the component pod logs are deleted afterwards, with their log-derived aggregates saved to logs/pods/AGGREGATED.json; lib/logs.py and lib/scaling.py read that file on a rerun, so the result does not change."""
     remove_stale_temp(snap)
+    forget_reads(snap)
     inv = load_json(snap / "inventory.json")
+    now = taken_at(inv)  # the one clock of a summary: every age, window and expiry below is measured from the snapshot time (#165)
+    if not (inv or {}).get("taken_at"):
+        RunLog(snap / "run.log").note("inventory.json has no taken_at; the ages of this summary are measured from the wall clock and change on a rerun")
     s = {
         "kubegap": __version__,
         "snapshot": str(snap),
@@ -565,13 +561,13 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
         "events": summarize_events(snap),
         "metrics": summarize_metrics(snap),
         "objects": summarize_objects(snap, inv),
-        "conditions": summarize_conditions(snap),
+        "conditions": summarize_conditions(snap, now),
         "webhooks": summarize_webhooks(snap),
         "observability": _component("observability", snap, inv),
         "controlplane": _component("controlplane", snap, inv),
         "nodeos": _component("nodeos", snap, inv),
         "k3s": _component("k3s", snap, inv, on_error={"present": None}),
-        "recent_changes": summarize_recent_changes(snap),
+        "recent_changes": summarize_recent_changes(snap, now),
         "logs": summarize_logs(snap, inv),
         "tools": summarize_tools(snap),
         "resources": _component("resources", snap, inv),
@@ -612,6 +608,12 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
             "eks": ({k: inv["cluster"]["eks"].get(k) for k in ("version", "support_type", "control_plane_logging_off", "public_access_cidrs", "secrets_encryption", "addons")} if inv["cluster"].get("eks") else None),
             "ssm_unregistered": [x["node"] for x in inv["node_access"].get("ssm_unregistered") or []],
         }
+    # every objects/<stem>.json a summary module asked for, with why it is missing when it is (#160). `unlisted` is a kubegap defect: the cluster serves
+    # the kind and the reader spells the file name differently, so its checks passed on nothing; run.log and report section 7-1 name those stems
+    s["collection"]["object_files"] = object_files(snap)
+    unlisted = sorted(stem for stem, st in s["collection"]["object_files"].items() if st == "unlisted")
+    if unlisted:
+        RunLog(snap / "run.log").note("object files a reader asked for that the cluster serves but the snapshot does not have (the reader's stem and the file name disagree)", stems=unlisted)
     removed = 0 if keep_component_logs else remove_component_logs(snap, s)
     if isinstance(s.get("logs"), dict):
         s["logs"]["component_logs_removed"] = component_logs_removed(snap)  # from the marker, so a later keep_component_logs: true does not claim the logs are there

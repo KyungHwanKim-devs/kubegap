@@ -10,7 +10,7 @@ import datetime as _dt
 import re
 from pathlib import Path
 
-from .snapshot import load_json
+from .snapshot import load_json, parse_ts, taken_at
 
 QUOTA_WATCH = {  # only the quotas that actually block Kubernetes operations (ENI, EIP, EBS volume count, ALB/NLB count, instance vCPU)
     "L-1216C47A": "on-demand standard instance vCPU",
@@ -33,20 +33,13 @@ QUOTA_WATCH = {  # only the quotas that actually block Kubernetes operations (EN
 WORLD = ("0.0.0.0/0", "::/0")
 
 
-def _ts(s):
-    try:
-        return _dt.datetime.fromisoformat(str(s))
-    except (ValueError, TypeError):
-        return None
-
-
 def _acm(snap: Path, now) -> dict:
     doc = load_json(snap / "aws" / "acm-certificates.json")
     if doc is None:
         return {"available": False}
     rows = []
     for c in doc.get("CertificateSummaryList") or []:
-        na = _ts(c.get("NotAfter"))
+        na = parse_ts(c.get("NotAfter"))
         rows.append(
             {
                 "domain": c.get("DomainName"),
@@ -238,9 +231,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     inv = inv or {}
     if not (inv.get("cluster") or {}).get("eks") and not (snap / "aws" / "describe-cluster.json").exists():
         return {"present": False}
-    now = _ts(inv.get("taken_at")) or _dt.datetime.now(_dt.UTC)
-    if now.tzinfo is None:
-        now = now.replace(tzinfo=_dt.UTC)
+    now = taken_at(inv)
     return {
         "present": True,
         "acm": _acm(snap, now),

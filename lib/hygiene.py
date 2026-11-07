@@ -18,7 +18,7 @@ from pathlib import Path
 
 from . import scrub, versions
 from .controlplane import workload_of
-from .snapshot import load_json, objects
+from .snapshot import load_json, objects, parse_ts, taken_at
 
 OPERATOR_PREFIXES = (
     "argocd-",
@@ -68,25 +68,6 @@ def _metric_rows(snap: Path, qid: str):
             continue
 
 
-def _ts(s):
-    if not s:
-        return None
-    s = str(s)
-    try:
-        return _dt.datetime.fromisoformat(s)
-    except ValueError:
-        pass
-    m = re.match(r"(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})", s)  # helm: 2025-12-29 02:07:42.385466 +0900 KST
-    if m:
-        tz = re.search(r"([+-]\d{4}) ", s)
-        d = _dt.datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S")
-        if tz:
-            sign = 1 if tz.group(1)[0] == "+" else -1
-            d = d.replace(tzinfo=_dt.timezone(sign * _dt.timedelta(hours=int(tz.group(1)[1:3]), minutes=int(tz.group(1)[3:5]))))
-        return d
-    return None
-
-
 class _Ctx:
     def __init__(self, snap: Path, inv: dict | None):
         self.snap = snap
@@ -94,6 +75,7 @@ class _Ctx:
         self.prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
         self.platform = (inv.get("cluster") or {}).get("platform")
         self.server_version = (inv.get("cluster") or {}).get("server_version")
+        self.now = taken_at(inv)  # every age in this module is measured from the snapshot time (#165)
         self.workloads = []
         for stem, kind in (("deployments", "Deployment"), ("statefulsets", "StatefulSet"), ("daemonsets", "DaemonSet"), ("cronjobs", "CronJob")):
             for o in objects(snap, stem):
@@ -363,7 +345,7 @@ def _helm(cx: _Ctx, now: _dt.datetime) -> dict:
         return {"present": False, "note": _helm_missing_note(cx.snap)}
     rows = []
     for r in d if isinstance(d, list) else []:
-        upd = _ts(r.get("updated"))
+        upd = parse_ts(r.get("updated"))
         chart = r.get("chart") or ""
         m = re.match(r"(.+)-(v?\d[\w.\-]*)$", chart)
         rows.append(
@@ -572,7 +554,7 @@ def _orphans(cx: _Ctx) -> dict:
                 "name": name,
                 "prod": ns in cx.prod,
                 "keys": sorted((cm.get("data") or {}).keys())[:5],
-                "age_days": round((_dt.datetime.now(_dt.UTC) - _ts(md.get("creationTimestamp"))).total_seconds() / 86400) if _ts(md.get("creationTimestamp")) else None,
+                "age_days": round((cx.now - parse_ts(md.get("creationTimestamp"))).total_seconds() / 86400) if parse_ts(md.get("creationTimestamp")) else None,
             }
         )
     # Secrets (name and type only, from metrics)
@@ -730,7 +712,7 @@ def _templating(cx: _Ctx) -> dict:
 
 def analyze(snap: Path, inv: dict | None, summary_webhooks: dict | None = None) -> dict:
     cx = _Ctx(snap, inv)
-    now = _dt.datetime.now(_dt.UTC)
+    now = cx.now
     return {
         "polaris": _polaris(cx),
         "deprecated": _deprecated(cx),
@@ -799,7 +781,7 @@ def _data_change(md: dict) -> tuple | None:
         fields = e.get("fieldsV1") or {}
         if not isinstance(fields, dict) or not ({"f:data", "f:binaryData"} & set(fields)):
             continue
-        t = _ts(e.get("time"))
+        t = parse_ts(e.get("time"))
         if t and (best is None or t > best[0]):
             best = (t, e.get("manager"))
     return best
@@ -817,7 +799,7 @@ def _config_changes(cx: _Ctx) -> dict | None:
         dc = _data_change(md)
         if c.get("immutable"):
             # an immutable ConfigMap cannot be edited; the only change is delete and recreate under the same name, and then the creation time is the change time
-            created = _ts(md.get("creationTimestamp"))
+            created = parse_ts(md.get("creationTimestamp"))
             if created:
                 dc = (created, (dc[1] if dc else None) or "recreated")
         if dc:
@@ -828,7 +810,7 @@ def _config_changes(cx: _Ctx) -> dict | None:
     pods_checked = 0
     for p in cx.pods:
         st = p.get("status") or {}
-        pod_started = _ts(st.get("startTime"))
+        pod_started = parse_ts(st.get("startTime"))
         if st.get("phase") != "Running" or not pod_started:
             continue
         pods_checked += 1
@@ -836,7 +818,7 @@ def _config_changes(cx: _Ctx) -> dict | None:
         # env and subPath are resolved when a container starts, so a container restarted after the change already holds the new value: compare with the container's own start
         container_started = {}
         for cs in (st.get("containerStatuses") or []) + (st.get("initContainerStatuses") or []) + (st.get("ephemeralContainerStatuses") or []):
-            t = _ts((((cs.get("state") or {}).get("running") or {}).get("startedAt")) or (((cs.get("state") or {}).get("terminated") or {}).get("startedAt")))
+            t = parse_ts((((cs.get("state") or {}).get("running") or {}).get("startedAt")) or (((cs.get("state") or {}).get("terminated") or {}).get("startedAt")))
             if t:
                 container_started[cs.get("name")] = t
         for name, ref in _cm_refs(p.get("spec") or {}).items():
@@ -906,12 +888,8 @@ def _failed_pods(cx: _Ctx, now) -> dict:
             continue
         reason = st.get("reason") or next((((c.get("lastState") or {}).get("terminated") or {}).get("reason") for c in st.get("containerStatuses") or [] if (c.get("lastState") or {}).get("terminated")), None) or "Failed"
         ns = p["metadata"]["namespace"]
-        age_h = None
-        try:
-            created = _dt.datetime.fromisoformat(str(p["metadata"].get("creationTimestamp")))
-            age_h = round((now - created).total_seconds() / 3600, 1)
-        except (ValueError, TypeError):
-            pass
+        created = parse_ts(p["metadata"].get("creationTimestamp"))
+        age_h = round((now - created).total_seconds() / 3600, 1) if created else None
         by_reason[reason] += 1
         by_ns[ns] += 1
         rows.append(

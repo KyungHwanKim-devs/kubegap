@@ -3,6 +3,7 @@ from the cited format string (references/sources.md, "Pod log formats"), plus a 
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 
 import pytest
@@ -82,10 +83,11 @@ def test_ts_of_keeps_the_offset_containerd_wrote():
     # containerd stamps the CRI log line with time.Now() in the node's zone (internal/cri/io/logger.go:134@v2.1.5), so pods on one cluster mix Z and +09:00
     plus9 = "[pod/a/b] 2026-11-05T00:10:15.175726273+09:00 hello"
     zulu = "[pod/a/b] 2026-11-04T15:10:15.175726273Z hello"
-    assert logs._ts_of(plus9) == "2026-11-05T00:10:15.175726273+09:00"
-    assert logs._utc_str(logs._ts_of(plus9)) == logs._utc_str(logs._ts_of(zulu)) == "2026-11-04T15:10:15Z"
-    assert logs._utc_str(logs._ts_of("E1104 13:20:26.752445    1316 pod_workers.go:1301] x")) is not None
-    assert logs._utc_str(None) is None and logs._ts_of("no time here") is None
+    today = dt.date(2026, 11, 5)
+    assert logs._ts_of(plus9, today) == "2026-11-05T00:10:15.175726273+09:00"
+    assert logs._utc_str(logs._ts_of(plus9, today)) == logs._utc_str(logs._ts_of(zulu, today)) == "2026-11-04T15:10:15Z"
+    assert logs._utc_str(logs._ts_of("E1104 13:20:26.752445    1316 pod_workers.go:1301] x", today)) == "2026-11-04T13:20:26Z"
+    assert logs._utc_str(None) is None and logs._ts_of("no time here", today) is None
 
 
 def test_klog_lines_without_an_offset_take_the_node_zone():
@@ -99,18 +101,12 @@ def test_klog_lines_without_an_offset_take_the_node_zone():
     assert logs._utc_str("2026-11-05T00:10:15Z", kst) == "2026-11-05T00:10:15Z"  # an explicit offset wins over the assumed zone
 
 
-def test_klog_dates_after_today_belong_to_last_year(monkeypatch):
-    # the klog header has no year (internal/buffer/buffer.go:133-142@v2.130.1): a scan on 2027-01-02 over a window that starts on 2026-12-31 must not put those lines a year ahead
-    import datetime as dt
-
-    class _D(dt.date):
-        @classmethod
-        def today(cls):
-            return cls(2027, 1, 2)
-
-    monkeypatch.setattr(logs._dt, "date", _D)
-    assert logs._ts_of("E1231 23:59:59.000000    1316 x.go:1] a") == "2026-12-31T23:59:59"
-    assert logs._ts_of("E0102 00:00:01.000000    1316 x.go:1] a") == "2027-01-02T00:00:01"
+def test_klog_dates_after_the_snapshot_date_belong_to_last_year():
+    # the klog header has no year (internal/buffer/buffer.go:133-142@v2.130.1): a snapshot taken on 2027-01-02 whose journal starts on 2026-12-31 must not put those lines a year ahead.
+    # The year comes from the snapshot date, not the wall clock, so the same snapshot scans the same way later (#165)
+    today = dt.date(2027, 1, 2)
+    assert logs._ts_of("E1231 23:59:59.000000    1316 x.go:1] a", today) == "2026-12-31T23:59:59"
+    assert logs._ts_of("E0102 00:00:01.000000    1316 x.go:1] a", today) == "2027-01-02T00:00:01"
 
 
 def test_klog_header_with_digits_in_the_file_name_is_normalized():

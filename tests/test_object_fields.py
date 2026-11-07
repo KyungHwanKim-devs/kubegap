@@ -24,7 +24,7 @@ def _write(snap: Path, stem: str, items: list, folder: str = "objects"):
     p.write_text(json.dumps({"items": items}), encoding="utf-8")
 
 
-# ---------- K1-1: the CronJob file is `cronjobs.json` since discovery fetches CronJobs (lib/discover.py OBJECT_KINDS), `cronjobs.batch.json` before ----------
+# ---------- K1-1: the CronJob file is `cronjobs.json` since discovery fetches CronJobs (lib/discover.py OBJECT_KINDS) ----------
 
 
 def test_every_literal_stem_matches_what_discovery_writes():
@@ -39,27 +39,15 @@ def test_every_literal_stem_matches_what_discovery_writes():
     assert not bad, f"discovery writes these kinds under the short name, the reader must use it: {bad}"
 
 
-def test_discovery_stems_are_the_table_discovery_fetches():
-    assert frozenset(discover.OBJECT_KINDS) == snapshot.DISCOVERY_STEMS
-
-
-def test_objects_never_falls_back_for_a_kind_discovery_does_not_fetch(tmp_path):
+def test_objects_never_falls_back_to_another_file(tmp_path):
+    """A reader spells the file name exactly: no short-name, group-name or legacy spelling is tried, so a wrong stem reads nothing and `object_file_status` says so (#160)."""
     _write(tmp_path, "pods", [{"metadata": {"name": "p"}}])
     _write(tmp_path, "jobs.batch", [{"metadata": {"name": "j"}}])
+    _write(tmp_path, "cronjobs", [{"metadata": {"name": "c"}}])
     assert snapshot.objects(tmp_path, "pods.metrics.k8s.io") == []  # never pods.json
     assert snapshot.objects(tmp_path, "jobs") == []  # jobs is not a discovery kind
-
-
-def test_objects_reads_the_old_and_the_new_cronjob_file(tmp_path):
-    cj = [{"metadata": {"namespace": "p", "name": "backup"}, "spec": {"schedule": "0 3 * * *"}}]
-    _write(tmp_path, "cronjobs.batch", cj)
-    assert snapshot.objects(tmp_path, "cronjobs") == cj  # a snapshot from before 2026-11-05
-    assert snapshot.objects(tmp_path, "cronjobs.batch") == cj
-    new = tmp_path / "new"
-    _write(new, "cronjobs", cj)
-    assert snapshot.objects(new, "cronjobs") == cj
-    assert snapshot.objects(new, "cronjobs.batch") == cj  # the reverse, for a caller that still spells the group
-    assert snapshot.objects(new, "jobs.batch") == []
+    assert snapshot.objects(tmp_path, "cronjobs.batch") == []  # the spelling the readers used before 2026-11-05 reads nothing
+    assert snapshot.objects(tmp_path, "cronjobs") == [{"metadata": {"name": "c"}}]
 
 
 def test_cronjob_checks_see_the_cronjobs_discovery_wrote(tmp_path):

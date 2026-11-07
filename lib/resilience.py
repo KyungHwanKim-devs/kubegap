@@ -19,7 +19,7 @@ from pathlib import Path
 from .controlplane import workload_of
 from .events import count_of
 from .nodeos import kernel_oom_kills
-from .snapshot import load_json, objects
+from .snapshot import load_json, objects, parse_ts, taken_at
 
 SUSPECT_LIVENESS_RE = re.compile(r"(db|database|mysql|postgres|redis|mongo|kafka|ready|readiness|deps|dependenc|upstream|downstream|elastic|full=true)", re.IGNORECASE)
 DB_SELF_PROBE_RE = re.compile(
@@ -68,15 +68,6 @@ def mounts_pvc(spec: dict | None) -> bool:
 
 
 SHELLS = ("sh", "/bin/sh", "bash", "/bin/bash", "/usr/bin/bash", "ash", "/bin/ash")
-
-
-def _ts(s):
-    if not s:
-        return None
-    try:
-        return _dt.datetime.fromisoformat(str(s))
-    except ValueError:
-        return None
 
 
 def _q(v) -> float:
@@ -150,6 +141,7 @@ class _Ctx:
         inv = inv or {}
         self.prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
         self.platform = (inv.get("cluster") or {}).get("platform")
+        self.now = taken_at(inv)  # every age in this module is measured from the snapshot time (#165)
         comps = inv.get("components") or {}
         present = set(inv.get("components_present") or [])
         self.karpenter = bool((comps.get("karpenter") or {}).get("present")) or "karpenter" in present
@@ -835,7 +827,7 @@ def _restarts(cx: _Ctx) -> dict:
             last = (cs.get("lastState") or {}).get("terminated") or {}
             waiting = ((cs.get("state") or {}).get("waiting") or {}).get("reason")
             cause = last.get("reason") or "?"
-            fin = _ts(last.get("finishedAt"))
+            fin = parse_ts(last.get("finishedAt"))
             bt = boot.get(p["spec"].get("nodeName"))
             rebooted = bool(fin and bt and abs((bt - fin).total_seconds()) <= 600)
             if rebooted:
@@ -872,13 +864,13 @@ def _restarts(cx: _Ctx) -> dict:
     rows.sort(key=lambda r: -r["restarts"])
     # containers whose last termination reason is OOMKilled (regardless of restart count) — input for resources.oomkilled to attach "when" (seen: an OOM from 5 months ago reported as high)
     oom_last = {}
-    now = _dt.datetime.now(_dt.UTC)
+    now = cx.now
     for p in cx.pods:
         ns, name = p["metadata"]["namespace"], p["metadata"]["name"]
         for cs in p["status"].get("containerStatuses") or []:
             last = (cs.get("lastState") or {}).get("terminated") or {}
             if last.get("reason") == "OOMKilled":
-                fin = _ts(last.get("finishedAt"))
+                fin = parse_ts(last.get("finishedAt"))
                 oom_last[f"{ns}/{name}/{cs.get('name')}"] = {"finished": last.get("finishedAt"), "age_days": round((now - fin).total_seconds() / 86400, 1) if fin else None, "restarts": cs.get("restartCount") or 0, "prod": ns in cx.prod}
     return {
         "rows": rows[:40],
@@ -1080,15 +1072,15 @@ def _cronjobs(cx: _Ctx, now: _dt.datetime) -> dict:
         ns = md["namespace"]
         jt = (sp.get("jobTemplate") or {}).get("spec") or {}
         interval = _cron_interval_h(sp.get("schedule"))
-        last_ok = _ts(st.get("lastSuccessfulTime"))
-        last_sched = _ts(st.get("lastScheduleTime"))
+        last_ok = parse_ts(st.get("lastSuccessfulTime"))
+        last_sched = parse_ts(st.get("lastScheduleTime"))
         age_ok = round((now - last_ok).total_seconds() / 3600, 1) if last_ok else None
         myjobs = jobs_by_owner.get((ns, md["name"]), [])
         failed = [j["metadata"]["name"] for j in myjobs if (j.get("status") or {}).get("failed")]
         durs = []
         for j in myjobs:
             js = j.get("status") or {}
-            a, b = _ts(js.get("startTime")), _ts(js.get("completionTime"))
+            a, b = parse_ts(js.get("startTime")), parse_ts(js.get("completionTime"))
             if a and b:
                 durs.append((b - a).total_seconds())
         durs.sort()
@@ -1298,7 +1290,7 @@ def _priority(cx: _Ctx) -> dict:
 
 def analyze(snap: Path, inv: dict | None) -> dict:
     cx = _Ctx(snap, inv)
-    now = _dt.datetime.now(_dt.UTC)
+    now = cx.now
     return {
         "probes": _probes(cx),
         "pdbs": _pdbs(cx),

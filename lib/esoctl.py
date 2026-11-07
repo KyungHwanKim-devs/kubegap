@@ -8,7 +8,6 @@ provider API call success/failure, sync errors, reconcile errors). Result: the `
 
 from __future__ import annotations
 
-import datetime as _dt
 import json
 import re
 from collections import Counter
@@ -16,19 +15,12 @@ from pathlib import Path
 
 from .durations import go_duration_s
 from .promtext import parse as _parse_prom
-from .snapshot import objects
+from .snapshot import objects, parse_ts, taken_at
 
 
 def _ver(image: str | None):
     m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
     return m.group(1) if m else None
-
-
-def _ts(s):
-    try:
-        return _dt.datetime.fromisoformat(str(s))
-    except (ValueError, TypeError):
-        return None
 
 
 def _interval_h(s) -> float | None:
@@ -63,7 +55,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     ess = objects(snap, "externalsecrets.external-secrets.io")
     if not ctrl["present"] and not ess:
         return {"present": False}
-    now = _ts(inv.get("taken_at")) or _dt.datetime.now(_dt.UTC)
+    now = taken_at(inv)
     prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
     ns_eso = ctrl.get("namespace") or "external-secrets"
     sa = next((s for s in objects(snap, "serviceaccounts") if s["metadata"]["namespace"] == ns_eso and s["metadata"]["name"] == (ctrl.get("service_account") or "external-secrets")), None)
@@ -107,7 +99,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         st = x.get("status") or {}
         conds = {c.get("type"): (c.get("status"), c.get("reason"), c.get("message")) for c in st.get("conditions") or []}
         ready = conds.get("Ready", (None, None, None))
-        rt = _ts(st.get("refreshTime"))
+        rt = parse_ts(st.get("refreshTime"))
         interval_h = _interval_h(sp.get("refreshInterval"))
         age_h = round((now - rt).total_seconds() / 3600, 1) if rt else None
         stale = bool(interval_h and age_h is not None and age_h > max(interval_h * 3, 1.0))
