@@ -14,7 +14,7 @@ from pathlib import Path
 
 from . import podmetrics as _pm
 from .promtext import parse as _parse_prom
-from .snapshot import load_json, objects
+from .snapshot import load_json, objects, taken_at
 
 
 def _ver(image: str | None):
@@ -260,7 +260,7 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
         "metrics_version_floor": _pm_floor(pm, ld),
         "leader_found": leader is not None,
         "leader_process_start": (ld or {}).get("process_start"),
-        "leader_uptime_days": round((__import__("time").time() - (ld or {}).get("process_start")) / 86400, 1) if (ld or {}).get("process_start") else None,
+        "leader_uptime_days": round((taken_at(inv).timestamp() - (ld or {}).get("process_start")) / 86400, 1) if (ld or {}).get("process_start") else None,
         "nodepool_usage_ratio": (ld or {}).get("nodepool_usage_ratio") or {},
         "nodepool_usage_max": max(((ld or {}).get("nodepool_usage_ratio") or {}).values(), default=None),
         "nodeclaims_created_by_reason": (ld or {}).get("nodeclaims_created_by_reason"),

@@ -286,7 +286,7 @@ def cmd_collect(args) -> int:
     snap = _new_snapshot(args, ctx)
     write_private(snap / "INCOMPLETE", "progress: discovering the cluster, no collector started yet\nIf this file remains, the snapshot was interrupted. An interrupted folder was once picked up as the diff baseline, so the marker keeps it out of latest and previous.\n")
     log = RunLog(snap / "run.log", echo=args.verbose)
-    log.meta(kubegap=__version__, context=ctx, command="collect", args=vars(args))
+    log.meta(kubegap=__version__, context=ctx, command="collect", args={k: v for k, v in vars(args).items() if k != "func"})  # the handler object printed as `<function … at 0x…>`, a memory address in run.log
     print(f"context {ctx} -> {snap}\n== discover")
     inv = _discover.discover(ctx, cfg, snap, kubeconfig=args.kubeconfig, log=log, profile_override=args.profile)
     print(f"  platform {inv['cluster']['platform']}, profile {inv['profile']['name']}, components {len(inv['components_present'])}, collectors to run {len(inv['collectors_enabled'])}")

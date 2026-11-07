@@ -58,9 +58,27 @@ def test_taken_at_is_the_inventory_time():
 
 
 def test_no_summary_module_reads_the_wall_clock():
-    """A sweep of `datetime.now` and `date.today` in lib/. What stays is the time a collection or a report *ran* (a stamp or a query window), never an age a check judges."""
-    collection_time = {"albmetrics.py", "collect.py", "cwlogs.py", "cwmetrics.py", "discover.py", "firstrun.py", "prom.py", "runlog.py", "setup.py", "paths.py", "diff.py", "render.py"}
-    clock = re.compile(r"datetime\.now\(|date\.today\(|utcnow\(")
+    """A sweep of `datetime.now`, `date.today`, `time.time` (also behind `__import__("time")`) and `monotonic` in lib/. What stays is the time a collection or a report *ran*
+    (a stamp, a query window, a timeout), never an age a check judges. lib/karpenterctl.py measured the controller's uptime with `__import__("time").time()` until #145."""
+    collection_time = {
+        "albmetrics.py",
+        "collect.py",
+        "cwlogs.py",
+        "cwmetrics.py",
+        "discover.py",
+        "firstrun.py",
+        "prom.py",
+        "runlog.py",
+        "setup.py",
+        "paths.py",
+        "diff.py",
+        "render.py",
+        "prune.py",
+        "node.py",
+        "portfwd.py",
+        "shell.py",
+    }  # the last three time a command or a wait
+    clock = re.compile(r"datetime\.now\(|date\.today\(|utcnow\(|time\.time\(|__import__\(\"time\"\)|monotonic\(")
     left = []
     for f in sorted((ROOT / "lib").glob("*.py")):
         if f.name in collection_time:
