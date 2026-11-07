@@ -158,7 +158,11 @@ The key shape of the summary file, moved here from SKILL.md section 5. When a se
 
 ## kubegap
 
-`kubegap` (the kubegap version that wrote this summary), `snapshot` (the snapshot folder, absolute), `generated_at` (when summarize ran; the ages inside the summary are measured from `inventory.taken_at`, not from this)
+`kubegap` (the kubegap version that wrote this summary), `schema` (the snapshot format version, copied from inventory.json), `snapshot` (the snapshot folder, absolute), `generated_at` (when summarize ran; the ages inside the summary are measured from `inventory.taken_at`, not from this)
+
+## schema
+
+see `kubegap`
 
 ## snapshot
 
