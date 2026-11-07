@@ -1143,6 +1143,11 @@ def _cronjobs(cx: _Ctx, now: _dt.datetime) -> dict:
 
 
 BACKUP_NAME_RE = re.compile(r"(backup|dump|snapshot|archive|bak)", re.IGNORECASE)
+# The stores whose data lives nowhere else and so need a dump: the DB_HINT_RE names minus the caches, queues, coordination services and monitoring stores
+# (redis, valkey, memcache, kafka, rabbit, nats, pulsar, zookeeper, etcd, prometheus, thanos, loki, mimir, cortex, tempo, victoria, vault), whose data is
+# rebuilt, re-ingested or backed up by other means, and minus minio, which is where dumps go (OFFSITE_RE) rather than what is dumped; those are listed as
+# excluded so the reader sees them (#169).
+BACKUP_TARGET_RE = re.compile(r"(postgres|pgsql|mysql|mariadb|mongo|elastic|opensearch|clickhouse|qdrant|milvus|cassandra|neo4j|influx|timescale|solr|couch|cockroach|tidb|scylla|weaviate|meili|typesense)", re.IGNORECASE)
 OFFSITE_RE = re.compile(r"(s3://|s3\.|aws s3|rclone|restic|gs://|gsutil|b2 |backblaze|minio|mc cp|azcopy|rsync .*@|scp |sftp|wal-g|pgbackrest|borg|kopia)", re.IGNORECASE)
 
 
@@ -1179,28 +1184,54 @@ def _backup_locality(cx: _Ctx) -> dict:
         if cr.get("name"):
             pvc_node[(cr.get("namespace"), cr["name"])] = _pv_node(pv)
             pvc_pv[(cr.get("namespace"), cr["name"])] = pv["metadata"]["name"]
+    services: dict[str, list[tuple[str, dict]]] = defaultdict(list)  # ns → [(service name, selector)]
+    for s in cx.services:
+        sel = (s.get("spec") or {}).get("selector")
+        if sel:
+            services[s["metadata"]["namespace"]].append((s["metadata"]["name"], sel))
     db_pvcs: dict[str, list[tuple]] = defaultdict(list)  # ns → [(workload, pvc, node)]
+    databases: list[dict] = []  # one row per store that needs a dump (BACKUP_TARGET_RE) and mounts a PVC
+    excluded: list[str] = []  # stores DB_HINT_RE names that are not dump targets (caches, queues, monitoring)
     for kind, o in cx.workloads:
         ns = o["metadata"]["namespace"]
-        if not DB_HINT_RE.search(o["metadata"]["name"] + " " + " ".join(c.get("image", "") for c in cx.tpl(o).get("containers") or [])):
-            continue
+        containers = cx.tpl(o).get("containers") or []
+        name_and_repos = o["metadata"]["name"] + " " + " ".join(image_repo(c.get("image")) for c in containers)  # the repository, never the tag: umami:postgresql-latest is an app
+        if not any(is_db_like(c.get("name"), c.get("image"), o["metadata"]["name"]) for c in containers):
+            continue  # the shared gate: a Grafana whose release is called prometheus, an exporter or a sidecar next to a store is not a store
         claims = [v["persistentVolumeClaim"]["claimName"] for v in cx.tpl(o).get("volumes") or [] if v.get("persistentVolumeClaim")]
         for vct in (o.get("spec") or {}).get("volumeClaimTemplates") or []:
             for p in cx.pods_of(kind, o):
                 for v in p["spec"].get("volumes") or []:
                     if v.get("persistentVolumeClaim") and v["persistentVolumeClaim"]["claimName"].startswith(vct["metadata"]["name"] + "-"):
                         claims.append(v["persistentVolumeClaim"]["claimName"])
+        if not claims:
+            continue
         for c in sorted(set(claims)):
             db_pvcs[ns].append((cx.wl_key(kind, o), c, pvc_node.get((ns, c))))
+        if not BACKUP_TARGET_RE.search(name_and_repos):
+            excluded.append(cx.wl_key(kind, o))
+            continue
+        labels = cx.tpl_labels(o)
+        databases.append(
+            {
+                "namespace": ns,
+                "kind": kind.lower(),
+                "name": o["metadata"]["name"],
+                "target": cx.wl_key(kind, o),
+                "prod": ns in cx.prod,
+                "pvcs": sorted(set(claims)),
+                "services": sorted(sn for sn, sel in services.get(ns, []) if all(labels.get(k) == v for k, v in sel.items())),
+                "backup_cronjobs": [],
+                "other_backup_cronjobs_in_namespace": [],
+            }
+        )
     rows = []
     for cj in objects(cx.snap, "cronjobs"):
         md, sp = cj["metadata"], cj.get("spec") or {}
         ns = md["namespace"]
         pod = (((sp.get("jobTemplate") or {}).get("spec") or {}).get("template") or {}).get("spec") or {}
-        text = " ".join(
-            " ".join((c.get("command") or []) + (c.get("args") or [])) + " " + " ".join(str(e.get("value") or "") for e in c.get("env") or []) + " " + c.get("image", "")
-            for c in (pod.get("containers") or []) + (pod.get("initContainers") or [])
-        )
+        cmd_text = " ".join(" ".join((c.get("command") or []) + (c.get("args") or [])) + " " + " ".join(str(e.get("value") or "") for e in c.get("env") or []) for c in (pod.get("containers") or []) + (pod.get("initContainers") or []))
+        text = cmd_text + " " + " ".join(c.get("image", "") for c in (pod.get("containers") or []) + (pod.get("initContainers") or []))
         if not BACKUP_NAME_RE.search(md["name"] + " " + text[:400]):
             continue
         claims = [v["persistentVolumeClaim"]["claimName"] for v in pod.get("volumes") or [] if v.get("persistentVolumeClaim")]
@@ -1210,6 +1241,21 @@ def _backup_locality(cx: _Ctx) -> dict:
         src = db_pvcs.get(ns, [])
         src_nodes = {n for _, _, n in src if n}
         same_node = bool(dest_nodes & src_nodes) or (bool(host_paths) and bool(pod.get("nodeSelector") or pod.get("nodeName")))
+        # Which database this CronJob dumps: its command, args or env values name the database's Service (the host of pg_dump -h, mysqldump -h, a connection
+        # string), the workload itself, or its first pod (<statefulset>-0), as a whole token. A name that is only the prefix of another (app-postgres of
+        # app-postgres-mx) does not match (#169). The image is not part of the match (a CronJob running the postgres image would claim a database named
+        # postgres), and a user name that equals a sibling's name would (pg_dump -U postgres): the known limit of a token match. The text is not recorded: an env
+        # value may be a credential.
+        targets_db = []
+        for db in databases:
+            if db["namespace"] != ns:
+                continue
+            keys = [*db["services"], db["name"]] + ([f"{db['name']}-0"] if db["kind"] == "statefulset" else [])
+            hit = next((k for k in keys if re.search(r"(?<![\w-])" + re.escape(k) + r"(?![\w-])", cmd_text)), None)  # a dot may precede: pg-0.pg-headless names the Service
+            if hit:
+                targets_db.append({"target": db["target"], "matched_by": hit})
+                if not sp.get("suspend"):
+                    db["backup_cronjobs"].append({"name": md["name"], "matched_by": hit})
         rows.append(
             {
                 "namespace": ns,
@@ -1218,6 +1264,7 @@ def _backup_locality(cx: _Ctx) -> dict:
                 "prod": ns in cx.prod,
                 "schedule": sp.get("schedule"),
                 "suspend": bool(sp.get("suspend")),
+                "targets_db": targets_db,
                 "dest_pvcs": claims,
                 "dest_nodes": sorted(n for n in dest_nodes if n),
                 "host_paths": host_paths,
@@ -1229,18 +1276,17 @@ def _backup_locality(cx: _Ctx) -> dict:
                 "note": "offsite_hint = whether command, args or env values contain strings such as s3, rclone or restic (names only, values are not recorded)",
             }
         )
-    dbs_without_backup = []
-    backed_ns = {r["namespace"] for r in rows if not r["suspend"]}
-    for ns, lst in db_pvcs.items():
-        if ns not in backed_ns and ns in cx.prod:
-            dbs_without_backup += [w for w, _, _ in lst]
+    for db in databases:
+        own = {b["name"] for b in db["backup_cronjobs"]}
+        db["other_backup_cronjobs_in_namespace"] = [{"name": r["name"], "suspend": r["suspend"], "targets_db": [t["target"] for t in r["targets_db"]]} for r in rows if r["namespace"] == db["namespace"] and r["name"] not in own]
     return {
         "rows": rows,
         "count": len(rows),
         "local_only": [r["target"] for r in rows if r["local_only"]],
         "same_node": [r["target"] for r in rows if r["same_node_as_source"]],
-        "prod_db_without_backup_cronjob": sorted(set(dbs_without_backup)),
-        "db_workloads_with_pvc": sum(len(v) for v in db_pvcs.values()),
+        "databases": databases,
+        "excluded_stores": sorted(excluded),
+        "note": "databases: every store that needs a dump (BACKUP_TARGET_RE) with a PVC, and the backup CronJobs whose command, args or env name its Service, its workload or its first pod; excluded_stores: caches, queues, monitoring stores and MinIO with a PVC, which this check does not ask a dump of",
     }
 
 
