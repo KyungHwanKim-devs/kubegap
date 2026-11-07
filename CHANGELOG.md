@@ -6,7 +6,13 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ### Added
 
+- Four foundations modules that give the shared small jobs one home each (#150): `lib/quantity.py` (Kubernetes quantities, `to_float`, `to_int`, `rounded`), `lib/workload.py` (`workload_of`, `key`, `is_db_like`, `image_repo`, `mounts_pvc`, `selector_matches`, `eligible_nodes`, moved from controlplane, resilience, security and traffic), `lib/nodetext.py` (the node script's section text and the kernel oom-kill line, moved from nodeos) and `lib/logtext.py` (klog normalisation, moved from controlplane); `lib/snapshot.py` gains `event_count` (from events) and the readers of `metrics/<query>.json` (`metric_doc`, `metric_result`, `metric_rows`, `metric_by`, `metric_value`, `metric_sample`, `metric_scalar`, `metric_sum`), `series_present` and `node_os_text`; `lib/versions.py` gains `image_version`. `tests/test_helper_homes.py` fails on a private helper with the same body in two modules, on a function named after a job that has a home, and on a unit table, an image-tag regex or a metrics-file path outside its home.
+
 - `lib/` has six named layers (foundations, collection, summaries, judgement, output, commands) and a stated import direction, written in `references/development.md` and enforced by `tests/test_boundaries.py`, which reads the imports of every module (inside functions and summarize's by-name dispatch included) against a module-to-layer map; the 22 imports that still cross the rule are listed there with the issue that removes each (#150, #151). Discovery no longer imports the first-run module: the command passes the SSH decision in. (#149)
+
+### Changed
+
+- The private copies those homes replace are gone: the image-tag reader `_ver` in ten summary modules and the same regex inline in three, the quantity reader `_q` in four modules and four inline memory tables, every private reader of `metrics/<query>.json` in seventeen modules (one reading now: a query that did not run has no rows, a NaN or infinite sample is no value), the rounding and number helpers `_r`, `_num`, `_int` in eight modules, the workload key `_wl` in two, the inline event counter in summarize, and `writer`'s own table writer, which lacked `render.cell`'s escaping. Nineteen of the twenty-two import exceptions of `tests/test_boundaries.py` are deleted with them; the three that remain are #151's. Reports are unchanged (the regression expectations are identical). (#150)
 
 ### Fixed
 
