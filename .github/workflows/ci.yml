@@ -15,6 +15,8 @@ jobs:
     steps:
       # Check out the repository into a folder named kubegap (the Agent Skills validator requires the folder name to match the skill name)
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # tests/test_shape_history.py compares references/summary-shape.md with the last tagged release
 
       # Install the matrix Python; pipx ships with the GitHub runner image
       - uses: actions/setup-python@v5
