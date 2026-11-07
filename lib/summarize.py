@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import __version__, paths
 from .runlog import RunLog, read_runlog
-from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, forget_reads, items, load_json, object_files, remove_stale_temp, taken_at, write_private
+from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, forget_reads, items, load_json, object_files, parse_ts, remove_stale_temp, taken_at, write_private
 
 WAITING_REASONS = ("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "CreateContainerConfigError", "CreateContainerError", "InvalidImageName", "RunContainerError")
 LABEL_KEEP = ("__name__", "namespace", "pod", "container", "node", "instance", "mountpoint", "qos_class", "reason", "job", "horizontalpodautoscaler", "endpoint", "kind", "phase", "poddisruptionbudget", "service", "deployment")
@@ -290,10 +290,8 @@ def summarize_conditions(snap: Path, now: _dt.datetime) -> dict:
                 if not bad:
                     continue
                 lt = c.get("lastTransitionTime")
-                try:
-                    age_h = round((now - _dt.datetime.fromisoformat(str(lt))).total_seconds() / 3600, 1) if lt else None
-                except ValueError:
-                    age_h = None
+                lt_dt = parse_ts(lt)
+                age_h = round((now - lt_dt).total_seconds() / 3600, 1) if lt_dt else None
                 ns = o["metadata"].get("namespace")
                 out["unhealthy"].append({"kind": f.stem, "namespace": ns, "name": o["metadata"]["name"], "condition": t, "status": st, "reason": c.get("reason"), "message": (c.get("message") or "")[:240], "since": lt, "age_hours": age_h})
                 out["by_kind"][f.stem] = out["by_kind"].get(f.stem, 0) + 1
@@ -385,9 +383,8 @@ def summarize_recent_changes(snap: Path, now: _dt.datetime, hours: int = 24) -> 
     revisions: dict[tuple[str, str, str], _dt.datetime] = {}  # (owner kind, namespace, owner name) -> newest ControllerRevision creation
     for cr in items(load_json(odir / "controllerrevisions.apps.json")):
         for ref in cr["metadata"].get("ownerReferences") or []:
-            try:
-                dt = _dt.datetime.fromisoformat(cr["metadata"].get("creationTimestamp") or "")
-            except ValueError:
+            dt = parse_ts(cr["metadata"].get("creationTimestamp"))
+            if dt is None:
                 continue
             k = (ref.get("kind"), cr["metadata"]["namespace"], ref.get("name"))
             if k not in revisions or dt > revisions[k]:
@@ -398,9 +395,8 @@ def summarize_recent_changes(snap: Path, now: _dt.datetime, hours: int = 24) -> 
             for cnd in (o.get("status") or {}).get("conditions") or []:
                 t = cnd.get("lastUpdateTime") or cnd.get("lastTransitionTime")
                 if t:
-                    try:
-                        dt = _dt.datetime.fromisoformat(t)
-                    except ValueError:
+                    dt = parse_ts(t)
+                    if dt is None:
                         continue
                     if latest is None or dt > latest:
                         latest = dt
@@ -419,10 +415,7 @@ def summarize_recent_changes(snap: Path, now: _dt.datetime, hours: int = 24) -> 
     for e in items(load_json(snap / "events.json")):
         if e.get("reason") in ("ScalingReplicaSet", "SuccessfulCreate", "Killing", "Scheduled"):
             t = e.get("lastTimestamp") or e.get("eventTime") or ((e.get("series") or {}).get("lastObservedTime"))
-            try:
-                dt = _dt.datetime.fromisoformat(str(t)) if t else None
-            except ValueError:
-                dt = None
+            dt = parse_ts(t)
             if dt and dt >= since:
                 inv = e.get("involvedObject") or {}
                 ev_targets.append(f"{inv.get('kind')}/{inv.get('namespace')}/{inv.get('name')}")
@@ -558,6 +551,8 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
     forget_reads(snap)
     inv = load_json(snap / "inventory.json")
     now = taken_at(inv)  # the one clock of a summary: every age, window and expiry below is measured from the snapshot time (#165)
+    if not (inv or {}).get("taken_at"):
+        RunLog(snap / "run.log").note("inventory.json has no taken_at; the ages of this summary are measured from the wall clock and change on a rerun")
     s = {
         "kubegap": __version__,
         "snapshot": str(snap),

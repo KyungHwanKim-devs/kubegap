@@ -14,7 +14,7 @@ from collections import Counter
 from pathlib import Path
 
 from . import amconfig
-from .snapshot import items, load_json, taken_at
+from .snapshot import items, load_json, parse_ts, taken_at
 
 # Symptom/cause classification heuristic. If the expr has any symptom metric it is a symptom; if every metric is infrastructure it is a cause; otherwise (the app's own metrics) it is "app (assumed symptom)".
 SYMPTOM_RE = re.compile(
@@ -378,10 +378,8 @@ def _alertmanager(snap: Path, now: _dt.datetime) -> dict:
     sil = load_json(snap / "alertmanager" / "silences.json") or []
     sil_rows = []
     for s_ in sil if isinstance(sil, list) else []:
-        try:
-            ends = _dt.datetime.fromisoformat(str(s_.get("endsAt")))
-            starts = _dt.datetime.fromisoformat(str(s_.get("startsAt")))
-        except ValueError:
+        ends, starts = parse_ts(s_.get("endsAt")), parse_ts(s_.get("startsAt"))
+        if ends is None or starts is None:
             ends = starts = None
         sil_rows.append(
             {

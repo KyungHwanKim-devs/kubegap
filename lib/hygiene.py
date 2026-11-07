@@ -888,12 +888,8 @@ def _failed_pods(cx: _Ctx, now) -> dict:
             continue
         reason = st.get("reason") or next((((c.get("lastState") or {}).get("terminated") or {}).get("reason") for c in st.get("containerStatuses") or [] if (c.get("lastState") or {}).get("terminated")), None) or "Failed"
         ns = p["metadata"]["namespace"]
-        age_h = None
-        try:
-            created = _dt.datetime.fromisoformat(str(p["metadata"].get("creationTimestamp")))
-            age_h = round((now - created).total_seconds() / 3600, 1)
-        except (ValueError, TypeError):
-            pass
+        created = parse_ts(p["metadata"].get("creationTimestamp"))
+        age_h = round((now - created).total_seconds() / 3600, 1) if created else None
         by_reason[reason] += 1
         by_ns[ns] += 1
         rows.append(

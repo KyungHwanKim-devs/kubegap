@@ -59,7 +59,7 @@ def test_taken_at_is_the_inventory_time():
 
 def test_no_summary_module_reads_the_wall_clock():
     """A sweep of `datetime.now` and `date.today` in lib/. What stays is the time a collection or a report *ran* (a stamp or a query window), never an age a check judges."""
-    collection_time = {"albmetrics.py", "collect.py", "cwlogs.py", "cwmetrics.py", "discover.py", "firstrun.py", "prom.py", "runlog.py", "setup.py", "paths.py", "prune.py", "diff.py", "render.py"}
+    collection_time = {"albmetrics.py", "collect.py", "cwlogs.py", "cwmetrics.py", "discover.py", "firstrun.py", "prom.py", "runlog.py", "setup.py", "paths.py", "diff.py", "render.py"}
     clock = re.compile(r"datetime\.now\(|date\.today\(|utcnow\(")
     left = []
     for f in sorted((ROOT / "lib").glob("*.py")):

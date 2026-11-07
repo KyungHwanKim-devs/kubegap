@@ -26,7 +26,7 @@ from .mask import mask_text, strip_control
 from .promtext import parse as _parse_prom
 from .signatures import Signature
 from .signatures import load as load_signatures
-from .snapshot import COMPONENT_LOGS_DIR, component_logs_aggregate, component_logs_removed, load_json, taken_at
+from .snapshot import COMPONENT_LOGS_DIR, component_logs_aggregate, component_logs_removed, load_json, parse_ts, taken_at
 
 ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})")
 KLOG_TS_RE = re.compile(r"\b[IWEF](\d{2})(\d{2}) (\d{2}:\d{2}:\d{2})")
@@ -353,10 +353,8 @@ def analyze_loki(snap: Path, inv: dict) -> dict:
             if st.get("phase") != "Running":
                 continue
             start = st.get("startTime")
-            try:
-                age_h = (now - _dt.datetime.fromisoformat(start)).total_seconds() / 3600 if start else 0
-            except ValueError:
-                age_h = 0
+            started = parse_ts(start)
+            age_h = (now - started).total_seconds() / 3600 if started else 0
             if age_h < 1:
                 continue
             running_old += 1

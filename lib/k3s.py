@@ -18,7 +18,7 @@ from pathlib import Path
 
 from .controlplane import workload_of
 from .nodeos import _int, _kv, _num, parse_sections
-from .snapshot import items, load_json, taken_at
+from .snapshot import items, load_json, parse_ts, taken_at
 
 # source: k3s-io/k3s pkg/cli/cert/cert.go:106-122@v1.33.5+k3s1; :104-120@v1.37.2+k3s1 (`%s: certificate %s (%s) is ok, expires at %s` / `will expire within %d days at %s` / `expired at %s` / `is not valid before %s`, RFC3339 times); pkg/util/cert.go:12-15, 37@v1.33.5+k3s1 (usages CertSign, ServerAuth, ClientAuth, Unknown joined with commas)
 CERT_RE = re.compile(r'msg="([^:"]+): certificate ([^ ]+) \(([A-Za-z,]+)\) (is ok, expires at|will expire within \d+ days at|expired at|is not valid before) ([0-9T:Z+-]+)"')
@@ -99,21 +99,15 @@ def _parse_server(lines: list[str], now: _dt.datetime) -> dict:
         if mode == "snap" and s.startswith("etcd-snapshot"):
             parts = s.split()
             if len(parts) >= 4:
-                try:
-                    created = _dt.datetime.fromisoformat(parts[3])
-                    age_h = round((now - created).total_seconds() / 3600, 1)
-                except ValueError:
-                    created, age_h = None, None
+                created = parse_ts(parts[3])
+                age_h = round((now - created).total_seconds() / 3600, 1) if created else None
                 out["etcd_snapshots"].append({"name": parts[0], "location": parts[1], "size_mb": round(_int(parts[2]) / 1024**2, 1), "created": parts[3], "age_h": age_h, "offsite": not parts[1].startswith("file://")})
         elif mode == "cert":
             out["certificates_raw_lines"] += 1
             m = CERT_RE.search(s)
             if m:
-                try:
-                    exp = _dt.datetime.fromisoformat(m.group(5))
-                    days = round((exp - now).total_seconds() / 86400)
-                except ValueError:
-                    days = None
+                exp = parse_ts(m.group(5))
+                days = round((exp - now).total_seconds() / 86400) if exp else None
                 status = next(v for k, v in CERT_STATUS.items() if m.group(4).startswith(k))
                 rec = {"file": m.group(1), "name": m.group(2), "usage": m.group(3), "status": status, "expires": m.group(5), "days_left": days}
                 out["certificates"].append(rec)
@@ -124,11 +118,9 @@ def _parse_server(lines: list[str], now: _dt.datetime) -> dict:
         snaps.sort(key=lambda x: x["created"])
         out["snapshot_latest_age_h"] = snaps[-1]["age_h"]
         if len(snaps) >= 2:
-            try:
-                t = [_dt.datetime.fromisoformat(x["created"]) for x in snaps[-2:]]
+            t = [parse_ts(x["created"]) for x in snaps[-2:]]
+            if all(t):
                 out["snapshot_interval_h"] = round((t[1] - t[0]).total_seconds() / 3600, 1)
-            except ValueError:
-                pass
         out["snapshots_offsite"] = any(x["offsite"] for x in snaps)
     out["certificates_min_days_left"] = min((c["days_left"] for c in out["certificates"] if c["days_left"] is not None), default=None)
     return out

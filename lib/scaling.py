@@ -20,8 +20,6 @@ from .durations import go_duration_s
 from .events import count_of
 from .snapshot import component_logs_aggregate, component_logs_removed, load_json, objects, parse_ts, taken_at
 
-ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?")
-
 # The Karpenter disruption line, in the three shapes it has had (references/sources.md, "lib/scaling.py Karpenter log facts"; kubernetes-sigs/karpenter):
 # - through 0.37: `"message":"disrupting via <reason> <decision>, terminating N nodes (M pods) <node>/<type>/<capacity>, …"` (pkg/controllers/disruption/controller.go:188@v0.37.0,
 #   Command.String() types.go:184-194@v0.37.0);

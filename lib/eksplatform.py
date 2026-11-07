@@ -232,8 +232,6 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     if not (inv.get("cluster") or {}).get("eks") and not (snap / "aws" / "describe-cluster.json").exists():
         return {"present": False}
     now = taken_at(inv)
-    if now.tzinfo is None:
-        now = now.replace(tzinfo=_dt.UTC)
     return {
         "present": True,
         "acm": _acm(snap, now),
