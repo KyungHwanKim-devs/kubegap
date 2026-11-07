@@ -4,6 +4,10 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+## [0.1.5] - 2026-11-07
+
+The results-you-can-trust milestone (11) is complete. This release is about a verdict meaning what it says: an end-to-end regression test runs summarize, evaluate and render on two committed reference snapshots and fails CI on a moved key, a dropped finding or a changed sentence; every age is measured from the snapshot's time, so one snapshot gives one result whenever it is read; a check never passes on an input it did not read, whether a Prometheus series that does not exist, a Kubernetes kind the account may not list, or a summary section that was not built; the snapshot carries its format version and nothing reads another; a README table says at which upstream versions every fact was read and the report header says where the audited cluster sits in that range. New checks: a MetalLB Service IP nobody announces and a BGP session that is down. The backup check judges each database, and one deprecated object is one finding. 411 checks, rubric 0.1.86. Snapshots of earlier versions are not read: collect again.
+
 ### Added
 
 - Two MetalLB checks for the failures that cut traffic while every object looks fine. `traffic.metallb-service-ip-not-announced` fails on a LoadBalancer Service that holds an IP from a pool no L2Advertisement or BGPAdvertisement reaches (by name, label selector, or an empty list that reaches every pool: the most common MetalLB misconfiguration, decided from the objects on any version), and on an IP that no node announces when the announcing nodes were read from every speaker (the speaker metrics through 0.15, the ServiceL2Status and ServiceBGPStatus objects from 0.14.6, the version whose speaker writes them for every announced Service; the summary took 0.16 as that boundary). `traffic.metallb-bgp-session-down` fails on a BGP session that is not up, read from the first source that answers: the speaker's `metallb_bgp_session_up` in native mode through 0.15 (the summary already held the numbers, no check read them), the BGPSessionState objects of frr-k8s mode from MetalLB 0.15.2 (group `frrk8s.metallb.io`, `status.bgpStatus` other than `Established`; frr-k8s is the chart's default BGP backend from 0.16.0 and the ClusterRole now grants the group), or the Prometheus query `metallb_bgp_session_down` over `metallb_bgp_session_up` and `frrk8s_bgp_session_up` when it scrapes MetalLB (native mode on 0.16 and later, FRR mode at any version), and skips naming the three when none answers. `summary.metallb.pools.services[]` carries `pool`, `pool_advertised`, `announced_by` and `announcers_read`; `summary.metallb.summary` carries `bgp_backend`, `bgp_sessions_read`, `bgp_session_source`, `bgp_sessions_total` and `bgp_sessions_down`; `summary.metallb.bgp_session_states` lists the BGPSessionState objects. Measured with the summary built from a 0.16.2 install on kind with no L2Advertisement and two Services with IPs, and from a 0.14.5 speaker printing one session down: no MetalLB check reported either before. 411 checks. Rubric 0.1.86. ([#162](https://github.com/KyungHwanKim-devs/kubegap/issues/162))
@@ -276,7 +280,8 @@ The first milestone, permissions and the read-only claim, is complete: issues #1
 - Expectation profiles `prod`, `lab`, `small-prod`, `multi-az-prod` and `dev`.
 - English and Korean README and sample reports.
 
-[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.5...HEAD
+[0.1.5]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/KyungHwanKim-devs/kubegap/compare/v0.1.1...v0.1.2
