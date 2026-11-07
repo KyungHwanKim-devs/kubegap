@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from lib import traffic
+from lib.summaries import traffic
 
 TG_ARN = "arn:aws:elasticloadbalancing:ap-northeast-2:1:targetgroup/tg-web/1"
 TG_DIM = "targetgroup/tg-web/1"

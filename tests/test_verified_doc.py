@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lib import render, verified
+from lib.output import render, verified
 
 ROOT = Path(__file__).resolve().parent.parent
 BEGIN, END = "<!-- verified-table:begin -->\n", "<!-- verified-table:end -->\n"

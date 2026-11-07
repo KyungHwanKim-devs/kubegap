@@ -10,7 +10,9 @@ import re
 
 import pytest
 
-from lib import evaluate, regress, summarize
+from lib.commands import regress
+from lib.judgement import evaluate
+from lib.summaries import summarize
 
 VARIANTS = regress.variants()
 RUNS: dict[str, dict[str, str]] = {}

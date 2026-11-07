@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lib import hygiene
+from lib.summaries import hygiene
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -56,7 +56,7 @@ def test_pluto_target_versions_supply_the_minor_when_the_inventory_has_none(tmp_
 
 
 def test_the_check_fails_on_a_kubent_row_removed_by_the_target(tmp_path):
-    from lib import evaluate
+    from lib.judgement import evaluate
     from tests.test_degraded import _all_checks, _ctx
 
     snap = _snap(tmp_path, kubent=KUBENT_ROWS[:1])
@@ -168,7 +168,8 @@ def test_a_nameless_namespace_with_two_candidates_is_not_merged_and_says_so(tmp_
 
 
 def test_the_check_target_is_one_per_object(tmp_path):
-    from lib import evaluate, rubric
+    from lib.foundations import rubric
+    from lib.judgement import evaluate
 
     snap = _snap(tmp_path, pluto={"items": [PLUTO_WEB], "target-versions": {"k8s": "v1.33.0"}}, kubent=[KUBENT_WEB])
     inv = {"cluster": {"platform": "eks", "server_version": "v1.32.0"}, "namespaces": {"prod_like": []}, "profile": {"name": "prod"}}

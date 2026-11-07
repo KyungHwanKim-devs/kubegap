@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lib.node import ssh_argv
+from lib.collection.node import ssh_argv
 
 
 def _opt(argv, name):
@@ -39,15 +39,15 @@ def test_user_key_port_and_per_host_user():
 
 
 def test_hand_command_matches_port_and_user():
-    from lib.node import ssh_hand_command
+    from lib.collection.node import ssh_hand_command
 
     assert ssh_hand_command({}, "10.0.0.1") == "ssh 10.0.0.1 true"
     assert ssh_hand_command({"user": "ubuntu", "port": 2222}, "10.0.0.1") == "ssh -p 2222 ubuntu@10.0.0.1 true"
 
 
 def test_refused_host_key_hint(monkeypatch):
-    from lib import node as node_mod
-    from lib.shell import Result
+    from lib.collection import node as node_mod
+    from lib.foundations.shell import Result
 
     monkeypatch.setattr(node_mod.shell, "run", lambda argv, **kw: Result(argv, code=255, stderr="No ED25519 host key is known for 10.0.0.1 and you have requested strict checking.\nHost key verification failed."))
     na = node_mod.NodeAccess({"node_access": {"method": "ssh"}, "nodes": {"nodes": [{"name": "n1", "internal_ip": "10.0.0.1"}]}}, {"ssh": {"user": "ubuntu", "port": 2222}})

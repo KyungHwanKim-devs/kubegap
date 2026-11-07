@@ -12,9 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from lib import collect, discover, scrub, shell, summarize, yamlite
-from lib.config import Config
-from lib.runlog import RunLog, read_runlog
+from lib.collection import collect, discover
+from lib.foundations import scrub, shell, yamlite
+from lib.foundations.config import Config
+from lib.foundations.runlog import RunLog, read_runlog
+from lib.summaries import summarize
 
 CANARY = "CANARY-9f3a"
 LIST = {"kind": "List", "apiVersion": "v1", "items": [{"kind": "ConfigMap", "apiVersion": "v1", "metadata": {"name": "c", "namespace": "n"}, "data": {"PASSWORD": CANARY}}]}

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import json
 
-from lib import collect, paths, rubric
+from lib.collection import collect
+from lib.foundations import paths, rubric
 
 
 def test_step_in_mode_defaults_to_every_mode():
@@ -66,7 +67,7 @@ def test_validate_modes_field():
 
 def test_tenancy_pools_accept_string_taints(tmp_path):
     """Regression: discover writes node taints as `key=value:effect` strings; tenancy used to call .get() on them and the whole section died on the first tainted node."""
-    from lib import tenancy
+    from lib.summaries import tenancy
 
     (tmp_path / "objects").mkdir()
     inv = {

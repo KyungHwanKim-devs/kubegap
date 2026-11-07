@@ -1,6 +1,6 @@
-"""lib/nodetext: the node script's text format and the kernel oom-kill line (#150)."""
+"""lib/foundations/nodetext: the node script's text format and the kernel oom-kill line (#150)."""
 
-from lib import nodetext
+from lib.foundations import nodetext
 
 OS_TXT = "### meta\nhostname=n1\nkernel=6.8.0\n### kernel\nsource=journalctl\nlines=3\nc:oom_cgroup=1\nsamples:\n  something\noom_samples:\n2026-11-05T02:00:00+0000 kernel: oom-kill:constraint=CONSTRAINT_MEMCG,nodemask=(null),cpuset=/,mems_allowed=0,oom_memcg=/kubepods.slice/kubepods-burstable.slice/kubepods-burstable-pod2a2e36d9_6307_40b4_ab46_f44f16f5327b.slice,task_memcg=/x,task=java,pid=1,uid=0\n"
 

@@ -23,14 +23,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from lib import (  # noqa: E402  lib is importable only after the skill folder is on sys.path
-    __version__,
-    kube,
-    paths,
-)
-from lib import rubric as _rubric  # noqa: E402
-from lib import yamlite as _yamlite  # noqa: E402
-from lib.snapshot import check_schema, schema_of, write_private  # noqa: E402
+from lib import __version__  # noqa: E402  lib is importable only after the skill folder is on sys.path
+from lib.collection import kube  # noqa: E402
+from lib.foundations import paths  # noqa: E402
+from lib.foundations import rubric as _rubric  # noqa: E402
+from lib.foundations import yamlite as _yamlite  # noqa: E402
+from lib.foundations.snapshot import check_schema, schema_of, write_private  # noqa: E402
 
 EXIT_OK = 0
 EXIT_ERROR = 1
@@ -45,8 +43,8 @@ def _resolve_context(args) -> str | None:
 
 
 def cmd_setup(args) -> int:
-    from lib import setup as _setup
-    from lib.config import load_config
+    from lib.commands import setup as _setup
+    from lib.foundations.config import load_config
 
     if args.check_tool_updates is not None:
         if args.install_ssm_document:
@@ -89,7 +87,7 @@ def _context(args, cfg) -> str:
 
 def _first_run_state(args, *, need_setup: bool = True):
     """(context, context folder, saved setup result, config) for the commands that work on the first-run questions."""
-    from lib.config import load_config
+    from lib.foundations.config import load_config
 
     cfg = load_config(args.config)
     ctx = _context(args, cfg)
@@ -104,7 +102,7 @@ def _first_run_state(args, *, need_setup: bool = True):
 def cmd_questions(args) -> int:
     """Print the open first-run questions of this context from the saved setup result, the saved node probe and the remembered answers.
     Reads files only; `setup` is what looks at the cluster."""
-    from lib import firstrun as _firstrun
+    from lib.commands import firstrun as _firstrun
 
     ctx, ctx_dir, setup, cfg = _first_run_state(args)
     lang = _language(args, cfg)
@@ -118,7 +116,7 @@ def cmd_questions(args) -> int:
 
 def cmd_answer(args) -> int:
     """Remember the user's choice for one first-run question so it is not asked again. `--forget` drops remembered answers."""
-    from lib import firstrun as _firstrun
+    from lib.commands import firstrun as _firstrun
 
     ctx, ctx_dir, setup, cfg = _first_run_state(args, need_setup=not args.forget)
     if args.forget:
@@ -144,7 +142,7 @@ def cmd_answer(args) -> int:
 
 def cmd_config(args) -> int:
     """`config set <key> <value>`: write one key of config.yaml. --dry-run prints the lines that would change and writes nothing."""
-    from lib import configedit as _ce
+    from lib.commands import configedit as _ce
 
     path = Path(args.config).expanduser()
     try:
@@ -164,7 +162,7 @@ def cmd_config(args) -> int:
 
 def cmd_iam_policy(args) -> int:
     """Print deploy/permissions/iam-policy.json with the account id and cluster name of this context filled in. Prints only; nothing is sent to AWS."""
-    from lib.config import load_config
+    from lib.foundations.config import load_config
 
     ctx = _context(args, load_config(args.config))
     info = kube.context_info(ctx, args.kubeconfig)
@@ -183,7 +181,7 @@ def cmd_iam_policy(args) -> int:
 
 def cmd_contexts(args) -> int:
     """List kube contexts, mark the current one, and say which cluster each points to (EKS or k3s, best guess). For guidance only."""
-    from lib import shell
+    from lib.foundations import shell
 
     cmd = ["kubectl", "config", "get-contexts", "-o", "name"]
     if args.kubeconfig:
@@ -214,7 +212,7 @@ def cmd_contexts(args) -> int:
 
 def _root(args):
     """Snapshot root: --snapshots-root > $KUBEGAP_SNAPSHOTS > config snapshots_root > ~/.kubegap/snapshots."""
-    from lib.config import load_config as _lc
+    from lib.foundations.config import load_config as _lc
 
     cfg_val = None
     try:
@@ -232,10 +230,10 @@ def _new_snapshot(args, ctx: str):
 
 def cmd_discover(args) -> int:
     """Run discovery only and write inventory.json and objects/ into a new snapshot folder (for debugging; collect does the same as its first step)."""
-    from lib import discover as _discover
-    from lib import firstrun as _firstrun
-    from lib.config import load_config
-    from lib.runlog import RunLog
+    from lib.collection import discover as _discover
+    from lib.commands import firstrun as _firstrun
+    from lib.foundations.config import load_config
+    from lib.foundations.runlog import RunLog
 
     cfg = load_config(args.config)
     ctx = _resolve_context(args)
@@ -266,11 +264,11 @@ def cmd_collect(args) -> int:
     """Discover then collect. One new snapshot folder receives inventory.json, objects/, events.json, metrics/, aws/ and run.log."""
     import time as _time
 
-    from lib import collect as _collect
-    from lib import discover as _discover
-    from lib import firstrun as _firstrun
-    from lib.config import load_config
-    from lib.runlog import RunLog
+    from lib.collection import collect as _collect
+    from lib.collection import discover as _discover
+    from lib.commands import firstrun as _firstrun
+    from lib.foundations.config import load_config
+    from lib.foundations.runlog import RunLog
 
     cfg = load_config(args.config)
     ctx = _resolve_context(args)
@@ -278,7 +276,7 @@ def cmd_collect(args) -> int:
         return EXIT_ERROR
     t0 = _time.monotonic()
     # Refuse if a collection is already in progress for the same context (two collects started 44 s apart once overlapped and one died during discovery). In progress = INCOMPLETE present and run.log updated within 10 minutes
-    from lib import paths as _paths
+    from lib.foundations import paths as _paths
 
     for other in _paths.list_snapshots(ctx, _root(args)):
         rl = other / "run.log"
@@ -321,8 +319,8 @@ def _mode(args, cfg) -> str:
 
 
 def cmd_summarize(args) -> int:
-    from lib import summarize as _summarize
-    from lib.config import load_config
+    from lib.summaries import summarize as _summarize
+    from lib.foundations.config import load_config
 
     cfg = load_config(args.config)
     snap = _resolve_snapshot_arg(args, args.snapshot)
@@ -336,8 +334,8 @@ def cmd_summarize(args) -> int:
 def cmd_evaluate(args) -> int:
     import json as _json
 
-    from lib import evaluate as _evaluate
-    from lib.config import load_config
+    from lib.judgement import evaluate as _evaluate
+    from lib.foundations.config import load_config
 
     cfg = load_config(args.config)
     snap = _resolve_snapshot_arg(args, args.snapshot)
@@ -355,7 +353,7 @@ def cmd_evaluate(args) -> int:
 
 def cmd_diff(args) -> int:
     """Compare two snapshots. B defaults to latest; A defaults to the snapshot just before B. Writes diff.json into B's folder and appends one row for B to history.csv."""
-    from lib import diff as _diff
+    from lib.output import diff as _diff
 
     b = _resolve_snapshot_arg(args, args.snapshot_b)
     if args.snapshot_a:
@@ -381,8 +379,8 @@ def cmd_diff(args) -> int:
 
 
 def cmd_render_details(args) -> int:
-    """Assemble report-details.md from the snapshot files and the `analysis` block of <snapshot>/llm/facts.json (see lib/render.py)."""
-    from lib import render as _render
+    """Assemble report-details.md from the snapshot files and the `analysis` block of <snapshot>/llm/facts.json (see lib/output/render.py)."""
+    from lib.output import render as _render
 
     snap = _resolve_snapshot_arg(args, args.snapshot)
     p = _render.render_details(snap, language=args.language)
@@ -393,7 +391,7 @@ def cmd_render_details(args) -> int:
 
 def cmd_protect_home(args) -> int:
     """chmod 700 the folders under ~/.kubegap that other users can read (the "Fix now" of the home-mode first-run question). Changes nothing else."""
-    from lib import paths as _paths
+    from lib.foundations import paths as _paths
 
     _paths.ensure_private_dir(_paths.snapshots_root())
     if args.context:
@@ -407,7 +405,7 @@ def cmd_protect_home(args) -> int:
 
 def cmd_keep_report(args) -> int:
     """Move the report of a snapshot to earlier-reports/ so that another report can be written from the same data (SKILL.md section 7)."""
-    from lib import render as _render
+    from lib.output import render as _render
 
     snap = _resolve_snapshot_arg(args, args.snapshot)
     kept = _render.keep_report(snap)
@@ -416,8 +414,8 @@ def cmd_keep_report(args) -> int:
 
 
 def cmd_write_report(args) -> int:
-    """Write report.md from llm/facts.json with separate agents (lib/writer.py). Takes minutes; run it in the background and read its progress lines."""
-    from lib import writer as _writer
+    """Write report.md from llm/facts.json with separate agents (lib/output/writer.py). Takes minutes; run it in the background and read its progress lines."""
+    from lib.output import writer as _writer
 
     snap = _resolve_snapshot_arg(args, args.snapshot)
     host = None if args.host == "auto" else args.host
@@ -436,7 +434,7 @@ def cmd_write_report(args) -> int:
 
 def cmd_checks(args) -> int:
     """List every check in the rubric, grouped by area, as Markdown (docs/CHECKS.md is generated from this) or as plain text."""
-    from lib import rubric as _rubric
+    from lib.foundations import rubric as _rubric
 
     checks, errors = _rubric.load_checks([p.name for p in sorted(paths.COLLECTORS_DIR.iterdir()) if (p / "checks.yaml").is_file()])
     if errors:
@@ -477,7 +475,7 @@ def cmd_checks(args) -> int:
 
 def cmd_tools(args) -> int:
     """The optional tools: what each feeds, in which mode, how it is installed. --markdown writes the table of docs/SETUP.md (--language ko: docs/ko/SETUP.md), checked by tests/test_tools_doc.py."""
-    from lib import tools as _tools
+    from lib.commands import tools as _tools
 
     catalog = _tools.catalog()
     if args.markdown:
@@ -489,8 +487,8 @@ def cmd_tools(args) -> int:
 
 
 def cmd_node_commands(args) -> int:
-    """Every command kubegap runs on nodes, from the collector definitions and lib/node.py. --markdown writes deploy/node-access/COMMANDS.md, --ssm-document writes deploy/permissions/ssm-document.yaml (both checked by tests/test_node_commands.py)."""
-    from lib import nodecommands as _nc
+    """Every command kubegap runs on nodes, from the collector definitions and lib/collection/node.py. --markdown writes deploy/node-access/COMMANDS.md, --ssm-document writes deploy/permissions/ssm-document.yaml (both checked by tests/test_node_commands.py)."""
+    from lib.collection import nodecommands as _nc
 
     cmds = _nc.node_commands()
     if args.markdown:
@@ -511,7 +509,7 @@ def cmd_mask(args) -> int:
     """Mask report files. If inventory.json exists in the same folder, AWS account ids are masked too. SKILL.md calls this right before saving."""
     import json as _json
 
-    from lib import mask as _mask
+    from lib.foundations import mask as _mask
 
     accounts = list(args.account or [])
     for f in args.files:
@@ -534,8 +532,8 @@ def cmd_nodes(args) -> int:
     (or, with --snapshot, to the nodes in that snapshot's inventory.json), so it works before the first collection."""
     import json as _json
 
-    from lib.config import load_config
-    from lib.node import NodeAccess
+    from lib.foundations.config import load_config
+    from lib.collection.node import NodeAccess
 
     cfg = load_config(args.config)
     if args.snapshot:
@@ -543,7 +541,7 @@ def cmd_nodes(args) -> int:
         inv = _json.loads((snap / "inventory.json").read_text(encoding="utf-8"))
         ctx_dir, source = snap.parent, f"snapshot {snap.name}"
     else:
-        from lib import discover as _discover
+        from lib.collection import discover as _discover
 
         ctx = _context(args, cfg)
         inv = _discover.live_inventory(ctx, cfg, kubeconfig=args.kubeconfig)
@@ -557,7 +555,7 @@ def cmd_nodes(args) -> int:
         print("no node backend: nothing was sent to a node. The node checks (node.*) are reported as 'no node access'.")
         return EXIT_ERROR
     if na.method == "ssm":
-        from lib import nodecommands as _nc
+        from lib.collection import nodecommands as _nc
 
         st = na.ssm_document
         if st.get("current"):
@@ -568,7 +566,7 @@ def cmd_nodes(args) -> int:
             print("--cmd is not available on the SSM backend: only the steps of the document can run (deploy/node-access/COMMANDS.md). Use --step <name>", file=sys.stderr)
             return EXIT_ERROR
     if args.step:
-        from lib import nodecommands as _nc
+        from lib.collection import nodecommands as _nc
 
         match = [c for c in _nc.node_commands() if c["step"] == args.step]
         if not match:
@@ -617,8 +615,8 @@ def cmd_nodes(args) -> int:
         for n, c in caps.items():
             print("  " + f"{n:<12}" + "".join(f"{(c['caps'].get(k) or '-'):<12}" for k in keys))
     if probing:
-        # The probe result is what the first-run question about node access reads (lib/firstrun.py): which nodes answered and why the others did not
-        from lib import firstrun as _firstrun
+        # The probe result is what the first-run question about node access reads (lib/commands/firstrun.py): which nodes answered and why the others did not
+        from lib.commands import firstrun as _firstrun
 
         probe = {n: {"ok": r.ok, "host": (r.detail or {}).get("host"), "kind": (r.detail or {}).get("kind"), "why": None if r.ok else (r.error or "").split(" → ")[0][:200]} for n, r in results.items()}
         doc = {"snapshot": snap.name if snap else None, "method": na.method, "probe": probe, **({"nodes": caps} if caps is not None else {})}
@@ -630,26 +628,26 @@ def cmd_nodes(args) -> int:
 def cmd_selftest(args) -> int:
     from pathlib import Path as _P
 
-    from lib import selftest as _st
+    from lib.commands import selftest as _st
 
     r = _st.run(check_ids=args.check or None, snapshots=[_P(x) for x in (args.snapshot or [])])
     return 1 if r["failed"] or r["load_errors"] or r["audit_failed"] else 0
 
 
 def cmd_verified(args) -> int:
-    """The "Verified against" table of README (lib/verified.py), to paste between the verified-table markers; a test compares the two."""
-    from lib import verified as _verified
+    """The "Verified against" table of README (lib/output/verified.py), to paste between the verified-table markers; a test compares the two."""
+    from lib.output import verified as _verified
 
     sys.stdout.write(_verified.render_table(args.language))
     return EXIT_OK
 
 
 def cmd_regress(args) -> int:
-    """End-to-end regression on the committed snapshot fixtures (lib/regress.py). --update rewrites the expectation, the one way it changes."""
+    """End-to-end regression on the committed snapshot fixtures (lib/commands/regress.py). --update rewrites the expectation, the one way it changes."""
     import tempfile as _tf
     from pathlib import Path as _P
 
-    from lib import regress as _rg
+    from lib.commands import regress as _rg
 
     failed = 0
     for variant, fixture, mutate in _rg.variants():
@@ -689,8 +687,8 @@ def cmd_snapshots(args) -> int:
 
 def cmd_prune(args) -> int:
     """Remove old snapshot folders of this context. The newest complete daily and full snapshots always stay (they are the diff baselines)."""
-    from lib import prune as _prune
-    from lib.config import load_config
+    from lib.commands import prune as _prune
+    from lib.foundations.config import load_config
 
     cfg = load_config(args.config)
     try:
@@ -887,7 +885,7 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    from lib import tools as _tools
+    from lib.commands import tools as _tools
 
     ok, why = _tools.supported_host()
     if not ok:

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from lib import paths, rubric
-from lib.evaluate import Context, _details, _eval_summary, _Run, referenced_keys
+from lib.foundations import paths, rubric
+from lib.judgement.evaluate import Context, _details, _eval_summary, _Run, referenced_keys
 
 CHECK = {
     "id": "resilience.prod-concentration",
@@ -126,20 +126,20 @@ def test_known_issues_file_names_real_checks_and_tracker_numbers():
 
 
 def test_known_issue_reaches_the_finding_and_its_evidence(tmp_path, monkeypatch):
-    from lib import evaluate
+    from lib.judgement import evaluate
 
     monkeypatch.setattr(rubric, "load_known_issues", lambda: ({"resilience.prod-concentration": [{"issue": 64, "note": "n"}]}, []))
     item = {"node": "n1", "share": 0.5, "prod_pods": 3, "prod_workloads": ["a"]}
     (tmp_path / "summary.json").write_text(json.dumps({"resilience": {"placement": {"prod_by_node": [item]}}}))
     (tmp_path / "inventory.json").write_text(json.dumps({"profile": {"name": "prod"}, "cluster": {"platform": "eks"}}))
     monkeypatch.setattr(rubric, "load_checks", lambda collectors: ([{**CHECK, "collector": "core", "profiles": ["prod", "lab"]}], []))
-    from lib.config import load_config
+    from lib.foundations.config import load_config
 
     evaluate.evaluate(tmp_path, load_config(None), echo=None)
     d = json.loads((tmp_path / "findings-draft.json").read_text())
     f = d["findings"][0]
     assert f["known_issues"] == [{"issue": 64, "note": "n"}] and "known issue" not in f["evidence"]  # the evidence stays the check's; render adds the tag
-    from lib.render import _evidence
+    from lib.output.render import _evidence
 
     assert _evidence(f, 300).endswith(" known issue #64")
     rec = next(c for c in d["check_results"] if c["id"] == CHECK["id"])

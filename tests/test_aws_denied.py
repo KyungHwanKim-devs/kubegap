@@ -2,7 +2,7 @@
 
 import json
 
-from lib import eksplatform
+from lib.summaries import eksplatform
 
 
 def _w(p, name, doc):

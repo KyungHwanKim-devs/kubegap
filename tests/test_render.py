@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from lib import render
+from lib.output import render
 
 
 def _snap(tmp_path, with_fragments: bool):

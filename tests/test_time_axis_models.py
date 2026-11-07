@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 
-from lib import nodetext, resilience, summarize
-from lib.evaluate import Context, _eval_metric, _Run, oom_text
+from lib.foundations import nodetext
+from lib.judgement.evaluate import Context, _eval_metric, _Run, oom_text
+from lib.summaries import resilience, summarize
 
 KERNEL_LINE = (
     "2026-11-02T08:34:08+0000 ip-10-0-9-9.internal kernel: oom-kill:constraint=CONSTRAINT_MEMCG,nodemask=(null),cpuset=cri-containerd-f00.scope,mems_allowed=0,"

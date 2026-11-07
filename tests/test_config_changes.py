@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from lib import hygiene
+from lib.summaries import hygiene
 
 
 def _write(tmp_path, stem, items):

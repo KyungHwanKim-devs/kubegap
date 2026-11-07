@@ -5,10 +5,10 @@ from __future__ import annotations
 import datetime as dt
 import json
 
-from lib import observability, resilience, traffic, vpccni
-from lib.evaluate import Context
-from lib.traffic import _latest_hour
-from lib.workload import is_db_like
+from lib.foundations.workload import is_db_like
+from lib.judgement.evaluate import Context
+from lib.summaries import observability, resilience, traffic, vpccni
+from lib.summaries.traffic import _latest_hour
 
 # ---------- database-like ----------
 

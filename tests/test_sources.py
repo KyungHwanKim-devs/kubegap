@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from lib import metricnames, paths, signatures, yamlite
+from lib.foundations import metricnames, paths, signatures, yamlite
 
 ROOT = Path(__file__).resolve().parent.parent
 SOURCES = ROOT / "references" / "sources.md"
@@ -49,7 +49,7 @@ def test_every_row_cites_a_file_line_and_version_or_says_unverified():
 def test_every_kubegap_location_exists():
     steps = {f"{Path(f).parent.name}.{s.get('id')}" for f in (ROOT / "collectors").glob("*/collect.yaml") for s in yamlite.load_file(f) or []}
     checks = {c.get("id") for f in (ROOT / "collectors").glob("*/checks.yaml") for c in yamlite.load_file(f) or []}
-    lib_texts = [f.read_text(encoding="utf-8") for f in (ROOT / "lib").glob("*.py")]
+    lib_texts = [f.read_text(encoding="utf-8") for f in (ROOT / "lib").rglob("*.py")]
     seen = 0
     for fact, where, _source, _holds in _rows():
         for m in KUBEGAP_LOCATION.finditer(where):
@@ -78,8 +78,8 @@ def test_every_tool_step_names_its_source():
 
 NODE_PATTERN_FILES = {
     "collectors/core/node-os.sh": re.compile(r"^P_[A-Z_]+="),  # the kernel-message classes
-    "lib/nodeos.py": re.compile(r"^_?[A-Z_]+_RE = re\.compile"),
-    "lib/k3s.py": re.compile(r"^[A-Z_]+_RE = re\.compile"),
+    "lib/summaries/nodeos.py": re.compile(r"^_?[A-Z_]+_RE = re\.compile"),
+    "lib/summaries/k3s.py": re.compile(r"^[A-Z_]+_RE = re\.compile"),
 }
 
 
@@ -130,11 +130,23 @@ def test_every_http_step_names_its_source():
 # ---------- pod /metrics names (#120): collectors/<area>/pod-metrics.yaml ----------
 
 VERSION = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
-PARSERS = ["lib/karpenterctl.py", "lib/kedactl.py", "lib/stackhealth.py", "lib/argocdctl.py", "lib/albctl.py", "lib/certmanager.py", "lib/esoctl.py", "lib/metallbctl.py", "lib/k3s.py", "lib/logs.py", "lib/vpccni.py"]
+PARSERS = [
+    "lib/summaries/karpenterctl.py",
+    "lib/summaries/kedactl.py",
+    "lib/summaries/stackhealth.py",
+    "lib/summaries/argocdctl.py",
+    "lib/summaries/albctl.py",
+    "lib/summaries/certmanager.py",
+    "lib/summaries/esoctl.py",
+    "lib/summaries/metallbctl.py",
+    "lib/summaries/k3s.py",
+    "lib/summaries/logs.py",
+    "lib/summaries/vpccni.py",
+]
 
 
 def test_every_pod_metrics_step_names_its_table():
-    from lib import podmetrics
+    from lib.foundations import podmetrics
 
     for f in (ROOT / "collectors").glob("*/collect.yaml"):
         for s in yamlite.load_file(f) or []:
@@ -149,7 +161,7 @@ def test_every_pod_metrics_step_names_its_table():
 
 
 def test_every_pod_metric_name_has_a_source_and_a_valid_version_range():
-    from lib import podmetrics
+    from lib.foundations import podmetrics
 
     seen = 0
     for area, entries in podmetrics.tables().items():
@@ -170,7 +182,7 @@ def test_every_metric_literal_in_a_parser_is_in_a_table():
     """A parser may spell a metric only as one of its area's table carries. Every metric-shaped string literal counts, in a tuple, a startswith, an `in`
     test or a .get on the parsed text; a dict key (`"x":`) and a read of another dict (`rec["x"]`, `(ld or {}).get("x")`) do not. The
     grafana_stat_totals_users typo lived in a tuple for weeks because nothing checked this."""
-    from lib import podmetrics
+    from lib.foundations import podmetrics
 
     names = {n for a in podmetrics.tables() for n in podmetrics.all_names(a)}
     query_ids = {it["id"] for _, it in _queries()}  # a metrics.yaml query id (`loki_discarded_1h`) is not a metric name
@@ -198,8 +210,8 @@ def test_every_metric_literal_in_a_parser_is_in_a_table():
 
 def test_the_literal_test_catches_a_tuple_typo(tmp_path, monkeypatch):
     """The old stackhealth loop spelled the typo in a tuple; the test above must see it."""
-    bad = tmp_path / "lib" / "stackhealth.py"
-    bad.parent.mkdir()
+    bad = tmp_path / "lib" / "summaries" / "stackhealth.py"
+    bad.parent.mkdir(parents=True)
     bad.write_text('for k in ("grafana_stat_totals_dashboard", "grafana_stat_totals_users"):\n    if k in pm["single"]:\n        pass\n')
     import sys
 
@@ -207,7 +219,7 @@ def test_the_literal_test_catches_a_tuple_typo(tmp_path, monkeypatch):
 
     me = sys.modules[__name__]  # pytest may import this file under either name; patch the module object the test function closes over
     monkeypatch.setattr(me, "ROOT", tmp_path)
-    monkeypatch.setattr(me, "PARSERS", ["lib/stackhealth.py"])
+    monkeypatch.setattr(me, "PARSERS", ["lib/summaries/stackhealth.py"])
 
     with pytest.raises(AssertionError, match="grafana_stat_totals_users"):
         test_every_metric_literal_in_a_parser_is_in_a_table()
@@ -310,7 +322,7 @@ def test_coredns_servfail_matches_without_the_log_plugin(coredns):
 
 def test_one_upstream_outage_is_one_finding(tmp_path):
     """250 timeout lines on each of two pods: coredns.upstream-timeout fails (500 >= 200) and coredns.servfail counts nothing, so the outage is not two findings."""
-    from lib import logs
+    from lib.summaries import logs
 
     d = tmp_path / "logs" / "pods" / "coredns"
     d.mkdir(parents=True)
@@ -354,7 +366,7 @@ GONE = {
 
 
 def _queries():
-    yield from metricnames.queries()  # the one walk of collectors/*/metrics.yaml (lib/metricnames.py); lib/prom and lib/evaluate read the same list
+    yield from metricnames.queries()  # the one walk of collectors/*/metrics.yaml (lib/foundations/metricnames.py); lib/collection/prom and lib/judgement/evaluate read the same list
 
 
 def _query_names(query: str) -> tuple[set[str], list[str]]:
@@ -444,7 +456,7 @@ def test_every_apiserver_selector_filters_on_the_apiserver_job():
 
 def test_the_stored_object_queries_read_the_old_and_the_new_name():
     """apiserver_storage_objects is deprecated since 1.34.0 and hidden from 1.37 (component-base registry.go:47-70,74-83@v1.37.2); apiserver_resource_objects exists
-    since 1.34 (storage/etcd3/metrics/metrics.go:91-95@v1.34.13). lib/controlplane.py reads the new query first."""
+    since 1.34 (storage/etcd3/metrics/metrics.go:91-95@v1.34.13). lib/summaries/controlplane.py reads the new query first."""
     assert _query_text("apiserver_storage_objects_top") == 'topk(15, apiserver_storage_objects{job="{apiserver_job}"})'
     assert _query_text("apiserver_resource_objects_top") == 'topk(15, apiserver_resource_objects{job="{apiserver_job}"})'
 
@@ -540,7 +552,7 @@ def test_the_keda_error_query_reads_only_the_counter_that_carries_a_scaled_objec
 
 
 def test_the_loki_table_carries_both_retention_names():
-    from lib import podmetrics
+    from lib.foundations import podmetrics
 
     names = podmetrics.entry("loki", "retention_last_run")["names"]
     assert [n["name"] for n in names] == ["loki_compactor_apply_retention_last_successful_run_timestamp_seconds", "loki_boltdb_shipper_apply_retention_last_successful_run_timestamp_seconds"]
@@ -563,7 +575,7 @@ def test_every_version_a_query_cites_is_named_in_sources():
 
 
 def test_every_k8s_version_row_cites_the_release_schedule():
-    from lib import rubric
+    from lib.foundations import rubric
 
     rows = rubric.load_k8s_versions()
     assert len(rows) >= 9
@@ -573,7 +585,7 @@ def test_every_k8s_version_row_cites_the_release_schedule():
 
 
 def test_every_karpenter_compat_row_cites_the_generated_matrix_and_names_both_bounds():
-    from lib import scaling
+    from lib.summaries import scaling
 
     rows = yamlite.load_file(ROOT / "rubric" / "karpenter-compat.yaml")
     assert len(rows) >= 17
@@ -590,7 +602,7 @@ def test_every_karpenter_compat_row_cites_the_generated_matrix_and_names_both_bo
 
 
 def test_every_component_rule_entry_cites_the_chart_or_manifest():
-    from lib.components import COMPONENTS, EVIDENCE_KEYS
+    from lib.foundations.components import COMPONENTS, EVIDENCE_KEYS
 
     assert set(EVIDENCE_KEYS) <= {"daemonset", "deployment", "statefulset", "cronjob", "crd", "namespace", "storageclass_provisioner", "node_annotation", "node_version_contains", "configmap_data_regex", "image", "aws_addons"}
     for comp in COMPONENTS:
@@ -717,10 +729,10 @@ def test_every_object_field_row_cites_the_type_or_says_unverified():
 
 
 def test_every_object_field_location_exists():
-    lib_texts = {f.name: f.read_text(encoding="utf-8") for f in (ROOT / "lib").glob("*.py")}
+    lib_texts = {f.name: f.read_text(encoding="utf-8") for f in (ROOT / "lib").rglob("*.py")}
     seen = 0
     for kind, field, where, *_ in _field_rows():
-        for m in re.finditer(r"`(lib/(\w+\.py))(?::(\w+))?`", where):
+        for m in re.finditer(r"`(lib/\w+/(\w+\.py))(?::(\w+))?`", where):
             seen += 1
             _path, name, func = m.groups()
             assert name in lib_texts, (kind, field, name)
@@ -732,7 +744,7 @@ def _camel_keys(module: str) -> set[str]:
     """String-literal keys read with .get("k"), ["k"] or `"k" in x` that carry an upper-case letter and no separator: the camelCase of a Kubernetes field."""
     import ast
 
-    tree = ast.parse((ROOT / "lib" / f"{module}.py").read_text(encoding="utf-8"))
+    tree = ast.parse(next((ROOT / "lib").rglob(f"{module}.py")).read_text(encoding="utf-8"))
     keys = set()
     for node in ast.walk(tree):
         k = None

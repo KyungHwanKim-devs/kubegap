@@ -1,8 +1,8 @@
-"""lib/snapshot.py: forgiving readers (a missing or corrupt file must not stop the summary)."""
+"""lib/foundations/snapshot.py: forgiving readers (a missing or corrupt file must not stop the summary)."""
 
 import json
 
-from lib import snapshot
+from lib.foundations import snapshot
 
 
 def test_load_json_reads_a_valid_file(tmp_path):

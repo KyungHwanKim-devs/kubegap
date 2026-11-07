@@ -6,7 +6,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lib import collect, karpenterctl, kedactl, podmetrics, promtext, stackhealth, yamlite
+from lib.collection import collect
+from lib.foundations import podmetrics, promtext, yamlite
+from lib.summaries import karpenterctl, kedactl, stackhealth
 
 ROOT = Path(__file__).resolve().parent.parent
 

@@ -1,6 +1,6 @@
-"""lib/workload: the name, key and nature of a workload read from the objects alone (#150)."""
+"""lib/foundations/workload: the name, key and nature of a workload read from the objects alone (#150)."""
 
-from lib import workload
+from lib.foundations import workload
 
 
 def test_workload_of_strips_the_hashes_kubernetes_appends():

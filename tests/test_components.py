@@ -1,13 +1,13 @@
 """Component detection against the names the official charts and manifests produce (#130). Every expectation here is a name read in the
-project's source and cited on the rule's entry in lib/components.py; the point of the tests is the release-name shapes the rules missed
+project's source and cited on the rule's entry in lib/foundations/components.py; the point of the tests is the release-name shapes the rules missed
 until #130: a Helm chart names its workload <release> or <release>-<chart>, so the chart name is a suffix."""
 
 from __future__ import annotations
 
 import pytest
 
-from lib import discover
-from lib.components import COMPONENTS, EVIDENCE_KEYS
+from lib.collection import discover
+from lib.foundations.components import COMPONENTS, EVIDENCE_KEYS
 
 
 def _objs(**kinds) -> dict:
@@ -39,7 +39,7 @@ def test_nothing_installed_detects_nothing():
 @pytest.mark.parametrize(
     "kind,ns,name,image,component",
     [
-        # <release>-<chart> and <release> names the fullname helpers produce (lib/components.py cites each chart's _helpers.tpl)
+        # <release>-<chart> and <release> names the fullname helpers produce (lib/foundations/components.py cites each chart's _helpers.tpl)
         ("deployments", "monitoring", "monitoring-prometheus-server", "quay.io/other/x", "prometheus"),
         ("statefulsets", "monitoring", "prometheus-alertmanager", "x", {"alertmanager", "prometheus"}),  # the charts/prometheus subchart; the prometheus-* prefix takes it too, as its source says
         ("statefulsets", "mon", "am", "x", None),

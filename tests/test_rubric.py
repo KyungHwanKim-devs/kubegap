@@ -1,8 +1,8 @@
-"""lib/rubric.py: threshold resolution, profile loading and check validation. Uses the real rubric/profiles folder (repo-local, no cluster)."""
+"""lib/foundations/rubric.py: threshold resolution, profile loading and check validation. Uses the real rubric/profiles folder (repo-local, no cluster)."""
 
 import pytest
 
-from lib import rubric
+from lib.foundations import rubric
 
 
 def check(**over):
@@ -88,7 +88,7 @@ def test_validate_requires_expr_for_metric_but_not_for_absence_or_llm():
     assert any("absence requires family or component" in e for e in rubric.validate(check(type="absence", rule={}), "src"))
 
 
-@pytest.mark.xfail(strict=False, reason="validate does not yet require test.cases; today that is enforced by `kubegap selftest` (lib/selftest.py reports checks without a test section)")
+@pytest.mark.xfail(strict=False, reason="validate does not yet require test.cases; today that is enforced by `kubegap selftest` (lib/commands/selftest.py reports checks without a test section)")
 def test_validate_rejects_check_without_test_cases():
     errs = rubric.validate(check(), "src")
     assert any("test" in e for e in errs)

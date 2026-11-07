@@ -1,5 +1,5 @@
 """Node command output formats (#127): the kernel-message classes of collectors/core/node-os.sh matched against lines built from the kernel's
-format strings, and the parsers of lib/nodeos.py and lib/k3s.py against the text the tools print at the versions references/sources.md cites."""
+format strings, and the parsers of lib/summaries/nodeos.py and lib/summaries/k3s.py against the text the tools print at the versions references/sources.md cites."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from lib import k3s, nodeos
+from lib.summaries import k3s, nodeos
 
 NOW = dt.datetime(2026, 11, 5, 17, 25, 17, tzinfo=dt.UTC)  # the etcd snapshot and certificate ages are measured from the snapshot time, not the wall clock (#165)
 
@@ -99,7 +99,7 @@ def test_every_pattern_is_counted_once():
     assert set(PATTERNS) == {pat for pat, _ in CLASSES.values()}, "a P_ pattern that no C line counts, or the reverse"
 
 
-# ---------- lib/nodeos.py ----------
+# ---------- lib/summaries/nodeos.py ----------
 
 
 def test_containerd_version_from_both_version_line_shapes():
@@ -148,7 +148,7 @@ def test_cgroup_version_from_stat_including_the_unnamed_magic_of_coreutils_822()
     assert [nodeos.CGROUP_FS.get(fs, "unknown") for fs in ("cgroup2fs", "tmpfs", "UNKNOWN (0x63677270)", "cgroupfs")] == ["v2", "v1", "v2", "unknown"]
 
 
-# ---------- lib/k3s.py ----------
+# ---------- lib/summaries/k3s.py ----------
 
 CERT_LINES = [
     'time="2026-11-05T17:25:17Z" level=info msg="/var/lib/rancher/k3s/server/tls/server-ca.crt: certificate k3s-server-ca@1761681912 (CertSign) is ok, expires at 2035-10-26T19:25:12Z"',

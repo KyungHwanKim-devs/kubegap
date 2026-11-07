@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 import sys
 
-from lib import paths
+from lib.foundations import paths
 
 
 def test_a_word_rule_matches_a_name_with_a_korean_particle(tmp_path):

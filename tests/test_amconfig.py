@@ -1,4 +1,4 @@
-"""Alertmanager's loaded configuration read through lib/amconfig (#126): the receivers a route names, nested routes, inhibit rules, time intervals,
+"""Alertmanager's loaded configuration read through lib/foundations/amconfig (#126): the receivers a route names, nested routes, inhibit rules, time intervals,
 and what happens when yamlite cannot read the text."""
 
 from __future__ import annotations
@@ -6,7 +6,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lib import amconfig, stackhealth
+from lib.foundations import amconfig
+from lib.summaries import stackhealth
 
 EKS_LIKE = """global:
   resolve_timeout: 5m

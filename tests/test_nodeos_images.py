@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from lib import nodeos
+from lib.summaries import nodeos
 
 CRI_LINES = [
     "cmd=crictl",

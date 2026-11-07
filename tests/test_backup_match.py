@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lib import resilience
+from lib.summaries import resilience
 
 INV = {"cluster": {"platform": "k3s"}, "namespaces": {"prod_like": ["prod-a", "prod-b"]}, "profile": {"name": "lab"}, "nodes": {"nodes": []}}
 

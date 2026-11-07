@@ -8,7 +8,7 @@ import time
 
 import pytest
 
-from lib import prune
+from lib.commands import prune
 
 
 def _snap(ctx, name, mode, complete=True):

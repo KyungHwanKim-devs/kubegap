@@ -6,8 +6,8 @@ import glob
 import re
 from pathlib import Path
 
-from lib import paths, rubric
-from lib.evaluate import Context
+from lib.foundations import paths, rubric
+from lib.judgement.evaluate import Context
 
 RULES = Path("references/report-writing-en.md")
 HANDA_RE = re.compile(r"(합니다|입니다|습니다|했다|한다)(?=$|[\s.!?\"')\]」])")  # a sentence or heading ending in the formal or plain form; headings carry no period

@@ -1,4 +1,4 @@
-"""`kubegap setup --install` downloads the pinned version of a tool and places it only when its sha256 matches the digest pinned in lib/tools.py (#88)."""
+"""`kubegap setup --install` downloads the pinned version of a tool and places it only when its sha256 matches the digest pinned in lib/commands/tools.py (#88)."""
 
 import hashlib
 import io
@@ -11,8 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from lib import shell, snapshot, tools
-from lib.tools import Tool
+from lib.commands import tools
+from lib.commands.tools import Tool
+from lib.foundations import shell, snapshot
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -233,8 +234,8 @@ def test_check_updates_never_writes_and_reports_a_fetch_error_per_tool(monkeypat
 
 
 def test_setup_prints_installed_version_and_checksum_verified(monkeypatch):
-    from lib import setup as _setup
-    from lib.config import Config
+    from lib.commands import setup as _setup
+    from lib.foundations.config import Config
 
     status = [{"name": "jq", "role": "JSON processing", "required": True, "present": False, "path": None, "version": None, "checks": ["*"], "installable": True, "note": ""}]
     monkeypatch.setattr(_setup.tools, "check_tools", lambda: status)
@@ -259,7 +260,7 @@ def test_setup_prints_installed_version_and_checksum_verified(monkeypatch):
 
 
 def test_check_tool_updates_command_prints_and_exits_nonzero_when_behind(monkeypatch):
-    from lib import setup as _setup
+    from lib.commands import setup as _setup
 
     rows = [
         {"name": "jq", "pinned": "jq-1.8.2", "latest": "jq-1.8.2", "behind": False, "sha256": None, "error": None},
@@ -283,8 +284,8 @@ def test_check_tool_updates_command_prints_and_exits_nonzero_when_behind(monkeyp
 
 
 def test_tool_output_written_by_the_tool_itself_is_made_owner_only(tmp_path, monkeypatch):
-    from lib import collect
-    from lib.runlog import RunLog
+    from lib.collection import collect
+    from lib.foundations.runlog import RunLog
 
     bindir = tmp_path / "fakebin"
     bindir.mkdir()
@@ -314,7 +315,7 @@ def test_check_updates_names_an_unknown_or_unpinned_tool_instead_of_calling_it_c
     _serve(monkeypatch, {})
     rows = tools.check_updates(["bogus", "python3"])
     assert [(r["name"], r["error"]) for r in rows] == [("bogus", "unknown tool"), ("python3", "no download entry (installed through brew or a virtualenv, not pinned here)")]
-    from lib import setup as _setup
+    from lib.commands import setup as _setup
 
     monkeypatch.setattr(_setup.tools, "check_updates", lambda only=None: rows)
     lines = []
@@ -342,8 +343,8 @@ def test_a_third_party_tap_formula_installs_the_pinned_download_first(monkeypatc
 
 
 def test_setup_says_where_the_pinned_digest_came_from(monkeypatch):
-    from lib import setup as _setup
-    from lib.config import Config
+    from lib.commands import setup as _setup
+    from lib.foundations.config import Config
 
     status = [{"name": n, "role": "x", "required": False, "present": False, "path": None, "version": None, "checks": [], "installable": True, "note": ""} for n in ("kubent", "jq")]
     monkeypatch.setattr(_setup.tools, "check_tools", lambda: status)
@@ -620,7 +621,7 @@ def test_check_updates_reports_the_krr_pin_and_prints_the_requirements_when_behi
     rows = tools.check_updates(["krr"])
     row = next(r for r in rows if r["name"] == "krr")
     assert (row["pinned"], row["latest"], row["behind"]) == ("v1.31.1", "v1.32.0", True) and row["requirements"].startswith("# krr v1.32.0"), row
-    from lib import setup as _setup
+    from lib.commands import setup as _setup
 
     lines = []
     monkeypatch.setattr(_setup, "_p", lines.append)

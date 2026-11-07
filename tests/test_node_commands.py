@@ -7,7 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from lib import nodecommands, yamlite
+from lib.collection import nodecommands
+from lib.foundations import yamlite
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -113,8 +114,8 @@ def test_commands_md_says_which_pods_are_curled():
 
 def test_install_document_finds_the_uploaded_version_by_describing_it(monkeypatch):
     """#125: list-document-versions carries no Hash (DocumentVersionInfo, ssm service-2.json:7949-7990@2.39.3), so a version already holding the local content is found through describe-document --document-version and made the default instead of being uploaded again."""
-    from lib import aws as _aws
-    from lib import nodecommands
+    from lib.collection import aws as _aws
+    from lib.collection import nodecommands
 
     local = nodecommands.document_sha256()
     calls = []

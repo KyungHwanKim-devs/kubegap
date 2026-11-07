@@ -2,7 +2,8 @@
 
 import json
 
-from lib import kube, shell
+from lib.collection import kube
+from lib.foundations import shell
 
 
 def _fake_config(user: dict, cluster_name: str = "arn:aws:eks:ap-northeast-2:123456789012:cluster/c1"):
@@ -69,8 +70,8 @@ def test_auth_summary_lines(monkeypatch):
 
 
 def test_setup_prints_the_auth_line_and_writes_no_exec_value(tmp_path, monkeypatch):
-    from lib import setup as _setup
-    from lib.config import Config
+    from lib.commands import setup as _setup
+    from lib.foundations.config import Config
 
     user = {"exec": {"command": "aws", "args": ["eks", "get-token"], "env": [{"name": "AWS_PROFILE", "value": "p"}, {"name": "SECRET_X", "value": "abc"}]}}
     cfg_view = _fake_config(user)

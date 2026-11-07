@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from lib import vpccni
+from lib.summaries import vpccni
 
 PROM = """awscni_add_ip_req_count 558
 awscni_assigned_ip_addresses 35

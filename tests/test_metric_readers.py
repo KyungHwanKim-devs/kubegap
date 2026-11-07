@@ -1,9 +1,9 @@
-"""lib/snapshot's readers of metrics/<query>.json, the one reading of a Prometheus result file (#150)."""
+"""lib/foundations/snapshot's readers of metrics/<query>.json, the one reading of a Prometheus result file (#150)."""
 
 import json
 import math
 
-from lib import snapshot
+from lib.foundations import snapshot
 
 
 def _write(snap, qid, doc):

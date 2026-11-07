@@ -1,10 +1,10 @@
-"""lib/diff.py: compare two tiny hand-built snapshot folders and check the shape and values of diff.json."""
+"""lib/output/diff.py: compare two tiny hand-built snapshot folders and check the shape and values of diff.json."""
 
 import json
 
 import pytest
 
-from lib import diff as diffmod
+from lib.output import diff as diffmod
 
 
 def deployment(ns, name, replicas, generation=1):

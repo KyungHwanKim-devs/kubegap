@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from lib import vpccni
+from lib.summaries import vpccni
 
 
 def _write(tmp_path, routes):

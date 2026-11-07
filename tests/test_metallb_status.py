@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lib import k3s, metallbctl, summarize
+from lib.summaries import k3s, metallbctl, summarize
 
 ROOT = Path(__file__).resolve().parent.parent
 INV = {"nodes": {"count": 2, "nodes": [{"name": "kind-worker"}, {"name": "kind-control-plane"}]}}
@@ -165,7 +165,7 @@ def test_a_disabled_metrics_port_on_0_16_is_not_an_unreadable_speaker(tmp_path):
 
 
 def test_metallb_is_read_on_a_platform_that_is_not_k3s(tmp_path):
-    """Pools and Services were built inside lib/k3s.py, so on kubeadm a Service counted as 0 and the L2 check raised KeyError on an empty dict. Observed on kind before this change."""
+    """Pools and Services were built inside lib/summaries/k3s.py, so on kubeadm a Service counted as 0 and the L2 check raised KeyError on an empty dict. Observed on kind before this change."""
     s_ = snap(tmp_path, **{L2: [L2_WEB], BGP: [], STATE: [STATE_VALID]})
     out = metallbctl.analyze(s_, {**INV, "cluster": {"platform": "kubeadm"}})
     assert (out["summary"]["pools"], out["summary"]["total_ips"], out["summary"]["used"], out["summary"]["lb_services"]) == (1, 11, 2, 2)
@@ -180,7 +180,7 @@ def test_no_metallb_stays_absent(tmp_path):
 
 def test_the_k3s_section_no_longer_carries_metallb(tmp_path):
     """One reader: k3s.cluster.metallb would only repeat metallb, and the fixtures of collectors/k3s-platform/checks.yaml no longer list it."""
-    assert "_metallb" not in (ROOT / "lib" / "k3s.py").read_text(encoding="utf-8")
+    assert "_metallb" not in (ROOT / "lib" / "summaries" / "k3s.py").read_text(encoding="utf-8")
     assert next(row for row in summarize.COMPONENT_SECTIONS if row[0] == "metallb")[3] is None
     assert not hasattr(k3s, "_metallb")
 
@@ -247,8 +247,8 @@ def test_a_bgp_status_of_a_node_that_is_gone_does_not_count(tmp_path):
 
 
 def test_every_metallb_check_runs_wherever_metallb_is_present():
-    """`profiles: [lab]` reported all six as disabled on a kubeadm cluster of 4 nodes or more (small-prod, lib/discover.py), so being read was not enough."""
-    from lib import yamlite
+    """`profiles: [lab]` reported all six as disabled on a kubeadm cluster of 4 nodes or more (small-prod, lib/collection/discover.py), so being read was not enough."""
+    from lib.foundations import yamlite
 
     checks = yamlite.load_file(ROOT / "collectors/metallb/checks.yaml")
     assert len(checks) == 8 and all(set(c["profiles"]) == {"prod", "lab"} for c in checks)

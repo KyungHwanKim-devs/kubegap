@@ -1,5 +1,5 @@
 """Dashboards and datasources that Helm put into ConfigMaps are read without a Grafana token: kept by the scrubber because of the sidecar
-labels, summarised by lib/observability.py, counted by `setup` so the first-run question is asked only for dashboards made in Grafana itself."""
+labels, summarised by lib/summaries/observability.py, counted by `setup` so the first-run question is asked only for dashboards made in Grafana itself."""
 
 from __future__ import annotations
 
@@ -7,8 +7,10 @@ import copy
 import json
 from pathlib import Path
 
-from lib import monitoring, observability, scrub, shell
-from lib.snapshot import write_private
+from lib.collection import monitoring
+from lib.foundations import scrub, shell
+from lib.foundations.snapshot import write_private
+from lib.summaries import observability
 
 DASH = {"uid": "09ec8aa1e996d6ffcd6817bbaff4db1b", "title": "Kubernetes / API server", "panels": [{"targets": [{"expr": "sum(rate(apiserver_request_total[5m]))"}]}, {"panels": [{"targets": [{"expr": "up"}]}]}]}
 DASH_CM = {"kind": "ConfigMap", "metadata": {"namespace": "monitoring", "name": "kps-apiserver", "labels": {"grafana_dashboard": "1"}, "annotations": {"grafana_folder": "Kubernetes"}}, "data": {"apiserver.json": json.dumps(DASH)}}

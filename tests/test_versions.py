@@ -1,11 +1,11 @@
-"""lib/versions reads version strings for the modules that parsed a Kubernetes minor, major or semver triple themselves (#144, the rest in #150): the seven parsers it replaced must not come back."""
+"""lib/foundations/versions reads version strings for the modules that parsed a Kubernetes minor, major or semver triple themselves (#144, the rest in #150): the seven parsers it replaced must not come back."""
 
 from __future__ import annotations
 
 import re
 from pathlib import Path
 
-from lib import versions
+from lib.foundations import versions
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -26,7 +26,7 @@ def test_major_minor_reads_every_spelling_the_clusters_and_tools_use():
 def test_no_other_module_parses_a_version_with_its_own_regular_expression():
     """hygiene, scaling, collect, kubeproxy, evaluate (twice), vpccni and traffic each had one before #144; the image-tag readers of the *ctl modules are #150."""
     pat = re.compile(r"v\?\(\\d\+\)\\\.\(\\d\+\)|v\?\\d\+\\\.\(\\d\+\)|v\?\(\\d\+\\\.\\d\+\)")
-    offenders = [f.name for f in (ROOT / "lib").glob("*.py") if f.name != "versions.py" and pat.search(f.read_text(encoding="utf-8"))]
+    offenders = [f.name for f in (ROOT / "lib").rglob("*.py") if f.name != "versions.py" and pat.search(f.read_text(encoding="utf-8"))]
     assert offenders == [], offenders
 
 

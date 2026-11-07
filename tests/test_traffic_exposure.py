@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from lib import traffic
-from lib.traffic import sg_exposure
+from lib.summaries import traffic
+from lib.summaries.traffic import sg_exposure
 
 KAFKA_ARN = "arn:aws:elasticloadbalancing:ap-northeast-2:1:targetgroup/tg-kafka/1"
 DB_ARN = "arn:aws:elasticloadbalancing:ap-northeast-2:1:targetgroup/tg-mysql/1"
@@ -204,7 +204,7 @@ def test_source_ranges_that_are_not_cidrs_are_ignored(tmp_path):
 
 
 def test_sg_text_widths():
-    from lib.evaluate import sg_text
+    from lib.judgement.evaluate import sg_text
 
     assert sg_text({"sg_exposure": "allow-list", "allowed_sources": {"3306": 4, "5432": 2}, "widest_prefix": {"3306": 32, "5432": 24}}) == "allow-list, at most 4 sources per port, widest /24"
     assert (
@@ -227,7 +227,7 @@ def test_eks_without_alb_metrics_is_not_read(tmp_path):
 
 
 def test_listener_parsing():
-    from lib.albmetrics import _listener, _tg_name
+    from lib.collection.albmetrics import _listener, _tg_name
 
     assert _tg_name("arn:aws:elasticloadbalancing:ap-northeast-2:1:targetgroup/tg-web/abc") == "tg-web"
     assert _tg_name(None) is None and _tg_name("") is None

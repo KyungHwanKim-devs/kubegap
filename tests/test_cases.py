@@ -7,7 +7,9 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from lib import evaluate, paths, rubric, selftest
+from lib.commands import selftest
+from lib.foundations import paths, rubric
+from lib.judgement import evaluate
 
 # "Company YEAR" inside prose: one to three capitalised words followed by a year. Words that are not a company are excluded.
 NAME_YEAR_IN_WHY = re.compile(r"\b([A-Z][A-Za-z0-9.&'-]+(?: [A-Z][A-Za-z0-9.&'-]+){0,2}),? \(?((?:19|20)\d\d)\)?")

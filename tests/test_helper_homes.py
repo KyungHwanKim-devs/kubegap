@@ -67,7 +67,7 @@ HOMED: dict[str, str] = {
 
 
 def _modules() -> dict[str, ast.Module]:
-    return {p.stem: ast.parse(p.read_text(encoding="utf-8"), str(p)) for p in sorted(LIB.glob("*.py"))}
+    return {p.stem: ast.parse(p.read_text(encoding="utf-8"), str(p)) for p in sorted(LIB.rglob("*.py")) if p.name != "__init__.py"}
 
 
 def _top_functions(tree: ast.Module):
@@ -124,12 +124,12 @@ def test_every_home_in_the_table_exists():
 
 
 def _sources() -> dict[str, str]:
-    return {p.stem: p.read_text(encoding="utf-8") for p in sorted(LIB.glob("*.py"))}
+    return {p.stem: p.read_text(encoding="utf-8") for p in sorted(LIB.rglob("*.py")) if p.name != "__init__.py"}
 
 
 def test_the_metrics_file_path_is_spelled_by_the_reader_and_the_writer_only():
-    """`metrics/<query id>.json` and `metrics/series-present.json` are read through lib/snapshot (metric_doc, metric_result, metric_rows, metric_by,
-    metric_scalar, metric_sum, series_present) and written by lib/prom (and by selftest, which builds a fake snapshot); no other module opens them,
+    """`metrics/<query id>.json` and `metrics/series-present.json` are read through lib/foundations/snapshot (metric_doc, metric_result, metric_rows, metric_by,
+    metric_scalar, metric_sum, series_present) and written by lib/collection/prom (and by selftest, which builds a fake snapshot); no other module opens them,
     whether the query id is a variable or a literal name."""
     pat = re.compile(r'"metrics"\s*/\s*f?"[^"]*\.json"')
     offenders = [m for m, src in _sources().items() if m not in ("snapshot", "prom", "selftest") and pat.search(src)]

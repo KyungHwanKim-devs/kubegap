@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from lib import traffic
+from lib.summaries import traffic
 
 
 @pytest.mark.parametrize(

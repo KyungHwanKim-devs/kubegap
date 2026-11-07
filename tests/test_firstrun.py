@@ -12,9 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from lib import discover, firstrun, kube
-from lib.config import Config
-from lib.runlog import RunLog
+from lib.collection import discover, kube
+from lib.commands import firstrun
+from lib.foundations.config import Config
+from lib.foundations.runlog import RunLog
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -347,8 +348,8 @@ def test_nodes_reads_the_node_list_from_the_cluster_without_a_snapshot(tmp_path,
         ok, error, stderr, stdout = True, None, "", ""
 
     monkeypatch.setattr(kube, "kubectl_json", lambda args, **kw: ({"items": [node] if args[:2] == ["get", "nodes"] else []}, R()))
-    from lib import node as node_mod
-    from lib.node import NodeResult
+    from lib.collection import node as node_mod
+    from lib.collection.node import NodeResult
 
     sent = []
 
@@ -367,8 +368,8 @@ def test_nodes_reads_the_node_list_from_the_cluster_without_a_snapshot(tmp_path,
 
 @pytest.mark.parametrize("err,kind", [("Host key verification failed.", "host-key"), ("Permission denied (publickey).", "auth"), ("ssh: connect to host x port 22: Operation timed out", "unreachable"), ("exit 255", "other")])
 def test_ssh_failures_are_classified(monkeypatch, err, kind):
-    from lib import node as node_mod
-    from lib import shell
+    from lib.collection import node as node_mod
+    from lib.foundations import shell
 
     class R:
         ok, error, stderr, stdout, code, seconds = False, None, err, "", 255, 0.1
@@ -398,7 +399,7 @@ def test_readme_numbers_and_question_names_match_the_code():
 
 
 def test_setup_doc_names_every_key_config_set_writes():
-    from lib import configedit
+    from lib.commands import configedit
 
     setup_doc = (ROOT / "docs" / "SETUP.md").read_text(encoding="utf-8")
     line = next(ln for ln in setup_doc.splitlines() if ln.startswith("It keeps your comments"))

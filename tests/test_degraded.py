@@ -9,8 +9,11 @@ from pathlib import Path
 
 import pytest
 
-from lib import discover, evaluate, rubric, summarize, yamlite
-from lib.runlog import RunLog
+from lib.collection import discover
+from lib.foundations import rubric, yamlite
+from lib.foundations.runlog import RunLog
+from lib.judgement import evaluate
+from lib.summaries import summarize
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -93,7 +96,7 @@ def test_webhooks_without_endpoints_file_report_nothing_as_endpoint_less(tmp_pat
 
 
 def test_discover_turns_the_node_backend_off_when_the_ssm_list_cannot_be_read(monkeypatch):
-    from lib import shell
+    from lib.foundations import shell
 
     monkeypatch.setattr(discover.kube, "kubectl_json", lambda *a, **k: ({"items": []}, None))
     monkeypatch.setattr(discover.aws, "aws_json", lambda *a, **k: (None, shell.Result(cmd=["aws"], code=254, stderr="An error occurred (AccessDeniedException) when calling the DescribeInstanceInformation operation")))
@@ -144,7 +147,7 @@ def test_every_needs_has_a_reason_and_parses():
 
 
 def test_selftest_accepts_expect_skip():
-    src = (ROOT / "lib" / "selftest.py").read_text(encoding="utf-8")
+    src = (ROOT / "lib" / "commands" / "selftest.py").read_text(encoding="utf-8")
     assert 'if expect == "skip"' in src
     assert sum(1 for c in _all_checks() for case in ((c.get("test") or {}).get("cases") or []) if case.get("expect") == "skip") >= 25
 
@@ -178,7 +181,7 @@ def test_summarize_echo_survives_missing_endpoints(tmp_path):
 
 
 def test_albctl_webhooks_skip_when_endpointslices_were_not_read(tmp_path):
-    from lib import albctl
+    from lib.summaries import albctl
 
     objs = tmp_path / "objects"
     objs.mkdir()
@@ -201,7 +204,7 @@ def test_albctl_webhooks_skip_when_endpointslices_were_not_read(tmp_path):
 
 
 def test_argocd_unread_pods_exclude_pods_the_collector_skipped(tmp_path):
-    from lib import argocdctl
+    from lib.summaries import argocdctl
 
     (tmp_path / "objects").mkdir()
     (tmp_path / "objects" / "deployments.json").write_text(
@@ -221,7 +224,7 @@ def test_argocd_unread_pods_exclude_pods_the_collector_skipped(tmp_path):
 
 
 def test_node_rows_for_unread_nodes_make_the_node_checks_skip_by_name(tmp_path):
-    from lib import nodeos
+    from lib.summaries import nodeos
 
     inv = {"nodes": {"nodes": [{"name": "n1"}, {"name": "n2"}]}, "cluster": {"platform": "k3s"}}
     (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {"node-os": {"nodes": {"n1": {"ok": False, "error": "no node access"}}}}}}))
@@ -250,7 +253,7 @@ def _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr, code=0, annotated
     import os
     import shlex
 
-    from lib import collect
+    from lib.collection import collect
 
     if annotated:
         (tmp_path / "objects").mkdir(exist_ok=True)
@@ -271,7 +274,7 @@ def _deprecated_tool(tmp_path, monkeypatch, tool, doc, stderr, code=0, annotated
 
 
 def _deprecated_result(tmp_path):
-    from lib import hygiene
+    from lib.summaries import hygiene
 
     summary = hygiene._deprecated(hygiene._Ctx(tmp_path, {}))
     check = next(c for c in _all_checks() if c["id"] == "hygiene.deprecated-api")
@@ -382,7 +385,7 @@ def test_pluto_error_printed_to_stdout_reaches_the_step_error(tmp_path, monkeypa
     import os
     import shlex
 
-    from lib import collect
+    from lib.collection import collect
 
     bindir = tmp_path / "fakebin"
     bindir.mkdir()
@@ -436,7 +439,7 @@ def test_deprecated_one_successful_tool_keeps_findings_and_ignores_failed_output
 
 def test_pluto_step_keeps_exit_code_zero_when_it_finds_something():
     """pluto exits 2 (deprecated), 3 (removed) or 4 (no replacement) unless told not to (pkg/api/output.go:333-341@v5.24.5; cmd/root.go:353 and :167 exit with it).
-    lib/shell.py writes the output file only on exit 0, so without the three flags tools/pluto.json was never written when pluto found something and
+    lib/foundations/shell.py writes the output file only on exit 0, so without the three flags tools/pluto.json was never written when pluto found something and
     the check passed with no pluto rows; with the read evidence of this branch it would skip instead. The flags do not filter the items (FilterOutput, pkg/api/output.go:159-181). Observed with the pinned binary:
     detect on a networking.k8s.io/v1beta1 Ingress exits 3 without the flags and 0 with them, with the same item in both JSONs."""
     step = next(s for s in yamlite.load_file(ROOT / "collectors/core/collect.yaml") if s.get("id") == "pluto")
@@ -444,7 +447,7 @@ def test_pluto_step_keeps_exit_code_zero_when_it_finds_something():
 
 
 def test_pluto_findings_with_exit_three_would_be_dropped(tmp_path, monkeypatch):
-    """What the flags prevent: a pluto that prints one removed item and exits 3 is a failed step whose output is never saved (lib/shell.py), its read
+    """What the flags prevent: a pluto that prints one removed item and exits 3 is a failed step whose output is never saved (lib/foundations/shell.py), its read
     evidence is not computed, and the summary carries no items. The test documents the failure mode the flags exist for; it is not a behaviour to keep."""
     doc = {"items": [{"name": "web", "namespace": "prod-a", "api": {"version": "networking.k8s.io/v1beta1", "kind": "Ingress"}, "deprecated": True, "removed": True}]}
     result = _deprecated_tool(tmp_path, monkeypatch, "pluto", doc, "", code=3)
