@@ -4,7 +4,7 @@
   "source": "detected",
   "missing_file": false
  },
- "rubric_version": "0.1.84",
+ "rubric_version": "0.1.85",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -1932,7 +1932,8 @@
    "status": "done",
    "reason": null,
    "counts": {
-    "warn": 1
+    "pass": 5,
+    "warn": 8
    }
   },
   {
@@ -4627,10 +4628,59 @@
   },
   {
    "check": "resilience.prod-db-without-backup-cronjob",
-   "target": "cluster",
+   "target": "app-ab-prod/statefulset/app-ab-backend-postgresql",
    "status": "warn",
-   "evidence": "Of 18 DB workloads with a PVC, production DBs without a backup CronJob in the same namespace: ['app-ab-prod/statefulset/app-ab-backend-postgresql', 'prod-app-r/statefulset/app-r-postgresql', 'prod-app-s/statefulset/app-s-backend-mysql', 'prod-app-t/statefulset/app-t-backend-postgresql', 'prod-app-v/statefulset/app-v-backend-prod-mysql', 'prod-app-x/statefulset/app-x-postgresql', 'prod-app-y/statefulset/app-y-backend-mysql', 'prod-app-z-backend/statefulset/app-z-neo4j']. Backup CronJobs 0 (local only 0, same node as source 0)",
-   "source": "summary.json:resilience.backup"
+   "evidence": "statefulset app-ab-backend-postgresql (Service app-ab-backend-postgresql, app-ab-backend-postgresql-hl, PVC data-app-ab-backend-postgresql-0): no backup CronJob names it; the namespace has no backup CronJob",
+   "source": "summary.json:resilience.backup.databases"
+  },
+  {
+   "check": "resilience.prod-db-without-backup-cronjob",
+   "target": "prod-app-r/statefulset/app-r-postgresql",
+   "status": "warn",
+   "evidence": "statefulset app-r-postgresql (Service app-r-postgresql, app-r-postgresql-hl, PVC data-app-r-postgresql-0): no backup CronJob names it; the namespace has no backup CronJob",
+   "source": "summary.json:resilience.backup.databases"
+  },
+  {
+   "check": "resilience.prod-db-without-backup-cronjob",
+   "target": "prod-app-s/statefulset/app-s-backend-mysql",
+   "status": "warn",
+   "evidence": "statefulset app-s-backend-mysql (Service app-s-backend-mysql, app-s-backend-mysql-headless, PVC data-app-s-backend-mysql-0): no backup CronJob names it; the namespace has no backup CronJob",
+   "source": "summary.json:resilience.backup.databases"
+  },
+  {
+   "check": "resilience.prod-db-without-backup-cronjob",
+   "target": "prod-app-t/statefulset/app-t-backend-postgresql",
+   "status": "warn",
+   "evidence": "statefulset app-t-backend-postgresql (Service app-t-backend-postgresql, app-t-backend-postgresql-hl, PVC data-app-t-backend-postgresql-0): no backup CronJob names it; the namespace has no backup CronJob",
+   "source": "summary.json:resilience.backup.databases"
+  },
+  {
+   "check": "resilience.prod-db-without-backup-cronjob",
+   "target": "prod-app-v/statefulset/app-v-backend-prod-mysql",
+   "status": "warn",
+   "evidence": "statefulset app-v-backend-prod-mysql (Service app-v-backend-prod-mysql, app-v-backend-prod-mysql-headless, PVC data-app-v-backend-prod-mysql-0): no backup CronJob names it; the namespace has no backup CronJob",
+   "source": "summary.json:resilience.backup.databases"
+  },
+  {
+   "check": "resilience.prod-db-without-backup-cronjob",
+   "target": "prod-app-x/statefulset/app-x-postgresql",
+   "status": "warn",
+   "evidence": "statefulset app-x-postgresql (Service app-x-postgresql, app-x-postgresql-hl, PVC data-app-x-postgresql-0): no backup CronJob names it; the namespace has no backup CronJob",
+   "source": "summary.json:resilience.backup.databases"
+  },
+  {
+   "check": "resilience.prod-db-without-backup-cronjob",
+   "target": "prod-app-y/statefulset/app-y-backend-mysql",
+   "status": "warn",
+   "evidence": "statefulset app-y-backend-mysql (Service app-y-backend-mysql, app-y-backend-mysql-headless, PVC data-app-y-backend-mysql-0): no backup CronJob names it; the namespace has no backup CronJob",
+   "source": "summary.json:resilience.backup.databases"
+  },
+  {
+   "check": "resilience.prod-db-without-backup-cronjob",
+   "target": "prod-app-z-backend/statefulset/app-z-neo4j",
+   "status": "warn",
+   "evidence": "statefulset app-z-neo4j (Service app-z-neo4j, PVC data-app-z-neo4j-0): no backup CronJob names it; the namespace has no backup CronJob",
+   "source": "summary.json:resilience.backup.databases"
   },
   {
    "check": "resilience.recreate-strategy-serving",

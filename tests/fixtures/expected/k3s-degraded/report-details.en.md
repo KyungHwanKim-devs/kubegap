@@ -7,7 +7,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | kube context / cluster | `default` / default (k3s, v1.33.5+k3s1) |
 | Run time / mode | 2026-11-07T10:22:59+09:00 / full (collection 262.7 s, 0 steps skipped by mode, 7 failed) |
 | Profile | `lab` (detected) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.84 / 1.1.0 |
+| kubegap / rubric / signatures | <kubegap> / 0.1.85 / 1.1.0 |
 | Nodes / namespaces / pods / CRDs | 2 (Ready 2) / 26 / 153 / 64 |
 | Components (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
 | Metrics store | none |
@@ -21,7 +21,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 |---|---|---|---|
 | critical | 2 | 2 | no previous run of this mode |
 | high | 23 | 60 | no previous run of this mode |
-| medium | 50 | 106 | no previous run of this mode |
+| medium | 50 | 108 | no previous run of this mode |
 | low | 4 | 107 | no previous run of this mode |
 | info | 0 | 0 | no previous run of this mode |
 
@@ -388,7 +388,9 @@ Signature catalog 1.1.0, 19 files, 19941 lines scanned (components: argocd, cert
 | `resilience.db-probe-timeout.app-g-api/statefulset/app-g-postgres:postgres` | warn | medium | app-g-api/statefulset/app-g-postgres container postgres: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent |
 | `resilience.db-probe-timeout.app-k/deployment/app-k-postgres:postgres` | warn | medium | app-k/deployment/app-k-postgres container postgres: liveness exec timeout 1s, period 20s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent |
 | `resilience.priority-inversion.cluster` | warn | medium | User-defined PriorityClasses [], pod distribution {'(none, 0)': 91, 'system-cluster-critical': 1, 'system-node-critical': 3}, prod pods without a class 48 of 48, prod max priority 0, non-prod max 0, inversions [], Preempted events 0 |
-| `resilience.prod-db-without-backup-cronjob.cluster` | warn | medium | Of 16 DB workloads with a PVC, production DBs without a backup CronJob in the same namespace: ['app-c-prod/statefulset/app-c-postgres', 'app-l-prod/deployment/app-l-postgres']. Backup CronJobs 7 (local only 7, same node as source 5) |
+| `resilience.prod-db-without-backup-cronjob.app-c-prod/statefulset/app-c-postgres` | warn | medium | statefulset app-c-postgres (Service app-c-postgres, PVC postgres-data-app-c-postgres-0): no backup CronJob names it; the namespace has no backup CronJob |
+| `resilience.prod-db-without-backup-cronjob.app-h-prod/statefulset/app-h-qdrant` | warn | medium | statefulset app-h-qdrant (Service app-h-qdrant, PVC app-h-qdrant-data-app-h-qdrant-0): no backup CronJob names it; the namespace's backup CronJobs dump other databases: app-h-mysql-backup -> app-h-mysql |
+| `resilience.prod-db-without-backup-cronjob.app-l-prod/deployment/app-l-postgres` | warn | medium | deployment app-l-postgres (Service app-l-postgres, PVC app-l-postgres-data): no backup CronJob names it; the namespace has no backup CronJob |
 | `resilience.single-node-dependency.registry/statefulset/registry` | warn | medium | ['nodeSelector kubernetes.io/hostname=node-b'], replicas 1 |
 | `resources.krr-recommendation.app-a-prod/daemonset/app-a-sandbox-prepull:hold-adk` | warn | medium | memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD) |
 | `resources.krr-recommendation.app-a-prod/daemonset/app-a-sandbox-prepull:hold-c` | warn | medium | memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD) |
@@ -5640,32 +5642,70 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resilience.prod-db-without-backup-cronjob.cluster</code></summary>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.app-c-prod/statefulset/app-c-postgres</code></summary>
 
 ```json
 {
- "count": 7,
- "db_workloads_with_pvc": 16,
- "local_only": [
-  "app-a-prod/app-a-postgres-backup",
-  "app-f-prod/app-f-postgres-backup",
-  "app-f-prod/app-f-postgres-mx-backup",
-  "app-f-prod/app-f-postgres-vn-backup",
-  "app-g-api/app-g-postgres-backup",
-  "app-h-prod/app-h-mysql-backup",
-  "app-i-prod/app-i-postgres-backup"
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-c-postgres",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "postgres-data-app-c-postgres-0"
  ],
- "prod_db_without_backup_cronjob": [
-  "app-c-prod/statefulset/app-c-postgres",
-  "app-l-prod/deployment/app-l-postgres"
+ "services": [
+  "app-c-postgres"
  ],
- "same_node": [
-  "app-f-prod/app-f-postgres-backup",
-  "app-f-prod/app-f-postgres-vn-backup",
-  "app-g-api/app-g-postgres-backup",
-  "app-h-prod/app-h-mysql-backup",
-  "app-i-prod/app-i-postgres-backup"
- ]
+ "target": "app-c-prod/statefulset/app-c-postgres"
+}
+```
+
+</details>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.app-h-prod/statefulset/app-h-qdrant</code></summary>
+
+```json
+{
+ "backup_cronjobs": [],
+ "kind": "statefulset",
+ "name": "app-h-qdrant",
+ "other_backup_cronjobs_in_namespace": [
+  {
+   "name": "app-h-mysql-backup",
+   "suspend": false,
+   "targets_db": [
+    "app-h-prod/statefulset/app-h-mysql"
+   ]
+  }
+ ],
+ "prod": true,
+ "pvcs": [
+  "app-h-qdrant-data-app-h-qdrant-0"
+ ],
+ "services": [
+  "app-h-qdrant"
+ ],
+ "target": "app-h-prod/statefulset/app-h-qdrant"
+}
+```
+
+</details>
+<details><summary><code>resilience.prod-db-without-backup-cronjob.app-l-prod/deployment/app-l-postgres</code></summary>
+
+```json
+{
+ "backup_cronjobs": [],
+ "kind": "deployment",
+ "name": "app-l-postgres",
+ "other_backup_cronjobs_in_namespace": [],
+ "prod": true,
+ "pvcs": [
+  "app-l-postgres-data"
+ ],
+ "services": [
+  "app-l-postgres"
+ ],
+ "target": "app-l-prod/deployment/app-l-postgres"
 }
 ```
 
