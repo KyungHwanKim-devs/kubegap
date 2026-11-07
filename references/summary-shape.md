@@ -158,6 +158,8 @@ The key shape of the summary file, moved here from SKILL.md section 5. One secti
 
 ## run
 
+`collection{mode, mode_skipped_steps[], failed_steps[], seconds_total, object_files{<stem>: ok | not-served | excluded | denied | failed | unlisted | no-record}}` (`object_files` is every `objects/<stem>.json` a summary module asked `snapshot.objects` for, with why it is missing when it is, judged against the `objects.dump-all` record of collect-result.json (#160): `not-served` is a kind this cluster does not have, normal; `unlisted` is a kind the API serves without a file of that name, a reader's spelling mistake that report section 7-1 and run.log name; `no-record` when the step did not run).
+
 `run{commands, failed[], skipped[], seconds_total, by_collector}` (from run.log: `failed` is the commands that exited non-zero, timed out or could not run; a step that failed after its command exited 0, such as kubent or pluto with no confirmed read, is in `collection.failed_steps` and not here, and the report reads `collection.failed_steps`, #132).
 
 ## eksplatform
