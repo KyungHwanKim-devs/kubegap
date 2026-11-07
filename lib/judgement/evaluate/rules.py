@@ -6,10 +6,12 @@ Part of the evaluator (lib/judgement/evaluate).
 from __future__ import annotations
 
 import fnmatch
+import inspect
 import re
 from collections import Counter
 from typing import ClassVar
 
+from . import evidence
 from .context import Context
 
 SAFE_BUILTINS = {
@@ -94,16 +96,31 @@ def finding(check: dict, target: str, status: str, evidence, source: str, extra:
     }
 
 
-KEY_HARD_RE = re.compile(r"item\['([^']+)'\]")
+KEY_HARD_RE = re.compile(r"""item\[['"]([^'"]+)['"]\]""")  # both quote styles: the expressions use single quotes, the evidence helpers (formatted Python) double
 
 
-KEY_SOFT_RE = re.compile(r"item\.get\('([^']+)'")
+KEY_SOFT_RE = re.compile(r"""item\.get\(['"]([^'"]+)['"]""")
+
+
+HELPER_CALL_RE = re.compile(r"\b_([a-z0-9_]+_text)\(")
+
+
+def expression_texts(check: dict) -> str:
+    """The rule, target and evidence of a check as one text to scan for the `item` keys they read, with the source of every evidence helper the
+    evidence calls (`_n_plus_one_text(item)` reads its keys inside lib/judgement/evaluate/evidence.py) appended, so a key renamed in a summary module is still
+    found by selftest's audit against a real snapshot (#24)."""
+    rule = check.get("rule") or {}
+    texts = " ".join(str(x) for x in (rule.get("expr"), rule.get("warn_expr"), check.get("target"), check.get("evidence")) if x)
+    for name in HELPER_CALL_RE.findall(texts):
+        fn = getattr(evidence, name, None)
+        if fn is not None:
+            texts += " " + inspect.getsource(fn)
+    return texts
 
 
 def referenced_keys(check: dict) -> set[str]:
     """The `item` keys a summary check's expressions read: `item['k']` and `item.get('k')` across rule, target and evidence. selftest audits these against a real summary; `details` keeps exactly these."""
-    rule = check.get("rule") or {}
-    texts = " ".join(str(x) for x in (rule.get("expr"), rule.get("warn_expr"), check.get("target"), check.get("evidence")) if x)
+    texts = expression_texts(check)
     return set(KEY_HARD_RE.findall(texts)) | set(KEY_SOFT_RE.findall(texts))
 
 

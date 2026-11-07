@@ -15,7 +15,22 @@ from ...foundations import metricnames, rubric, versions
 from ...foundations.snapshot import dump_record, load_json, metric_doc, missing_reason, object_file_status, series_present, taken_at
 from ...foundations.snapshot import objects as snapshot_objects
 from ...foundations.workload import is_db_like, mounts_pvc
-from .evidence import oom_text, sg_text
+from .evidence import (
+    argocd_backend_text,
+    ecr_stale_storage_text,
+    ingress_5xx_text,
+    ingress_latency_text,
+    metallb_config_text,
+    metallb_speaker_text,
+    n_plus_one_text,
+    nginx_vulnerable_text,
+    no_backup_text,
+    oom_last_text,
+    oom_text,
+    sg_text,
+    snat_private_routes_text,
+    throttling_text,
+)
 
 SYMPTOM_METRIC_RE = re.compile(r"\b(http_|grpc_|nginx_ingress_controller_|traefik_|aws_applicationelb_|probe_|haproxy_|envoy_|istio_requests|sli:|slo:)")
 
@@ -435,6 +450,19 @@ class Context:
             "db_like": self.db_like,
             "_sg_text": sg_text,
             "_oom_text": oom_text,
+            # the twelve long evidence sentences of #24, one helper each (lib/judgement/evaluate/evidence.py)
+            "_argocd_backend_text": argocd_backend_text,
+            "_throttling_text": throttling_text,
+            "_oom_last_text": oom_last_text,
+            "_no_backup_text": no_backup_text,
+            "_n_plus_one_text": n_plus_one_text,
+            "_ingress_5xx_text": ingress_5xx_text,
+            "_ingress_latency_text": ingress_latency_text,
+            "_nginx_vulnerable_text": nginx_vulnerable_text,
+            "_ecr_stale_storage_text": ecr_stale_storage_text,
+            "_metallb_speaker_text": metallb_speaker_text,
+            "_metallb_config_text": metallb_config_text,
+            "_snat_private_routes_text": snat_private_routes_text,
             "inv": self.inv,
             "summary": self.summary,
             "ctx": {"profile": self.profile.get("name"), "platform": (self.inv.get("cluster") or {}).get("platform"), "prod_like": sorted(self.prod_like)},

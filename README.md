@@ -236,7 +236,7 @@ Every permission is listed in [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md), and 
 - [`docs/HEADLESS.md`](docs/HEADLESS.md): how to run it without a person, and how to schedule it every morning
 - [`docs/CHECKS.md`](docs/CHECKS.md): every check
 - [`docs/DESIGN-DECISIONS.md`](docs/DESIGN-DECISIONS.md): why it is built this way
-- [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`references/development.md`](references/development.md): how to add or change a check
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): how to add or change a check, the test commands, the pull request rules and the review checklist. [`references/development.md`](references/development.md) has the mechanics behind them
 
 ## License
 

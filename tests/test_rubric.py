@@ -118,3 +118,22 @@ def test_active_suppressions_split_by_until_date():
     assert [s["id"] for s in expired] == ["a"]
     assert [s["id"] for s in active] == ["b", "c", "d"]
     assert rubric.active_suppressions(None, today) == ([], [])
+
+
+def test_no_check_expression_is_longer_than_500_characters():
+    """An evidence sentence longer than that is code: it goes into lib/judgement/evaluate/evidence.py as a helper the expression calls (#24). The twelve that
+    were over 500 characters did; the ones between 200 and 500 are prose templates a reader can still follow in place."""
+    from pathlib import Path
+
+    from lib.foundations import yamlite
+
+    root = Path(__file__).resolve().parent.parent
+    long = []
+    for f in sorted((root / "collectors").glob("*/checks.yaml")):
+        for c in yamlite.load_file(f) or []:
+            if not isinstance(c, dict):
+                continue
+            for name, text in (("expr", (c.get("rule") or {}).get("expr")), ("warn_expr", (c.get("rule") or {}).get("warn_expr")), ("target", c.get("target")), ("evidence", c.get("evidence"))):
+                if isinstance(text, str) and len(text) > 500:
+                    long.append(f"{c['id']} {name} ({len(text)} chars)")
+    assert long == [], "move the sentence into an evidence helper"

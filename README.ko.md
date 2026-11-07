@@ -236,7 +236,7 @@ ConfigMap 값도 저장하지 않습니다. 키마다 길이와 형태만 남기
 - [`docs/ko/HEADLESS.md`](docs/ko/HEADLESS.md): 사람 없이 돌리는 법, 매일 아침 예약해서 돌리는 법
 - [`docs/CHECKS.md`](docs/CHECKS.md): 점검 항목 전체, 영어
 - [`docs/DESIGN-DECISIONS.md`](docs/DESIGN-DECISIONS.md): 왜 이렇게 만들었는지, 영어
-- [`CONTRIBUTING.md`](CONTRIBUTING.md), [`references/development.md`](references/development.md): 점검 항목을 추가하거나 고치는 법, 영어
+- [`CONTRIBUTING.md`](CONTRIBUTING.md): 점검 항목을 추가하거나 고치는 절차, 테스트 명령, pull request 규칙, 리뷰 체크리스트. 영어 뒤에 한국어. 그 뒤의 기계적인 것은 [`references/development.md`](references/development.md), 영어
 
 ## 라이선스
 

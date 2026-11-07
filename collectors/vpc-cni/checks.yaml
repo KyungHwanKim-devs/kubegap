@@ -954,7 +954,7 @@
   rule:
     warn_expr: "not item['external_snat'] and len(item['private_destinations']) > 0"
   target: "'cluster'"
-  evidence: "f\"AWS_VPC_K8S_CNI_EXTERNALSNAT false; private routes {'in the node subnets' if item.get('scoped_to_node_subnets') else 'in the cluster VPC'}: peering {item['peering_routes']}, transit gateway {item['transit_gateway_routes']}, VPN {item['vpn_routes']}, Outposts local gateway {item['local_gateway_routes']}, appliance {item.get('appliance_routes', 0)}; destinations still SNATed {item['private_destinations'][:6]}{'; exempted by AWS_VPC_K8S_CNI_EXCLUDE_SNAT_CIDRS ' + str(item.get('excluded_destinations')) if item.get('excluded_destinations') else ''}\""
+  evidence: "_snat_private_routes_text(item)"
   severity_default: medium
   symptom_linked: false
   why: >

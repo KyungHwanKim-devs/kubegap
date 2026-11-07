@@ -3327,7 +3327,7 @@
     expr: "(item['cluster_connection_ok'] is False or (item['k8s_api_errors'] or 0) >= 100 or (item['git_failure_ratio'] or 0) >= 0.1)"
     warn_expr: "((item['k8s_api_errors'] or 0) > 0 or (item['git_failure_ratio'] or 0) >= 0.01 or (item['redis_failure_ratio'] or 0) >= 0.01 or (item['grpc_errors'] or 0) > 0 or (item['repo_pending_requests'] or 0) > 10)"
   target: "'cluster'"
-  evidence: "f\"cluster connection {item['cluster_connection_ok']}, cache age {item['cluster_cache_age_s']}s, k8s API 5xx/429 {item['k8s_api_errors']}, git requests {item['git_requests']} / failures {item['git_failures']} ({item['git_failure_ratio']}), redis failures {item['redis_failed']}/{item['redis_total']}, repo-server pending {item['repo_pending_requests']}, gRPC errors {item['grpc_errors']} (PermissionDenied {item['grpc_permission_denied']} and Unauthenticated {item['grpc_unauthenticated']} counted separately)\""
+  evidence: "_argocd_backend_text(item)"
   severity_default: medium
   symptom_linked: true
   why: >
