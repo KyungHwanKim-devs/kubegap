@@ -33,12 +33,15 @@ import json
 import re
 from pathlib import Path
 
-from . import __version__, aws, firstrun, kube, monitoring, paths, podmetrics, scrub
+from . import __version__, aws, kube, monitoring, paths, podmetrics, scrub
 from . import rubric as _rubric
 from .components import COMPONENTS, match_name
 from .config import Config
 from .runlog import RunLog
 from .snapshot import items, write_private
+
+# The platforms whose nodes are read over SSH (EKS uses SSM; the rest have no node access). lib/firstrun asks the SSH question for these.
+SSH_PLATFORMS = ("k3s", "rke2", "unknown")
 
 OBJECT_KINDS = {  # the minimum set of kinds inventory needs. collect fetches more kinds beyond these.
     "nodes": ["get", "nodes"],
@@ -234,7 +237,7 @@ def _profile(platform: str, nodes: dict, cfg: Config, override: str | None) -> d
 
 
 def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log: RunLog, *, context: str | None = None, kubeconfig: str | None = None, ssh_state: str = "yes") -> dict:
-    """ssh_state is `firstrun.ssh_decision`: on an SSH platform a node is contacted only when the user decided so ("yes": a config entry, a
+    """ssh_state is the user's SSH decision (`lib/firstrun.ssh_decision`, passed in by the command): on an SSH platform a node is contacted only when the user decided so ("yes": a config entry, a
     probe they ran, or the first-run answer). "skipped" and "open" give no backend, with the reason and how to change it. config.yaml
     `node_access` wins over all of it."""
     forced = cfg.get("node_access")
@@ -243,11 +246,11 @@ def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log:
         out["method"], out["source"] = forced, "config.yaml"
     elif platform == "eks":
         out["method"], out["reasons"] = "ssm", ["EKS: SSM send-command"]
-    elif platform in firstrun.SSH_PLATFORMS and ssh_state == "skipped":
+    elif platform in SSH_PLATFORMS and ssh_state == "skipped":
         out["method"], out["source"], out["reasons"] = "none", "first-run answer", [f"{platform}: reading nodes over SSH was skipped at the first-run question; `/kubegap setup` asks again"]
-    elif platform in firstrun.SSH_PLATFORMS and ssh_state == "open":
+    elif platform in SSH_PLATFORMS and ssh_state == "open":
         out["method"], out["reasons"] = "none", [f"{platform}: reading nodes over SSH has not been chosen yet, so no node was contacted. `/kubegap setup` asks; `node_access: ssh` in config.yaml decides it without asking"]
-    elif platform in firstrun.SSH_PLATFORMS:
+    elif platform in SSH_PLATFORMS:
         out["method"], out["reasons"] = "ssh", [f"{platform}: SSH"]
     else:  # gke, aks and anything else without SSM or SSH: no backend (the maintainer has no such cluster to build and test one on)
         out["method"], out["reasons"] = "none", [f"{platform}: kubegap has no node access for this platform (node-exporter metrics only)"]
@@ -329,7 +332,9 @@ def _eks_facts(eks: dict, cfg: Config, snap: Path, log: RunLog) -> dict:
     return out
 
 
-def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = None, log: RunLog | None = None, profile_override: str | None = None, echo=print) -> dict:
+def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfig: str | None = None, log: RunLog | None = None, profile_override: str | None = None, echo=print) -> dict:
+    """`ssh_state` is the user's decision about reading nodes over SSH (\"yes\", \"skipped\" or \"open\"), made by `lib/firstrun.ssh_decision` and passed in by the
+    command: discovery is a collection module and does not read first-run answers itself; it has no default because nothing may contact a node by omission."""
     log = log or RunLog(snap / "run.log")
     log.stage("discover", "start", context=context)
     taken = _dt.datetime.now().astimezone()
@@ -368,7 +373,7 @@ def discover(context: str, cfg: Config, snap: Path, *, kubeconfig: str | None = 
     platform, platform_reasons = detect_platform(ctx_info, nodes, comps, objs)
     write_objects()
     profile = _profile(platform, nodes, cfg, profile_override)
-    node_access = _node_access(platform, nodes, cfg, ctx_info.get("eks") if ctx_info.get("is_eks") else None, log, context=context, kubeconfig=kubeconfig, ssh_state=firstrun.ssh_decision(snap.parent, cfg))
+    node_access = _node_access(platform, nodes, cfg, ctx_info.get("eks") if ctx_info.get("is_eks") else None, log, context=context, kubeconfig=kubeconfig, ssh_state=ssh_state)
 
     # Stores: service discovery + connect and read retention (same code as setup)
     svcs, _err = monitoring.find_services(context, kubeconfig, log=log)

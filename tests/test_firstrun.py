@@ -155,10 +155,14 @@ def test_no_ssh_connection_before_the_user_decided(tmp_path):
     assert discover._node_access("gke", nodes, Config({"node_access": "none"}), None, RunLog(None), ssh_state="open")["method"] == "none"
 
 
-def test_discover_passes_the_ssh_decision_of_the_context_folder():
+def test_discovery_receives_the_ssh_decision_from_the_command():
+    """Discovery is a collection module and does not read first-run answers (#149): the command computes `firstrun.ssh_decision` for the context folder
+    and passes it, and `discover()` has no default for it, so no caller can contact a node by leaving the decision out."""
     import inspect
 
-    assert "ssh_state=firstrun.ssh_decision(snap.parent, cfg)" in inspect.getsource(discover.discover)
+    assert inspect.signature(discover.discover).parameters["ssh_state"].default is inspect.Parameter.empty
+    cli = (Path(__file__).resolve().parent.parent / "scripts" / "kubegap").read_text(encoding="utf-8")
+    assert cli.count("_discover.discover(") == 2 and cli.count("ssh_state=_firstrun.ssh_decision(snap.parent, cfg)") == 2
     assert inspect.signature(discover._node_access).parameters["ssh_state"].default == "yes"  # `kubegap nodes` is itself the decision
 
 
