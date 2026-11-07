@@ -8,26 +8,18 @@ Output: the `kedactl` section of summary.json. Shape documented in SKILL.md.
 
 from __future__ import annotations
 
-import datetime as _dt
 import re
 from collections import Counter
 from pathlib import Path
 
 from . import podmetrics as _pm
 from .promtext import parse as _parse_prom
-from .snapshot import load_json, objects
+from .snapshot import load_json, objects, parse_ts, taken_at
 
 
 def _ver(image: str | None):
     m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
     return m.group(1) if m else None
-
-
-def _ts(s):
-    try:
-        return _dt.datetime.fromisoformat(str(s))
-    except (ValueError, TypeError):
-        return None
 
 
 def _deploy(snap: Path, name_sub: str) -> dict:
@@ -66,7 +58,7 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
     sjs = objects(snap, "scaledjobs.keda.sh")
     if not (op["present"] or ms["present"] or sos):
         return {"present": False}
-    now = _ts(inv.get("taken_at")) or _dt.datetime.now(_dt.UTC)
+    now = taken_at(inv)
     prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
     # operator flags
     op_args = op.get("args") or []
@@ -118,7 +110,7 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
         sp = x.get("spec") or {}
         st = x.get("status") or {}
         conds = {c.get("type"): c.get("status") for c in st.get("conditions") or []}
-        last_active = _ts(st.get("lastActiveTime"))
+        last_active = parse_ts(st.get("lastActiveTime"))
         days_inactive = round((now - last_active).total_seconds() / 86400, 1) if last_active else None
         triggers = sp.get("triggers") or []
         auth_missing = []

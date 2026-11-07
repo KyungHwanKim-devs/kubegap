@@ -10,26 +10,18 @@ Result: the `argocdctl` section of summary.json. Shape is described in SKILL.md.
 
 from __future__ import annotations
 
-import datetime as _dt
 import re
 from collections import Counter
 from pathlib import Path
 
 from .durations import go_duration_s
 from .promtext import parse as _parse_prom
-from .snapshot import load_json, objects
+from .snapshot import load_json, objects, parse_ts, taken_at
 
 
 def _ver(image: str | None):
     m = re.search(r":v?([0-9]+\.[0-9]+\.[0-9]+)", image or "")
     return m.group(1) if m else None
-
-
-def _ts(s):
-    try:
-        return _dt.datetime.fromisoformat(str(s))
-    except (ValueError, TypeError):
-        return None
 
 
 def _dur_s(s) -> float | None:
@@ -66,7 +58,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     wls = [w for w in objects(snap, "deployments") + objects(snap, "statefulsets") if w["metadata"]["namespace"] == "argocd" and w["metadata"]["name"].startswith("argocd-")]
     if not apps and not wls:
         return {"present": False}
-    now = _ts(inv.get("taken_at")) or _dt.datetime.now(_dt.UTC)
+    now = taken_at(inv)
     prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
     comps = {}
     for w in wls:
@@ -153,8 +145,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         op = st.get("operationState") or {}
         dest_ns = (sp.get("destination") or {}).get("namespace")
         kinds = Counter(r.get("kind") for r in st.get("resources") or [])
-        fin = _ts(op.get("finishedAt"))
-        rec = _ts(st.get("reconciledAt"))
+        fin = parse_ts(op.get("finishedAt"))
+        rec = parse_ts(st.get("reconciledAt"))
         sync = (st.get("sync") or {}).get("status")
         health = (st.get("health") or {}).get("status")
         cond = [c.get("type") for c in st.get("conditions") or []]

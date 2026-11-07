@@ -26,7 +26,7 @@ from typing import ClassVar
 from . import __version__, paths, rubric, versions
 from .config import Config
 from .resilience import is_db_like, mounts_pvc
-from .snapshot import load_json, write_private
+from .snapshot import load_json, taken_at, write_private
 from .snapshot import objects as snapshot_objects
 
 SAFE_BUILTINS = {
@@ -75,9 +75,9 @@ class Context:
         self.prod_like = set((inv.get("namespaces") or {}).get("prod_like") or [])
         self._objects: dict[str, list] = {}
         self._k8s_versions = rubric.load_k8s_versions()
-        # `inv["today"]` (YYYY-MM-DD) pins the date the date-based checks compare against. Only the embedded test cases set it, so their
-        # expected verdicts do not change as the calendar moves past a version's end-of-support date. A real inventory has no such key.
-        self.today = _dt.date.fromisoformat(str(inv["today"])[:10]) if inv.get("today") else _dt.date.today()
+        # The date the date-based checks (end of support, certificate expiry, suppress `until`) compare against: the snapshot date, so the same snapshot
+        # gives the same verdicts later (#165). `inv["today"]` (YYYY-MM-DD) pins it instead; only the embedded test cases set it. A real inventory has no such key.
+        self.today = _dt.date.fromisoformat(str(inv["today"])[:10]) if inv.get("today") else taken_at(inv).date()
         self._addon_versions: dict[str, dict] = {}
         self._owners: dict[tuple[str, str], str] | None = None
         self._pods: dict[tuple[str, str], dict] | None = None
@@ -964,7 +964,7 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
     mode = paths.snapshot_mode(
         snap
     )  # daily or full. A check marked `modes: [full]` needs inputs the daily run does not collect, so it is reported as not-collected instead of being evaluated on missing data (which would turn "file absent" into false absence findings)
-    active_sup, expired_sup = rubric.active_suppressions(cfg.get("suppress"))
+    active_sup, expired_sup = rubric.active_suppressions(cfg.get("suppress"), cx.today)
     overrides = cfg.get("overrides") or {}
 
     results: list[dict] = []

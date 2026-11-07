@@ -26,7 +26,7 @@ from .mask import mask_text, strip_control
 from .promtext import parse as _parse_prom
 from .signatures import Signature
 from .signatures import load as load_signatures
-from .snapshot import COMPONENT_LOGS_DIR, component_logs_aggregate, component_logs_removed, load_json
+from .snapshot import COMPONENT_LOGS_DIR, component_logs_aggregate, component_logs_removed, load_json, taken_at
 
 ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})")
 KLOG_TS_RE = re.compile(r"\b[IWEF](\d{2})(\d{2}) (\d{2}:\d{2}:\d{2})")
@@ -57,15 +57,14 @@ TS_ANY_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-
 MAX_FILE_BYTES = 30 * 1024 * 1024
 
 
-def _ts_of(line: str) -> str | None:
+def _ts_of(line: str, today: _dt.date) -> str | None:
     """The first timestamp in the line as written (ISO 8601 with its fraction and offset when present, so `_parse_iso` keeps a `+09:00` line 9 hours apart
-    from a `Z` one), else a klog header `E1104 15:10:15` completed with the current year (no offset: read as UTC, and by `scan` once more as node-local time)."""
+    from a `Z` one), else a klog header `E1104 15:10:15` completed with the year of `today`, the snapshot date (no offset: read as UTC, and by `scan` once more as node-local time)."""
     m = ISO_TZ_RE.search(line)
     if m:
         return m.group(0)
     m = KLOG_TS_RE.search(line)
     if m:
-        today = _dt.date.today()
         y = today.year - 1 if (int(m.group(1)), int(m.group(2))) > (today.month, today.day) else today.year  # a January scan reads December lines as last year's
         return f"{y}-{m.group(1)}-{m.group(2)}T{m.group(3)}"
     return None
@@ -180,14 +179,9 @@ def scan(snap: Path, sigs: list[Signature]) -> dict:
     boot_until = _node_boot_windows(snap)
     boot_skipped: Counter = Counter()
     # klog lines in the k3s journal ("E1025 13:23:38") are node-local time without a tz. Interpret them once more with the snapshot's taken_at offset (operator local = small k3s cluster node local) to compare against the boot window
-    local_tz = None
-    try:
-        taken = ((load_json(snap / "inventory.json") or {}).get("taken_at")) or ""
-        m_tz = re.search(r"([+-]\d{2}):?(\d{2})$", taken)
-        if m_tz:
-            local_tz = _dt.timezone((1 if m_tz.group(0)[0] == "+" else -1) * _dt.timedelta(hours=int(m_tz.group(1)[1:]), minutes=int(m_tz.group(2))))
-    except (ValueError, TypeError):
-        local_tz = None
+    taken = taken_at(load_json(snap / "inventory.json"))
+    local_tz = taken.tzinfo
+    today = taken.date()  # completes the year of a klog header
     for f in files:
         rel = str(f.relative_to(snap))
         applicable = [s for s in sigs if s.applies_to(rel)]
@@ -211,7 +205,7 @@ def scan(snap: Path, sigs: list[Signature]) -> dict:
             if any_re.search(line):
                 matched_ids = match_line(line, applicable)
                 if node_boot_until is not None:
-                    ts_txt = _ts_of(line)
+                    ts_txt = _ts_of(line, today)
                     lt = _parse_iso(ts_txt)
                     if lt is not None and local_tz is not None and not (ISO_RE.search(line)) and KLOG_TS_RE.search(line):
                         lt_local = lt.replace(tzinfo=local_tz)
@@ -230,7 +224,7 @@ def scan(snap: Path, sigs: list[Signature]) -> dict:
                         h = hits[s.id]
                         h["count"] += 1
                         h["files"][rel] += 1
-                        ts = _utc_str(_ts_of(line), local_tz)
+                        ts = _utc_str(_ts_of(line, today), local_tz)
                         if ts:
                             h["first"] = min(h["first"], ts) if h["first"] else ts
                             h["last"] = max(h["last"], ts) if h["last"] else ts
@@ -347,11 +341,7 @@ def analyze_loki(snap: Path, inv: dict) -> dict:
     out["pods_with_logs_1h"] = len(pods_lbl)
     out["namespaces_with_logs_1h"] = len(ns_lbl)
     pods = load_json(snap / "objects" / "pods.json") or {}
-    taken = inv.get("taken_at")
-    try:
-        now = _dt.datetime.fromisoformat(taken) if taken else _dt.datetime.now().astimezone()
-    except ValueError:
-        now = _dt.datetime.now().astimezone()
+    now = taken_at(inv)
     missing: list[dict] = []
     running_old = 0
     by_node_total: Counter = Counter()

@@ -18,7 +18,7 @@ from pathlib import Path
 from . import versions
 from .durations import go_duration_s
 from .events import count_of
-from .snapshot import component_logs_aggregate, component_logs_removed, load_json, objects
+from .snapshot import component_logs_aggregate, component_logs_removed, load_json, objects, parse_ts, taken_at
 
 ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.\d+)?(Z|[+-]\d{2}:?\d{2})?")
 
@@ -67,23 +67,6 @@ def launch_failure_key(line: str) -> str | None:
         m = _LAUNCH_CODE.search(line) or _LAUNCH_PHRASE.search(line)  # the EC2 code names the cause; the controller phrase only says a launch failed
         return m.group(1) if m else None
     return None
-
-
-def _ts(s) -> _dt.datetime | None:
-    if not s:
-        return None
-    m = ISO_RE.search(str(s))
-    if not m:
-        return None
-    try:
-        d = _dt.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S")
-    except ValueError:
-        return None
-    tz = m.group(2)
-    if not tz or tz == "Z":
-        return d.replace(tzinfo=_dt.UTC)
-    sign = 1 if tz[0] == "+" else -1
-    return d.replace(tzinfo=_dt.timezone(sign * _dt.timedelta(hours=int(tz[1:3]), minutes=int(tz[-2:]))))
 
 
 def _dur_h(s: str | None) -> float | None:
@@ -139,7 +122,7 @@ def _hpa(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
         mn, mx = sp.get("minReplicas", 1), sp.get("maxReplicas")
         cur, des = st.get("currentReplicas"), st.get("desiredReplicas")
         sa = conds.get("ScalingActive", (None, None, ""))
-        last_scale = _ts(st.get("lastScaleTime"))
+        last_scale = parse_ts(st.get("lastScaleTime"))
         row = {
             "namespace": ns,
             "name": name,
@@ -378,10 +361,10 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
         md, st = c["metadata"], c.get("status") or {}
         labels = md.get("labels") or {}
         conds = {x.get("type"): x for x in st.get("conditions") or []}
-        created = _ts(md.get("creationTimestamp"))
+        created = parse_ts(md.get("creationTimestamp"))
 
         def secs(t):
-            tt = _ts((conds.get(t) or {}).get("lastTransitionTime")) if (conds.get(t) or {}).get("status") == "True" else None
+            tt = parse_ts((conds.get(t) or {}).get("lastTransitionTime")) if (conds.get(t) or {}).get("status") == "True" else None
             return round((tt - created).total_seconds()) if (tt and created) else None
 
         pool = labels.get("karpenter.sh/nodepool")
@@ -431,7 +414,7 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
         for line in text.splitlines():
             if '"logger":"controller"' not in line and "level=" not in line:
                 continue
-            ts = _ts(line)
+            ts = parse_ts(line)
             m = re.search(r'"message":"(launched|registered|initialized) nodeclaim".*?"NodeClaim":\{"name":"([^"]+)"', line)
             if m and ts:
                 lat[m.group(2)][m.group(1)] = ts
@@ -535,7 +518,7 @@ KARPENTER_LOG_KEYS = ("latency_24h", "nodeclaims_launched_24h", "disruptions_24h
 
 
 def analyze(snap: Path, inv: dict | None) -> dict:
-    now = _dt.datetime.now(_dt.UTC)
+    now = taken_at(inv)
     keda = _keda(snap)
     hpa = _hpa(snap, inv, now)
     karpenter = _karpenter(snap, inv, now)

@@ -200,9 +200,8 @@ def resolve_thresholds(check: dict, profile: dict, cfg_overrides: dict) -> dict:
     return out
 
 
-def active_suppressions(cfg_suppress: list | None, today: _dt.date | None = None) -> tuple[list[dict], list[dict]]:
-    """Split the config.yaml suppress list into (active, expired)."""
-    today = today or _dt.date.today()
+def active_suppressions(cfg_suppress: list | None, today: _dt.date) -> tuple[list[dict], list[dict]]:
+    """Split the config.yaml suppress list into (active, expired); `today` is the snapshot date (`evaluate.Context.today`)."""
     active, expired = [], []
     for s in cfg_suppress or []:
         until = s.get("until")

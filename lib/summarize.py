@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import __version__, paths
 from .runlog import read_runlog
-from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, items, load_json, remove_stale_temp, write_private
+from .snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, COMPONENT_LOGS_MARKER, component_logs_removed, items, load_json, remove_stale_temp, taken_at, write_private
 
 WAITING_REASONS = ("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "CreateContainerConfigError", "CreateContainerError", "InvalidImageName", "RunContainerError")
 LABEL_KEEP = ("__name__", "namespace", "pod", "container", "node", "instance", "mountpoint", "qos_class", "reason", "job", "horizontalpodautoscaler", "endpoint", "kind", "phase", "poddisruptionbudget", "service", "deployment")
@@ -265,13 +265,12 @@ BAD_TRUE = {"Degraded", "Stalled", "Failed", "Error", "Unhealthy", "Suspended", 
 SKIP_KINDS = {"pods", "nodes", "events", "jobs.batch", "replicasets.apps", "endpointslices.discovery.k8s.io", "leases.coordination.k8s.io"}
 
 
-def summarize_conditions(snap: Path) -> dict:
+def summarize_conditions(snap: Path, now: _dt.datetime) -> dict:
     """Scan status.conditions on every object and collect bad patterns (Ready=False, Degraded=True and the like). Operators without a dedicated collector get baseline coverage."""
     odir = snap / "objects"
     out: dict = {"source": "objects/*.json", "scanned_kinds": 0, "scanned_objects": 0, "unhealthy": [], "by_kind": {}}
     if not odir.is_dir():
         return out
-    now = _dt.datetime.now(_dt.UTC)
     for f in sorted(odir.glob("*.json")):
         if f.stem in SKIP_KINDS:
             continue
@@ -374,14 +373,14 @@ def summarize_webhooks(snap: Path) -> dict:
     }
 
 
-def summarize_recent_changes(snap: Path, hours: int = 24, now: _dt.datetime | None = None) -> dict:
+def summarize_recent_changes(snap: Path, now: _dt.datetime, hours: int = 24) -> dict:
     """`recent_changes` of summary.json, read in every mode: workloads changed in the last N hours. A Deployment's change time is the `lastUpdateTime` of its
     conditions (the Progressing condition is refreshed on every rollout: kubernetes/kubernetes pkg/controller/deployment/progress.go:36@v1.37.2 `syncRolloutStatus`). StatefulSets and
     DaemonSets declare `status.conditions` but no controller writes them (0 writers in pkg/controller/statefulset and pkg/controller/daemon at v1.30.14 and v1.37.2;
     #124 K2-1), so their change time is the `creationTimestamp` of the newest ControllerRevision they own (the controllers create one per template change:
     pkg/controller/history/controller_history.go:293@v1.37.2 `CreateControllerRevision`). The targets of ScalingReplicaSet/SuccessfulCreate events are listed too; generation is recorded."""
     odir = snap / "objects"
-    since = (now or _dt.datetime.now(_dt.UTC)) - _dt.timedelta(hours=hours)
+    since = now - _dt.timedelta(hours=hours)
     changed: list[dict] = []
     revisions: dict[tuple[str, str, str], _dt.datetime] = {}  # (owner kind, namespace, owner name) -> newest ControllerRevision creation
     for cr in items(load_json(odir / "controllerrevisions.apps.json")):
@@ -557,6 +556,7 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
     """Build summary.json. Unless keep_component_logs is true the component pod logs are deleted afterwards, with their log-derived aggregates saved to logs/pods/AGGREGATED.json; lib/logs.py and lib/scaling.py read that file on a rerun, so the result does not change."""
     remove_stale_temp(snap)
     inv = load_json(snap / "inventory.json")
+    now = taken_at(inv)  # the one clock of a summary: every age, window and expiry below is measured from the snapshot time (#165)
     s = {
         "kubegap": __version__,
         "snapshot": str(snap),
@@ -565,13 +565,13 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
         "events": summarize_events(snap),
         "metrics": summarize_metrics(snap),
         "objects": summarize_objects(snap, inv),
-        "conditions": summarize_conditions(snap),
+        "conditions": summarize_conditions(snap, now),
         "webhooks": summarize_webhooks(snap),
         "observability": _component("observability", snap, inv),
         "controlplane": _component("controlplane", snap, inv),
         "nodeos": _component("nodeos", snap, inv),
         "k3s": _component("k3s", snap, inv, on_error={"present": None}),
-        "recent_changes": summarize_recent_changes(snap),
+        "recent_changes": summarize_recent_changes(snap, now),
         "logs": summarize_logs(snap, inv),
         "tools": summarize_tools(snap),
         "resources": _component("resources", snap, inv),

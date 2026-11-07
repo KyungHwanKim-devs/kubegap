@@ -9,22 +9,14 @@ Result: the `ecr` section of summary.json. Shape is described in SKILL.md.
 
 from __future__ import annotations
 
-import datetime as _dt
 import json
 from collections import Counter
 from pathlib import Path
 
-from .snapshot import load_json, objects
+from .snapshot import load_json, objects, parse_ts, taken_at
 
 ECR_STORAGE_USD_PER_GB_MONTH = 0.10  # same list price in every region (as of 2026-10)
 STALE_PULL_DAYS = 90
-
-
-def _ts(s):
-    try:
-        return _dt.datetime.fromisoformat(str(s))
-    except (ValueError, TypeError):
-        return None
 
 
 def _registry_of(image: str) -> str:
@@ -37,7 +29,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     repos_doc = load_json(snap / "aws" / "ecr-repositories.json")
     if repos_doc is None:
         return {"present": False, "reason": "aws/ecr-repositories.json missing (not EKS, or ecr:DescribeRepositories failed)"}
-    now = _ts(inv.get("taken_at")) or _dt.datetime.now(_dt.UTC)
+    now = taken_at(inv)
     prod = set((inv.get("namespaces") or {}).get("prod_like") or [])
     account = ((inv.get("eks") or {}).get("account")) or (repos_doc.get("repositories") or [{}])[0].get("registryId")
     registry = load_json(snap / "aws" / "ecr-registry.json") or {}
@@ -74,8 +66,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         real = [i for i in ims if i not in attest]
         untagged = [i for i in real if not i.get("imageTags")]
         size_b = sum(i.get("imageSizeInBytes") or 0 for i in ims)
-        last_push = max((_ts(i.get("imagePushedAt")) for i in ims if i.get("imagePushedAt")), default=None)
-        last_pull = max((_ts(i.get("lastRecordedPullTime")) for i in ims if i.get("lastRecordedPullTime")), default=None)
+        last_push = max((parse_ts(i.get("imagePushedAt")) for i in ims if i.get("imagePushedAt")), default=None)
+        last_pull = max((parse_ts(i.get("lastRecordedPullTime")) for i in ims if i.get("lastRecordedPullTime")), default=None)
         scan_status = Counter((i.get("imageScanStatus") or {}).get("status", "none") for i in real)
         sev: Counter = Counter()
         for i in real:

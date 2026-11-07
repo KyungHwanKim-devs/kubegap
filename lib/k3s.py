@@ -18,7 +18,7 @@ from pathlib import Path
 
 from .controlplane import workload_of
 from .nodeos import _int, _kv, _num, parse_sections
-from .snapshot import items, load_json
+from .snapshot import items, load_json, taken_at
 
 # source: k3s-io/k3s pkg/cli/cert/cert.go:106-122@v1.33.5+k3s1; :104-120@v1.37.2+k3s1 (`%s: certificate %s (%s) is ok, expires at %s` / `will expire within %d days at %s` / `expired at %s` / `is not valid before %s`, RFC3339 times); pkg/util/cert.go:12-15, 37@v1.33.5+k3s1 (usages CertSign, ServerAuth, ClientAuth, Unknown joined with commas)
 CERT_RE = re.compile(r'msg="([^:"]+): certificate ([^ ]+) \(([A-Za-z,]+)\) (is ok, expires at|will expire within \d+ days at|expired at|is not valid before) ([0-9T:Z+-]+)"')
@@ -71,7 +71,7 @@ def _parse_args(args: list[str]) -> dict:
     return out
 
 
-def _parse_server(lines: list[str]) -> dict:
+def _parse_server(lines: list[str], now: _dt.datetime) -> dict:
     kv = _kv([ln for ln in lines if "=" in ln and not ln.startswith(" ") and ":" not in ln.split("=")[0]])
     out: dict = {
         "secrets_encryption": kv.get("secrets_encrypt") or None,
@@ -83,7 +83,6 @@ def _parse_server(lines: list[str]) -> dict:
         "certificates_raw_lines": 0,
     }
     mode = None
-    now = _dt.datetime.now(_dt.UTC)
     for ln in lines:
         s = ln.strip()
         if s == "etcd_snapshots:":
@@ -296,10 +295,10 @@ def _node_runtime(rec: dict, sec: dict) -> None:
     }
 
 
-def _node_server_storage(rec: dict, sec: dict) -> None:
+def _node_server_storage(rec: dict, sec: dict, now: _dt.datetime) -> None:
     """Fills rec from the server, registries, containerd, local-path, disks and thermal sections of logs/node/<node>/k3s-platform.txt and records sudoers gaps."""
     srv = sec.get("server", [])
-    rec["server"] = _parse_server(srv) if any(ln.strip() for ln in srv) else None
+    rec["server"] = _parse_server(srv, now) if any(ln.strip() for ln in srv) else None
     if rec["role"] == "server" and rec["server"]:
         if not rec["server"].get("secrets_encryption"):
             rec["gaps"].append("k3s secrets-encrypt status (sudoers)")
@@ -333,7 +332,7 @@ def _node_server_storage(rec: dict, sec: dict) -> None:
     rec["thermal_max_c"] = max(th.values(), default=None)
 
 
-def _nodes(snap: Path, nodes_inv: list[dict]) -> tuple[list[dict], set[str], Counter]:
+def _nodes(snap: Path, nodes_inv: list[dict], now: _dt.datetime) -> tuple[list[dict], set[str], Counter]:
     """(node records, node IPs, kubelet version counter). Reads objects/nodes.json and logs/node/<node>/k3s-platform.txt per node."""
     node_objs = {n["metadata"]["name"]: n for n in items(load_json(snap / "objects" / "nodes.json"))}
     node_ips: set[str] = set()
@@ -352,7 +351,7 @@ def _nodes(snap: Path, nodes_inv: list[dict]) -> tuple[list[dict], set[str], Cou
         rec["collected"] = True
         sec = parse_sections(path.read_text(encoding="utf-8", errors="replace"))
         _node_runtime(rec, sec)
-        _node_server_storage(rec, sec)
+        _node_server_storage(rec, sec, now)
         recs.append(rec)
     return recs, node_ips, versions
 
@@ -495,7 +494,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     platform = (inv.get("cluster") or {}).get("platform")
     if platform not in ("k3s", "rke2"):
         return {"present": False, "note": f"platform {platform}: not k3s"}
-    recs, node_ips, versions = _nodes(snap, (inv.get("nodes") or {}).get("nodes", []))
+    recs, node_ips, versions = _nodes(snap, (inv.get("nodes") or {}).get("nodes", []), taken_at(inv))
     return {
         "present": True,
         "source": "objects/nodes.json(k3s.io/node-args) + logs/node/<node>/k3s-platform.txt + objects/*",

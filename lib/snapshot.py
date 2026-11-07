@@ -13,8 +13,10 @@ content (the tool binaries `kubegap setup --install` places in `.tools/bin/`). `
 from __future__ import annotations
 
 import contextlib
+import datetime as _dt
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -76,6 +78,43 @@ def load_json(path: Path) -> Any:
 def items(doc: Any) -> list:
     """The "items" list of a kubectl list document. Empty list for None, a non-dict or a document without items."""
     return (doc.get("items") or []) if isinstance(doc, dict) else []
+
+
+_HELM_TS_RE = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})(?:\.\d+)?(?: ([+-]\d{4}))?")  # Go time.String(): 2025-12-29 02:07:42.385466 +0900 KST
+_ISO_IN_TEXT_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?")
+
+
+def parse_ts(s: Any) -> _dt.datetime | None:
+    """An aware datetime from a timestamp the snapshot holds, else None.
+
+    Reads the ISO 8601 forms kubectl and the inventory write (`2026-11-05T08:25:17Z`, `2026-11-05T17:25:17+09:00`, with a fraction), helm's
+    `time.String()` form in `helm list` output (`2025-12-29 02:07:42.385466 +0900 KST`) and the first ISO timestamp inside a longer string (a log line).
+    A timestamp without an offset is UTC, so every value compares with every other. Every summary module reads its timestamps through this one function.
+    """
+    if not s:
+        return None
+    s = str(s)
+    try:
+        d = _dt.datetime.fromisoformat(s)
+    except ValueError:
+        d = None
+    if d is None:
+        m = _HELM_TS_RE.match(s)
+        if m:
+            d = _dt.datetime.strptime(m.group(1) + (m.group(2) or "+0000"), "%Y-%m-%d %H:%M:%S%z")
+        else:
+            m = _ISO_IN_TEXT_RE.search(s)
+            if not m:
+                return None
+            d = _dt.datetime.fromisoformat(m.group(0).replace(",", "."))
+    return d.replace(tzinfo=_dt.UTC) if d.tzinfo is None else d
+
+
+def taken_at(inv: dict | None) -> _dt.datetime:
+    """When the snapshot was taken: `taken_at` of inventory.json, aware. Every age, window and expiry a summary module or a check computes measures
+    from here, never from the wall clock, so summarizing the same snapshot a day later gives the same result (#165). An inventory without the key
+    (only one a test builds) gets the wall clock."""
+    return parse_ts((inv or {}).get("taken_at")) or _dt.datetime.now(_dt.UTC)
 
 
 COMPONENT_LOGS_DIR = Path("logs") / "pods"

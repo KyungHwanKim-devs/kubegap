@@ -3,6 +3,7 @@ format strings, and the parsers of lib/nodeos.py and lib/k3s.py against the text
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 import subprocess
 from pathlib import Path
@@ -10,6 +11,8 @@ from pathlib import Path
 import pytest
 
 from lib import k3s, nodeos
+
+NOW = dt.datetime(2026, 11, 5, 17, 25, 17, tzinfo=dt.UTC)  # the etcd snapshot and certificate ages are measured from the snapshot time, not the wall clock (#165)
 
 ROOT = Path(__file__).resolve().parent.parent
 NODE_OS = (ROOT / "collectors" / "core" / "node-os.sh").read_text(encoding="utf-8")
@@ -155,16 +158,8 @@ CERT_LINES = [
 ]
 
 
-def test_certificate_check_wordings_of_k3s(monkeypatch):
-    import datetime as dt
-
-    class Fixed(dt.datetime):
-        @classmethod
-        def now(cls, tz=None):
-            return cls(2026, 11, 5, 17, 25, 17, tzinfo=dt.UTC)
-
-    monkeypatch.setattr(k3s._dt, "datetime", Fixed)
-    out = k3s._parse_server(["secrets_encrypt=Disabled, no configuration file found", "certificates:", *CERT_LINES])
+def test_certificate_check_wordings_of_k3s():
+    out = k3s._parse_server(["secrets_encrypt=Disabled, no configuration file found", "certificates:", *CERT_LINES], NOW)
     assert [c["status"] for c in out["certificates"]] == ["ok", "expiring", "expired", "not-yet-valid"]
     assert out["certificates"][2]["usage"] == "ServerAuth,ClientAuth"
     assert [c["name"] for c in out["certificates_expiring_90d"]] == ["system:admin", "kube-apiserver"], "the warning wording (120-day window) and the expired one are under 90 days"
@@ -179,7 +174,8 @@ def test_etcd_snapshot_rows_and_journald_sizes():
             "etcd-snapshot-kkh2-1793664001 file:///var/lib/rancher/k3s/server/db/snapshots/etcd-snapshot-kkh2-1793664001 39432224 2026-11-03T00:00:01Z",
             "etcd-snapshot-kkh2-1793707204 s3://bucket/etcd-snapshot-kkh2-1793707204 39514144 2026-11-03T12:00:04Z",
             "db_mb=594",
-        ]
+        ],
+        NOW,
     )
     assert [s["offsite"] for s in out["etcd_snapshots"]] == [False, True] and out["snapshot_interval_h"] == 12.0 and out["etcd_snapshots"][0]["size_mb"] == 37.6
     rec: dict = {"gaps": [], "role": "server"}
