@@ -130,3 +130,50 @@ def test_pluto_rows_take_the_kind_from_the_api_block(tmp_path):
     (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {"pluto": {"ok": True, "api_read": True}}}}))
     row = hygiene._deprecated(hygiene._Ctx(tmp_path, {}))["items"][0]
     assert (row["kind"], row["name"], row["namespace"], row["api"], row["removed_in"], row["replacement"]) == ("Deployment", "web", "default", "apps/v1beta2", "v1.16.0", "apps/v1")
+
+
+# ---------- one object, two tools, one row (#164) ----------
+
+PLUTO_WEB = {"name": "web", "namespace": "default", "api": {"version": "apps/v1beta2", "kind": "Deployment", "deprecated-in": "v1.9.0", "removed-in": "v1.16.0", "replacement-api": "apps/v1"}, "deprecated": True, "removed": True}
+KUBENT_WEB = {"Name": "web", "Namespace": "<undefined>", "Kind": "Deployment", "ApiVersion": "apps/v1beta2", "RuleSet": "Deprecated APIs removed in 1.16", "ReplaceWith": "apps/v1", "Since": "1.9.0"}
+
+
+def _rows(tmp_path, pluto_items, kubent_rows):
+    snap = _snap(tmp_path, pluto={"items": pluto_items, "target-versions": {"k8s": "v1.33.0"}}, kubent=kubent_rows)
+    return hygiene._deprecated(hygiene._Ctx(snap, {"cluster": {"server_version": "v1.32.0"}}))["items"]
+
+
+def test_a_manifest_without_a_namespace_is_one_row_with_plutos_namespace(tmp_path):
+    rows = _rows(tmp_path, [PLUTO_WEB], [KUBENT_WEB])
+    assert len(rows) == 1 and rows[0]["namespace"] == "default" and rows[0]["tools"] == ["kubent", "pluto"] and rows[0]["source"] == "kubent+pluto"
+    assert rows[0]["removed"] is True and rows[0]["replacement"] == "apps/v1" and rows[0]["rule"] == "Deprecated APIs removed in 1.16"
+
+
+def test_a_manifest_with_a_namespace_merges_on_it_and_another_namespace_stays_apart(tmp_path):
+    rows = _rows(tmp_path, [PLUTO_WEB, {**PLUTO_WEB, "namespace": "staging"}], [{**KUBENT_WEB, "Namespace": "default"}])
+    by_ns = {r["namespace"]: r for r in rows}
+    assert set(by_ns) == {"default", "staging"} and by_ns["default"]["tools"] == ["kubent", "pluto"] and by_ns["staging"]["tools"] == ["pluto"]
+
+
+def test_a_cluster_scoped_object_keeps_no_namespace_and_merges_on_the_name(tmp_path):
+    pluto = {"name": "restricted", "api": {"version": "policy/v1beta1", "kind": "PodSecurityPolicy", "removed-in": "v1.25.0"}, "deprecated": True, "removed": True}
+    rows = _rows(tmp_path, [pluto], [KUBENT_ROWS[0]])
+    assert len(rows) == 1 and rows[0]["namespace"] is None and rows[0]["tools"] == ["kubent", "pluto"]
+
+
+def test_a_nameless_namespace_with_two_candidates_is_not_merged_and_says_so(tmp_path):
+    rows = _rows(tmp_path, [PLUTO_WEB, {**PLUTO_WEB, "namespace": "staging"}], [KUBENT_WEB])
+    unmerged = [r for r in rows if r["namespace"] is None]
+    assert len(rows) == 3 and len(unmerged) == 1 and "2 namespaces (default, staging)" in unmerged[0]["note"]
+
+
+def test_the_check_target_is_one_per_object(tmp_path):
+    from lib import evaluate, rubric
+
+    snap = _snap(tmp_path, pluto={"items": [PLUTO_WEB], "target-versions": {"k8s": "v1.33.0"}}, kubent=[KUBENT_WEB])
+    inv = {"cluster": {"platform": "eks", "server_version": "v1.32.0"}, "namespaces": {"prod_like": []}, "profile": {"name": "prod"}}
+    (snap / "inventory.json").write_text(json.dumps(inv))
+    summary = {"hygiene": {"deprecated": hygiene._deprecated(hygiene._Ctx(snap, inv))}}
+    check = next(c for c in rubric.load_checks(["core"])[0] if c["id"] == "hygiene.deprecated-api")
+    r = evaluate.evaluate_check(check, evaluate.Context(snap, inv, summary, rubric.load_profile("prod")), rubric.resolve_thresholds(check, rubric.load_profile("prod"), {}))
+    assert [f["target"] for f in r["findings"]] == ["default/deployment/web"] and "[kubent+pluto]" in r["findings"][0]["evidence"]
