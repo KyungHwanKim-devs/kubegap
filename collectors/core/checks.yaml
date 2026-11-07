@@ -22783,21 +22783,20 @@
           local_only: true
           note: "offsite_hint records whether the command, args or env values contain a string such as s3, rclone or restic (names only, values are not recorded)"
 - id: resilience.prod-db-without-backup-cronjob
-  name: Production DB workload has no backup CronJob
+  name: Production database has no backup CronJob that dumps it
   area: resilience
   type: summary
-  each: resilience.backup
-  cluster_level: true
+  each: resilience.backup.databases
   rule:
-    warn_expr: "len(item['prod_db_without_backup_cronjob']) > 0"
-  target: "'cluster'"
-  evidence: "f\"Of {item['db_workloads_with_pvc']} DB workloads with a PVC, production DBs without a backup CronJob in the same namespace: {item['prod_db_without_backup_cronjob']}. Backup CronJobs {item['count']} (local only {len(item['local_only'])}, same node as source {len(item['same_node'])})\""
+    warn_expr: "item['prod'] and not item['backup_cronjobs']"
+  target: "item['target']"
+  evidence: "f\"{item['kind']} {item['name']} (Service {', '.join(item['services']) or 'none'}, PVC {', '.join(item['pvcs'])}): no backup CronJob names it\" + (f\"; the namespace's backup CronJobs dump other databases: \" + ', '.join(f\"{o['name']}{' (suspended)' if o['suspend'] else ''} -> {', '.join(t.split('/')[-1] for t in o['targets_db']) or 'no database matched'}\" for o in item['other_backup_cronjobs_in_namespace']) if item['other_backup_cronjobs_in_namespace'] else '; the namespace has no backup CronJob')"
   severity_default: medium
   symptom_linked: false
   why: >
-    resilience.no-backup asks whether the cluster has any backup mechanism (Velero, k8up, etcd snapshots, dump CronJobs). This check is one level down — does each DB have a dump. A CronJob with backup, dump or snapshot in its name in the same namespace counts as present (operator CR backups and external backups are invisible → warn at most).
+    resilience.no-backup asks whether the cluster has any backup mechanism (Velero, k8up, etcd snapshots, dump CronJobs). This check is one level down — does each DB have a dump. A CronJob counts for a database when its command, args or env name the database's Service, its workload or its first pod as a whole token (the host of pg_dump -h or mysqldump -h); a CronJob in the same namespace that dumps another database does not count, and the evidence lists it so the reader sees what the namespace does back up (#169). Caches, queues, monitoring stores and MinIO (redis, kafka, prometheus, minio and the like) are not asked a dump of; they are listed in summary resilience.backup.excluded_stores. A CronJob is a backup CronJob when backup, dump or snapshot is in its name or in the start of its command; whether it counts for a database is the token match above, so a CronJob named for one database does not cover the others. Operator-managed backups (CloudNativePG, Percona, k8up, Velero) are the business of resilience.no-backup, not of this check.
   measured: >
-    Measured: on an EKS cluster none of the 5 production DBs had one (nor EBS snapshots, storage section); on a small k3s cluster, 2 production Postgres instances.
+    Measured on a small k3s cluster: 7 backup CronJobs, each naming one database's Service in its dump command; 3 of 9 production databases had none (two Postgres, one Qdrant next to a MySQL that has a dump). On an EKS cluster, none of the 8 production databases had a CronJob.
   suggest: "A dump CronJob (pg_dump, mysqldump) per DB plus an off-node copy. On EKS an EBS snapshot policy (DLM) or Velero can replace it — then suppress this warning."
   verify:
     - "kubectl get cronjobs -A | grep -iE 'backup|dump|snapshot'"
@@ -22806,43 +22805,63 @@
     cases:
       - expect: "warn"
         item:
-          count: 7
-          local_only:
-            - "prod-i/app-k-postgres-backup"
-            - "prod-h/app-i-postgres-backup"
-            - "prod-m/app-i-postgres-mx-backup"
-            - "prod-n/app-i-postgres-vn-backup"
-            - "app-o-api/app-o-postgres-backup"
-            - "app-l-prod/app-l-mysql-backup"
-            - "prod-k/app-m-postgres-backup"
-          same_node:
-            - "prod-h/app-i-postgres-backup"
-            - "prod-m/app-i-postgres-vn-backup"
-            - "app-o-api/app-o-postgres-backup"
-            - "app-l-prod/app-l-mysql-backup"
-            - "prod-k/app-m-postgres-backup"
-          prod_db_without_backup_cronjob:
-            - "prod-l/statefulset/app-n-postgres"
-          db_workloads_with_pvc: 16
+          namespace: "prod-a"
+          kind: "statefulset"
+          name: "qdrant"
+          target: "prod-a/statefulset/qdrant"
+          prod: true
+          pvcs:
+            - "qdrant-storage-qdrant-0"
+          services:
+            - "qdrant"
+          backup_cronjobs: []
+          other_backup_cronjobs_in_namespace:
+            - name: "mysql-backup"
+              suspend: false
+              targets_db:
+                - "prod-a/statefulset/mysql"
+      - expect: "warn"
+        item:
+          namespace: "prod-b"
+          kind: "deployment"
+          name: "postgres"
+          target: "prod-b/deployment/postgres"
+          prod: true
+          pvcs:
+            - "postgres-data"
+          services:
+            - "postgres"
+          backup_cronjobs: []
+          other_backup_cronjobs_in_namespace: []
       - expect: "pass"
         item:
-          count: 7
-          local_only:
-            - "prod-i/app-k-postgres-backup"
-            - "prod-h/app-i-postgres-backup"
-            - "prod-m/app-i-postgres-mx-backup"
-            - "prod-n/app-i-postgres-vn-backup"
-            - "app-o-api/app-o-postgres-backup"
-            - "app-l-prod/app-l-mysql-backup"
-            - "prod-k/app-m-postgres-backup"
-          same_node:
-            - "prod-h/app-i-postgres-backup"
-            - "prod-m/app-i-postgres-vn-backup"
-            - "app-o-api/app-o-postgres-backup"
-            - "app-l-prod/app-l-mysql-backup"
-            - "prod-k/app-m-postgres-backup"
-          prod_db_without_backup_cronjob: []
-          db_workloads_with_pvc: 16
+          namespace: "prod-a"
+          kind: "statefulset"
+          name: "mysql"
+          target: "prod-a/statefulset/mysql"
+          prod: true
+          pvcs:
+            - "data-mysql-0"
+          services:
+            - "mysql"
+          backup_cronjobs:
+            - name: "mysql-backup"
+              matched_by: "mysql"
+          other_backup_cronjobs_in_namespace: []
+      - expect: "pass"
+        item:
+          namespace: "dev-a"
+          kind: "statefulset"
+          name: "postgres"
+          target: "dev-a/statefulset/postgres"
+          prod: false
+          pvcs:
+            - "data-postgres-0"
+          services:
+            - "postgres"
+          backup_cronjobs: []
+          other_backup_cronjobs_in_namespace: []
+
 - id: security.plaintext-configmap-secret
   name: Secret-like keys or config lines inside a ConfigMap (key names only are recorded)
   area: security
