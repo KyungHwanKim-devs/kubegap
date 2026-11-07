@@ -18,7 +18,7 @@
   type: metric
   inputs: [cpu_throttle_ratio_24h, cpu_throttle_ratio_5m]
   join_on: [namespace, pod, container]
-  join_any: true   # a series in either input is judged: a spike that the 24-hour query's floor left out still warns, and a snapshot from before the 24-hour query is judged on the 5-minute value alone
+  join_any: true   # a series in either input is judged: a spike that the 24-hour query's floor left out still warns
   exclude_transient: true  # exclude Job, CronJob and GitHub Actions runner pods
   rule:
     expr: "v.get('cpu_throttle_ratio_24h', 0) >= threshold"
@@ -1380,7 +1380,7 @@
     - "kubectl get pdb -n <ns>"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         objects:
@@ -3332,7 +3332,7 @@
   verify: ["kubectl get crd | grep -E 'externalsecrets|secretproviderclasses|sealedsecrets'"]
   profiles: [prod, lab]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         inventory:
@@ -3423,7 +3423,7 @@
 
 # ---------- Storage ----------
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         inventory:
@@ -3476,7 +3476,7 @@
     - "kubectl get sc ; kubectl get pvc -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,SC:.spec.storageClassName | grep gp2"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         inventory:
@@ -4098,7 +4098,7 @@
     - "logs/cloudwatch/apiserver_webhook_failures.json"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         item:
@@ -4130,7 +4130,7 @@
     - "logs/cloudwatch/controller_manager_error_samples.json"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         item:
@@ -4175,7 +4175,7 @@
     - "logs/cloudwatch/apiserver_slow_traces.json"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         item:
@@ -4212,7 +4212,7 @@
     - "logs/cloudwatch/authenticator_failures.json"
   profiles: [prod]
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         item:
@@ -4253,7 +4253,7 @@
 
 # ---------- Platform common ----------
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:
@@ -4303,7 +4303,7 @@
 
 # ---- Node OS (area node). Material is summary.nodeos (lib/nodeos.py). Read from inside the node, so only what does not overlap with the node-exporter metric checks (node.conntrack-usage etc.) lives here. ----
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:  # `today` pins the date so the verdicts do not drift as end-of-support dates in rubric/k8s-versions.yaml pass
       - expect: "fail"
         inventory:
@@ -19268,7 +19268,7 @@
     - "kubectl logs -n karpenter deploy/karpenter --since=24h | grep -c 'disrupting via'"
   notes: Fixed after a review of a real EKS run (floor → ceil, pool with 0 nodes passes). An earlier report that said "computed as 0, no disruption" was a floor-rounding bug in this check.
   test:
-    profile: "eks"
+    profile: "prod"
     cases:
       - expect: "fail"
         objects:

@@ -270,8 +270,6 @@ def configmap_chars(cm: dict) -> int:
 
 
 def configmap_secret_like_keys(cm: dict) -> list[str]:
-    """The recorded detection on a scrubbed ConfigMap; computed on the spot for an unscrubbed one (older snapshots)."""
+    """The detection recorded on the ConfigMap when it was scrubbed (`kubegap_scrub.secret_like_keys`); every ConfigMap in a snapshot went through scrub_configmap."""
     mark = cm.get(MARK)
-    if isinstance(mark, dict) and isinstance(mark.get("secret_like_keys"), list):
-        return list(mark["secret_like_keys"])
-    return secret_like_keys(cm.get("data") or {})
+    return list(mark["secret_like_keys"]) if isinstance(mark, dict) and isinstance(mark.get("secret_like_keys"), list) else []

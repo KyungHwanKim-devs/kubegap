@@ -17,7 +17,7 @@
   verify:
     - "sudo du -sm /var/lib/rancher/k3s/storage/*"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:
@@ -49,7 +49,7 @@
   verify:
     - "kubectl get pv -o custom-columns=NAME:.metadata.name,CLAIM:.spec.claimRef.name,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "warn"
         item:

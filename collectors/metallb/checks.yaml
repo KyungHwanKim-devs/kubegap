@@ -20,7 +20,7 @@
   verify:
     - "kubectl get ipaddresspools -A -o yaml; kubectl get svc -A --field-selector spec.type=LoadBalancer"
   test:
-    profile: "k3s"
+    profile: "lab"
     cases:
       - expect: "fail"
         item:

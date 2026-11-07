@@ -83,9 +83,9 @@ def _metric_texts(snap: Path) -> dict[str, str]:
 
 
 def _step(snap: Path) -> dict:
-    """The metallb-speaker-metrics step of collect-result.json; it moved here from k3s-platform (compatibility with older snapshots)."""
+    """The metallb-speaker-metrics step record of collect-result.json."""
     cr = load_json(snap / "collect-result.json") or {}
-    return (((cr.get("metallb") or {}).get("steps") or {}).get("metallb-speaker-metrics")) or (((cr.get("k3s-platform") or {}).get("steps") or {}).get("metallb-speaker-metrics")) or {}
+    return ((cr.get("metallb") or {}).get("steps") or {}).get("metallb-speaker-metrics") or {}
 
 
 def _pools(snap: Path, lb_class: str = "") -> dict:

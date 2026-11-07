@@ -17,11 +17,7 @@ class RubricError(ValueError):
     pass
 
 
-PROFILE_ALIASES = {"eks": "prod", "k3s": "lab", "homelab": "lab"}  # profile names before 0.1.51 were platform names; snapshots and configs from then still say so
-
-
 def load_profile(name: str) -> dict:
-    name = PROFILE_ALIASES.get(name, name)
     p = paths.PROFILES_DIR / f"{name}.yaml"
     if not p.is_file():
         return {"name": name, "missing": True, "disabled_checks": [], "thresholds": {}, "exclude": {}, "expected_families": None}
