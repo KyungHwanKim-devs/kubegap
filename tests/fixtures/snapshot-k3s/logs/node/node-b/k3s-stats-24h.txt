@@ -1,0 +1,19 @@
+   5523 etcd-json info
+   3677 etcd-json warn
+    780 klog I reconciler_common.go
+    375 klog E cronjob_controllerv2.go
+    303 logrus info
+    260 klog I operation_generator.go
+    252 klog I scope.go
+    248 klog I pod_container_deletor.go
+    244 klog I kubelet_volumes.go
+    241 klog I pod_startup_latency_tracker.go
+    149 klog I cidrallocator.go
+     61 klog E upgradeaware.go
+     34 klog I horizontal.go
+      5 klog E log.go
+      3 logrus error
+      3 klog I alloc.go
+      3 klog E cadvisor_stats_provider.go
+      2 klog I event.go
+      1 klog W dispatcher.go

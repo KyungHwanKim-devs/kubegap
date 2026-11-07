@@ -1,0 +1,1 @@
+{"id":"prom_wal_corruptions","query":"max(prometheus_tsdb_wal_corruptions_total)","why":"Cumulative WAL corruptions","taken_at":"2026-11-07T10:35:07+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794015310.879,"0"]}],"series":1}

@@ -1,0 +1,1 @@
+{"id":"prom_reload_ok","query":"min(prometheus_config_last_reload_successful)","why":"Whether the last config reload succeeded (0 means new rules/scrape config were not applied and the old config is still running)","taken_at":"2026-11-07T10:23:15+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794014598.385,"1"]}],"series":1}

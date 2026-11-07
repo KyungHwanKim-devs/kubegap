@@ -1,0 +1,9 @@
+argocd_git_lsremote_fail_total{repo="/tmp/_argocd-repo/265bd16e-95c1-4248-afd0-f3566e2ad84a",revision="HEAD"} 1
+argocd_git_request_duration_seconds_sum{repo="https://github.com/example-org/k8s-manifests",request_type="ls-remote"} 5050.341240320027
+argocd_git_request_duration_seconds_count{repo="https://github.com/example-org/k8s-manifests",request_type="ls-remote"} 12863
+argocd_git_request_total{repo="https://github.com/example-org/k8s-manifests",request_type="ls-remote"} 12863
+argocd_redis_request_total{failed="false",initiator="argocd-repo-server"} 224939
+argocd_repo_pending_request_total{repo="https://github.com/example-org/k8s-manifests"} 0
+argocd_repo_pending_request_total{repo="https://prometheus-community.github.io/helm-charts"} 0
+process_resident_memory_bytes 1.23543552e+08
+process_start_time_seconds 1.79322519538e+09

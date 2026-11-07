@@ -1,0 +1,161 @@
+### meta
+uid=1000
+hostname=node-a
+kernel=5.15.0-198-generic
+os=Ubuntu 22.04.5 LTS
+uptime_s=789605.31
+loadavg=0.58 0.57 0.56
+nproc=6
+mem_total_kb=32802564
+containerd=containerd containerd.io v2.2.0 1c4457e00facac03ce1d75f7b6777a7a851e5c41
+k3s=k3s version v1.33.5+k3s1 (fab4a5c3)
+dmesg_restrict=1
+zombies=0
+kubelet_rss_kb=
+containerd_rss_kb=46336
+k3s_rss_kb=275908
+### kernel
+source=journalctl
+lines=23256
+c:oom_node=0
+c:oom_cgroup=0
+c:oom_system_victim=0
+c:lockup=0
+c:io_error=0
+c:fs_error=0
+c:nic=0
+c:conntrack_full=0
+c:net_pressure=0
+c:mem_pressure=0
+c:bug=0
+c:segfault=0
+c:clock=0
+samples:
+oom_samples:
+### sysctl
+net.netfilter.nf_conntrack_max=196608
+net.netfilter.nf_conntrack_count=1911
+net.netfilter.nf_conntrack_tcp_timeout_established=86400
+fs.inotify.max_user_watches=247744
+fs.inotify.max_user_instances=128
+fs.file-max=9223372036854775807
+fs.file-nr=5984 0 9223372036854775807
+fs.aio-max-nr=65536
+net.core.somaxconn=4096
+net.core.netdev_max_backlog=1000
+net.ipv4.ip_local_port_range=32768 60999
+net.ipv4.tcp_max_syn_backlog=2048
+net.ipv4.tcp_tw_reuse=2
+net.ipv4.ip_forward=1
+net.bridge.bridge-nf-call-iptables=1
+net.ipv4.neigh.default.gc_thresh3=1024
+vm.max_map_count=262144
+vm.swappiness=60
+vm.overcommit_memory=1
+vm.panic_on_oom=0
+kernel.panic=10
+kernel.panic_on_oops=1
+kernel.pid_max=4194304
+kernel.threads-max=253293
+kernel.dmesg_restrict=1
+### cri
+cmd=sudo -n /usr/local/bin/k3s crictl
+version=Version: 0.1.0 RuntimeName: containerd RuntimeVersion: v2.1.4-k3s1 RuntimeApiVersion: v1 
+crictl=
+state:Running=55
+state:Exited=66
+state:Created=0
+state:Unknown=0
+images=53
+images_top:
+4.17GB	registry.lab-a.example/app-h-embed:prod-67527dae60678e93822bf8eb71d8448f586fa0fe
+843MB	registry.lab-a.example/app-f-mexico:prod-5cd7d78054b8dcfe9f3a76cb5e3fa5bff6bada2a
+843MB	ghcr.io/team-app-e/app-f-mexico:prod-5cd7d78054b8dcfe9f3a76cb5e3fa5bff6bada2a
+841MB	registry.lab-a.example/app-f-vietnam:prod-af6a0983909b58cd53a1c2dbf3aadb3062aec673
+841MB	ghcr.io/team-app-e/app-f-vietnam:prod-af6a0983909b58cd53a1c2dbf3aadb3062aec673
+835MB	registry.lab-a.example/app-f:prod-c24abd1b7544dbf4998cdd19540e537f7a2ccdfd
+595MB	registry.lab-a.example/app-a-sandbox-spring:latest
+526MB	registry.lab-a.example/app-a-sandbox-todo:latest
+402MB	registry.lab-a.example/app-a-sandbox-go:latest
+351MB	registry.lab-a.example/app-c-web:prod-f7b662b3f5487d4cf443a654edb0526503f7db95
+347MB	registry.lab-a.example/app-a-sandbox-sql:latest
+346MB	registry.lab-a.example/app-a-sandbox-python-ml:latest
+322MB	registry.lab-a.example/app-a-sandbox-c:latest
+317MB	registry.lab-a.example/app-a-sandbox-nextjs:latest
+267MB	ghcr.io/umami-software/umami:postgresql-latest
+imagefs={"status":{"containerFilesystems":[],"imageFilesystems":[{"fsId":{"mountpoint":"/var/lib/rancher/k3s/agent/containerd/io.containerd.snapshotter.v1.overlayfs"},"inodesUsed":{"value":"797670"},"timestamp":"1794014637270602706","usedBytes":{"value":"31621632000"}}]}}
+conditions="status":true,"type":"RuntimeReady" "status":true,"type":"NetworkReady" "status":false,"type":"ContainerdHasNoDeprecationWarnings" 
+systemd_cgroup=true
+snapshotter=
+sandbox_image=
+cni_error=OK
+writable_layers:
+44	app-f-prod/app-f-mx-7f466df4fb-dsdpw/db-migrate
+42	app-f-prod/app-f-vn-766644b56d-dhklj/db-migrate
+42	app-f-prod/app-f-ga4-digest-day-29900160-6ss44/digest
+42	app-f-prod/app-f-5fc9656f46-r5stq/db-migrate
+42	app-f-prod/app-f-5fc9656f46-dr4nw/db-migrate
+37	app-a-prod/umami-report-month-29846880-rcgdq/report
+37	app-a-prod/umami-report-day-29898720-7nmbs/report
+17	app-h-prod/app-h-app-q-client-7599c7f5f-79njd/app
+15	app-h-prod/app-h-app-q-client-7599c7f5f-s2b62/app
+13	app-h-prod/app-h-app-q-client-7599c7f5f-79njd/app
+### cgroup
+fs=cgroup2fs
+controllers=cpuset cpu io memory hugetlb pids rdma misc
+### time
+Time zone: Asia/Seoul (KST, +0900)
+System clock synchronized: yes
+NTP service: active
+chrony=
+### disk
+fs:/ dev=/dev/mapper/ubuntu--vg-ubuntu--lv size_kb=111911664 used_kb=80862796 avail_kb=25901608 use=76% mount=/
+inode:/ inodes=7127040 iused=1179560 iuse=17%
+fs:/var/lib/containerd dev=/dev/mapper/ubuntu--vg-ubuntu--lv size_kb=111911664 used_kb=80862796 avail_kb=25901608 use=76% mount=/
+inode:/var/lib/containerd inodes=7127040 iused=1179560 iuse=17%
+fs:/var/lib/rancher dev=/dev/mapper/ubuntu--vg-ubuntu--lv size_kb=111911664 used_kb=80862796 avail_kb=25901608 use=76% mount=/
+inode:/var/lib/rancher inodes=7127040 iused=1179560 iuse=17%
+fs:/var/lib/kubelet dev=/dev/mapper/ubuntu--vg-ubuntu--lv size_kb=111911664 used_kb=80862796 avail_kb=25901608 use=76% mount=/
+inode:/var/lib/kubelet inodes=7127040 iused=1179560 iuse=17%
+fs:/var/log dev=/dev/mapper/ubuntu--vg-ubuntu--lv size_kb=111911664 used_kb=80862796 avail_kb=25901608 use=76% mount=/
+inode:/var/log inodes=7127040 iused=1179560 iuse=17%
+fs:/run dev=tmpfs size_kb=3280260 used_kb=10640 avail_kb=3269620 use=1% mount=/run
+inode:/run inodes=4100320 iused=4054 iuse=1%
+fs:/tmp dev=/dev/mapper/ubuntu--vg-ubuntu--lv size_kb=111911664 used_kb=80862796 avail_kb=25901608 use=76% mount=/
+inode:/tmp inodes=7127040 iused=1179560 iuse=17%
+pod_logs_mb:
+277	/var/log/pods
+39	/var/log/pods/app-h-prod_app-h-api-server-5d6b56f78b-fd59m_c8e60975-a994-42bf-a867-ea7a83a397a4
+32	/var/log/pods/argocd_argocd-repo-server-848dcbb4db-jz8xs_77f41e4d-cfcd-4a38-8a34-eddb0e3ade15
+31	/var/log/pods/app-c-prod_app-c-signaling-69c8794869-p9brb_a9af49cc-6cb0-4791-b0dc-6639c6962ce3
+28	/var/log/pods/app-h-prod_app-h-api-server-5d6b56f78b-srwnk_b0d02bba-a2a9-48cb-a8a9-42f693172e57
+22	/var/log/pods/logging_fluent-bit-nnsb5_4c4be6be-37cb-4717-9207-e4edbe501946
+21	/var/log/pods/app-b-prod_app-b-backend-578495c5bf-zs7lj_3eaefe1c-ea90-48d3-a46c-cee596657451
+17	/var/log/pods/app-h-prod_app-h-excel-agent-fd75f7986-8v9zq_1d0b56f1-00af-441e-ab26-caa43e639ece
+15	/var/log/pods/app-h-prod_app-h-api-server-5d6b56f78b-xxzbl_ba18014a-beb5-45a9-b824-39c2c49a661d
+14	/var/log/pods/metallb-system_speaker-xfxlv_2b79c67d-ed35-4b84-b502-84d153f6461d
+13	/var/log/pods/app-a-prod_app-a-backend-79c97cbbd6-ztv7h_f67e83d3-4a4f-4e50-b262-0c902bf556bc
+12	/var/log/pods/app-h-prod_app-h-embed-67f6f74f6c-lb7lj_c50aa43d-72ce-4e54-9d90-0ba6dd301a43
+emptydir_mb:
+219	/var/lib/kubelet/pods/77f41e4d-cfcd-4a38-8a34-eddb0e3ade15/volumes/kubernetes.io~empty-dir
+6	/var/lib/kubelet/pods/4c4be6be-37cb-4717-9207-e4edbe501946/volumes/kubernetes.io~empty-dir
+1	/var/lib/kubelet/pods/faf3240b-a897-45ce-8aa9-136f745cc344/plugins/kubernetes.io~empty-dir
+1	/var/lib/kubelet/pods/fa896d3b-5021-47ff-9b52-d94c532a93b6/plugins/kubernetes.io~empty-dir
+1	/var/lib/kubelet/pods/f856aa52-d130-41c0-bb36-a29e28ac2bbc/plugins/kubernetes.io~empty-dir
+1	/var/lib/kubelet/pods/f67e83d3-4a4f-4e50-b262-0c902bf556bc/plugins/kubernetes.io~empty-dir
+1	/var/lib/kubelet/pods/f540b139-1a97-40cd-8fa4-a8a31072de56/plugins/kubernetes.io~empty-dir
+1	/var/lib/kubelet/pods/f5299280-3063-480f-b8f1-e17b87e58aa4/plugins/kubernetes.io~empty-dir
+1	/var/lib/kubelet/pods/f3a2d81b-e800-4a0f-a8d6-7585658650bc/plugins/kubernetes.io~empty-dir
+1	/var/lib/kubelet/pods/f011a7ef-e8ad-4e22-be4c-9027df7a1c01/plugins/kubernetes.io~empty-dir
+docker_mb=1
+containerd_mb=40746
+### services
+kubelet active=inactive restarts=0 since=n/a
+containerd active=active restarts=0 since=Thu 2026-10-29 07:06:14 KST
+k3s-agent active=active restarts=0 since=Thu 2026-10-29 07:06:20 KST
+docker active=active restarts=0 since=Thu 2026-10-29 07:06:16 KST
+### updates
+reboot_required=yes
+ubuntu_updates=52 updates can be applied;1 of these updates is a standard security;
+ami_release=
+### end

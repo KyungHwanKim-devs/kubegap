@@ -1,0 +1,1 @@
+{"registryId":"<account>","repositoryName":"app-v-frontend","lifecyclePolicyText":"{\"rules\":[{\"rulePriority\":1,\"description\":\"Keep last 3 images\",\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":3},\"action\":{\"type\":\"expire\"}}]}","lastEvaluatedAt":"2026-11-07T07:05:18.063000+09:00"}

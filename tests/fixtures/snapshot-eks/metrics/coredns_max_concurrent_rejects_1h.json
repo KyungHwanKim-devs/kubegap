@@ -1,0 +1,1 @@
+{"id":"coredns_max_concurrent_rejects_1h","query":"sum(increase(coredns_forward_max_concurrent_rejects_total[1h]))","why":"Queries rejected by the forward max_concurrent limit (1h). Non-zero means CoreDNS is overloaded","taken_at":"2026-11-07T10:34:23+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794015263.877,"0"]}],"series":1}

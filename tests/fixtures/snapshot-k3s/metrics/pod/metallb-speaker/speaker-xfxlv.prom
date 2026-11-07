@@ -1,0 +1,6 @@
+metallb_k8s_client_config_loaded_bool 1
+metallb_k8s_client_config_stale_bool 0
+metallb_k8s_client_update_errors_total 0
+metallb_k8s_client_updates_total 11894
+process_resident_memory_bytes 5.2801536e+07
+process_start_time_seconds 1.79322518344e+09

@@ -1,0 +1,10 @@
+metallb_k8s_client_config_loaded_bool 1
+metallb_k8s_client_config_stale_bool 0
+metallb_k8s_client_update_errors_total 0
+metallb_k8s_client_updates_total 156082
+metallb_layer2_gratuitous_sent{ip="192.168.90.201"} 5632
+metallb_layer2_requests_received{ip="192.168.90.201"} 27
+metallb_layer2_responses_sent{ip="192.168.90.201"} 27
+metallb_speaker_announced{ip="192.168.90.201",node="node-b",protocol="layer2",service="ingress-nginx/nginx-ingress-ingress-nginx-controller"} 1
+process_resident_memory_bytes 3.581952e+07
+process_start_time_seconds 1.78372964985e+09

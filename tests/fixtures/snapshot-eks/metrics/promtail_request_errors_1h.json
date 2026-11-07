@@ -1,0 +1,1 @@
+{"id":"promtail_request_errors_1h","query":"sum by (status_code) (increase(promtail_request_duration_seconds_count{status_code!~\"2..\"}[1h]))","why":"Non-2xx responses (429, 5xx) from promtail → Loki pushes","taken_at":"2026-11-07T10:35:03+09:00","ok":true,"resultType":"vector","result":[],"series":0}

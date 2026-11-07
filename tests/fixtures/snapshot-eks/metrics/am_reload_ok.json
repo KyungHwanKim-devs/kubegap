@@ -1,0 +1,1 @@
+{"id":"am_reload_ok","query":"min(alertmanager_config_last_reload_successful)","why":"Whether the last Alertmanager config reload succeeded","taken_at":"2026-11-07T10:35:07+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794015311.191,"1"]}],"series":1}

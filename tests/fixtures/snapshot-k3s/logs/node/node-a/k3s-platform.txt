@@ -1,0 +1,71 @@
+### meta
+role=agent
+version=k3s version v1.33.5+k3s1 (fab4a5c3)
+config_file=absent
+smartctl=no
+sensors=no
+### unit
+ExecStart=/usr/local/bin/k3s \
+    agent \
+	'--server' \
+	'https://192.168.90.102:6443' \
+	'--token' \
+	'<redacted>' \
+	'--node-ip' \
+	'192.168.90.101' \
+	'--node-external-ip' \
+	'192.168.90.101' \
+
+unit:k3s-agent NRestarts=0 ActiveEnterTimestamp=Thu 2026-10-29 07:06:20 KST 
+### check-config
+- CONFIG_RT_GROUP_SCHED: missing
+- CONFIG_INET_XFRM_MODE_TRANSPORT: missing
+STATUS: pass
+### ports
+*:10250 k3s-agent
+127.0.0.1:6444 k3s-agent
+192.168.90.101:7946 speaker
+*:31564 k3s-agent
+### flannel
+mtu=1450
+vxlan=vxlan id 1 local 192.168.90.101 dev br0
+stats=rx: 174436470027 308270340 0 0 0 0 tx: 318867946777 224138145 0 7 0 0 
+underlay_mtu=1500
+addrs=br0=192.168.90.101/24 flannel.1=10.42.7.0/32 tailscale0=100.100.1.1/32 
+ip_forward=1
+br_netfilter=1
+### journald
+disk=416.0M
+conf=
+k3s_lines_24h=23614
+### server
+### registries
+mirrors:
+  registry.lab-a.example:
+    endpoint:
+      - https://registry.lab-a.example
+configs:
+  registry.lab-a.example:
+    auth:
+### containerd
+snapshotter = "overlayfs"
+sandbox = "rancher/mirrored-pause:3.6"
+SystemdCgroup = true
+SystemdCgroup = true
+config_path = "/var/lib/rancher/k3s/agent/etc/containerd/certs.d"
+[plugins.'io.containerd.cri.v1.images'.registry.configs.'registry.lab-a.example'.auth]
+### local-path
+total_mb=6194
+volumes_mb:
+5862	/var/lib/rancher/k3s/storage/pvc-ff3e86cb-38ac-461e-93ea-fc0c6f0fadda_app-a-prod_app-a-postgres-backup-pvc
+138	/var/lib/rancher/k3s/storage/pvc-291c9301-e481-4b69-9234-bb77f18d6faf_app-l-prod_app-l-postgres-data
+124	/var/lib/rancher/k3s/storage/pvc-c66c539e-96b8-4cb2-ba16-90df9d05a84f_app-l-prod_app-l-artifacts
+47	/var/lib/rancher/k3s/storage/pvc-123d97df-e04a-495f-9283-69147d9a8679_app-k_app-k-postgres-data
+27	/var/lib/rancher/k3s/storage/pvc-76f7091e-04fe-4abb-98b6-e814163b9ee6_app-h-prod_app-h-qdrant-data-app-h-qdrant-0
+1	/var/lib/rancher/k3s/storage/pvc-5e9317ac-0de1-4afb-b312-8244dbebd7bd_app-b-prod_app-b-artifacts
+1	/var/lib/rancher/k3s/storage/pvc-378c5351-e088-4317-9671-7f05346e9531_app-f-prod_app-f-postgres-mx-backup-pvc
+### disks
+sda disk 111.8G 0 WDC WDS120G2G0A-
+### thermal
+zone:acpitz=16800
+### end

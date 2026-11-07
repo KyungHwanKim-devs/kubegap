@@ -1,0 +1,1 @@
+{"id":"promtail_targets_active","query":"sum by (instance) (promtail_targets_active_total)","why":"Files being tailed per promtail instance (node). A node at 0 is not shipping its logs","taken_at":"2026-11-07T10:35:03+09:00","ok":true,"resultType":"vector","result":[],"series":0}

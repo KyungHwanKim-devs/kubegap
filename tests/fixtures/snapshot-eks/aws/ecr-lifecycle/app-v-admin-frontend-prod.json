@@ -1,0 +1,1 @@
+{"registryId":"<account>","repositoryName":"app-v-admin-frontend-prod","lifecyclePolicyText":"{\"rules\":[{\"rulePriority\":1,\"description\":\"Keep last 5 images\",\"selection\":{\"tagStatus\":\"any\",\"countType\":\"imageCountMoreThan\",\"countNumber\":5},\"action\":{\"type\":\"expire\"}}]}","lastEvaluatedAt":"2026-11-07T05:04:25.659000+09:00"}

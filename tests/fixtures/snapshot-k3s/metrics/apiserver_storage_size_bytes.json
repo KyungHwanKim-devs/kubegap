@@ -1,0 +1,1 @@
+{"id":"apiserver_storage_size_bytes","query":"max(apiserver_storage_size_bytes{job=\"apiserver\"})","why":"etcd database size (reported by the apiserver). EKS hides etcd but exposes this metric — the limit is 8GiB","taken_at":"2026-11-07T10:23:13+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794014600.475,"39931904"]}],"series":1}

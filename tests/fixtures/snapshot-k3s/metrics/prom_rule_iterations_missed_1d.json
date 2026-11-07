@@ -1,0 +1,1 @@
+{"id":"prom_rule_iterations_missed_1d","query":"sum(increase(prometheus_rule_group_iterations_missed_total[1d]))","why":"Rule evaluations skipped for overrunning the interval (24h)","taken_at":"2026-11-07T10:23:15+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794014598.198,"0"]}],"series":1}

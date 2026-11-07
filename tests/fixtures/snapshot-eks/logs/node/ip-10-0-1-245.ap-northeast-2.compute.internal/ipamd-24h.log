@@ -1,0 +1,2 @@
+{"level":"warn","ts":"2026-11-06T08:59:10.233Z","caller":"awssession/session.go:66","msg":"HTTP_TIMEOUT env is not set or set to less than 10 seconds, defaulting to httpTimeout to 10sec"}
+{"level":"error","ts":"2026-11-06T08:59:10.241Z","caller":"awsutils/awsutils.go:1618","msg":"r8gd.medium: instance type does not exist"}

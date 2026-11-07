@@ -1,0 +1,1 @@
+{"id":"pods_waiting_reason","query":"kube_pod_container_status_waiting_reason{reason!=\"ContainerCreating\"} == 1","why":"Waiting reasons such as CrashLoopBackOff, ImagePullBackOff, CreateContainerConfigError","taken_at":"2026-11-07T10:34:28+09:00","ok":true,"resultType":"vector","result":[],"series":0}

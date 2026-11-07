@@ -1,0 +1,1 @@
+{"id":"monitoring_oomkilled","query":"kube_pod_container_status_last_terminated_reason{namespace=\"monitoring\",reason=\"OOMKilled\"}","why":"Containers in the monitoring namespace whose last termination reason was OOMKilled","taken_at":"2026-11-07T10:23:15+09:00","ok":true,"resultType":"vector","result":[],"series":0}

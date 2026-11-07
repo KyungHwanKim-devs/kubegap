@@ -1,0 +1,1 @@
+{"id":"ingress_nginx_rps_1h","query":"sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests[1h])) > 0","why":"1h average RPS per ingress-nginx Ingress. No series when controller metrics are off (observability.golden-signals-missing)","taken_at":"2026-11-07T10:23:13+09:00","ok":true,"resultType":"vector","result":[],"series":0}

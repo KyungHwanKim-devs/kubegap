@@ -1,0 +1,1 @@
+{"id":"am_cluster_members","query":"max(alertmanager_cluster_members)","why":"Alertmanager cluster member count (absent when not HA)","taken_at":"2026-11-07T10:35:07+09:00","ok":true,"resultType":"vector","result":[],"series":0}

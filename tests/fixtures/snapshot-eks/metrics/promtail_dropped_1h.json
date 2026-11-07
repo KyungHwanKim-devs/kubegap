@@ -1,0 +1,1 @@
+{"id":"promtail_dropped_1h","query":"sum(increase(promtail_dropped_entries_total[1h]))","why":"Log lines promtail dropped in 1h (retries exhausted, rate limited). Anything above 0 is a permanent gap in the logs","taken_at":"2026-11-07T10:35:03+09:00","ok":true,"resultType":"vector","result":[],"series":0}

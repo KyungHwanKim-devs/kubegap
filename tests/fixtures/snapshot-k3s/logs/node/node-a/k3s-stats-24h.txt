@@ -1,0 +1,10 @@
+   8407 klog I scope.go
+   6597 klog E pod_workers.go
+   3700 klog I reconciler_common.go
+   1235 klog I operation_generator.go
+   1235 klog I kubelet_volumes.go
+   1231 klog I pod_container_deletor.go
+   1183 klog I pod_startup_latency_tracker.go
+     15 klog E log.go
+      8 klog E cadvisor_stats_provider.go
+      3 klog I status_manager.go

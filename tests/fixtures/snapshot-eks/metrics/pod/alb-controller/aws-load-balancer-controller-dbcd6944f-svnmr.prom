@@ -1,0 +1,170 @@
+aws_api_call_duration_seconds_sum{operation="AuthorizeSecurityGroupIngress",service="EC2"} 57.57614934399998
+aws_api_call_duration_seconds_count{operation="AuthorizeSecurityGroupIngress",service="EC2"} 195
+aws_api_call_duration_seconds_sum{operation="CreateRule",service="Elastic Load Balancing v2"} 3.0908932470000003
+aws_api_call_duration_seconds_count{operation="CreateRule",service="Elastic Load Balancing v2"} 30
+aws_api_call_duration_seconds_sum{operation="CreateTargetGroup",service="Elastic Load Balancing v2"} 7.960247445000002
+aws_api_call_duration_seconds_count{operation="CreateTargetGroup",service="Elastic Load Balancing v2"} 30
+aws_api_call_duration_seconds_sum{operation="DeleteRule",service="Elastic Load Balancing v2"} 1.129823853
+aws_api_call_duration_seconds_count{operation="DeleteRule",service="Elastic Load Balancing v2"} 14
+aws_api_call_duration_seconds_sum{operation="DeleteTargetGroup",service="Elastic Load Balancing v2"} 1.90614043
+aws_api_call_duration_seconds_count{operation="DeleteTargetGroup",service="Elastic Load Balancing v2"} 14
+aws_api_call_duration_seconds_sum{operation="DeregisterTargets",service="Elastic Load Balancing v2"} 585.9608732599979
+aws_api_call_duration_seconds_count{operation="DeregisterTargets",service="Elastic Load Balancing v2"} 11660
+aws_api_call_duration_seconds_sum{operation="DescribeAvailabilityZones",service="EC2"} 0.067444596
+aws_api_call_duration_seconds_count{operation="DescribeAvailabilityZones",service="EC2"} 2
+aws_api_call_duration_seconds_sum{operation="DescribeCertificate",service="ACM"} 244.61289206599986
+aws_api_call_duration_seconds_count{operation="DescribeCertificate",service="ACM"} 3509
+aws_api_call_duration_seconds_sum{operation="DescribeInstances",service="EC2"} 3185.219158582959
+aws_api_call_duration_seconds_count{operation="DescribeInstances",service="EC2"} 38801
+aws_api_call_duration_seconds_sum{operation="DescribeListenerCertificates",service="Elastic Load Balancing v2"} 66.8704614080001
+aws_api_call_duration_seconds_count{operation="DescribeListenerCertificates",service="Elastic Load Balancing v2"} 1280
+aws_api_call_duration_seconds_sum{operation="DescribeListeners",service="Elastic Load Balancing v2"} 105.91645946100017
+aws_api_call_duration_seconds_count{operation="DescribeListeners",service="Elastic Load Balancing v2"} 1866
+aws_api_call_duration_seconds_sum{operation="DescribeLoadBalancerAttributes",service="Elastic Load Balancing v2"} 86.94034551100029
+aws_api_call_duration_seconds_count{operation="DescribeLoadBalancerAttributes",service="Elastic Load Balancing v2"} 1866
+aws_api_call_duration_seconds_sum{operation="DescribeLoadBalancers",service="Elastic Load Balancing v2"} 239.4027615519994
+aws_api_call_duration_seconds_count{operation="DescribeLoadBalancers",service="Elastic Load Balancing v2"} 3732
+aws_api_call_duration_seconds_sum{operation="DescribeNetworkInterfaces",service="EC2"} 70.62993668299991
+aws_api_call_duration_seconds_count{operation="DescribeNetworkInterfaces",service="EC2"} 1080
+aws_api_call_duration_seconds_sum{operation="DescribeRules",service="Elastic Load Balancing v2"} 298.695368729
+aws_api_call_duration_seconds_count{operation="DescribeRules",service="Elastic Load Balancing v2"} 3732
+aws_api_call_duration_seconds_sum{operation="DescribeSecurityGroups",service="EC2"} 1904.0737101950035
+aws_api_call_duration_seconds_count{operation="DescribeSecurityGroups",service="EC2"} 24999
+aws_api_call_duration_seconds_sum{operation="DescribeSubnets",service="EC2"} 80.98117205300001
+aws_api_call_duration_seconds_count{operation="DescribeSubnets",service="EC2"} 586
+aws_api_call_duration_seconds_sum{operation="DescribeTags",service="Elastic Load Balancing v2"} 653.7218144339989
+aws_api_call_duration_seconds_count{operation="DescribeTags",service="Elastic Load Balancing v2"} 9199
+aws_api_call_duration_seconds_sum{operation="DescribeTargetGroupAttributes",service="Elastic Load Balancing v2"} 1819.335586460991
+aws_api_call_duration_seconds_count{operation="DescribeTargetGroupAttributes",service="Elastic Load Balancing v2"} 43347
+aws_api_call_duration_seconds_sum{operation="DescribeTargetGroups",service="Elastic Load Balancing v2"} 152.69428934899997
+aws_api_call_duration_seconds_count{operation="DescribeTargetGroups",service="Elastic Load Balancing v2"} 1880
+aws_api_call_duration_seconds_sum{operation="DescribeTargetHealth",service="Elastic Load Balancing v2"} 2757.855527256029
+aws_api_call_duration_seconds_count{operation="DescribeTargetHealth",service="Elastic Load Balancing v2"} 76055
+aws_api_call_duration_seconds_sum{operation="DescribeVpcs",service="EC2"} 251.64235260500027
+aws_api_call_duration_seconds_count{operation="DescribeVpcs",service="EC2"} 2989
+aws_api_call_duration_seconds_sum{operation="GetSubscriptionState",service="Shield"} 926.6461467480001
+aws_api_call_duration_seconds_count{operation="GetSubscriptionState",service="Shield"} 1221
+aws_api_call_duration_seconds_sum{operation="GetWebACLForResource",service="WAF Regional"} 38.20575118999999
+aws_api_call_duration_seconds_count{operation="GetWebACLForResource",service="WAF Regional"} 644
+aws_api_call_duration_seconds_sum{operation="GetWebACLForResource",service="WAFV2"} 48.194868803000006
+aws_api_call_duration_seconds_count{operation="GetWebACLForResource",service="WAFV2"} 644
+aws_api_call_duration_seconds_sum{operation="ListCertificates",service="ACM"} 57.43679363900002
+aws_api_call_duration_seconds_count{operation="ListCertificates",service="ACM"} 660
+aws_api_call_duration_seconds_sum{operation="ModifyRule",service="Elastic Load Balancing v2"} 53.37499080099995
+aws_api_call_duration_seconds_count{operation="ModifyRule",service="Elastic Load Balancing v2"} 557
+aws_api_call_duration_seconds_sum{operation="ModifyTargetGroup",service="Elastic Load Balancing v2"} 0.896074415
+aws_api_call_duration_seconds_count{operation="ModifyTargetGroup",service="Elastic Load Balancing v2"} 13
+aws_api_call_duration_seconds_sum{operation="RegisterTargets",service="Elastic Load Balancing v2"} 3339.457180210009
+aws_api_call_duration_seconds_count{operation="RegisterTargets",service="Elastic Load Balancing v2"} 11793
+aws_api_call_duration_seconds_sum{operation="RevokeSecurityGroupIngress",service="EC2"} 61.49861446699999
+aws_api_call_duration_seconds_count{operation="RevokeSecurityGroupIngress",service="EC2"} 194
+aws_api_call_retries_sum{operation="AuthorizeSecurityGroupIngress",service="EC2"} 0
+aws_api_call_retries_count{operation="AuthorizeSecurityGroupIngress",service="EC2"} 195
+aws_api_call_retries_sum{operation="CreateRule",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="CreateRule",service="Elastic Load Balancing v2"} 30
+aws_api_call_retries_sum{operation="CreateTargetGroup",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="CreateTargetGroup",service="Elastic Load Balancing v2"} 30
+aws_api_call_retries_sum{operation="DeleteRule",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="DeleteRule",service="Elastic Load Balancing v2"} 14
+aws_api_call_retries_sum{operation="DeleteTargetGroup",service="Elastic Load Balancing v2"} 1
+aws_api_call_retries_count{operation="DeleteTargetGroup",service="Elastic Load Balancing v2"} 14
+aws_api_call_retries_sum{operation="DeregisterTargets",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="DeregisterTargets",service="Elastic Load Balancing v2"} 11660
+aws_api_call_retries_sum{operation="DescribeAvailabilityZones",service="EC2"} 0
+aws_api_call_retries_count{operation="DescribeAvailabilityZones",service="EC2"} 2
+aws_api_call_retries_sum{operation="DescribeCertificate",service="ACM"} 0
+aws_api_call_retries_count{operation="DescribeCertificate",service="ACM"} 3509
+aws_api_call_retries_sum{operation="DescribeInstances",service="EC2"} 1
+aws_api_call_retries_count{operation="DescribeInstances",service="EC2"} 38801
+aws_api_call_retries_sum{operation="DescribeListenerCertificates",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="DescribeListenerCertificates",service="Elastic Load Balancing v2"} 1280
+aws_api_call_retries_sum{operation="DescribeListeners",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="DescribeListeners",service="Elastic Load Balancing v2"} 1866
+aws_api_call_retries_sum{operation="DescribeLoadBalancerAttributes",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="DescribeLoadBalancerAttributes",service="Elastic Load Balancing v2"} 1866
+aws_api_call_retries_sum{operation="DescribeLoadBalancers",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="DescribeLoadBalancers",service="Elastic Load Balancing v2"} 3732
+aws_api_call_retries_sum{operation="DescribeNetworkInterfaces",service="EC2"} 0
+aws_api_call_retries_count{operation="DescribeNetworkInterfaces",service="EC2"} 1080
+aws_api_call_retries_sum{operation="DescribeRules",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="DescribeRules",service="Elastic Load Balancing v2"} 3732
+aws_api_call_retries_sum{operation="DescribeSecurityGroups",service="EC2"} 0
+aws_api_call_retries_count{operation="DescribeSecurityGroups",service="EC2"} 24999
+aws_api_call_retries_sum{operation="DescribeSubnets",service="EC2"} 0
+aws_api_call_retries_count{operation="DescribeSubnets",service="EC2"} 586
+aws_api_call_retries_sum{operation="DescribeTags",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="DescribeTags",service="Elastic Load Balancing v2"} 9199
+aws_api_call_retries_sum{operation="DescribeTargetGroupAttributes",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="DescribeTargetGroupAttributes",service="Elastic Load Balancing v2"} 43347
+aws_api_call_retries_sum{operation="DescribeTargetGroups",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="DescribeTargetGroups",service="Elastic Load Balancing v2"} 1880
+aws_api_call_retries_sum{operation="DescribeTargetHealth",service="Elastic Load Balancing v2"} 1
+aws_api_call_retries_count{operation="DescribeTargetHealth",service="Elastic Load Balancing v2"} 76055
+aws_api_call_retries_sum{operation="DescribeVpcs",service="EC2"} 0
+aws_api_call_retries_count{operation="DescribeVpcs",service="EC2"} 2989
+aws_api_call_retries_sum{operation="GetSubscriptionState",service="Shield"} 0
+aws_api_call_retries_count{operation="GetSubscriptionState",service="Shield"} 1221
+aws_api_call_retries_sum{operation="GetWebACLForResource",service="WAF Regional"} 0
+aws_api_call_retries_count{operation="GetWebACLForResource",service="WAF Regional"} 644
+aws_api_call_retries_sum{operation="GetWebACLForResource",service="WAFV2"} 0
+aws_api_call_retries_count{operation="GetWebACLForResource",service="WAFV2"} 644
+aws_api_call_retries_sum{operation="ListCertificates",service="ACM"} 0
+aws_api_call_retries_count{operation="ListCertificates",service="ACM"} 660
+aws_api_call_retries_sum{operation="ModifyRule",service="Elastic Load Balancing v2"} 11
+aws_api_call_retries_count{operation="ModifyRule",service="Elastic Load Balancing v2"} 557
+aws_api_call_retries_sum{operation="ModifyTargetGroup",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="ModifyTargetGroup",service="Elastic Load Balancing v2"} 13
+aws_api_call_retries_sum{operation="RegisterTargets",service="Elastic Load Balancing v2"} 1
+aws_api_call_retries_count{operation="RegisterTargets",service="Elastic Load Balancing v2"} 11793
+aws_api_call_retries_sum{operation="RevokeSecurityGroupIngress",service="EC2"} 0
+aws_api_call_retries_count{operation="RevokeSecurityGroupIngress",service="EC2"} 194
+controller_runtime_max_concurrent_reconciles{controller="ingress"} 3
+controller_runtime_max_concurrent_reconciles{controller="service"} 3
+controller_runtime_max_concurrent_reconciles{controller="targetGroupBinding"} 3
+controller_runtime_reconcile_errors_total{controller="ingress"} 41
+controller_runtime_reconcile_errors_total{controller="service"} 0
+controller_runtime_reconcile_errors_total{controller="targetGroupBinding"} 0
+controller_runtime_reconcile_time_seconds_sum{controller="ingress"} 4326.911606546002
+controller_runtime_reconcile_time_seconds_count{controller="ingress"} 1320
+controller_runtime_reconcile_time_seconds_sum{controller="service"} 1085.5151688269998
+controller_runtime_reconcile_time_seconds_count{controller="service"} 586
+controller_runtime_reconcile_time_seconds_sum{controller="targetGroupBinding"} 12814.796814092082
+controller_runtime_reconcile_time_seconds_count{controller="targetGroupBinding"} 91517
+controller_runtime_reconcile_total{controller="ingress",result="error"} 41
+controller_runtime_reconcile_total{controller="ingress",result="requeue"} 0
+controller_runtime_reconcile_total{controller="ingress",result="requeue_after"} 0
+controller_runtime_reconcile_total{controller="ingress",result="success"} 1279
+controller_runtime_reconcile_total{controller="service",result="error"} 0
+controller_runtime_reconcile_total{controller="service",result="requeue"} 0
+controller_runtime_reconcile_total{controller="service",result="requeue_after"} 0
+controller_runtime_reconcile_total{controller="service",result="success"} 586
+controller_runtime_reconcile_total{controller="targetGroupBinding",result="error"} 0
+controller_runtime_reconcile_total{controller="targetGroupBinding",result="requeue"} 35026
+controller_runtime_reconcile_total{controller="targetGroupBinding",result="requeue_after"} 2550
+controller_runtime_reconcile_total{controller="targetGroupBinding",result="success"} 53941
+controller_runtime_webhook_requests_total{code="200",webhook="/mutate-elbv2-k8s-aws-v1beta1-targetgroupbinding"} 26
+controller_runtime_webhook_requests_total{code="200",webhook="/mutate-v1-pod"} 1762
+controller_runtime_webhook_requests_total{code="200",webhook="/mutate-v1-service"} 29
+controller_runtime_webhook_requests_total{code="200",webhook="/validate-elbv2-k8s-aws-v1beta1-ingressclassparams"} 0
+controller_runtime_webhook_requests_total{code="200",webhook="/validate-elbv2-k8s-aws-v1beta1-targetgroupbinding"} 30
+controller_runtime_webhook_requests_total{code="200",webhook="/validate-networking-v1-ingress"} 76
+controller_runtime_webhook_requests_total{code="500",webhook="/mutate-elbv2-k8s-aws-v1beta1-targetgroupbinding"} 0
+controller_runtime_webhook_requests_total{code="500",webhook="/mutate-v1-pod"} 0
+controller_runtime_webhook_requests_total{code="500",webhook="/mutate-v1-service"} 0
+controller_runtime_webhook_requests_total{code="500",webhook="/validate-elbv2-k8s-aws-v1beta1-ingressclassparams"} 0
+controller_runtime_webhook_requests_total{code="500",webhook="/validate-elbv2-k8s-aws-v1beta1-targetgroupbinding"} 0
+controller_runtime_webhook_requests_total{code="500",webhook="/validate-networking-v1-ingress"} 0
+leader_election_master_status{name="aws-load-balancer-controller-leader"} 1
+process_resident_memory_bytes 5.6037376e+07
+process_start_time_seconds 1.77337773458e+09
+rest_client_requests_total{code="200",host="172.20.0.1:443",method="DELETE"} 14
+rest_client_requests_total{code="200",host="172.20.0.1:443",method="GET"} 3.0750938e+07
+rest_client_requests_total{code="200",host="172.20.0.1:443",method="PATCH"} 51495
+rest_client_requests_total{code="200",host="172.20.0.1:443",method="PUT"} 2.0255362e+07
+rest_client_requests_total{code="201",host="172.20.0.1:443",method="POST"} 49743
+rest_client_requests_total{code="404",host="172.20.0.1:443",method="PATCH"} 49273
+rest_client_requests_total{code="429",host="172.20.0.1:443",method="GET"} 65
+rest_client_requests_total{code="503",host="172.20.0.1:443",method="GET"} 17
+workqueue_depth{name="ingress"} 0
+workqueue_depth{name="service"} 0
+workqueue_depth{name="targetGroupBinding"} 0

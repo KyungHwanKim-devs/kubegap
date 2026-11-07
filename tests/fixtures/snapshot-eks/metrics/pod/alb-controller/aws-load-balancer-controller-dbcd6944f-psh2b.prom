@@ -1,0 +1,22 @@
+aws_api_call_duration_seconds_sum{operation="DescribeTargetGroups",service="Elastic Load Balancing v2"} 1.5854502570000002
+aws_api_call_duration_seconds_count{operation="DescribeTargetGroups",service="Elastic Load Balancing v2"} 22
+aws_api_call_retries_sum{operation="DescribeTargetGroups",service="Elastic Load Balancing v2"} 0
+aws_api_call_retries_count{operation="DescribeTargetGroups",service="Elastic Load Balancing v2"} 22
+controller_runtime_webhook_requests_total{code="200",webhook="/mutate-elbv2-k8s-aws-v1beta1-targetgroupbinding"} 55
+controller_runtime_webhook_requests_total{code="200",webhook="/mutate-v1-pod"} 1810
+controller_runtime_webhook_requests_total{code="200",webhook="/mutate-v1-service"} 54
+controller_runtime_webhook_requests_total{code="200",webhook="/validate-elbv2-k8s-aws-v1beta1-ingressclassparams"} 0
+controller_runtime_webhook_requests_total{code="200",webhook="/validate-elbv2-k8s-aws-v1beta1-targetgroupbinding"} 51
+controller_runtime_webhook_requests_total{code="200",webhook="/validate-networking-v1-ingress"} 64
+controller_runtime_webhook_requests_total{code="500",webhook="/mutate-elbv2-k8s-aws-v1beta1-targetgroupbinding"} 0
+controller_runtime_webhook_requests_total{code="500",webhook="/mutate-v1-pod"} 0
+controller_runtime_webhook_requests_total{code="500",webhook="/mutate-v1-service"} 0
+controller_runtime_webhook_requests_total{code="500",webhook="/validate-elbv2-k8s-aws-v1beta1-ingressclassparams"} 0
+controller_runtime_webhook_requests_total{code="500",webhook="/validate-elbv2-k8s-aws-v1beta1-targetgroupbinding"} 0
+controller_runtime_webhook_requests_total{code="500",webhook="/validate-networking-v1-ingress"} 0
+leader_election_master_status{name="aws-load-balancer-controller-leader"} 0
+process_resident_memory_bytes 4.9688576e+07
+process_start_time_seconds 1.77337791908e+09
+rest_client_requests_total{code="200",host="172.20.0.1:443",method="GET"} 1.3066656e+07
+rest_client_requests_total{code="429",host="172.20.0.1:443",method="GET"} 21
+rest_client_requests_total{code="503",host="172.20.0.1:443",method="GET"} 23

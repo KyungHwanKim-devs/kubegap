@@ -1,0 +1,1 @@
+{"id":"prom_retention_days","query":"max(prometheus_tsdb_retention_limit_seconds) / 86400","why":"Configured retention (seconds → days). With retention.size at 0 only time is enforced, so the disk can fill first","taken_at":"2026-11-07T10:23:15+09:00","ok":true,"resultType":"vector","result":[{"metric":{},"value":[1794014597.38,"30"]}],"series":1}
