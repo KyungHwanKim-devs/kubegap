@@ -1,0 +1,822 @@
+# The versions kubegap's facts were read at (#146): one entry per component, the single source of README's "Verified against" table
+# (scripts/kubegap verified --markdown) and of the report header's range line (lib/verified.range_note). `read` lists every tag cited for the
+# component's repositories in collectors/*/*.yaml, signatures/, references/sources.md and lib/tools.py; tests/test_verified_doc.py fails when a
+# citation names a tag that is not here. `eks` and `k3s` are what the two reference clusters run, `newest` the newest release read. `assumes` is
+# the installation the queries and steps take for granted and `outside` what happens elsewhere: a skip with a reason, a detection, a config key.
+# `libraries` names the other repositories citations reach: logging and SDK libraries read for a signature, client libraries read for a metric name, and
+# the charts and operators read only to recognise a component (lib/components.py); their tags are not tracked here.
+components:
+  - name: "Kubernetes (kube-apiserver, kubelet, kube-proxy, kube-scheduler, controller-manager)"
+    repos:
+      - kubernetes/kubernetes
+      - kubernetes/apimachinery
+      - kubernetes/client-go
+      - kubernetes/component-base
+      - kubernetes/klog
+    read:
+      - "v0.29.0"
+      - "v0.29.1"
+      - "v0.29.3"
+      - "v0.31.0"
+      - "v0.32.5"
+      - "v0.35.0"
+      - "v0.36.2"
+      - "v0.37.0"
+      - "v0.37.1"
+      - "v1.30.14"
+      - "v1.31.14"
+      - "v1.32.2"
+      - "v1.32.13"
+      - "v1.33.5"
+      - "v1.33.13"
+      - "v1.34.2"
+      - "v1.34.13"
+      - "v1.35.10"
+      - "v1.36.6"
+      - "v1.37.2"
+      - "v2.110.1"
+      - "v2.120.1"
+      - "v2.130.1"
+      - "v2.140.0"
+    eks: "v1.32.13 (EKS 1.32)"
+    k3s: "v1.33.5 (v1.33.5+k3s1)"
+    newest: "v1.37.2"
+    assumes: "the apiserver series are read under the job label kube-prometheus-stack gives them (`apiserver`), else a detected one"
+    outside: "an older minor is read as is; a metric name that moved is caught by the series-presence record and the check skips naming it; the apiserver job comes from config key `apiserver_job` when detection fails"
+  - name: "k3s (the embedded apiserver, kubelet, kube-proxy, flannel, kine, etcd)"
+    repos:
+      - k3s-io/k3s
+      - k3s-io/kubernetes
+      - k3s-io/kine
+      - k3s-io/etcd
+      - k3s-io/containerd
+      - k3s-io/api
+      - rancher/remotedialer
+      - rancher/rke2-charts
+      - flannel-io/flannel
+    read:
+      - "cf8a16b"
+      - "e6b68fd83a6b"
+      - "f160aa32568d"
+      - "v0.1.3"
+      - "v0.2.1"
+      - "v0.6.1"
+      - "v0.14.0"
+      - "v0.17.1"
+      - "v0.17.4"
+      - "v0.27.0"
+      - "v0.28.10"
+      - "v1.33.5+k3s1"
+      - "v1.33.5-k3s1"
+      - "v1.37.1+k3s1"
+      - "v1.37.2+k3s1"
+      - "v1.37.2-k3s1"
+      - "v2.1.4-k3s1"
+      - "v3.5.21-k3s1"
+      - "v3.7.1-k3s3"
+    eks: null
+    k3s: "v1.33.5+k3s1"
+    newest: "v1.37.2+k3s1"
+    assumes: "node access over SSH; the k3s-platform collector runs when the platform is k3s or rke2"
+    outside: "a cluster that is not k3s skips every `platform.k3s-*` check"
+  - name: "containerd"
+    repos:
+      - containerd/containerd
+      - containerd/ttrpc
+      - containerd/go-cni
+      - containerd/plugin
+      - kubernetes-sigs/cri-tools
+    read:
+      - "api/v1.8.0"
+      - "v1.0.0"
+      - "v1.1.9"
+      - "v1.1.12"
+      - "v1.1.14"
+      - "v1.2.7"
+      - "v1.2.9"
+      - "v1.7.27"
+      - "v1.7.29"
+      - "v1.31.0"
+      - "v1.32.0"
+      - "v1.33.0"
+      - "v2.0.5"
+      - "v2.1.0"
+      - "v2.1.1"
+      - "v2.1.3"
+      - "v2.1.4"
+      - "v2.1.5"
+      - "v2.1.9"
+      - "v2.2.0"
+      - "v2.2.3"
+      - "v2.3.7"
+      - "v2.4.2"
+    eks: "v1.7.29, v2.1.5 (the two node images)"
+    k3s: "v2.1.4-k3s1"
+    newest: "v2.4.2"
+    assumes: null
+    outside: "the log signatures match the texts read at these versions; another runtime writes nothing they know"
+  - name: "CoreDNS"
+    repos:
+      - coredns/coredns
+      - coredns/caddy
+    read:
+      - "8de985351a98"
+      - "v1.1.1"
+      - "v1.1.4"
+      - "v1.10.1"
+      - "v1.11.0"
+      - "v1.11.1"
+      - "v1.11.3"
+      - "v1.12.3"
+      - "v1.14.6"
+      - "v1.15.0"
+    eks: "v1.11.3"
+    k3s: "v1.12.3"
+    newest: "v1.15.0"
+    assumes: "scraped by Prometheus (`coredns_*` series)"
+    outside: "the forward metrics moved to `coredns_proxy_*` at 1.11.0 and the queries read both spellings"
+  - name: "metrics-server"
+    repos:
+      - kubernetes-sigs/metrics-server
+    read:
+      - "v0.8.0"
+      - "v0.9.1"
+    eks: "v0.8.0"
+    k3s: "v0.8.0"
+    newest: "v0.9.1"
+    assumes: null
+    outside: null
+  - name: "node-exporter"
+    repos:
+      - prometheus/node_exporter
+    read:
+      - "v1.7.0"
+      - "v1.10.2"
+      - "v1.12.1"
+    eks: "v1.7.0"
+    k3s: "v1.10.2"
+    newest: "v1.12.1"
+    assumes: "scraped by Prometheus with the host network (the node checks join on `instance`)"
+    outside: "a collector that is off by default (processes) is not read; the series-presence record makes the check skip"
+  - name: "kube-state-metrics"
+    repos:
+      - kubernetes/kube-state-metrics
+    read:
+      - "v2.10.1"
+      - "v2.20.0"
+    eks: "v2.10.1"
+    k3s: "v2.17.0"
+    newest: "v2.20.0"
+    assumes: "scraped by Prometheus"
+    outside: "`kube_endpoint_address` changed shape at 2.14.0 and the queries count per address"
+  - name: "cAdvisor (in the kubelet)"
+    repos:
+      - google/cadvisor
+    read:
+      - "v0.51.0"
+      - "v0.52.1"
+      - "v0.53.0"
+      - "v0.60.5"
+    eks: "v0.51.0 (kubelet 1.32)"
+    k3s: "v0.52.1 (kubelet 1.33)"
+    newest: "v0.60.5"
+    assumes: "scraped through the kubelet's cadvisor endpoint"
+    outside: null
+  - name: "Prometheus"
+    repos:
+      - prometheus/prometheus
+      - prometheus/client_golang
+      - prometheus/common
+    read:
+      - "v0.45.0"
+      - "v0.67.1"
+      - "v1.19.1"
+      - "v1.20.5"
+      - "v1.23.2"
+      - "v1.24.1"
+      - "v2.49.1"
+      - "v3.7.3"
+      - "v3.8.1"
+      - "v3.9.1"
+      - "v3.10.0"
+      - "v3.15.1"
+      - "v0.71.0"
+    eks: "v2.49.1"
+    k3s: "v3.7.3"
+    newest: "v3.15.1"
+    assumes: "a Service kubegap can port-forward to (kube-prometheus-stack's, or `prometheus_url` in config)"
+    outside: "no Prometheus: every metric check skips with the reason, the report says so in section 7"
+  - name: "Alertmanager"
+    repos:
+      - prometheus/alertmanager
+      - hashicorp/memberlist
+      - hashicorp/go-multierror
+    read:
+      - "v0.5.0"
+      - "v0.5.1"
+      - "v0.6.0"
+      - "v0.26.0"
+      - "v0.29.0"
+      - "v0.34.2"
+      - "v1.1.0"
+      - "v1.1.1"
+    eks: "v0.26.0"
+    k3s: "v0.29.0"
+    newest: "v0.34.2"
+    assumes: "a Service kubegap can port-forward to"
+    outside: "no Alertmanager: the alerting checks skip"
+  - name: "kube-prometheus-stack / prometheus-operator"
+    tag_prefix: "kube-prometheus-stack-"
+    repos:
+      - prometheus-community/helm-charts
+      - prometheus-operator/prometheus-operator
+    read:
+      - "alertmanager-2.1.4"
+      - "kube-prometheus-stack-56.0.0"
+      - "kube-prometheus-stack-79.5.0"
+      - "kube-prometheus-stack-92.17.1"
+      - "kube-prometheus-stack-92.18.0"
+      - "kube-state-metrics-9.0.0"
+      - "prometheus-29.40.3"
+      - "prometheus-node-exporter-4.60.1"
+      - "v0.71.0"
+      - "v0.86.2"
+      - "v0.94.2"
+    eks: "chart 56.0.0, operator v0.71.0"
+    k3s: "chart 79.5.0, operator v0.86.2"
+    newest: "chart 92.18.0, operator v0.94.2"
+    assumes: "the chart's job labels (`apiserver`, `kubelet`, `node-exporter`, `kube-state-metrics`) and Service names"
+    outside: "other job names: the apiserver job is detected or set in `apiserver_job`; other Service names: `prometheus_url` in config"
+  - name: "Grafana"
+    repos:
+      - grafana/grafana
+      - grafana/helm-charts
+      - grafana-community/helm-charts
+    read:
+      - "80d6bc9"
+      - "grafana-8.5.0"
+      - "grafana-14.3.1"
+      - "loki-2.16.0"
+      - "loki-stack-2.10.3"
+      - "promtail-6.16.6"
+      - "promtail-6.17.1"
+      - "tempo-1.24.4"
+      - "tempo-distributed-1.61.3"
+      - "v10.2.3"
+      - "v12.2.1"
+      - "v13.3.0"
+    eks: "v10.2.3"
+    k3s: "v12.2.1"
+    newest: "v13.3.0"
+    assumes: "dashboards and datasources read from the sidecar ConfigMaps, or from the API with `grafana_api_token`"
+    outside: null
+  - name: "Loki and promtail"
+    tag_prefix: "v"
+    repos:
+      - grafana/loki
+      - grafana/dskit
+      - weaveworks/common
+    read:
+      - "334485600903"
+      - "8d1c6d34bb5a"
+      - "e3b70df0f08b"
+      - "ea101a3b86eb"
+      - "helm-loki-7.5.0"
+      - "v2.6.1"
+      - "v2.7.0"
+      - "v2.8.0"
+      - "v2.9.2"
+      - "v3.0.0"
+      - "v3.4.2"
+      - "v3.5.0"
+      - "v3.5.12"
+      - "v3.6.0"
+      - "v3.7.9"
+    eks: "Loki v2.6.1, promtail v2.9.2"
+    k3s: null
+    newest: "v3.7.9 (promtail end of life 2026-03-02)"
+    assumes: "a Loki Service kubegap can port-forward to; promtail or Fluent Bit as the agent"
+    outside: "no Loki: the log-volume checks skip; another agent is detected or not"
+  - name: "Fluent Bit"
+    repos:
+      - fluent/fluent-bit
+    read:
+      - "v3.0.4"
+      - "v4.0.0"
+      - "v4.0.14"
+      - "v4.1.0"
+      - "v5.1.5"
+    eks: null
+    k3s: "v3.0.4"
+    newest: "v5.1.5"
+    assumes: "scraped by Prometheus (`fluentbit_*`)"
+    outside: null
+  - name: "ingress-nginx"
+    tag_prefix: "controller-v"
+    repos:
+      - kubernetes/ingress-nginx
+      - nginx/nginx
+    read:
+      - "controller-v1.12.1"
+      - "controller-v1.14.0"
+      - "controller-v1.15.1"
+      - "helm-chart-4.15.1"
+      - "release-1.27.1"
+    eks: null
+    k3s: "controller-v1.14.0"
+    newest: "controller-v1.15.1"
+    assumes: "metrics scraped by Prometheus (`nginx_ingress_controller_*`)"
+    outside: "without the scrape the per-Ingress traffic checks skip (ingress metrics not read)"
+  - name: "Traefik"
+    repos:
+      - traefik/traefik
+      - traefik/traefik-helm-chart
+    read:
+      - "v1.7.34"
+      - "v3.3.2"
+      - "v3.3.6"
+      - "v3.6.0"
+      - "v3.6.6"
+      - "v3.6.7"
+      - "v3.7.0"
+      - "v3.7.15"
+      - "v3.7.17"
+      - "v27.0.2"
+      - "v28.0.0"
+      - "v34.2.0"
+      - "v41.6.1"
+      - "v42.3.0"
+    eks: null
+    k3s: null
+    newest: "v3.7.17"
+    assumes: "no Traefik runs on either reference cluster; metrics scraped by Prometheus when it does"
+    outside: null
+  - name: "MetalLB"
+    repos:
+      - metallb/metallb
+    read:
+      - "v0.12.1"
+      - "v0.13.0"
+      - "v0.13.12"
+      - "v0.14.5"
+      - "v0.14.6"
+      - "v0.14.9"
+      - "v0.15.2"
+      - "v0.15.3"
+      - "v0.16.1"
+      - "v0.16.2"
+    eks: null
+    k3s: "v0.14.5"
+    newest: "v0.16.2"
+    assumes: "speaker metrics read from the pods"
+    outside: "BGP status is read only where Prometheus scrapes it"
+  - name: "Argo CD"
+    repos:
+      - argoproj/argo-cd
+      - argoproj/argo-helm
+      - argoproj/gitops-engine
+      - argoproj/pkg
+    read:
+      - "argo-cd-10.12.0"
+      - "b89b0871b414"
+      - "bd7681ae3f8b"
+      - "d56162821bd1"
+      - "v2.13.0"
+      - "v2.14.0"
+      - "v3.0.0"
+      - "v3.1.0"
+      - "v3.2.0"
+      - "v3.6.0"
+      - "v3.6.1"
+    eks: "v2.13.0"
+    k3s: "v3.2.0"
+    newest: "v3.6.1"
+    assumes: "controller metrics read from the pods; ConfigMap keys `argocd-cm`, `argocd-cmd-params-cm`, `argocd-rbac-cm`"
+    outside: null
+  - name: "cert-manager"
+    repos:
+      - cert-manager/cert-manager
+      - go-acme/lego
+    read:
+      - "v1.14.4"
+      - "v1.20.0"
+      - "v1.21.0"
+      - "v1.21.3"
+      - "v4.21.0"
+      - "v5.6.0"
+    eks: null
+    k3s: "v1.14.4"
+    newest: "v1.21.3"
+    assumes: "controller metrics read from the pod"
+    outside: null
+  - name: "External Secrets Operator"
+    repos:
+      - external-secrets/external-secrets
+    read:
+      - "v0.9.13"
+      - "v0.10.0"
+      - "v0.11.0"
+      - "v0.16.0"
+      - "v0.17.0"
+      - "v2.1.0"
+      - "v2.14.0"
+    eks: "v0.9.13"
+    k3s: "v2.1.0"
+    newest: "v2.14.0"
+    assumes: "controller metrics read from the pod"
+    outside: null
+  - name: "KEDA"
+    repos:
+      - kedacore/keda
+      - kedacore/charts
+    read:
+      - "v2.12.0"
+      - "v2.13.1"
+      - "v2.14.0"
+      - "v2.16.0"
+      - "v2.16.1"
+      - "v2.17.0"
+      - "v2.17.2"
+      - "v2.19.0"
+      - "v2.21.0"
+    eks: "v2.17.2"
+    k3s: "v2.19.0"
+    newest: "v2.21.0"
+    assumes: "operator metrics read from the pod (`--enable-prometheus-metrics`)"
+    outside: "metrics off: the KEDA metric checks skip, the step says why"
+  - name: "Reloader"
+    repos:
+      - stakater/Reloader
+    read:
+      - "v1.4.23"
+    eks: null
+    k3s: "v1.4.14"
+    newest: "v1.4.23"
+    assumes: null
+    outside: null
+  - name: "Elasticsearch / OpenSearch / Kibana"
+    repos:
+      - elastic/elasticsearch
+      - elastic/ecs-logging-java
+      - opensearch-project/OpenSearch
+    read:
+      - "3.9.0"
+      - "v1.7.0"
+      - "v7.10.2"
+      - "v8.19.0"
+      - "v8.19.24"
+      - "v9.5.6"
+    eks: null
+    k3s: "Elasticsearch v7.10.2"
+    newest: "v9.5.6 (OpenSearch 3.9.0)"
+    assumes: "log signatures only"
+    outside: null
+  - name: "Karpenter"
+    repos:
+      - kubernetes-sigs/karpenter
+      - aws/karpenter-provider-aws
+      - awslabs/operatorpkg
+    read:
+      - "5e8ed3699dea"
+      - "67d0acfb6306"
+      - "edb8fe5824b4"
+      - "v0.31.4"
+      - "v0.32.0"
+      - "v0.33.0"
+      - "v0.37.0"
+      - "v1.0.0"
+      - "v1.1.0"
+      - "v1.2.0"
+      - "v1.3.0"
+      - "v1.5.0"
+      - "v1.6.0"
+      - "v1.15.1"
+    eks: "v0.37.0"
+    k3s: null
+    newest: "v1.15.1"
+    assumes: "NodePools and NodeClaims through the API, controller metrics from the pod"
+    outside: "no Karpenter: the `karpenter.*` checks skip (kind not served)"
+  - name: "AWS Load Balancer Controller"
+    repos:
+      - kubernetes-sigs/aws-load-balancer-controller
+    read:
+      - "v2.7.2"
+      - "v3.6.2"
+    eks: "v2.7.2"
+    k3s: null
+    newest: "v3.6.2"
+    assumes: "TargetGroupBindings through the API; ALB metrics from CloudWatch (`elasticloadbalancing:Describe*`, `cloudwatch:GetMetricData`)"
+    outside: "AWS calls refused: the ALB checks skip naming the call"
+  - name: "EBS CSI driver"
+    repos:
+      - kubernetes-sigs/aws-ebs-csi-driver
+      - kubernetes-csi/external-attacher
+      - kubernetes-csi/external-snapshotter
+      - kubernetes-sigs/sig-storage-lib-external-provisioner
+      - rancher/local-path-provisioner
+    read:
+      - "v0.0.31"
+      - "v0.0.37"
+      - "v1.37.0"
+      - "v1.38.0"
+      - "v1.38.1"
+      - "v1.41.0"
+      - "v1.42.0"
+      - "v1.53.0"
+      - "v1.54.0"
+      - "v1.67.2"
+      - "v4.7.0"
+      - "v4.13.0"
+      - "v8.1.0"
+      - "v8.7.0"
+      - "v10.0.1"
+      - "v11.0.1"
+    eks: "v1.37.0"
+    k3s: "local-path-provisioner v0.0.31"
+    newest: "v1.67.2"
+    assumes: "controller metrics scraped by Prometheus"
+    outside: "the `aws_ebs_csi_*` names exist since v1.38.0; before that the `cloudprovider_aws_*` names, and the queries read both"
+  - name: "VPC CNI (aws-node)"
+    repos:
+      - aws/amazon-vpc-cni-k8s
+      - aws/aws-network-policy-agent
+      - aws/amazon-eks-pod-identity-webhook
+      - awslabs/amazon-eks-ami
+      - awsdocs/amazon-eks-user-guide
+    read:
+      - "8d43223"
+      - "mainline"
+      - "v20251209"
+      - "v20261031"
+      - "v0.6.5"
+      - "v0.6.19"
+      - "v1.1.5"
+      - "v1.4.3"
+      - "v1.19.0"
+      - "v1.23.2"
+    eks: "v1.19.0"
+    k3s: null
+    newest: "v1.23.2"
+    assumes: "ipamd metrics read from the pods or through the node; the add-on configuration from `eks:DescribeAddon`"
+    outside: "metrics not read: the IP-exhaustion checks skip"
+  - name: "external-dns"
+    repos:
+      - kubernetes-sigs/external-dns
+    read:
+      - "v0.14.0"
+      - "v0.24.0"
+    eks: "v0.14.0"
+    k3s: null
+    newest: "v0.24.0"
+    assumes: "log signatures only"
+    outside: null
+  - name: "Actions Runner Controller"
+    tag_prefix: "gha-runner-scale-set-"
+    repos:
+      - actions/actions-runner-controller
+    read:
+      - "gha-runner-scale-set-0.10.1"
+      - "gha-runner-scale-set-0.15.1"
+      - "v0.27.6"
+    eks: "gha-runner-scale-set-0.10.1"
+    k3s: "summerwind actions-runner-controller v0.27.6 (the legacy controller)"
+    newest: "0.15.1"
+    assumes: "component detection only"
+    outside: null
+  - name: "cluster-autoscaler"
+    repos:
+      - kubernetes/autoscaler
+    read:
+      - "cluster-autoscaler-chart-9.60.0"
+    eks: null
+    k3s: null
+    newest: "chart 9.60.0"
+    assumes: "component detection only"
+    outside: null
+  - name: "Operating system of the nodes (systemd, kernel, glibc, coreutils, procps, smartmontools)"
+    repos:
+      - systemd/systemd
+      - torvalds/linux
+      - bminor/glibc
+      - musl-libc/musl
+      - coreutils/coreutils
+      - coreutils/gnulib
+      - procps-ng/procps
+      - smartmontools/smartmontools
+      - iproute2/iproute2
+      - ubuntu/update-notifier
+      - alpinelinux/aports
+    read:
+      - "0658e5039f75053480a7599edca236fecffe100d"
+      - "259829e78b9e434771388269cd7ff3f55ce74057"
+      - "3.22-stable"
+      - "3.23-stable"
+      - "3.192.54"
+      - "3.192.68build3"
+      - "RELEASE_7_2"
+      - "RELEASE_7_5"
+      - "glibc-2.31"
+      - "glibc-2.34"
+      - "glibc-2.41"
+      - "v219"
+      - "v220"
+      - "v235"
+      - "v239"
+      - "v249"
+      - "v252"
+      - "v255"
+      - "v1.2.5"
+      - "v3.3.10"
+      - "v3.3.17"
+      - "v4.0.4"
+      - "v4.11.0"
+      - "v5.2"
+      - "v5.3"
+      - "v5.4"
+      - "v5.10"
+      - "v5.15"
+      - "v6.1"
+      - "v6.1.0"
+      - "v6.8"
+      - "v6.12"
+      - "v8.22"
+      - "v8.26"
+      - "v9.5"
+    eks: "Amazon Linux 2 (systemd 219, kernel 5.10) and Amazon Linux 2023 (systemd 252, kernel 6.1)"
+    k3s: "Ubuntu 22.04 (systemd 249, kernel 5.15)"
+    newest: "systemd v255, kernel v6.12"
+    assumes: "the node scripts run over SSM or SSH"
+    outside: "no node access: the 36 `node.*` checks skip"
+  - name: "Go runtime and standard library (strings every Go component relays)"
+    repos:
+      - golang/go
+      - golang/crypto
+    read:
+      - "go1.21.0"
+      - "go1.24.6"
+      - "go1.24.13"
+      - "go1.25.0"
+      - "go1.25.3"
+      - "go1.26.0"
+      - "go1.26.1"
+      - "go1.26.10"
+      - "v0.17.0"
+    eks: "go1.24.13 (kubernetes 1.32)"
+    k3s: "go1.24.6 (kubernetes 1.33)"
+    newest: "go1.26.10"
+    assumes: null
+    outside: null
+  - name: "krr"
+    repos:
+      - robusta-dev/krr
+    read:
+      []
+    eks: "v1.31.1"
+    k3s: "v1.31.1"
+    newest: "v1.31.1 (the pin of `kubegap setup`)"
+    assumes: "installed by `kubegap setup`, pinned with a sha256"
+    outside: "not installed: the `resources.*` KRR checks report tool-missing"
+  - name: "polaris"
+    repos:
+      - FairwindsOps/polaris
+    read:
+      []
+    eks: "v10.2.6"
+    k3s: "v10.2.6"
+    newest: "v10.2.6 (the pin of `kubegap setup`)"
+    assumes: "installed by `kubegap setup`, pinned with a sha256"
+    outside: "not installed: tool-missing"
+  - name: "pluto"
+    repos:
+      - FairwindsOps/pluto
+    read:
+      - "v5.24.5"
+    eks: "v5.24.5"
+    k3s: "v5.24.5"
+    newest: "v5.24.5 (the pin of `kubegap setup`)"
+    assumes: "installed by `kubegap setup`, pinned with a sha256"
+    outside: "not installed: tool-missing"
+  - name: "kubent"
+    repos:
+      - doitintl/kube-no-trouble
+    read:
+      - "0.7.3"
+    eks: "0.7.3"
+    k3s: "0.7.3"
+    newest: "0.7.3 (the pin of `kubegap setup`)"
+    assumes: "installed by `kubegap setup`, pinned with a sha256"
+    outside: "not installed: tool-missing"
+  - name: "helm"
+    repos:
+      - helm/helm
+    read:
+      - "v3.22.1"
+      - "v4.3.1"
+    eks: "v4.3.1"
+    k3s: "v4.3.1"
+    newest: "v4.3.1 (the pin of `kubegap setup`; v3.22.1 compared)"
+    assumes: "installed by `kubegap setup`; `helm list` needs the Secrets the shipped ClusterRole does not grant"
+    outside: "the two Helm checks skip with the reason"
+libraries:
+  - VictoriaMetrics/helm-charts
+  - VictoriaMetrics/operator
+  - akoutmos/prom_ex
+  - aquasecurity/trivy-operator
+  - argoproj/argo-rollouts
+  - aws-observability/helm-charts
+  - aws/amazon-cloudwatch-agent-operator
+  - aws/aws-node-termination-handler
+  - aws/aws-sdk-go
+  - aws/aws-sdk-go-v2
+  - aws/eks-pod-identity-agent
+  - aws/smithy-go
+  - bitnami-labs/sealed-secrets
+  - bitnami/charts
+  - boto/botocore
+  - brettwooldridge/HikariCP
+  - cilium/cilium
+  - coredns/deployment
+  - cznic/sqlite
+  - danielqsj/kafka_exporter
+  - discourse/prometheus_exporter
+  - elastic/cloud-on-k8s
+  - elastic/helm-charts
+  - falcosecurity/charts
+  - fluent/helm-charts
+  - fluxcd/flux2
+  - fluxcd/kustomize-controller
+  - git/git
+  - go-git/go-git
+  - go-kit/log
+  - go-logfmt/logfmt
+  - go-logr/zapr
+  - go.uber.org/zap
+  - google/go-github
+  - gorilla/websocket
+  - grafana/agent
+  - grafana/alloy
+  - grpc-ecosystem/go-grpc-middleware
+  - grpc-ecosystem/go-grpc-prometheus
+  - grpc/grpc-go
+  - hashicorp/vault-helm
+  - istio/istio
+  - jaegertracing/helm-charts
+  - jaegertracing/jaeger-operator
+  - jochen-schweizer/express-prom-bundle
+  - k8up-io/k8up
+  - korfuri/django-prometheus
+  - kubecost/cost-analyzer-helm-chart
+  - kubereboot/charts
+  - kubereboot/kured
+  - kubernetes-csi/csi-driver-nfs
+  - kubernetes-sigs/aws-efs-csi-driver
+  - kubernetes-sigs/controller-runtime
+  - kubernetes-sigs/descheduler
+  - kubernetes-sigs/nfs-subdir-external-provisioner
+  - kubernetes-sigs/secrets-store-csi-driver
+  - kubernetes/sig-release
+  - kubernetes/website
+  - kyverno/kyverno
+  - linkerd/linkerd2
+  - longhorn/longhorn
+  - mattn/go-sqlite3
+  - micrometer-metrics/micrometer
+  - natefinch/lumberjack
+  - nginx/nginx-prometheus-exporter
+  - open-policy-agent/gatekeeper
+  - open-telemetry/opentelemetry-collector-contrib
+  - open-telemetry/opentelemetry-helm-charts
+  - open-telemetry/opentelemetry-operator
+  - open-telemetry/opentelemetry-specification
+  - open-telemetry/semantic-conventions
+  - openai/codex
+  - opencost/opencost-helm-chart
+  - opensearch-project/helm-charts
+  - opensearch-project/opensearch-k8s-operator
+  - projectcalico/calico
+  - prometheus-net/prometheus-net
+  - prometheus/client_java
+  - prometheus/docs
+  - prometheus/promci
+  - pyrra-dev/pyrra
+  - rancher/image-build-kubernetes
+  - rancher/rke2
+  - resmoio/kubernetes-event-exporter
+  - rook/rook
+  - rs/zerolog
+  - rycus86/prometheus_flask_exporter
+  - siimon/prom-client
+  - sirupsen/logrus
+  - slok/sloth
+  - spring-projects/spring-framework
+  - stephenhillier/starlette_exporter
+  - thanos-io/thanos
+  - tigera/operator
+  - trallnag/prometheus-fastapi-instrumentator
+  - uber-go/zap
+  - uken/fluent-plugin-elasticsearch
+  - urfave/cli
+  - vectordotdev/helm-charts
+  - vmware-tanzu/helm-charts
+  - vmware-tanzu/velero
+  - yabeda-rb/yabeda-rails

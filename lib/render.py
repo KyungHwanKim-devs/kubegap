@@ -44,6 +44,8 @@ LABELS: dict[str, dict[str, str]] = {
         "Run time / mode": "실행 시각 / 모드",
         "Profile": "프로파일",
         "kubegap / rubric / signatures": "kubegap / 점검 항목 버전 / 로그 시그니처 버전",
+        "Verified against": "검증한 버전 범위",
+        "(no component version read)": "(읽은 구성 요소 버전 없음)",
         "Nodes / namespaces / pods / CRDs": "노드 / 네임스페이스 / 파드 / CRD",
         "Components": "컴포넌트",
         "Metrics store": "메트릭 저장소",
@@ -250,6 +252,22 @@ def keep_report(snap: Path, now: _dt.datetime | None = None) -> Path | None:
     return dest
 
 
+def _verified_notes(inv: dict, language: str) -> list[tuple[str, str]]:
+    """The audited cluster's component versions next to the range kubegap's facts were read at (references/verified-versions.yaml, #146): the API server and
+    the four stores, the versions inventory.json carries."""
+    from . import verified
+
+    out = []
+    pairs = [("Kubernetes", (inv.get("cluster") or {}).get("server_version"))] + [
+        (name, ((inv.get("stores") or {}).get(key) or {}).get("version")) for name, key in (("Prometheus", "prometheus"), ("Alertmanager", "alertmanager"), ("Loki", "loki"), ("Grafana", "grafana"))
+    ]
+    for name, version in pairs:
+        note = verified.range_note(name, version, language)
+        if note:
+            out.append((name, note))
+    return out
+
+
 def render_details(snap: Path, language: str = "en") -> Path:
     lab = LABELS.get(language) or {}
 
@@ -302,6 +320,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
                 ],
                 [L("Profile"), f"`{(inv.get('profile') or {}).get('name')}` ({(inv.get('profile') or {}).get('source')})"],
                 [L("kubegap / rubric / signatures"), f"{fd.get('kubegap') or __version__} / {fd.get('rubric_version')} / {inv.get('signatures_version')}"],
+                [L("Verified against"), " · ".join(f"{name} {note}" for name, note in _verified_notes(inv, language)) or L("(no component version read)")],
                 [L("Nodes / namespaces / pods / CRDs"), f"{nodes.get('count')} (Ready {nodes.get('ready')}) / {(inv.get('namespaces') or {}).get('count')} / {(inv.get('pods') or {}).get('count')} / {(inv.get('crds') or {}).get('count')}"],
                 [f"{L('Components')} ({len(inv.get('components_present') or [])})", ", ".join(inv.get("components_present") or [])],
                 [

@@ -634,6 +634,14 @@ def cmd_selftest(args) -> int:
     return 1 if r["failed"] or r["load_errors"] or r["audit_failed"] else 0
 
 
+def cmd_verified(args) -> int:
+    """The "Verified against" table of README (lib/verified.py), to paste between the verified-table markers; a test compares the two."""
+    from lib import verified as _verified
+
+    sys.stdout.write(_verified.render_table(args.language))
+    return EXIT_OK
+
+
 def cmd_regress(args) -> int:
     """End-to-end regression on the committed snapshot fixtures (lib/regress.py). --update rewrites the expectation, the one way it changes."""
     import tempfile as _tf
@@ -861,6 +869,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--check", action="append", help="only this check id (repeatable)")
     s.add_argument("--snapshot", action="append", help="real snapshot folder (repeatable). Verifies that keys referenced by summary-type check expressions exist in that summary.json")
     s.set_defaults(func=cmd_selftest)
+
+    s = sub.add_parser("verified", help="print README's Verified-against table from references/verified-versions.yaml (paste between the verified-table markers; a test compares)")
+    s.add_argument("--markdown", action="store_true", help="Markdown table (the only format)")
+    s.add_argument("--language", choices=["en", "ko"], default="en")
+    s.set_defaults(func=cmd_verified)
 
     s = sub.add_parser("regress", help="run summarize, evaluate and render on the committed snapshot fixtures (tests/fixtures/snapshot-*) and compare with tests/fixtures/expected (no cluster needed)")
     s.add_argument("--fixture", help="only the variants of this fixture (k3s, eks, …)")
