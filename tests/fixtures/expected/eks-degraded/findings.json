@@ -4,7 +4,7 @@
   "source": "detected",
   "missing_file": false
  },
- "rubric_version": "0.1.83",
+ "rubric_version": "0.1.84",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -197,8 +197,8 @@
   },
   {
    "id": "observability.alerts-always-firing",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)",
    "counts": {}
   },
   {
@@ -234,7 +234,9 @@
    "id": "observability.golden-signals-missing",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "warn": 41
+   }
   },
   {
    "id": "observability.log-volume-change",
@@ -335,7 +337,7 @@
    "status": "done",
    "reason": null,
    "counts": {
-    "warn": 1
+    "fail": 1
    }
   },
   {
@@ -406,12 +408,9 @@
   },
   {
    "id": "controlplane.scheduler-unschedulable",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "fail": 3,
-    "warn": 3
-   }
+   "status": "skip",
+   "reason": "control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)",
+   "counts": {}
   },
   {
    "id": "controlplane.apiserver-429",
@@ -439,34 +438,27 @@
   },
   {
    "id": "controlplane.webhook-call-failures",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)",
    "counts": {}
   },
   {
    "id": "controlplane.controller-error-repeat",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "warn": 3,
-    "pass": 2
-   }
+   "status": "skip",
+   "reason": "control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)",
+   "counts": {}
   },
   {
    "id": "controlplane.apiserver-slow-traces",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "warn": 1
-   }
+   "status": "skip",
+   "reason": "control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)",
+   "counts": {}
   },
   {
    "id": "controlplane.authenticator-failures",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "warn": 1
-   }
+   "status": "skip",
+   "reason": "control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)",
+   "counts": {}
   },
   {
    "id": "controlplane.etcd-slow",
@@ -734,18 +726,18 @@
   },
   {
    "id": "cost.idle-compute-high",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: pricing (pricing:GetProducts) or node CPU usage metrics (node_cpu_usage_ratio_p95_7d) not read",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
    "id": "cost.request-waste",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: pricing (pricing:GetProducts) or the KRR totals not read",
    "counts": {
-    "fail": 1
+    "skipped": 1
    }
   },
   {
@@ -758,24 +750,24 @@
   },
   {
    "id": "cost.unused-eip",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: EC2 addresses not read (ec2:DescribeAddresses)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
    "id": "cost.idle-load-balancer",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: load balancers not read (elasticloadbalancing:Describe*)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
    "id": "cost.idle-node",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "node CPU usage metrics not read (node_cpu_usage_ratio_p95_7d)",
    "counts": {}
   },
   {
@@ -854,26 +846,26 @@
   },
   {
    "id": "security.networkpolicy-not-enforced",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
    "id": "security.no-default-deny",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
    "id": "security.imds-hop-limit",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: not EKS, or EC2 instance list not read (ec2:DescribeInstances)",
    "counts": {
-    "warn": 1
+    "skipped": 1
    }
   },
   {
@@ -886,10 +878,10 @@
   },
   {
    "id": "storage.pvc-usage-high",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: PVC usage metrics not read (kubelet_volume_stats_*) (18)",
    "counts": {
-    "pass": 18
+    "skipped": 18
    }
   },
   {
@@ -932,26 +924,26 @@
   },
   {
    "id": "storage.ebs-unattached",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: ebs not available",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
    "id": "storage.ebs-gp2-volumes",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: ebs not available",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
    "id": "storage.ebs-unencrypted",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: ebs not available",
    "counts": {
-    "warn": 1
+    "skipped": 1
    }
   },
   {
@@ -996,11 +988,9 @@
   },
   {
    "id": "hygiene.eks-upgrade-insight",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "fail": 1
-   }
+   "status": "skip",
+   "reason": "EKS upgrade insights not read (aws/list-insights.json missing: eks:ListInsights refused or not an EKS cluster)",
+   "counts": {}
   },
   {
    "id": "hygiene.helm-release-not-deployed",
@@ -1061,10 +1051,10 @@
   },
   {
    "id": "hygiene.orphan-secrets",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: Secret names not read (kube_secret_info through Prometheus)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
@@ -1085,19 +1075,15 @@
   },
   {
    "id": "traffic.lb-idle-timeout-long",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "pass": 3
-   }
+   "status": "skip",
+   "reason": "summary.traffic.alb.lbs missing",
+   "counts": {}
   },
   {
    "id": "traffic.alb-target-type-instance",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "pass": 53
-   }
+   "status": "skip",
+   "reason": "summary.traffic.alb.target_groups missing",
+   "counts": {}
   },
   {
    "id": "resilience.termination-grace-unusual",
@@ -1381,65 +1367,50 @@
   },
   {
    "id": "traffic.ingress-5xx-ratio",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (41)",
    "counts": {
-    "pass": 39,
-    "warn": 2
+    "skipped": 41
    }
   },
   {
    "id": "traffic.ingress-p95-latency",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (41)",
    "counts": {
-    "pass": 38,
-    "warn": 2,
-    "fail": 1
+    "skipped": 41
    }
   },
   {
    "id": "traffic.alb-elb-5xx",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "pass": 2,
-    "fail": 1
-   }
+   "status": "skip",
+   "reason": "summary.traffic.alb.lbs missing",
+   "counts": {}
   },
   {
    "id": "traffic.alb-unhealthy-targets",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "fail": 6
-   }
+   "status": "skip",
+   "reason": "summary.traffic.alb.unhealthy_target_groups missing",
+   "counts": {}
   },
   {
    "id": "traffic.alb-deregistration-vs-grace",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "pass": 24,
-    "warn": 29
-   }
+   "status": "skip",
+   "reason": "summary.traffic.alb.target_groups missing",
+   "counts": {}
   },
   {
    "id": "traffic.alb-protection-off",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "pass": 2,
-    "warn": 1
-   }
+   "status": "skip",
+   "reason": "summary.traffic.alb.lbs missing",
+   "counts": {}
   },
   {
    "id": "traffic.db-exposed",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: load balancer security groups not read (elasticloadbalancing:Describe*, ec2:DescribeSecurityGroups)",
    "counts": {
-    "fail": 1,
-    "warn": 1
+    "skipped": 1
    }
   },
   {
@@ -1460,7 +1431,7 @@
    "reason": null,
    "counts": {
     "warn": 7,
-    "pass": 36
+    "pass": 35
    }
   },
   {
@@ -1471,8 +1442,8 @@
   },
   {
    "id": "traffic.pod-not-ready",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "pod readiness ratio not read (metrics/pod_ready_ratio_24h.json missing or failed)",
    "counts": {}
   },
   {
@@ -1485,10 +1456,10 @@
   },
   {
    "id": "traffic.coredns-latency",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: CoreDNS metrics not read (coredns_dns_request_duration_seconds)",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
@@ -1521,10 +1492,10 @@
   },
   {
    "id": "scaling.hpa-never-scaled",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: HPA metrics not read (hpa_at_min_ratio_15d) (18)",
    "counts": {
-    "pass": 18
+    "skipped": 18
    }
   },
   {
@@ -1705,10 +1676,10 @@
   },
   {
    "id": "tenancy.burst-tenant-unbounded",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: namespace CPU metrics not read (namespace_cpu_max_7d, namespace_cpu_median_7d) (26)",
    "counts": {
-    "pass": 26
+    "skipped": 26
    }
   },
   {
@@ -1870,11 +1841,10 @@
   },
   {
    "id": "eks.addon-outdated",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: add-on versions not read (eks:DescribeAddonVersions) (4)",
    "counts": {
-    "fail": 2,
-    "warn": 2
+    "skipped": 4
    }
   },
   {
@@ -1887,8 +1857,8 @@
   },
   {
    "id": "eks.ssm-unregistered",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "inventory.node_access.ssm_unregistered missing",
    "counts": {}
   },
   {
@@ -1896,15 +1866,15 @@
    "status": "done",
    "reason": null,
    "counts": {
-    "fail": 1
+    "warn": 1
    }
   },
   {
    "id": "eks.no-backup-policy",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: dlm get-lifecycle-policies or backup list-backup-plans not read",
    "counts": {
-    "fail": 1
+    "skipped": 1
    }
   },
   {
@@ -1917,42 +1887,42 @@
   },
   {
    "id": "eks.acm-certificate-expiring",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: acm not available",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
    "id": "eks.service-quota-near-limit",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: quotas not available",
    "counts": {
-    "warn": 1
+    "skipped": 1
    }
   },
   {
    "id": "storage.ebs-volume-io-saturated",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: ebs not available",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
    "id": "eks.security-group-open-to-world",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: security groups not available",
    "counts": {
-    "pass": 1
+    "skipped": 1
    }
   },
   {
    "id": "eks.nodegroup-ami-old",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: nodegroups not available",
    "counts": {
-    "fail": 1
+    "skipped": 1
    }
   },
   {
@@ -2000,7 +1970,15 @@
    "status": "done",
    "reason": null,
    "counts": {
-    "warn": 1
+    "pass": 1
+   }
+  },
+  {
+   "id": "albctl.target-group-without-tgb",
+   "status": "skip",
+   "reason": "nothing to judge: ALB target groups not read (elasticloadbalancing:Describe*)",
+   "counts": {
+    "skipped": 1
    }
   },
   {
@@ -2309,67 +2287,51 @@
   },
   {
    "id": "ecr.scan-disabled",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "fail": 1
-   }
+   "status": "skip",
+   "reason": "summary.ecr.summary missing",
+   "counts": {}
   },
   {
    "id": "ecr.tag-mutable-prod",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "warn": 1
-   }
+   "status": "skip",
+   "reason": "summary.ecr.summary missing",
+   "counts": {}
   },
   {
    "id": "ecr.no-lifecycle-policy",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "warn": 1
-   }
+   "status": "skip",
+   "reason": "summary.ecr.summary missing",
+   "counts": {}
   },
   {
    "id": "ecr.stale-storage",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "pass": 1
-   }
+   "status": "skip",
+   "reason": "summary.ecr.summary missing",
+   "counts": {}
   },
   {
    "id": "ecr.dockerhub-dependency",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "warn": 1
-   }
+   "status": "skip",
+   "reason": "summary.ecr.summary missing",
+   "counts": {}
   },
   {
    "id": "ecr.pull-failures",
    "status": "skip",
-   "reason": "nothing to judge: events not collected",
-   "counts": {
-    "skipped": 1
-   }
+   "reason": "summary.ecr.summary missing",
+   "counts": {}
   },
   {
    "id": "ecr.no-replication",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "warn": 1
-   }
+   "status": "skip",
+   "reason": "summary.ecr.summary missing",
+   "counts": {}
   },
   {
    "id": "ecr.untagged-images",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "warn": 1
-   }
+   "status": "skip",
+   "reason": "summary.ecr.summary missing",
+   "counts": {}
   },
   {
    "id": "eso.provider-api-errors",
@@ -2765,11 +2727,18 @@
   },
   {
    "id": "vpccni.node-ip-exhaustion",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: pod IP usage not read (no ipamd metrics and the instance type's limits not read: ec2:DescribeInstanceTypes) (9)",
    "counts": {
-    "warn": 4,
-    "pass": 5
+    "skipped": 9
+   }
+  },
+  {
+   "id": "vpccni.no-available-ip",
+   "status": "skip",
+   "reason": "nothing to judge: VPC CNI metrics not read (awscni_no_available_ip_addresses) (9)",
+   "counts": {
+    "skipped": 9
    }
   },
   {
@@ -2782,19 +2751,17 @@
   },
   {
    "id": "vpccni.prefix-delegation-off",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: pod IP usage of no node read (no ipamd metrics and the instance types' limits not read: ec2:DescribeInstanceTypes)",
    "counts": {
-    "warn": 1
+    "skipped": 1
    }
   },
   {
    "id": "vpccni.subnet-ips-low",
    "status": "done",
    "reason": null,
-   "counts": {
-    "pass": 2
-   }
+   "counts": {}
   },
   {
    "id": "vpccni.warm-pool-whole-eni",
@@ -2830,11 +2797,9 @@
   },
   {
    "id": "vpccni.external-snat-off-with-private-routes",
-   "status": "done",
-   "reason": null,
-   "counts": {
-    "pass": 1
-   }
+   "status": "skip",
+   "reason": "summary.vpccni.snat missing",
+   "counts": {}
   }
  ],
  "findings": [
@@ -2865,34 +2830,6 @@
    "status": "warn",
    "evidence": "Allocatable without the largest node ip-10-0-1-139.ap-northeast-2.compute.internal (3.92 cores, 29.8GB): CPU 15.45 cores vs total requests 11.51 (OK), memory 46.3GB vs 45.7GB (OK). Pods on that node 34 (prod 23). Pods that fit on no other node []. Pools short of room: 32 pods limited to ip-10-0-1-137.ap-northeast-2.compute.internal, ip-10-0-1-245.ap-northeast-2.compute.internal, ip-10-0-2-100.ap-northeast-2.compute.internal need 2.79 cores and 14.81 GB, free there 2.62 cores and 11.64 GB; 1 pods limited to ip-10-0-1-137.ap-northeast-2.compute.internal, ip-10-0-1-245.ap-northeast-2.compute.internal need 0.5 cores and 4.0 GB, free there 0.28 cores and 8.39 GB. Node autoscaler karpenter (delay until a new node)",
    "source": "summary.json:resilience.n_plus_one"
-  },
-  {
-   "check": "controlplane.scheduler-unschedulable",
-   "target": "prod-app-x/app-x-api",
-   "status": "fail",
-   "evidence": "24h 'Unable to schedule pod; no fit' 7 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(",
-   "source": "summary.json:controlplane.scheduler.by_workload"
-  },
-  {
-   "check": "controlplane.scheduler-unschedulable",
-   "target": "prod-app-z-backend/app-z-file-worker",
-   "status": "fail",
-   "evidence": "24h 'Unable to schedule pod; no fit' 51 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(",
-   "source": "summary.json:controlplane.scheduler.by_workload"
-  },
-  {
-   "check": "controlplane.scheduler-unschedulable",
-   "target": "prod-app-z-backend/app-z-graph-worker",
-   "status": "fail",
-   "evidence": "24h 'Unable to schedule pod; no fit' 11 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(",
-   "source": "summary.json:controlplane.scheduler.by_workload"
-  },
-  {
-   "check": "eks.no-backup-policy",
-   "target": "cluster",
-   "status": "fail",
-   "evidence": "dlm get-lifecycle-policies Policies 0, backup list-backup-plans 0. In-cluster backup tools: {'etcd_snapshots': 0, 'backup_cronjobs': [], 'stale_backup_cronjobs': [], 'volume_snapshots': 0, 'any': False}",
-   "source": "inventory.json"
   },
   {
    "check": "eks.public-endpoint-open",
@@ -2947,7 +2884,7 @@
    "check": "platform.k8s-version-eol",
    "target": "cluster",
    "status": "fail",
-   "evidence": "server v1.32.13-eks-577a51e: EKS end of standard support 2026-03-23, 229 days past; upstream end of life 2026-02-28",
+   "evidence": "server v1.32.13-eks-577a51e: upstream end of life 2026-02-28, 252 days past",
    "source": "inventory.json"
   },
   {
@@ -2998,83 +2935,6 @@
    "status": "fail",
    "evidence": "[\"hostPath ['dev-net-tun']\", 'capabilities [\"tailscale:[\\'NET_ADMIN\\']\"]'], containers allowing root ['tailscale', 'forwarder']",
    "source": "summary.json:security.pod_security.rows"
-  },
-  {
-   "check": "traffic.alb-unhealthy-targets",
-   "target": "dev-app-aa/app-aa-backend",
-   "status": "fail",
-   "evidence": "Target group k8s-devvxtch-vxtchatb-b347218b4f (application, port 8000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-aa-backend']",
-   "source": "summary.json:traffic.alb.unhealthy_target_groups"
-  },
-  {
-   "check": "traffic.alb-unhealthy-targets",
-   "target": "dev-app-v/app-v-frontend",
-   "status": "fail",
-   "evidence": "Target group k8s-devtooto-appkf-133751726c (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 3.0, health check / expected codes 200, backends ['deployment/app-v-frontend']",
-   "source": "summary.json:traffic.alb.unhealthy_target_groups"
-  },
-  {
-   "check": "traffic.alb-unhealthy-targets",
-   "target": "prod-app-t/app-t-backend",
-   "status": "fail",
-   "evidence": "Target group k8s-prodcurt-curtainc-bb495c72c8 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-t-backend']",
-   "source": "summary.json:traffic.alb.unhealthy_target_groups"
-  },
-  {
-   "check": "traffic.alb-unhealthy-targets",
-   "target": "prod-app-v/app-v-frontend",
-   "status": "fail",
-   "evidence": "Target group k8s-prodtoot-appkf-36f816b829 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-v-frontend']",
-   "source": "summary.json:traffic.alb.unhealthy_target_groups"
-  },
-  {
-   "check": "traffic.alb-unhealthy-targets",
-   "target": "prod-app-y/app-y-frontend",
-   "status": "fail",
-   "evidence": "Target group k8s-prodinse-insertoo-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-y-frontend']",
-   "source": "summary.json:traffic.alb.unhealthy_target_groups"
-  },
-  {
-   "check": "traffic.alb-unhealthy-targets",
-   "target": "prod-app-z-backend/app-z-backend",
-   "status": "fail",
-   "evidence": "Target group k8s-prodrhem-appnbac-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0, health check / expected codes 200, backends ['deployment/app-z-backend']",
-   "source": "summary.json:traffic.alb.unhealthy_target_groups"
-  },
-  {
-   "check": "traffic.db-exposed",
-   "target": "loadbalancer/middleware/kafka-controller-0-external",
-   "status": "fail",
-   "evidence": "loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to the internet by the security group",
-   "source": "summary.json:traffic.db_exposed"
-  },
-  {
-   "check": "controlplane.scheduler-unschedulable",
-   "target": "arc-runners/self-hosted-arm64-8msc5-runner",
-   "status": "warn",
-   "evidence": "24h 'Unable to schedule pod; no fit' 36 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(",
-   "source": "summary.json:controlplane.scheduler.by_workload"
-  },
-  {
-   "check": "controlplane.scheduler-unschedulable",
-   "target": "prod-app-r/app-r-backend",
-   "status": "warn",
-   "evidence": "24h 'Unable to schedule pod; no fit' 4 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(",
-   "source": "summary.json:controlplane.scheduler.by_workload"
-  },
-  {
-   "check": "controlplane.scheduler-unschedulable",
-   "target": "prod-app-z-backend/app-z-embedding-server",
-   "status": "warn",
-   "evidence": "24h 'Unable to schedule pod; no fit' 4 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(",
-   "source": "summary.json:controlplane.scheduler.by_workload"
-  },
-  {
-   "check": "eks.service-quota-near-limit",
-   "target": "aws-account",
-   "status": "warn",
-   "evidence": "quotas with a usage metric 25/65, at 80% or more [], at 60% or more ['VPCs 0.6'], top operational quotas [['VPCs', 3.0, 5.0, 0.6], ['listener rules per ALB', 48.0, 100.0, 0.48], ['target groups per ALB', 41.0, 100.0, 0.41], ['certificates per ALB', 9.0, 25.0, 0.36], ['NLBs', 2.0, 50.0, 0.04], ['ALBs', 1.0, 50.0, 0.02]]",
-   "source": "summary.json:eksplatform.quotas"
   },
   {
    "check": "karpenter.ec2nodeclass-hardening",
@@ -3133,60 +2993,11 @@
    "source": "summary.json:resilience.restarts.rows"
   },
   {
-   "check": "security.imds-hop-limit",
-   "target": "cluster",
-   "status": "warn",
-   "evidence": "Of 9 instances, 9 with IMDS hop limit > 1 or tokens optional: {'hop=2 tokens=required': 9}. Examples [('system_core', 'm5.large', 2, 'required'), ('system_core', 'm5.large', 2, 'required'), ('karpenter-node', 't8i.medium', 2, 'required'), ('karpenter-node', 'm7i-flex.large', 2, 'required')]. EC2NodeClass metadataOptions [{'name': 'default', 'metadataOptions': {'httpEndpoint': 'enabled', 'httpProtocolIPv6': 'disabled', 'httpPutResponseHopLimit': 2, 'httpTokens': 'required'}}]. IRSA SAs 6, Pod Identity 0",
-   "source": "summary.json:security.aws"
-  },
-  {
-   "check": "traffic.db-exposed",
-   "target": "nlb/app-u-db-shared",
-   "status": "warn",
-   "evidence": "nlb (defined outside the cluster) /app-u-db-shared: ports [3306, 3307, 3308, 3309, 3310, 3311, 5432, 5433, 6379, 7687], exposure internet-facing, addresses ['app-u-db-shared-d7d643f6896a3b2b.elb.ap-northeast-2.amazonaws.com'], sourceRanges None, security group allow-list, at most 4 sources per port, widest /32. NLB created outside Kubernetes; 9 TargetGroupBindings bind it to dev-app-s/app-s-backend-mysql, dev-app-v/app-v-backend-dev-mysql, dev-app-y/app-y-backend-mysql, prod-app-s/app-s-backend-mysql, prod-app-t/app-t-backend-postgresql, prod-app-v/app-v-backend-prod-mysql and 3 more. DB port on an external address, limited by the security group to listed addresses",
-   "source": "summary.json:traffic.db_exposed"
-  },
-  {
-   "check": "vpccni.node-ip-exhaustion",
-   "target": "ip-10-0-1-137.ap-northeast-2.compute.internal",
-   "status": "warn",
-   "evidence": "node ip-10-0-1-137.ap-northeast-2.compute.internal (r8gd.medium, pool default): pod IPs 3/6 (0.5), ENI None/None (at limit False), 'no available IP' events None, max-pods 8, prod pods 1. prefix delegation False",
-   "source": "summary.json:vpccni.nodes"
-  },
-  {
-   "check": "vpccni.node-ip-exhaustion",
-   "target": "ip-10-0-1-241.ap-northeast-2.compute.internal",
-   "status": "warn",
-   "evidence": "node ip-10-0-1-241.ap-northeast-2.compute.internal (t8i.small, pool system-ondemand): pod IPs 6/9 (0.667), ENI None/None (at limit False), 'no available IP' events None, max-pods 11, prod pods 1. prefix delegation False",
-   "source": "summary.json:vpccni.nodes"
-  },
-  {
-   "check": "vpccni.node-ip-exhaustion",
-   "target": "ip-10-0-1-245.ap-northeast-2.compute.internal",
-   "status": "warn",
-   "evidence": "node ip-10-0-1-245.ap-northeast-2.compute.internal (r8gd.medium, pool default): pod IPs 5/6 (0.833), ENI None/None (at limit False), 'no available IP' events None, max-pods 8, prod pods 2. prefix delegation False",
-   "source": "summary.json:vpccni.nodes"
-  },
-  {
-   "check": "vpccni.node-ip-exhaustion",
-   "target": "ip-10-0-2-218.ap-northeast-2.compute.internal",
-   "status": "warn",
-   "evidence": "node ip-10-0-2-218.ap-northeast-2.compute.internal (t8i.medium, pool system-ondemand): pod IPs 13/15 (0.867), ENI None/None (at limit False), 'no available IP' events None, max-pods 17, prod pods 2. prefix delegation False",
-   "source": "summary.json:vpccni.nodes"
-  },
-  {
    "check": "argocd.default-project-wildcard",
    "target": "cluster",
    "status": "fail",
    "evidence": "AppProjects 1, projects whose sourceRepos and destinations are all * ['default'], apps bound to the default project 13/13 (prod 9)",
    "source": "summary.json:argocdctl.summary"
-  },
-  {
-   "check": "cost.request-waste",
-   "target": "cluster",
-   "status": "fail",
-   "evidence": "CPU request total 9.28 cores -> KRR recommendation 2.21 cores, reducible 7.07 cores ~ 167.84 USD/month",
-   "source": "summary.json:cost.request_waste"
   },
   {
    "check": "ebscsi.storageclass-unencrypted",
@@ -3196,46 +3007,11 @@
    "source": "summary.json:ebscsi.summary"
   },
   {
-   "check": "ecr.scan-disabled",
-   "target": "ecr/registry/<account>",
-   "status": "fail",
-   "evidence": "registry scanning BASIC (rules 0), repositories with scanOnPush off 41/45 (used by prod 27: ['ecr-app-ab-frontend-eks-prod', 'ecr-app-w-eks-prod', 'ecr-app-t-backend-eks-prod', 'ecr-app-t-web-eks-prod', 'ecr-app-r-postgresql-prod', 'ecr-app-s-admin-eks-prod']…), scanned images 0/908, CRITICAL+HIGH 0",
-   "source": "summary.json:ecr.summary"
-  },
-  {
-   "check": "eks.addon-outdated",
-   "target": "aws-ebs-csi-driver",
-   "status": "fail",
-   "evidence": "installed v1.37.0-eksbuild.1, latest available v1.67.2-eksbuild.1, default v1.67.2-eksbuild.1",
-   "source": "inventory.json:cluster.eks.addons"
-  },
-  {
-   "check": "eks.addon-outdated",
-   "target": "vpc-cni",
-   "status": "fail",
-   "evidence": "installed v1.19.0-eksbuild.1, latest available v1.23.2-eksbuild.12, default v1.22.4-eksbuild.14",
-   "source": "inventory.json:cluster.eks.addons"
-  },
-  {
-   "check": "eks.extended-support",
-   "target": "cluster",
-   "status": "fail",
-   "evidence": "version 1.32, supportType EXTENDED, status EXTENDED_SUPPORT, end of standard support 2026-03-23T09:00:00+09:00, end of extended support 2027-03-23T09:00:00+09:00",
-   "source": "inventory.json"
-  },
-  {
    "check": "eks.node-os-skew",
    "target": "cluster",
    "status": "fail",
    "evidence": "OS ['Amazon Linux 2', 'Amazon Linux 2023.9.20251208'], kernels ['5.10.245-245.983.amzn2.aarch64', '5.10.245-245.983.amzn2.x86_64', '6.1.158-180.294.amzn2023.x86_64'], runtimes ['containerd://1.7.29', 'containerd://2.1.5'], cgroup: AL2 may be v1, AL2023 is v2",
    "source": "inventory.json"
-  },
-  {
-   "check": "eks.nodegroup-ami-old",
-   "target": "nodegroups",
-   "status": "fail",
-   "evidence": "node groups 1, max AMI age 333 days, over 90 days ['system_core-20251217040546303900000001 333d'], over 180 days ['system_core-20251217040546303900000001'], health issues []",
-   "source": "summary.json:eksplatform.nodegroups"
   },
   {
    "check": "eso.provider-api-errors",
@@ -3250,13 +3026,6 @@
    "status": "fail",
    "evidence": "responses per datasource (cumulative since start) [('Loki(loki)', 2614, {'101': 4, '200': 2275, '400': 6, '429': 329}), ('Prometheus(prometheus)', 1535, {'200': 1349, '301': 186}), ('VictoriaMetrics_onprem(prometheus)', 142, {'200': 142})], error rate 1% or more ['Loki(loki)'] (max 0.1259), Grafana API 5xx 9/7002292",
    "source": "summary.json:stackhealth.grafana"
-  },
-  {
-   "check": "hygiene.eks-upgrade-insight",
-   "target": "Amazon Linux 2 compatibility",
-   "status": "fail",
-   "evidence": "Amazon Linux 2 compatibility (UPGRADE_READINESS, k8s 1.33): ERROR — Amazon EKS stopped publishing EKS-optimized Amazon Linux 2 (AL2) AMIs on November 26, 2025. AL2023 and Bottlerocket based AMIs for Amazon EKS are available for all supported Kubernetes versions includ",
-   "source": "summary.json:hygiene.deprecated.eks_insights_failing"
   },
   {
    "check": "hygiene.mutable-image-tag",
@@ -3700,6 +3469,13 @@
    "source": "summary.json:security.secrets.externalsecrets_not_ready"
   },
   {
+   "check": "security.no-certificate-manager",
+   "target": "cluster",
+   "status": "fail",
+   "evidence": "no component of family certificates in inventory.components",
+   "source": "inventory.json"
+  },
+  {
    "check": "security.polaris-security-danger",
    "target": "cluster",
    "status": "fail",
@@ -3710,7 +3486,7 @@
    "check": "storage.csi-snapshot-unavailable",
    "target": "cluster",
    "status": "fail",
-   "evidence": "VolumeSnapshot CRD False, VolumeSnapshots 0 (0 in 7 days), VolumeSnapshotClasses 0, EBS snapshots in 30 days 0 {}, prod PVCs 8",
+   "evidence": "VolumeSnapshot CRD False, VolumeSnapshots 0 (0 in 7 days), VolumeSnapshotClasses 0, EBS snapshots in 30 days None None, prod PVCs 8",
    "source": "summary.json:storage.snapshots"
   },
   {
@@ -3798,20 +3574,6 @@
    "source": "summary.json:tenancy.namespaces.rows"
   },
   {
-   "check": "traffic.alb-elb-5xx",
-   "target": "k8s-lab-kprodlb-b18a4555d7",
-   "status": "fail",
-   "evidence": "ALB k8s-lab-kprodlb-b18a4555d7 (internet-facing): 24h requests 162172.0, ELB 5xx 145.0, target 5xx 152.0, rejected connections 0, idle timeout 300s, target groups 41",
-   "source": "summary.json:traffic.alb.lbs"
-  },
-  {
-   "check": "traffic.ingress-p95-latency",
-   "target": "prod-app-s/app-s-api",
-   "status": "fail",
-   "evidence": "['canary-api-v1.lab-l.example', 'api.v1.lab-l.example']: p95 request-weighted 10.381s, hourly average 15.821s, 1h max 50.6329s, latest hour with requests 16.7603s on 3.0 requests at 2026-11-07T00:35, 287.0 requests/24h (source alb-cloudwatch)",
-   "source": "summary.json:traffic.ingresses"
-  },
-  {
    "check": "traffic.shared-alb-group",
    "target": "alb-group/app-u-prod-lb",
    "status": "fail",
@@ -3823,13 +3585,6 @@
    "target": "cluster",
    "status": "warn",
    "evidence": "reconcile errors since leader start 41, apiserver 429/503 responses 126, max workqueue depth 0.0, Ingresses without an LB address [], stale TargetGroupBindings []",
-   "source": "summary.json:albctl.summary"
-  },
-  {
-   "check": "albctl.tgb-stale-or-orphan",
-   "target": "cluster",
-   "status": "warn",
-   "evidence": "TargetGroupBindings 52 (targetType {'ip': 52}), generation lagging [], Service missing [], hand-made TGBs 9, target groups without a binding (traffic section) 1",
    "source": "summary.json:albctl.summary"
   },
   {
@@ -3847,53 +3602,11 @@
    "source": "summary.json:argocdctl.summary"
   },
   {
-   "check": "controlplane.authenticator-failures",
+   "check": "eks.extended-support",
    "target": "cluster",
    "status": "warn",
-   "evidence": "24h authentication failures 8: [{'message': 'access denied', 'count': 8}]",
-   "source": "summary.json:controlplane.authenticator"
-  },
-  {
-   "check": "controlplane.controller-error-repeat",
-   "target": "gc_controller.go",
-   "status": "warn",
-   "evidence": "24h E lines 6 times (gc_controller.go). Samples: summary.controlplane.controller_manager.top_errors",
-   "source": "summary.json:controlplane.controller_manager.errors_by_source"
-  },
-  {
-   "check": "controlplane.controller-error-repeat",
-   "target": "horizontal.go",
-   "status": "warn",
-   "evidence": "24h E lines 11 times (horizontal.go). Samples: summary.controlplane.controller_manager.top_errors",
-   "source": "summary.json:controlplane.controller_manager.errors_by_source"
-  },
-  {
-   "check": "controlplane.controller-error-repeat",
-   "target": "type.go",
-   "status": "warn",
-   "evidence": "24h W lines 80479 times (type.go). Samples: summary.controlplane.controller_manager.top_errors",
-   "source": "summary.json:controlplane.controller_manager.errors_by_source"
-  },
-  {
-   "check": "ecr.dockerhub-dependency",
-   "target": "ecr/registry/<account>",
-   "status": "warn",
-   "evidence": "registry distribution of container images {'602401143452.dkr.ecr.ap-northeast-2.amazonaws.com': 77, '<account>.dkr.ecr.ap-northeast-2.amazonaws.com': 59, 'docker.io': 34, 'quay.io': 25, 'ghcr.io': 9, 'public.ecr.aws': 8, 'registry.k8s.io': 3}, docker.io images 19 (e.g. ['alpine/socat:1.8.0.0', 'bitnami/kubectl:latest', 'docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4', 'docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3']), pull-through cache rules [], replication rules 0",
-   "source": "summary.json:ecr.summary"
-  },
-  {
-   "check": "eks.addon-outdated",
-   "target": "coredns",
-   "status": "warn",
-   "evidence": "installed v1.11.3-eksbuild.1, latest available v1.11.4-eksbuild.104, default v1.11.4-eksbuild.104",
-   "source": "inventory.json:cluster.eks.addons"
-  },
-  {
-   "check": "eks.addon-outdated",
-   "target": "kube-proxy",
-   "status": "warn",
-   "evidence": "installed v1.32.0-eksbuild.2, latest available v1.32.13-eksbuild.72, default v1.32.13-eksbuild.72",
-   "source": "inventory.json:cluster.eks.addons"
+   "evidence": "version 1.32, supportType EXTENDED, status None, end of standard support None, end of extended support None",
+   "source": "inventory.json"
   },
   {
    "check": "eso.controller-single-replica",
@@ -4013,6 +3726,293 @@
    "status": "warn",
    "evidence": "1 5xx out of 6899928 requests since start (by route {'loki_api_v1_series': 1}, excluding /ready 503 during startup), panics 0, WAL disk full 0, error log lines 11783, rejected {}",
    "source": "summary.json:stackhealth.loki"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "app-ab-prod/app-ab-backend",
+   "status": "warn",
+   "evidence": "hosts ['app-ab-tp-api.lab-k.example'], backends ['app-ab-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "app-ab-prod/app-ab-frontend",
+   "status": "warn",
+   "evidence": "hosts ['app-ab-tp-prod.lab-k.example'], backends ['app-ab-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "argocd/argocd-server",
+   "status": "warn",
+   "evidence": "hosts ['deploy.lab-k.example'], backends ['argocd-server'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-aa/app-aa-backend",
+   "status": "warn",
+   "evidence": "hosts ['demo-api.lab-m.example'], backends ['app-aa-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-aa/app-aa-frontend",
+   "status": "warn",
+   "evidence": "hosts ['demo.lab-m.example'], backends ['app-aa-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-s/app-s-admin",
+   "status": "warn",
+   "evidence": "hosts ['admin-dev.lab-l.example'], backends ['app-s-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-s/app-s-api",
+   "status": "warn",
+   "evidence": "hosts ['api-dev.v1.lab-l.example'], backends ['app-s-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-s/app-s-backend",
+   "status": "warn",
+   "evidence": "hosts ['api-dev.lab-l.example'], backends ['app-s-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-s/app-s-frontend",
+   "status": "warn",
+   "evidence": "hosts ['dev.lab-l.example'], backends ['app-s-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-v/app-v-admin-frontend",
+   "status": "warn",
+   "evidence": "hosts ['admin-dev.lab-n.example'], backends ['app-v-admin-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-v/app-v-backend",
+   "status": "warn",
+   "evidence": "hosts ['api-dev.lab-n.example'], backends ['app-v-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-v/app-v-frontend",
+   "status": "warn",
+   "evidence": "hosts ['dev.lab-n.example'], backends ['app-v-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-y/app-y-admin",
+   "status": "warn",
+   "evidence": "hosts ['admin-dev.lab-m.example'], backends ['app-y-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-y/app-y-ai",
+   "status": "warn",
+   "evidence": "hosts ['ai-dev.lab-m.example'], backends ['app-y-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-y/app-y-backend",
+   "status": "warn",
+   "evidence": "hosts ['app-y-api-dev.lab-k.example'], backends ['app-y-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "dev-app-y/app-y-frontend",
+   "status": "warn",
+   "evidence": "hosts ['app-y-dev.lab-k.example'], backends ['app-y-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "middleware/kafka-ui",
+   "status": "warn",
+   "evidence": "hosts ['kafka.lab-k.example'], backends ['kafka-ui'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "middleware/redis-insight",
+   "status": "warn",
+   "evidence": "hosts ['redis.lab-k.example'], backends ['redis-insight'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "monitoring/kube-prometheus-stack-grafana",
+   "status": "warn",
+   "evidence": "hosts ['monitor.lab-k.example'], backends ['kube-prometheus-stack-grafana'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "monitoring/vmauth",
+   "status": "warn",
+   "evidence": "hosts ['metrics-write.lab-k.example'], backends ['vmauth'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-r/app-r-backend",
+   "status": "warn",
+   "evidence": "hosts ['app-r-api.lab-k.example'], backends ['app-r-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-r/app-r-web",
+   "status": "warn",
+   "evidence": "hosts ['app-r.lab-k.example'], backends ['app-r-web'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-s/app-s-admin",
+   "status": "warn",
+   "evidence": "hosts ['canary-admin.lab-l.example', 'admin.lab-l.example'], backends ['app-s-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-s/app-s-api",
+   "status": "warn",
+   "evidence": "hosts ['canary-api-v1.lab-l.example', 'api.v1.lab-l.example'], backends ['app-s-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-s/app-s-backend",
+   "status": "warn",
+   "evidence": "hosts ['canary-api.lab-l.example', 'api.lab-l.example'], backends ['app-s-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-s/app-s-frontend",
+   "status": "warn",
+   "evidence": "hosts ['canary.lab-l.example', 'www.lab-l.example', 'lab-l.example'], backends ['app-s-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-t/app-t-ai",
+   "status": "warn",
+   "evidence": "hosts ['app-t-ai.lab-k.example'], backends ['app-t-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-t/app-t-backend",
+   "status": "warn",
+   "evidence": "hosts ['app-t-api.lab-k.example'], backends ['app-t-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-t/app-t-studio",
+   "status": "warn",
+   "evidence": "hosts ['app-t-studio.lab-k.example'], backends ['app-t-studio'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-t/app-t-web",
+   "status": "warn",
+   "evidence": "hosts ['app-t.lab-k.example'], backends ['app-t-web'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-v/app-v-admin-frontend",
+   "status": "warn",
+   "evidence": "hosts ['admin.lab-n.example'], backends ['app-v-admin-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-v/app-v-backend",
+   "status": "warn",
+   "evidence": "hosts ['api.lab-n.example'], backends ['app-v-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-v/app-v-frontend",
+   "status": "warn",
+   "evidence": "hosts ['lab-n.example', 'www.lab-n.example'], backends ['app-v-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-w/app-w",
+   "status": "warn",
+   "evidence": "hosts ['app-w.lab-k.example'], backends ['app-w'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-x/app-x-api",
+   "status": "warn",
+   "evidence": "hosts ['app-x-api.lab-k.example'], backends ['app-x-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-y/app-y-admin",
+   "status": "warn",
+   "evidence": "hosts ['admin.lab-m.example'], backends ['app-y-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-y/app-y-ai",
+   "status": "warn",
+   "evidence": "hosts ['ai.lab-m.example'], backends ['app-y-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-y/app-y-backend",
+   "status": "warn",
+   "evidence": "hosts ['api.lab-m.example'], backends ['app-y-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-y/app-y-frontend",
+   "status": "warn",
+   "evidence": "hosts ['lab-m.example', 'www.lab-m.example'], backends ['app-y-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-z-backend/app-z-backend",
+   "status": "warn",
+   "evidence": "hosts ['app-z-api.lab-k.example'], backends ['app-z-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
+  },
+  {
+   "check": "observability.golden-signals-missing",
+   "target": "prod-app-z-backend/app-z-frontend",
+   "status": "warn",
+   "evidence": "hosts ['app-z.lab-k.example'], backends ['app-z-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
+   "source": "summary.json:observability.golden_signals.missing_lte"
   },
   {
    "check": "observability.page-severity-cause-alerts",
@@ -4225,13 +4225,6 @@
    "source": "summary.json:resources.krr.workloads"
   },
   {
-   "check": "security.no-certificate-manager",
-   "target": "cluster",
-   "status": "warn",
-   "evidence": "no component of family certificates in inventory.components",
-   "source": "inventory.json"
-  },
-  {
    "check": "security.psa-not-enforced",
    "target": "cluster",
    "status": "warn",
@@ -4251,13 +4244,6 @@
    "status": "warn",
    "evidence": "Workloads with token mounted 86/92, of which 30 prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: ['prod-app-w/deployment/app-w', 'prod-app-t/deployment/app-t-ai', 'prod-app-t/deployment/app-t-backend', 'prod-app-t/deployment/app-t-studio', 'prod-app-t/deployment/app-t-web', 'prod-app-x/deployment/app-x-api', 'prod-app-s/deployment/app-s-admin', 'prod-app-s/deployment/app-s-api', 'prod-app-s/deployment/app-s-backend', 'prod-app-s/statefulset/app-s-backend-mysql', 'prod-app-s/deployment/app-s-frontend', 'prod-app-y/deployment/app-y-admin']. SAs with automount false 7/113",
    "source": "summary.json:security.service_accounts"
-  },
-  {
-   "check": "storage.ebs-unencrypted",
-   "target": "cluster",
-   "status": "warn",
-   "evidence": "18 of 18 volumes unencrypted: ['vol-078adb8df155474d5', 'vol-014ddb2ea18fb9f56', 'vol-04d6da165847ff0c2', 'vol-0a599f6260d09b6a1', 'vol-00f082f394c11e743', 'vol-09dd14b8fe1120fe8', 'vol-0d059a329425ff008', 'vol-0cd5d589fe93566d4']",
-   "source": "summary.json:storage.ebs"
   },
   {
    "check": "storage.prod-db-reclaim-delete",
@@ -4400,209 +4386,6 @@
    "source": "summary.json:tenancy.namespaces.rows"
   },
   {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "app-ab-prod/app-ab-backend",
-   "status": "warn",
-   "evidence": "Target group k8s-pwcprod-pwcbacke-bea446d347: deregistration_delay 300s, backends ['deployment/app-ab-backend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "app-ab-prod/app-ab-frontend",
-   "status": "warn",
-   "evidence": "Target group k8s-pwcprod-pwcfront-e72ef00971: deregistration_delay 300s, backends ['deployment/app-ab-frontend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "argocd/argocd-server",
-   "status": "warn",
-   "evidence": "Target group k8s-argocd-argocdse-74c4dcbda2: deregistration_delay 300s, backends ['deployment/argocd-server'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "dev-app-aa/app-aa-backend",
-   "status": "warn",
-   "evidence": "Target group k8s-devvxtch-vxtchatb-b347218b4f: deregistration_delay 300s, backends ['deployment/app-aa-backend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "dev-app-aa/app-aa-frontend",
-   "status": "warn",
-   "evidence": "Target group k8s-devvxtch-vxtchatb-e9834ca5fe: deregistration_delay 300s, backends ['deployment/app-aa-frontend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "dev-app-v/app-v-admin-frontend",
-   "status": "warn",
-   "evidence": "Target group k8s-devtooto-appka-ae7a7a06ff: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "dev-app-v/app-v-backend",
-   "status": "warn",
-   "evidence": "Target group k8s-devtooto-appkb-0987e78003: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "dev-app-v/app-v-frontend",
-   "status": "warn",
-   "evidence": "Target group k8s-devtooto-appkf-133751726c: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "middleware/kafka-ui",
-   "status": "warn",
-   "evidence": "Target group k8s-middlewa-kafkaui-0a6256c8b2: deregistration_delay 300s, backends ['deployment/kafka-ui'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "middleware/redis-insight",
-   "status": "warn",
-   "evidence": "Target group k8s-middlewa-redisins-e7e7fd218a: deregistration_delay 300s, backends ['deployment/redis-insight'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "monitoring/kube-prometheus-stack-grafana",
-   "status": "warn",
-   "evidence": "Target group k8s-monitori-kubeprom-af0f3aa6c7: deregistration_delay 300s, backends ['deployment/kube-prometheus-stack-grafana'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "monitoring/vmauth",
-   "status": "warn",
-   "evidence": "Target group k8s-monitori-vmauth-e07e5153ee: deregistration_delay 300s, backends ['deployment/vmauth'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-r/app-r-backend",
-   "status": "warn",
-   "evidence": "Target group k8s-prodsoro-appmba-f68effe430: deregistration_delay 300s, backends ['deployment/app-r-backend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-r/app-r-web",
-   "status": "warn",
-   "evidence": "Target group k8s-prodsoro-appmwe-194ae69849: deregistration_delay 300s, backends ['deployment/app-r-web'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-t/app-t-ai",
-   "status": "warn",
-   "evidence": "Target group k8s-prodcurt-curtainc-fc2d368787: deregistration_delay 300s, backends ['deployment/app-t-ai'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-t/app-t-backend",
-   "status": "warn",
-   "evidence": "Target group k8s-prodcurt-curtainc-bb495c72c8: deregistration_delay 300s, backends ['deployment/app-t-backend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-t/app-t-studio",
-   "status": "warn",
-   "evidence": "Target group k8s-prodcurt-curtainc-57e5adf3bf: deregistration_delay 300s, backends ['deployment/app-t-studio'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-t/app-t-web",
-   "status": "warn",
-   "evidence": "Target group k8s-prodcurt-curtainc-022a51fc31: deregistration_delay 300s, backends ['deployment/app-t-web'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-v/app-v-admin-frontend",
-   "status": "warn",
-   "evidence": "Target group k8s-prodtoot-appka-d0c066d282: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-v/app-v-backend",
-   "status": "warn",
-   "evidence": "Target group k8s-prodtoot-appkb-7df87a92cc: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-v/app-v-frontend",
-   "status": "warn",
-   "evidence": "Target group k8s-prodtoot-appkf-36f816b829: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-w/app-w",
-   "status": "warn",
-   "evidence": "Target group k8s-prodcarp-carpenst-e238817282: deregistration_delay 300s, backends ['deployment/app-w'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-x/app-x-api",
-   "status": "warn",
-   "evidence": "Target group k8s-prodfand-apppa-754a9b50b2: deregistration_delay 300s, backends ['deployment/app-x-api'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-y/app-y-admin",
-   "status": "warn",
-   "evidence": "Target group k8s-prodinse-insertoo-37417ab44f: deregistration_delay 300s, backends ['deployment/app-y-admin'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-y/app-y-ai",
-   "status": "warn",
-   "evidence": "Target group k8s-prodinse-insertoo-b22674073c: deregistration_delay 300s, backends ['deployment/app-y-ai'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-y/app-y-backend",
-   "status": "warn",
-   "evidence": "Target group k8s-prodinse-insertoo-89a3732998: deregistration_delay 300s, backends ['deployment/app-y-backend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-y/app-y-frontend",
-   "status": "warn",
-   "evidence": "Target group k8s-prodinse-insertoo-032c25d752: deregistration_delay 300s, backends ['deployment/app-y-frontend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-z-backend/app-z-backend",
-   "status": "warn",
-   "evidence": "Target group k8s-prodrhem-appnbac-8c88bb317a: deregistration_delay 300s, backends ['deployment/app-z-backend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
-   "check": "traffic.alb-deregistration-vs-grace",
-   "target": "prod-app-z-backend/app-z-frontend",
-   "status": "warn",
-   "evidence": "Target group k8s-prodrhem-appnfro-9726e5b1d3: deregistration_delay 300s, backends ['deployment/app-z-frontend'] terminationGracePeriod 30s, no preStop",
-   "source": "summary.json:traffic.alb.target_groups"
-  },
-  {
    "check": "traffic.external-exposure",
    "target": "ingress/argocd/argocd-server",
    "status": "warn",
@@ -4650,41 +4433,6 @@
    "status": "warn",
    "evidence": "ingress ['admin.lab-m.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check",
    "source": "summary.json:traffic.exposure"
-  },
-  {
-   "check": "traffic.ingress-5xx-ratio",
-   "target": "prod-app-s/app-s-backend",
-   "status": "warn",
-   "evidence": "['canary-api.lab-l.example', 'api.lab-l.example']: 24h 5xx 134.0 of 59863.0 requests = 0.22% (source alb-cloudwatch), p95 max 0.4638s",
-   "source": "summary.json:traffic.ingresses"
-  },
-  {
-   "check": "traffic.ingress-5xx-ratio",
-   "target": "prod-app-v/app-v-frontend",
-   "status": "warn",
-   "evidence": "['lab-n.example', 'www.lab-n.example']: 24h 5xx 13.0 of 9644.0 requests = 0.14% (source alb-cloudwatch), p95 max 0.8344s",
-   "source": "summary.json:traffic.ingresses"
-  },
-  {
-   "check": "traffic.ingress-p95-latency",
-   "target": "prod-app-r/app-r-backend",
-   "status": "warn",
-   "evidence": "['app-r-api.lab-k.example']: p95 request-weighted 1.0837s, hourly average 1.0712s, 1h max 3.5461s, latest hour with requests 3.5461s on 591.0 requests at 2026-11-06T08:35, 16 hours before the newest hour, no requests since, 4346.0 requests/24h (source alb-cloudwatch)",
-   "source": "summary.json:traffic.ingresses"
-  },
-  {
-   "check": "traffic.ingress-p95-latency",
-   "target": "prod-app-t/app-t-ai",
-   "status": "warn",
-   "evidence": "['app-t-ai.lab-k.example']: p95 request-weighted 2.3158s, hourly average 2.4183s, 1h max 2.6907s, latest hour with requests 2.6907s on 1.0 requests at 2026-11-06T06:35, 18 hours before the newest hour, no requests since, 34.0 requests/24h (under 100 requests a day: warn only) (source alb-cloudwatch)",
-   "source": "summary.json:traffic.ingresses"
-  },
-  {
-   "check": "vpccni.prefix-delegation-off",
-   "target": "cluster",
-   "status": "warn",
-   "evidence": "ENABLE_PREFIX_DELEGATION false, nitro nodes 9/9. nodes above 50% IP usage ['ip-10-0-2-218.ap-northeast-2.compute.internal', 'ip-10-0-1-245.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal', 'ip-10-0-1-139.ap-northeast-2.compute.internal', 'ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-1-137.ap-northeast-2.compute.internal'], nodes that saw 'no available IP' []. warm policy whole_eni",
-   "source": "summary.json:vpccni.warm.summary"
   },
   {
    "check": "hygiene.no-ephemeral-storage-requests",
@@ -4827,13 +4575,6 @@
    "source": "summary.json:argocdctl.summary"
   },
   {
-   "check": "controlplane.apiserver-slow-traces",
-   "target": "cluster",
-   "status": "warn",
-   "evidence": "24h Traces (requests over 500ms) 144: [{'op': 'List', 'count': 136}, {'op': 'Call conversion webhook', 'count': 8}]",
-   "source": "summary.json:controlplane.apiserver"
-  },
-  {
    "check": "coredns.metrics-unavailable",
    "target": "cluster",
    "status": "warn",
@@ -4844,36 +4585,8 @@
    "check": "ebscsi.controller-metrics-disabled",
    "target": "cluster",
    "status": "warn",
-   "evidence": "controller EC2 API request series 0, driver 1.37.0 (add-on v1.37.0-eksbuild.1). When enabled, shows EC2 API errors {} / throttles None",
+   "evidence": "controller EC2 API request series 0, driver 1.37.0 (add-on None). When enabled, shows EC2 API errors {} / throttles None",
    "source": "summary.json:ebscsi.summary"
-  },
-  {
-   "check": "ecr.no-lifecycle-policy",
-   "target": "ecr/registry/<account>",
-   "status": "warn",
-   "evidence": "repositories without a lifecycle policy ['app-v', 'bitnami/kafka', 'ecr-app-ab-postgresql-pgvector', 'bitnami/mysql'] (total 10.9GiB), overall 45 repositories, 908 images, 473.1GiB ≈ 50.8 USD/month, untagged images 257 (excluding 182 attestations)",
-   "source": "summary.json:ecr.summary"
-  },
-  {
-   "check": "ecr.no-replication",
-   "target": "ecr/registry/<account>",
-   "status": "warn",
-   "evidence": "replication rules 0, repositories used by prod 29, total 473.1GiB",
-   "source": "summary.json:ecr.summary"
-  },
-  {
-   "check": "ecr.tag-mutable-prod",
-   "target": "ecr/registry/<account>",
-   "status": "warn",
-   "evidence": "MUTABLE repositories 44/45, used by prod 28: ['ecr-app-ab-frontend-eks-prod', 'ecr-app-w-eks-prod', 'ecr-app-t-backend-eks-prod', 'ecr-app-t-web-eks-prod', 'ecr-app-r-postgresql-prod', 'ecr-app-s-admin-eks-prod', 'ecr-app-ab-postgresql-pgvector', 'ecr-app-t-postgresql-prod']…, digest-pinned containers 2/95, repositories with a latest tag []",
-   "source": "summary.json:ecr.summary"
-  },
-  {
-   "check": "ecr.untagged-images",
-   "target": "ecr/registry/<account>",
-   "status": "warn",
-   "evidence": "untagged images 257/908 (excluding 182 BuildKit attestation manifests), repositories 45",
-   "source": "summary.json:ecr.summary"
   },
   {
    "check": "eso.version-old",
@@ -5609,13 +5322,6 @@
    "status": "warn",
    "evidence": "Node ip-10-0-2-60.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): prod pods 2 (['prod-app-s', 'prod-app-v']) together with dev pods 2 (['dev-app-s', 'dev-app-v']). Memory limit total/allocatable 1.49, CPU limit total/allocatable 2.44, containers without a memory limit 2",
    "source": "summary.json:tenancy.isolation.nodes"
-  },
-  {
-   "check": "traffic.alb-protection-off",
-   "target": "k8s-lab-kprodlb-b18a4555d7",
-   "status": "warn",
-   "evidence": "ALB k8s-lab-kprodlb-b18a4555d7: deletion_protection False, access_logs False, target groups in the ingress group 41",
-   "source": "summary.json:traffic.alb.lbs"
   },
   {
    "check": "vpccni.metrics-unreadable",

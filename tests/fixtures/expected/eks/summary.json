@@ -14344,6 +14344,13 @@
    ],
    "truncated": 0
   },
+  "series-present": {
+   "source": "metrics/series-present.json",
+   "why": null,
+   "ok": null,
+   "series": null,
+   "error": null
+  },
   "targets_down": {
    "source": "metrics/targets_down.json",
    "why": "Failed scrape targets (up==0). What Prometheus cannot see, no metric check can see",
@@ -15593,6 +15600,7 @@
      "samples_7d": 20157.0
     }
    ],
+   "skip_reason": null,
    "watchdog_samples_7d": 20157.0,
    "note": "always_firing = 7-day sample count at or above 95% of Watchdog (always firing). On EKS, KubeControllerManagerDown and KubeSchedulerDown fire forever because the control plane is invisible — false positives"
   },
@@ -17864,6 +17872,7 @@
   },
   "log_group": "/aws/eks/app-u-cluster-eks/cluster",
   "available": true,
+  "skip_reason": null,
   "apiserver": {
    "errors_by_source": [
     {
@@ -29713,7 +29722,8 @@
      "target_groups": [
       "k8s-prodillu-appi-2bcc150443"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-s",
@@ -29769,7 +29779,8 @@
      "target_groups": [
       "k8s-prodillu-appi-d65740e6d5"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-v",
@@ -29825,7 +29836,8 @@
      "target_groups": [
       "k8s-prodtoot-appkf-36f816b829"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-s",
@@ -29882,7 +29894,8 @@
      "target_groups": [
       "k8s-prodillu-appi-e87721a9c3"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "monitoring",
@@ -29937,7 +29950,8 @@
      "target_groups": [
       "k8s-monitori-vmauth-e07e5153ee"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-t",
@@ -29992,7 +30006,8 @@
      "target_groups": [
       "k8s-prodcurt-curtainc-bb495c72c8"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-v",
@@ -30047,7 +30062,8 @@
      "target_groups": [
       "k8s-devtooto-appkf-133751726c"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-r",
@@ -30102,7 +30118,8 @@
      "target_groups": [
       "k8s-prodsoro-appmba-f68effe430"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-s",
@@ -30157,7 +30174,8 @@
      "target_groups": [
       "k8s-devillus-appi-1a33cd027e"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-z-backend",
@@ -30212,7 +30230,8 @@
      "target_groups": [
       "k8s-prodrhem-appnfro-9726e5b1d3"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-t",
@@ -30267,7 +30286,8 @@
      "target_groups": [
       "k8s-prodcurt-curtainc-022a51fc31"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-v",
@@ -30322,7 +30342,8 @@
      "target_groups": [
       "k8s-prodtoot-appkb-7df87a92cc"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-y",
@@ -30378,7 +30399,8 @@
      "target_groups": [
       "k8s-prodinse-insertoo-032c25d752"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-s",
@@ -30433,7 +30455,8 @@
      "target_groups": [
       "k8s-devillus-appi-785b0c249b"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-t",
@@ -30488,7 +30511,8 @@
      "target_groups": [
       "k8s-prodcurt-curtainc-57e5adf3bf"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-s",
@@ -30544,7 +30568,8 @@
      "target_groups": [
       "k8s-prodillu-appi-c50edbe2df"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-s",
@@ -30599,7 +30624,8 @@
      "target_groups": [
       "k8s-devillus-appi-75eb881035"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "monitoring",
@@ -30654,7 +30680,8 @@
      "target_groups": [
       "k8s-monitori-kubeprom-af0f3aa6c7"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-y",
@@ -30709,7 +30736,8 @@
      "target_groups": [
       "k8s-prodinse-insertoo-89a3732998"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-x",
@@ -30764,7 +30792,8 @@
      "target_groups": [
       "k8s-prodfand-apppa-754a9b50b2"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "argocd",
@@ -30819,7 +30848,8 @@
      "target_groups": [
       "k8s-argocd-argocdse-74c4dcbda2"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-t",
@@ -30874,7 +30904,8 @@
      "target_groups": [
       "k8s-prodcurt-curtainc-fc2d368787"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-z-backend",
@@ -30929,7 +30960,8 @@
      "target_groups": [
       "k8s-prodrhem-appnbac-8c88bb317a"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-r",
@@ -30984,7 +31016,8 @@
      "target_groups": [
       "k8s-prodsoro-appmwe-194ae69849"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-v",
@@ -31039,7 +31072,8 @@
      "target_groups": [
       "k8s-prodtoot-appka-d0c066d282"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-v",
@@ -31094,7 +31128,8 @@
      "target_groups": [
       "k8s-devtooto-appkb-0987e78003"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-aa",
@@ -31149,7 +31184,8 @@
      "target_groups": [
       "k8s-devvxtch-vxtchatb-e9834ca5fe"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-s",
@@ -31204,7 +31240,8 @@
      "target_groups": [
       "k8s-devillus-appi-9224ee28d5"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-y",
@@ -31259,7 +31296,8 @@
      "target_groups": [
       "k8s-devinser-insertoo-e2123e6d2b"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-y",
@@ -31314,7 +31352,8 @@
      "target_groups": [
       "k8s-devinser-insertoo-1b001aa84b"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-y",
@@ -31369,7 +31408,8 @@
      "target_groups": [
       "k8s-devinser-insertoo-bf57c25c47"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-y",
@@ -31424,7 +31464,8 @@
      "target_groups": [
       "k8s-devinser-insertoo-5ae87eece7"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-v",
@@ -31479,7 +31520,8 @@
      "target_groups": [
       "k8s-devtooto-appka-ae7a7a06ff"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "dev-app-aa",
@@ -31534,7 +31576,8 @@
      "target_groups": [
       "k8s-devvxtch-vxtchatb-b347218b4f"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "middleware",
@@ -31589,7 +31632,8 @@
      "target_groups": [
       "k8s-middlewa-kafkaui-0a6256c8b2"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "middleware",
@@ -31644,7 +31688,8 @@
      "target_groups": [
       "k8s-middlewa-redisins-e7e7fd218a"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-w",
@@ -31699,7 +31744,8 @@
      "target_groups": [
       "k8s-prodcarp-carpenst-e238817282"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-y",
@@ -31754,7 +31800,8 @@
      "target_groups": [
       "k8s-prodinse-insertoo-37417ab44f"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "prod-app-y",
@@ -31809,7 +31856,8 @@
      "target_groups": [
       "k8s-prodinse-insertoo-b22674073c"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "app-ab-prod",
@@ -31864,7 +31912,8 @@
      "target_groups": [
       "k8s-pwcprod-pwcbacke-bea446d347"
      ]
-    }
+    },
+    "metrics_read": true
    },
    {
     "namespace": "app-ab-prod",
@@ -31919,7 +31968,8 @@
      "target_groups": [
       "k8s-pwcprod-pwcfront-e72ef00971"
      ]
-    }
+    },
+    "metrics_read": true
    }
   ],
   "ingress_count": 41,
@@ -36431,6 +36481,7 @@
      "prod": true
     }
    ],
+   "skip_reason": null,
    "unhealthy_events_total": 1,
    "endpoints_not_ready": []
   },
@@ -58864,74 +58915,78 @@
      "calls": 2.0
     }
    ],
-   "eks_insights": [
-    {
-     "name": "Cluster health issues",
-     "category": "UPGRADE_READINESS",
-     "status": "PASSING",
-     "reason": "No cluster health issues detected.",
-     "k8s_version": "1.33",
-     "last_transition": "2025-12-16T21:44:30+09:00"
-    },
-    {
-     "name": "Deprecated APIs removed in Kubernetes v1.37",
-     "category": "UPGRADE_READINESS",
-     "status": "PASSING",
-     "reason": "No deprecated API usage detected within the last 30 days.",
-     "k8s_version": "1.37",
-     "last_transition": "2026-09-30T18:19:26+09:00"
-    },
-    {
-     "name": "kube-proxy version skew",
-     "category": "UPGRADE_READINESS",
-     "status": "PASSING",
-     "reason": "kube-proxy versions match the cluster control plane version.",
-     "k8s_version": "1.33",
-     "last_transition": "2025-12-16T21:44:30+09:00"
-    },
-    {
-     "name": "Kubelet version skew",
-     "category": "UPGRADE_READINESS",
-     "status": "PASSING",
-     "reason": "Node kubelet versions match the cluster control plane version.",
-     "k8s_version": "1.33",
-     "last_transition": "2025-12-16T21:44:30+09:00"
-    },
-    {
-     "name": "EKS add-on version compatibility",
-     "category": "UPGRADE_READINESS",
-     "status": "PASSING",
-     "reason": "All installed EKS add-on versions are compatible with next Kubernetes version.",
-     "k8s_version": "1.33",
-     "last_transition": "2025-12-16T21:44:30+09:00"
-    },
-    {
-     "name": "Amazon Linux 2 compatibility",
-     "category": "UPGRADE_READINESS",
-     "status": "ERROR",
-     "reason": "Amazon EKS stopped publishing EKS-optimized Amazon Linux 2 (AL2) AMIs on November 26, 2025. AL2023 and Bottlerocket based AMIs for Amazon EKS are available for all supported Kubernetes versions includ",
-     "k8s_version": "1.33",
-     "last_transition": "2025-12-22T18:19:26+09:00"
-    },
-    {
-     "name": "Deprecated APIs removed in Kubernetes v1.38",
-     "category": "UPGRADE_READINESS",
-     "status": "PASSING",
-     "reason": "No deprecated API usage detected within the last 30 days.",
-     "k8s_version": "1.38",
-     "last_transition": "2026-09-30T18:19:26+09:00"
-    }
-   ],
-   "eks_insights_failing": [
-    {
-     "name": "Amazon Linux 2 compatibility",
-     "category": "UPGRADE_READINESS",
-     "status": "ERROR",
-     "reason": "Amazon EKS stopped publishing EKS-optimized Amazon Linux 2 (AL2) AMIs on November 26, 2025. AL2023 and Bottlerocket based AMIs for Amazon EKS are available for all supported Kubernetes versions includ",
-     "k8s_version": "1.33",
-     "last_transition": "2025-12-22T18:19:26+09:00"
-    }
-   ],
+   "eks_insights": {
+    "read": true,
+    "rows": [
+     {
+      "name": "Cluster health issues",
+      "category": "UPGRADE_READINESS",
+      "status": "PASSING",
+      "reason": "No cluster health issues detected.",
+      "k8s_version": "1.33",
+      "last_transition": "2025-12-16T21:44:30+09:00"
+     },
+     {
+      "name": "Deprecated APIs removed in Kubernetes v1.37",
+      "category": "UPGRADE_READINESS",
+      "status": "PASSING",
+      "reason": "No deprecated API usage detected within the last 30 days.",
+      "k8s_version": "1.37",
+      "last_transition": "2026-09-30T18:19:26+09:00"
+     },
+     {
+      "name": "kube-proxy version skew",
+      "category": "UPGRADE_READINESS",
+      "status": "PASSING",
+      "reason": "kube-proxy versions match the cluster control plane version.",
+      "k8s_version": "1.33",
+      "last_transition": "2025-12-16T21:44:30+09:00"
+     },
+     {
+      "name": "Kubelet version skew",
+      "category": "UPGRADE_READINESS",
+      "status": "PASSING",
+      "reason": "Node kubelet versions match the cluster control plane version.",
+      "k8s_version": "1.33",
+      "last_transition": "2025-12-16T21:44:30+09:00"
+     },
+     {
+      "name": "EKS add-on version compatibility",
+      "category": "UPGRADE_READINESS",
+      "status": "PASSING",
+      "reason": "All installed EKS add-on versions are compatible with next Kubernetes version.",
+      "k8s_version": "1.33",
+      "last_transition": "2025-12-16T21:44:30+09:00"
+     },
+     {
+      "name": "Amazon Linux 2 compatibility",
+      "category": "UPGRADE_READINESS",
+      "status": "ERROR",
+      "reason": "Amazon EKS stopped publishing EKS-optimized Amazon Linux 2 (AL2) AMIs on November 26, 2025. AL2023 and Bottlerocket based AMIs for Amazon EKS are available for all supported Kubernetes versions includ",
+      "k8s_version": "1.33",
+      "last_transition": "2025-12-22T18:19:26+09:00"
+     },
+     {
+      "name": "Deprecated APIs removed in Kubernetes v1.38",
+      "category": "UPGRADE_READINESS",
+      "status": "PASSING",
+      "reason": "No deprecated API usage detected within the last 30 days.",
+      "k8s_version": "1.38",
+      "last_transition": "2026-09-30T18:19:26+09:00"
+     }
+    ],
+    "failing": [
+     {
+      "name": "Amazon Linux 2 compatibility",
+      "category": "UPGRADE_READINESS",
+      "status": "ERROR",
+      "reason": "Amazon EKS stopped publishing EKS-optimized Amazon Linux 2 (AL2) AMIs on November 26, 2025. AL2023 and Bottlerocket based AMIs for Amazon EKS are available for all supported Kubernetes versions includ",
+      "k8s_version": "1.33",
+      "last_transition": "2025-12-22T18:19:26+09:00"
+     }
+    ],
+    "skip_reason": null
+   },
    "target": {
     "cert-manager": "v1.5.3",
     "istio": "v1.11.0",
@@ -59529,6 +59584,7 @@
     }
    ],
    "large_configmaps": [],
+   "secrets_read": true,
    "secrets_total": 145,
    "orphan_secrets": [
     {
@@ -61655,6 +61711,8 @@
    "platform": "eks"
   },
   "networkpolicy": {
+   "read": true,
+   "file_status": "ok",
    "policies": 4,
    "namespaces_with_policy": [
     "app-ab-prod",
@@ -63815,6 +63873,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.023,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.04,
      "cpu_median_7d": 0.02,
      "burst_ratio_7d": 2.0,
@@ -63858,6 +63917,7 @@
      "pools": {},
      "shares_nodes_with_prod": false,
      "cpu_p95_7d": 0.55,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 1.617,
      "cpu_median_7d": 0.0,
      "burst_ratio_7d": null,
@@ -63905,6 +63965,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.001,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.002,
      "cpu_median_7d": 0.001,
      "burst_ratio_7d": null,
@@ -63955,6 +64016,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.042,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.077,
      "cpu_median_7d": 0.031,
      "burst_ratio_7d": 2.5,
@@ -63996,6 +64058,7 @@
      "pools": {},
      "shares_nodes_with_prod": false,
      "cpu_p95_7d": null,
+     "cpu_metrics_read": true,
      "cpu_max_7d": null,
      "cpu_median_7d": null,
      "burst_ratio_7d": null,
@@ -64037,6 +64100,7 @@
      "pools": {},
      "shares_nodes_with_prod": false,
      "cpu_p95_7d": null,
+     "cpu_metrics_read": true,
      "cpu_max_7d": null,
      "cpu_median_7d": null,
      "burst_ratio_7d": null,
@@ -64087,6 +64151,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.017,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.018,
      "cpu_median_7d": 0.017,
      "burst_ratio_7d": 1.1,
@@ -64135,6 +64200,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.052,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.069,
      "cpu_median_7d": 0.049,
      "burst_ratio_7d": 1.4,
@@ -64183,6 +64249,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.024,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.039,
      "cpu_median_7d": 0.023,
      "burst_ratio_7d": 1.7,
@@ -64230,6 +64297,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.035,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.036,
      "cpu_median_7d": 0.033,
      "burst_ratio_7d": 1.1,
@@ -64277,6 +64345,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.002,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.002,
      "cpu_median_7d": 0.002,
      "burst_ratio_7d": null,
@@ -64323,6 +64392,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.02,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.039,
      "cpu_median_7d": 0.013,
      "burst_ratio_7d": 3.0,
@@ -64370,6 +64440,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.004,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.004,
      "cpu_median_7d": 0.003,
      "burst_ratio_7d": null,
@@ -64411,6 +64482,7 @@
      "pools": {},
      "shares_nodes_with_prod": false,
      "cpu_p95_7d": null,
+     "cpu_metrics_read": true,
      "cpu_max_7d": null,
      "cpu_median_7d": null,
      "burst_ratio_7d": null,
@@ -64452,6 +64524,7 @@
      "pools": {},
      "shares_nodes_with_prod": false,
      "cpu_p95_7d": null,
+     "cpu_metrics_read": true,
      "cpu_max_7d": null,
      "cpu_median_7d": null,
      "burst_ratio_7d": null,
@@ -64518,6 +64591,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.056,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.085,
      "cpu_median_7d": 0.046,
      "burst_ratio_7d": 1.8,
@@ -64569,6 +64643,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.097,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.128,
      "cpu_median_7d": 0.091,
      "burst_ratio_7d": 1.4,
@@ -64624,6 +64699,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.177,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.495,
      "cpu_median_7d": 0.159,
      "burst_ratio_7d": 3.1,
@@ -64671,6 +64747,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.006,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.326,
      "cpu_median_7d": 0.005,
      "burst_ratio_7d": null,
@@ -64719,6 +64796,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.112,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.134,
      "cpu_median_7d": 0.093,
      "burst_ratio_7d": 1.4,
@@ -64767,6 +64845,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.009,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.032,
      "cpu_median_7d": 0.007,
      "burst_ratio_7d": null,
@@ -64814,6 +64893,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.024,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.09,
      "cpu_median_7d": 0.022,
      "burst_ratio_7d": 4.2,
@@ -64859,6 +64939,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.004,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.004,
      "cpu_median_7d": 0.004,
      "burst_ratio_7d": null,
@@ -64907,6 +64988,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.007,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.037,
      "cpu_median_7d": 0.006,
      "burst_ratio_7d": null,
@@ -64954,6 +65036,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.037,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.043,
      "cpu_median_7d": 0.035,
      "burst_ratio_7d": 1.2,
@@ -65003,6 +65086,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.904,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 3.931,
      "cpu_median_7d": 0.011,
      "burst_ratio_7d": 344.0,
@@ -66973,6 +67057,7 @@
     "nodes": 9,
     "prefix_delegation": false,
     "nitro_nodes": 9,
+    "capacity_read": true,
     "nodes_near_ip_limit": [
      "ip-10-0-2-218.ap-northeast-2.compute.internal",
      "ip-10-0-1-245.ap-northeast-2.compute.internal",
@@ -69254,6 +69339,7 @@
    ],
    "rest_client_429_503": 126,
    "workqueue_depth_max": 0.0,
+   "target_groups_read": true,
    "traffic_target_groups_without_tgb": 1,
    "traffic_unhealthy_target_groups": 6,
    "cluster_name_arg": "app-u-cluster-eks"
@@ -75289,6 +75375,7 @@
  "cost": {
   "platform": "eks",
   "efficiency": {
+   "metrics_read": true,
    "nodes": 9,
    "allocatable_cpu": 19.37,
    "p95_used_cpu": 1.1,
@@ -75549,6 +75636,8 @@
    }
   },
   "compute": {
+   "pricing_read": true,
+   "node_metrics_read": true,
    "monthly_usd": 459.83,
    "spot_monthly_usd": 133.3,
    "ondemand_monthly_usd": 326.54,
@@ -75572,6 +75661,7 @@
      "monthly_usd": 7.08
     }
    ],
+   "skip_reason": null,
    "on_demand_in_spot_pool": []
   },
   "request_waste": {
@@ -75581,6 +75671,8 @@
    "recommended_cpu_total": 2.21
   },
   "fixed": {
+   "addresses_read": true,
+   "load_balancers_read": true,
    "eip_unused": 0,
    "eip_unused_monthly_usd": 0.0,
    "eips_total": 4,

@@ -10779,6 +10779,13 @@
    ],
    "truncated": 0
   },
+  "series-present": {
+   "source": "metrics/series-present.json",
+   "why": null,
+   "ok": null,
+   "series": null,
+   "error": null
+  },
   "targets_down": {
    "source": "metrics/targets_down.json",
    "why": "Failed scrape targets (up==0). What Prometheus cannot see, no metric check can see",
@@ -12167,6 +12174,7 @@
      "samples_7d": 20129.0
     }
    ],
+   "skip_reason": null,
    "watchdog_samples_7d": 20160.0,
    "note": "always_firing = 7-day sample count at or above 95% of Watchdog (always firing). On EKS, KubeControllerManagerDown and KubeSchedulerDown fire forever because the control plane is invisible — false positives"
   },
@@ -14824,6 +14832,7 @@
    }
   },
   "available": true,
+  "skip_reason": null,
   "scheduler": {
    "unschedulable_total_24h": 0,
    "by_workload": []
@@ -16947,6 +16956,7 @@
    }
   ],
   "cluster": {
+   "servers_read": true,
    "servers": [
     "node-b"
    ],
@@ -17412,6 +17422,7 @@
       "phase": "Bound"
      }
     ],
+    "du_read": true,
     "node_total_mb": {
      "node-a": 6194,
      "node-b": 144743
@@ -24077,7 +24088,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-a-prod",
@@ -24114,7 +24126,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-a-prod",
@@ -24149,7 +24162,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-a-prod",
@@ -24185,7 +24199,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "argocd",
@@ -24220,7 +24235,8 @@
     "prod": false,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-b-prod",
@@ -24258,7 +24274,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-b-prod",
@@ -24293,7 +24310,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-c-prod",
@@ -24333,7 +24351,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-c-prod",
@@ -24370,7 +24389,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-d",
@@ -24405,7 +24425,8 @@
     "prod": false,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-f-prod",
@@ -24443,7 +24464,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-f-prod",
@@ -24481,7 +24503,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-f-prod",
@@ -24519,7 +24542,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-f-prod",
@@ -24557,7 +24581,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-g-api",
@@ -24598,7 +24623,8 @@
     "prod": false,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-h-prod",
@@ -24635,7 +24661,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-h-prod",
@@ -24670,7 +24697,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-h-prod",
@@ -24706,7 +24734,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-h-prod",
@@ -24743,7 +24772,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-h-prod",
@@ -24780,7 +24810,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "logging",
@@ -24815,7 +24846,8 @@
     "prod": false,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-i-prod",
@@ -24852,7 +24884,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "monitoring",
@@ -24887,7 +24920,8 @@
     "prod": false,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-k",
@@ -24922,7 +24956,8 @@
     "prod": false,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "registry",
@@ -24960,7 +24995,8 @@
     "prod": false,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-n",
@@ -24996,7 +25032,8 @@
     "prod": false,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-n",
@@ -25033,7 +25070,8 @@
     "prod": false,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-l-prod",
@@ -25071,7 +25109,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    },
    {
     "namespace": "app-l-prod",
@@ -25106,7 +25145,8 @@
     "prod": true,
     "metrics": {
      "source": null
-    }
+    },
+    "metrics_read": false
    }
   ],
   "ingress_count": 29,
@@ -26090,6 +26130,7 @@
      "prod": true
     }
    ],
+   "skip_reason": null,
    "unhealthy_events_total": 0,
    "endpoints_not_ready": []
   },
@@ -51406,8 +51447,12 @@
      "calls": 1.0
     }
    ],
-   "eks_insights": [],
-   "eks_insights_failing": [],
+   "eks_insights": {
+    "read": false,
+    "rows": null,
+    "failing": null,
+    "skip_reason": "EKS upgrade insights not read (aws/list-insights.json missing: eks:ListInsights refused or not an EKS cluster)"
+   },
    "target": {
     "cert-manager": "v1.5.3",
     "istio": "v1.11.0",
@@ -52606,6 +52651,7 @@
     }
    ],
    "large_configmaps": [],
+   "secrets_read": true,
    "secrets_total": 139,
    "orphan_secrets": [
     {
@@ -55262,6 +55308,8 @@
    "platform": "k3s"
   },
   "networkpolicy": {
+   "read": true,
+   "file_status": "ok",
    "policies": 8,
    "namespaces_with_policy": [
     "app-a-prod",
@@ -57391,6 +57439,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.313,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.341,
      "cpu_median_7d": 0.27,
      "burst_ratio_7d": 1.3,
@@ -57439,6 +57488,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.002,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.004,
      "cpu_median_7d": 0.002,
      "burst_ratio_7d": null,
@@ -57485,6 +57535,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.01,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.016,
      "cpu_median_7d": 0.01,
      "burst_ratio_7d": null,
@@ -57530,6 +57581,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.0,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.0,
      "cpu_median_7d": 0.0,
      "burst_ratio_7d": null,
@@ -57576,6 +57628,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.027,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.041,
      "cpu_median_7d": 0.026,
      "burst_ratio_7d": 1.6,
@@ -57622,6 +57675,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.028,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.052,
      "cpu_median_7d": 0.024,
      "burst_ratio_7d": 2.2,
@@ -57668,6 +57722,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.102,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.589,
      "cpu_median_7d": 0.028,
      "burst_ratio_7d": 21.3,
@@ -57714,6 +57769,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.006,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.01,
      "cpu_median_7d": 0.005,
      "burst_ratio_7d": null,
@@ -57760,6 +57816,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.002,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.008,
      "cpu_median_7d": 0.002,
      "burst_ratio_7d": null,
@@ -57808,6 +57865,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.008,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.051,
      "cpu_median_7d": 0.007,
      "burst_ratio_7d": null,
@@ -57849,6 +57907,7 @@
      "pools": {},
      "shares_nodes_with_prod": false,
      "cpu_p95_7d": null,
+     "cpu_metrics_read": true,
      "cpu_max_7d": null,
      "cpu_median_7d": null,
      "burst_ratio_7d": null,
@@ -57897,6 +57956,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.004,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.53,
      "cpu_median_7d": 0.003,
      "burst_ratio_7d": null,
@@ -57943,6 +58003,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.06,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.063,
      "cpu_median_7d": 0.05,
      "burst_ratio_7d": 1.3,
@@ -57988,6 +58049,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.002,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.004,
      "cpu_median_7d": 0.002,
      "burst_ratio_7d": null,
@@ -58029,6 +58091,7 @@
      "pools": {},
      "shares_nodes_with_prod": false,
      "cpu_p95_7d": null,
+     "cpu_metrics_read": true,
      "cpu_max_7d": null,
      "cpu_median_7d": null,
      "burst_ratio_7d": null,
@@ -58074,6 +58137,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.002,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.003,
      "cpu_median_7d": 0.002,
      "burst_ratio_7d": null,
@@ -58119,6 +58183,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.008,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.024,
      "cpu_median_7d": 0.006,
      "burst_ratio_7d": null,
@@ -58164,6 +58229,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.005,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.006,
      "cpu_median_7d": 0.005,
      "burst_ratio_7d": null,
@@ -58205,6 +58271,7 @@
      "pools": {},
      "shares_nodes_with_prod": false,
      "cpu_p95_7d": null,
+     "cpu_metrics_read": true,
      "cpu_max_7d": null,
      "cpu_median_7d": null,
      "burst_ratio_7d": null,
@@ -58246,6 +58313,7 @@
      "pools": {},
      "shares_nodes_with_prod": false,
      "cpu_p95_7d": null,
+     "cpu_metrics_read": true,
      "cpu_max_7d": null,
      "cpu_median_7d": null,
      "burst_ratio_7d": null,
@@ -58296,6 +58364,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.018,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.023,
      "cpu_median_7d": 0.017,
      "burst_ratio_7d": 1.4,
@@ -58342,6 +58411,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.402,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.665,
      "cpu_median_7d": 0.326,
      "burst_ratio_7d": 2.0,
@@ -58388,6 +58458,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.005,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.007,
      "cpu_median_7d": 0.005,
      "burst_ratio_7d": null,
@@ -58434,6 +58505,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.123,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.27,
      "cpu_median_7d": 0.108,
      "burst_ratio_7d": 2.5,
@@ -58479,6 +58551,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.0,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.001,
      "cpu_median_7d": 0.0,
      "burst_ratio_7d": null,
@@ -58524,6 +58597,7 @@
      },
      "shares_nodes_with_prod": true,
      "cpu_p95_7d": 0.001,
+     "cpu_metrics_read": true,
      "cpu_max_7d": 0.001,
      "cpu_median_7d": 0.0,
      "burst_ratio_7d": null,
@@ -62884,6 +62958,7 @@
     "phase": "Bound"
    }
   ],
+  "skip_reason": null,
   "summary": {
    "present": true,
    "provisioner_ready": 1,
@@ -65229,6 +65304,7 @@
  "cost": {
   "platform": "k3s",
   "efficiency": {
+   "metrics_read": true,
    "nodes": 2,
    "allocatable_cpu": 18.0,
    "p95_used_cpu": 0.92,

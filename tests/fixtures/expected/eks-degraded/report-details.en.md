@@ -5,9 +5,9 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | Item | Value |
 |---|---|
 | kube context / cluster | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
-| Run time / mode | 2026-11-07T10:33:37+09:00 / full (collection 300.7 s, 0 steps skipped by mode, 7 failed) |
+| Run time / mode | 2026-11-07T10:33:37+09:00 / full (collection 300.7 s, 0 steps skipped by mode, 40 failed) |
 | Profile | `prod` (detected) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.83 / 1.1.0 |
+| kubegap / rubric / signatures | <kubegap> / 0.1.84 / 1.1.0 |
 | Nodes / namespaces / pods / CRDs | 9 (Ready 9) / 26 / 154 / 47 |
 | Components (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
 | Metrics store | none |
@@ -20,12 +20,12 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | Severity (default) | fail | warn | vs. previous run of this mode |
 |---|---|---|---|
 | critical | 1 | 3 | no previous run of this mode |
-| high | 26 | 18 | no previous run of this mode |
-| medium | 92 | 122 | no previous run of this mode |
-| low | 15 | 119 | no previous run of this mode |
+| high | 15 | 8 | no previous run of this mode |
+| medium | 84 | 120 | no previous run of this mode |
+| low | 15 | 113 | no previous run of this mode |
 | info | 2 | 0 | no previous run of this mode |
 
-Checks 365: evaluated 282, disabled by profile 2, skipped 79, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
+Checks 367: evaluated 231, disabled by profile 2, skipped 132, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
 
 ### 1-1. Final judgment vs. first pass (adjustments)
 
@@ -40,10 +40,6 @@ Checks 365: evaluated 282, disabled by profile 2, skipped 79, not collected in t
 | Finding | Severity | Consecutive runs | Evidence |
 |---|---|---|---|
 | `resilience.no-backup.cluster` | critical |  | no backup tool (family backup). Alternative signals: etcd snapshots 0, backup-like CronJobs that ran in the last 7 days [], VolumeSnapshots 0. If signals exist, the LLM checks whether copies leave the node |
-| `controlplane.scheduler-unschedulable.prod-app-x/app-x-api` | high |  | 24h 'Unable to schedule pod; no fit' 7 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had … |
-| `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-file-worker` | high |  | 24h 'Unable to schedule pod; no fit' 51 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had … |
-| `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-graph-worker` | high |  | 24h 'Unable to schedule pod; no fit' 11 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had … |
-| `eks.no-backup-policy.cluster` | high |  | dlm get-lifecycle-policies Policies 0, backup list-backup-plans 0. In-cluster backup tools: {'etcd_snapshots': 0, 'backup_cronjobs': [], 'stale_backup_cronjobs': [], 'volume_snapshots': 0, 'any': False} |
 | `eks.public-endpoint-open.cluster` | high |  | public True, private True, allowed CIDRs ['0.0.0.0/0'] |
 | `karpenter.ec2nodeclass-al2.cluster` | high |  | EC2NodeClass 1 total, amiFamily AL2 ['default'], AMI families ['AL2'], AMI not pinned (auto-tracks latest) ['default'] |
 | `observability.failure-mode-uncovered.OOMKill` | high |  | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
@@ -51,7 +47,7 @@ Checks 365: evaluated 282, disabled by profile 2, skipped 79, not collected in t
 | `observability.no-event-retention.cluster` | high |  | no component of family event-retention in inventory.components |
 | `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | high |  | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
 | `observability.stack-storage-emptydir.monitoring/loki-stack` | high |  | emptyDir volumes: tmp, storage, replicas 1 |
-| `platform.k8s-version-eol.cluster` | high |  | server v1.32.13-eks-577a51e: EKS end of standard support 2026-03-23, 229 days past; upstream end of life 2026-02-28 |
+| `platform.k8s-version-eol.cluster` | high |  | server v1.32.13-eks-577a51e: upstream end of life 2026-02-28, 252 days past |
 | `platform.karpenter-version-compat.cluster` | high |  | Karpenter 0.37.0 supports Kubernetes 1.23 to 1.30 (table row 0.37), the cluster runs 1.32.  |
 | `resilience.prod-concentration.ip-10-0-1-139.ap-northeast-2.compute.internal` | high |  | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default, spot) holds prod pods 23/45 (0.51), 18 workloads: ['app-ab-prod/app-ab-backend', 'app-ab-prod/app-ab-frontend', 'prod-app-s/app-s-admin' … |
 | `resilience.replicas-same-node.prod-app-w/deployment/app-w` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
@@ -59,13 +55,6 @@ Checks 365: evaluated 282, disabled by profile 2, skipped 79, not collected in t
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
 | `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling … |
 | `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
-| `traffic.alb-unhealthy-targets.dev-app-aa/app-aa-backend` | high |  | Target group k8s-devvxtch-vxtchatb-b347218b4f (application, port 8000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0 … |
-| `traffic.alb-unhealthy-targets.dev-app-v/app-v-frontend` | high |  | Target group k8s-devtooto-appkf-133751726c (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 3.0 … |
-| `traffic.alb-unhealthy-targets.prod-app-t/app-t-backend` | high |  | Target group k8s-prodcurt-curtainc-bb495c72c8 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0 … |
-| `traffic.alb-unhealthy-targets.prod-app-v/app-v-frontend` | high |  | Target group k8s-prodtoot-appkf-36f816b829 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0 … |
-| `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | high |  | Target group k8s-prodinse-insertoo-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0 … |
-| `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | high |  | Target group k8s-prodrhem-appnbac-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0 … |
-| `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | high |  | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com'], sourceRanges None … |
 
 (consecutive-run counts need diff.json; none for this snapshot)
 
@@ -88,7 +77,7 @@ No earlier full snapshot to compare with.
 | `resilience.no-backup.cluster` | fail | critical | There is no way to recover cluster state (objects) and PV data. Deleting a namespace by mistake or a broken etcd or PV is the end. A CronJob dump without a tool is often "a backup kept on the same … | Velero (plus EBS snapshots or PV backup). On EKS at least a DLM snapshot policy. In a small k3s cluster, k3s etcd-snapshot or a state.db copy plus PV directory backup. Test a restore; a dump that was … |
 | `observability.no-slo.cluster` | warn | critical | Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first. | Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress. |
 | `observability.no-event-retention.cluster` | fail | high | Kubernetes events are kept for only one hour by default. FailedScheduling, OOMKilling and Unhealthy from the night are gone by morning. The most undervalued material is lost. | Ship events to Loki or Elasticsearch with kubernetes-event-exporter. Alternatively, the promtail/alloy event source if Loki exists, or `[INPUT] kubernetes_events` with fluent-bit (detection … |
-| `security.no-certificate-manager.cluster` | warn | medium | When TLS certificate renewal is manual, services keep going down from expiry. cert-manager (or ACM plus ALB on EKS) automates renewal. On EKS, ALBs using ACM certificates work without cert-manager … | Install cert-manager, or if ACM is in use, suppress this check in config.yaml with a reason. |
+| `security.no-certificate-manager.cluster` | fail | medium | When TLS certificate renewal is manual, services keep going down from expiry. cert-manager (or ACM plus ALB on EKS) automates renewal. On EKS, ALBs using ACM certificates work without cert-manager … | Install cert-manager, or if ACM is in use, suppress this check in config.yaml with a reason. |
 | `hygiene.no-progressive-delivery.cluster` | fail | info | A rolling update is "replace everything", so a defect in the new version reaches all traffic immediately. Without a canary tool (some traffic -> check metrics -> expand), deployment verification … | As services grow, automate canary judgment with Argo Rollouts (same ecosystem as Argo CD) + AnalysisTemplate (ALB 5xx, p95 Prometheus queries). |
 
 Expected families missing (inventory): backup, event-retention, slo, certificates, progressive-delivery.
@@ -99,8 +88,9 @@ Expected families missing (inventory): backup, event-retention, slo, certificate
 - Suppression expired 0: none
 - Tool missing 0: none
 - Not collected in full mode 0: none
-- Skipped or errored 79: `resources.cpu-throttling` (skip: metrics/cpu_throttle_ratio_24h,cpu_throttle_ratio_5m all missing or failed), `resources.oomkilled` (skip: metrics/oomkilled_last_terminated.json missing (not collected or no Prometheus)), `resources.oomkilled-repeated` (skip: summary.resilience.oom_7d.rows missing), `resources.node-memory-request-usage-gap` (skip: metrics/node_memory_request_ratio.json missing or failed), `resources.besteffort-in-prod` (skip: metrics/besteffort_pods.json missing (not collected or no Prometheus)), `resources.node-request-usage-gap` (skip: metrics/node_cpu_request_ratio.json missing or failed), `resources.cpu-request-overprovisioned` (skip: metrics/cpu_request_p95_ratio_7d.json missing or failed), `resources.cpu-limit-near-p95` (skip: metrics/cpu_limit_p95_ratio_7d.json missing (not collected or no Prometheus)), `resources.memory-request-overprovisioned` (skip: metrics/memory_request_p95_ratio_7d.json missing or failed), `resources.memory-limit-near-p95` (skip: metrics/memory_limit_p95_ratio_7d.json missing (not collected or no Prometheus)), `resources.large-request-binpacking` (skip: metrics/large_request_containers.json missing (not collected or no Prometheus)), `node.conntrack-usage` (skip: metrics/conntrack_ratio.json missing (not collected or no Prometheus)), `node.disk-usage` (skip: metrics/disk_usage_ratio.json missing (not collected or no Prometheus)), `node.inode-usage` (skip: metrics/inode_usage_ratio.json missing (not collected or no Prometheus)), `node.ntp-offset` (skip: metrics/ntp_offset_seconds.json missing (not collected or no Prometheus)), `node.ntp-unsynced` (skip: metrics/ntp_sync_status.json missing (not collected or no Prometheus)), `node.swap-enabled` (skip: metrics/node_swap_total_bytes.json missing (not collected or no Prometheus)), `observability.alertmanager-default-null` (skip: nothing to judge: Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)), `observability.alertmanager-notification-failed` (skip: metrics/alertmanager_notifications_failed_1d.json missing (not collected or no Prometheus)), `observability.severity-channels-not-separated` (skip: nothing to judge: Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)), `observability.scrape-targets-down` (skip: metrics/scrape_targets_down_by_job.json missing (not collected or no Prometheus)), `security.networkpolicy-coverage` (skip: objects/networkpolicies.networking.k8s.io.json missing: the ClusterRole does not grant list on this kind), `events.tracked-warning-reasons` (skip: summary.events.history.tracked_hits missing), `controlplane.apiserver-429` (skip: metrics/apiserver_429_rate.json missing (not collected or no Prometheus)), `controlplane.apiserver-5xx` (skip: metrics/apiserver_5xx_rate.json missing (not collected or no Prometheus)), `controlplane.apiserver-latency` (skip: metrics/apiserver_p99_latency_by_verb.json missing (not collected or no Prometheus)), `controlplane.webhook-latency` (skip: metrics/apiserver_webhook_p99_by_name.json missing (not collected or no Prometheus)), `node.kernel-oom-node-level` (skip: nothing to judge: node not read (9)), `node.kernel-lockup` (skip: nothing to judge: node not read (9)), `node.kernel-io-fs-errors` (skip: nothing to judge: node not read (9)), `node.kernel-nic-events` (skip: nothing to judge: node not read (9)), `node.conntrack-table-full` (skip: nothing to judge: node not read (9)), `node.kernel-net-mem-pressure` (skip: nothing to judge: node not read (9)), `node.cgroup-v1` (skip: nothing to judge: node not read (9)), `node.sysctl-tuning` (skip: nothing to judge: node not read (9)), `node.cri-not-ready` (skip: nothing to judge: node not read, or cri not read (9)), `node.cri-exited-containers` (skip: nothing to judge: node not read (9)), `node.pod-logs-large` (skip: summary.nodeos.pod_logs missing), `node.pod-dir-large` (skip: summary.nodeos.pod_dirs missing), `node.service-restarts` (skip: nothing to judge: node not read (9)), `node.reboot-required` (skip: nothing to judge: node not read (9)), `node.os-updates-pending` (skip: nothing to judge: node not read (9)), `node.kubelet-reserved-missing` (skip: nothing to judge: node not read, or kubelet not read (9)), `node.kubelet-eviction-memory-missing` (skip: nothing to judge: node not read, or kubelet not read (9)), `node.clock-unsynced-os` (skip: nothing to judge: node not read (9)), `node.zombie-processes` (skip: nothing to judge: node not read (9)), `observability.fluentbit-output-errors` (skip: summary.logs.agents.fluent-bit missing), `observability.alert-firing-stale` (skip: metrics/alerts_firing_stale_days.json missing (not collected or no Prometheus)), `node.memory-available-low` (skip: metrics/node_memory_available_ratio.json missing (not collected or no Prometheus)), `node.network-errors` (skip: metrics/node_network_errors_1d.json missing (not collected or no Prometheus)), `node.timewait-sockets-high` (skip: metrics/node_tcp_timewait.json missing (not collected or no Prometheus)), `node.kubelet-pleg-slow` (skip: metrics/kubelet_pleg_p99_1h.json missing (not collected or no Prometheus)), `controlplane.watch-count-high` (skip: metrics/apiserver_watch_per_node.json missing (not collected or no Prometheus)), `controlplane.apiserver-401-rate` (skip: metrics/apiserver_401_rate_1h.json missing (not collected or no Prometheus)), `controlplane.etcd-db-size` (skip: metrics/apiserver_storage_size_bytes.json missing (not collected or no Prometheus)), `node.kubelet-api-qps-low` (skip: nothing to judge: node not read, or kubelet not read (9)), `traffic.ingress-nginx-vulnerable-version` (skip: summary.traffic.nginx missing), `traffic.ingress-nginx-retired` (skip: summary.traffic.nginx missing), `scaling.hpa-at-max` (skip: metrics/hpa_at_max_ratio_15d.json missing (not collected or no Prometheus)), `scaling.hpa-flapping` (skip: metrics/hpa_desired_changes_7d.json missing (not collected or no Prometheus)), `scaling.pod-pending-long` (skip: metrics/pod_pending_seconds.json missing (not collected or no Prometheus)), `node.docker-and-containerd` (skip: nothing to judge: node not read (9)), `node.container-writable-layer-large` (skip: nothing to judge: node not read (9)), `node.large-images` (skip: nothing to judge: node not read (9)), `alertmanager.receivers-unused-or-no-inhibit` (skip: nothing to judge: alertmanager not present, or its configuration could not be parsed (config_parse_error)), `alertmanager.notifications-silent` (skip: nothing to judge: alertmanager not present; metrics not read), `coredns.nxdomain-ratio-high` (skip: nothing to judge: metrics not read), `coredns.cache-hit-low` (skip: nothing to judge: metrics not read), `coredns.aaaa-noise` (skip: nothing to judge: metrics not read), `coredns.forward-upstream-errors` (skip: nothing to judge: metrics not read), `coredns.panic-or-reload-failed` (skip: nothing to judge: metrics not read), `coredns.pod-imbalance` (skip: nothing to judge: metrics not read), `ebscsi.node-ops-errors` (skip: nothing to judge: kubelet metrics not read), `ecr.pull-failures` (skip: nothing to judge: events not collected), `kubeproxy.sync-slow` (skip: nothing to judge: metrics not read), `kubeproxy.rules-pending` (skip: nothing to judge: metrics not read), `kubeproxy.restore-failures` (skip: nothing to judge: metrics not read), `kubeproxy.conntrack-invalid-drops` (skip: nothing to judge: conntrack INVALID counter not served: kube-proxy 1.30, ipvs or nftables mode, no nfacct, or the proxy mode not read (summary ct_invalid_reason says which)), `vpccni.ec2-api-errors` (skip: nothing to judge: metrics not read (9))
+- Skipped or errored 132: `resources.cpu-throttling` (skip: metrics/cpu_throttle_ratio_24h,cpu_throttle_ratio_5m all missing or failed), `resources.oomkilled` (skip: metrics/oomkilled_last_terminated.json missing (not collected or no Prometheus)), `resources.oomkilled-repeated` (skip: summary.resilience.oom_7d.rows missing), `resources.node-memory-request-usage-gap` (skip: metrics/node_memory_request_ratio.json missing or failed), `resources.besteffort-in-prod` (skip: metrics/besteffort_pods.json missing (not collected or no Prometheus)), `resources.node-request-usage-gap` (skip: metrics/node_cpu_request_ratio.json missing or failed), `resources.cpu-request-overprovisioned` (skip: metrics/cpu_request_p95_ratio_7d.json missing or failed), `resources.cpu-limit-near-p95` (skip: metrics/cpu_limit_p95_ratio_7d.json missing (not collected or no Prometheus)), `resources.memory-request-overprovisioned` (skip: metrics/memory_request_p95_ratio_7d.json missing or failed), `resources.memory-limit-near-p95` (skip: metrics/memory_limit_p95_ratio_7d.json missing (not collected or no Prometheus)), `resources.large-request-binpacking` (skip: metrics/large_request_containers.json missing (not collected or no Prometheus)), `node.conntrack-usage` (skip: metrics/conntrack_ratio.json missing (not collected or no Prometheus)), `node.disk-usage` (skip: metrics/disk_usage_ratio.json missing (not collected or no Prometheus)), `node.inode-usage` (skip: metrics/inode_usage_ratio.json missing (not collected or no Prometheus)), `node.ntp-offset` (skip: metrics/ntp_offset_seconds.json missing (not collected or no Prometheus)), `node.ntp-unsynced` (skip: metrics/ntp_sync_status.json missing (not collected or no Prometheus)), `node.swap-enabled` (skip: metrics/node_swap_total_bytes.json missing (not collected or no Prometheus)), `observability.alerts-always-firing` (skip: alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)), `observability.alertmanager-default-null` (skip: nothing to judge: Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)), `observability.alertmanager-notification-failed` (skip: metrics/alertmanager_notifications_failed_1d.json missing (not collected or no Prometheus)), `observability.severity-channels-not-separated` (skip: nothing to judge: Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)), `observability.scrape-targets-down` (skip: metrics/scrape_targets_down_by_job.json missing (not collected or no Prometheus)), `security.networkpolicy-coverage` (skip: objects/networkpolicies.networking.k8s.io.json missing: the ClusterRole does not grant list on this kind), `events.tracked-warning-reasons` (skip: summary.events.history.tracked_hits missing), `controlplane.scheduler-unschedulable` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.apiserver-429` (skip: metrics/apiserver_429_rate.json missing (not collected or no Prometheus)), `controlplane.apiserver-5xx` (skip: metrics/apiserver_5xx_rate.json missing (not collected or no Prometheus)), `controlplane.apiserver-latency` (skip: metrics/apiserver_p99_latency_by_verb.json missing (not collected or no Prometheus)), `controlplane.webhook-latency` (skip: metrics/apiserver_webhook_p99_by_name.json missing (not collected or no Prometheus)), `controlplane.webhook-call-failures` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.controller-error-repeat` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.apiserver-slow-traces` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.authenticator-failures` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `node.kernel-oom-node-level` (skip: nothing to judge: node not read (9)), `node.kernel-lockup` (skip: nothing to judge: node not read (9)), `node.kernel-io-fs-errors` (skip: nothing to judge: node not read (9)), `node.kernel-nic-events` (skip: nothing to judge: node not read (9)), `node.conntrack-table-full` (skip: nothing to judge: node not read (9)), `node.kernel-net-mem-pressure` (skip: nothing to judge: node not read (9)), `node.cgroup-v1` (skip: nothing to judge: node not read (9)), `node.sysctl-tuning` (skip: nothing to judge: node not read (9)), `node.cri-not-ready` (skip: nothing to judge: node not read, or cri not read (9)), `node.cri-exited-containers` (skip: nothing to judge: node not read (9)), `node.pod-logs-large` (skip: summary.nodeos.pod_logs missing), `node.pod-dir-large` (skip: summary.nodeos.pod_dirs missing), `node.service-restarts` (skip: nothing to judge: node not read (9)), `node.reboot-required` (skip: nothing to judge: node not read (9)), `node.os-updates-pending` (skip: nothing to judge: node not read (9)), `node.kubelet-reserved-missing` (skip: nothing to judge: node not read, or kubelet not read (9)), `node.kubelet-eviction-memory-missing` (skip: nothing to judge: node not read, or kubelet not read (9)), `node.clock-unsynced-os` (skip: nothing to judge: node not read (9)), `node.zombie-processes` (skip: nothing to judge: node not read (9)), `observability.fluentbit-output-errors` (skip: summary.logs.agents.fluent-bit missing), `observability.alert-firing-stale` (skip: metrics/alerts_firing_stale_days.json missing (not collected or no Prometheus)), `cost.idle-compute-high` (skip: nothing to judge: pricing (pricing:GetProducts) or node CPU usage metrics (node_cpu_usage_ratio_p95_7d) not read), `cost.request-waste` (skip: nothing to judge: pricing (pricing:GetProducts) or the KRR totals not read), `cost.unused-eip` (skip: nothing to judge: EC2 addresses not read (ec2:DescribeAddresses)), `cost.idle-load-balancer` (skip: nothing to judge: load balancers not read (elasticloadbalancing:Describe*)), `cost.idle-node` (skip: node CPU usage metrics not read (node_cpu_usage_ratio_p95_7d)), `security.networkpolicy-not-enforced` (skip: nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)), `security.no-default-deny` (skip: nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)), `security.imds-hop-limit` (skip: nothing to judge: not EKS, or EC2 instance list not read (ec2:DescribeInstances)), `storage.pvc-usage-high` (skip: nothing to judge: PVC usage metrics not read (kubelet_volume_stats_*) (18)), `storage.ebs-unattached` (skip: nothing to judge: ebs not available), `storage.ebs-gp2-volumes` (skip: nothing to judge: ebs not available), `storage.ebs-unencrypted` (skip: nothing to judge: ebs not available), `hygiene.eks-upgrade-insight` (skip: EKS upgrade insights not read (aws/list-insights.json missing: eks:ListInsights refused or not an EKS cluster)), `hygiene.orphan-secrets` (skip: nothing to judge: Secret names not read (kube_secret_info through Prometheus)), `traffic.lb-idle-timeout-long` (skip: summary.traffic.alb.lbs missing), `traffic.alb-target-type-instance` (skip: summary.traffic.alb.target_groups missing), `node.memory-available-low` (skip: metrics/node_memory_available_ratio.json missing (not collected or no Prometheus)), `node.network-errors` (skip: metrics/node_network_errors_1d.json missing (not collected or no Prometheus)), `node.timewait-sockets-high` (skip: metrics/node_tcp_timewait.json missing (not collected or no Prometheus)), `node.kubelet-pleg-slow` (skip: metrics/kubelet_pleg_p99_1h.json missing (not collected or no Prometheus)), `controlplane.watch-count-high` (skip: metrics/apiserver_watch_per_node.json missing (not collected or no Prometheus)), `controlplane.apiserver-401-rate` (skip: metrics/apiserver_401_rate_1h.json missing (not collected or no Prometheus)), `controlplane.etcd-db-size` (skip: metrics/apiserver_storage_size_bytes.json missing (not collected or no Prometheus)), `node.kubelet-api-qps-low` (skip: nothing to judge: node not read, or kubelet not read (9)), `traffic.ingress-5xx-ratio` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (41)), `traffic.ingress-p95-latency` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (41)), `traffic.alb-elb-5xx` (skip: summary.traffic.alb.lbs missing), `traffic.alb-unhealthy-targets` (skip: summary.traffic.alb.unhealthy_target_groups missing), `traffic.alb-deregistration-vs-grace` (skip: summary.traffic.alb.target_groups missing), `traffic.alb-protection-off` (skip: summary.traffic.alb.lbs missing), `traffic.db-exposed` (skip: nothing to judge: load balancer security groups not read (elasticloadbalancing:Describe*, ec2:DescribeSecurityGroups)), `traffic.ingress-nginx-vulnerable-version` (skip: summary.traffic.nginx missing), `traffic.ingress-nginx-retired` (skip: summary.traffic.nginx missing), `traffic.pod-not-ready` (skip: pod readiness ratio not read (metrics/pod_ready_ratio_24h.json missing or failed)), `traffic.coredns-latency` (skip: nothing to judge: CoreDNS metrics not read (coredns_dns_request_duration_seconds)), `scaling.hpa-at-max` (skip: metrics/hpa_at_max_ratio_15d.json missing (not collected or no Prometheus)), `scaling.hpa-never-scaled` (skip: nothing to judge: HPA metrics not read (hpa_at_min_ratio_15d) (18)), `scaling.hpa-flapping` (skip: metrics/hpa_desired_changes_7d.json missing (not collected or no Prometheus)), `scaling.pod-pending-long` (skip: metrics/pod_pending_seconds.json missing (not collected or no Prometheus)), `tenancy.burst-tenant-unbounded` (skip: nothing to judge: namespace CPU metrics not read (namespace_cpu_max_7d, namespace_cpu_median_7d) (26)), `node.docker-and-containerd` (skip: nothing to judge: node not read (9)), `node.container-writable-layer-large` (skip: nothing to judge: node not read (9)), `node.large-images` (skip: nothing to judge: node not read (9)), `eks.addon-outdated` (skip: nothing to judge: add-on versions not read (eks:DescribeAddonVersions) (4)), `eks.ssm-unregistered` (skip: inventory.node_access.ssm_unregistered missing), `eks.no-backup-policy` (skip: nothing to judge: dlm get-lifecycle-policies or backup list-backup-plans not read), `eks.acm-certificate-expiring` (skip: nothing to judge: acm not available), `eks.service-quota-near-limit` (skip: nothing to judge: quotas not available), `storage.ebs-volume-io-saturated` (skip: nothing to judge: ebs not available), `eks.security-group-open-to-world` (skip: nothing to judge: security groups not available), `eks.nodegroup-ami-old` (skip: nothing to judge: nodegroups not available), `albctl.target-group-without-tgb` (skip: nothing to judge: ALB target groups not read (elasticloadbalancing:Describe*)), `alertmanager.receivers-unused-or-no-inhibit` (skip: nothing to judge: alertmanager not present, or its configuration could not be parsed (config_parse_error)), `alertmanager.notifications-silent` (skip: nothing to judge: alertmanager not present; metrics not read), `coredns.nxdomain-ratio-high` (skip: nothing to judge: metrics not read), `coredns.cache-hit-low` (skip: nothing to judge: metrics not read), `coredns.aaaa-noise` (skip: nothing to judge: metrics not read), `coredns.forward-upstream-errors` (skip: nothing to judge: metrics not read), `coredns.panic-or-reload-failed` (skip: nothing to judge: metrics not read), `coredns.pod-imbalance` (skip: nothing to judge: metrics not read), `ebscsi.node-ops-errors` (skip: nothing to judge: kubelet metrics not read), `ecr.scan-disabled` (skip: summary.ecr.summary missing), `ecr.tag-mutable-prod` (skip: summary.ecr.summary missing), `ecr.no-lifecycle-policy` (skip: summary.ecr.summary missing), `ecr.stale-storage` (skip: summary.ecr.summary missing), `ecr.dockerhub-dependency` (skip: summary.ecr.summary missing), `ecr.pull-failures` (skip: summary.ecr.summary missing), `ecr.no-replication` (skip: summary.ecr.summary missing), `ecr.untagged-images` (skip: summary.ecr.summary missing), `kubeproxy.sync-slow` (skip: nothing to judge: metrics not read), `kubeproxy.rules-pending` (skip: nothing to judge: metrics not read), `kubeproxy.restore-failures` (skip: nothing to judge: metrics not read), `kubeproxy.conntrack-invalid-drops` (skip: nothing to judge: conntrack INVALID counter not served: kube-proxy 1.30, ipvs or nftables mode, no nfacct, or the proxy mode not read (summary ct_invalid_reason says which)), `vpccni.node-ip-exhaustion` (skip: nothing to judge: pod IP usage not read (no ipamd metrics and the instance type's limits not read: ec2:DescribeInstanceTypes) (9)), `vpccni.no-available-ip` (skip: nothing to judge: VPC CNI metrics not read (awscni_no_available_ip_addresses) (9)), `vpccni.prefix-delegation-off` (skip: nothing to judge: pod IP usage of no node read (no ipamd metrics and the instance types' limits not read: ec2:DescribeInstanceTypes)), `vpccni.ec2-api-errors` (skip: nothing to judge: metrics not read (9)), `vpccni.external-snat-off-with-private-routes` (skip: summary.vpccni.snat missing)
 - Judged in part 0 (some targets lacked what the rule needs; those are not judged, not passed): none
+- Query returned no series 0 (every metric name the query reads has series, so nothing happened; a name with no series would be a skip): none
 
 ## 7. Appendix
 
@@ -109,14 +99,14 @@ Expected families missing (inventory): backup, event-retention, slo, certificate
 | Collector | Steps | Failed | Skipped (reason) |
 |---|---|---|---|
 | core | 13 | events, metrics.core | node-os (no node command backend) |
-| eks-platform | 29 |  | kubelet-journal (no node command backend); containerd-journal (no node command backend) |
+| eks-platform | 29 | nodegroup, addon-versions, cluster-versions, insights, subnets, route-tables, ssm-instances, cluster-security-groups, controlplane-logs, dlm-policies, backup-plans, alb-metrics, ec2-volumes, ec2-volumes-available, ec2-snapshots-30d, ec2-instances-imds, pod-identity-associations, ec2-addresses, ec2-nat-gateways, ec2-spot-prices, pricing-ondemand, ce-cost-30d, acm-certificates, service-quotas, quota-usage, ec2-root-volumes, ebs-volume-metrics | kubelet-journal (no node command backend); containerd-journal (no node command backend) |
 | actions-runner-controller | 0 |  | no collect.yaml (collector not implemented) |
 | alb-controller | 1 |  |  |
 | alertmanager | 4 |  | status (no alertmanager connection); silences (no alertmanager connection); alerts (no alertmanager connection); receivers (no alertmanager connection) |
 | argocd | 3 |  |  |
 | coredns | 1 | metrics |  |
 | ebs-csi | 1 | metrics |  |
-| ecr | 5 |  |  |
+| ecr | 5 | registry, scanning-configuration, pull-through-cache, images, lifecycle-policy |  |
 | external-dns | 0 |  | no collect.yaml (collector not implemented) |
 | external-secrets | 1 |  |  |
 | grafana | 5 |  | datasources (grafana_api_token missing); dashboards (grafana_api_token missing); dashboards-json (grafana_api_token missing) |
@@ -131,21 +121,21 @@ Expected families missing (inventory): backup, event-retention, slo, certificate
 | prometheus-operator | 0 |  | no collect.yaml (collector not implemented) |
 | promtail | 0 |  | no collect.yaml (collector not implemented) |
 | victoria-metrics | 0 |  | no collect.yaml (collector not implemented) |
-| vpc-cni | 3 |  | ipamd-metrics (no node command backend); ipamd-log (no node command backend) |
+| vpc-cni | 3 | instance-type-network | ipamd-metrics (no node command backend); ipamd-log (no node command backend) |
 
 Kinds the ClusterRole does not grant (1; a check that needs one of them is skipped, not passed): `networkpolicies.networking.k8s.io`
 
 Kinds this cluster does not serve (7; a check that needs one of them is skipped, not passed): `certificates.cert-manager.io`, `clusterissuers.cert-manager.io`, `horizontalrunnerautoscalers.actions.summerwind.dev`, `issuers.cert-manager.io`, `runnerdeployments.actions.summerwind.dev`, `volumesnapshotclasses.snapshot.storage.k8s.io`, `volumesnapshots.snapshot.storage.k8s.io`
 
-701 commands, 300.7 s. Failed steps: 7: `core.events` Error from server (Forbidden): events is forbidden: User "kubegap" cannot list resource "events" in API group "" at the …; `core.metrics.core` no Prometheus connection; `coredns.metrics` no Prometheus connection; `ebs-csi.metrics` no Prometheus connection; `kube-proxy.metrics` no Prometheus connection; `loki.metrics.loki` no Prometheus connection; `prometheus.metrics.observability` no Prometheus connection
+701 commands, 300.7 s. Failed steps: 40: `core.events` Error from server (Forbidden): events is forbidden: User "kubegap" cannot list resource "events" in API group "" at the …; `core.metrics.core` no Prometheus connection; `eks-platform.nodegroup` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.addon-versions` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.cluster-versions` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.insights` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.subnets` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.route-tables` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.ssm-instances` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.cluster-security-groups` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.controlplane-logs` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.dlm-policies` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.backup-plans` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.alb-metrics` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.ec2-volumes` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.ec2-volumes-available` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.ec2-snapshots-30d` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.ec2-instances-imds` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.pod-identity-associations` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …; `eks-platform.ec2-addresses` An error occurred (AccessDeniedException) when calling the operation: User is not authorized to perform it (the …
 
-Commands that failed inside a step that still succeeded (run.log): 26: `alb-controller.controller-metrics.aws-load-balancer-controller-dbcd6944f-psh2b` Unable to connect to the server: net/http: request canceled (Client.Timeout exceeded while awaiting headers); `alb-controller.controller-metrics.aws-load-balancer-controller-dbcd6944f-psh2b.node.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `alb-controller.controller-metrics.aws-load-balancer-controller-dbcd6944f-psh2b.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `alb-controller.controller-metrics.aws-load-balancer-controller-dbcd6944f-svnmr.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `argocd.application-controller-metrics.argocd-application-controller-0.node.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `argocd.application-controller-metrics.argocd-application-controller-0.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `ecr.lifecycle-policy.bitnami/kafka` An error occurred (LifecyclePolicyNotFoundException) when calling the GetLifecyclePolicy operation: Lifecycle policy …; `ecr.lifecycle-policy.bitnami/mysql` An error occurred (LifecyclePolicyNotFoundException) when calling the GetLifecyclePolicy operation: Lifecycle policy …; `ecr.lifecycle-policy.ecr-app-ab-postgresql-pgvector` An error occurred (LifecyclePolicyNotFoundException) when calling the GetLifecyclePolicy operation: Lifecycle policy …; `ecr.lifecycle-policy.app-v` An error occurred (LifecyclePolicyNotFoundException) when calling the GetLifecyclePolicy operation: Lifecycle policy …; `grafana.self-metrics.kube-prometheus-stack-grafana-7c9959564d-w8qx7.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `karpenter.controller-metrics.karpenter-9769889bd-nphgs.node.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `karpenter.controller-metrics.karpenter-9769889bd-nphgs.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `karpenter.controller-metrics.karpenter-9769889bd-pkxd2.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `eks-platform.kubelet-journal.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `eks-platform.kubelet-journal.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `eks-platform.containerd-journal.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `kube-proxy.proxy-mode.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `eks-platform.containerd-journal.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `kube-proxy.proxy-mode.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore
+Commands that failed inside a step that still succeeded (run.log): 22: `alb-controller.controller-metrics.aws-load-balancer-controller-dbcd6944f-psh2b` Unable to connect to the server: net/http: request canceled (Client.Timeout exceeded while awaiting headers); `alb-controller.controller-metrics.aws-load-balancer-controller-dbcd6944f-psh2b.node.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `alb-controller.controller-metrics.aws-load-balancer-controller-dbcd6944f-psh2b.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `alb-controller.controller-metrics.aws-load-balancer-controller-dbcd6944f-svnmr.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `argocd.application-controller-metrics.argocd-application-controller-0.node.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `argocd.application-controller-metrics.argocd-application-controller-0.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `grafana.self-metrics.kube-prometheus-stack-grafana-7c9959564d-w8qx7.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `karpenter.controller-metrics.karpenter-9769889bd-nphgs.node.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `karpenter.controller-metrics.karpenter-9769889bd-nphgs.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `karpenter.controller-metrics.karpenter-9769889bd-pkxd2.node.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `eks-platform.kubelet-journal.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `eks-platform.kubelet-journal.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `eks-platform.containerd-journal.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `kube-proxy.proxy-mode.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `eks-platform.containerd-journal.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `kube-proxy.proxy-mode.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `vpc-cni.ipamd-metrics.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `vpc-cni.ipamd-metrics.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `vpc-cni.ipamd-log.ip-10-0-1-117.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore; `vpc-cni.ipamd-log.ip-10-0-2-60.ap-northeast-2.compute.internal` node not registered with SSM. The node IAM role needs AmazonSSMManagedInstanceCore
 
 Deprecated-API tools: kubent 28 of 41 Lists answered (13 refused or not served); pluto 95 of 95 object kinds saved (0 not permitted or failed); kubent had 167 objects with a last-applied annotation to judge; pluto had 345 objects with a last-applied annotation to judge.
 
 ### 7-2. Checks evaluated
 
-365 checks: disabled 2, done 282, llm 2, skip 79. Load errors: none.
+367 checks: disabled 2, done 231, llm 2, skip 132. Load errors: none.
 
 ### 7-3. Signature matches and unclassified errors
 
@@ -180,10 +170,6 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `observability.no-slo.cluster` | warn | critical | no SLO tool. Signals: sli/slo recording rules [], burn rate alerts [], slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'] known issue #15 |
 | `observability.no-symptom-alerts.cluster` | warn | critical | 157 alert rules: symptom 0, cause 130, app metrics (assumed symptom) 22. Symptom ratio 0.0. Symptom rules: [] |
 | `resilience.n-plus-one.cluster` | warn | critical | Allocatable without the largest node ip-10-0-1-139.ap-northeast-2.compute.internal (3.92 cores, 29.8GB): CPU 15.45 cores vs total requests 11.51 (OK), memory 46.3GB vs 45.7GB (OK). Pods on that node 34 (prod 23). Pods that fit on no other node []. Pools short of room: 32 pods limited to … |
-| `controlplane.scheduler-unschedulable.prod-app-x/app-x-api` | fail | high | 24h 'Unable to schedule pod; no fit' 7 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
-| `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-file-worker` | fail | high | 24h 'Unable to schedule pod; no fit' 51 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
-| `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-graph-worker` | fail | high | 24h 'Unable to schedule pod; no fit' 11 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
-| `eks.no-backup-policy.cluster` | fail | high | dlm get-lifecycle-policies Policies 0, backup list-backup-plans 0. In-cluster backup tools: {'etcd_snapshots': 0, 'backup_cronjobs': [], 'stale_backup_cronjobs': [], 'volume_snapshots': 0, 'any': False} |
 | `eks.public-endpoint-open.cluster` | fail | high | public True, private True, allowed CIDRs ['0.0.0.0/0'] |
 | `karpenter.ec2nodeclass-al2.cluster` | fail | high | EC2NodeClass 1 total, amiFamily AL2 ['default'], AMI families ['AL2'], AMI not pinned (auto-tracks latest) ['default'] |
 | `observability.failure-mode-uncovered.OOMKill` | fail | high | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
@@ -191,7 +177,7 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `observability.no-event-retention.cluster` | fail | high | no component of family event-retention in inventory.components |
 | `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | fail | high | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
 | `observability.stack-storage-emptydir.monitoring/loki-stack` | fail | high | emptyDir volumes: tmp, storage, replicas 1 |
-| `platform.k8s-version-eol.cluster` | fail | high | server v1.32.13-eks-577a51e: EKS end of standard support 2026-03-23, 229 days past; upstream end of life 2026-02-28 |
+| `platform.k8s-version-eol.cluster` | fail | high | server v1.32.13-eks-577a51e: upstream end of life 2026-02-28, 252 days past |
 | `platform.karpenter-version-compat.cluster` | fail | high | Karpenter 0.37.0 supports Kubernetes 1.23 to 1.30 (table row 0.37), the cluster runs 1.32.  |
 | `resilience.prod-concentration.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | high | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default, spot) holds prod pods 23/45 (0.51), 18 workloads: ['app-ab-prod/app-ab-backend', 'app-ab-prod/app-ab-frontend', 'prod-app-s/app-s-admin', 'prod-app-s/app-s-api', 'prod-app-s/app-s-backend', 'prod-app-s/app-s-frontend' … |
 | `resilience.replicas-same-node.prod-app-w/deployment/app-w` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
@@ -199,17 +185,6 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
 | `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling constraints 4 |
 | `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
-| `traffic.alb-unhealthy-targets.dev-app-aa/app-aa-backend` | fail | high | Target group k8s-devvxtch-vxtchatb-b347218b4f (application, port 8000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-aa-backend'] |
-| `traffic.alb-unhealthy-targets.dev-app-v/app-v-frontend` | fail | high | Target group k8s-devtooto-appkf-133751726c (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 3.0, health check / expected codes 200, backends ['deployment/app-v-frontend'] |
-| `traffic.alb-unhealthy-targets.prod-app-t/app-t-backend` | fail | high | Target group k8s-prodcurt-curtainc-bb495c72c8 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-t-backend'] |
-| `traffic.alb-unhealthy-targets.prod-app-v/app-v-frontend` | fail | high | Target group k8s-prodtoot-appkf-36f816b829 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-v-frontend'] |
-| `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | fail | high | Target group k8s-prodinse-insertoo-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-y-frontend'] |
-| `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | fail | high | Target group k8s-prodrhem-appnbac-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0, health check / expected codes 200, backends ['deployment/app-z-backend'] |
-| `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | fail | high | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to the internet by the … |
-| `controlplane.scheduler-unschedulable.arc-runners/self-hosted-arm64-8msc5-runner` | warn | high | 24h 'Unable to schedule pod; no fit' 36 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
-| `controlplane.scheduler-unschedulable.prod-app-r/app-r-backend` | warn | high | 24h 'Unable to schedule pod; no fit' 4 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
-| `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-embedding-server` | warn | high | 24h 'Unable to schedule pod; no fit' 4 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
-| `eks.service-quota-near-limit.aws-account` | warn | high | quotas with a usage metric 25/65, at 80% or more [], at 60% or more ['VPCs 0.6'], top operational quotas [['VPCs', 3.0, 5.0, 0.6], ['listener rules per ALB', 48.0, 100.0, 0.48], ['target groups per ALB', 41.0, 100.0, 0.41], ['certificates per ALB', 9.0, 25.0, 0.36], ['NLBs', 2.0, 50.0, 0.04] … |
 | `karpenter.ec2nodeclass-hardening.cluster` | warn | high | IMDS hop limit 2 or more ['default'], tokens optional [], root volume encrypted not set ['default'] (size {'default': 50.0}GB) |
 | `logs.signatures.external-secrets.provider-error` | warn | high | 62 occurrences (2026-11-06T17:31:20Z ~ 2026-11-07T01:34:43Z), thresholds warn 1/fail 10. Files: ['logs/pods/external-secrets/external-secrets_external-secrets.log']. Samples: ['[pod/external-secrets-7859bcd5c-g8z4q/external-secrets] 2026-11-06T17:31:20.550454017Z … |
 | `logs.signatures.karpenter.version-unsupported` | warn | high | 1 occurrences (2026-11-06T08:49:38Z ~ 2026-11-06T08:49:38Z), thresholds warn 1/fail 10. Files: ['logs/pods/karpenter/karpenter_karpenter.log']. Samples: ['[pod/karpenter-9769889bd-pkxd2/controller] 2026-11-06T08:49:38.045274596Z … |
@@ -218,24 +193,11 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `prometheus.memory-pressure.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus` | warn | high | working set / limit None (limit 1536Mi), active series None, Prometheus container last terminated OOMKilled True (2026-11-05T08:21:29Z), restarts 2, OOMKilled containers in the monitoring namespace [], restarts over 7 days {} |
 | `resilience.replicas-same-node.prod-app-x/deployment/app-x-api` | warn | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-137.ap-northeast-2.compute.internal': 1}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
 | `resilience.restarts-crashloop.argocd/argocd-application-controller-0:application-controller` | warn | high | 42 restarts, state Running, last termination OOMKilled (exit 137) 2026-10-30T09:00:04Z, cause class OOM (memory limit), Unhealthy events 0, node reboot time None |
-| `security.imds-hop-limit.cluster` | warn | high | Of 9 instances, 9 with IMDS hop limit > 1 or tokens optional: {'hop=2 tokens=required': 9}. Examples [('system_core', 'm5.large', 2, 'required'), ('system_core', 'm5.large', 2, 'required'), ('karpenter-node', 't8i.medium', 2, 'required'), ('karpenter-node', 'm7i-flex.large', 2, 'required')]. … |
-| `traffic.db-exposed.nlb/app-u-db-shared` | warn | high | nlb (defined outside the cluster) /app-u-db-shared: ports [3306, 3307, 3308, 3309, 3310, 3311, 5432, 5433, 6379, 7687], exposure internet-facing, addresses ['app-u-db-shared-d7d643f6896a3b2b.elb.ap-northeast-2.amazonaws.com'], sourceRanges None, security group allow-list, at most 4 sources per … |
-| `vpccni.node-ip-exhaustion.ip-10-0-1-137.ap-northeast-2.compute.internal` | warn | high | node ip-10-0-1-137.ap-northeast-2.compute.internal (r8gd.medium, pool default): pod IPs 3/6 (0.5), ENI None/None (at limit False), 'no available IP' events None, max-pods 8, prod pods 1. prefix delegation False |
-| `vpccni.node-ip-exhaustion.ip-10-0-1-241.ap-northeast-2.compute.internal` | warn | high | node ip-10-0-1-241.ap-northeast-2.compute.internal (t8i.small, pool system-ondemand): pod IPs 6/9 (0.667), ENI None/None (at limit False), 'no available IP' events None, max-pods 11, prod pods 1. prefix delegation False |
-| `vpccni.node-ip-exhaustion.ip-10-0-1-245.ap-northeast-2.compute.internal` | warn | high | node ip-10-0-1-245.ap-northeast-2.compute.internal (r8gd.medium, pool default): pod IPs 5/6 (0.833), ENI None/None (at limit False), 'no available IP' events None, max-pods 8, prod pods 2. prefix delegation False |
-| `vpccni.node-ip-exhaustion.ip-10-0-2-218.ap-northeast-2.compute.internal` | warn | high | node ip-10-0-2-218.ap-northeast-2.compute.internal (t8i.medium, pool system-ondemand): pod IPs 13/15 (0.867), ENI None/None (at limit False), 'no available IP' events None, max-pods 17, prod pods 2. prefix delegation False |
 | `argocd.default-project-wildcard.cluster` | fail | medium | AppProjects 1, projects whose sourceRepos and destinations are all * ['default'], apps bound to the default project 13/13 (prod 9) |
-| `cost.request-waste.cluster` | fail | medium | CPU request total 9.28 cores -> KRR recommendation 2.21 cores, reducible 7.07 cores ~ 167.84 USD/month |
 | `ebscsi.storageclass-unencrypted.cluster` | fail | medium | ebs.csi.aws.com StorageClasses 4, without encrypted ['gp3', 'gp3-2a', 'gp3-2c'] (default class gp3), in-tree leftovers ['gp2'], without allowVolumeExpansion ['gp2', 'gp3', 'gp3-2a', 'gp3-2c'] |
-| `ecr.scan-disabled.ecr/registry/<account>` | fail | medium | registry scanning BASIC (rules 0), repositories with scanOnPush off 41/45 (used by prod 27: ['ecr-app-ab-frontend-eks-prod', 'ecr-app-w-eks-prod', 'ecr-app-t-backend-eks-prod', 'ecr-app-t-web-eks-prod', 'ecr-app-r-postgresql-prod', 'ecr-app-s-admin-eks-prod']…), scanned images 0/908, CRITICAL+HIGH 0 |
-| `eks.addon-outdated.aws-ebs-csi-driver` | fail | medium | installed v1.37.0-eksbuild.1, latest available v1.67.2-eksbuild.1, default v1.67.2-eksbuild.1 |
-| `eks.addon-outdated.vpc-cni` | fail | medium | installed v1.19.0-eksbuild.1, latest available v1.23.2-eksbuild.12, default v1.22.4-eksbuild.14 |
-| `eks.extended-support.cluster` | fail | medium | version 1.32, supportType EXTENDED, status EXTENDED_SUPPORT, end of standard support 2026-03-23T09:00:00+09:00, end of extended support 2027-03-23T09:00:00+09:00 |
 | `eks.node-os-skew.cluster` | fail | medium | OS ['Amazon Linux 2', 'Amazon Linux 2023.9.20251208'], kernels ['5.10.245-245.983.amzn2.aarch64', '5.10.245-245.983.amzn2.x86_64', '6.1.158-180.294.amzn2023.x86_64'], runtimes ['containerd://1.7.29', 'containerd://2.1.5'], cgroup: AL2 may be v1, AL2023 is v2 |
-| `eks.nodegroup-ami-old.nodegroups` | fail | medium | node groups 1, max AMI age 333 days, over 90 days ['system_core-20251217040546303900000001 333d'], over 180 days ['system_core-20251217040546303900000001'], health issues [] |
 | `eso.provider-api-errors.cluster` | fail | medium | provider API calls since controller start: success 31963 / errors 2711 (ratio 0.0782), sync failures 2711/73134, reconcile errors 2711, ExternalSecrets not Ready ['database/externalsecret/mysql-app-v-secret'] (oldest refresh 7796.6 hours ago) |
 | `grafana.datasource-errors.monitoring/deployment/kube-prometheus-stack-grafana` | fail | medium | responses per datasource (cumulative since start) [('Loki(loki)', 2614, {'101': 4, '200': 2275, '400': 6, '429': 329}), ('Prometheus(prometheus)', 1535, {'200': 1349, '301': 186}), ('VictoriaMetrics_onprem(prometheus)', 142, {'200': 142})], error rate 1% or more ['Loki(loki)'] (max 0.1259), Grafana … |
-| `hygiene.eks-upgrade-insight.Amazon Linux 2 compatibility` | fail | medium | Amazon Linux 2 compatibility (UPGRADE_READINESS, k8s 1.33): ERROR — Amazon EKS stopped publishing EKS-optimized Amazon Linux 2 (AL2) AMIs on November 26, 2025. AL2023 and Bottlerocket based AMIs for Amazon EKS are available for all supported Kubernetes versions includ |
 | `hygiene.mutable-image-tag.prod-app-z-backend/deployment/tts-proxy:tailscale` | fail | medium | image tailscale/tailscale:latest (tag latest, imagePullPolicy IfNotPresent, registry docker.io) |
 | `hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/tts-proxy` | fail | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'memoryLimitsMissing', 'memoryRequestsMissing']. Security-category danger ['dangerousCapabilities', 'privilegeEscalationAllowed' … |
 | `observability.log-coverage-gap.cluster` | fail | medium | Of 147 pods Running for over 1h, 83 are absent from Loki pod labels (ratio 0.565). Nodes with every pod missing: []. By namespace: {'kube-system': 23, 'monitoring': 22, 'prod-app-z-backend': 5, 'keda': 3, 'middleware': 3, 'prod-app-t': 3, 'prod-app-s': 3, 'argocd': 2, 'dev-app-s': 2, 'dev-app-y' … |
@@ -299,8 +261,9 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `resources.no-memory-limit.prod-app-z-backend/tts-proxy` | fail | medium | containers without a limit: tailscale, forwarder |
 | `scaling.karpenter-expired-not-replaced.default-n44bh` | fail | medium | NodeClaim default-n44bh → node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge spot): age 1056.5h, 336.5h past expireAfter 720.0h. Blocking reason (DisruptionBlocked): {}. do-not-disrupt pods on this node 2: prod-app-s/app-s-admin-57f5fcc58d-khsh5, prod-app-x/app-x-api-5755745bc7-2sjvd |
 | `security.externalsecret-not-ready.database/mysql-app-v-secret` | fail | medium | Ready False (SecretSyncedError): could not get secret data from provider |
+| `security.no-certificate-manager.cluster` | fail | medium | no component of family certificates in inventory.components |
 | `security.polaris-security-danger.cluster` | fail | medium | Polaris score 79. Security danger workloads 74 (prod 29): per check {'dangerousCapabilities': 2, 'hostNetworkSet': 2, 'privilegeEscalationAllowed': 59, 'runAsPrivileged': 2, 'runAsRootAllowed': 58, 'hostPIDSet': 1, 'rolebindingClusterAdminRole': 2, 'rolebindingRolePodExecAttach': 2 … |
-| `storage.csi-snapshot-unavailable.cluster` | fail | medium | VolumeSnapshot CRD False, VolumeSnapshots 0 (0 in 7 days), VolumeSnapshotClasses 0, EBS snapshots in 30 days 0 {}, prod PVCs 8 |
+| `storage.csi-snapshot-unavailable.cluster` | fail | medium | VolumeSnapshot CRD False, VolumeSnapshots 0 (0 in 7 days), VolumeSnapshotClasses 0, EBS snapshots in 30 days None None, prod PVCs 8 |
 | `storage.no-volume-expansion.gp3` | fail | medium | allowVolumeExpansion False, provisioner ebs.csi.aws.com |
 | `storage.no-volume-expansion.gp3-2a` | fail | medium | allowVolumeExpansion False, provisioner ebs.csi.aws.com |
 | `storage.no-volume-expansion.gp3-2c` | fail | medium | allowVolumeExpansion False, provisioner ebs.csi.aws.com |
@@ -313,20 +276,11 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `tenancy.prod-boundary-missing.prod-app-x` | fail | medium | prod-app-x: ResourceQuota False, NetworkPolicies 0 (enforced by the cluster False), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 14 |
 | `tenancy.prod-boundary-missing.prod-app-y` | fail | medium | prod-app-y: ResourceQuota False, NetworkPolicies 0 (enforced by the cluster False), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 14 |
 | `tenancy.prod-boundary-missing.prod-app-z-backend` | fail | medium | prod-app-z-backend: ResourceQuota False, NetworkPolicies 0 (enforced by the cluster False), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 14 |
-| `traffic.alb-elb-5xx.k8s-lab-kprodlb-b18a4555d7` | fail | medium | ALB k8s-lab-kprodlb-b18a4555d7 (internet-facing): 24h requests 162172.0, ELB 5xx 145.0, target 5xx 152.0, rejected connections 0, idle timeout 300s, target groups 41 |
-| `traffic.ingress-p95-latency.prod-app-s/app-s-api` | fail | medium | ['canary-api-v1.lab-l.example', 'api.v1.lab-l.example']: p95 request-weighted 10.381s, hourly average 15.821s, 1h max 50.6329s, latest hour with requests 16.7603s on 3.0 requests at 2026-11-07T00:35, 287.0 requests/24h (source alb-cloudwatch) |
 | `traffic.shared-alb-group.alb-group/app-u-prod-lb` | fail | medium | ALB group app-u-prod-lb: 41 ingresses, 48 hosts, 16 namespaces ['app-ab-prod', 'argocd', 'dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y', 'middleware', 'monitoring', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend'], kinds … |
 | `albctl.reconcile-errors.cluster` | warn | medium | reconcile errors since leader start 41, apiserver 429/503 responses 126, max workqueue depth 0.0, Ingresses without an LB address [], stale TargetGroupBindings [] |
-| `albctl.tgb-stale-or-orphan.cluster` | warn | medium | TargetGroupBindings 52 (targetType {'ip': 52}), generation lagging [], Service missing [], hand-made TGBs 9, target groups without a binding (traffic section) 1 |
 | `argocd.admin-account-no-sso.cluster` | warn | medium | admin.enabled True, SSO (dex/oidc) False, anonymous False, RBAC policy.default '' / policy.csv 0 lines, exec.enabled False, URL https://deploy.lab-k.example |
 | `argocd.components-not-ha.cluster` | warn | medium | components (ready/replicas) {'applicationset-controller': '1/1', 'dex-server': '1/1', 'notifications-controller': '1/1', 'redis': '1/1', 'repo-server': '1/1', 'server': '1/1', 'application-controller': '1/1'}, not ready [], single replica (server, repo-server) ['repo-server', 'server'], version … |
-| `controlplane.authenticator-failures.cluster` | warn | medium | 24h authentication failures 8: [{'message': 'access denied', 'count': 8}] |
-| `controlplane.controller-error-repeat.gc_controller.go` | warn | medium | 24h E lines 6 times (gc_controller.go). Samples: summary.controlplane.controller_manager.top_errors |
-| `controlplane.controller-error-repeat.horizontal.go` | warn | medium | 24h E lines 11 times (horizontal.go). Samples: summary.controlplane.controller_manager.top_errors |
-| `controlplane.controller-error-repeat.type.go` | warn | medium | 24h W lines 80479 times (type.go). Samples: summary.controlplane.controller_manager.top_errors |
-| `ecr.dockerhub-dependency.ecr/registry/<account>` | warn | medium | registry distribution of container images {'602401143452.dkr.ecr.ap-northeast-2.amazonaws.com': 77, '<account>.dkr.ecr.ap-northeast-2.amazonaws.com': 59, 'docker.io': 34, 'quay.io': 25, 'ghcr.io': 9, 'public.ecr.aws': 8, 'registry.k8s.io': 3}, docker.io images 19 (e.g. ['alpine/socat:1.8.0.0' … |
-| `eks.addon-outdated.coredns` | warn | medium | installed v1.11.3-eksbuild.1, latest available v1.11.4-eksbuild.104, default v1.11.4-eksbuild.104 |
-| `eks.addon-outdated.kube-proxy` | warn | medium | installed v1.32.0-eksbuild.2, latest available v1.32.13-eksbuild.72, default v1.32.13-eksbuild.72 |
+| `eks.extended-support.cluster` | warn | medium | version 1.32, supportType EXTENDED, status None, end of standard support None, end of extended support None |
 | `eso.controller-single-replica.cluster` | warn | medium | controller 1/1, webhook 1/1 (Fail policy ['validate.externalsecret.external-secrets.io', 'validate.secretstore.external-secrets.io', 'validate.clustersecretstore.external-secrets.io']), cert-controller 1/1, --concurrent 1 |
 | `hygiene.mutable-image-tag.arc-runners/cronjob/arc-cool-down:kubectl` | warn | medium | image bitnami/kubectl:latest (tag latest, imagePullPolicy Always, registry docker.io) |
 | `hygiene.mutable-image-tag.arc-runners/cronjob/arc-warm-up:kubectl` | warn | medium | image bitnami/kubectl:latest (tag latest, imagePullPolicy Always, registry docker.io) |
@@ -343,6 +297,47 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `logs.signatures.metrics-server.scrape-failed` | warn | medium | 31 occurrences (2026-11-06T01:43:11Z ~ 2026-11-06T10:09:11Z), thresholds warn 5/fail 100. Files: ['logs/pods/metrics-server/kube-system_metrics-server.log']. Samples: ['[pod/metrics-server-65d4b7df64-xxfjs/metrics-server] 2026-11-06T01:43:11.055572813Z E1106 01:43:11.055448       1 scraper.go:149] … |
 | `loki.memory-pressure.monitoring/statefulset/loki-stack` | warn | medium | RSS 289MiB / limit 512Mi = 0.565, in-memory streams 54, last termination OOMKilled True(2026-10-25T00:15:41Z), restarts 1, storage emptyDir |
 | `loki.request-errors.monitoring/statefulset/loki-stack` | warn | medium | 1 5xx out of 6899928 requests since start (by route {'loki_api_v1_series': 1}, excluding /ready 503 during startup), panics 0, WAL disk full 0, error log lines 11783, rejected {} |
+| `observability.golden-signals-missing.app-ab-prod/app-ab-backend` | warn | medium | hosts ['app-ab-tp-api.lab-k.example'], backends ['app-ab-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.app-ab-prod/app-ab-frontend` | warn | medium | hosts ['app-ab-tp-prod.lab-k.example'], backends ['app-ab-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.argocd/argocd-server` | warn | medium | hosts ['deploy.lab-k.example'], backends ['argocd-server'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-aa/app-aa-backend` | warn | medium | hosts ['demo-api.lab-m.example'], backends ['app-aa-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-aa/app-aa-frontend` | warn | medium | hosts ['demo.lab-m.example'], backends ['app-aa-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-s/app-s-admin` | warn | medium | hosts ['admin-dev.lab-l.example'], backends ['app-s-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-s/app-s-api` | warn | medium | hosts ['api-dev.v1.lab-l.example'], backends ['app-s-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-s/app-s-backend` | warn | medium | hosts ['api-dev.lab-l.example'], backends ['app-s-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-s/app-s-frontend` | warn | medium | hosts ['dev.lab-l.example'], backends ['app-s-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-v/app-v-admin-frontend` | warn | medium | hosts ['admin-dev.lab-n.example'], backends ['app-v-admin-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-v/app-v-backend` | warn | medium | hosts ['api-dev.lab-n.example'], backends ['app-v-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-v/app-v-frontend` | warn | medium | hosts ['dev.lab-n.example'], backends ['app-v-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-y/app-y-admin` | warn | medium | hosts ['admin-dev.lab-m.example'], backends ['app-y-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-y/app-y-ai` | warn | medium | hosts ['ai-dev.lab-m.example'], backends ['app-y-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-y/app-y-backend` | warn | medium | hosts ['app-y-api-dev.lab-k.example'], backends ['app-y-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.dev-app-y/app-y-frontend` | warn | medium | hosts ['app-y-dev.lab-k.example'], backends ['app-y-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.middleware/kafka-ui` | warn | medium | hosts ['kafka.lab-k.example'], backends ['kafka-ui'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.middleware/redis-insight` | warn | medium | hosts ['redis.lab-k.example'], backends ['redis-insight'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.monitoring/kube-prometheus-stack-grafana` | warn | medium | hosts ['monitor.lab-k.example'], backends ['kube-prometheus-stack-grafana'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.monitoring/vmauth` | warn | medium | hosts ['metrics-write.lab-k.example'], backends ['vmauth'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-r/app-r-backend` | warn | medium | hosts ['app-r-api.lab-k.example'], backends ['app-r-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-r/app-r-web` | warn | medium | hosts ['app-r.lab-k.example'], backends ['app-r-web'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-s/app-s-admin` | warn | medium | hosts ['canary-admin.lab-l.example', 'admin.lab-l.example'], backends ['app-s-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-s/app-s-api` | warn | medium | hosts ['canary-api-v1.lab-l.example', 'api.v1.lab-l.example'], backends ['app-s-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-s/app-s-backend` | warn | medium | hosts ['canary-api.lab-l.example', 'api.lab-l.example'], backends ['app-s-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-s/app-s-frontend` | warn | medium | hosts ['canary.lab-l.example', 'www.lab-l.example', 'lab-l.example'], backends ['app-s-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-t/app-t-ai` | warn | medium | hosts ['app-t-ai.lab-k.example'], backends ['app-t-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-t/app-t-backend` | warn | medium | hosts ['app-t-api.lab-k.example'], backends ['app-t-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-t/app-t-studio` | warn | medium | hosts ['app-t-studio.lab-k.example'], backends ['app-t-studio'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-t/app-t-web` | warn | medium | hosts ['app-t.lab-k.example'], backends ['app-t-web'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-v/app-v-admin-frontend` | warn | medium | hosts ['admin.lab-n.example'], backends ['app-v-admin-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-v/app-v-backend` | warn | medium | hosts ['api.lab-n.example'], backends ['app-v-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-v/app-v-frontend` | warn | medium | hosts ['lab-n.example', 'www.lab-n.example'], backends ['app-v-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-w/app-w` | warn | medium | hosts ['app-w.lab-k.example'], backends ['app-w'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-x/app-x-api` | warn | medium | hosts ['app-x-api.lab-k.example'], backends ['app-x-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-y/app-y-admin` | warn | medium | hosts ['admin.lab-m.example'], backends ['app-y-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-y/app-y-ai` | warn | medium | hosts ['ai.lab-m.example'], backends ['app-y-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-y/app-y-backend` | warn | medium | hosts ['api.lab-m.example'], backends ['app-y-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-y/app-y-frontend` | warn | medium | hosts ['lab-m.example', 'www.lab-m.example'], backends ['app-y-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-z-backend/app-z-backend` | warn | medium | hosts ['app-z-api.lab-k.example'], backends ['app-z-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
+| `observability.golden-signals-missing.prod-app-z-backend/app-z-frontend` | warn | medium | hosts ['app-z.lab-k.example'], backends ['app-z-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
 | `observability.page-severity-cause-alerts.cluster` | warn | medium | of 157 alert rules, 36 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerClusterDown', 'AlertmanagerClusterCrashlooping', 'etcdMembersDown' … |
 | `observability.promtail-dropped.cluster` | warn | medium | Lines dropped in 1h None, non-2xx sends None, active targets total None -- promtail metrics are not in Prometheus (no ServiceMonitor). The numbers above were not measured |
 | `observability.slo-without-burn-rate.cluster` | warn | medium | SLO tools [], 0 sli/slo recording rules, slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'], 0 burn rate alerts |
@@ -373,11 +368,9 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `resources.krr-recommendation.prod-app-y/statefulset/app-y-backend-mysql:mysql` | warn | medium | CPU request over by 0.19 cores: CPU request 0.2 → 0.01 cores, CPU limit 1.0 → none, memory request 768 → 740 MB, memory limit 1536 → 740 MB. KRR severity CRITICAL (CPU req OK, CPU limit WARNING, memory req GOOD, memory limit CRITICAL) |
 | `resources.krr-recommendation.prod-app-z-backend/deployment/app-z-backend:backend` | warn | medium | memory request over by 410 MB: CPU HPA detected, memory request 1024 → 614 MB, memory limit 2048 → 614 MB. KRR severity CRITICAL (CPU req UNKNOWN, CPU limit UNKNOWN, memory req WARNING, memory limit CRITICAL). cpu: HPA detected |
 | `resources.krr-recommendation.prod-app-z-backend/deployment/app-z-pg-proxy:forwarder` | warn | medium | memory request under by 68 MB: CPU request 0.02 → 0.01 cores, CPU limit 0.2 → none, memory request 32 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD) |
-| `security.no-certificate-manager.cluster` | warn | medium | no component of family certificates in inventory.components |
 | `security.psa-not-enforced.cluster` | warn | medium | Namespaces with an enforce label [], prod without one ['app-ab-prod', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend']. Share of containers allowing root 0.61 (29 prod workloads) |
 | `security.rbac-wildcard.argocd-application-controller` | warn | medium | ClusterRole argocd-application-controller: * in verbs and resources, bound subjects [('ServiceAccount', 'argocd', 'argocd-application-controller')] |
 | `security.sa-token-mounted-without-rbac.cluster` | warn | medium | Workloads with token mounted 86/92, of which 30 prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: ['prod-app-w/deployment/app-w', 'prod-app-t/deployment/app-t-ai', 'prod-app-t/deployment/app-t-backend', 'prod-app-t/deployment/app-t-studio', 'prod-app-t/deployment/app-t-web' … |
-| `storage.ebs-unencrypted.cluster` | warn | medium | 18 of 18 volumes unencrypted: ['vol-078adb8df155474d5', 'vol-014ddb2ea18fb9f56', 'vol-04d6da165847ff0c2', 'vol-0a599f6260d09b6a1', 'vol-00f082f394c11e743', 'vol-09dd14b8fe1120fe8', 'vol-0d059a329425ff008', 'vol-0cd5d589fe93566d4'] |
 | `storage.prod-db-reclaim-delete.cluster` | warn | medium | DB-like prod PVCs whose PV reclaimPolicy is Delete: ['prod-app-t/data-app-t-backend-postgresql-0', 'prod-app-x/data-app-x-postgresql-0', 'prod-app-s/data-app-s-backend-mysql-0', 'prod-app-y/data-app-y-backend-mysql-0', 'prod-app-z-backend/data-app-z-neo4j-0', 'prod-app-r/data-app-r-postgresql-0' … |
 | `tenancy.prod-without-quota.app-ab-prod` | warn | medium | app-ab-prod (prod): no ResourceQuota. Pods 3, CPU requests total 0.25 cores, memory requests total 0.94GB, 7d CPU p95 None cores (cluster share None), memory p95 NoneGB, 7d max/median Nonex. Tenants in this cluster 14, shares nodes with prod True |
 | `tenancy.prod-without-quota.arc-runners` | warn | medium | arc-runners (ci): no ResourceQuota. Pods 0, CPU requests total 0.0 cores, memory requests total 0.0GB, 7d CPU p95 None cores (cluster share None), memory p95 NoneGB, 7d max/median Nonex. Tenants in this cluster 14, shares nodes with prod False |
@@ -397,35 +390,6 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `tenancy.shared-node-limit-overcommit.ip-10-0-1-139.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default): tenant kinds ['dev', 'prod'], namespaces ['prod-app-y', 'dev-app-y', 'prod-app-s', 'prod-app-z-backend', 'dev-app-s', 'prod-app-v']. Memory limit total 47.0GB / allocatable 29.8GB = 1.58x, request total 18.9GB, containers without a … |
 | `tenancy.shared-node-limit-overcommit.ip-10-0-2-218.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-2-218.ap-northeast-2.compute.internal (pool system-ondemand): tenant kinds ['dev', 'other', 'prod'], namespaces ['monitoring', 'argocd', 'dev-app-aa', 'keda', 'kube-system', 'middleware']. Memory limit total 5.7GB / allocatable 3.2GB = 1.79x, request total 2.0GB, containers without a … |
 | `tenancy.tenant-without-limitrange.prod-app-z-backend` | warn | medium | prod-app-z-backend (prod): no LimitRange, containers without requests 2 / without a memory limit 2 (pods 9). 7d CPU p95 None cores, memory p95 NoneGB |
-| `traffic.alb-deregistration-vs-grace.app-ab-prod/app-ab-backend` | warn | medium | Target group k8s-pwcprod-pwcbacke-bea446d347: deregistration_delay 300s, backends ['deployment/app-ab-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.app-ab-prod/app-ab-frontend` | warn | medium | Target group k8s-pwcprod-pwcfront-e72ef00971: deregistration_delay 300s, backends ['deployment/app-ab-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.argocd/argocd-server` | warn | medium | Target group k8s-argocd-argocdse-74c4dcbda2: deregistration_delay 300s, backends ['deployment/argocd-server'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.dev-app-aa/app-aa-backend` | warn | medium | Target group k8s-devvxtch-vxtchatb-b347218b4f: deregistration_delay 300s, backends ['deployment/app-aa-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.dev-app-aa/app-aa-frontend` | warn | medium | Target group k8s-devvxtch-vxtchatb-e9834ca5fe: deregistration_delay 300s, backends ['deployment/app-aa-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.dev-app-v/app-v-admin-frontend` | warn | medium | Target group k8s-devtooto-appka-ae7a7a06ff: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.dev-app-v/app-v-backend` | warn | medium | Target group k8s-devtooto-appkb-0987e78003: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.dev-app-v/app-v-frontend` | warn | medium | Target group k8s-devtooto-appkf-133751726c: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.middleware/kafka-ui` | warn | medium | Target group k8s-middlewa-kafkaui-0a6256c8b2: deregistration_delay 300s, backends ['deployment/kafka-ui'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.middleware/redis-insight` | warn | medium | Target group k8s-middlewa-redisins-e7e7fd218a: deregistration_delay 300s, backends ['deployment/redis-insight'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.monitoring/kube-prometheus-stack-grafana` | warn | medium | Target group k8s-monitori-kubeprom-af0f3aa6c7: deregistration_delay 300s, backends ['deployment/kube-prometheus-stack-grafana'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.monitoring/vmauth` | warn | medium | Target group k8s-monitori-vmauth-e07e5153ee: deregistration_delay 300s, backends ['deployment/vmauth'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-r/app-r-backend` | warn | medium | Target group k8s-prodsoro-appmba-f68effe430: deregistration_delay 300s, backends ['deployment/app-r-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-r/app-r-web` | warn | medium | Target group k8s-prodsoro-appmwe-194ae69849: deregistration_delay 300s, backends ['deployment/app-r-web'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-ai` | warn | medium | Target group k8s-prodcurt-curtainc-fc2d368787: deregistration_delay 300s, backends ['deployment/app-t-ai'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-backend` | warn | medium | Target group k8s-prodcurt-curtainc-bb495c72c8: deregistration_delay 300s, backends ['deployment/app-t-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-studio` | warn | medium | Target group k8s-prodcurt-curtainc-57e5adf3bf: deregistration_delay 300s, backends ['deployment/app-t-studio'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-web` | warn | medium | Target group k8s-prodcurt-curtainc-022a51fc31: deregistration_delay 300s, backends ['deployment/app-t-web'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-v/app-v-admin-frontend` | warn | medium | Target group k8s-prodtoot-appka-d0c066d282: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-v/app-v-backend` | warn | medium | Target group k8s-prodtoot-appkb-7df87a92cc: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-v/app-v-frontend` | warn | medium | Target group k8s-prodtoot-appkf-36f816b829: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-w/app-w` | warn | medium | Target group k8s-prodcarp-carpenst-e238817282: deregistration_delay 300s, backends ['deployment/app-w'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-x/app-x-api` | warn | medium | Target group k8s-prodfand-apppa-754a9b50b2: deregistration_delay 300s, backends ['deployment/app-x-api'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-admin` | warn | medium | Target group k8s-prodinse-insertoo-37417ab44f: deregistration_delay 300s, backends ['deployment/app-y-admin'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-ai` | warn | medium | Target group k8s-prodinse-insertoo-b22674073c: deregistration_delay 300s, backends ['deployment/app-y-ai'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-backend` | warn | medium | Target group k8s-prodinse-insertoo-89a3732998: deregistration_delay 300s, backends ['deployment/app-y-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-frontend` | warn | medium | Target group k8s-prodinse-insertoo-032c25d752: deregistration_delay 300s, backends ['deployment/app-y-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-z-backend/app-z-backend` | warn | medium | Target group k8s-prodrhem-appnbac-8c88bb317a: deregistration_delay 300s, backends ['deployment/app-z-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-z-backend/app-z-frontend` | warn | medium | Target group k8s-prodrhem-appnfro-9726e5b1d3: deregistration_delay 300s, backends ['deployment/app-z-frontend'] terminationGracePeriod 30s, no preStop |
 | `traffic.external-exposure.ingress/argocd/argocd-server` | warn | medium | ingress ['deploy.lab-k.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check |
 | `traffic.external-exposure.ingress/dev-app-s/app-s-admin` | warn | medium | ingress ['admin-dev.lab-l.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check |
 | `traffic.external-exposure.ingress/dev-app-v/app-v-admin-frontend` | warn | medium | ingress ['admin-dev.lab-n.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check |
@@ -433,11 +397,6 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `traffic.external-exposure.ingress/prod-app-s/app-s-admin` | warn | medium | ingress ['canary-admin.lab-l.example', 'admin.lab-l.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check |
 | `traffic.external-exposure.ingress/prod-app-v/app-v-admin-frontend` | warn | medium | ingress ['admin.lab-n.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check |
 | `traffic.external-exposure.ingress/prod-app-y/app-y-admin` | warn | medium | ingress ['admin.lab-m.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check |
-| `traffic.ingress-5xx-ratio.prod-app-s/app-s-backend` | warn | medium | ['canary-api.lab-l.example', 'api.lab-l.example']: 24h 5xx 134.0 of 59863.0 requests = 0.22% (source alb-cloudwatch), p95 max 0.4638s |
-| `traffic.ingress-5xx-ratio.prod-app-v/app-v-frontend` | warn | medium | ['lab-n.example', 'www.lab-n.example']: 24h 5xx 13.0 of 9644.0 requests = 0.14% (source alb-cloudwatch), p95 max 0.8344s |
-| `traffic.ingress-p95-latency.prod-app-r/app-r-backend` | warn | medium | ['app-r-api.lab-k.example']: p95 request-weighted 1.0837s, hourly average 1.0712s, 1h max 3.5461s, latest hour with requests 3.5461s on 591.0 requests at 2026-11-06T08:35, 16 hours before the newest hour, no requests since, 4346.0 requests/24h (source alb-cloudwatch) |
-| `traffic.ingress-p95-latency.prod-app-t/app-t-ai` | warn | medium | ['app-t-ai.lab-k.example']: p95 request-weighted 2.3158s, hourly average 2.4183s, 1h max 2.6907s, latest hour with requests 2.6907s on 1.0 requests at 2026-11-06T06:35, 18 hours before the newest hour, no requests since, 34.0 requests/24h (under 100 requests a day: warn only) (source alb-cloudwatch) |
-| `vpccni.prefix-delegation-off.cluster` | warn | medium | ENABLE_PREFIX_DELEGATION false, nitro nodes 9/9. nodes above 50% IP usage ['ip-10-0-2-218.ap-northeast-2.compute.internal', 'ip-10-0-1-245.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal' … |
 | `hygiene.no-ephemeral-storage-requests.cluster` | fail | low | Containers with an ephemeral-storage request 1 of 113 (0.009), without one in prod 35. emptyDirs without sizeLimit 22 (prod: ['app-ab-prod/statefulset/app-ab-backend-postgresql', 'prod-app-r/deployment/app-r-backend', 'prod-app-r/statefulset/app-r-postgresql' … |
 | `hygiene.old-replicasets.cluster` | fail | low | Of 428 ReplicaSets, 362 have 0 replicas. Deployment revisionHistoryLimit distribution {'10': 62, '3': 6} |
 | `node.os-not-collected.ip-10-0-1-117.ap-northeast-2.compute.internal` | fail | low | os.txt missing |
@@ -458,13 +417,8 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `argocd.notifications-not-configured.cluster` | warn | low | service.* in argocd-notifications-cm False (triggers 0), prod apps 9, and no Argo CD metrics flow to Alertmanager either (no ServiceMonitor) |
 | `argocd.prod-tracks-moving-ref.cluster` | warn | low | prod apps 9, apps whose targetRevision is a branch or HEAD 9 ['argocd/application/app-w-prod', 'argocd/application/app-t-prod', 'argocd/application/app-x-prod', 'argocd/application/app-s-prod', 'argocd/application/app-y-prod', 'argocd/application/app-ab-prod' … |
 | `argocd.version-eol.cluster` | warn | low | Argo CD 2.13.0 (components {'applicationset-controller': '1/1', 'dex-server': '1/1', 'notifications-controller': '1/1', 'redis': '1/1', 'repo-server': '1/1', 'server': '1/1', 'application-controller': '1/1'}) — 3.0 was released 2025-05, only the three latest minors are supported (N-2) |
-| `controlplane.apiserver-slow-traces.cluster` | warn | low | 24h Traces (requests over 500ms) 144: [{'op': 'List', 'count': 136}, {'op': 'Call conversion webhook', 'count': 8}] |
 | `coredns.metrics-unavailable.cluster` | warn | low | no coredns_* series. replicas 2, version 1.11.3. Even with the prometheus plugin in the Corefile, nothing is scraped without a ServiceMonitor |
-| `ebscsi.controller-metrics-disabled.cluster` | warn | low | controller EC2 API request series 0, driver 1.37.0 (add-on v1.37.0-eksbuild.1). When enabled, shows EC2 API errors {} / throttles None |
-| `ecr.no-lifecycle-policy.ecr/registry/<account>` | warn | low | repositories without a lifecycle policy ['app-v', 'bitnami/kafka', 'ecr-app-ab-postgresql-pgvector', 'bitnami/mysql'] (total 10.9GiB), overall 45 repositories, 908 images, 473.1GiB ≈ 50.8 USD/month, untagged images 257 (excluding 182 attestations) |
-| `ecr.no-replication.ecr/registry/<account>` | warn | low | replication rules 0, repositories used by prod 29, total 473.1GiB |
-| `ecr.tag-mutable-prod.ecr/registry/<account>` | warn | low | MUTABLE repositories 44/45, used by prod 28: ['ecr-app-ab-frontend-eks-prod', 'ecr-app-w-eks-prod', 'ecr-app-t-backend-eks-prod', 'ecr-app-t-web-eks-prod', 'ecr-app-r-postgresql-prod', 'ecr-app-s-admin-eks-prod', 'ecr-app-ab-postgresql-pgvector', 'ecr-app-t-postgresql-prod']…, digest-pinned … |
-| `ecr.untagged-images.ecr/registry/<account>` | warn | low | untagged images 257/908 (excluding 182 BuildKit attestation manifests), repositories 45 |
+| `ebscsi.controller-metrics-disabled.cluster` | warn | low | controller EC2 API request series 0, driver 1.37.0 (add-on None). When enabled, shows EC2 API errors {} / throttles None |
 | `eso.version-old.cluster` | warn | low | external-secrets 0.9.13 (ExternalSecrets 49, PushSecrets 0) |
 | `grafana.version-old.monitoring/deployment/kube-prometheus-stack-grafana` | warn | low | Grafana 10.2.3 (database ok), ingress ['monitor.lab-k.example'], dashboards 28 |
 | `hygiene.always-pull-with-tag.keda/deployment/keda-admission-webhooks:keda-admission-webhooks` | warn | low | image ghcr.io/kedacore/keda-admission-webhooks:2.17.2 (tag tag, imagePullPolicy Always, registry ghcr.io) |
@@ -570,7 +524,6 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `tenancy.dev-shares-prod-nodes.ip-10-0-1-245.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-1-245.ap-northeast-2.compute.internal (pool default): prod pods 2 (['prod-app-t', 'prod-app-z-backend']) together with dev pods 1 (['dev-app-s']). Memory limit total/allocatable 0.94, CPU limit total/allocatable 2.98, containers without a memory limit 0 |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-100.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-100.ap-northeast-2.compute.internal (pool default): prod pods 9 (['prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-z-backend']) together with dev pods 2 (['dev-app-aa', 'dev-app-v']). Memory limit total/allocatable 1.1, CPU limit total/allocatable 1.96, containers without a memory … |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-60.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-60.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): prod pods 2 (['prod-app-s', 'prod-app-v']) together with dev pods 2 (['dev-app-s', 'dev-app-v']). Memory limit total/allocatable 1.49, CPU limit total/allocatable 2.44, containers without a memory limit … |
-| `traffic.alb-protection-off.k8s-lab-kprodlb-b18a4555d7` | warn | low | ALB k8s-lab-kprodlb-b18a4555d7: deletion_protection False, access_logs False, target groups in the ingress group 41 |
 | `vpccni.metrics-unreadable.cluster` | warn | low | 9 of 9 nodes without readable ipamd metrics (localhost:61678): ['ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-1-137.ap-northeast-2.compute.internal', 'ip-10-0-1-139.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal' … |
 | `eks.audit-log-off.cluster` | fail | info | enabled logs ['api', 'authenticator', 'controllerManager', 'scheduler'], disabled logs ['audit'] |
 | `hygiene.no-progressive-delivery.cluster` | fail | info | No progressive-delivery component (Argo Rollouts, Flagger). All deployments are rolling updates (replace everything) -- ALB weighted target groups are not used either |
@@ -640,36 +593,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "requests_cpu_total": 11.51,
  "requests_memory_gb_total": 45.7,
  "tight": false
-}
-```
-
-</details>
-<details><summary><code>controlplane.scheduler-unschedulable.prod-app-x/app-x-api</code></summary>
-
-```json
-{
- "count": 7,
- "workload": "prod-app-x/app-x-api"
-}
-```
-
-</details>
-<details><summary><code>controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-file-worker</code></summary>
-
-```json
-{
- "count": 51,
- "workload": "prod-app-z-backend/app-z-file-worker"
-}
-```
-
-</details>
-<details><summary><code>controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-graph-worker</code></summary>
-
-```json
-{
- "count": 11,
- "workload": "prod-app-z-backend/app-z-graph-worker"
 }
 ```
 
@@ -928,383 +851,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>traffic.alb-unhealthy-targets.dev-app-aa/app-aa-backend</code></summary>
-
-```json
-{
- "health_check": {
-  "path": "/",
-  "port": "traffic-port",
-  "protocol": "HTTP",
-  "interval_s": 15,
-  "timeout_s": 5,
-  "healthy_threshold": 2,
-  "unhealthy_threshold": 2,
-  "matcher": "200"
- },
- "lb_type": "application",
- "name": "k8s-devvxtch-vxtchatb-b347218b4f",
- "port": 8000,
- "target": "dev-app-aa/app-aa-backend",
- "targets_healthy": 0,
- "targets_total": 1,
- "targets_unhealthy": [
-  {
-   "id": "10.0.1.55",
-   "port": 8000,
-   "state": "unhealthy",
-   "reason": "Target.ResponseCodeMismatch",
-   "description": "Health checks failed with these codes: [404]"
-  }
- ],
- "unhealthy_max_24h": 1.0,
- "unhealthy_reasons": {
-  "Target.ResponseCodeMismatch: Health checks failed with these codes: [404]": 1
- },
- "workloads": [
-  "deployment/app-aa-backend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-unhealthy-targets.dev-app-v/app-v-frontend</code></summary>
-
-```json
-{
- "health_check": {
-  "path": "/",
-  "port": "traffic-port",
-  "protocol": "HTTP",
-  "interval_s": 15,
-  "timeout_s": 5,
-  "healthy_threshold": 2,
-  "unhealthy_threshold": 2,
-  "matcher": "200"
- },
- "lb_type": "application",
- "name": "k8s-devtooto-appkf-133751726c",
- "port": 3000,
- "target": "dev-app-v/app-v-frontend",
- "targets_healthy": 0,
- "targets_total": 1,
- "targets_unhealthy": [
-  {
-   "id": "10.0.2.126",
-   "port": 3000,
-   "state": "unhealthy",
-   "reason": "Target.ResponseCodeMismatch",
-   "description": "Health checks failed with these codes: [307]"
-  }
- ],
- "unhealthy_max_24h": 3.0,
- "unhealthy_reasons": {
-  "Target.ResponseCodeMismatch: Health checks failed with these codes: [307]": 1
- },
- "workloads": [
-  "deployment/app-v-frontend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-unhealthy-targets.prod-app-t/app-t-backend</code></summary>
-
-```json
-{
- "health_check": {
-  "path": "/",
-  "port": "traffic-port",
-  "protocol": "HTTP",
-  "interval_s": 15,
-  "timeout_s": 5,
-  "healthy_threshold": 2,
-  "unhealthy_threshold": 2,
-  "matcher": "200"
- },
- "lb_type": "application",
- "name": "k8s-prodcurt-curtainc-bb495c72c8",
- "port": 3000,
- "target": "prod-app-t/app-t-backend",
- "targets_healthy": 0,
- "targets_total": 1,
- "targets_unhealthy": [
-  {
-   "id": "10.0.1.121",
-   "port": 3000,
-   "state": "unhealthy",
-   "reason": "Target.ResponseCodeMismatch",
-   "description": "Health checks failed with these codes: [404]"
-  }
- ],
- "unhealthy_max_24h": 1.0,
- "unhealthy_reasons": {
-  "Target.ResponseCodeMismatch: Health checks failed with these codes: [404]": 1
- },
- "workloads": [
-  "deployment/app-t-backend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-unhealthy-targets.prod-app-v/app-v-frontend</code></summary>
-
-```json
-{
- "health_check": {
-  "path": "/",
-  "port": "traffic-port",
-  "protocol": "HTTP",
-  "interval_s": 15,
-  "timeout_s": 5,
-  "healthy_threshold": 2,
-  "unhealthy_threshold": 2,
-  "matcher": "200"
- },
- "lb_type": "application",
- "name": "k8s-prodtoot-appkf-36f816b829",
- "port": 3000,
- "target": "prod-app-v/app-v-frontend",
- "targets_healthy": 0,
- "targets_total": 1,
- "targets_unhealthy": [
-  {
-   "id": "10.0.1.234",
-   "port": 3000,
-   "state": "unhealthy",
-   "reason": "Target.ResponseCodeMismatch",
-   "description": "Health checks failed with these codes: [307]"
-  }
- ],
- "unhealthy_max_24h": 1.0,
- "unhealthy_reasons": {
-  "Target.ResponseCodeMismatch: Health checks failed with these codes: [307]": 1
- },
- "workloads": [
-  "deployment/app-v-frontend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend</code></summary>
-
-```json
-{
- "health_check": {
-  "path": "/",
-  "port": "traffic-port",
-  "protocol": "HTTP",
-  "interval_s": 15,
-  "timeout_s": 5,
-  "healthy_threshold": 2,
-  "unhealthy_threshold": 2,
-  "matcher": "200"
- },
- "lb_type": "application",
- "name": "k8s-prodinse-insertoo-032c25d752",
- "port": 3003,
- "target": "prod-app-y/app-y-frontend",
- "targets_healthy": 0,
- "targets_total": 1,
- "targets_unhealthy": [
-  {
-   "id": "10.0.1.89",
-   "port": 3003,
-   "state": "unhealthy",
-   "reason": "Target.ResponseCodeMismatch",
-   "description": "Health checks failed with these codes: [307]"
-  }
- ],
- "unhealthy_max_24h": 1.0,
- "unhealthy_reasons": {
-  "Target.ResponseCodeMismatch: Health checks failed with these codes: [307]": 1
- },
- "workloads": [
-  "deployment/app-y-frontend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend</code></summary>
-
-```json
-{
- "health_check": {
-  "path": "/",
-  "port": "traffic-port",
-  "protocol": "HTTP",
-  "interval_s": 15,
-  "timeout_s": 5,
-  "healthy_threshold": 2,
-  "unhealthy_threshold": 2,
-  "matcher": "200"
- },
- "lb_type": "application",
- "name": "k8s-prodrhem-appnbac-8c88bb317a",
- "port": 8000,
- "target": "prod-app-z-backend/app-z-backend",
- "targets_healthy": 0,
- "targets_total": 2,
- "targets_unhealthy": [
-  {
-   "id": "10.0.1.71",
-   "port": 8000,
-   "state": "unhealthy",
-   "reason": "Target.ResponseCodeMismatch",
-   "description": "Health checks failed with these codes: [404]"
-  },
-  {
-   "id": "10.0.2.59",
-   "port": 8000,
-   "state": "unhealthy",
-   "reason": "Target.ResponseCodeMismatch",
-   "description": "Health checks failed with these codes: [404]"
-  }
- ],
- "unhealthy_max_24h": 2.0,
- "unhealthy_reasons": {
-  "Target.ResponseCodeMismatch: Health checks failed with these codes: [404]": 2
- },
- "workloads": [
-  "deployment/app-z-backend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external</code></summary>
-
-```json
-{
- "allowed_sources": {
-  "9094": 1
- },
- "hosts": [
-  "k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com"
- ],
- "name": "kafka-controller-0-external",
- "namespace": "middleware",
- "note": "DB port open to the internet by the security group",
- "open_ports": [
-  9094
- ],
- "ports": [
-  9094,
-  443
- ],
- "scheme": "internet-facing",
- "sg_exposure": "open",
- "source_ranges": null,
- "target": "loadbalancer/middleware/kafka-controller-0-external",
- "type": "loadbalancer"
-}
-```
-
-</details>
-<details><summary><code>controlplane.scheduler-unschedulable.arc-runners/self-hosted-arm64-8msc5-runner</code></summary>
-
-```json
-{
- "count": 36,
- "workload": "arc-runners/self-hosted-arm64-8msc5-runner"
-}
-```
-
-</details>
-<details><summary><code>controlplane.scheduler-unschedulable.prod-app-r/app-r-backend</code></summary>
-
-```json
-{
- "count": 4,
- "workload": "prod-app-r/app-r-backend"
-}
-```
-
-</details>
-<details><summary><code>controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-embedding-server</code></summary>
-
-```json
-{
- "count": 4,
- "workload": "prod-app-z-backend/app-z-embedding-server"
-}
-```
-
-</details>
-<details><summary><code>eks.service-quota-near-limit.aws-account</code></summary>
-
-```json
-{
- "available": true,
- "near_limit": [],
- "over_60": [
-  "VPCs 0.6"
- ],
- "quotas": 65,
- "watched_top": [
-  [
-   "VPCs",
-   3.0,
-   5.0,
-   0.6
-  ],
-  [
-   "listener rules per ALB",
-   48.0,
-   100.0,
-   0.48
-  ],
-  [
-   "target groups per ALB",
-   41.0,
-   100.0,
-   0.41
-  ],
-  [
-   "certificates per ALB",
-   9.0,
-   25.0,
-   0.36
-  ],
-  [
-   "NLBs",
-   2.0,
-   50.0,
-   0.04
-  ],
-  [
-   "ALBs",
-   1.0,
-   50.0,
-   0.02
-  ],
-  [
-   "target groups",
-   55.0,
-   3000.0,
-   0.018
-  ],
-  [
-   "on-demand standard instance vCPU",
-   12.0,
-   1152.0,
-   0.01
-  ],
-  [
-   "spot standard instance vCPU",
-   10.0,
-   1152.0,
-   0.009
-  ]
- ],
- "with_usage": 25
-}
-```
-
-</details>
 <details><summary><code>karpenter.ec2nodeclass-hardening.cluster</code></summary>
 
 ```json
@@ -1451,252 +997,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>security.imds-hop-limit.cluster</code></summary>
-
-```json
-{
- "applicable": true,
- "ec2nodeclass_metadata": [
-  {
-   "name": "default",
-   "metadataOptions": {
-    "httpEndpoint": "enabled",
-    "httpProtocolIPv6": "disabled",
-    "httpPutResponseHopLimit": 2,
-    "httpTokens": "required"
-   }
-  }
- ],
- "imds_by_setting": {
-  "hop=2 tokens=required": 9
- },
- "imds_hop_limit_gt1": [
-  {
-   "id": "i-0141cf1ef71b07012",
-   "type": "m5.large",
-   "name": "system_core",
-   "hop_limit": 2,
-   "tokens": "required"
-  },
-  {
-   "id": "i-0fce7d18322427934",
-   "type": "m5.large",
-   "name": "system_core",
-   "hop_limit": 2,
-   "tokens": "required"
-  },
-  {
-   "id": "i-04dcdd0ad94ceeab4",
-   "type": "t8i.medium",
-   "name": "karpenter-node",
-   "hop_limit": 2,
-   "tokens": "required"
-  },
-  {
-   "id": "i-0b3d5b9714d017bd7",
-   "type": "m7i-flex.large",
-   "name": "karpenter-node",
-   "hop_limit": 2,
-   "tokens": "required"
-  },
-  {
-   "id": "i-0e5916fd8c279d789",
-   "type": "c6g.xlarge",
-   "name": "karpenter-node",
-   "hop_limit": 2,
-   "tokens": "required"
-  },
-  {
-   "id": "i-0029fbb1dfb764ddc",
-   "type": "r8gd.xlarge",
-   "name": "karpenter-node",
-   "hop_limit": 2,
-   "tokens": "required"
-  },
-  {
-   "id": "i-0426e9090b648d693",
-   "type": "t8i.small",
-   "name": "karpenter-node",
-   "hop_limit": 2,
-   "tokens": "required"
-  },
-  {
-   "id": "i-03266ad13dc8fe3a3",
-   "type": "r8gd.medium",
-   "name": "karpenter-node",
-   "hop_limit": 2,
-   "tokens": "required"
-  },
-  {
-   "id": "i-0035bb41ebc4fe6ef",
-   "type": "r8gd.medium",
-   "name": "karpenter-node",
-   "hop_limit": 2,
-   "tokens": "required"
-  }
- ],
- "instances": 9,
- "irsa_service_accounts": [
-  "external-secrets/external-secrets",
-  "karpenter/karpenter",
-  "kube-system/aws-load-balancer-controller",
-  "kube-system/ebs-csi-controller-sa",
-  "kube-system/external-dns",
-  "monitoring/loki"
- ],
- "pod_identity_associations": 0
-}
-```
-
-</details>
-<details><summary><code>traffic.db-exposed.nlb/app-u-db-shared</code></summary>
-
-```json
-{
- "allowed_sources": {
-  "3306": 4,
-  "3307": 4,
-  "3308": 4,
-  "3309": 4,
-  "3310": 4,
-  "3311": 4,
-  "5432": 4,
-  "5433": 4,
-  "6379": 1,
-  "7687": 4
- },
- "hosts": [
-  "app-u-db-shared-d7d643f6896a3b2b.elb.ap-northeast-2.amazonaws.com"
- ],
- "name": "app-u-db-shared",
- "namespace": null,
- "note": "NLB created outside Kubernetes; 9 TargetGroupBindings bind it to dev-app-s/app-s-backend-mysql, dev-app-v/app-v-backend-dev-mysql, dev-app-y/app-y-backend-mysql, prod-app-s/app-s-backend-mysql, prod-app-t/app-t-backend-postgresql, prod-app-v/app-v-backend-prod-mysql and 3 more. DB port on an external address, limited by the security group to listed addresses",
- "ports": [
-  3306,
-  3307,
-  3308,
-  3309,
-  3310,
-  3311,
-  5432,
-  5433,
-  6379,
-  7687
- ],
- "scheme": "internet-facing",
- "sg_exposure": "allow-list",
- "target": "nlb/app-u-db-shared",
- "type": "nlb (defined outside the cluster)",
- "widest_prefix": {
-  "3306": 32,
-  "3307": 32,
-  "3308": 32,
-  "3309": 32,
-  "3310": 32,
-  "3311": 32,
-  "5432": 32,
-  "5433": 32,
-  "6379": 32,
-  "7687": 32
- }
-}
-```
-
-</details>
-<details><summary><code>vpccni.node-ip-exhaustion.ip-10-0-1-137.ap-northeast-2.compute.internal</code></summary>
-
-```json
-{
- "eni_at_max": false,
- "instance_type": "r8gd.medium",
- "ip_headroom": 3,
- "ip_max": 6,
- "ip_usage_ratio": 0.5,
- "ip_used": 3,
- "max_pods": 8,
- "metrics": {
-  "available": false
- },
- "metrics_available": false,
- "no_available_ip_events": null,
- "node": "ip-10-0-1-137.ap-northeast-2.compute.internal",
- "pool": "default",
- "prefix_delegation": false,
- "prod_pods": 1
-}
-```
-
-</details>
-<details><summary><code>vpccni.node-ip-exhaustion.ip-10-0-1-241.ap-northeast-2.compute.internal</code></summary>
-
-```json
-{
- "eni_at_max": false,
- "instance_type": "t8i.small",
- "ip_headroom": 3,
- "ip_max": 9,
- "ip_usage_ratio": 0.667,
- "ip_used": 6,
- "max_pods": 11,
- "metrics": {
-  "available": false
- },
- "metrics_available": false,
- "no_available_ip_events": null,
- "node": "ip-10-0-1-241.ap-northeast-2.compute.internal",
- "pool": "system-ondemand",
- "prefix_delegation": false,
- "prod_pods": 1
-}
-```
-
-</details>
-<details><summary><code>vpccni.node-ip-exhaustion.ip-10-0-1-245.ap-northeast-2.compute.internal</code></summary>
-
-```json
-{
- "eni_at_max": false,
- "instance_type": "r8gd.medium",
- "ip_max": 6,
- "ip_usage_ratio": 0.833,
- "ip_used": 5,
- "max_pods": 8,
- "metrics": {
-  "available": false
- },
- "metrics_available": false,
- "no_available_ip_events": null,
- "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
- "pool": "default",
- "prefix_delegation": false,
- "prod_pods": 2
-}
-```
-
-</details>
-<details><summary><code>vpccni.node-ip-exhaustion.ip-10-0-2-218.ap-northeast-2.compute.internal</code></summary>
-
-```json
-{
- "eni_at_max": false,
- "instance_type": "t8i.medium",
- "ip_max": 15,
- "ip_usage_ratio": 0.867,
- "ip_used": 13,
- "max_pods": 17,
- "metrics": {
-  "available": false
- },
- "metrics_available": false,
- "no_available_ip_events": null,
- "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
- "pool": "system-ondemand",
- "prefix_delegation": false,
- "prod_pods": 2
-}
-```
-
-</details>
 <details><summary><code>argocd.default-project-wildcard.cluster</code></summary>
 
 ```json
@@ -1708,18 +1008,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "wildcard_projects": [
   "default"
  ]
-}
-```
-
-</details>
-<details><summary><code>cost.request-waste.cluster</code></summary>
-
-```json
-{
- "krr_saving_cores": 7.07,
- "monthly_usd_est": 167.84,
- "recommended_cpu_total": 2.21,
- "requests_cpu_total": 9.28
 }
 ```
 
@@ -1744,136 +1032,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "gp3-2c"
  ],
  "default_class": "gp3"
-}
-```
-
-</details>
-<details><summary><code>ecr.scan-disabled.ecr/registry/&lt;account&gt;</code></summary>
-
-```json
-{
- "account": "<account>",
- "critical_high_findings": 0,
- "images": 908,
- "images_scanned": 0,
- "registry_scan_on_push": false,
- "repos_scan_off": [
-  "ecr-app-ab-frontend-eks-prod",
-  "ecr-app-y-admin-dev",
-  "ecr-app-w-eks-prod",
-  "bitnami/kafka",
-  "ecr-app-t-backend-eks-prod",
-  "ecr-app-t-web-eks-prod",
-  "ecr-app-r-postgresql-prod",
-  "ecr-app-s-frontend-prod",
-  "app-v-admin-frontend",
-  "ecr-app-s-frontend-dev",
-  "ecr-app-s-admin-eks-prod",
-  "ecr-app-ab-postgresql-pgvector",
-  "ecr-app-t-postgresql-prod",
-  "ecr-app-x-postgresql-prod",
-  "app-v-backend",
-  "app-v-frontend",
-  "ecr-app-s-admin-dev",
-  "ecr-app-s-backend-dev",
-  "ecr-app-s-api-dev",
-  "ecr-app-s-backend-eks-prod",
-  "ecr-app-s-api-eks-prod",
-  "ecr-app-y-frontend-eks-prod",
-  "ecr-app-y-backend-dev",
-  "ecr-app-y-admin-eks-prod",
-  "app-aa-backend",
-  "app-aa-frontend",
-  "ecr-app-z-embedding-eks-prod",
-  "ecr-app-x-api-eks-prod",
-  "app-v-admin-frontend-prod",
-  "app-v-frontend-prod",
-  "app-v-backend-prod",
-  "ecr-app-s-frontend-eks-prod",
-  "ecr-app-y-frontend-dev",
-  "ecr-app-y-backend-eks-prod",
-  "bitnami/mysql",
-  "ecr-app-z-backend-eks-prod",
-  "ecr-app-z-frontend-eks-prod",
-  "ecr-app-t-ai-eks-prod",
-  "ecr-app-t-studio-eks-prod",
-  "ecr-app-r-web-eks-prod",
-  "ecr-app-r-backend-eks-prod"
- ],
- "repos_scan_off_prod": [
-  "ecr-app-ab-frontend-eks-prod",
-  "ecr-app-w-eks-prod",
-  "ecr-app-t-backend-eks-prod",
-  "ecr-app-t-web-eks-prod",
-  "ecr-app-r-postgresql-prod",
-  "ecr-app-s-admin-eks-prod",
-  "ecr-app-ab-postgresql-pgvector",
-  "ecr-app-t-postgresql-prod",
-  "ecr-app-x-postgresql-prod",
-  "ecr-app-s-backend-eks-prod",
-  "ecr-app-s-api-eks-prod",
-  "ecr-app-y-frontend-eks-prod",
-  "ecr-app-y-admin-eks-prod",
-  "ecr-app-z-embedding-eks-prod",
-  "ecr-app-x-api-eks-prod",
-  "app-v-admin-frontend-prod",
-  "app-v-frontend-prod",
-  "app-v-backend-prod",
-  "ecr-app-s-frontend-eks-prod",
-  "ecr-app-y-backend-eks-prod",
-  "bitnami/mysql",
-  "ecr-app-z-backend-eks-prod",
-  "ecr-app-z-frontend-eks-prod",
-  "ecr-app-t-ai-eks-prod",
-  "ecr-app-t-studio-eks-prod",
-  "ecr-app-r-web-eks-prod",
-  "ecr-app-r-backend-eks-prod"
- ],
- "repositories": 45,
- "scan_rules": 0,
- "scan_type": "BASIC"
-}
-```
-
-</details>
-<details><summary><code>eks.addon-outdated.aws-ebs-csi-driver</code></summary>
-
-```json
-{
- "key": "aws-ebs-csi-driver",
- "item": {
-  "version": "v1.37.0-eksbuild.1"
- }
-}
-```
-
-</details>
-<details><summary><code>eks.addon-outdated.vpc-cni</code></summary>
-
-```json
-{
- "key": "vpc-cni",
- "item": {
-  "version": "v1.19.0-eksbuild.1"
- }
-}
-```
-
-</details>
-<details><summary><code>eks.nodegroup-ami-old.nodegroups</code></summary>
-
-```json
-{
- "ami_old_180d": [
-  "system_core-20251217040546303900000001"
- ],
- "ami_old_90d": [
-  "system_core-20251217040546303900000001 333d"
- ],
- "available": true,
- "max_ami_age_days": 333,
- "nodegroups": 1,
- "unhealthy": []
 }
 ```
 
@@ -1943,19 +1101,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "metrics_available": true,
  "present": true,
  "target": "monitoring/deployment/kube-prometheus-stack-grafana"
-}
-```
-
-</details>
-<details><summary><code>hygiene.eks-upgrade-insight.Amazon Linux 2 compatibility</code></summary>
-
-```json
-{
- "category": "UPGRADE_READINESS",
- "k8s_version": "1.33",
- "name": "Amazon Linux 2 compatibility",
- "reason": "Amazon EKS stopped publishing EKS-optimized Amazon Linux 2 (AL2) AMIs on November 26, 2025. AL2023 and Bottlerocket based AMIs for Amazon EKS are available for all supported Kubernetes versions includ",
- "status": "ERROR"
 }
 ```
 
@@ -3130,8 +2275,8 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 
 ```json
 {
- "ebs_snapshot_descriptions": {},
- "ebs_snapshots_30d": 0,
+ "ebs_snapshot_descriptions": null,
+ "ebs_snapshots_30d": null,
  "platform": "eks",
  "prod_pvcs": 8,
  "recent_7d": 0,
@@ -3355,57 +2500,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>traffic.alb-elb-5xx.k8s-lab-kprodlb-b18a4555d7</code></summary>
-
-```json
-{
- "elb_5xx_24h": 145.0,
- "idle_timeout_s": 300,
- "name": "k8s-lab-kprodlb-b18a4555d7",
- "rejected_connections_24h": 0,
- "requests_24h": 162172.0,
- "scheme": "internet-facing",
- "target_5xx_24h": 152.0,
- "target_groups": 41,
- "type": "application"
-}
-```
-
-</details>
-<details><summary><code>traffic.ingress-p95-latency.prod-app-s/app-s-api</code></summary>
-
-```json
-{
- "hosts": [
-  "canary-api-v1.lab-l.example",
-  "api.v1.lab-l.example"
- ],
- "metrics": {
-  "source": "alb-cloudwatch",
-  "window": "24h",
-  "requests": 287.0,
-  "requests_24h_equiv": 287.0,
-  "rps_avg": 0.003,
-  "errors_5xx": 0,
-  "errors_ratio": 0.0,
-  "p95_s_max_1h": 50.6329,
-  "p95_s_avg": 15.821,
-  "p95_s_weighted": 10.381,
-  "p95_s_last_1h": 16.7603,
-  "p95_s_last_at": "2026-11-07T00:35:00+00:00",
-  "requests_last_1h": 3.0,
-  "hours_since_requests": 0,
-  "unhealthy_max_24h": 0,
-  "unhealthy_now": 0,
-  "target_groups": [
-   "k8s-prodillu-appi-c50edbe2df"
-  ]
- },
- "target": "prod-app-s/app-s-api"
-}
-```
-
-</details>
 <details><summary><code>traffic.shared-alb-group.alb-group/app-u-prod-lb</code></summary>
 
 ```json
@@ -3462,32 +2556,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>albctl.tgb-stale-or-orphan.cluster</code></summary>
-
-```json
-{
- "tgb_by_target_type": {
-  "ip": 52
- },
- "tgb_count": 52,
- "tgb_manual": [
-  "dev-app-s/app-s-dev-mysql-tgb",
-  "dev-app-y/app-y-dev-mysql-tgb",
-  "dev-app-v/app-v-dev-mysql-tgb",
-  "prod-app-t/app-t-prod-postgresql-tgb",
-  "prod-app-s/app-s-prod-mysql-tgb",
-  "prod-app-y/app-y-prod-mysql-tgb",
-  "prod-app-z-backend/app-z-prod-neo4j-tgb",
-  "prod-app-z-backend/app-z-prod-pg-proxy-tgb",
-  "prod-app-v/app-v-prod-mysql-tgb"
- ],
- "tgb_service_missing": [],
- "tgb_stale": [],
- "traffic_target_groups_without_tgb": 1
-}
-```
-
-</details>
 <details><summary><code>argocd.admin-account-no-sso.cluster</code></summary>
 
 ```json
@@ -3523,107 +2591,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "server"
  ],
  "version": "2.13.0"
-}
-```
-
-</details>
-<details><summary><code>controlplane.authenticator-failures.cluster</code></summary>
-
-```json
-{
- "failures": [
-  {
-   "message": "access denied",
-   "count": 8
-  }
- ],
- "failures_total": 8
-}
-```
-
-</details>
-<details><summary><code>controlplane.controller-error-repeat.gc_controller.go</code></summary>
-
-```json
-{
- "count": 6,
- "level": "E",
- "source": "gc_controller.go"
-}
-```
-
-</details>
-<details><summary><code>controlplane.controller-error-repeat.horizontal.go</code></summary>
-
-```json
-{
- "count": 11,
- "level": "E",
- "source": "horizontal.go"
-}
-```
-
-</details>
-<details><summary><code>controlplane.controller-error-repeat.type.go</code></summary>
-
-```json
-{
- "count": 80479,
- "level": "W",
- "source": "type.go"
-}
-```
-
-</details>
-<details><summary><code>ecr.dockerhub-dependency.ecr/registry/&lt;account&gt;</code></summary>
-
-```json
-{
- "account": "<account>",
- "dockerhub_images": 19,
- "dockerhub_sample": [
-  "alpine/socat:1.8.0.0",
-  "bitnami/kubectl:latest",
-  "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4",
-  "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3",
-  "docker.io/bitnamilegacy/kubectl:1.32.4",
-  "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
- ],
- "images_by_registry": {
-  "602401143452.dkr.ecr.ap-northeast-2.amazonaws.com": 77,
-  "<account>.dkr.ecr.ap-northeast-2.amazonaws.com": 59,
-  "docker.io": 34,
-  "quay.io": 25,
-  "ghcr.io": 9,
-  "public.ecr.aws": 8,
-  "registry.k8s.io": 3
- },
- "pull_through_cache_rules": [],
- "replication_rules": 0
-}
-```
-
-</details>
-<details><summary><code>eks.addon-outdated.coredns</code></summary>
-
-```json
-{
- "key": "coredns",
- "item": {
-  "version": "v1.11.3-eksbuild.1"
- }
-}
-```
-
-</details>
-<details><summary><code>eks.addon-outdated.kube-proxy</code></summary>
-
-```json
-{
- "key": "kube-proxy",
- "item": {
-  "version": "v1.32.0-eksbuild.2"
- }
 }
 ```
 
@@ -3950,6 +2917,710 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "requests_total": 6899928,
  "target": "monitoring/statefulset/loki-stack",
  "wal_disk_full_failures": 0
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.app-ab-prod/app-ab-backend</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-ab-tp-api.lab-k.example"
+ ],
+ "ingress": "app-ab-backend",
+ "namespace": "app-ab-prod",
+ "services": [
+  "app-ab-backend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.app-ab-prod/app-ab-frontend</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-ab-tp-prod.lab-k.example"
+ ],
+ "ingress": "app-ab-frontend",
+ "namespace": "app-ab-prod",
+ "services": [
+  "app-ab-frontend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.argocd/argocd-server</code></summary>
+
+```json
+{
+ "hosts": [
+  "deploy.lab-k.example"
+ ],
+ "ingress": "argocd-server",
+ "namespace": "argocd",
+ "services": [
+  "argocd-server"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-aa/app-aa-backend</code></summary>
+
+```json
+{
+ "hosts": [
+  "demo-api.lab-m.example"
+ ],
+ "ingress": "app-aa-backend",
+ "namespace": "dev-app-aa",
+ "services": [
+  "app-aa-backend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-aa/app-aa-frontend</code></summary>
+
+```json
+{
+ "hosts": [
+  "demo.lab-m.example"
+ ],
+ "ingress": "app-aa-frontend",
+ "namespace": "dev-app-aa",
+ "services": [
+  "app-aa-frontend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-admin</code></summary>
+
+```json
+{
+ "hosts": [
+  "admin-dev.lab-l.example"
+ ],
+ "ingress": "app-s-admin",
+ "namespace": "dev-app-s",
+ "services": [
+  "app-s-admin"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-api</code></summary>
+
+```json
+{
+ "hosts": [
+  "api-dev.v1.lab-l.example"
+ ],
+ "ingress": "app-s-api",
+ "namespace": "dev-app-s",
+ "services": [
+  "app-s-api"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-backend</code></summary>
+
+```json
+{
+ "hosts": [
+  "api-dev.lab-l.example"
+ ],
+ "ingress": "app-s-backend",
+ "namespace": "dev-app-s",
+ "services": [
+  "app-s-backend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-frontend</code></summary>
+
+```json
+{
+ "hosts": [
+  "dev.lab-l.example"
+ ],
+ "ingress": "app-s-frontend",
+ "namespace": "dev-app-s",
+ "services": [
+  "app-s-frontend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-v/app-v-admin-frontend</code></summary>
+
+```json
+{
+ "hosts": [
+  "admin-dev.lab-n.example"
+ ],
+ "ingress": "app-v-admin-frontend",
+ "namespace": "dev-app-v",
+ "services": [
+  "app-v-admin-frontend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-v/app-v-backend</code></summary>
+
+```json
+{
+ "hosts": [
+  "api-dev.lab-n.example"
+ ],
+ "ingress": "app-v-backend",
+ "namespace": "dev-app-v",
+ "services": [
+  "app-v-backend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-v/app-v-frontend</code></summary>
+
+```json
+{
+ "hosts": [
+  "dev.lab-n.example"
+ ],
+ "ingress": "app-v-frontend",
+ "namespace": "dev-app-v",
+ "services": [
+  "app-v-frontend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-admin</code></summary>
+
+```json
+{
+ "hosts": [
+  "admin-dev.lab-m.example"
+ ],
+ "ingress": "app-y-admin",
+ "namespace": "dev-app-y",
+ "services": [
+  "app-y-admin"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-ai</code></summary>
+
+```json
+{
+ "hosts": [
+  "ai-dev.lab-m.example"
+ ],
+ "ingress": "app-y-ai",
+ "namespace": "dev-app-y",
+ "services": [
+  "app-y-ai"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-backend</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-y-api-dev.lab-k.example"
+ ],
+ "ingress": "app-y-backend",
+ "namespace": "dev-app-y",
+ "services": [
+  "app-y-backend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-frontend</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-y-dev.lab-k.example"
+ ],
+ "ingress": "app-y-frontend",
+ "namespace": "dev-app-y",
+ "services": [
+  "app-y-frontend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.middleware/kafka-ui</code></summary>
+
+```json
+{
+ "hosts": [
+  "kafka.lab-k.example"
+ ],
+ "ingress": "kafka-ui",
+ "namespace": "middleware",
+ "services": [
+  "kafka-ui"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.middleware/redis-insight</code></summary>
+
+```json
+{
+ "hosts": [
+  "redis.lab-k.example"
+ ],
+ "ingress": "redis-insight",
+ "namespace": "middleware",
+ "services": [
+  "redis-insight"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.monitoring/kube-prometheus-stack-grafana</code></summary>
+
+```json
+{
+ "hosts": [
+  "monitor.lab-k.example"
+ ],
+ "ingress": "kube-prometheus-stack-grafana",
+ "namespace": "monitoring",
+ "services": [
+  "kube-prometheus-stack-grafana"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.monitoring/vmauth</code></summary>
+
+```json
+{
+ "hosts": [
+  "metrics-write.lab-k.example"
+ ],
+ "ingress": "vmauth",
+ "namespace": "monitoring",
+ "services": [
+  "vmauth"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-r/app-r-backend</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-r-api.lab-k.example"
+ ],
+ "ingress": "app-r-backend",
+ "namespace": "prod-app-r",
+ "services": [
+  "app-r-backend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-r/app-r-web</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-r.lab-k.example"
+ ],
+ "ingress": "app-r-web",
+ "namespace": "prod-app-r",
+ "services": [
+  "app-r-web"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-admin</code></summary>
+
+```json
+{
+ "hosts": [
+  "canary-admin.lab-l.example",
+  "admin.lab-l.example"
+ ],
+ "ingress": "app-s-admin",
+ "namespace": "prod-app-s",
+ "services": [
+  "app-s-admin"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-api</code></summary>
+
+```json
+{
+ "hosts": [
+  "canary-api-v1.lab-l.example",
+  "api.v1.lab-l.example"
+ ],
+ "ingress": "app-s-api",
+ "namespace": "prod-app-s",
+ "services": [
+  "app-s-api"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-backend</code></summary>
+
+```json
+{
+ "hosts": [
+  "canary-api.lab-l.example",
+  "api.lab-l.example"
+ ],
+ "ingress": "app-s-backend",
+ "namespace": "prod-app-s",
+ "services": [
+  "app-s-backend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-frontend</code></summary>
+
+```json
+{
+ "hosts": [
+  "canary.lab-l.example",
+  "www.lab-l.example",
+  "lab-l.example"
+ ],
+ "ingress": "app-s-frontend",
+ "namespace": "prod-app-s",
+ "services": [
+  "app-s-frontend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-ai</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-t-ai.lab-k.example"
+ ],
+ "ingress": "app-t-ai",
+ "namespace": "prod-app-t",
+ "services": [
+  "app-t-ai"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-backend</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-t-api.lab-k.example"
+ ],
+ "ingress": "app-t-backend",
+ "namespace": "prod-app-t",
+ "services": [
+  "app-t-backend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-studio</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-t-studio.lab-k.example"
+ ],
+ "ingress": "app-t-studio",
+ "namespace": "prod-app-t",
+ "services": [
+  "app-t-studio"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-web</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-t.lab-k.example"
+ ],
+ "ingress": "app-t-web",
+ "namespace": "prod-app-t",
+ "services": [
+  "app-t-web"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-v/app-v-admin-frontend</code></summary>
+
+```json
+{
+ "hosts": [
+  "admin.lab-n.example"
+ ],
+ "ingress": "app-v-admin-frontend",
+ "namespace": "prod-app-v",
+ "services": [
+  "app-v-admin-frontend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-v/app-v-backend</code></summary>
+
+```json
+{
+ "hosts": [
+  "api.lab-n.example"
+ ],
+ "ingress": "app-v-backend",
+ "namespace": "prod-app-v",
+ "services": [
+  "app-v-backend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-v/app-v-frontend</code></summary>
+
+```json
+{
+ "hosts": [
+  "lab-n.example",
+  "www.lab-n.example"
+ ],
+ "ingress": "app-v-frontend",
+ "namespace": "prod-app-v",
+ "services": [
+  "app-v-frontend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-w/app-w</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-w.lab-k.example"
+ ],
+ "ingress": "app-w",
+ "namespace": "prod-app-w",
+ "services": [
+  "app-w"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-x/app-x-api</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-x-api.lab-k.example"
+ ],
+ "ingress": "app-x-api",
+ "namespace": "prod-app-x",
+ "services": [
+  "app-x-api"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-admin</code></summary>
+
+```json
+{
+ "hosts": [
+  "admin.lab-m.example"
+ ],
+ "ingress": "app-y-admin",
+ "namespace": "prod-app-y",
+ "services": [
+  "app-y-admin"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-ai</code></summary>
+
+```json
+{
+ "hosts": [
+  "ai.lab-m.example"
+ ],
+ "ingress": "app-y-ai",
+ "namespace": "prod-app-y",
+ "services": [
+  "app-y-ai"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-backend</code></summary>
+
+```json
+{
+ "hosts": [
+  "api.lab-m.example"
+ ],
+ "ingress": "app-y-backend",
+ "namespace": "prod-app-y",
+ "services": [
+  "app-y-backend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-frontend</code></summary>
+
+```json
+{
+ "hosts": [
+  "lab-m.example",
+  "www.lab-m.example"
+ ],
+ "ingress": "app-y-frontend",
+ "namespace": "prod-app-y",
+ "services": [
+  "app-y-frontend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-z-backend/app-z-backend</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-z-api.lab-k.example"
+ ],
+ "ingress": "app-z-backend",
+ "namespace": "prod-app-z-backend",
+ "services": [
+  "app-z-backend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
+}
+```
+
+</details>
+<details><summary><code>observability.golden-signals-missing.prod-app-z-backend/app-z-frontend</code></summary>
+
+```json
+{
+ "hosts": [
+  "app-z.lab-k.example"
+ ],
+ "ingress": "app-z-frontend",
+ "namespace": "prod-app-z-backend",
+ "services": [
+  "app-z-frontend"
+ ],
+ "source": "alb-cloudwatch (not collected)"
 }
 ```
 
@@ -4793,36 +4464,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "app-ab-prod/deployment/app-ab-frontend"
  ],
  "workloads": 92
-}
-```
-
-</details>
-<details><summary><code>storage.ebs-unencrypted.cluster</code></summary>
-
-```json
-{
- "available": true,
- "unencrypted": [
-  "vol-078adb8df155474d5",
-  "vol-014ddb2ea18fb9f56",
-  "vol-04d6da165847ff0c2",
-  "vol-0a599f6260d09b6a1",
-  "vol-00f082f394c11e743",
-  "vol-09dd14b8fe1120fe8",
-  "vol-0d059a329425ff008",
-  "vol-0cd5d589fe93566d4",
-  "vol-0df02294ac2267514",
-  "vol-03dec435edcdbfeb2",
-  "vol-0c9046b93ad181550",
-  "vol-0b9828b66a5d51c71",
-  "vol-0ec49e5b8dd809459",
-  "vol-088f062f50986187b",
-  "vol-0af82d4111623d69b",
-  "vol-077bead6fe444edce",
-  "vol-085c2b8585a891006",
-  "vol-0c083bfd01c5721b1"
- ],
- "volumes": 18
 }
 ```
 
@@ -5745,499 +5386,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.app-ab-prod/app-ab-backend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-pwcprod-pwcbacke-bea446d347",
- "target": "app-ab-prod/app-ab-backend",
- "workloads": [
-  "deployment/app-ab-backend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.app-ab-prod/app-ab-frontend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-pwcprod-pwcfront-e72ef00971",
- "target": "app-ab-prod/app-ab-frontend",
- "workloads": [
-  "deployment/app-ab-frontend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.argocd/argocd-server</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-argocd-argocdse-74c4dcbda2",
- "target": "argocd/argocd-server",
- "workloads": [
-  "deployment/argocd-server"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.dev-app-aa/app-aa-backend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-devvxtch-vxtchatb-b347218b4f",
- "target": "dev-app-aa/app-aa-backend",
- "workloads": [
-  "deployment/app-aa-backend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.dev-app-aa/app-aa-frontend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-devvxtch-vxtchatb-e9834ca5fe",
- "target": "dev-app-aa/app-aa-frontend",
- "workloads": [
-  "deployment/app-aa-frontend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.dev-app-v/app-v-admin-frontend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-devtooto-appka-ae7a7a06ff",
- "target": "dev-app-v/app-v-admin-frontend",
- "workloads": [
-  "deployment/app-v-admin-frontend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.dev-app-v/app-v-backend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-devtooto-appkb-0987e78003",
- "target": "dev-app-v/app-v-backend",
- "workloads": [
-  "deployment/app-v-backend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.dev-app-v/app-v-frontend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-devtooto-appkf-133751726c",
- "target": "dev-app-v/app-v-frontend",
- "workloads": [
-  "deployment/app-v-frontend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.middleware/kafka-ui</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-middlewa-kafkaui-0a6256c8b2",
- "target": "middleware/kafka-ui",
- "workloads": [
-  "deployment/kafka-ui"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.middleware/redis-insight</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-middlewa-redisins-e7e7fd218a",
- "target": "middleware/redis-insight",
- "workloads": [
-  "deployment/redis-insight"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.monitoring/kube-prometheus-stack-grafana</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-monitori-kubeprom-af0f3aa6c7",
- "target": "monitoring/kube-prometheus-stack-grafana",
- "workloads": [
-  "deployment/kube-prometheus-stack-grafana"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.monitoring/vmauth</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-monitori-vmauth-e07e5153ee",
- "target": "monitoring/vmauth",
- "workloads": [
-  "deployment/vmauth"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-r/app-r-backend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodsoro-appmba-f68effe430",
- "target": "prod-app-r/app-r-backend",
- "workloads": [
-  "deployment/app-r-backend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-r/app-r-web</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodsoro-appmwe-194ae69849",
- "target": "prod-app-r/app-r-web",
- "workloads": [
-  "deployment/app-r-web"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-t/app-t-ai</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodcurt-curtainc-fc2d368787",
- "target": "prod-app-t/app-t-ai",
- "workloads": [
-  "deployment/app-t-ai"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-t/app-t-backend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodcurt-curtainc-bb495c72c8",
- "target": "prod-app-t/app-t-backend",
- "workloads": [
-  "deployment/app-t-backend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-t/app-t-studio</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodcurt-curtainc-57e5adf3bf",
- "target": "prod-app-t/app-t-studio",
- "workloads": [
-  "deployment/app-t-studio"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-t/app-t-web</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodcurt-curtainc-022a51fc31",
- "target": "prod-app-t/app-t-web",
- "workloads": [
-  "deployment/app-t-web"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-v/app-v-admin-frontend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodtoot-appka-d0c066d282",
- "target": "prod-app-v/app-v-admin-frontend",
- "workloads": [
-  "deployment/app-v-admin-frontend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-v/app-v-backend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodtoot-appkb-7df87a92cc",
- "target": "prod-app-v/app-v-backend",
- "workloads": [
-  "deployment/app-v-backend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-v/app-v-frontend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodtoot-appkf-36f816b829",
- "target": "prod-app-v/app-v-frontend",
- "workloads": [
-  "deployment/app-v-frontend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-w/app-w</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodcarp-carpenst-e238817282",
- "target": "prod-app-w/app-w",
- "workloads": [
-  "deployment/app-w"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-x/app-x-api</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodfand-apppa-754a9b50b2",
- "target": "prod-app-x/app-x-api",
- "workloads": [
-  "deployment/app-x-api"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-y/app-y-admin</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodinse-insertoo-37417ab44f",
- "target": "prod-app-y/app-y-admin",
- "workloads": [
-  "deployment/app-y-admin"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-y/app-y-ai</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodinse-insertoo-b22674073c",
- "target": "prod-app-y/app-y-ai",
- "workloads": [
-  "deployment/app-y-ai"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-y/app-y-backend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodinse-insertoo-89a3732998",
- "target": "prod-app-y/app-y-backend",
- "workloads": [
-  "deployment/app-y-backend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-y/app-y-frontend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodinse-insertoo-032c25d752",
- "target": "prod-app-y/app-y-frontend",
- "workloads": [
-  "deployment/app-y-frontend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-z-backend/app-z-backend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodrhem-appnbac-8c88bb317a",
- "target": "prod-app-z-backend/app-z-backend",
- "workloads": [
-  "deployment/app-z-backend"
- ]
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-deregistration-vs-grace.prod-app-z-backend/app-z-frontend</code></summary>
-
-```json
-{
- "backend_grace_s": 30,
- "backend_prestop": false,
- "deregistration_delay_s": 300,
- "lb_type": "application",
- "name": "k8s-prodrhem-appnfro-9726e5b1d3",
- "target": "prod-app-z-backend/app-z-frontend",
- "workloads": [
-  "deployment/app-z-frontend"
- ]
-}
-```
-
-</details>
 <details><summary><code>traffic.external-exposure.ingress/argocd/argocd-server</code></summary>
 
 ```json
@@ -6354,162 +5502,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "target": "ingress/prod-app-y/app-y-admin",
  "tls": true,
  "type": "ingress"
-}
-```
-
-</details>
-<details><summary><code>traffic.ingress-5xx-ratio.prod-app-s/app-s-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "canary-api.lab-l.example",
-  "api.lab-l.example"
- ],
- "metrics": {
-  "source": "alb-cloudwatch",
-  "window": "24h",
-  "requests": 59863.0,
-  "requests_24h_equiv": 59863.0,
-  "rps_avg": 0.693,
-  "errors_5xx": 134.0,
-  "errors_ratio": 0.00224,
-  "p95_s_max_1h": 0.4638,
-  "p95_s_avg": 0.0765,
-  "p95_s_weighted": 0.1016,
-  "p95_s_last_1h": 0.0441,
-  "p95_s_last_at": "2026-11-07T00:35:00+00:00",
-  "requests_last_1h": 2620.0,
-  "hours_since_requests": 0,
-  "unhealthy_max_24h": 0,
-  "unhealthy_now": 0,
-  "target_groups": [
-   "k8s-prodillu-appi-d65740e6d5"
-  ]
- },
- "target": "prod-app-s/app-s-backend"
-}
-```
-
-</details>
-<details><summary><code>traffic.ingress-5xx-ratio.prod-app-v/app-v-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "lab-n.example",
-  "www.lab-n.example"
- ],
- "metrics": {
-  "source": "alb-cloudwatch",
-  "window": "24h",
-  "requests": 9644.0,
-  "requests_24h_equiv": 9644.0,
-  "rps_avg": 0.112,
-  "errors_5xx": 13.0,
-  "errors_ratio": 0.00135,
-  "p95_s_max_1h": 0.8344,
-  "p95_s_avg": 0.2325,
-  "p95_s_weighted": 0.2639,
-  "p95_s_last_1h": 0.1253,
-  "p95_s_last_at": "2026-11-07T00:35:00+00:00",
-  "requests_last_1h": 307.0,
-  "hours_since_requests": 0,
-  "unhealthy_max_24h": 1.0,
-  "unhealthy_now": 1,
-  "target_groups": [
-   "k8s-prodtoot-appkf-36f816b829"
-  ]
- },
- "target": "prod-app-v/app-v-frontend"
-}
-```
-
-</details>
-<details><summary><code>traffic.ingress-p95-latency.prod-app-r/app-r-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-r-api.lab-k.example"
- ],
- "metrics": {
-  "source": "alb-cloudwatch",
-  "window": "24h",
-  "requests": 4346.0,
-  "requests_24h_equiv": 4346.0,
-  "rps_avg": 0.05,
-  "errors_5xx": 0,
-  "errors_ratio": 0.0,
-  "p95_s_max_1h": 3.5461,
-  "p95_s_avg": 1.0712,
-  "p95_s_weighted": 1.0837,
-  "p95_s_last_1h": 3.5461,
-  "p95_s_last_at": "2026-11-06T08:35:00+00:00",
-  "requests_last_1h": 591.0,
-  "hours_since_requests": 16,
-  "unhealthy_max_24h": 0,
-  "unhealthy_now": 0,
-  "target_groups": [
-   "k8s-prodsoro-appmba-f68effe430"
-  ]
- },
- "target": "prod-app-r/app-r-backend"
-}
-```
-
-</details>
-<details><summary><code>traffic.ingress-p95-latency.prod-app-t/app-t-ai</code></summary>
-
-```json
-{
- "hosts": [
-  "app-t-ai.lab-k.example"
- ],
- "metrics": {
-  "source": "alb-cloudwatch",
-  "window": "24h",
-  "requests": 34.0,
-  "requests_24h_equiv": 34.0,
-  "rps_avg": 0.0,
-  "errors_5xx": 0,
-  "errors_ratio": 0.0,
-  "p95_s_max_1h": 2.6907,
-  "p95_s_avg": 2.4183,
-  "p95_s_weighted": 2.3158,
-  "p95_s_last_1h": 2.6907,
-  "p95_s_last_at": "2026-11-06T06:35:00+00:00",
-  "requests_last_1h": 1.0,
-  "hours_since_requests": 18,
-  "unhealthy_max_24h": 0,
-  "unhealthy_now": 0,
-  "target_groups": [
-   "k8s-prodcurt-curtainc-fc2d368787"
-  ]
- },
- "target": "prod-app-t/app-t-ai"
-}
-```
-
-</details>
-<details><summary><code>vpccni.prefix-delegation-off.cluster</code></summary>
-
-```json
-{
- "nitro_nodes": 9,
- "nodes": 9,
- "nodes_near_ip_limit": [
-  "ip-10-0-2-218.ap-northeast-2.compute.internal",
-  "ip-10-0-1-245.ap-northeast-2.compute.internal",
-  "ip-10-0-1-241.ap-northeast-2.compute.internal",
-  "ip-10-0-2-60.ap-northeast-2.compute.internal",
-  "ip-10-0-1-139.ap-northeast-2.compute.internal",
-  "ip-10-0-1-117.ap-northeast-2.compute.internal",
-  "ip-10-0-1-137.ap-northeast-2.compute.internal"
- ],
- "nodes_no_available_ip": [],
- "policy": "whole_eni",
- "prefix_delegation": false
 }
 ```
 
@@ -6874,25 +5866,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>controlplane.apiserver-slow-traces.cluster</code></summary>
-
-```json
-{
- "slow_traces": [
-  {
-   "op": "List",
-   "count": 136
-  },
-  {
-   "op": "Call conversion webhook",
-   "count": 8
-  }
- ],
- "slow_traces_total": 144
-}
-```
-
-</details>
 <details><summary><code>coredns.metrics-unavailable.cluster</code></summary>
 
 ```json
@@ -6908,207 +5881,13 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 
 ```json
 {
- "addon_version": "v1.37.0-eksbuild.1",
+ "addon_version": null,
  "api_errors_24h": {},
  "api_throttles_24h": null,
  "controller_metrics_enabled": false,
  "controller_metrics_series": 0,
  "controller_present": true,
  "version": "1.37.0"
-}
-```
-
-</details>
-<details><summary><code>ecr.no-lifecycle-policy.ecr/registry/&lt;account&gt;</code></summary>
-
-```json
-{
- "account": "<account>",
- "attestations": 182,
- "images": 908,
- "monthly_usd": 50.8,
- "repos_no_lifecycle": [
-  "app-v",
-  "bitnami/kafka",
-  "ecr-app-ab-postgresql-pgvector",
-  "bitnami/mysql"
- ],
- "repos_no_lifecycle_gib": 10.9,
- "repositories": 45,
- "total_gib": 473.1,
- "untagged": 257
-}
-```
-
-</details>
-<details><summary><code>ecr.no-replication.ecr/registry/&lt;account&gt;</code></summary>
-
-```json
-{
- "account": "<account>",
- "replication_rules": 0,
- "repos_mutable_prod": [
-  "ecr-app-ab-frontend-eks-prod",
-  "ecr-app-w-eks-prod",
-  "ecr-app-t-backend-eks-prod",
-  "ecr-app-t-web-eks-prod",
-  "ecr-app-r-postgresql-prod",
-  "ecr-app-s-admin-eks-prod",
-  "ecr-app-ab-postgresql-pgvector",
-  "ecr-app-t-postgresql-prod",
-  "ecr-app-x-postgresql-prod",
-  "ecr-app-s-backend-eks-prod",
-  "ecr-app-s-api-eks-prod",
-  "ecr-app-y-frontend-eks-prod",
-  "ecr-app-ab-backend-eks-prod",
-  "ecr-app-y-ai-prod",
-  "ecr-app-y-admin-eks-prod",
-  "ecr-app-z-embedding-eks-prod",
-  "ecr-app-x-api-eks-prod",
-  "app-v-admin-frontend-prod",
-  "app-v-frontend-prod",
-  "app-v-backend-prod",
-  "ecr-app-s-frontend-eks-prod",
-  "ecr-app-y-backend-eks-prod",
-  "ecr-app-z-backend-eks-prod",
-  "ecr-app-z-frontend-eks-prod",
-  "ecr-app-t-ai-eks-prod",
-  "ecr-app-t-studio-eks-prod",
-  "ecr-app-r-web-eks-prod",
-  "ecr-app-r-backend-eks-prod"
- ],
- "repos_scan_off_prod": [
-  "ecr-app-ab-frontend-eks-prod",
-  "ecr-app-w-eks-prod",
-  "ecr-app-t-backend-eks-prod",
-  "ecr-app-t-web-eks-prod",
-  "ecr-app-r-postgresql-prod",
-  "ecr-app-s-admin-eks-prod",
-  "ecr-app-ab-postgresql-pgvector",
-  "ecr-app-t-postgresql-prod",
-  "ecr-app-x-postgresql-prod",
-  "ecr-app-s-backend-eks-prod",
-  "ecr-app-s-api-eks-prod",
-  "ecr-app-y-frontend-eks-prod",
-  "ecr-app-y-admin-eks-prod",
-  "ecr-app-z-embedding-eks-prod",
-  "ecr-app-x-api-eks-prod",
-  "app-v-admin-frontend-prod",
-  "app-v-frontend-prod",
-  "app-v-backend-prod",
-  "ecr-app-s-frontend-eks-prod",
-  "ecr-app-y-backend-eks-prod",
-  "bitnami/mysql",
-  "ecr-app-z-backend-eks-prod",
-  "ecr-app-z-frontend-eks-prod",
-  "ecr-app-t-ai-eks-prod",
-  "ecr-app-t-studio-eks-prod",
-  "ecr-app-r-web-eks-prod",
-  "ecr-app-r-backend-eks-prod"
- ],
- "total_gib": 473.1
-}
-```
-
-</details>
-<details><summary><code>ecr.tag-mutable-prod.ecr/registry/&lt;account&gt;</code></summary>
-
-```json
-{
- "account": "<account>",
- "digest_pinned": 2,
- "images_in_use": 95,
- "repos_mutable": [
-  "app-v",
-  "ecr-app-ab-frontend-eks-prod",
-  "ecr-app-y-admin-dev",
-  "ecr-app-w-eks-prod",
-  "bitnami/kafka",
-  "ecr-app-t-backend-eks-prod",
-  "ecr-app-t-web-eks-prod",
-  "ecr-app-r-postgresql-prod",
-  "ecr-app-s-frontend-prod",
-  "app-v-admin-frontend",
-  "ecr-app-s-frontend-dev",
-  "ecr-app-s-admin-eks-prod",
-  "ecr-app-ab-postgresql-pgvector",
-  "ecr-app-t-postgresql-prod",
-  "ecr-app-x-postgresql-prod",
-  "app-v-backend",
-  "app-v-frontend",
-  "ecr-app-s-admin-dev",
-  "ecr-app-s-backend-dev",
-  "ecr-app-s-api-dev",
-  "ecr-app-s-backend-eks-prod",
-  "ecr-app-s-api-eks-prod",
-  "ecr-app-y-frontend-eks-prod",
-  "ecr-app-y-backend-dev",
-  "ecr-app-ab-backend-eks-prod",
-  "ecr-app-y-ai-prod",
-  "ecr-app-y-admin-eks-prod",
-  "app-aa-backend",
-  "app-aa-frontend",
-  "ecr-app-z-embedding-eks-prod",
-  "ecr-app-x-api-eks-prod",
-  "app-v-admin-frontend-prod",
-  "app-v-frontend-prod",
-  "app-v-backend-prod",
-  "ecr-app-s-frontend-eks-prod",
-  "ecr-app-y-frontend-dev",
-  "ecr-app-y-backend-eks-prod",
-  "ecr-app-y-ai-dev",
-  "ecr-app-z-backend-eks-prod",
-  "ecr-app-z-frontend-eks-prod",
-  "ecr-app-t-ai-eks-prod",
-  "ecr-app-t-studio-eks-prod",
-  "ecr-app-r-web-eks-prod",
-  "ecr-app-r-backend-eks-prod"
- ],
- "repos_mutable_prod": [
-  "ecr-app-ab-frontend-eks-prod",
-  "ecr-app-w-eks-prod",
-  "ecr-app-t-backend-eks-prod",
-  "ecr-app-t-web-eks-prod",
-  "ecr-app-r-postgresql-prod",
-  "ecr-app-s-admin-eks-prod",
-  "ecr-app-ab-postgresql-pgvector",
-  "ecr-app-t-postgresql-prod",
-  "ecr-app-x-postgresql-prod",
-  "ecr-app-s-backend-eks-prod",
-  "ecr-app-s-api-eks-prod",
-  "ecr-app-y-frontend-eks-prod",
-  "ecr-app-ab-backend-eks-prod",
-  "ecr-app-y-ai-prod",
-  "ecr-app-y-admin-eks-prod",
-  "ecr-app-z-embedding-eks-prod",
-  "ecr-app-x-api-eks-prod",
-  "app-v-admin-frontend-prod",
-  "app-v-frontend-prod",
-  "app-v-backend-prod",
-  "ecr-app-s-frontend-eks-prod",
-  "ecr-app-y-backend-eks-prod",
-  "ecr-app-z-backend-eks-prod",
-  "ecr-app-z-frontend-eks-prod",
-  "ecr-app-t-ai-eks-prod",
-  "ecr-app-t-studio-eks-prod",
-  "ecr-app-r-web-eks-prod",
-  "ecr-app-r-backend-eks-prod"
- ],
- "repos_with_latest_tag": [],
- "repositories": 45
-}
-```
-
-</details>
-<details><summary><code>ecr.untagged-images.ecr/registry/&lt;account&gt;</code></summary>
-
-```json
-{
- "account": "<account>",
- "attestations": 182,
- "images": 908,
- "repositories": 45,
- "untagged": 257
 }
 ```
 
@@ -7628,12 +6407,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "argocd-server"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7646,12 +6425,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-s-admin"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7664,12 +6443,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-s-api"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7682,12 +6461,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-s-backend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7700,12 +6479,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-s-frontend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7718,12 +6497,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-y-admin"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7736,12 +6515,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-y-ai"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7754,12 +6533,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-y-backend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7772,12 +6551,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-y-frontend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7790,12 +6569,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-v-admin-frontend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7808,12 +6587,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-v-backend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7826,12 +6605,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-v-frontend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7844,12 +6623,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-aa-backend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7862,12 +6641,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-aa-frontend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7880,12 +6659,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "kafka-ui"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7898,12 +6677,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "redis-insight"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7916,12 +6695,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "kube-prometheus-stack-grafana"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7934,12 +6713,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "vmauth"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7952,12 +6731,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-w"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7970,12 +6749,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-t-ai"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -7988,12 +6767,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-t-backend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8006,12 +6785,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-t-studio"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8024,12 +6803,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-t-web"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8042,12 +6821,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-x-api"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8061,12 +6840,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-s-admin"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8080,12 +6859,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-s-api"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8099,12 +6878,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-s-backend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8119,12 +6898,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-s-frontend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8137,12 +6916,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-y-admin"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8155,12 +6934,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-y-ai"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8173,12 +6952,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-y-backend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8192,12 +6971,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-y-frontend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8210,12 +6989,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-z-backend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8228,12 +7007,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-z-frontend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8246,12 +7025,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-r-backend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8264,12 +7043,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-r-web"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8282,12 +7061,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-v-admin-frontend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8300,12 +7079,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-v-backend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8319,12 +7098,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-v-frontend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8337,12 +7116,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-ab-backend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   },
   {
@@ -8355,12 +7134,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "services": [
     "app-ab-frontend"
    ],
-   "latency": true,
-   "traffic": true,
-   "errors": true,
+   "latency": false,
+   "traffic": false,
+   "errors": false,
    "saturation": false,
-   "source": "alb-cloudwatch",
-   "missing_all_lte": false,
+   "source": "alb-cloudwatch (not collected)",
+   "missing_all_lte": true,
    "cluster_ic_metrics": false
   }
  ],
@@ -10237,19 +9016,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "prod_pods": 2,
  "separation_possible": true,
  "shares_dev_prod": true
-}
-```
-
-</details>
-<details><summary><code>traffic.alb-protection-off.k8s-lab-kprodlb-b18a4555d7</code></summary>
-
-```json
-{
- "access_logs": false,
- "deletion_protection": false,
- "name": "k8s-lab-kprodlb-b18a4555d7",
- "target_groups": 41,
- "type": "application"
 }
 ```
 

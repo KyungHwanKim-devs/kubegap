@@ -7,7 +7,7 @@
 | kube context / 클러스터 | `default` / default (k3s, v1.33.5+k3s1) |
 | 실행 시각 / 모드 | 2026-11-07T10:22:59+09:00 / full (수집 262.7초, 모드 때문에 건너뛴 단계 0개, 실패 0개) |
 | 프로파일 | `lab` (detected) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | 0.1.4 / 0.1.83 / 1.1.0 |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | 0.1.4 / 0.1.84 / 1.1.0 |
 | 노드 / 네임스페이스 / 파드 / CRD | 2 (Ready 2) / 26 / 153 / 64 |
 | 컴포넌트 (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
 | 메트릭 저장소 | prometheus 3.7.3 retention 30d / size 0B via port-forward |
@@ -25,7 +25,7 @@
 | low | 9 | 122 | 같은 모드의 지난 점검 없음 |
 | info | 0 | 0 | 같은 모드의 지난 점검 없음 |
 
-점검 항목 347개 중 판정 295개, 프로파일에서 끈 것 41개, 건너뜀 9개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개예요. 숨긴 항목은 0개예요.
+점검 항목 347개 중 판정 293개, 프로파일에서 끈 것 41개, 건너뜀 11개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개예요. 숨긴 항목은 0개예요.
 
 ### 1-1. 자동 판정과 최종 판정이 다른 곳
 
@@ -99,8 +99,9 @@
 - 숨김 기한이 지난 항목 0: 없음
 - 도구 없음 0: 없음
 - full 모드에서 수집 안 함 0: 없음
-- 건너뛰었거나 오류가 난 점검 항목 9: `observability.log-volume-change` (skip: summary.logs.loki.volume_change missing), `security.no-secrets-manager` (skip: profile lab does not require family secrets-manager), `scaling.no-node-autoscaler` (skip: profile lab does not require family node-autoscaler), `observability.log-coverage-gap` (skip: summary.logs.loki.coverage missing), `observability.loki-not-ready` (skip: nothing to judge: loki not present), `observability.loki-ingest-discarded` (skip: summary.logs.agents.loki_metrics missing), `observability.promtail-dropped` (skip: summary.logs.agents.promtail missing), `observability.log-error-ratio-high` (skip: summary.logs.loki.namespaces_1h missing), `observability.unstructured-logs` (skip: summary.logs.loki.namespaces_1h missing)
+- 건너뛰었거나 오류가 난 점검 항목 11: `observability.log-volume-change` (skip: summary.logs.loki.volume_change missing), `security.no-secrets-manager` (skip: profile lab does not require family secrets-manager), `scaling.no-node-autoscaler` (skip: profile lab does not require family node-autoscaler), `observability.log-coverage-gap` (skip: summary.logs.loki.coverage missing), `observability.loki-not-ready` (skip: nothing to judge: loki not present), `observability.loki-ingest-discarded` (skip: summary.logs.agents.loki_metrics missing), `observability.promtail-dropped` (skip: summary.logs.agents.promtail missing), `observability.log-error-ratio-high` (skip: summary.logs.loki.namespaces_1h missing), `observability.unstructured-logs` (skip: summary.logs.loki.namespaces_1h missing), `traffic.ingress-5xx-ratio` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)), `traffic.ingress-p95-latency` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29))
 - 일부만 판정한 점검 항목 0 (판정에 필요한 자료가 없는 대상은 판정하지 않았고 통과로 세지 않았어요): 없음
+- 질의 결과가 빈 항목 6 (질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻이에요. 이름 자체가 없으면 건너뜀으로 처리해요): `resources.oomkilled`, `resources.large-request-binpacking`, `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `node.network-errors`, `scaling.pod-pending-long`
 
 ## 7. 부록
 
@@ -143,7 +144,7 @@
 
 ### 7-2. 판정한 점검 항목
 
-점검 항목 347개: disabled 41, done 295, llm 2, skip 9. 불러오기 오류: 없음.
+점검 항목 347개: disabled 41, done 293, llm 2, skip 11. 불러오기 오류: 없음.
 
 ### 7-3. 로그 시그니처 일치와 분류 안 된 오류
 
@@ -8663,6 +8664,7 @@
 {
  "default_deny_ingress_namespaces": [],
  "enforced": true,
+ "policies": 8,
  "prod_without_default_deny": [
   "app-a-prod",
   "app-b-prod",
@@ -9555,6 +9557,7 @@
  "cpu_limits": 8.2,
  "cpu_max_7d": 0.589,
  "cpu_median_7d": 0.028,
+ "cpu_metrics_read": true,
  "cpu_p95_7d": 0.102,
  "has_quota": false,
  "kind": "prod",
@@ -9741,6 +9744,7 @@
 
 ```json
 {
+ "available": true,
  "p99_s_1h": 0.1457,
  "servfail_ratio_1h": 0.0
 }
@@ -10584,6 +10588,7 @@
 {
  "allocatable_cpu": 18.0,
  "can_drop_largest_node": false,
+ "metrics_read": true,
  "nodes": 2,
  "p95_used_cpu": 0.92,
  "p95_util_ratio": 0.051,
@@ -10888,6 +10893,7 @@
    "prod": false
   }
  ],
+ "secrets_read": true,
  "secrets_total": 139
 }
 ```
@@ -12483,7 +12489,8 @@
    "192.168.90.101",
    "192.168.90.102"
   ]
- }
+ },
+ "servers_read": true
 }
 ```
 
@@ -12495,7 +12502,8 @@
  "check_config_missing": [
   "CONFIG_INET_XFRM_MODE_TRANSPORT",
   "CONFIG_RT_GROUP_SCHED"
- ]
+ ],
+ "servers_read": true
 }
 ```
 

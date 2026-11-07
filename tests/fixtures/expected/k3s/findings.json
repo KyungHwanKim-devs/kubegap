@@ -4,7 +4,7 @@
   "source": "detected",
   "missing_file": false
  },
- "rubric_version": "0.1.83",
+ "rubric_version": "0.1.84",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -20,7 +20,9 @@
    "id": "resources.oomkilled",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "empty": 1
+   }
   },
   {
    "id": "resources.oomkilled-repeated",
@@ -101,7 +103,9 @@
    "id": "resources.large-request-binpacking",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "empty": 1
+   }
   },
   {
    "id": "resources.krr-recommendation",
@@ -246,7 +250,9 @@
    "id": "observability.alertmanager-notification-failed",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "empty": 1
+   }
   },
   {
    "id": "observability.silence-forgotten",
@@ -312,7 +318,9 @@
    "id": "observability.scrape-targets-down",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "empty": 1
+   }
   },
   {
    "id": "resilience.no-backup",
@@ -1117,7 +1125,9 @@
    "id": "node.network-errors",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "empty": 1
+   }
   },
   {
    "id": "node.timewait-sockets-high",
@@ -1365,18 +1375,18 @@
   },
   {
    "id": "traffic.ingress-5xx-ratio",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)",
    "counts": {
-    "pass": 29
+    "skipped": 29
    }
   },
   {
    "id": "traffic.ingress-p95-latency",
-   "status": "done",
-   "reason": null,
+   "status": "skip",
+   "reason": "nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)",
    "counts": {
-    "pass": 29
+    "skipped": 29
    }
   },
   {
@@ -1556,7 +1566,9 @@
    "id": "scaling.pod-pending-long",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "empty": 1
+   }
   },
   {
    "id": "scaling.karpenter-nodeclaim-slow",
