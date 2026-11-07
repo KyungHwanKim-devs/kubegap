@@ -127,8 +127,8 @@ def test_a_nan_sample_is_null_not_a_nan_token(tmp_path):
 def test_the_normalisation_hides_only_the_path_the_clock_and_the_version(tmp_path):
     from lib import __version__
 
-    text = f'"snapshot": "{tmp_path}", "generated_at": "2026-11-07T10:00:00+09:00", "kubegap": "{__version__}", "rubric_version": "0.1.83", "instance": "10.{__version__}2:9100"\n| kubegap / rubric / signatures | {__version__} / 0.1.83 / 1.1.0 |'
+    text = f'"snapshot": "{tmp_path}", "generated_at": "2026-11-07T10:00:00+09:00", "kubegap": "{__version__}", "rubric_version": "0.1.83", "instance": "10.{__version__}2:9100"\n| kubegap / rubric / signatures | {__version__} / 0.1.83 / 1.1.0 |\n| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | {__version__} / 0.1.83 / 1.1.0 |'
     assert (
         regress.normalise(text, tmp_path)
-        == f'"snapshot": "<snapshot>", "generated_at": "<generated_at>", "kubegap": "<kubegap>", "rubric_version": "0.1.83", "instance": "10.{__version__}2:9100"\n| kubegap / rubric / signatures | <kubegap> / 0.1.83 / 1.1.0 |'
+        == f'"snapshot": "<snapshot>", "generated_at": "<generated_at>", "kubegap": "<kubegap>", "rubric_version": "0.1.83", "instance": "10.{__version__}2:9100"\n| kubegap / rubric / signatures | <kubegap> / 0.1.83 / 1.1.0 |\n| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.83 / 1.1.0 |'
     )

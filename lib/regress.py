@@ -139,11 +139,16 @@ def run(snap: Path) -> dict[str, str]:
 
 
 def normalise(text: str, snap: Path) -> str:
-    """The snapshot path, `generated_at` and the kubegap version, each where it is written (never as a bare substring: `0.1.4` is also inside `10.0.1.42`)."""
+    """The snapshot path, `generated_at` and the kubegap version, each where it is written (never as a bare substring: `0.1.4` is also inside `10.0.1.42`). The header row is matched under its label in every
+    report language (lib/render.LABELS): the Korean row kept the version and the first release after the expectation was written failed the comparison."""
+    from .render import LABELS  # render imports nothing from here
+
     text = text.replace(str(snap), "<snapshot>")
     text = re.sub(r'"generated_at": "[^"]*"', '"generated_at": "<generated_at>"', text)
     text = re.sub(r'"kubegap": "[^"]*"', '"kubegap": "<kubegap>"', text)
-    return re.sub(r"(\| kubegap / rubric / signatures \| )" + re.escape(__version__) + " /", r"\1<kubegap> /", text)
+    key = "kubegap / rubric / signatures"
+    labels = "|".join(re.escape(LABELS[lang].get(key, key)) for lang in LABELS)
+    return re.sub(r"(\| (?:" + labels + r") \| )" + re.escape(__version__) + " /", r"\1<kubegap> /", text)
 
 
 def compare(variant: str, outputs: dict[str, str]) -> list[str]:
