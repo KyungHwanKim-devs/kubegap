@@ -1,4 +1,4 @@
-# Prometheus self-health checks. summary.stackhealth.prometheus — lib/stackhealth.py. Observability coverage (rules, alerts, targets) is handled by core observability.*. The baseline checks stay in core (evaluated as absence even without Prometheus).
+# Prometheus self-health checks. summary.stackhealth.prometheus — lib/summaries/stackhealth.py. Observability coverage (rules, alerts, targets) is handled by core observability.*. The baseline checks stay in core (evaluated as absence even without Prometheus).
 - id: prometheus.memory-pressure
   name: Prometheus memory is close to its limit or has an OOMKilled history
   area: observability

@@ -1,11 +1,11 @@
-"""ConfigMap values never reach the snapshot (lib/scrub.py), except the configuration keys kubegap parses, and the readers work on scrubbed and on older raw objects."""
+"""ConfigMap values never reach the snapshot (lib/foundations/scrub.py), except the configuration keys kubegap parses, and the readers work on scrubbed and on older raw objects."""
 
 from __future__ import annotations
 
 import copy
 import json
 
-from lib import scrub
+from lib.foundations import scrub
 
 
 def _cm(ns, name, data, binary=None):
@@ -101,10 +101,10 @@ def test_secret_like_detection_skips_templates_and_paths():
 
 
 def test_argocd_helpers_accept_scrubbed_and_raw_values():
-    from lib import argocdctl
+    from lib.summaries import argocdctl
 
     assert argocdctl._csv_lines({"lines": 4, "len": 100}) == 4
-    assert argocdctl._csv_lines("a\n\nb\n") == 0  # the text form does not reach a snapshot (lib/scrub.py LINE_COUNT_ONLY)
+    assert argocdctl._csv_lines("a\n\nb\n") == 0  # the text form does not reach a snapshot (lib/foundations/scrub.py LINE_COUNT_ONLY)
     assert argocdctl._csv_lines(None) == 0
     assert argocdctl._non_empty({"present": True, "len": 40}) is True
     assert argocdctl._non_empty({"present": False, "len": 0}) is False

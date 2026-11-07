@@ -1,5 +1,5 @@
-# Metric names kubegap reads from the external-secrets controller /metrics (step external-secrets.controller-metrics, parsed by lib/esoctl.py through
-# lib/podmetrics.py). Read in external-secrets/external-secrets at v0.9.13, v2.1.0 and v2.14.0: every name exists in the three; 2.x moved the provider
+# Metric names kubegap reads from the external-secrets controller /metrics (step external-secrets.controller-metrics, parsed by lib/summaries/esoctl.py through
+# lib/foundations/podmetrics.py). Read in external-secrets/external-secrets at v0.9.13, v2.1.0 and v2.14.0: every name exists in the three; 2.x moved the provider
 # counter from pkg/metrics/metrics.go to runtime/metrics/metrics.go without renaming it.
 - key: sync_calls
   labels: [name, namespace]

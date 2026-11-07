@@ -1,4 +1,4 @@
-# local-path-provisioner checks. summary.local_path — lib/localpath.py (directory usage comes from the local-path section of the k3s-platform node script). The first two were moved from k3s-platform with their ids unchanged.
+# local-path-provisioner checks. summary.local_path — lib/summaries/localpath.py (directory usage comes from the local-path section of the k3s-platform node script). The first two were moved from k3s-platform with their ids unchanged.
 - id: storage.local-path-over-capacity
   name: local-path volume usage exceeds the PVC capacity (capacity is not enforced)
   area: storage

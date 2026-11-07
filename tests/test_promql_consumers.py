@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lib import controlplane, ebscsi, kubeproxy, logs, stackhealth
+from lib.summaries import controlplane, ebscsi, kubeproxy, logs, stackhealth
 
 
 def _metric(root: Path, qid: str, rows: list[tuple[dict, float]]) -> None:

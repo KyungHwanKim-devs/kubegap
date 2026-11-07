@@ -1,5 +1,5 @@
-# Metric names kubegap reads from KEDA's /metrics (steps keda.metrics-apiserver-metrics and keda.operator-metrics, parsed by lib/kedactl.py through
-# lib/podmetrics.py). names: newest spelling first; since = first release that emits the name (inclusive), before = first that no longer does.
+# Metric names kubegap reads from KEDA's /metrics (steps keda.metrics-apiserver-metrics and keda.operator-metrics, parsed by lib/summaries/kedactl.py through
+# lib/foundations/podmetrics.py). names: newest spelling first; since = first release that emits the name (inclusive), before = first that no longer does.
 # The operator's keda_scaler_errors_total and keda_scaler_errors exist through v2.16 and are gone at v2.17; keda_scaled_object_errors_total and
 # keda_scaler_detail_errors_total were added in v2.14 and are the only error counters since v2.17. Read in kedacore/keda pkg/metricscollector/prommetrics.go
 # at v2.12.0, v2.13.0, v2.14.0, v2.16.0, v2.17.2, v2.19.0 and v2.21.0 (the file was pkg/prommetrics/prommetrics.go before v2.13).

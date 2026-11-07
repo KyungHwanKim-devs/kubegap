@@ -7,7 +7,8 @@ import os
 import tempfile
 from pathlib import Path
 
-from lib import shell, tools
+from lib.commands import tools
+from lib.foundations import shell
 
 
 def _krr():

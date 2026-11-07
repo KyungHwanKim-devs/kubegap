@@ -1,4 +1,4 @@
-"""`lib.portfwd.PortForward` lets kubectl choose the local port (#99) and keeps the forward usable while kubectl talks.
+"""`lib.collection.portfwd.PortForward` lets kubectl choose the local port (#99) and keeps the forward usable while kubectl talks.
 
 A fake `kubectl` first on PATH plays the parts kubectl can play: it binds the port the arguments ask for (0 = any free
 one), prints the `Forwarding from` lines kubectl prints for `--address localhost` (127.0.0.1 and ::1), writes the port it
@@ -16,8 +16,8 @@ from pathlib import Path
 
 import pytest
 
-from lib import portfwd
-from lib.portfwd import PortForward, _port_open
+from lib.collection import portfwd
+from lib.collection.portfwd import PortForward, _port_open
 
 FAKE = textwrap.dedent(
     """\

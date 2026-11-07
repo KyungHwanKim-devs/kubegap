@@ -7,18 +7,18 @@ What it does, in this order:
 1. Copies the collected inputs and leaves out what summarize, evaluate and render produce (summary.json, findings-draft.json, report.md,
    report-details.md, diff.json, llm/, earlier-reports/, extra/, INCOMPLETE), so the fixture is an input, never an expectation.
 2. Trims what no reader uses, mechanically (no reader-specific key lists, so a new reader finds the fields a real snapshot has):
-   JSON is written compact; `metadata.managedFields` goes except on ConfigMaps (lib/hygiene.py reads their change times); CRD
+   JSON is written compact; `metadata.managedFields` goes except on ConfigMaps (lib/summaries/hygiene.py reads their change times); CRD
    `spec.versions[].schema` and `additionalPrinterColumns` go (readers take name, group and scope); a string over --max-string
    characters that is a PEM block or has no whitespace (certificates, CSRs, base64 blobs; never a config document, which readers parse)
-   becomes `<n chars>`; Polaris results that passed go (lib/hygiene.py reads failures); each entry of `droppedTargets` in
-   prometheus/targets.json becomes `{}` (lib/observability.py counts them, the count stays); KRR scan `labels` and `annotations` go
-   (lib/resources.py reads object, recommended and warnings); with --log-lines, log files keep only that many lines (the default keeps
+   becomes `<n chars>`; Polaris results that passed go (lib/summaries/hygiene.py reads failures); each entry of `droppedTargets` in
+   prometheus/targets.json becomes `{}` (lib/summaries/observability.py counts them, the count stays); KRR scan `labels` and `annotations` go
+   (lib/summaries/resources.py reads object, recommended and warnings); with --log-lines, log files keep only that many lines (the default keeps
    them whole: a cut changes what the signature scan counts).
-3. Masks and renames: lib/mask.mask_text (tokens, keys, account ids; not IP addresses, which readers parse, so the map rewrites them
+3. Masks and renames: lib/foundations/mask.mask_text (tokens, keys, account ids; not IP addresses, which readers parse, so the map rewrites them
    to other private addresses), then the name map of scripts/scrub-sample.py when --map is given (the map is yours and stays out of
    the repository), applied to file contents and to paths (a node's log folder carries its name), then the machine's home directory
    and the snapshots root. A JSON file is parsed again after the text pass, so a replacement can never leave an unreadable file.
-4. Verifies, unless --no-verify: runs lib/regress on a copy of the source and on the fixture and prints every check whose status differs
+4. Verifies, unless --no-verify: runs lib/commands/regress on a copy of the source and on the fixture and prints every check whose status differs
    and every finding whose verdict differs per target. A trim that changes a verdict is a trim too far.
 5. Prints the size on disk and gzip-compressed (about what git stores). Keep a fixture under 2 MB compressed.
 """
@@ -37,7 +37,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import importlib
 
-from lib import mask, yamlite
+from lib.foundations import mask, yamlite
 
 _scrub_sample = importlib.import_module("scrub-sample")
 
@@ -87,11 +87,11 @@ def trim_json(rel: str, doc, max_string: int):
                 for c in pr.get("ContainerResults") or []:
                     failures_only(c.get("Results"))
     if rel == "prometheus/targets.json" and isinstance(doc, dict) and isinstance(doc.get("data"), dict):
-        doc["data"]["droppedTargets"] = [{} for _ in doc["data"].get("droppedTargets") or []]  # lib/observability.py counts them; the count stays, the labels go
+        doc["data"]["droppedTargets"] = [{} for _ in doc["data"].get("droppedTargets") or []]  # lib/summaries/observability.py counts them; the count stays, the labels go
     if rel == "tools/krr.json" and isinstance(doc, dict):
         for s in doc.get("scans") or []:
             o = s.get("object") or {}
-            for k in ("labels", "annotations"):  # `warnings` stays: lib/resources.py keeps them per row and counts the unknown reasons
+            for k in ("labels", "annotations"):  # `warnings` stays: lib/summaries/resources.py keeps them per row and counts the unknown reasons
                 o.pop(k, None)
     shorten(doc)
     return doc
@@ -143,11 +143,11 @@ def build(src: pathlib.Path, dst: pathlib.Path, rules: list[tuple[str, str]], *,
 
 def verify(src: pathlib.Path, dst: pathlib.Path, rules: list[tuple[str, str]]) -> list[str]:
     """Check statuses of the source snapshot against the fixture, and every finding's verdict per target (targets of the source renamed through
-    the same map first), both run through lib/regress on a copy."""
+    the same map first), both run through lib/commands/regress on a copy."""
     import tempfile
     from collections import Counter
 
-    from lib import regress
+    from lib.commands import regress
 
     def verdicts(folder: pathlib.Path, rename):
         with tempfile.TemporaryDirectory() as td:

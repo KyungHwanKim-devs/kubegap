@@ -1,4 +1,4 @@
-"""The line formats lib/logs.py reads (#129): the two classification regexes, the timestamp readers and the unclassified-error key, each on a line built
+"""The line formats lib/summaries/logs.py reads (#129): the two classification regexes, the timestamp readers and the unclassified-error key, each on a line built
 from the cited format string (references/sources.md, "Pod log formats"), plus a scan over files that mix containerd offsets and ANSI colour."""
 
 from __future__ import annotations
@@ -8,9 +8,9 @@ import re
 
 import pytest
 
-from lib import logs
-from lib.logtext import KLOG_RE, normalize_message
-from lib.signatures import Signature
+from lib.foundations.logtext import KLOG_RE, normalize_message
+from lib.foundations.signatures import Signature
+from lib.summaries import logs
 
 P = "[pod/x-7d9f8c6b5-abcde/main] 2026-11-05T00:10:15.100000000Z "
 

@@ -1,4 +1,4 @@
-# Loki self-health checks. Input: summary.stackhealth.loki (lib/stackhealth.py; loki/metrics.txt is the raw Loki /metrics output). Unlimited retention, not-ready, OOMKilled, rejections and promtail drops are covered by core observability.loki-* and promtail-*.
+# Loki self-health checks. Input: summary.stackhealth.loki (lib/summaries/stackhealth.py; loki/metrics.txt is the raw Loki /metrics output). Unlimited retention, not-ready, OOMKilled, rejections and promtail drops are covered by core observability.loki-* and promtail-*.
 - id: loki.memory-pressure
   name: Loki memory near its limit or OOMKilled history
   area: observability

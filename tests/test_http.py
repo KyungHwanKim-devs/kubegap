@@ -1,13 +1,13 @@
-"""lib.http never follows a redirect, and a token over plain http to a non-loopback host is warned about once (#83)."""
+"""lib.foundations.http never follows a redirect, and a token over plain http to a non-loopback host is warned about once (#83)."""
 
 import http.server
 import threading
 
 import pytest
 
-from lib import collect
-from lib import http as khttp
-from lib.runlog import RunLog, read_runlog
+from lib.collection import collect
+from lib.foundations import http as khttp
+from lib.foundations.runlog import RunLog, read_runlog
 
 
 class _Server:

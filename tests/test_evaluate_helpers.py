@@ -1,4 +1,4 @@
-"""lib/evaluate.py pure helpers: the sandboxed expression evaluator and the static helpers checks.yaml expressions call."""
+"""lib/judgement/evaluate.py pure helpers: the sandboxed expression evaluator and the static helpers checks.yaml expressions call."""
 
 import datetime as dt
 import json
@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from lib import evaluate
-from lib.evaluate import SAFE_BUILTINS, Context, _eval, _excluded, _get_path, _status
+from lib.judgement import evaluate
+from lib.judgement.evaluate import SAFE_BUILTINS, Context, _eval, _excluded, _get_path, _status
 
 # ---------- sandboxed eval ----------
 
@@ -131,7 +131,7 @@ def test_symptom_metric_regex():
 
 
 def test_is_db_like_by_name_image_and_workload():
-    from lib.workload import is_db_like
+    from lib.foundations.workload import is_db_like
 
     assert is_db_like("neo4j", "neo4j:2026.05.0-community", "app-neo4j")
     assert is_db_like("db", "public.ecr.aws/bitnami/postgresql:16", "shop-db")
@@ -148,7 +148,7 @@ def test_is_db_like_by_name_image_and_workload():
 
 
 def test_image_repo():
-    from lib.workload import image_repo
+    from lib.foundations.workload import image_repo
 
     assert image_repo("neo4j:2026.05.0-community") == "neo4j"
     assert image_repo("public.ecr.aws/bitnami/redis:7.2.3-debian-11-r1") == "redis"

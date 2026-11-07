@@ -1,8 +1,8 @@
-"""The Karpenter log lines lib/scaling.py reads, built from the logging calls cited in references/sources.md ("lib/scaling.py Karpenter log facts", #129)."""
+"""The Karpenter log lines lib/summaries/scaling.py reads, built from the logging calls cited in references/sources.md ("lib/summaries/scaling.py Karpenter log facts", #129)."""
 
 from __future__ import annotations
 
-from lib.scaling import disruption_line, launch_failure_key
+from lib.summaries.scaling import disruption_line, launch_failure_key
 
 # pkg/controllers/disruption/controller.go:188@v0.37.0 with Command.String() types.go:184-194@v0.37.0
 L037 = '{"level":"INFO","time":"2026-11-04T00:30:10.620Z","logger":"controller","message":"disrupting via consolidation delete, terminating 1 nodes (3 pods) ip-10-0-1-5.ap-northeast-2.compute.internal/m6g.large/spot","commit":"490ef94","command-id":"b1"}'

@@ -1,4 +1,4 @@
-"""Snapshot files are written atomically, owner-only, through lib.snapshot.write_private and nothing else (#87)."""
+"""Snapshot files are written atomically, owner-only, through lib.foundations.snapshot.write_private and nothing else (#87)."""
 
 import ast
 import stat
@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from lib import snapshot
+from lib.foundations import snapshot
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -102,7 +102,7 @@ def test_no_other_module_writes_files():
     """Every file write in lib/ and scripts/kubegap goes through write_private or write_private_bytes. The one exception: run.log is appended line by line (runlog.py).
     Tool binaries went through Path.write_bytes in tools.py until #88; they are placed with write_private_bytes now."""
     offenders = []
-    for f in [*sorted(ROOT.glob("lib/*.py")), ROOT / "scripts" / "kubegap"]:
+    for f in [*sorted(ROOT.glob("lib/*/*.py")), ROOT / "scripts" / "kubegap"]:
         if f.name in ("snapshot.py", "runlog.py"):
             continue
         offenders += _write_calls(f.read_text(encoding="utf-8"), str(f.relative_to(ROOT)))
@@ -131,7 +131,7 @@ def test_write_call_scanner_catches_the_known_forms():
 
 
 def test_runlog_only_appends():
-    runlog = _write_calls((ROOT / "lib" / "runlog.py").read_text(encoding="utf-8"), "lib/runlog.py")
+    runlog = _write_calls((ROOT / "lib" / "foundations" / "runlog.py").read_text(encoding="utf-8"), "lib/foundations/runlog.py")
     assert runlog and all("'a'" in x for x in runlog), runlog
 
 

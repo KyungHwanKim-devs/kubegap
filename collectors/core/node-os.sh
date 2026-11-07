@@ -1,7 +1,7 @@
 #!/bin/sh
 # kubegap node OS read-only inspection. Writes nothing to the node.
 # On EKS it runs via SSM (root); over SSH it runs as the login user and only the read-only commands allowed by deploy/node-access/kubegap-sudoers via sudo -n.
-# Output is a sequence of sections split by "### <section>" and is parsed by lib/nodeos.py. SSM truncates stdout at 24,000 characters, so every section caps its line count.
+# Output is a sequence of sections split by "### <section>" and is parsed by lib/summaries/nodeos.py. SSM truncates stdout at 24,000 characters, so every section caps its line count.
 S() { echo "### $1"; }
 if [ "$(id -u)" = 0 ]; then SUDO=""; else SUDO="sudo -n"; fi
 K3S=/usr/local/bin/k3s
@@ -83,7 +83,7 @@ C clock "$P_CLK"
 echo "samples:"
 printf '%s\n' "$KLOG" | grep -E "$P_OOM_NODE|$P_OOM_CG|$P_LOCKUP|$P_IO|$P_FS|$P_NIC|$P_CT|$P_NET|$P_MEM|$P_BUG|$P_SEG|$P_CLK" \
   | grep -v '^$' | cut -c1-200 | tail -n 40
-# OOM lines in full, up to 400 characters: the kernel's oom-kill line carries the pod uid in oom_memcg (…kubepods-burstable-pod<uid>.slice), which is past column 200, and lib/resilience.py maps it to the workload
+# OOM lines in full, up to 400 characters: the kernel's oom-kill line carries the pod uid in oom_memcg (…kubepods-burstable-pod<uid>.slice), which is past column 200, and lib/summaries/resilience.py maps it to the workload
 echo "oom_samples:"
 printf '%s\n' "$KLOG" | grep -E "oom-kill:|$P_OOM_CG|$P_OOM_NODE" | grep -v '^$' | cut -c1-400 | tail -n 60
 

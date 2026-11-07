@@ -1,8 +1,8 @@
-"""lib/monitoring reads Loki's retention from the /config dump by structure, never from the first `retention_period:` line of the text (#126, #148)."""
+"""lib/collection/monitoring reads Loki's retention from the /config dump by structure, never from the first `retention_period:` line of the text (#126, #148)."""
 
 from __future__ import annotations
 
-from lib import monitoring
+from lib.collection import monitoring
 
 DUMP = """auth_enabled: false
 limits_config:
@@ -36,7 +36,7 @@ def test_a_real_loki_3_7_9_config_dump_loads_whole_once_unfolded():
     on): go-yaml folds its long query strings, yamlite.load refuses the raw text, and the unfolded text loads whole (3,584 lines, 42 top-level keys)."""
     from pathlib import Path
 
-    from lib import yamlite
+    from lib.foundations import yamlite
 
     dump = Path(__file__).parent.joinpath("fixtures", "loki-config-3.7.9.yaml").read_text(encoding="utf-8")
     import pytest

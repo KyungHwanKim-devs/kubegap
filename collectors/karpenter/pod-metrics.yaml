@@ -1,4 +1,4 @@
-# Metric names kubegap reads from Karpenter's /metrics (step karpenter.controller-metrics, parsed by lib/karpenterctl.py through lib/podmetrics.py).
+# Metric names kubegap reads from Karpenter's /metrics (step karpenter.controller-metrics, parsed by lib/summaries/karpenterctl.py through lib/foundations/podmetrics.py).
 # names: newest spelling first. since = first release that emits the name (inclusive), before = first release that no longer does (exclusive).
 # Karpenter v1.0.0 renamed or removed most of its metrics in one step, with no release emitting both spellings: counters got a _total suffix,
 # the nodepool subsystem became nodepools, disruption became voluntary_disruption, provisioner_scheduling became scheduler, *_time_seconds

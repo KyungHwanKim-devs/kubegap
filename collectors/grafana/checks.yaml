@@ -1,4 +1,4 @@
-# Grafana self-health checks. summary.stackhealth.grafana — lib/stackhealth.py. :3000/metrics is readable without authentication. Datasource and dashboard lists only when grafana_api_token is set. observability.grafana-unused-dashboard is disabled for the open-source edition.
+# Grafana self-health checks. summary.stackhealth.grafana — lib/summaries/stackhealth.py. :3000/metrics is readable without authentication. Datasource and dashboard lists only when grafana_api_token is set. observability.grafana-unused-dashboard is disabled for the open-source edition.
 - id: grafana.datasource-errors
   name: Grafana → datasource queries fail with 429/5xx (panels break)
   area: observability

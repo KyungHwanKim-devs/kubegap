@@ -5,7 +5,8 @@ from __future__ import annotations
 
 import pytest
 
-from lib import logs, paths, signatures
+from lib.foundations import paths, signatures
+from lib.summaries import logs
 from tests import signature_lines as data
 
 SIGS, ERRORS = signatures.load(sorted(p.parent.name for p in paths.COLLECTORS_DIR.glob("*/signatures.yaml")))

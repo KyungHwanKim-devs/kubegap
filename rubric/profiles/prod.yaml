@@ -4,7 +4,7 @@ description: Production expectations. All core checks on; platform-specific chec
 disabled_checks: []
 # Per-check threshold overrides. Same meaning as rule.threshold.<profile> in checks.yaml; values here take precedence.
 thresholds: {}
-# Component families that must be present (same as EXPECTED_FAMILIES in lib/components.py; this list takes precedence)
+# Component families that must be present (same as EXPECTED_FAMILIES in lib/foundations/components.py; this list takes precedence)
 expected_families: [metrics-store, logs-store, alert-router, backup, event-retention, secrets-manager, slo, certificates, node-autoscaler, kube-state-metrics, node-exporter, progressive-delivery]
 # Per-check exclusion patterns. On EKS the control plane is not visible, so these kube-prometheus-stack Services are expected to have no endpoints.
 exclude:

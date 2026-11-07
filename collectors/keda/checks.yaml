@@ -1,4 +1,4 @@
-# KEDA checks. summary.kedactl.summary — lib/kedactl.py. ScaledObject Ready/Fallback and metrics API availability are covered by core scaling.keda-* and metrics-api-unavailable.
+# KEDA checks. summary.kedactl.summary — lib/summaries/kedactl.py. ScaledObject Ready/Fallback and metrics API availability are covered by core scaling.keda-* and metrics-api-unavailable.
 - id: keda.unused
   name: KEDA is installed but there is no ScaledObject or ScaledJob at all
   area: hygiene

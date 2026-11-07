@@ -45,7 +45,7 @@
   timeout: 30
 # ---- Node OS ----
 # node item: script ships a file from collectors/core/ to the node and runs it (EKS = SSM as root, SSH = login user plus kubegap-sudoers read-only commands).
-# No requires: the script leaves sections it has no permission for empty and the parser (lib/nodeos.py) records them as "no permission". Output logs/node/<node>/os.txt.
+# No requires: the script leaves sections it has no permission for empty and the parser (lib/summaries/nodeos.py) records them as "no permission". Output logs/node/<node>/os.txt.
 - id: node-os
   modes: [full]   # skipped by the daily run
   type: node
@@ -89,7 +89,7 @@
   tool: polaris
   # Not --only-show-failed-tests: it drops every controller whose only failures are controller-level checks (missingPodDisruptionBudget, deploymentMissingReplicas …),
   # because the filter keeps a controller only when its PodResult is non-empty (pkg/validator/output.go:180-185@v10.2.6; schema.go:245-249 always sets PodResult).
-  # lib/hygiene.py skips the Success entries itself.
+  # lib/summaries/hygiene.py skips the Success entries itself.
   cmd: [polaris, audit, --context, "{context}", --format, json]
   source: "polaris: cmd/polaris/root.go:47@v10.2.6 (--context), cmd/polaris/audit.go:62 (--format); exit 0 unless --set-exit-code-* (audit.go:127-134); shape in references/sources.md"
   out: tools/polaris.json
@@ -98,11 +98,11 @@
   modes: [full]   # skipped by the daily run
   type: tool
   tool: pluto
-  # `detect -` reads a manifest List on stdin and contacts nothing. The List is built by lib/lastapplied.py from the objects saved above, so this step depends on objects.dump-all
+  # `detect -` reads a manifest List on stdin and contacts nothing. The List is built by lib/foundations/lastapplied.py from the objects saved above, so this step depends on objects.dump-all
   # and fails when that step saved no kind. Not detect-api-resources or detect-all-in-cluster: both List every resource the server advertises, Secrets included when the identity
   # may (pkg/discovery-api/discovery_api.go:83,115@v5.24.5, no flag excludes one, cmd/root.go:87-114), which is the read the README rules out; the second also reads Helm's release Secrets.
   # The three --ignore-* flags keep the exit code 0 when pluto finds something: without them it exits 2 (deprecated), 3 (removed) or 4 (no replacement)
-  # (pkg/api/output.go:333-341@v5.24.5, cmd/root.go:353); lib/shell.py writes the output file only on exit 0, so the items were never saved and the
+  # (pkg/api/output.go:333-341@v5.24.5, cmd/root.go:353); lib/foundations/shell.py writes the output file only on exit 0, so the items were never saved and the
   # check passed with nothing to judge. The flags do not filter the items (FilterOutput, pkg/api/output.go:159-181 does not read them).
   stdin: last-applied
   cmd: [pluto, detect, "-", -o, json, --target-versions, "k8s={k8s_next_minor}", --ignore-deprecations, --ignore-removals, --ignore-unavailable-replacements]
@@ -114,12 +114,12 @@
   type: tool
   tool: kubent
   # --log-level=debug: the per-List lines `Retrieving: <gvr>` and `Failed to retrieve: <gvr>: <err>` (pkg/collector/cluster.go:121,124@0.7.3) are Debug, the default level is Info
-  # (pkg/config/config.go:38); their difference is the read evidence lib/collect.py counts (#132). The Helm v3 collector lists release Secrets, which the ClusterRole forbids; the cluster collector is enough.
+  # (pkg/config/config.go:38); their difference is the read evidence lib/collection/collect.py counts (#132). The Helm v3 collector lists release Secrets, which the ClusterRole forbids; the cluster collector is enough.
   cmd: [kubent, --context, "{context}", -o, json, -t, "{k8s_next_minor_short}", --helm3=false, --log-level=debug]
   source: "kubent: pkg/config/config.go:45@0.7.3 (--context), :51 (-o), :54 (-t), :48 (--helm3), :53 (--log-level); exit 0 with [] when nothing is found or read (cmd/kubent/main.go:49-56, pkg/collector/cluster.go:119-125); shape in references/sources.md"
   out: tools/kubent.json
   timeout: 300
-# Helm keeps each release record in a Secret (sh.helm.release.v1.<name>.v<n>), so `helm list` reads Secrets. kubegap stores only what list prints: name, namespace, status, revision, chart and app version, updated. User values (`helm get values`) are not collected: they often hold credentials. The shipped ClusterRole has no secrets permission, so with it this step fails and the Helm checks are skipped (lib/hygiene.py says why).
+# Helm keeps each release record in a Secret (sh.helm.release.v1.<name>.v<n>), so `helm list` reads Secrets. kubegap stores only what list prints: name, namespace, status, revision, chart and app version, updated. User values (`helm get values`) are not collected: they often hold credentials. The shipped ClusterRole has no secrets permission, so with it this step fails and the Helm checks are skipped (lib/summaries/hygiene.py says why).
 - id: helm-list
   modes: [full]   # skipped by the daily run
   type: tool

@@ -1,5 +1,5 @@
-# Metric names kubegap reads from the AWS Load Balancer Controller /metrics (step alb-controller.controller-metrics, parsed by lib/albctl.py through
-# lib/podmetrics.py). Read in kubernetes-sigs/aws-load-balancer-controller at v2.7.2 and v3.6.2: the aws_api_* names and labels are the same in
+# Metric names kubegap reads from the AWS Load Balancer Controller /metrics (step alb-controller.controller-metrics, parsed by lib/summaries/albctl.py through
+# lib/foundations/podmetrics.py). Read in kubernetes-sigs/aws-load-balancer-controller at v2.7.2 and v3.6.2: the aws_api_* names and labels are the same in
 # both (v3 moved the file from pkg/aws/metrics to pkg/metrics/aws). The controller_runtime_*, workqueue_*, rest_client_* and leader_election_* names
 # come from controller-runtime (v0.14.6 at v2.7.2, v0.24.1 at v3.6.2).
 - key: leader

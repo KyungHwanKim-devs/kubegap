@@ -1,4 +1,4 @@
-# Metric names kubegap reads from Grafana's own /metrics (step grafana.self-metrics, parsed by lib/stackhealth.py through lib/podmetrics.py).
+# Metric names kubegap reads from Grafana's own /metrics (step grafana.self-metrics, parsed by lib/summaries/stackhealth.py through lib/foundations/podmetrics.py).
 # Read in grafana/grafana at v10.2.3, v12.2.1 and v13.3.0; every name below exists unchanged in the three. grafana_stat_total_users is singular
 # (pkg/infra/metrics/metrics.go:465@v10.2.3): the plural spelling kubegap used until #120 never existed.
 - key: build_info

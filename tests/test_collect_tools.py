@@ -6,8 +6,9 @@ import os
 import stat
 from pathlib import Path
 
-from lib import collect, yamlite
-from lib.runlog import RunLog
+from lib.collection import collect
+from lib.foundations import yamlite
+from lib.foundations.runlog import RunLog
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -165,7 +166,7 @@ def test_a_partial_discovery_reaches_the_numbers_pluto_reports(tmp_path, monkeyp
 
 def test_discovery_resources_stay_the_discovery_kinds():
     """Two hand-kept lists of one fact: a kind added to OBJECT_KINDS alone would be fetched again by the dump, and pluto would see every object twice."""
-    from lib import discover
+    from lib.collection import discover
 
     assert {r.split(".", 1)[0] for r in collect.DISCOVERY_RESOURCES} == set(discover.OBJECT_KINDS)
 

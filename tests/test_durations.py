@@ -1,9 +1,9 @@
-"""`lib/durations.go_duration_s` reads what Go's `time.ParseDuration` reads (golang/go src/time/format.go:1605-1614,1621-1718@go1.25.0): the form of every
+"""`lib/foundations/durations.go_duration_s` reads what Go's `time.ParseDuration` reads (golang/go src/time/format.go:1605-1614,1621-1718@go1.25.0): the form of every
 `metav1.Duration` field and of the Argo CD and KEDA ConfigMap values kubegap compares (#124 N-7, N-8)."""
 
 import pytest
 
-from lib.durations import go_duration_s
+from lib.foundations.durations import go_duration_s
 
 
 @pytest.mark.parametrize(

@@ -1,8 +1,8 @@
-"""lib/quantity: the one reader of Kubernetes quantities (#150)."""
+"""lib/foundations/quantity: the one reader of Kubernetes quantities (#150)."""
 
 import pytest
 
-from lib import quantity
+from lib.foundations import quantity
 
 
 @pytest.mark.parametrize(

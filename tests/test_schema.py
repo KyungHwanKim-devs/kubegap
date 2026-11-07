@@ -6,7 +6,7 @@ import json
 
 import pytest
 
-from lib import paths, snapshot
+from lib.foundations import paths, snapshot
 
 
 def _snap(tmp_path, inv: dict | None):
@@ -38,15 +38,15 @@ def test_discover_summarize_and_evaluate_write_the_version():
     from pathlib import Path
 
     root = Path(__file__).resolve().parent.parent
-    for f in ("lib/discover.py", "lib/summarize.py", "lib/evaluate.py"):
+    for f in ("lib/collection/discover.py", "lib/summaries/summarize.py", "lib/judgement/evaluate.py"):
         src = (root / f).read_text(encoding="utf-8")
         assert '"schema": paths.SCHEMA_VERSION' in src, f
     assert "check_schema(snap)" in (root / "scripts" / "kubegap").read_text(encoding="utf-8"), "the CLI refuses before any reader opens the snapshot"
-    assert "check_schema(snap)" in (root / "lib" / "regress.py").read_text(encoding="utf-8"), "the regression harness demands the same of a fixture"
+    assert "check_schema(snap)" in (root / "lib" / "commands" / "regress.py").read_text(encoding="utf-8"), "the regression harness demands the same of a fixture"
 
 
 def test_the_fixtures_carry_the_current_version():
-    from lib import regress
+    from lib.commands import regress
 
     for f in regress.fixtures():
         assert snapshot.schema_of(f) == paths.SCHEMA_VERSION, f.name

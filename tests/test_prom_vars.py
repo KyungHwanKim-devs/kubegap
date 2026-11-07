@@ -1,12 +1,12 @@
 """The `{apiserver_job}` placeholder of the apiserver queries (#140): filled from config, else detected once per run from the job values of
-apiserver_request_total, and when no such series exists the queries are saved as failed with the reason, which lib/evaluate.py turns into a skip."""
+apiserver_request_total, and when no such series exists the queries are saved as failed with the reason, which lib/judgement/evaluate.py turns into a skip."""
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
 
-from lib.prom import Prometheus
+from lib.collection.prom import Prometheus
 
 
 class _Fake(Prometheus):

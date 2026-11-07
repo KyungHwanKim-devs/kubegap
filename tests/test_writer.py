@@ -6,7 +6,8 @@ import json
 
 import pytest
 
-from lib import paths, shell, writer
+from lib.foundations import paths, shell
+from lib.output import writer
 
 
 def _facts(**over):

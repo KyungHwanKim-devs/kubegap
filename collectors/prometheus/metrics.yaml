@@ -82,7 +82,7 @@
   source:
     - "ALERTS_FOR_STATE: prometheus/prometheus rules/alerting.go:43,245-253@v2.49.1, :43,250-259@v3.7.3, :43,258-267@v3.15.1 (written for each pending or firing alert with the value of its ActiveAt in seconds :462@v2.49.1, :520@v3.7.3, :541@v3.15.1; labels alertname and the alert's own labels, no alertstate)"
 
-# ---- Prometheus and Alertmanager self health (read by lib/stackhealth.py)
+# ---- Prometheus and Alertmanager self health (read by lib/summaries/stackhealth.py)
 - id: prom_head_series
   why: Active series in memory. Above 1M, memory and rule evaluation both slow down (a small cluster is typically 100-200k)
   query: max(prometheus_tsdb_head_series)
@@ -124,13 +124,13 @@
     - "scrape_duration_seconds: prometheus/prometheus scrape/scrape.go:1727,1749@v2.49.1, :2063,2134@v3.7.3, :2240,2311@v3.15.1 (written by Prometheus after every scrape with the target's job and instance labels)"
     - "label job on up and scrape series: prometheus-operator/prometheus-operator pkg/prometheus/promcfg.go:1373-1376@v0.71.0, :2063-2066@v0.86.2 (job is the value of the Service label a ServiceMonitor's jobLabel names, else the Service name; Prometheus sets it from the scrape config's job_name otherwise)"
 - id: prom_scrape_interval_s
-  # One series per distinct interval, so this is the longest configured interval, not the most common one. lib/stackhealth.py judges each job against its own scrapeInterval from prometheus/targets.json and uses this value only when that file is missing.
+  # One series per distinct interval, so this is the longest configured interval, not the most common one. lib/summaries/stackhealth.py judges each job against its own scrapeInterval from prometheus/targets.json and uses this value only when that file is missing.
   why: Longest scrape interval in use (seconds): the median interval length of the longest configured interval. Fallback denominator for the slow-scrape judgement when prometheus/targets.json is missing
   query: max(prometheus_target_interval_length_seconds{quantile="0.5"})
   source:
     - "prometheus_target_interval_length_seconds: prometheus/prometheus scrape/metrics.go:173@v2.49.1, :182@v3.7.3, :197@v3.15.1 (SummaryVec with the label interval :177@v2.49.1, :186@v3.7.3, :201@v3.15.1, one series set per distinct scrape interval in the configuration, quantiles 0.01, 0.05, 0.5, 0.9, 0.99; no target or job label of its own)"
 - id: prom_sample_limit_exceeded_1h
-  # The counter has no target label (see its source entry): a `sum by (job)` grouped it by the Prometheus's own job and named Prometheus as the job that exceeded the limit. lib/stackhealth.py names the targets from prometheus/targets.json (lastError).
+  # The counter has no target label (see its source entry): a `sum by (job)` grouped it by the Prometheus's own job and named Prometheus as the job that exceeded the limit. lib/summaries/stackhealth.py names the targets from prometheus/targets.json (lastError).
   why: Scrapes dropped entirely for exceeding sampleLimit over 1h, summed over every target. Which targets are failing on it comes from prometheus/targets.json
   query: sum(increase(prometheus_target_scrapes_exceeded_sample_limit_total[1h]))
   source:

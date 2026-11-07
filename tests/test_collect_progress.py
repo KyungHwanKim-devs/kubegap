@@ -1,6 +1,6 @@
 """The progress line collect prints per finished collector and writes into INCOMPLETE (#78)."""
 
-from lib import collect
+from lib.collection import collect
 
 
 def test_progress_line_has_counts_elapsed_last_and_running():

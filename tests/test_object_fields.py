@@ -10,8 +10,11 @@ from pathlib import Path
 
 import pytest
 
-from lib import argocdctl, certmanager, diff, discover, ebscsi, esoctl, hygiene, karpenterctl, localpath, resilience, scaling, snapshot, summarize, tenancy, traffic, vpccni, workload
-from lib.k3s import _node_base
+from lib.collection import discover
+from lib.foundations import snapshot, workload
+from lib.output import diff
+from lib.summaries import argocdctl, certmanager, ebscsi, esoctl, hygiene, karpenterctl, localpath, resilience, scaling, summarize, tenancy, traffic, vpccni
+from lib.summaries.k3s import _node_base
 
 ROOT = Path(__file__).resolve().parent.parent
 NOW = dt.datetime(2026, 11, 5, 3, 0, tzinfo=dt.UTC)
@@ -24,14 +27,14 @@ def _write(snap: Path, stem: str, items: list, folder: str = "objects"):
     p.write_text(json.dumps({"items": items}), encoding="utf-8")
 
 
-# ---------- K1-1: the CronJob file is `cronjobs.json` since discovery fetches CronJobs (lib/discover.py OBJECT_KINDS) ----------
+# ---------- K1-1: the CronJob file is `cronjobs.json` since discovery fetches CronJobs (lib/collection/discover.py OBJECT_KINDS) ----------
 
 
 def test_every_literal_stem_matches_what_discovery_writes():
     """A reader names a kind discovery fetches by its short name (that is the file discovery writes and the dump-all step then skips)."""
     short = set(discover.OBJECT_KINDS)
     bad = []
-    for f in sorted((ROOT / "lib").glob("*.py")):
+    for f in sorted((ROOT / "lib").rglob("*.py")):
         for m in re.finditer(r'objects\((?:[\w.]+, *)?"([\w.-]+)"\)', f.read_text(encoding="utf-8")):
             stem = m.group(1)
             if "." in stem and stem.split(".", 1)[0] in short:
@@ -69,7 +72,7 @@ def test_event_count_reads_series_count():
 
 def test_no_reader_counts_events_without_the_helper():
     """resilience, storage, ebscsi, traffic and scaling summed `count` only (K1-2, K3-6); they go through snapshot.event_count now."""
-    for f in (ROOT / "lib").glob("*.py"):
+    for f in (ROOT / "lib").rglob("*.py"):
         assert 'e.get("count") or 1' not in f.read_text(encoding="utf-8"), f.name
 
 

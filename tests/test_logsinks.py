@@ -1,10 +1,12 @@
-"""Where the logs go, read from the shipper's configuration (lib/logsinks.py, #174). The texts are the shapes of real ConfigMaps: the fluent-bit
+"""Where the logs go, read from the shipper's configuration (lib/collection/logsinks.py, #174). The texts are the shapes of real ConfigMaps: the fluent-bit
 classic format of the maintainer's k3s cluster, the fluent-bit chart's own example, a fluentd match block and a promtail clients block."""
 
 from __future__ import annotations
 
-from lib import firstrun, logsinks, shell
-from lib.config import Config
+from lib.collection import logsinks
+from lib.commands import firstrun
+from lib.foundations import shell
+from lib.foundations.config import Config
 
 FLUENT_BIT = """[SERVICE]
     Flush         1

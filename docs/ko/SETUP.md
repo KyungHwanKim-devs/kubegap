@@ -66,7 +66,7 @@ kubegap을 쓰면서 내 컴퓨터 바깥에 무언가를 준비해야 할 수 �
 
 일부 정보는 로그인만으로 읽히지 않습니다. 사용자가 로그를 읽는 그룹에 들어 있어야 하고, 선택 사항인 sudoers 파일을 넣으면 root만 읽을 수 있는 나머지도 읽힙니다. 방법은 [`deploy/node-access/README.md`](../../deploy/node-access/README.md)에 있습니다. kubegap은 노드에서 아무것도 바꾸지 않으므로 이 설정은 직접 하세요.
 
-**GKE, AKS, SSM도 SSH도 없는 관리형 노드.** 노드 안쪽은 읽지 않고, 노드 점검 항목은 미수집으로 적힙니다. 이 플랫폼용 백엔드는 `lib/node.py`에 같은 명령 목록을 실행하는 분기 하나를 더하는 일인데, 관리자에게는 만들고 확인할 클러스터가 없습니다. 그 클러스터를 쓰는 분의 기여를 기다립니다.
+**GKE, AKS, SSM도 SSH도 없는 관리형 노드.** 노드 안쪽은 읽지 않고, 노드 점검 항목은 미수집으로 적힙니다. 이 플랫폼용 백엔드는 `lib/collection/node.py`에 같은 명령 목록을 실행하는 분기 하나를 더하는 일인데, 관리자에게는 만들고 확인할 클러스터가 없습니다. 그 클러스터를 쓰는 분의 기여를 기다립니다.
 
 노드 접속은 첫 수집 전을 포함해 언제든 확인할 수 있습니다.
 
@@ -78,7 +78,7 @@ scripts/kubegap nodes --context <name>
 
 ## 추가 도구
 
-kubegap은 helm, krr, polaris, pluto, kubent를 `PATH`에서 찾습니다. EKS에서는 aws, SSH를 쓰는 플랫폼에서는 ssh도 찾습니다. `kubegap setup`을 실행하면 없는 도구와 그 도구의 결과를 쓰는 점검 항목이 나오고, 첫 실행 질문이 설치할지 묻습니다. 설정에 `install_tools: never`를 두면 그 질문을 건너뛰고 아무것도 설치하지 않습니다. 아래 표는 도구마다 어느 점검 항목에 쓰이는지, 어느 모드에서 돌아가는지, 설치하면 어디에 들어가는지, 없으면 리포트에 어떻게 적히는지입니다. `scripts/kubegap tools --markdown --language ko`가 `lib/tools.py`와 점검 카탈로그에서 만들고, 테스트가 최신인지 확인합니다.
+kubegap은 helm, krr, polaris, pluto, kubent를 `PATH`에서 찾습니다. EKS에서는 aws, SSH를 쓰는 플랫폼에서는 ssh도 찾습니다. `kubegap setup`을 실행하면 없는 도구와 그 도구의 결과를 쓰는 점검 항목이 나오고, 첫 실행 질문이 설치할지 묻습니다. 설정에 `install_tools: never`를 두면 그 질문을 건너뛰고 아무것도 설치하지 않습니다. 아래 표는 도구마다 어느 점검 항목에 쓰이는지, 어느 모드에서 돌아가는지, 설치하면 어디에 들어가는지, 없으면 리포트에 어떻게 적히는지입니다. `scripts/kubegap tools --markdown --language ko`가 `lib/commands/tools.py`와 점검 카탈로그에서 만들고, 테스트가 최신인지 확인합니다.
 
 <!-- tools-table:begin -->
 | 도구 | 하는 일 | 쓰는 점검 항목 | 모드 | 설치 방법과 위치 | 없으면 |
@@ -95,7 +95,7 @@ kubegap은 helm, krr, polaris, pluto, kubent를 `PATH`에서 찾습니다. EKS�
 설치는 이렇게 합니다.
 
 - Homebrew가 있으면 Homebrew로 설치합니다.
-- Homebrew가 없으면 `lib/tools.py`에 고정한 버전의 릴리스 바이너리를 내려받습니다. 같은 파일에 고정한 sha256과 비교해서 값이 맞을 때만 kubegap 폴더 안의 `.tools/bin/`에 넣습니다.
+- Homebrew가 없으면 `lib/commands/tools.py`에 고정한 버전의 릴리스 바이너리를 내려받습니다. 같은 파일에 고정한 sha256과 비교해서 값이 맞을 때만 kubegap 폴더 안의 `.tools/bin/`에 넣습니다.
 - polaris와 pluto는 서드파티 tap에서 받기 때문에 고정 버전 다운로드를 먼저 시도합니다.
 - krr는 전용 Python virtualenv에 `deploy/krr-requirements.txt`로 설치합니다. 이 파일은 krr가 쓰는 패키지 전부를 파일마다 sha256으로 고정하고 있어서 `pip install --require-hashes`로 값이 맞는 것만 들어갑니다. 서드파티 tap의 formula보다 이 virtualenv를 먼저 씁니다.
 - Linux에서 aws CLI zip은 `gpg`가 있으면 AWS CLI Team의 OpenPGP 서명으로도 확인합니다. 키는 `deploy/aws-cli-public-key.asc`에 있습니다. gpg가 없으면 sha256 고정값만으로 판단하고, 설치 결과에 그렇게 적습니다.

@@ -7,8 +7,10 @@ import os
 import shlex
 from pathlib import Path
 
-from lib import collect, hygiene, lastapplied, scrub, yamlite
-from lib.runlog import RunLog
+from lib.collection import collect
+from lib.foundations import lastapplied, scrub, yamlite
+from lib.foundations.runlog import RunLog
+from lib.summaries import hygiene
 
 ROOT = Path(__file__).resolve().parent.parent
 ANN = "kubectl.kubernetes.io/last-applied-configuration"
@@ -53,7 +55,7 @@ def test_objects_pluto_would_skip_are_skipped(tmp_path):
 
 
 def test_a_scrubbed_configmap_is_skipped_and_nothing_of_it_is_read(tmp_path):
-    """lib/scrub.py replaces the annotation of a ConfigMap by {len, shape} before the file is written; pluto has no rule for ConfigMap or Secret (versions.yaml@v5.24.5)."""
+    """lib/foundations/scrub.py replaces the annotation of a ConfigMap by {len, shape} before the file is written; pluto has no rule for ConfigMap or Secret (versions.yaml@v5.24.5)."""
     cm = obj("ConfigMap", "app", applied={"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "app"}, "data": {"a": "b"}}, data={"a": "b"})
     doc = {"items": [cm]}
     assert scrub.scrub_or_error(doc) is None and not isinstance(cm["metadata"]["annotations"][ANN], str)

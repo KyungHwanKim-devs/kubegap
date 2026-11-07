@@ -6,9 +6,10 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from lib import collect, podmetrics, shell
-from lib.config import Config
-from lib.runlog import RunLog
+from lib.collection import collect
+from lib.foundations import podmetrics, shell
+from lib.foundations.config import Config
+from lib.foundations.runlog import RunLog
 
 
 def _wl(kind, ns, name, labels, ports, image="x"):

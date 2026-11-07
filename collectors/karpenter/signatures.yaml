@@ -90,7 +90,7 @@
     - "aws/smithy-go errors.go:37@v1.28.2"
 # karpenter.disruption-blocked is removed: DisruptionBlocked, "Cannot disrupt ...", "pdb prevents pod evictions" and the do-not-disrupt texts are Event messages or condition errors only
 # (pkg/controllers/disruption/events/events.go:110-128@v0.37.0, pkg/controllers/state/statenode.go:344@v1.15.1); Karpenter's recorder never logs (pkg/events/recorder.go:86) and the
-# controller-runtime event logger is wrapped by logging.IgnoreDebugEvents. "disruption budget" matched only "detected disruption budget errors" (an invalid budget spec). lib/events.py TRACKED covers DisruptionBlocked.
+# controller-runtime event logger is wrapped by logging.IgnoreDebugEvents. "disruption budget" matched only "detected disruption budget errors" (an invalid budget spec). lib/summaries/events.py TRACKED covers DisruptionBlocked.
 # `cannot evict pod` and `Cannot evict pod as it would violate the pod's disruption budget` were dropped: the first exists nowhere, the second is the apiserver's text, which Karpenter
 # catches with IsTooManyRequests and turns into the FailedDraining Event (never logged). `eviction.*(failed|blocked)` matched nothing in that order.
 # "failed evicting pod" (non-PDB eviction API error, ERROR) exists up to v1.5.x; from v1.6.0 the error is returned and reaches controller-runtime's "Reconciler error".

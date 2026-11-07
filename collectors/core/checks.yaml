@@ -1131,7 +1131,7 @@
   symptom_linked: false
   why: >
     KRR (Robusta) recommends per-container requests and limits from 14 days of Prometheus history (simple strategy: CPU request = p95, no CPU limit, memory request = limit = max + 15%).
-    KRR CRITICAL also includes "memory limit larger than the recommendation (max + 15%)", which is noise if used as is, so kubegap re-grades on request differences only (lib/resources.py kubegap_level):
+    KRR CRITICAL also includes "memory limit larger than the recommendation (max + 15%)", which is noise if used as is, so kubegap re-grades on request differences only (lib/summaries/resources.py kubegap_level):
     fail = memory request below the recommendation (under-allocated: OOM, node overcommit) or CPU request over by 0.2 cores or more / memory request over by 512 MB or more. warn = a smaller difference. A limit-only difference is pass (the CPU limit removal advice is cpu_limit_remove_recommended in the summary).
     UNKNOWN means no data (short-lived pod or absent from Prometheus) or a CPU-based HPA target that KRR declines to recommend for.
     It asks the same question as the kubegap p95 checks (cpu/memory-*-p95) over a different window (14 days) with a different calculation, so a workload flagged by both is certain.
@@ -3673,7 +3673,7 @@
   verify:
     - "kubectl get events -A --field-selector reason=<Reason> --sort-by=.lastTimestamp"
     - "snapshots/<context>/events-history.json"
-  notes: lib/events.py TRACKED
+  notes: lib/summaries/events.py TRACKED
   profiles: [prod, lab]
 
 # ---------- Operators in general ----------
@@ -4301,7 +4301,7 @@
     - "kubectl version ; rubric/k8s-versions.yaml ; (EKS) aws eks describe-cluster-versions"
   profiles: [prod, lab]
 
-# ---- Node OS (area node). Material is summary.nodeos (lib/nodeos.py). Read from inside the node, so only what does not overlap with the node-exporter metric checks (node.conntrack-usage etc.) lives here. ----
+# ---- Node OS (area node). Material is summary.nodeos (lib/summaries/nodeos.py). Read from inside the node, so only what does not overlap with the node-exporter metric checks (node.conntrack-usage etc.) lives here. ----
   test:
     profile: "lab"
     cases:  # `today` pins the date so the verdicts do not drift as end-of-support dates in rubric/k8s-versions.yaml pass
@@ -9410,7 +9410,7 @@
   verify:
     - "scripts/kubegap nodes --context <name>"
 
-# ---- Logs (signatures, Loki). Source: summary.logs (lib/logs.py) ----
+# ---- Logs (signatures, Loki). Source: summary.logs (lib/summaries/logs.py) ----
   test:
     cases:
       - expect: "fail"
@@ -10085,7 +10085,7 @@
                 severity: "warning"
               value: 7
 
-# ---------- Cost and efficiency. Source: summary.cost (lib/cost.py). Prices are estimates (on-demand list price, current spot price); the actual bill is summary.cost.bill ----------
+# ---------- Cost and efficiency. Source: summary.cost (lib/summaries/cost.py). Prices are estimates (on-demand list price, current spot price); the actual bill is summary.cost.bill ----------
 - id: cost.idle-compute-high
   name: Most of the compute cost is idle (7-day CPU p95)
   area: cost
@@ -10454,7 +10454,7 @@
           request_over_usage: 2.0
           can_drop_largest_node: false
 
-# ---------- Security. Source: summary.security (lib/security.py). Secret values are never recorded anywhere ----------
+# ---------- Security. Source: summary.security (lib/summaries/security.py). Secret values are never recorded anywhere ----------
 - id: security.cluster-admin-bindings
   name: cluster-admin bound to non-system subjects
   area: security
@@ -11205,7 +11205,7 @@
           present: false
 
 
-# ---------- Storage. Source: summary.storage (lib/storage.py). k3s local-path checks live in collectors/k3s-platform ----------
+# ---------- Storage. Source: summary.storage (lib/summaries/storage.py). k3s local-path checks live in collectors/k3s-platform ----------
 - id: storage.pvc-usage-high
   name: PVC usage high
   area: storage
@@ -12069,7 +12069,7 @@
           prod_db_pvcs_without_snapshot_path: []
           platform: "k3s"
 
-# ---------- Structure and hygiene. Source: summary.hygiene (lib/hygiene.py) ----------
+# ---------- Structure and hygiene. Source: summary.hygiene (lib/summaries/hygiene.py) ----------
 - id: hygiene.polaris-reliability-danger
   name: Polaris reliability/efficiency danger items (untagged images, hostPath, missing probes, etc.)
   area: hygiene
@@ -14590,7 +14590,7 @@
           last_applied: true
       - expect: "none"
 
-# ---------- Resilience. Material is summary.resilience (lib/resilience.py) ----------
+# ---------- Resilience. Material is summary.resilience (lib/summaries/resilience.py) ----------
 - id: resilience.liveness-dependency-path
   name: liveness probe checks dependencies (DB, ready) or shares its path with readiness
   area: resilience
@@ -16175,7 +16175,7 @@
           preempted_events: 0
           no_user_classes_with_prod: false
 
-# ---------- Traffic. Material is summary.traffic (lib/traffic.py) ----------
+# ---------- Traffic. Material is summary.traffic (lib/summaries/traffic.py) ----------
 - id: traffic.ingress-5xx-ratio
   name: Ingress 5xx ratio is high (ALB CloudWatch or ingress-nginx)
   area: traffic
@@ -17876,7 +17876,7 @@
     - "kubectl get svc -A --field-selector spec.type=LoadBalancer -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,POLICY:.spec.externalTrafficPolicy"
   profiles: [prod, lab]
 
-# ---------- Scaling. Material is summary.scaling (lib/scaling.py) ----------
+# ---------- Scaling. Material is summary.scaling (lib/summaries/scaling.py) ----------
   test:
     cases:
       - expect: "warn"
@@ -19312,7 +19312,7 @@
                     - nodes: "0"
           nodeclaims.karpenter.sh: []
 
-# --- Multi-tenancy (summary.tenancy — lib/tenancy.py) ---
+# --- Multi-tenancy (summary.tenancy — lib/summaries/tenancy.py) ---
 - id: tenancy.prod-without-quota
   name: Production tenant namespace has no ResourceQuota (one tenant can eat all the nodes)
   area: tenancy

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from lib import summarize
+from lib.summaries import summarize
 
 
 def test_component_logs_are_removed_and_marker_left(tmp_path):
@@ -36,7 +36,7 @@ def _fake_snapshot(tmp_path):
 
 
 def test_summarize_deletes_logs_writes_aggregate_and_rerun_is_identical(tmp_path):
-    from lib import snapshot
+    from lib.foundations import snapshot
 
     snap = _fake_snapshot(tmp_path)
     s1 = summarize.summarize(snap, echo=None)
@@ -75,12 +75,13 @@ def test_summarize_keep_component_logs(tmp_path):
 
 
 def test_logs_step_finds_the_workloads_of_present_components_with_the_shared_matcher(tmp_path, monkeypatch):
-    """The step matches the detection rules' name patterns against the object dump through lib.components.match_name (the one matcher since #136; until then it
-    imported a private one from lib.discover inside the function, which no test ran, and the k3s full run of 2026-11-05 crashed on the stale import)."""
+    """The step matches the detection rules' name patterns against the object dump through lib.foundations.components.match_name (the one matcher since #136; until then it
+    imported a private one from lib.collection.discover inside the function, which no test ran, and the k3s full run of 2026-11-05 crashed on the stale import)."""
     import json
 
-    from lib import collect, shell
-    from lib.runlog import RunLog
+    from lib.collection import collect
+    from lib.foundations import shell
+    from lib.foundations.runlog import RunLog
 
     (tmp_path / "objects").mkdir()
     dep = {

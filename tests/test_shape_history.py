@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from lib import regress
+from lib.commands import regress
 
 ROOT = Path(__file__).resolve().parent.parent
 

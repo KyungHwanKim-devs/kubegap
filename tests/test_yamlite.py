@@ -1,11 +1,11 @@
-"""lib/yamlite.py: the hand-written YAML subset parser. Each test is one feature of the supported subset, one fixed bug, or one rejected construct."""
+"""lib/foundations/yamlite.py: the hand-written YAML subset parser. Each test is one feature of the supported subset, one fixed bug, or one rejected construct."""
 
 import textwrap
 
 import pytest
 
-from lib import yamlite
-from lib.yamlite import YamlError, load
+from lib.foundations import yamlite
+from lib.foundations.yamlite import YamlError, load
 
 
 def y(text: str):
@@ -375,7 +375,7 @@ def test_mapping_value_reads_a_key_inside_its_own_section_of_text_the_parser_can
     limits_config; the whole-text regular expression kubegap used took whichever came first (#126)."""
     import pytest
 
-    from lib import yamlite
+    from lib.foundations import yamlite
 
     with pytest.raises(yamlite.YamlError):
         yamlite.load(LOKI_LIKE)
@@ -411,7 +411,7 @@ def test_unfolding_plain_scalars_lets_go_yaml_output_load():
     """Alertmanager serves Config.String() and Loki its /config: both are go-yaml output, which folds plain scalars at 80 columns."""
     import pytest
 
-    from lib import yamlite
+    from lib.foundations import yamlite
 
     with pytest.raises(yamlite.YamlError):
         yamlite.load(FOLDED_AM)
@@ -426,7 +426,7 @@ def test_unfolding_plain_scalars_lets_go_yaml_output_load():
 
 
 def test_mapping_value_handles_block_scalars_comments_and_broken_quotes():
-    from lib import yamlite
+    from lib.foundations import yamlite
 
     text = 'a:\n  b: |\n    long\n  c: value # a comment\n  d: "quoted # not a comment"\n  e: "unterminated\n    continued"\n'
     assert yamlite.mapping_value(text, "a", "b") is None

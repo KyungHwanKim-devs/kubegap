@@ -1,4 +1,4 @@
-"""The optional-tools table of docs/SETUP.md and docs/ko/SETUP.md is generated from lib/tools.py and the check catalog (#23);
+"""The optional-tools table of docs/SETUP.md and docs/ko/SETUP.md is generated from lib/commands/tools.py and the check catalog (#23);
 these tests fail when the table is stale or when a tool names a check the catalog does not have (the first-run question
 once offered argocd, promtool and amtool for checks that did not exist and steps that never ran them)."""
 
@@ -11,7 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from lib import paths, tools
+from lib.commands import tools
+from lib.foundations import paths
 
 ROOT = paths.ROOT
 BEGIN, END = "<!-- tools-table:begin -->\n", "<!-- tools-table:end -->\n"
@@ -60,7 +61,7 @@ def test_checks_text_counts_a_prefix_and_keeps_an_id():
 
 def test_the_node_access_tools_count_only_the_node_script_checks():
     """What the table says aws and ssh feed must be the number the first-run question promises (firstrun.node_script_checks)."""
-    from lib import firstrun
+    from lib.commands import firstrun
 
     catalog = tools.catalog()
     for name in ("aws", "ssh"):

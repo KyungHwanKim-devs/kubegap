@@ -1,8 +1,8 @@
-"""lib/discover.py platform detector. The function is pure: it reads the kubeconfig flags, node provider IDs and kubelet versions, detected components and a few objects."""
+"""lib/collection/discover.py platform detector. The function is pure: it reads the kubeconfig flags, node provider IDs and kubelet versions, detected components and a few objects."""
 
 import pytest
 
-from lib import discover
+from lib.collection import discover
 
 detect = discover.detect_platform
 

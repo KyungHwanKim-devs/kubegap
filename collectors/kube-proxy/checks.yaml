@@ -1,4 +1,4 @@
-# kube-proxy checks. summary.kubeproxy.summary — lib/kubeproxy.py. conntrack table saturation is handled by core node.conntrack-*.
+# kube-proxy checks. summary.kubeproxy.summary — lib/summaries/kubeproxy.py. conntrack table saturation is handled by core node.conntrack-*.
 - id: kubeproxy.metrics-not-scraped
   name: kube-proxy metrics missing from Prometheus or targets down (rule sync state cannot be observed)
   area: observability

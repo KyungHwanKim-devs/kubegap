@@ -1,5 +1,5 @@
 """#165: every age, window and expiry a summary or a check computes is measured from the snapshot's `taken_at`, never from the wall clock, so the same
-snapshot gives the same findings whenever it is read. `lib/snapshot.parse_ts` is the one timestamp reader and `lib/snapshot.taken_at` the one clock."""
+snapshot gives the same findings whenever it is read. `lib/foundations/snapshot.parse_ts` is the one timestamp reader and `lib/foundations/snapshot.taken_at` the one clock."""
 
 from __future__ import annotations
 
@@ -10,8 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from lib import evaluate, hygiene, k3s, rubric, snapshot, summarize
-from lib.evaluate import Context
+from lib.foundations import rubric, snapshot
+from lib.judgement import evaluate
+from lib.judgement.evaluate import Context
+from lib.summaries import hygiene, k3s, summarize
 
 ROOT = Path(__file__).resolve().parent.parent
 TAKEN = "2026-11-05T17:25:17+09:00"  # the k3s reference snapshot
@@ -59,7 +61,7 @@ def test_taken_at_is_the_inventory_time():
 
 def test_no_summary_module_reads_the_wall_clock():
     """A sweep of `datetime.now`, `date.today`, `time.time` (also behind `__import__("time")`) and `monotonic` in lib/. What stays is the time a collection or a report *ran*
-    (a stamp, a query window, a timeout), never an age a check judges. lib/karpenterctl.py measured the controller's uptime with `__import__("time").time()` until #145."""
+    (a stamp, a query window, a timeout), never an age a check judges. lib/summaries/karpenterctl.py measured the controller's uptime with `__import__("time").time()` until #145."""
     collection_time = {
         "albmetrics.py",
         "collect.py",
@@ -80,7 +82,7 @@ def test_no_summary_module_reads_the_wall_clock():
     }  # the last three time a command or a wait
     clock = re.compile(r"datetime\.now\(|date\.today\(|utcnow\(|time\.time\(|__import__\(\"time\"\)|monotonic\(")
     left = []
-    for f in sorted((ROOT / "lib").glob("*.py")):
+    for f in sorted((ROOT / "lib").rglob("*.py")):
         if f.name in collection_time:
             continue
         for n, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):

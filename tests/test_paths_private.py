@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from lib import paths, snapshot
+from lib.foundations import paths, snapshot
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -106,7 +106,7 @@ def test_a_path_under_user_dir_is_inspected_from_user_dir(tmp_path, capsys, monk
 
 
 def test_runlog_file_is_owner_only(tmp_path):
-    from lib.runlog import RunLog
+    from lib.foundations.runlog import RunLog
 
     log = RunLog(tmp_path / "ctx" / "snap" / "run.log")
     log.note("x")
@@ -118,7 +118,7 @@ def test_runlog_file_is_owner_only(tmp_path):
 
 def test_runlog_recreated_after_unlink_is_still_owner_only(tmp_path):
     """setup deletes setup.log after building the RunLog and writes again; the mode must not depend on that order."""
-    from lib.runlog import RunLog
+    from lib.foundations.runlog import RunLog
 
     p = tmp_path / "setup.log"
     log = RunLog(p)
@@ -166,9 +166,9 @@ def _mkdir_calls(source: str, filename: str) -> list[str]:
 
 
 def test_no_other_module_creates_folders():
-    """Every folder under a snapshot, the user dir or .tools/ comes from paths.ensure_private_dir (lib/tools.py included since #88)."""
+    """Every folder under a snapshot, the user dir or .tools/ comes from paths.ensure_private_dir (lib/commands/tools.py included since #88)."""
     offenders = []
-    for f in [*sorted(ROOT.glob("lib/*.py")), ROOT / "scripts" / "kubegap"]:
+    for f in [*sorted(ROOT.glob("lib/*/*.py")), ROOT / "scripts" / "kubegap"]:
         if f.name == "paths.py":
             continue
         offenders += _mkdir_calls(f.read_text(encoding="utf-8"), str(f.relative_to(ROOT)))

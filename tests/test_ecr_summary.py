@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 
-from lib import ecr
+from lib.summaries import ecr
 
 
 def _write(path, doc):

@@ -1,4 +1,4 @@
-# VPC CNI (aws-node) checks. summary.vpccni — lib/vpccni.py. Network policy enforcement and add-on versions are covered by the core security and eks-platform checks.
+# VPC CNI (aws-node) checks. summary.vpccni — lib/summaries/vpccni.py. Network policy enforcement and add-on versions are covered by the core security and eks-platform checks.
 - id: vpccni.node-ip-exhaustion
   name: Node pod IPs near the limit of its instance type
   area: traffic

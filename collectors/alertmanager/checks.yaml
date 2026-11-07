@@ -1,4 +1,4 @@
-# Alertmanager self-health checks. summary.stackhealth.alertmanager — lib/stackhealth.py. Routing (null default receiver, silences, delivery failures) is covered by core observability.alertmanager-*.
+# Alertmanager self-health checks. summary.stackhealth.alertmanager — lib/summaries/stackhealth.py. Routing (null default receiver, silences, delivery failures) is covered by core observability.alertmanager-*.
 - id: alertmanager.single-instance
   name: Single Alertmanager with cluster mode disabled (single point of failure for alert routing)
   area: observability

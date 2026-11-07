@@ -1,10 +1,10 @@
 # The versions kubegap's facts were read at (#146): one entry per component, the single source of README's "Verified against" table
-# (scripts/kubegap verified --markdown) and of the report header's range line (lib/verified.range_note). `read` lists every tag cited for the
-# component's repositories in collectors/*/*.yaml, signatures/, references/sources.md and lib/tools.py; tests/test_verified_doc.py fails when a
+# (scripts/kubegap verified --markdown) and of the report header's range line (lib/output/verified.range_note). `read` lists every tag cited for the
+# component's repositories in collectors/*/*.yaml, signatures/, references/sources.md and lib/commands/tools.py; tests/test_verified_doc.py fails when a
 # citation names a tag that is not here. `eks` and `k3s` are what the two reference clusters run, `newest` the newest release read. `assumes` is
 # the installation the queries and steps take for granted and `outside` what happens elsewhere: a skip with a reason, a detection, a config key.
 # `libraries` names the other repositories citations reach: logging and SDK libraries read for a signature, client libraries read for a metric name, and
-# the charts and operators read only to recognise a component (lib/components.py); their tags are not tracked here.
+# the charts and operators read only to recognise a component (lib/foundations/components.py); their tags are not tracked here.
 components:
   - name: "Kubernetes (kube-apiserver, kubelet, kube-proxy, kube-scheduler, controller-manager)"
     repos:

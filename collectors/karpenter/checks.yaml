@@ -1,4 +1,4 @@
-# Karpenter controller checks. summary.karpenterctl.summary — lib/karpenterctl.py. NodePool/NodeClaim status, latency, budgets and version compatibility are covered by core scaling.karpenter-* and eks-platform platform.karpenter-version-compat.
+# Karpenter controller checks. summary.karpenterctl.summary — lib/summaries/karpenterctl.py. NodePool/NodeClaim status, latency, budgets and version compatibility are covered by core scaling.karpenter-* and eks-platform platform.karpenter-version-compat.
 - id: karpenter.controller-availability
   name: Karpenter controller replicas, spread, PDB and own node (if the controller dies, scale-out and spot interruption handling stop)
   area: scaling

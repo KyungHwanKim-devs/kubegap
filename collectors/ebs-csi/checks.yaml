@@ -1,4 +1,4 @@
-# EBS CSI checks. summary.ebscsi.summary — lib/ebscsi.py. Attach limits, EBS volumes and snapshots are covered by the core storage section (storage.*).
+# EBS CSI checks. summary.ebscsi.summary — lib/summaries/ebscsi.py. Attach limits, EBS volumes and snapshots are covered by the core storage section (storage.*).
 - id: ebscsi.controller-availability
   name: EBS CSI controller has 1 replica or all replicas on one node (single point where volume attach and provisioning stop)
   area: storage

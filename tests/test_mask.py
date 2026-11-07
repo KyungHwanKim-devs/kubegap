@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from lib import mask
+from lib.foundations import mask
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -54,6 +54,6 @@ def test_mask_file_reports_control_chars(tmp_path):
 
 
 def test_log_samples_pass_through_mask_text():
-    """lib/logs.py keeps the first 240 characters of a log line as a sample through mask_text, so a coloured log line arrives in summary.json without the colours."""
-    src = (ROOT / "lib" / "logs.py").read_text(encoding="utf-8")
+    """lib/summaries/logs.py keeps the first 240 characters of a log line as a sample through mask_text, so a coloured log line arrives in summary.json without the colours."""
+    src = (ROOT / "lib" / "summaries" / "logs.py").read_text(encoding="utf-8")
     assert src.count("mask_text(line[:240]).text") == 2

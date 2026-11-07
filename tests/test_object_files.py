@@ -13,8 +13,12 @@ from pathlib import Path
 
 import pytest
 
-from lib import collect, evaluate, render, rubric, snapshot, summarize
-from lib.runlog import RunLog, read_runlog
+from lib.collection import collect
+from lib.foundations import rubric, snapshot
+from lib.foundations.runlog import RunLog, read_runlog
+from lib.judgement import evaluate
+from lib.output import render
+from lib.summaries import summarize
 
 ROOT = Path(__file__).resolve().parent.parent
 FIXTURES = sorted((ROOT / "tests" / "fixtures" / "api-resources").glob("*.json"))
@@ -28,7 +32,7 @@ STEM_RES = (
 def literal_stems() -> set[str]:
     """Every object file name lib/*.py and the checks spell out."""
     stems: set[str] = set()
-    for f in [*(ROOT / "lib").glob("*.py"), *(ROOT / "collectors").glob("*/checks.yaml")]:
+    for f in [*(ROOT / "lib").rglob("*.py"), *(ROOT / "collectors").glob("*/checks.yaml")]:
         text = f.read_text(encoding="utf-8")
         for rx in STEM_RES:
             stems.update(rx.findall(text))

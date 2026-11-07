@@ -1,4 +1,4 @@
-# AWS Load Balancer Controller checks. summary.albctl.summary — lib/albctl.py. ALB and target group CloudWatch metrics are covered by the core traffic section (traffic.alb-*).
+# AWS Load Balancer Controller checks. summary.albctl.summary — lib/summaries/albctl.py. ALB and target group CloudWatch metrics are covered by the core traffic section (traffic.alb-*).
 - id: albctl.controller-availability
   name: AWS Load Balancer Controller replicas, spread and PDB (if the controller dies, Ingress and TargetGroup changes stop)
   area: traffic

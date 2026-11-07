@@ -1,4 +1,4 @@
-# Kubernetes minors each Karpenter version supports (check platform.karpenter-version-compat, lib/scaling.py:_karpenter). Read in source (#130): the
+# Kubernetes minors each Karpenter version supports (check platform.karpenter-version-compat, lib/summaries/scaling.py:_karpenter). Read in source (#130): the
 # table the Karpenter documentation's compatibility matrix is generated from, `aws/karpenter-provider-aws hack/docs/compatibilitymatrix_gen/compatibility.yaml`
 # at v1.15.1 (the matrix itself: website/content/en/docs/upgrading/compatibility.md:18-20@v1.15.1). Cited per row.
 # `karpenter` is a minor ("1.4", every 1.4.x) or a patch ("1.0.5": that patch and the later ones of its minor); the row with the highest version not

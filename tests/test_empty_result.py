@@ -7,7 +7,9 @@ import json
 import threading
 from pathlib import Path
 
-from lib import evaluate, metricnames, prom, rubric
+from lib.collection import prom
+from lib.foundations import metricnames, rubric
+from lib.judgement import evaluate
 
 ROOT = Path(__file__).resolve().parent.parent
 INV = {"cluster": {"platform": "k3s"}, "namespaces": {"prod_like": []}, "profile": {"name": "lab"}, "nodes": {"nodes": []}}

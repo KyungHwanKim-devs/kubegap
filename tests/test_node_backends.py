@@ -7,9 +7,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from lib import collect, discover
-from lib.node import NodeResult
-from lib.runlog import RunLog
+from lib.collection import collect, discover
+from lib.collection.node import NodeResult
+from lib.foundations.runlog import RunLog
 
 
 class _FakeNA:
@@ -69,7 +69,7 @@ def test_discover_gives_no_backend_to_a_platform_without_ssm_or_ssh():
 
 
 def test_node_access_knows_two_backends_only():
-    from lib import node as node_mod
+    from lib.collection import node as node_mod
 
     na = node_mod.NodeAccess({"node_access": {"method": "daemonset"}, "nodes": {"nodes": [{"name": "n1"}]}}, {})
     r = na.run_on_node("n1", "true")
@@ -83,7 +83,7 @@ PM_STEP = {"id": "speaker-metrics", "type": "pod-metrics", "namespace": "metallb
 
 
 def _pm_ctx(tmp_path, na, log=None, blocked=True):
-    from lib.config import Config
+    from lib.foundations.config import Config
 
     inv = {"nodes": {"nodes": [{"name": "n1"}, {"name": "n2"}]}}
     state = collect.CollectState()
@@ -102,7 +102,7 @@ def _pod(name, phase, ip, node="n1"):
 def _fake_kubectl(pods):
     import json
 
-    from lib import shell
+    from lib.foundations import shell
 
     def kubectl(args, **kw):
         if args[:2] == ["get", "pods"]:
@@ -145,7 +145,7 @@ def test_pod_metrics_refusal_after_a_real_proxy_error_stays_a_failure(tmp_path, 
     """A 403 from the proxy is a real failure; the refused fallback is added to its error instead of turning the pod, and the step, into a skip."""
     import json
 
-    from lib import shell
+    from lib.foundations import shell
 
     def kubectl(args, **kw):
         if args[:2] == ["get", "pods"]:
@@ -165,7 +165,7 @@ def test_metallb_speaker_evidence_carries_the_skip_reason(tmp_path):
     """metallbctl._l2 lists unreadable speakers from the step's pod entries; a skipped pod has no error, so the skip reason is what the evidence shows."""
     import json
 
-    from lib import metallbctl
+    from lib.summaries import metallbctl
 
     cr = {"metallb": {"steps": {"metallb-speaker-metrics": {"pods": {"speaker-a": {"ok": False, "node": "n1", "error": None, "skipped": "pod not Running (Pending)"}, "speaker-b": {"ok": True, "node": "n2"}}}}}}
     (tmp_path / "collect-result.json").write_text(json.dumps(cr))

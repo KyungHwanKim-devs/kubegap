@@ -1,4 +1,4 @@
-# MetalLB checks. summary.metallb — lib/metallbctl.py, on every platform. The first two were moved from k3s-platform with their ids unchanged.
+# MetalLB checks. summary.metallb — lib/summaries/metallbctl.py, on every platform. The first two were moved from k3s-platform with their ids unchanged.
 - id: traffic.metallb-pool-near-full
   name: MetalLB IP pool running out of free addresses
   area: traffic

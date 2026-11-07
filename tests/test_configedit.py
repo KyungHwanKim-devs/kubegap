@@ -6,8 +6,9 @@ import stat
 
 import pytest
 
-from lib import configedit, yamlite
-from lib.configedit import ConfigEditError, set_key, set_text
+from lib.commands import configedit
+from lib.commands.configedit import ConfigEditError, set_key, set_text
+from lib.foundations import yamlite
 
 
 def test_new_file_gets_header_then_key(tmp_path):
@@ -74,7 +75,7 @@ def test_layouts_the_editor_does_not_handle_say_so():
 
 
 def test_every_settable_key_is_a_known_config_key():
-    from lib.config import KNOWN_KEYS
+    from lib.foundations.config import KNOWN_KEYS
 
     assert {k.split(".")[0] for k in configedit.SETTABLE} | set(configedit.REFUSED) <= KNOWN_KEYS
 
