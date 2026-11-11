@@ -228,6 +228,12 @@ Collected data is stored on your machine under `~/.kubegap/`, one folder per aud
 
 Every permission is listed in [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md), and the collected data is described in [`docs/DATA.md`](docs/DATA.md). The ClusterRole and IAM policy for a security review are in [`deploy/permissions/`](deploy/permissions/).
 
+## The public reports behind the checks
+
+The 209 case links in [`docs/CHECKS.md`](docs/CHECKS.md) point at reports other teams published about their own incidents. Most of them are also in [Incident Library](https://benchlet.com/incidentlib/app), a public collection where each report is written up as one case with its symptoms, trigger, root cause, components and lessons, in English and Korean, and the cases can be searched by a symptom sentence. When a report says "Zalando 2019" next to a check, the library has the same report as a case with a stable number, and the CHECKS.md row links to it.
+
+The library is open to AI tools too: an HTTP API at https://incidentlib-api.benchlet.com and an MCP server at https://incidentlib-mcp.benchlet.com/mcp, both without a key. An agent that has just read a kubegap finding can ask the library which public incidents had the same symptoms.
+
 ## Documentation
 
 - [`docs/SETUP.md`](docs/SETUP.md): how to connect to the cluster, AWS and the nodes, how to change settings, and how to run with the least access

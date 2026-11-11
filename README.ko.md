@@ -228,6 +228,12 @@ ConfigMap 값도 저장하지 않습니다. 키마다 길이와 형태만 남기
 
 필요한 권한은 하나하나 [`docs/ko/PERMISSIONS.md`](docs/ko/PERMISSIONS.md)에, 수집하는 데이터는 [`docs/ko/DATA.md`](docs/ko/DATA.md)에 정리해 두었습니다. 보안 검토에 쓸 ClusterRole과 IAM 정책은 [`deploy/permissions/`](deploy/permissions/)에 있습니다.
 
+## 점검 항목 뒤에 있는 공개 보고서
+
+[`docs/CHECKS.md`](docs/CHECKS.md)의 사례 링크 209개는 다른 팀이 자기 장애를 스스로 적어 공개한 보고서입니다. 그 대부분은 [Incident Library](https://benchlet.com/incidentlib/app/ko)에도 있습니다. 보고서 하나를 증상, 계기, 원인, 구성 요소, 교훈이 있는 사례 하나로 정리해 두고 증상 문장으로 찾을 수 있게 한 공개 모음이고, 영어와 한국어로 읽을 수 있습니다. 점검 항목 옆에 "Zalando 2019"라고 적힌 보고서는 라이브러리에 번호가 붙은 사례로도 있고, CHECKS.md의 그 줄이 거기로 이어집니다.
+
+라이브러리는 AI 도구에도 열려 있습니다. HTTP API는 https://incidentlib-api.benchlet.com, MCP 서버는 https://incidentlib-mcp.benchlet.com/mcp 이고 둘 다 키가 필요 없습니다. kubegap 리포트의 문제를 읽은 에이전트가 같은 증상을 겪은 공개 장애가 있었는지 라이브러리에 바로 물어볼 수 있습니다.
+
 ## 문서
 
 - [`docs/ko/SETUP.md`](docs/ko/SETUP.md): 클러스터와 AWS, 노드에 어떻게 연결하는지, 설정을 바꾸는 법, 가장 좁은 권한으로 돌리는 법
