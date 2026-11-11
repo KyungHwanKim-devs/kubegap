@@ -209,3 +209,12 @@ def active_suppressions(cfg_suppress: list | None, today: _dt.date) -> tuple[lis
                 exp = False
         (expired if exp else active).append(s)
     return active, expired
+
+
+def load_incident_library() -> dict | None:
+    """references/incident-library.yaml: the public case urls that Incident Library also holds, url -> case id, and the base address of its case pages. None when the file is absent."""
+    path = paths.ROOT / "references" / "incident-library.yaml"
+    if not path.is_file():
+        return None
+    doc = yamlite.load(path.read_text(encoding="utf-8")) or {}
+    return {"base": str(doc.get("base", "")).rstrip("/"), "cases": {str(x["url"]).rstrip("/"): str(x["id"]) for x in doc.get("cases") or []}}

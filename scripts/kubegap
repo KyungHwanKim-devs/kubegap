@@ -459,10 +459,18 @@ def cmd_checks(args) -> int:
         known, _known_errors = _rubric.load_known_issues()
         if known:
             print(f"\n{len(known)} checks have an open defect of kubegap itself on the tracker (`rubric/known-issues.yaml`); a finding of such a check says `known issue #N` at the end of its evidence.")
+        library = _rubric.load_incident_library()
+        if library:
+            print(
+                f"\n{sum(1 for c in checks for x in c.get('cases') or [] if x['url'].rstrip('/') in library['cases'])} of the case links are also reviewed cases of [Incident Library](https://benchlet.com/incidentlib/app), where the same report is written up with its symptoms, root cause and components and can be searched by symptom; the case id follows the source link."
+            )
         for a in areas:
             print(f"\n## {a}\n\n| id | What it checks | Default severity | Profiles | Collector | Public cases | Known issues |\n|---|---|---|---|---|---|---|")
             for c in sorted(by_area[a], key=lambda c: c["id"]):
-                cases = ", ".join(f"[{x['who']}]({x['url']})" for x in c.get("cases") or [])
+                def cite(x):
+                    i = library["cases"].get(x["url"].rstrip("/")) if library else None
+                    return f"[{x['who']}]({x['url']})" + (f" · [{i}]({library['base']}/{i})" if i else "")
+                cases = ", ".join(cite(x) for x in c.get("cases") or [])
                 issues = ", ".join(f"[#{k['issue']}](https://github.com/KyungHwanKim-devs/kubegap/issues/{k['issue']})" for k in known.get(c["id"]) or [])
                 print(f"| `{c['id']}` | {c['name']} | {c['severity_default']} | {', '.join(c.get('profiles') or [])} | {c['collector']} | {cases} | {issues} |")
         return EXIT_OK
