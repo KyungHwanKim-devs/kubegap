@@ -12,6 +12,8 @@ kubegap makes read calls only. The exact Kubernetes rules and AWS actions, each 
 
 **ConfigMaps.** ConfigMap values are not recorded either. The snapshot keeps the length and shape of each key. The real value is kept only for the configuration keys kubegap parses, listed in `KEEP_VALUES` in [`lib/foundations/scrub.py`](../lib/foundations/scrub.py): the CoreDNS Corefile, the kube-proxy configuration, the local-path-provisioner paths and a few Argo CD flags. Two kinds of ConfigMap keep more because the Grafana sidecars load them: one labelled `grafana_dashboard` keeps its dashboard JSON as it is, and of one labelled `grafana_datasource` the name, type, url and isDefault of each datasource are kept and the rest of the provisioning file, where a password or a header value could be, is dropped.
 
+**Environment variables.** A container environment variable whose name looks like a credential (it contains PASSWORD, PASSWD, SECRET, TOKEN, API_KEY, PRIVATE_KEY, ACCESS_KEY, CLIENT_SECRET, DSN or CONNECTION_STRING, or ends with AUTH, and does not end with a suffix such as _FILE, _PATH, _NAME or _URL) is written without its value, wherever it appears: Pods, workload templates, ControllerRevisions and Jobs. In its place the snapshot keeps the value's length and shape and whether the value looked like a credential, which is what `security.plaintext-secret-env` reports. Variables of other names keep their values, because some checks parse them (the Karpenter feature gates, the VPC CNI warm targets). The `kubectl.kubernetes.io/last-applied-configuration` annotation of every object, which repeats the whole manifest, keeps only its apiVersion and kind, which is what pluto judges.
+
 **Logs.** Component pod logs of the last 24 hours are read by code, counted into the summary with masked sample lines, and then deleted from the snapshot before the agent starts. Set `keep_component_logs: true` in the config only if you accept that raw log lines may then be read by the agent.
 
 ## What stays on your machine
@@ -29,6 +31,7 @@ The agent that runs the skill reads the snapshot files to write the report, and 
 
 - Secret values are never collected, so they cannot leave.
 - ConfigMap values are not in the snapshot, apart from the keys listed above.
+- The values of credential-like environment variables are not in the snapshot.
 - Component pod logs are deleted before the agent starts, unless you set `keep_component_logs: true`.
 - Tokens, account ids and private IPs are masked in the report, not in the snapshot.
 

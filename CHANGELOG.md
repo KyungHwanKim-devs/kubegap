@@ -4,6 +4,16 @@ All notable changes to kubegap are recorded here. The format follows [Keep a Cha
 
 ## [Unreleased]
 
+### Security
+
+- The value of a container environment variable whose name looks like a credential is no longer written to the snapshot. `scrub_objects` in `lib/foundations/scrub.py` now walks every `env` list (Pods, workload templates, ControllerRevision data, Jobs) and, for a name `SECRET_ENV_RE` matches and `ENV_SKIP_RE` does not, replaces `value` with `kubegap_scrub: {len, shape, secret_like}`. `secret_like` is the verdict of `security.plaintext-secret-env`, worked out before the value goes (`env_secret_like`, moved from `lib/summaries/security.py`), so the check reports the same workloads. Variables of other names keep their values, which `karpenterctl`, `vpccni`, `scaling` and `netpol_enforced` parse. A backup CronJob whose database host appears only in a `*_DSN` or `*_CONNECTION_STRING` value is no longer matched to that database by `backup_locality`, because that value can carry a password.
+- `kubectl.kubernetes.io/last-applied-configuration` repeated the whole manifest, environment values included, on every object other than a ConfigMap. It is reduced to the JSON of its apiVersion and kind, which is all `lib/foundations/lastapplied` hands to pluto.
+- The committed fixtures `tests/fixtures/snapshot-k3s` and `snapshot-eks` went through the new scrub. They had carried literal credentials from the reference clusters' pod specs and applied copies.
+
+### Changed
+
+- `SECRET_ENV_RE` also matches a name ending with `AUTH`, the form some images take a credential in (`NEO4J_AUTH="neo4j/<password>"`, neo4j docker image). `security.plaintext-secret-env` now reports such a variable set as a literal: one more high finding in the eks fixture.
+
 ## [0.2.0] - 2026-11-07
 
 The safe-for-others-to-change milestone (12) is complete. This release is about the shape of the code rather than what it judges: `lib/` is six packages, one per layer, with an import direction a test enforces and no summary module importing another; the four modules that were over 1,000 lines are sub-packages split by responsibility; every shared small job has one home and a test that stops a second copy; the twelve longest evidence sentences are helpers instead of 1,000-character expressions in YAML; and `CONTRIBUTING.md` is the guide a contributor opens first, in English and Korean, with the procedure, the commands and the review checklist. Reports are unchanged apart from one new key, `traffic.alb.covered_services`, and three corrections named under Changed. 411 checks, rubric 0.1.87. Snapshots of earlier formats are not read: collect again.
