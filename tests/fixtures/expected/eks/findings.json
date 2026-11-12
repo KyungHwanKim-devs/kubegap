@@ -945,7 +945,9 @@
    "id": "security.plaintext-secret-env",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "fail": 1
+   }
   },
   {
    "id": "security.externalsecret-not-ready",
@@ -3222,6 +3224,13 @@
    "status": "fail",
    "evidence": "4 NetworkPolicies (['app-ab-prod', 'prod-app-r', 'prod-app-t', 'prod-app-x']), enforced False: aws-eks-nodeagent --enable-network-policy=false, 0 PolicyEndpoints",
    "source": "summary.json:security.networkpolicy"
+  },
+  {
+   "check": "security.plaintext-secret-env",
+   "target": "prod-app-z-backend/statefulset/app-z-neo4j:neo4j",
+   "status": "fail",
+   "evidence": "Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded)",
+   "source": "summary.json:security.secrets.plaintext_env"
   },
   {
    "check": "security.privileged-or-host-access",

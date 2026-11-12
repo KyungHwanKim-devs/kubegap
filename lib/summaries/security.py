@@ -16,7 +16,6 @@ from ..foundations import scrub
 from ..foundations.snapshot import dump_record, load_json, metric_rows, object_file_status, objects
 from ..foundations.workload import key as wl_key
 
-SECRET_ENV_RE, ENV_SKIP_RE = scrub.SECRET_ENV_RE, scrub.ENV_SKIP_RE  # shared with the collection-time ConfigMap scan
 DANGEROUS_CAPS = {"SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE", "SYS_MODULE", "ALL", "NET_RAW", "SYS_RAWIO", "DAC_READ_SEARCH"}
 SYSTEM_NS_PREFIX = ("kube-", "karpenter", "monitoring", "cert-manager", "external-secrets", "ingress-nginx", "metallb-system", "keda", "argocd", "arc-system", "arc-systems", "logging", "reloader")
 SYSTEM_SUBJECTS = {("Group", "system:masters"), ("User", "eks:addon-manager"), ("Group", "system:nodes"), ("User", "system:kube-controller-manager"), ("User", "system:kube-scheduler")}
@@ -216,16 +215,8 @@ def _secrets(snap: Path, prod: set, platform: str | None) -> dict:
         for o in objects(snap, stem):
             ns = o["metadata"]["namespace"]
             for c in _tpl(kind, o).get("containers") or []:
-
-                def suspicious(e):
-                    v = str(e.get("value"))
-                    if not v or v == "None" or v.startswith("/") or v.isdigit() or v.lower() in ("true", "false", "yes", "no", "on", "off") or len(v) < 8:
-                        return False  # numeric limits (TOKEN_CAP), flags (ALLOW_EMPTY_PASSWORD=yes) and short values are not secrets
-                    if e["name"].startswith("STAKATER_"):
-                        return False  # the "Secret name to watch" variable injected by Reloader
-                    return bool(SECRET_ENV_RE.search(e["name"])) and not ENV_SKIP_RE.search(e["name"])
-
-                names = [e["name"] for e in c.get("env") or [] if "value" in e and suspicious(e)]
+                # the value of a credential-like variable was dropped at collection time with its verdict kept (lib/foundations/scrub.py)
+                names = [e["name"] for e in c.get("env") or [] if scrub.entry_secret_like(e)]
                 if names:
                     plain.append({"workload": wl_key(kind, o), "namespace": ns, "prod": ns in prod, "container": c["name"], "env_names": names[:8]})  # values are not recorded
     # A ConfigMap key is a candidate when its name looks secret-like and its value looks like a secret (key name only is recorded, never the value; e.g. fluent-bit HTTP_Passwd)

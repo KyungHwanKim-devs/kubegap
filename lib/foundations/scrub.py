@@ -16,6 +16,12 @@ credential is not written to disk at all. Masking after the fact only catches sh
   gzip expands up to about a thousand times, so one crafted annotation could otherwise ask for a gigabyte. The annotation is replaced by
   length and shape either way, so nothing of it reaches the snapshot.
   Component detection in lib/collection/discover runs on the in-memory objects before this scrub.
+- A container environment variable whose name looks like a credential (SECRET_ENV_RE, not ENV_SKIP_RE), wherever an `env` list
+  appears (Pods, workload templates, ControllerRevision data, Jobs): its `value` is removed and replaced by `kubegap_scrub` with
+  the value's length and shape and the verdict of `security.plaintext-env-secret` (env_secret_like), worked out before the value goes.
+  Variables of other names keep their values, which readers such as lib/summaries/karpenterctl parse.
+- Every other object's `kubectl.kubernetes.io/last-applied-configuration` holds a copy of the manifest, environment values included.
+  It is reduced to the JSON of its apiVersion and kind, which is all lib/foundations/lastapplied hands to pluto.
 
 The three writers of kubectl JSON go through `scrub_or_error`: lib/collection/discover for the kinds it fetches, lib/collection/collect dump-all for the rest, and
 the `type: kubectl` steps through `json_scrubber`, which lib/foundations/shell applies before the file exists. A scrub that raises writes nothing and fails the step.
@@ -58,7 +64,8 @@ LAST_APPLIED = "kubectl.kubernetes.io/last-applied-configuration"
 COPY_ANNOTATIONS = (LAST_APPLIED, "objectset.rio.cattle.io/applied")
 
 # Secret-like key detection, moved here from lib/summaries/security.py so it can run before the values are dropped.
-SECRET_ENV_RE = re.compile(r"(PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_?KEY|ACCESS_KEY|CLIENT_SECRET|DSN|CONNECTION_STRING)", re.IGNORECASE)
+# AUTH at the end of a name is a credential in the images that take one that way, e.g. NEO4J_AUTH="neo4j/<password>" (neo4j docker image).
+SECRET_ENV_RE = re.compile(r"(PASSWORD|PASSWD|SECRET|TOKEN|API_?KEY|PRIVATE_?KEY|ACCESS_KEY|CLIENT_SECRET|DSN|CONNECTION_STRING|AUTH$)", re.IGNORECASE)
 ENV_SKIP_RE = re.compile(r"(_FILE|_PATH|_DIR|_NAME|_KEY_ID|_REF|_ENABLED|_URL|_HEADER|_TTL|_LENGTH|_EXPIRY|_TIMEOUT)$", re.IGNORECASE)
 # A line inside a config file such as `HTTP_Passwd xxx`, `password: xxx`, `DB_PASSWORD=xxx`. The key may start with the secret word itself (the earlier form required one leading character and missed a bare `password = ...`).
 _LINE_RE = re.compile(r"(?im)^\s*([A-Za-z0-9_.-]*(?:passw(?:or)?d|secret|token|api[_-]?key)[A-Za-z0-9_.-]*)\s*[:= ]\s*(\S{8,})\s*$")
@@ -91,6 +98,51 @@ def secret_like_keys(data: dict, limit: int = 8) -> list[str]:
         if len(keys) >= limit:
             break
     return list(dict.fromkeys(keys))[:limit]  # dedupe (the same password line can appear in several blocks) while keeping order
+
+
+def env_name_secret_like(name: str) -> bool:
+    """A variable name that may carry a credential, so its value is not written (the name rule of security.plaintext-env-secret)."""
+    return bool(SECRET_ENV_RE.search(name)) and not ENV_SKIP_RE.search(name)
+
+
+def env_secret_like(name: str, value) -> bool:
+    """Whether an env entry's literal value looks like a credential. Numeric limits (TOKEN_CAP), flags (ALLOW_EMPTY_PASSWORD=yes), paths and
+    short values are not; neither is Reloader's STAKATER_* variable, which names a Secret to watch."""
+    v = str(value)
+    if not v or v == "None" or v.startswith("/") or v.isdigit() or v.lower() in ("true", "false", "yes", "no", "on", "off") or len(v) < 8:
+        return False
+    if name.startswith("STAKATER_"):
+        return False
+    return env_name_secret_like(name)
+
+
+def scrub_env(env: list) -> None:
+    """Drop the value of each credential-like variable of one `env` list, keeping its length, shape and verdict under MARK."""
+    for e in env:
+        if isinstance(e, dict) and "value" in e and isinstance(e.get("name"), str) and env_name_secret_like(e["name"]):
+            v = e.pop("value")
+            e[MARK] = {"len": len(str(v)), "shape": shape(v), "secret_like": env_secret_like(e["name"], v)}
+
+
+def entry_secret_like(e: dict) -> bool:
+    """The verdict recorded for one env entry when its value was dropped. An entry without MARK has a name that is not credential-like."""
+    mark = e.get(MARK)
+    return isinstance(mark, dict) and bool(mark.get("secret_like"))
+
+
+def _reduce_applied(ann: dict) -> None:
+    """Keep only apiVersion and kind of a last-applied copy, as JSON text, so lib/foundations/lastapplied reads it as before."""
+    text = ann.get(LAST_APPLIED)
+    if not isinstance(text, str):
+        return
+    try:
+        manifest = json.loads(text)
+    except ValueError:
+        manifest = None
+    if isinstance(manifest, dict):
+        ann[LAST_APPLIED] = json.dumps({"apiVersion": manifest.get("apiVersion"), "kind": manifest.get("kind")}, separators=(",", ":"))
+    else:
+        ann[LAST_APPLIED] = {"len": len(text), "shape": shape(text)}
 
 
 def shape(v) -> str:
@@ -253,6 +305,12 @@ def scrub_objects(obj):
         elif isinstance(kind, str) and kind in CONFIGMAP_KINDS:
             scrub_configmap(obj)
             return obj
+        meta = obj.get("metadata")
+        if isinstance(kind, str) and isinstance(meta, dict) and isinstance(meta.get("annotations"), dict):
+            _reduce_applied(meta["annotations"])
+        env = obj.get("env")
+        if isinstance(env, list):
+            scrub_env(env)
         for v in obj.values():
             scrub_objects(v)
     elif isinstance(obj, list):

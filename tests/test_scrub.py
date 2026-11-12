@@ -82,9 +82,35 @@ def test_scrub_objects_handles_lists_and_secrets_and_is_idempotent():
     assert "hunter2hunter2" not in json.dumps(out)
     assert "data" not in out["items"][1] and "stringData" not in out["items"][1]
     assert out["items"][1]["type"] == "Opaque"
-    assert out["items"][2]["spec"]["containers"][0]["env"][0]["value"] == "literal-in-pod-spec"  # Pod specs are not touched; security.plaintext-env reads them
+    # a credential-like variable loses its value and keeps the verdict security.plaintext-env reads
+    assert "literal-in-pod-spec" not in json.dumps(out)
+    assert out["items"][2]["spec"]["containers"][0]["env"][0] == {"name": "DB_PASSWORD", scrub.MARK: {"len": 19, "shape": "word", "secret_like": True}}
     again = scrub.scrub_objects(copy.deepcopy(out))
     assert again == out
+
+
+def test_env_values_go_only_for_credential_like_names():
+    env = [
+        {"name": "NEO4J_AUTH", "value": "neo4j/correct-horse"},
+        {"name": "TOKEN_CAP", "value": "500000"},
+        {"name": "CLUSTER_NAME", "value": "prod-a"},
+        {"name": "DB_PASSWORD_FILE", "value": "/run/secrets/db"},
+        {"name": "API_TOKEN", "valueFrom": {"secretKeyRef": {"name": "s", "key": "k"}}},
+    ]
+    tpl = {"kind": "ControllerRevision", "metadata": {"name": "r"}, "data": {"spec": {"template": {"spec": {"containers": [{"name": "c", "env": copy.deepcopy(env)}]}}}}}
+    out = scrub.scrub_objects(tpl)["data"]["spec"]["template"]["spec"]["containers"][0]["env"]
+    assert "correct-horse" not in json.dumps(out) and "500000" not in json.dumps(out)
+    assert [scrub.entry_secret_like(e) for e in out] == [True, False, False, False, False]
+    assert out[2] == env[2] and out[3] == env[3] and out[4] == env[4]  # other names, skipped suffixes and references stay as they were
+
+
+def test_a_workload_keeps_only_apiversion_and_kind_of_its_applied_copy():
+    applied = json.dumps({"apiVersion": "apps/v1", "kind": "Deployment", "spec": {"template": {"spec": {"containers": [{"env": [{"name": "X", "value": "in-the-copy"}]}]}}}})
+    dep = {"kind": "Deployment", "metadata": {"name": "d", "annotations": {scrub.LAST_APPLIED: applied, "other": "kept"}}}
+    out = scrub.scrub_objects(dep)
+    assert json.loads(out["metadata"]["annotations"][scrub.LAST_APPLIED]) == {"apiVersion": "apps/v1", "kind": "Deployment"}
+    assert out["metadata"]["annotations"]["other"] == "kept"
+    assert scrub.scrub_objects(copy.deepcopy(out)) == out
 
 
 def test_readers_work_on_scrubbed_and_unscrubbed_objects():

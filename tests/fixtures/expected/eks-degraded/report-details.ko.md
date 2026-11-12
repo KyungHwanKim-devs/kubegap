@@ -21,7 +21,7 @@
 | 심각도(기본값) | fail | warn | 같은 모드의 지난 점검 대비 |
 |---|---|---|---|
 | critical | 1 | 3 | 같은 모드의 지난 점검 없음 |
-| high | 15 | 8 | 같은 모드의 지난 점검 없음 |
+| high | 16 | 8 | 같은 모드의 지난 점검 없음 |
 | medium | 84 | 127 | 같은 모드의 지난 점검 없음 |
 | low | 15 | 113 | 같은 모드의 지난 점검 없음 |
 | info | 2 | 0 | 같은 모드의 지난 점검 없음 |
@@ -55,6 +55,7 @@
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | high |  | replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
 | `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling … |
+| `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | high |  | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 
 (연속 횟수는 diff.json이 있어야 나와요. 이번 점검에는 없어요)
@@ -185,6 +186,7 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | fail | high | replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
 | `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling constraints 4 |
+| `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | high | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 | `karpenter.ec2nodeclass-hardening.cluster` | warn | high | IMDS hop limit 2 or more ['default'], tokens optional [], root volume encrypted not set ['default'] (size {'default': 50.0}GB) |
 | `logs.signatures.external-secrets.provider-error` | warn | high | 62 occurrences (2026-11-06T17:31:20Z ~ 2026-11-07T01:34:43Z), thresholds warn 1/fail 10. Files: ['logs/pods/external-secrets/external-secrets_external-secrets.log']. Samples: ['[pod/external-secrets-7859bcd5c-g8z4q/external-secrets] 2026-11-06T17:31:20.550454017Z … |
@@ -836,6 +838,20 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
  "zones": {
   "ap-northeast-2a": 2
  }
+}
+```
+
+</details>
+<details><summary><code>security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j</code></summary>
+
+```json
+{
+ "container": "neo4j",
+ "env_names": [
+  "NEO4J_AUTH"
+ ],
+ "prod": true,
+ "workload": "prod-app-z-backend/statefulset/app-z-neo4j"
 }
 ```
 

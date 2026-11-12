@@ -21,7 +21,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | Severity (default) | fail | warn | vs. previous run of this mode |
 |---|---|---|---|
 | critical | 1 | 3 | no previous run of this mode |
-| high | 15 | 8 | no previous run of this mode |
+| high | 16 | 8 | no previous run of this mode |
 | medium | 84 | 127 | no previous run of this mode |
 | low | 15 | 113 | no previous run of this mode |
 | info | 2 | 0 | no previous run of this mode |
@@ -55,6 +55,7 @@ Checks 367: evaluated 231, disabled by profile 2, skipped 132, not collected in 
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | high |  | replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
 | `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling … |
+| `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | high |  | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 
 (consecutive-run counts need diff.json; none for this snapshot)
@@ -185,6 +186,7 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | fail | high | replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
 | `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling constraints 4 |
+| `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | high | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 | `karpenter.ec2nodeclass-hardening.cluster` | warn | high | IMDS hop limit 2 or more ['default'], tokens optional [], root volume encrypted not set ['default'] (size {'default': 50.0}GB) |
 | `logs.signatures.external-secrets.provider-error` | warn | high | 62 occurrences (2026-11-06T17:31:20Z ~ 2026-11-07T01:34:43Z), thresholds warn 1/fail 10. Files: ['logs/pods/external-secrets/external-secrets_external-secrets.log']. Samples: ['[pod/external-secrets-7859bcd5c-g8z4q/external-secrets] 2026-11-06T17:31:20.550454017Z … |
@@ -836,6 +838,20 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "zones": {
   "ap-northeast-2a": 2
  }
+}
+```
+
+</details>
+<details><summary><code>security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j</code></summary>
+
+```json
+{
+ "container": "neo4j",
+ "env_names": [
+  "NEO4J_AUTH"
+ ],
+ "prod": true,
+ "workload": "prod-app-z-backend/statefulset/app-z-neo4j"
 }
 ```
 

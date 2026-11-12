@@ -21,7 +21,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | Severity (default) | fail | warn | vs. previous run of this mode |
 |---|---|---|---|
 | critical | 1 | 3 | no previous run of this mode |
-| high | 35 | 29 | no previous run of this mode |
+| high | 36 | 29 | no previous run of this mode |
 | medium | 117 | 172 | no previous run of this mode |
 | low | 17 | 145 | no previous run of this mode |
 | info | 2 | 0 | no previous run of this mode |
@@ -66,6 +66,7 @@ Checks 367: evaluated 360, disabled by profile 2, skipped 3, not collected in th
 | `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | high |  | kernel log: 0 kills in 24 h on 1 of 2 nodes read. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods. cAdvisor counter 0 |
 | `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | high |  | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago), 2 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
 | `security.networkpolicy-not-enforced.cluster` | high |  | 4 NetworkPolicies (['app-ab-prod', 'prod-app-r', 'prod-app-t', 'prod-app-x']), enforced False: aws-eks-nodeagent --enable-network-policy=false, 0 PolicyEndpoints |
+| `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | high |  | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 | `storage.pvc-usage-high.dev-app-aa/data-app-aa-mysql-0` | high |  | Usage 0.902 (capacity 9.7GB, inodes 0.0), growth 0.0GB/day, None days to full, workloads ['statefulset/app-aa-mysql'], StorageClass gp3 |
 | `traffic.alb-unhealthy-targets.dev-app-aa/app-aa-backend` | high |  | Target group k8s-devvxtch-vxtchatb-b347218b4f (application, port 8000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0 … |
@@ -241,6 +242,7 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | fail | high | kernel log: 0 kills in 24 h on 1 of 2 nodes read. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods. cAdvisor counter 0 |
 | `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | fail | high | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago), 2 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
 | `security.networkpolicy-not-enforced.cluster` | fail | high | 4 NetworkPolicies (['app-ab-prod', 'prod-app-r', 'prod-app-t', 'prod-app-x']), enforced False: aws-eks-nodeagent --enable-network-policy=false, 0 PolicyEndpoints |
+| `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | high | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 | `storage.pvc-usage-high.dev-app-aa/data-app-aa-mysql-0` | fail | high | Usage 0.902 (capacity 9.7GB, inodes 0.0), growth 0.0GB/day, None days to full, workloads ['statefulset/app-aa-mysql'], StorageClass gp3 |
 | `traffic.alb-unhealthy-targets.dev-app-aa/app-aa-backend` | fail | high | Target group k8s-devvxtch-vxtchatb-b347218b4f (application, port 8000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-aa-backend'] |
@@ -1229,6 +1231,20 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  ],
  "policies": 4,
  "policies_but_not_enforced": true
+}
+```
+
+</details>
+<details><summary><code>security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j</code></summary>
+
+```json
+{
+ "container": "neo4j",
+ "env_names": [
+  "NEO4J_AUTH"
+ ],
+ "prod": true,
+ "workload": "prod-app-z-backend/statefulset/app-z-neo4j"
 }
 ```
 

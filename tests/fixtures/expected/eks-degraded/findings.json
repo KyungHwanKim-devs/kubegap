@@ -826,7 +826,9 @@
    "id": "security.plaintext-secret-env",
    "status": "done",
    "reason": null,
-   "counts": {}
+   "counts": {
+    "fail": 1
+   }
   },
   {
    "id": "security.externalsecret-not-ready",
@@ -2929,6 +2931,13 @@
    "status": "fail",
    "evidence": "replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling constraints 4",
    "source": "summary.json:resilience.placement.rows"
+  },
+  {
+   "check": "security.plaintext-secret-env",
+   "target": "prod-app-z-backend/statefulset/app-z-neo4j:neo4j",
+   "status": "fail",
+   "evidence": "Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded)",
+   "source": "summary.json:security.secrets.plaintext_env"
   },
   {
    "check": "security.privileged-or-host-access",
