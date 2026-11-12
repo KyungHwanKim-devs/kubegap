@@ -14,6 +14,8 @@ kubegap은 읽기 호출만 합니다. 어떤 Kubernetes 규칙과 AWS 액션을
 
 **ConfigMap.** ConfigMap 값도 기록하지 않습니다. 점검 한 번에 모은 데이터를 담는 폴더를 스냅샷이라고 부르는데, 스냅샷에는 키마다 길이와 형태만 남깁니다. 실제 값을 남기는 키는 kubegap이 분석해야 하는 설정뿐이고, [`lib/foundations/scrub.py`](../../lib/foundations/scrub.py)의 `KEEP_VALUES`에 적혀 있습니다. CoreDNS Corefile, kube-proxy 설정, local-path-provisioner 경로, Argo CD 플래그 몇 개입니다. Grafana 사이드카가 읽어 들이는 ConfigMap 두 종류는 더 남깁니다. `grafana_dashboard` 라벨이 붙은 것은 대시보드 JSON을 그대로, `grafana_datasource` 라벨이 붙은 것은 데이터소스마다 name, type, url, isDefault만 남기고 비밀번호나 헤더 값이 있을 수 있는 나머지는 지웁니다.
 
+**환경 변수.** 컨테이너 환경 변수 가운데 이름이 비밀번호처럼 보이는 것은 값을 빼고 기록합니다. PASSWORD, PASSWD, SECRET, TOKEN, API_KEY, PRIVATE_KEY, ACCESS_KEY, CLIENT_SECRET, DSN, CONNECTION_STRING 이 이름에 들어 있거나 이름이 AUTH 로 끝나고, _FILE, _PATH, _NAME, _URL 같은 접미사로 끝나지 않는 이름입니다. 파드, 워크로드 템플릿, ControllerRevision, Job 어디에 있든 같습니다. 값 대신 길이와 형태, 그리고 값이 비밀번호처럼 보였는지만 남기며, `security.plaintext-secret-env` 점검은 이것을 보고합니다. 다른 이름의 변수는 값을 그대로 둡니다. Karpenter 기능 게이트나 VPC CNI 의 웜 타깃처럼 값을 분석하는 점검이 있기 때문입니다. 매니페스트 전체를 한 번 더 담고 있는 `kubectl.kubernetes.io/last-applied-configuration` 주석은 모든 객체에서 apiVersion 과 kind 만 남깁니다. pluto 가 판정에 쓰는 것이 이 둘입니다.
+
 **로그.** 컴포넌트 파드의 최근 24시간 로그는 스크립트가 읽습니다. 스크립트는 오류를 세어 요약에 넣고 마스킹한 샘플 줄을 남긴 뒤, 에이전트가 시작하기 전에 원본을 스냅샷에서 지웁니다. 원본 로그를 에이전트가 읽어도 괜찮을 때만 설정 파일에 `keep_component_logs: true`를 넣으세요.
 
 ## 내 컴퓨터에 남는 것
@@ -31,6 +33,7 @@ kubegap이 모은 것은 전부 내 컴퓨터의 `~/.kubegap/snapshots/<context>
 
 - Secret 값은 애초에 모으지 않으므로 나갈 수 없습니다.
 - ConfigMap 값은 위에 적은 키를 빼면 스냅샷에 없습니다.
+- 비밀번호처럼 보이는 이름의 환경 변수 값은 스냅샷에 없습니다.
 - 컴포넌트 파드 로그는 `keep_component_logs: true`를 넣지 않는 한 에이전트가 시작하기 전에 지웁니다.
 - 토큰, 계정 ID, 사설 IP는 리포트에서 마스킹합니다. 스냅샷에서는 마스킹하지 않습니다.
 

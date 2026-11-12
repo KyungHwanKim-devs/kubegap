@@ -38985,8 +38985,20 @@
    ]
   },
   "secrets": {
-   "plaintext_env": [],
-   "plaintext_env_prod": [],
+   "plaintext_env": [
+    {
+     "workload": "prod-app-z-backend/statefulset/app-z-neo4j",
+     "namespace": "prod-app-z-backend",
+     "prod": true,
+     "container": "neo4j",
+     "env_names": [
+      "NEO4J_AUTH"
+     ]
+    }
+   ],
+   "plaintext_env_prod": [
+    "prod-app-z-backend/statefulset/app-z-neo4j:neo4j"
+   ],
    "plaintext_configmap": [],
    "plaintext_configmap_prod": [],
    "externalsecrets": 49,
