@@ -41,6 +41,23 @@ CALL_TIMEOUT = 1800  # the solution check of a full report reads objects for a q
 READ_ONLY_TOOLS = "Read,Grep,Glob"
 WRITERS_AT_ONCE = 3
 GUIDES = ("check-solutions", "write-overview", "write-problem", "check-facts", "replace")
+# the area names a Korean reader sees in the table; the keys of the facts stay as they are in the checks
+AREA_WORD = {
+    "영역별 한 줄": {
+        "resources": "리소스",
+        "scaling": "스케일링",
+        "observability": "모니터링",
+        "traffic": "트래픽",
+        "resilience": "가용성",
+        "hygiene": "설정 관리",
+        "storage": "스토리지",
+        "security": "보안",
+        "cost": "비용",
+        "tenancy": "멀티테넌시",
+        "node OS": "노드 OS",
+        "platform": "플랫폼",
+    }
+}
 AREAS = ("resources", "scaling", "observability", "traffic", "resilience", "hygiene", "storage", "security", "cost", "tenancy", "node OS", "platform")
 CIRCLED = "①②③④⑤⑥⑦⑧⑨⑩"
 HEADINGS = {
@@ -82,6 +99,7 @@ HEADINGS = {
         "pods_v": "{running} running, {pending} pending, {failed} failed",
         "ns_v": "{count}, {prod} production",
         "no_store": "none",
+        "no_loki": "no Loki",
         "prev_work": "What the previous report advised",
         "state": "State",
         "proof": "Proof",
@@ -136,6 +154,7 @@ HEADINGS = {
         "pods_v": "실행 {running}, 대기 {pending}, 실패 {failed}",
         "ns_v": "{count}개, 프로덕션 {prod}개",
         "no_store": "없음",
+        "no_loki": "Loki 없음",
         "prev_work": "지난 리포트의 권고",
         "state": "상태",
         "proof": "근거",
@@ -374,7 +393,7 @@ def glance(snap: Path, h: dict, *, names: bool = True) -> str:
         [h["pods"], h["pods_v"].format(running=phase.get("Running", 0), pending=phase.get("Pending", 0), failed=phase.get("Failed", 0))],
         [h["namespaces"], h["ns_v"].format(count=ns.get("count", 0), prod=len(ns.get("prod_like") or []))],
         [h["components"], f"{len(inv.get('components_present') or [])}: " + ", ".join(inv.get("components_present") or []) if names else h["count"].format(n=len(inv.get("components_present") or []))],
-        [h["stores"], f"{prom.get('kind') or h['no_store']} {prom.get('version') or ''}".strip() + " / " + (f"{loki.get('kind') or ''} {loki.get('version') or ''}".strip() if loki.get("ok") else h["no_store"])],
+        [h["stores"], f"{prom.get('kind') or h['no_store']} {prom.get('version') or ''}".strip() + " / " + (f"{loki.get('kind') or ''} {loki.get('version') or ''}".strip() if loki.get("ok") else h["no_loki"])],
         [h["versions"], f"{cluster.get('server_version') or ''} ({cluster.get('platform') or ''})".strip()],
     ]
     return f"## {h['glance']}\n\n" + table([h["item"], h["value"]], rows)
@@ -417,7 +436,7 @@ def since_section(facts: dict, h: dict, snap: Path, written: str | None) -> str:
 
 def area_lines(facts: dict, h: dict) -> str:
     summary = (facts.get("analysis") or {}).get("area_summary") or {}
-    rows = [[a, summary.get(a) or h["none"]] for a in AREAS] if isinstance(summary, dict) and summary else []
+    rows = [[AREA_WORD.get(h["areas"], {}).get(a, a), summary.get(a) or h["none"]] for a in AREAS] if isinstance(summary, dict) and summary else []
     return f"## {h['areas']}\n\n" + (table([h["area"], h["what"]], rows) if rows else h["none"])
 
 
@@ -516,7 +535,7 @@ def assemble(snap: Path, facts: dict, overview: str, problems: list[str], langua
     out += [_sections.declined(snap, language), since_section(facts, h, snap, parts.get("since")), upcoming(facts, h)]
     out = [x for x in out if x]  # a section with nothing to say is left out (nothing was decided against)
     out.append(area_lines(facts, h))
-    out += [_sections.limits(facts, snap, language, skipped), _sections.numbers(snap, language)]
+    out += [_sections.limits(facts, snap, language, skipped), _sections.numbers(snap, language, facts)]
     tail = f"{h['details']}: [`report-details.md`](report-details.md) · kubegap {version}, rubric {rubric} · {h['snapshot']} `{snap}`"
     return space_blocks("\n\n".join(out)) + f"\n\n{_check_ids(facts, h)}{tail}\n"
 
@@ -595,7 +614,11 @@ def write_report(snap: Path, language: str, host: str, rubric: str, version: str
     def write_overview() -> str:
         return call(host, guides["write-overview"], _tagged(cluster=cluster, glossary=glossary_text, facts=json.dumps(overview_facts, ensure_ascii=False, indent=1)), snap, run=run)
 
+    titles = {str(i.get("id")): str(i.get("title")) for i in (facts.get("happened") or {}).get("incidents") or [] if isinstance(i, dict)}
+
     def write_problem(n: int, p: dict) -> str:
+        # the writer of a problem sees only its problem: give it the titles of the incidents that exposed it, so it names them and not their ids
+        p = {**p, "picked": {**(p.get("picked") or {}), "exposed_by": [titles.get(str(x), str(x)) for x in (p.get("picked") or {}).get("exposed_by") or []]}}
         return call(host, guides["write-problem"], _tagged(number=str(n), cluster=cluster, glossary=glossary_text, problem=json.dumps(p, ensure_ascii=False, indent=1)), snap, run=run)
 
     say(f"writing: the overview and {len(problems)} problems")

@@ -178,8 +178,8 @@ def test_the_report_is_assembled_in_its_order_with_what_code_writes(tmp_path):
     assert "## 지금 깨져 있는 것" not in text  # nothing broken: the section is not there, the first screen says so
     assert "| move the dumps | 반영됨 | 7 CronJobs on n1 |" in text and "**새로 생긴 것**\n\n- two nodes rebooted" in text and "**없어진 것**\n\n- 없음" in text
     assert "**클러스터는 그대로인데 kubegap의 기준이 바뀌어 달라진 것**\n\n판정 기준이 바뀐 점검:\n\n- `x.y` 2" in text  # counted per check; the ids are in report-details.md
-    assert "| 2026-11-20 | certificate renews | summary.json |" in text and "| security | one plaintext token |" in text
-    assert "- Grafana 토큰.\n  - 약해지는 결론: 대시보드 목록." in text and "kubegap에 전용 점검 항목이 없습니다: istio." in text
+    assert "| 2026-11-20 | certificate renews | summary.json |" in text and "| 보안 | one plaintext token |" in text
+    assert "- Grafana 토큰.\n  - 답하면 더 보는 것: 대시보드 목록." in text and "kubegap에 전용 점검 항목이 없습니다: istio." in text
     assert "비교 기준은 2026-11-11 14:08 full 점검입니다." in text and "| critical | 1 | 0 | 0 | 0 |" in text
     assert "- 사건 A: `traffic.pod-not-ready.*`" in text and "- 문제 1: `resilience.no-backup.cluster`" in text
     assert text.rstrip().endswith(f"수집 자료 `{s}`")

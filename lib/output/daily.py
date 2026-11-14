@@ -28,6 +28,7 @@ import re
 from pathlib import Path
 
 from ..foundations import paths
+from ..foundations import rubric as _rubric
 from ..foundations.snapshot import load_json
 from . import facts as _facts
 from . import glossary as _glossary
@@ -77,13 +78,63 @@ TEXT = {
         "unseen_aws": "AWS API를 부르지 않았습니다.",
         "unseen_logs": "컴포넌트 로그는 오류 종류별 개수만 셌고, 로그 글은 남기지 않았습니다.",
         "unseen_values": "Secret 값과 ConfigMap 값은 읽지 않았고, 애플리케이션의 환경 변수 값은 남기지 않았습니다.",
-        "unseen_raw": "판정이 끝난 뒤 원본 오브젝트와 이벤트를 지웠습니다. 이 컴퓨터에는 요약과 판정 결과만 남아 있고, 모델에 전달된 것도 그것뿐입니다.",
+        "unseen_raw": "판정이 끝난 뒤 원본 오브젝트와 이벤트를 지웠습니다. 이 컴퓨터에는 요약과 판정 결과만 남아 있고, 리포트를 쓰는 AI 모델에 전달된 것도 그것뿐입니다.",
         "unseen_checks": "그래서 점검 항목 {total}개 가운데 {unseen}개는 이번에 보지 못했습니다. 노드 안쪽, 비용, 없어질 API 같은 항목이고, 문제로도 통과로도 세지 않았습니다.",
-        "unseen_full": "이 항목들을 보고, 원인을 원본까지 열어 따지고, 문제마다 원리와 점검 방법과 규모별 해결 방안을 길게 설명하는 것은 `/kubegap full`입니다.",
+        "unseen_serious": "특히 아래와 같은 문제는 심각할 수 있는데도 노드 안쪽이나 클라우드 계정을 읽어야 보여서 daily 점검으로는 알 수 없습니다. 이 리포트에 없다고 해서 문제가 없다는 뜻이 아닙니다.",
+        "unseen_full": "이것들을 확인하고, 원인을 원본까지 열어 따지고, 문제마다 원리와 점검 방법과 규모별 해결 방안을 길게 설명하는 것은 `/kubegap full`입니다.",
+        "first_unseen": "daily 점검이 볼 수 없는 심각한 문제가 {n}가지 있습니다. 목록은 맨 아래에 있고, 확인하려면 `/kubegap full`을 돌립니다.",
         "ids": "점검 항목 id (`/kubegap explain <id>`)",
         "tail": "kubegap {version}, rubric {rubric} · 스냅샷 `{snap}`",
     }
 }
+
+
+# What a daily run cannot find, said in the reader's words: one phrase per check that is critical or high at some scale and judged only by a
+# full run, because it needs the inside of a node or the cloud account. The report lists the ones that apply to the cluster, so that a reader
+# does not take their absence for a pass. tests/test_daily_report.py fails when such a check has no phrase here.
+UNSEEN = {
+    "ko": {
+        "node.kernel-oom-node-level": "노드 전체의 메모리가 모자라 커널이 프로세스를 끝낸 일",
+        "node.kernel-lockup": "커널이 멈추는 오류",
+        "node.kernel-io-fs-errors": "디스크 I/O 오류와 파일시스템 오류",
+        "node.conntrack-table-full": "conntrack 테이블이 가득 차 패킷이 버려지는 것",
+        "node.cri-not-ready": "컨테이너 런타임 이상",
+        "node.clock-unsynced-os": "노드 시계가 맞지 않는 것",
+        "traffic.flannel-sysctl-off": "노드의 네트워크 커널 설정이 꺼져 있는 것",
+        "platform.k3s-etcd-snapshot-stale": "etcd 스냅샷이 없거나 오래된 것",
+        "platform.k3s-certificate-expiring": "k3s 내부 인증서의 만료",
+        "platform.k3s-datastore-slow": "k3s 데이터스토어(etcd)가 느린 것",
+        "platform.k3s-datastore-large": "k3s 데이터스토어가 한도에 가까운 것",
+        "storage.local-path-over-capacity": "local-path 볼륨이 요청한 용량을 넘은 것",
+        "storage.local-path-fs-near-full": "노드 디스크가 차는 것",
+        "controlplane.webhook-call-failures": "API 서버의 웹훅 호출 실패",
+        "security.eks-secrets-encryption-off": "EKS의 Secret 암호화 설정",
+        "security.imds-hop-limit": "파드가 노드의 IAM 자격 증명에 닿을 수 있는 설정",
+        "traffic.alb-unhealthy-targets": "로드밸런서 뒤의 비정상 대상",
+        "eks.public-endpoint-open": "클러스터 엔드포인트가 인터넷 전체에 열려 있는 것",
+        "eks.no-backup-policy": "EBS 스냅샷과 백업 정책이 없는 것",
+        "eks.acm-certificate-expiring": "ACM 인증서의 만료",
+        "eks.service-quota-near-limit": "AWS 서비스 한도에 가까운 것",
+        "eks.security-group-open-to-world": "보안 그룹이 인터넷 전체에 열려 있는 것",
+        "vpccni.node-ip-exhaustion": "파드에 줄 IP가 모자란 것",
+        "vpccni.no-available-ip": "파드에 줄 IP가 모자란 것",
+        "vpccni.subnet-ips-low": "파드에 줄 IP가 모자란 것",
+    }
+}
+
+
+def serious_full_only(platform: str | None, collectors: list[str] | None) -> list[dict]:
+    """The checks a daily run cannot judge although their finding would be serious: full-only, critical or high at some scale, and belonging
+    to this cluster (its platform, and a collector that ran)."""
+    out = []
+    for c in _rubric.catalog():
+        sev = c["severity_default"]
+        if c.get("modes") != ["full"] or not any(v in ("critical", "high") for v in (sev.values() if isinstance(sev, dict) else [sev])):
+            continue
+        if _rubric.applies(c, platform, "large") or (collectors is not None and c.get("collector") not in collectors):
+            continue
+        out.append(c)
+    return out
 
 
 def _prose(facts: dict):
@@ -209,15 +260,26 @@ def first_seen(snap: Path, entry: dict, limit: int = 30) -> tuple[str, int] | No
     return _writer._when((load_json(since / "inventory.json") or {}).get("taken_at")) or since.name, runs  # with the time: two runs may share a day
 
 
-def _unseen(snap: Path, t: dict) -> str:
+def _unseen(snap: Path, t: dict, language: str) -> str:
     inv, fd = load_json(snap / "inventory.json") or {}, load_json(snap / "findings-draft.json") or {}
     by = (fd.get("checks") or {}).get("by_status") or {}
     lines = [t["unseen_intro"], "", f"- {t['unseen_nodes']}"]
     if (inv.get("cluster") or {}).get("platform") == "eks":
         lines.append(f"- {t['unseen_aws']}")
     lines += [f"- {t['unseen_logs']}", f"- {t['unseen_values']}", f"- {t['unseen_raw']}", ""]
-    lines += [t["unseen_checks"].format(total=(fd.get("checks") or {}).get("total", 0), unseen=by.get("not-collected", 0)), "", t["unseen_full"]]
+    lines += [t["unseen_checks"].format(total=(fd.get("checks") or {}).get("total", 0), unseen=by.get("not-collected", 0)), ""]
+    serious = unseen_phrases(snap, language)
+    if serious:
+        lines += [t["unseen_serious"], "", *(f"- {p}" for p in serious), ""]
+    lines.append(t["unseen_full"])
     return f"## {t['unseen']}\n\n" + "\n".join(lines)
+
+
+def unseen_phrases(snap: Path, language: str) -> list[str]:
+    """The serious things this daily run could not find, in the reader's words, without repeats."""
+    inv = load_json(snap / "inventory.json") or {}
+    checks = serious_full_only((inv.get("cluster") or {}).get("platform"), inv.get("collectors_enabled"))
+    return list(dict.fromkeys(UNSEEN[language][c["id"]] for c in checks if c["id"] in UNSEEN[language]))
 
 
 def assemble(snap: Path, facts: dict, language: str, rubric: str, version: str) -> str:
@@ -243,6 +305,9 @@ def assemble(snap: Path, facts: dict, language: str, rubric: str, version: str) 
     ]
     if scale:
         first += ["", f"{t['first_scale']}: {_sections.SCALE_WORD[language].get(scale, scale)}"]
+    n_unseen = len(unseen_phrases(snap, language))
+    if n_unseen:
+        first += ["", t["first_unseen"].format(n=n_unseen)]
     out += ["\n".join(first), _writer.glance(snap, h, names=False)]
     if broken:
         out.append(f"## {t['broken']}\n\n" + "\n\n".join(f"### {b.get('title')}\n\n{str(b.get('what') or '').strip()}" for b in broken))
@@ -276,7 +341,7 @@ def assemble(snap: Path, facts: dict, language: str, rubric: str, version: str) 
         since += _writer.criteria_changes(snap, h)
     if prev:
         out.append(f"## {t['since']}\n\n" + "\n".join(since).rstrip())
-    out.append(_unseen(snap, t))
+    out.append(_unseen(snap, t, language))
     ids = [f"- {x.get('title')}: " + ", ".join(f"`{i}`" for i in _facts._ids(x)) for x in broken + incidents + top if _facts._ids(x)]
     tail = t["tail"].format(version=version, rubric=rubric, snap=snap)
     return _writer.space_blocks("\n\n".join(out)) + "\n\n" + (f"{t['ids']}:\n\n" + "\n".join(ids) + "\n\n" if ids else "") + tail + "\n"

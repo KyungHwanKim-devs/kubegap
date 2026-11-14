@@ -44,7 +44,7 @@ def _facts(**over) -> dict:
                 "loss": "irreversible",
                 "what": "백업 CronJob 7개가 모두 같은 클러스터의 볼륨에 덤프를 씁니다.",
                 "why": "두 노드를 함께 잃으면 원본과 사본이 같이 사라집니다.",
-                "do": "덤프를 클러스터 밖 오브젝트 스토리지로 한 벌 더 보내는 CronJob을 두는 편이 좋습니다.",
+                "do": "덤프를 클러스터 밖 오브젝트 스토리지로 한 번 더 보내는 CronJob을 두는 편이 좋습니다.",
                 "read": {"title": "k3s 문서", "url": URL},
                 "finding_ids": ["resilience.no-backup.cluster"],
                 "facts": [{"what": "백업 CronJob", "value": 7, "source_file": "summary.json", "json_path": "backup.cronjobs"}],
@@ -133,3 +133,21 @@ def test_write_report_starts_no_agent_for_a_daily_snapshot(tmp_path):
         assert "daily contract" in str(e)
     else:
         raise AssertionError("facts that leave a high failure out are refused")
+
+
+def test_every_serious_check_a_daily_run_cannot_judge_is_named_for_the_reader():
+    """A reader must not take the absence of these for a pass, so the report lists them; a new full-only critical or high check needs its phrase."""
+    for platform in ("k3s", "eks", "other"):
+        missing = [c["id"] for c in daily.serious_full_only(platform, None) if c["id"] not in daily.UNSEEN["ko"]]
+        assert missing == [], f"{platform}: add a phrase to daily.UNSEEN for {missing}"
+
+
+def test_the_daily_report_lists_what_it_cannot_find_for_this_cluster(tmp_path):
+    snap = _snap(tmp_path)
+    inv = json.loads((snap / "inventory.json").read_text())
+    inv["collectors_enabled"] = ["core", "k3s-platform", "local-path-provisioner"]
+    (snap / "inventory.json").write_text(json.dumps(inv))
+    text = daily.assemble(snap, _facts(), "ko", "0.1.91", "0.2.0")
+    assert "- 노드 디스크가 차는 것" in text and "- k3s 내부 인증서의 만료" in text and "ACM 인증서" not in text  # k3s, not EKS
+    assert "이 리포트에 없다고 해서 문제가 없다는 뜻이 아닙니다." in text
+    assert "daily 점검이 볼 수 없는 심각한 문제가" in text.split("## 클러스터 한눈에")[0]  # said on the first screen too

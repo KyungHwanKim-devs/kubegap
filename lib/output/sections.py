@@ -12,6 +12,7 @@ from pathlib import Path
 
 from ..foundations import paths
 from ..foundations.snapshot import load_json
+from . import facts as _facts
 from .render import table
 
 SEVERITIES = ("critical", "high", "medium", "low")
@@ -37,6 +38,8 @@ TEXT = {
         "unsupported": "Not read by kubegap yet",
         "skipped": "What you answered not to read at the first-run questions",
         "weakens": "Weaker for it",
+        "gain": "What answering adds",
+        "adjusted": "{n} findings whose severity the analysis changed are counted at the changed level.",
         "to_see": "To see it",
         "components": "{n} components were read only through their objects and metrics; kubegap has no checks of their own for them: {names}.",
         "components_weakens": "a fault inside one of these components is not in this report",
@@ -62,6 +65,8 @@ TEXT = {
         "unsupported": "kubegap이 아직 읽지 못하는 것",
         "skipped": "첫 실행 질문에서 읽지 않기로 답하신 것",
         "weakens": "약해지는 결론",
+        "gain": "답하면 더 보는 것",
+        "adjusted": "분석에서 심각도를 조정한 {n}건은 조정한 값으로 셌습니다.",
         "to_see": "보려면",
         "components": "컴포넌트 {n}개는 오브젝트와 메트릭으로만 읽었습니다. kubegap에 전용 점검 항목이 없습니다: {names}.",
         "components_weakens": "이 컴포넌트 안에서 생긴 이상은 이 리포트에 나오지 않습니다",
@@ -77,7 +82,7 @@ def _when(taken_at: str | None, name: str) -> str:
     return str(taken_at or name)[:16].replace("T", " ")
 
 
-def numbers(snap: Path, language: str) -> str:
+def numbers(snap: Path, language: str, facts: dict | None = None) -> str:
     """Fail and warn per severity as the first pass counted them, and against one baseline: how many failures went away and how many are new.
     A net change hides both ("four things were fixed and the failures only went up"), so the two are shown apart. The baseline is the one
     `diff` used (paths.previous_snapshot: the last run of this mode that has a report)."""
@@ -86,8 +91,12 @@ def numbers(snap: Path, language: str) -> str:
     diff = load_json(snap / "diff.json") or {}
     mode = MODE_WORD[language][paths.snapshot_mode(snap)]
     found = list(fd.get("findings") or [])
-    fail = Counter(f["severity_default"] for f in found if f.get("status") == "fail")
-    warn = Counter(f["severity_default"] for f in found if f.get("status") == "warn")
+    # the severity the report speaks of: the first-pass level unless the analysis changed it (facts `analysis.severity_changes`), so the table
+    # and the text count the same things
+    final = _facts.final_severities(facts or {}, [f for f in found if f.get("id")])
+    adjusted = sum(1 for f in found if f.get("id") and final.get(f["id"]) != f.get("severity_default"))
+    fail = Counter(final.get(f.get("id"), f["severity_default"]) for f in found if f.get("status") == "fail")
+    warn = Counter(final.get(f.get("id"), f["severity_default"]) for f in found if f.get("status") == "warn")
     df = diff.get("findings") or {}
     has_base = bool(diff.get("a")) and "missing" not in df
     resolved = Counter(r.get("severity_default") for r in df.get("resolved") or [] if r.get("status") == "fail")
@@ -106,6 +115,8 @@ def numbers(snap: Path, language: str) -> str:
     if scale.get("name"):
         source = t["guessed"].format(nodes=scale.get("nodes")) if scale.get("source") == "guessed" else ""
         lines += [t["scale"].format(scale=SCALE_WORD[language].get(scale["name"], scale["name"]), source=source), ""]
+    if adjusted:
+        lines += [t["adjusted"].format(n=adjusted), ""]
     if has_base:
         a = Path(diff["a"])
         a_inv = load_json(a / "inventory.json") or {}
@@ -152,8 +163,8 @@ def limits(facts: dict, snap: Path, language: str, skipped: list[dict] | None = 
     t = TEXT[language]
     groups: dict[str, list[str]] = {k: [] for k in ("no-data", "unsupported", "skipped")}
 
-    def line(what: str, weakens: str, to_see: str | None) -> str:
-        return f"- {what}\n  - {t['weakens']}: {weakens}." + (f"\n  - {t['to_see']}: {to_see}." if to_see else "")
+    def line(what: str, weakens: str, to_see: str | None, label: str = "weakens") -> str:
+        return f"- {what}\n  - {t[label]}: {weakens}." + (f"\n  - {t['to_see']}: {to_see}." if to_see else "")
 
     for lim in facts.get("limits") or []:
         if isinstance(lim, dict) and lim.get("kind") in groups and lim.get("what") and lim.get("weakens"):
@@ -162,7 +173,7 @@ def limits(facts: dict, snap: Path, language: str, skipped: list[dict] | None = 
     if comps:
         groups["unsupported"].append(line(t["components"].format(n=len(comps), names=", ".join(comps)), t["components_weakens"], None))
     for s in skipped or []:
-        groups["skipped"].append(line(f"{s.get('header')}.", "; ".join(s.get("gain") or []).rstrip("."), t["skipped_to_see"].rstrip(".")))
+        groups["skipped"].append(line(f"{s.get('header')}.", "; ".join(s.get("gain") or []).rstrip("."), t["skipped_to_see"].rstrip("."), "gain"))
     out = [f"## {t['limits']}", ""]
     for kind in ("no-data", "unsupported", "skipped"):
         out += [f"**{t[kind]}**", "", *(groups[kind] or [f"- {t['none']}"]), ""]

@@ -28,6 +28,7 @@ CERTAINTY = ("confirmed", "likely", "unknown")
 LIMIT_KINDS = ("no-data", "unsupported", "skipped")
 METHOD_KINDS = ("metric", "alert", "dashboard", "log", "command")
 PROBLEMS_FULL = 5
+AREAS = ("resources", "scaling", "observability", "traffic", "resilience", "hygiene", "storage", "security", "cost", "tenancy", "node OS", "platform")
 
 
 def _ids(entry: dict) -> list[str]:
@@ -164,6 +165,10 @@ def check(facts: dict, snap: Path, mode: str) -> list[str]:
         if not isinstance(c, dict) or not c.get("finding_id") or c.get("final") not in SEVERITIES or not c.get("reason"):
             out.append("analysis.severity_changes: each entry needs finding_id (an id, or a prefix ending in *), final (a severity) and reason")
 
+    for key in ("areas", "area_summary"):
+        given = (facts.get("analysis") or {}).get(key)
+        if isinstance(given, dict) and set(given) - set(AREAS):
+            out.append(f"analysis.{key}: unknown area {sorted(set(given) - set(AREAS))}; the areas are {', '.join(AREAS)}")
     for lim in facts.get("limits") or []:
         if not isinstance(lim, dict) or lim.get("kind") not in LIMIT_KINDS:
             out.append(f"limits: kind must be one of {', '.join(LIMIT_KINDS)} ({(lim or {}).get('what') if isinstance(lim, dict) else lim!r})")
