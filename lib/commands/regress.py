@@ -140,6 +140,14 @@ def as_mode(snap: Path, mode: str) -> None:
                 if o.get("kind") == "ConfigMap":
                     o.pop(scrub.MARK, None)
             write_private(f, json.dumps(scrub.scrub_objects(data, app_settings=False), ensure_ascii=False))
+    agg_path = snap / "logs" / "pods" / "AGGREGATED.json"
+    if "component-log-samples" not in have and agg_path.is_file():  # the counts without any text of a line, as the step writes them with keep_lines false
+        agg = load_json(agg_path)
+        scan = agg["log_scan"]
+        scan["lines_kept"], scan["unclassified_errors"] = False, []
+        for r in scan["signatures"]:
+            r["samples"] = []
+        write_private(agg_path, json.dumps(agg, ensure_ascii=False, indent=1))
     cluster = inv.get("cluster") or {}
     if "cloud-account" not in have and cluster.get("eks"):
         cluster["eks"] = discover.eks_facts_unread(cluster["eks"], Config(), mode)

@@ -33,7 +33,6 @@ KNOWN_KEYS = {
     "apiserver_job",
     "snapshots_root",
     "ssm_document",
-    "keep_component_logs",
     "retention",
     "components",
 }
@@ -57,11 +56,6 @@ class Config(dict):
         """Whether `kubegap setup` may upload the kubegap-node-read SSM document to the account: ask (default; the agent asks once), always, never."""
         v = str(self.get("ssm_document", "ask")).lower()
         return v if v in INSTALL_POLICIES else "ask"
-
-    @property
-    def keep_component_logs(self) -> bool:
-        """false (default): summarize deletes logs/pods/ after the logs section is built, so the agent cannot read raw component logs. true keeps them (they may then reach the model API)."""
-        return bool(self.get("keep_component_logs", False))
 
     @property
     def confirm_context(self) -> bool:

@@ -332,7 +332,7 @@ def cmd_summarize(args) -> int:
     print(f"snapshot {snap}")
     if paths.is_incomplete(snap):
         print("warning: collect did not finish on this snapshot (INCOMPLETE). Summarize and evaluate still work, but inputs are missing; note it in report section 7-1.")
-    _summarize.summarize(snap, keep_component_logs=cfg.keep_component_logs)
+    _summarize.summarize(snap)
     return EXIT_OK
 
 

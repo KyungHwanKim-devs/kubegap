@@ -158,18 +158,10 @@ Signature catalog 1.1.1, 23 files, 25969 lines scanned (components: argocd, cert
 | grafana \| logger=context userId=0 orgId=0 uname= t=<ts> level=error msg="Request Completed" method=GET path=/login status=<n> remote_addr=<ip> … | 62 | logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log |
 | node:node-b \| "ContainerStatus from runtime service failed" err="rpc error: code = NotFound desc = an error occurred when try to find container … | 4 | logs/node/node-b/k3s-errors-24h.log |
 | cert-manager \| "challenge in work queue no longer exists" err="challenge.acme.cert-manager.io \"app-i-prod-tls-2-<n>-<n>\" not found" … | 3 | logs/pods/cert-manager/cert-manager_cert-manager.log |
+| cert-manager \| "re-queuing item due to optimistic locking on resource" logger="cert-manager.certificates-key-manager" key="app-i-prod/app-i-prod-tls" … | 2 | logs/pods/cert-manager/cert-manager_cert-manager.log |
 | node:node-b \| time="" level=error msg="failed sending message on channel" error="write unix … | 2 | logs/node/node-b/containerd-24h.log |
 | node:node-b \| Error proxying data from client to backend: read tcp <ip>-><ip>: read: connection reset by peer | 2 | logs/node/node-b/k3s-errors-24h.log |
 | node:node-b \| time="" level=error msg="Sending HTTP/1.1 <n> response to <ip>: dial tcp <ip>: connect: connection refused" | 2 | logs/node/node-b/k3s-errors-24h.log |
-| cert-manager \| "re-queuing item due to optimistic locking on resource" logger="cert-manager.certificates-key-manager" key="app-i-prod/app-i-prod-tls" … | 2 | logs/pods/cert-manager/cert-manager_cert-manager.log |
-| node:node-a \| time="" level=error msg="ttrpc: received message on inactive stream" stream=55 | 1 | logs/node/node-a/containerd-24h.log |
-| node:node-a \| time="" level=error msg="failed sending message on channel" error="write unix … | 1 | logs/node/node-a/containerd-24h.log |
-| node:node-a \| time="" level=error msg="collecting metrics for b73413c324169f1c0f439f1c790073368e6a346194ef64ab8f54bb442f86da43" error="ttrpc: closed" | 1 | logs/node/node-a/containerd-24h.log |
-| node:node-a \| "ContainerStatus from runtime service failed" err="rpc error: code = NotFound desc = an error occurred when try to find container … | 1 | logs/node/node-a/k3s-errors-24h.log |
-| node:node-b \| time="" level=error msg="ttrpc: received message on inactive stream" stream=57 | 1 | logs/node/node-b/containerd-24h.log |
-| node:node-b \| time="" level=error msg="ContainerStatus for \"c5cbacd83eafe0ce7ded7ae7ef9eb85c23a574efdaee33cab930f616f125a667\" failed" error="rpc error: … | 1 | logs/node/node-b/containerd-24h.log |
-| node:node-b \| time="" level=error msg="ContainerStatus for \"caf5378485e07e917fa98db1ee07a958a5db8cef7b7c02ae11745d94ee7ed376\" failed" error="rpc error: … | 1 | logs/node/node-b/containerd-24h.log |
-| node:node-b \| time="" level=error msg="Sending HTTP/1.1 <n> response to <ip>: dial tcp <ip>: connect: connection timed out" | 1 | logs/node/node-b/k3s-errors-24h.log |
 | cert-manager \| "re-queuing item due to optimistic locking on resource" logger="cert-manager.certificaterequests-issuer-acme" … | 1 | logs/pods/cert-manager/cert-manager_cert-manager.log |
 | cert-manager \| ingress 'app-i-prod/cm-acme-http-solver-5rn6c' in work queue no longer exists | 1 | logs/pods/cert-manager/cert-manager_cert-manager.log |
 | cert-manager \| ingress 'app-i-prod/cm-acme-http-solver-xp828' in work queue no longer exists | 1 | logs/pods/cert-manager/cert-manager_cert-manager.log |
@@ -181,6 +173,14 @@ Signature catalog 1.1.1, 23 files, 25969 lines scanned (components: argocd, cert
 | grafana \| logger=infra.usagestats.collector t=<ts> level=error msg="Failed to read all Amazon Prometheus data sources" error="plugin … | 1 | logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log |
 | grafana \| logger=infra.usagestats t=<ts> level=error msg="Failed to fetch usage stats from provider" error="plugin … | 1 | logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log |
 | grafana \| logger=infra.usagestats.collector t=<ts> level=error msg="Failed to get advisor usage stats" error="the server could not find the requested … | 1 | logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log |
+| node:node-a \| time="" level=error msg="ttrpc: received message on inactive stream" stream=55 | 1 | logs/node/node-a/containerd-24h.log |
+| node:node-a \| time="" level=error msg="failed sending message on channel" error="write unix … | 1 | logs/node/node-a/containerd-24h.log |
+| node:node-a \| time="" level=error msg="collecting metrics for b73413c324169f1c0f439f1c790073368e6a346194ef64ab8f54bb442f86da43" error="ttrpc: closed" | 1 | logs/node/node-a/containerd-24h.log |
+| node:node-a \| "ContainerStatus from runtime service failed" err="rpc error: code = NotFound desc = an error occurred when try to find container … | 1 | logs/node/node-a/k3s-errors-24h.log |
+| node:node-b \| time="" level=error msg="ttrpc: received message on inactive stream" stream=57 | 1 | logs/node/node-b/containerd-24h.log |
+| node:node-b \| time="" level=error msg="ContainerStatus for \"c5cbacd83eafe0ce7ded7ae7ef9eb85c23a574efdaee33cab930f616f125a667\" failed" error="rpc error: … | 1 | logs/node/node-b/containerd-24h.log |
+| node:node-b \| time="" level=error msg="ContainerStatus for \"caf5378485e07e917fa98db1ee07a958a5db8cef7b7c02ae11745d94ee7ed376\" failed" error="rpc error: … | 1 | logs/node/node-b/containerd-24h.log |
+| node:node-b \| time="" level=error msg="Sending HTTP/1.1 <n> response to <ip>: dial tcp <ip>: connect: connection timed out" | 1 | logs/node/node-b/k3s-errors-24h.log |
 
 ### 7-4. Raw files the LLM read directly
 
@@ -12102,10 +12102,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 {
  "error_lines_unclassified": 463,
  "files_scanned": [
-  "logs/node/node-a/containerd-24h.log",
-  "logs/node/node-a/k3s-errors-24h.log",
-  "logs/node/node-b/containerd-24h.log",
-  "logs/node/node-b/k3s-errors-24h.log",
   "logs/pods/argocd/argocd_argocd-application-controller.log",
   "logs/pods/argocd/argocd_argocd-applicationset-controller.log",
   "logs/pods/argocd/argocd_argocd-notifications-controller.log",
@@ -12124,7 +12120,11 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "logs/pods/keda/keda_keda-operator.log",
   "logs/pods/metallb/metallb-system_controller.log",
   "logs/pods/metallb/metallb-system_speaker.log",
-  "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log"
+  "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log",
+  "logs/node/node-a/containerd-24h.log",
+  "logs/node/node-a/k3s-errors-24h.log",
+  "logs/node/node-b/containerd-24h.log",
+  "logs/node/node-b/k3s-errors-24h.log"
  ],
  "lines_scanned": 25969,
  "unclassified_errors": [
@@ -12177,6 +12177,14 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:51.176999164Z E1106 02:40:51.176850       1 controller.go:208] \"challenge in work queue no longer exists\" err=\"challenge.acme.cert-manager.io \\\"app-i-prod-tls-2-18"
   },
   {
+   "pattern": "cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificates-key-manager\" key=\"app-i-prod/app-i-prod-tls\" …",
+   "count": 2,
+   "files": {
+    "logs/pods/cert-manager/cert-manager_cert-manager.log": 2
+   },
+   "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:21.056745652Z I1106 02:40:21.056673       1 controller.go:162] \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificates-key-manage"
+  },
+  {
    "pattern": "node:node-b | time=\"\" level=error msg=\"failed sending message on channel\" error=\"write unix …",
    "count": 2,
    "files": {
@@ -12199,78 +12207,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
     "logs/node/node-b/k3s-errors-24h.log": 2
    },
    "sample": "time=\"2026-11-07T00:53:40Z\" level=error msg=\"Sending HTTP/1.1 502 response to 127.0.0.1:51472: dial tcp 10.42.7.234:8084: connect: connection refused\""
-  },
-  {
-   "pattern": "cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificates-key-manager\" key=\"app-i-prod/app-i-prod-tls\" …",
-   "count": 2,
-   "files": {
-    "logs/pods/cert-manager/cert-manager_cert-manager.log": 2
-   },
-   "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:21.056745652Z I1106 02:40:21.056673       1 controller.go:162] \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificates-key-manage"
-  },
-  {
-   "pattern": "node:node-a | time=\"\" level=error msg=\"ttrpc: received message on inactive stream\" stream=55",
-   "count": 1,
-   "files": {
-    "logs/node/node-a/containerd-24h.log": 1
-   },
-   "sample": "time=\"2026-11-07T10:00:48.314940481+09:00\" level=error msg=\"ttrpc: received message on inactive stream\" stream=55"
-  },
-  {
-   "pattern": "node:node-a | time=\"\" level=error msg=\"failed sending message on channel\" error=\"write unix …",
-   "count": 1,
-   "files": {
-    "logs/node/node-a/containerd-24h.log": 1
-   },
-   "sample": "time=\"2026-11-07T10:08:49.302843837+09:00\" level=error msg=\"failed sending message on channel\" error=\"write unix /run/containerd/s/82a1424efbf4b29f75d4b7954a903da8a990560e033adb46b5d3ad9bf71b5ba2->@: write: broken pipe\" runtime=io.container"
-  },
-  {
-   "pattern": "node:node-a | time=\"\" level=error msg=\"collecting metrics for b73413c324169f1c0f439f1c790073368e6a346194ef64ab8f54bb442f86da43\" error=\"ttrpc: closed\"",
-   "count": 1,
-   "files": {
-    "logs/node/node-a/containerd-24h.log": 1
-   },
-   "sample": "time=\"2026-11-07T10:17:49.609659033+09:00\" level=error msg=\"collecting metrics for b73413c324169f1c0f439f1c790073368e6a346194ef64ab8f54bb442f86da43\" error=\"ttrpc: closed\""
-  },
-  {
-   "pattern": "node:node-a | \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = an error occurred when try to find container …",
-   "count": 1,
-   "files": {
-    "logs/node/node-a/k3s-errors-24h.log": 1
-   },
-   "sample": "E1107 04:37:39.317923    1316 log.go:32] \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = an error occurred when try to find container \\\"44bd2df2003262994afda2aff80b4413e8bc4fb9ecc932d6ede6e2d8ec3b547e\\\":"
-  },
-  {
-   "pattern": "node:node-b | time=\"\" level=error msg=\"ttrpc: received message on inactive stream\" stream=57",
-   "count": 1,
-   "files": {
-    "logs/node/node-b/containerd-24h.log": 1
-   },
-   "sample": "time=\"2026-11-06T12:05:37.770477338Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=57"
-  },
-  {
-   "pattern": "node:node-b | time=\"\" level=error msg=\"ContainerStatus for \\\"c5cbacd83eafe0ce7ded7ae7ef9eb85c23a574efdaee33cab930f616f125a667\\\" failed\" error=\"rpc error: …",
-   "count": 1,
-   "files": {
-    "logs/node/node-b/containerd-24h.log": 1
-   },
-   "sample": "time=\"2026-11-07T00:45:45.666650862Z\" level=error msg=\"ContainerStatus for \\\"c5cbacd83eafe0ce7ded7ae7ef9eb85c23a574efdaee33cab930f616f125a667\\\" failed\" error=\"rpc error: code = NotFound desc = an error occurred when try to find container \\\""
-  },
-  {
-   "pattern": "node:node-b | time=\"\" level=error msg=\"ContainerStatus for \\\"caf5378485e07e917fa98db1ee07a958a5db8cef7b7c02ae11745d94ee7ed376\\\" failed\" error=\"rpc error: …",
-   "count": 1,
-   "files": {
-    "logs/node/node-b/containerd-24h.log": 1
-   },
-   "sample": "time=\"2026-11-07T00:45:45.666963151Z\" level=error msg=\"ContainerStatus for \\\"caf5378485e07e917fa98db1ee07a958a5db8cef7b7c02ae11745d94ee7ed376\\\" failed\" error=\"rpc error: code = NotFound desc = an error occurred when try to find container \\\""
-  },
-  {
-   "pattern": "node:node-b | time=\"\" level=error msg=\"Sending HTTP/1.1 <n> response to <ip>: dial tcp <ip>: connect: connection timed out\"",
-   "count": 1,
-   "files": {
-    "logs/node/node-b/k3s-errors-24h.log": 1
-   },
-   "sample": "time=\"2026-11-07T00:55:52Z\" level=error msg=\"Sending HTTP/1.1 502 response to 127.0.0.1:51554: dial tcp 192.168.90.101:7472: connect: connection timed out\""
   },
   {
    "pattern": "cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificaterequests-issuer-acme\" …",
@@ -12359,6 +12295,70 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
     "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 1
    },
    "sample": "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T06:11:05.418076524Z logger=infra.usagestats.collector t=2026-11-06T06:11:05.417976706Z level=error msg=\"Failed to get advisor usage stats\" error=\"the server could not fin"
+  },
+  {
+   "pattern": "node:node-a | time=\"\" level=error msg=\"ttrpc: received message on inactive stream\" stream=55",
+   "count": 1,
+   "files": {
+    "logs/node/node-a/containerd-24h.log": 1
+   },
+   "sample": "time=\"2026-11-07T10:00:48.314940481+09:00\" level=error msg=\"ttrpc: received message on inactive stream\" stream=55"
+  },
+  {
+   "pattern": "node:node-a | time=\"\" level=error msg=\"failed sending message on channel\" error=\"write unix …",
+   "count": 1,
+   "files": {
+    "logs/node/node-a/containerd-24h.log": 1
+   },
+   "sample": "time=\"2026-11-07T10:08:49.302843837+09:00\" level=error msg=\"failed sending message on channel\" error=\"write unix /run/containerd/s/82a1424efbf4b29f75d4b7954a903da8a990560e033adb46b5d3ad9bf71b5ba2->@: write: broken pipe\" runtime=io.container"
+  },
+  {
+   "pattern": "node:node-a | time=\"\" level=error msg=\"collecting metrics for b73413c324169f1c0f439f1c790073368e6a346194ef64ab8f54bb442f86da43\" error=\"ttrpc: closed\"",
+   "count": 1,
+   "files": {
+    "logs/node/node-a/containerd-24h.log": 1
+   },
+   "sample": "time=\"2026-11-07T10:17:49.609659033+09:00\" level=error msg=\"collecting metrics for b73413c324169f1c0f439f1c790073368e6a346194ef64ab8f54bb442f86da43\" error=\"ttrpc: closed\""
+  },
+  {
+   "pattern": "node:node-a | \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = an error occurred when try to find container …",
+   "count": 1,
+   "files": {
+    "logs/node/node-a/k3s-errors-24h.log": 1
+   },
+   "sample": "E1107 04:37:39.317923    1316 log.go:32] \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = an error occurred when try to find container \\\"44bd2df2003262994afda2aff80b4413e8bc4fb9ecc932d6ede6e2d8ec3b547e\\\":"
+  },
+  {
+   "pattern": "node:node-b | time=\"\" level=error msg=\"ttrpc: received message on inactive stream\" stream=57",
+   "count": 1,
+   "files": {
+    "logs/node/node-b/containerd-24h.log": 1
+   },
+   "sample": "time=\"2026-11-06T12:05:37.770477338Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=57"
+  },
+  {
+   "pattern": "node:node-b | time=\"\" level=error msg=\"ContainerStatus for \\\"c5cbacd83eafe0ce7ded7ae7ef9eb85c23a574efdaee33cab930f616f125a667\\\" failed\" error=\"rpc error: …",
+   "count": 1,
+   "files": {
+    "logs/node/node-b/containerd-24h.log": 1
+   },
+   "sample": "time=\"2026-11-07T00:45:45.666650862Z\" level=error msg=\"ContainerStatus for \\\"c5cbacd83eafe0ce7ded7ae7ef9eb85c23a574efdaee33cab930f616f125a667\\\" failed\" error=\"rpc error: code = NotFound desc = an error occurred when try to find container \\\""
+  },
+  {
+   "pattern": "node:node-b | time=\"\" level=error msg=\"ContainerStatus for \\\"caf5378485e07e917fa98db1ee07a958a5db8cef7b7c02ae11745d94ee7ed376\\\" failed\" error=\"rpc error: …",
+   "count": 1,
+   "files": {
+    "logs/node/node-b/containerd-24h.log": 1
+   },
+   "sample": "time=\"2026-11-07T00:45:45.666963151Z\" level=error msg=\"ContainerStatus for \\\"caf5378485e07e917fa98db1ee07a958a5db8cef7b7c02ae11745d94ee7ed376\\\" failed\" error=\"rpc error: code = NotFound desc = an error occurred when try to find container \\\""
+  },
+  {
+   "pattern": "node:node-b | time=\"\" level=error msg=\"Sending HTTP/1.1 <n> response to <ip>: dial tcp <ip>: connect: connection timed out\"",
+   "count": 1,
+   "files": {
+    "logs/node/node-b/k3s-errors-24h.log": 1
+   },
+   "sample": "time=\"2026-11-07T00:55:52Z\" level=error msg=\"Sending HTTP/1.1 502 response to 127.0.0.1:51554: dial tcp 192.168.90.101:7472: connect: connection timed out\""
   }
  ]
 }

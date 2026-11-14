@@ -144,7 +144,6 @@ scripts/kubegap config set prometheus_url http://prometheus.example.internal:909
 | `scale`, `dev_namespaces` | `scale`(small·medium·large)은 질문 없이 운영 규모를 정하고, `dev_namespaces`는 운영이 아닌 네임스페이스를 지정합니다 |
 | `suppress`, `overrides` | 점검 항목을 끄거나 기준값을 바꿉니다 |
 | `retention`, `snapshots_root` | 모은 데이터를 얼마나 남길지, 어디에 둘지 정합니다 |
-| `keep_component_logs` | 컴포넌트 파드 로그의 원본을 남깁니다. 어떤 뜻인지는 [DATA.md](DATA.md#읽는-것)에 있습니다 |
 | `apiserver_job` | apiserver를 수집하는 job 이름을 지정합니다 |
 
 ## 모은 데이터

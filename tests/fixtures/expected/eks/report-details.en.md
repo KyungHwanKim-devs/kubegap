@@ -178,9 +178,10 @@ Signature catalog 1.1.1, 40 files, 23879 lines scanned (components: actions-runn
 | node:ip-10-0-1-139.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="get state for bb8345cc36bb26c57461ca9eb5c37ef0819a9de1a4cfe72eece946c75b3c5599" error="context deadline … | 6 | logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log |
 | ebs-csi \| "Volume deletion failed" err="persistentvolume pvc-<uuid> is still attached to node ip-10-0-1-98.ap-northeast-2.compute.internal" … | 4 | logs/pods/ebs-csi/kube-system_ebs-csi-controller.log |
 | ebs-csi \| "Unhandled Error" err="error syncing volume \"pvc-<uuid>\": persistentvolume pvc-<uuid> is still attached to node … | 4 | logs/pods/ebs-csi/kube-system_ebs-csi-controller.log |
-| node:ip-10-0-2-100.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62" error="context deadline … | 3 | logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log |
 | ebs-csi \| "Event occurred" object="prod-app-x/app-x-api-usage" fieldPath="" kind="PersistentVolumeClaim" apiVersion="v1" type="Warning" … | 3 | logs/pods/ebs-csi/kube-system_ebs-csi-controller.log |
 | ebs-csi \| "Unhandled Error" err="error syncing claim \"<uuid>\": failed to provision volume with StorageClass \"gp3\": error generating accessibility … | 3 | logs/pods/ebs-csi/kube-system_ebs-csi-controller.log |
+| node:ip-10-0-2-100.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62" error="context deadline … | 3 | logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log |
+| kube-proxy \| "Kube-proxy configuration may be incomplete or incorrect" err="nodePortAddresses is unset; NodePort connections will be accepted on all … | 2 | logs/pods/kube-proxy/kube-system_kube-proxy.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="failed to load cni during init, please check CRI plugin status before setting up network for pods" error="cni … | 2 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| "Eviction manager: failed to get summary stats" err="failed to get node info: node \"ip-10-0-1-<n>.ap-northeast-2.compute.internal\" not … | 2 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| "ContainerStatus from runtime service failed" err="rpc error: code = NotFound desc = an error occurred when try to find container … | 2 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log |
@@ -194,7 +195,6 @@ Signature catalog 1.1.1, 40 files, 23879 lines scanned (components: actions-runn
 | node:ip-10-0-2-100.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="get state for 1a8fce1368e23a54372baa095d5b19d99ed81102dc9e7b3beb9ba13ff476c798" error="context deadline … | 2 | logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log |
 | node:ip-10-0-2-100.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="ttrpc: received message on inactive stream" stream=3 | 2 | logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log |
 | node:ip-10-0-2-100.ap-northeast-2.compute.internal \| "Eviction manager: failed to get summary stats" err="failed to get node info: node \"ip-10-0-2-<n>.ap-northeast-2.compute.internal\" not … | 2 | logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log |
-| kube-proxy \| "Kube-proxy configuration may be incomplete or incorrect" err="nodePortAddresses is unset; NodePort connections will be accepted on all … | 2 | logs/pods/kube-proxy/kube-system_kube-proxy.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="collecting metrics for a8a9d8b268ec10d5dc42145447580db16a5b3152ee3f97d810ded9029e1106f2" error="cgroups: … | 1 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="failed to reload cni configuration after receiving fs change event(WRITE         … | 1 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="ContainerStatus for \"e8426e2dc7f50ebd0fc6522f7e55f5ecb85cf46287b7077842a160630158833e\" failed" error="rpc … | 1 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log |
@@ -11071,23 +11071,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 {
  "error_lines_unclassified": 145,
  "files_scanned": [
-  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log",
-  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log",
-  "logs/node/ip-10-0-1-241.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-1-241.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log",
-  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log",
-  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/kubelet-24h.log",
   "logs/pods/actions-runner-controller/arc-system_arc-gha-rs-controller.log",
   "logs/pods/alb-controller/kube-system_aws-load-balancer-controller.log",
   "logs/pods/argocd/argocd_argocd-application-controller.log",
@@ -11110,7 +11093,24 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "logs/pods/metrics-server/kube-system_metrics-server.log",
   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log",
   "logs/pods/promtail/monitoring_loki-stack-promtail.log",
-  "logs/pods/vpc-cni/kube-system_aws-node.log"
+  "logs/pods/vpc-cni/kube-system_aws-node.log",
+  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log",
+  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log",
+  "logs/node/ip-10-0-1-241.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-1-241.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log",
+  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log",
+  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/kubelet-24h.log"
  ],
  "lines_scanned": 23879,
  "unclassified_errors": [
@@ -11164,14 +11164,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "sample": "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-provisioner] 2026-11-06T08:58:33.262494744Z E1106 08:58:33.262448       1 controller.go:1025] \"Unhandled Error\" err=\"error syncing volume \\\"pvc-014f87e5-611a-4e1b-a8ca-7392e8b26757\\\": persistentv"
   },
   {
-   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context deadline …",
-   "count": 3,
-   "files": {
-    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 3
-   },
-   "sample": "2026-11-06T09:01:56+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:01:56.321732901Z\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context d"
-  },
-  {
    "pattern": "ebs-csi | \"Event occurred\" object=\"prod-app-x/app-x-api-usage\" fieldPath=\"\" kind=\"PersistentVolumeClaim\" apiVersion=\"v1\" type=\"Warning\" …",
    "count": 3,
    "files": {
@@ -11186,6 +11178,22 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
     "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log": 3
    },
    "sample": "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-provisioner] 2026-11-06T07:44:20.455164108Z E1106 07:44:20.455119       1 controller.go:974] \"Unhandled Error\" err=\"error syncing claim \\\"014f87e5-611a-4e1b-a8ca-7392e8b26757\\\": failed to provisi"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context deadline …",
+   "count": 3,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 3
+   },
+   "sample": "2026-11-06T09:01:56+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:01:56.321732901Z\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context d"
+  },
+  {
+   "pattern": "kube-proxy | \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted on all …",
+   "count": 2,
+   "files": {
+    "logs/pods/kube-proxy/kube-system_kube-proxy.log": 2
+   },
+   "sample": "[pod/kube-proxy-46cc5/kube-proxy] 2026-11-06T08:59:05.940716243Z E1106 08:59:05.939170       1 server.go:234] \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted o"
   },
   {
    "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"failed to load cni during init, please check CRI plugin status before setting up network for pods\" error=\"cni …",
@@ -11290,14 +11298,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 2
    },
    "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.259774    1556 eviction_manager.go:292] \"Eviction manager: failed to get summary stats\" err=\"failed to get node info: node \\\"ip-10-0-2-100."
-  },
-  {
-   "pattern": "kube-proxy | \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted on all …",
-   "count": 2,
-   "files": {
-    "logs/pods/kube-proxy/kube-system_kube-proxy.log": 2
-   },
-   "sample": "[pod/kube-proxy-46cc5/kube-proxy] 2026-11-06T08:59:05.940716243Z E1106 08:59:05.939170       1 server.go:234] \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted o"
   },
   {
    "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"collecting metrics for a8a9d8b268ec10d5dc42145447580db16a5b3152ee3f97d810ded9029e1106f2\" error=\"cgroups: …",

@@ -27,6 +27,11 @@ eksplatform.py	str(usage['errors'][0])	[:200]	text or a fixed-format prefix/suff
 esoctl.py	ready[2] or ''	[:160]	text or a fixed-format prefix/suffix
 events.py	e.get('message') or ''	[:200]	text or a fixed-format prefix/suffix
 events.py	series	[:-1]	text or a fixed-format prefix/suffix
+foundations/logscan.py	line	[:240]	text or a fixed-format prefix/suffix
+foundations/logscan.py	msg	[:140]	text or a fixed-format prefix/suffix
+foundations/logscan.py	s.pattern	[4:]	text or a fixed-format prefix/suffix
+foundations/logscan.py	tz	[-2:]	text or a fixed-format prefix/suffix
+foundations/logscan.py	tz	[1:3]	text or a fixed-format prefix/suffix
 hygiene/__init__.py	f	[:-5]	text or a fixed-format prefix/suffix
 hygiene/__init__.py	img	[:160]	text or a fixed-format prefix/suffix
 hygiene/__init__.py	str(st.get('message') or '')	[:160]	text or a fixed-format prefix/suffix
@@ -37,11 +42,6 @@ k3s.py	lines[0]	[:15]	text or a fixed-format prefix/suffix
 k3s.py	ln	[:9]	text or a fixed-format prefix/suffix
 k3s.py	snaps	[-2:]	the last two snapshots, to compute their spacing
 logs.py	kind	[:-1]	text or a fixed-format prefix/suffix
-logs.py	line	[:240]	text or a fixed-format prefix/suffix
-logs.py	msg	[:140]	text or a fixed-format prefix/suffix
-logs.py	s.pattern	[4:]	text or a fixed-format prefix/suffix
-logs.py	tz	[-2:]	text or a fixed-format prefix/suffix
-logs.py	tz	[1:3]	text or a fixed-format prefix/suffix
 metallbctl.py	by_node	.most_common(1)	picks the leader node, a computation
 metallbctl.py	r.get('error') or r.get('skipped') or ''	[:160]	text or a fixed-format prefix/suffix
 metallbctl.py	strip_control(st.get('errorSummary') or '')[0]	[:200]	text or a fixed-format prefix/suffix

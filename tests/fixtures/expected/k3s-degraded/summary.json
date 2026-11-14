@@ -4623,6 +4623,7 @@
   "signatures_version": "1.1.1",
   "catalog_size": 80,
   "catalog_errors": [],
+  "component_logs": "counted while they were collected; no line is stored",
   "components_with_logs": [
    "argocd",
    "cert-manager",
@@ -4636,27 +4637,29 @@
    "metallb",
    "prometheus"
   ],
-  "files": [
-   "logs/pods/argocd/argocd_argocd-application-controller.log",
-   "logs/pods/argocd/argocd_argocd-applicationset-controller.log",
-   "logs/pods/argocd/argocd_argocd-notifications-controller.log",
-   "logs/pods/argocd/argocd_argocd-repo-server.log",
-   "logs/pods/argocd/argocd_argocd-server.log",
-   "logs/pods/cert-manager/cert-manager_cert-manager-cainjector.log",
-   "logs/pods/cert-manager/cert-manager_cert-manager.log",
-   "logs/pods/coredns/kube-system_coredns.log",
-   "logs/pods/elasticsearch-opensearch/logging_elasticsearch.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets.log",
-   "logs/pods/fluent-bit/logging_fluent-bit.log",
-   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log",
-   "logs/pods/ingress-nginx/ingress-nginx_nginx-ingress-ingress-nginx-controller.log",
-   "logs/pods/keda/keda_keda-operator.log",
-   "logs/pods/metallb/metallb-system_controller.log",
-   "logs/pods/metallb/metallb-system_speaker.log",
-   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log"
-  ],
+  "component_log_lines": {
+   "logs/pods/argocd/argocd_argocd-application-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-applicationset-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-notifications-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-repo-server.log": 1500,
+   "logs/pods/argocd/argocd_argocd-server.log": 1104,
+   "logs/pods/cert-manager/cert-manager_cert-manager-cainjector.log": 120,
+   "logs/pods/cert-manager/cert-manager_cert-manager.log": 66,
+   "logs/pods/coredns/kube-system_coredns.log": 1500,
+   "logs/pods/elasticsearch-opensearch/logging_elasticsearch.log": 29,
+   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log": 1160,
+   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log": 576,
+   "logs/pods/external-secrets/external-secrets_external-secrets.log": 1500,
+   "logs/pods/fluent-bit/logging_fluent-bit.log": 1200,
+   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 879,
+   "logs/pods/ingress-nginx/ingress-nginx_nginx-ingress-ingress-nginx-controller.log": 3000,
+   "logs/pods/keda/keda_keda-operator.log": 26,
+   "logs/pods/metallb/metallb-system_controller.log": 522,
+   "logs/pods/metallb/metallb-system_speaker.log": 1200,
+   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log": 1059
+  },
+  "component_logs_capped": [],
+  "files": [],
   "lines_kept": true,
   "files_scanned": [
    "logs/pods/argocd/argocd_argocd-application-controller.log",
@@ -5047,8 +5050,7 @@
     "metrics_scraped": false,
     "note": "fluent-bit metrics are not in Prometheus (no ServiceMonitor/PodMonitor). Output errors and drops 0 mean not measured"
    }
-  },
-  "component_logs_removed": true
+  }
  },
  "tools": {
   "source": "tools/",

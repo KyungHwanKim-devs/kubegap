@@ -32462,6 +32462,7 @@
   "signatures_version": "1.1.1",
   "catalog_size": 92,
   "catalog_errors": [],
+  "component_logs": "counted while they were collected; no line is stored",
   "components_with_logs": [
    "actions-runner-controller",
    "alb-controller",
@@ -32479,31 +32480,33 @@
    "promtail",
    "vpc-cni"
   ],
-  "files": [
-   "logs/pods/actions-runner-controller/arc-system_arc-gha-rs-controller.log",
-   "logs/pods/alb-controller/kube-system_aws-load-balancer-controller.log",
-   "logs/pods/argocd/argocd_argocd-application-controller.log",
-   "logs/pods/argocd/argocd_argocd-applicationset-controller.log",
-   "logs/pods/argocd/argocd_argocd-notifications-controller.log",
-   "logs/pods/argocd/argocd_argocd-repo-server.log",
-   "logs/pods/argocd/argocd_argocd-server.log",
-   "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log",
-   "logs/pods/ebs-csi/kube-system_ebs-csi-node-windows.log",
-   "logs/pods/ebs-csi/kube-system_ebs-csi-node.log",
-   "logs/pods/external-dns/kube-system_external-dns.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets.log",
-   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log",
-   "logs/pods/karpenter/karpenter_karpenter.log",
-   "logs/pods/keda/keda_keda-operator.log",
-   "logs/pods/kube-proxy/kube-system_kube-proxy.log",
-   "logs/pods/loki/monitoring_loki-stack.log",
-   "logs/pods/metrics-server/kube-system_metrics-server.log",
-   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log",
-   "logs/pods/promtail/monitoring_loki-stack-promtail.log",
-   "logs/pods/vpc-cni/kube-system_aws-node.log"
-  ],
+  "component_log_lines": {
+   "logs/pods/actions-runner-controller/arc-system_arc-gha-rs-controller.log": 823,
+   "logs/pods/alb-controller/kube-system_aws-load-balancer-controller.log": 273,
+   "logs/pods/argocd/argocd_argocd-application-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-applicationset-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-notifications-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-repo-server.log": 1068,
+   "logs/pods/argocd/argocd_argocd-server.log": 1131,
+   "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log": 1560,
+   "logs/pods/ebs-csi/kube-system_ebs-csi-node-windows.log": 57,
+   "logs/pods/ebs-csi/kube-system_ebs-csi-node.log": 57,
+   "logs/pods/external-dns/kube-system_external-dns.log": 1500,
+   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log": 1500,
+   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log": 576,
+   "logs/pods/external-secrets/external-secrets_external-secrets.log": 1500,
+   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 549,
+   "logs/pods/karpenter/karpenter_karpenter.log": 344,
+   "logs/pods/keda/keda_keda-operator.log": 47,
+   "logs/pods/kube-proxy/kube-system_kube-proxy.log": 5097,
+   "logs/pods/loki/monitoring_loki-stack.log": 1500,
+   "logs/pods/metrics-server/kube-system_metrics-server.log": 31,
+   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log": 72,
+   "logs/pods/promtail/monitoring_loki-stack-promtail.log": 1153,
+   "logs/pods/vpc-cni/kube-system_aws-node.log": 42
+  },
+  "component_logs_capped": [],
+  "files": [],
   "lines_kept": false,
   "files_scanned": [
    "logs/pods/actions-runner-controller/arc-system_arc-gha-rs-controller.log",
@@ -33534,8 +33537,7 @@
     "discarded_1h": null,
     "requests_5xx_1h": null
    }
-  },
-  "component_logs_removed": true
+  }
  },
  "tools": {
   "source": "tools/",
@@ -35784,7 +35786,8 @@
     "Node/ip-10-0-1-139.ap-northeast-2.compute.internal": {
      "do-not-disrupt pods": 22556
     }
-   }
+   },
+   "logs_note": "24h latency, launches, disruptions and launch failures were counted from the controller's log while it was collected (logs/pods/AGGREGATED.json); the log itself is not stored"
   },
   "pending": {
    "available": true,

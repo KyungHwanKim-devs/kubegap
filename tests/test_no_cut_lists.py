@@ -11,6 +11,8 @@ import ast
 from pathlib import Path
 
 ROOT = Path("lib/summaries")
+# Facts of the summary that are counted below it, while the logs are collected (no line of a component log is stored, so they cannot be counted later).
+ALSO = [Path("lib/foundations/logscan.py"), Path("lib/foundations/karpenterlog.py")]
 ALLOWED = Path("tests/data/summary-cuts-allowed.tsv")
 
 
@@ -21,15 +23,16 @@ def _const(b) -> bool:
 def cuts() -> list[tuple[str, str, str]]:
     """(file, the expression that is cut, how) for every constant slice and every most_common(n) under lib/summaries."""
     out = []
-    for path in sorted(ROOT.rglob("*.py")):
+    for path in [*sorted(ROOT.rglob("*.py")), *ALSO]:
         src = path.read_text(encoding="utf-8")
+        name = str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else f"foundations/{path.name}"
         for node in ast.walk(ast.parse(src)):
             if isinstance(node, ast.Subscript) and isinstance(node.slice, ast.Slice):
                 bounds = [b for b in (node.slice.lower, node.slice.upper) if b is not None]
                 if bounds and all(_const(b) for b in bounds):
-                    out.append((str(path.relative_to(ROOT)), " ".join(ast.unparse(node.value).split()), "[" + ast.unparse(node.slice) + "]"))
+                    out.append((name, " ".join(ast.unparse(node.value).split()), "[" + ast.unparse(node.slice) + "]"))
             elif isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "most_common" and node.args:
-                out.append((str(path.relative_to(ROOT)), " ".join(ast.unparse(node.func.value).split()), f".most_common({ast.unparse(node.args[0])})"))
+                out.append((name, " ".join(ast.unparse(node.func.value).split()), f".most_common({ast.unparse(node.args[0])})"))
     return out
 
 

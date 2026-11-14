@@ -116,7 +116,7 @@ The keys that answer a first-run question for good:
 
 **What is read without a token.** The Grafana chart's sidecars load dashboards and datasources from ConfigMaps labelled `grafana_dashboard` and `grafana_datasource`; kube-prometheus-stack ships its dashboards that way. kubegap keeps those ConfigMaps in the snapshot (the dashboard JSON as is; of a datasource file only name, type, url and isDefault per entry, never a password or a header) and takes the two lists and the alert-metric-without-dashboard comparison from them. Grafana's own metric `grafana_stat_totals_dashboard`, read from its `/metrics` endpoint through the same port-forward (no login needed) or from a Prometheus that scrapes Grafana, says how many dashboards exist in all; when that is more than the ConfigMaps hold, the difference was made in Grafana itself and the first-run question asks for a token with those numbers. kubegap never reads the Grafana admin password.
 
-Other things the file holds: `mode: full` to make full the default, `scale` (small, medium or large) to fix the scale without the question and `dev_namespaces` to name namespaces that are not production, `suppress` and `overrides` to silence a check or change a threshold, `retention` and `snapshots_root` for the collected data, `keep_component_logs`, `apiserver_job`.
+Other things the file holds: `mode: full` to make full the default, `scale` (small, medium or large) to fix the scale without the question and `dev_namespaces` to name namespaces that are not production, `suppress` and `overrides` to silence a check or change a threshold, `retention` and `snapshots_root` for the collected data, `apiserver_job`.
 
 ## Collected data
 

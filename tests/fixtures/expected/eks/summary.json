@@ -36866,6 +36866,7 @@
   "signatures_version": "1.1.1",
   "catalog_size": 92,
   "catalog_errors": [],
+  "component_logs": "counted while they were collected; no line is stored",
   "components_with_logs": [
    "actions-runner-controller",
    "alb-controller",
@@ -36883,6 +36884,32 @@
    "promtail",
    "vpc-cni"
   ],
+  "component_log_lines": {
+   "logs/pods/actions-runner-controller/arc-system_arc-gha-rs-controller.log": 823,
+   "logs/pods/alb-controller/kube-system_aws-load-balancer-controller.log": 273,
+   "logs/pods/argocd/argocd_argocd-application-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-applicationset-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-notifications-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-repo-server.log": 1068,
+   "logs/pods/argocd/argocd_argocd-server.log": 1131,
+   "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log": 1560,
+   "logs/pods/ebs-csi/kube-system_ebs-csi-node-windows.log": 57,
+   "logs/pods/ebs-csi/kube-system_ebs-csi-node.log": 57,
+   "logs/pods/external-dns/kube-system_external-dns.log": 1500,
+   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log": 1500,
+   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log": 576,
+   "logs/pods/external-secrets/external-secrets_external-secrets.log": 1500,
+   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 549,
+   "logs/pods/karpenter/karpenter_karpenter.log": 344,
+   "logs/pods/keda/keda_keda-operator.log": 47,
+   "logs/pods/kube-proxy/kube-system_kube-proxy.log": 5097,
+   "logs/pods/loki/monitoring_loki-stack.log": 1500,
+   "logs/pods/metrics-server/kube-system_metrics-server.log": 31,
+   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log": 72,
+   "logs/pods/promtail/monitoring_loki-stack-promtail.log": 1153,
+   "logs/pods/vpc-cni/kube-system_aws-node.log": 42
+  },
+  "component_logs_capped": [],
   "files": [
    "logs/cloudwatch/apiserver_errors_by_source.json",
    "logs/cloudwatch/apiserver_etcd_errors.json",
@@ -36946,7 +36973,10 @@
    "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/kubelet-24h.log",
    "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/kubelet-configz.json",
    "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/os.txt",
-   "logs/node/ip-10-0-2-60.ap-northeast-2.compute.internal/kubelet-configz.json",
+   "logs/node/ip-10-0-2-60.ap-northeast-2.compute.internal/kubelet-configz.json"
+  ],
+  "lines_kept": true,
+  "files_scanned": [
    "logs/pods/actions-runner-controller/arc-system_arc-gha-rs-controller.log",
    "logs/pods/alb-controller/kube-system_aws-load-balancer-controller.log",
    "logs/pods/argocd/argocd_argocd-application-controller.log",
@@ -36969,10 +36999,7 @@
    "logs/pods/metrics-server/kube-system_metrics-server.log",
    "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log",
    "logs/pods/promtail/monitoring_loki-stack-promtail.log",
-   "logs/pods/vpc-cni/kube-system_aws-node.log"
-  ],
-  "lines_kept": true,
-  "files_scanned": [
+   "logs/pods/vpc-cni/kube-system_aws-node.log",
    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log",
    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/ipamd-24h.log",
    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log",
@@ -36989,30 +37016,7 @@
    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log",
    "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/containerd-24h.log",
    "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/ipamd-24h.log",
-   "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/kubelet-24h.log",
-   "logs/pods/actions-runner-controller/arc-system_arc-gha-rs-controller.log",
-   "logs/pods/alb-controller/kube-system_aws-load-balancer-controller.log",
-   "logs/pods/argocd/argocd_argocd-application-controller.log",
-   "logs/pods/argocd/argocd_argocd-applicationset-controller.log",
-   "logs/pods/argocd/argocd_argocd-notifications-controller.log",
-   "logs/pods/argocd/argocd_argocd-repo-server.log",
-   "logs/pods/argocd/argocd_argocd-server.log",
-   "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log",
-   "logs/pods/ebs-csi/kube-system_ebs-csi-node-windows.log",
-   "logs/pods/ebs-csi/kube-system_ebs-csi-node.log",
-   "logs/pods/external-dns/kube-system_external-dns.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets.log",
-   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log",
-   "logs/pods/karpenter/karpenter_karpenter.log",
-   "logs/pods/keda/keda_keda-operator.log",
-   "logs/pods/kube-proxy/kube-system_kube-proxy.log",
-   "logs/pods/loki/monitoring_loki-stack.log",
-   "logs/pods/metrics-server/kube-system_metrics-server.log",
-   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log",
-   "logs/pods/promtail/monitoring_loki-stack-promtail.log",
-   "logs/pods/vpc-cni/kube-system_aws-node.log"
+   "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/kubelet-24h.log"
   ],
   "lines_scanned": 23879,
   "error_lines_unclassified": 145,
@@ -37312,14 +37316,6 @@
     "sample": "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-provisioner] 2026-11-06T08:58:33.262494744Z E1106 08:58:33.262448       1 controller.go:1025] \"Unhandled Error\" err=\"error syncing volume \\\"pvc-014f87e5-611a-4e1b-a8ca-7392e8b26757\\\": persistentv"
    },
    {
-    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context deadline …",
-    "count": 3,
-    "files": {
-     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 3
-    },
-    "sample": "2026-11-06T09:01:56+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:01:56.321732901Z\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context d"
-   },
-   {
     "pattern": "ebs-csi | \"Event occurred\" object=\"prod-app-x/app-x-api-usage\" fieldPath=\"\" kind=\"PersistentVolumeClaim\" apiVersion=\"v1\" type=\"Warning\" …",
     "count": 3,
     "files": {
@@ -37334,6 +37330,22 @@
      "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log": 3
     },
     "sample": "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-provisioner] 2026-11-06T07:44:20.455164108Z E1106 07:44:20.455119       1 controller.go:974] \"Unhandled Error\" err=\"error syncing claim \\\"014f87e5-611a-4e1b-a8ca-7392e8b26757\\\": failed to provisi"
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context deadline …",
+    "count": 3,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 3
+    },
+    "sample": "2026-11-06T09:01:56+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:01:56.321732901Z\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context d"
+   },
+   {
+    "pattern": "kube-proxy | \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted on all …",
+    "count": 2,
+    "files": {
+     "logs/pods/kube-proxy/kube-system_kube-proxy.log": 2
+    },
+    "sample": "[pod/kube-proxy-46cc5/kube-proxy] 2026-11-06T08:59:05.940716243Z E1106 08:59:05.939170       1 server.go:234] \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted o"
    },
    {
     "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"failed to load cni during init, please check CRI plugin status before setting up network for pods\" error=\"cni …",
@@ -37438,14 +37450,6 @@
      "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 2
     },
     "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.259774    1556 eviction_manager.go:292] \"Eviction manager: failed to get summary stats\" err=\"failed to get node info: node \\\"ip-10-0-2-100."
-   },
-   {
-    "pattern": "kube-proxy | \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted on all …",
-    "count": 2,
-    "files": {
-     "logs/pods/kube-proxy/kube-system_kube-proxy.log": 2
-    },
-    "sample": "[pod/kube-proxy-46cc5/kube-proxy] 2026-11-06T08:59:05.940716243Z E1106 08:59:05.939170       1 server.go:234] \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted o"
    },
    {
     "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"collecting metrics for a8a9d8b268ec10d5dc42145447580db16a5b3152ee3f97d810ded9029e1106f2\" error=\"cgroups: …",
@@ -38832,8 +38836,7 @@
     "discarded_1h": null,
     "requests_5xx_1h": null
    }
-  },
-  "component_logs_removed": true
+  }
  },
  "tools": {
   "source": "tools/",
@@ -45700,7 +45703,8 @@
     "Node/ip-10-0-1-139.ap-northeast-2.compute.internal": {
      "do-not-disrupt pods": 22556
     }
-   }
+   },
+   "logs_note": "24h latency, launches, disruptions and launch failures were counted from the controller's log while it was collected (logs/pods/AGGREGATED.json); the log itself is not stored"
   },
   "pending": {
    "available": true,

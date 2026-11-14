@@ -95,7 +95,7 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 
 ### 로그와 메트릭을 읽는 권한
 
-**`pods/log`.** 수집 단계 `core/component-logs`가 컴포넌트 파드의 최근 24시간 로그를 `kubectl logs`로 읽습니다. 요약 단계인 `summarize`가 끝나면 원본을 지우고, `keep_component_logs`를 설정하면 남깁니다. `logs.signatures`, `observability.unclassified-errors`, 그리고 `lib/summaries/scaling.py`가 `logs/pods/karpenter/`에서 읽는 Karpenter 로그 정보가 이 로그를 씁니다.
+**`pods/log`.** 수집 단계 `core/component-logs`가 컴포넌트 파드의 최근 24시간 로그를 `kubectl logs`로 읽습니다. 로그는 읽으면서 메모리에서 세고, 원문은 스냅샷에 쓰지 않습니다. `logs.signatures`, `observability.unclassified-errors`, 그리고 Karpenter 컨트롤러 로그에서 세는 정보(`lib/foundations/karpenterlog.py`)가 이 로그를 씁니다.
 
 없으면 `logs.signatures`는 일치하는 로그가 없다고 보고, `observability.unclassified-errors`는 분류할 로그가 없습니다. 이 둘은 로그 파일이 없는 경우와 로그가 빈 경우를 구분하지 못해서, `skip` 없이 조용히 넘어갑니다. `observability.*`의 Loki와 로그 에이전트 점검 항목 9개는 Loki와 Prometheus를 읽으므로 영향이 없습니다.
 

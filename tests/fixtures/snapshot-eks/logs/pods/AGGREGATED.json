@@ -1,0 +1,627 @@
+{
+ "counted_at": "collection",
+ "log_scan": {
+  "lines_kept": true,
+  "files_scanned": [
+   "logs/pods/actions-runner-controller/arc-system_arc-gha-rs-controller.log",
+   "logs/pods/alb-controller/kube-system_aws-load-balancer-controller.log",
+   "logs/pods/argocd/argocd_argocd-application-controller.log",
+   "logs/pods/argocd/argocd_argocd-applicationset-controller.log",
+   "logs/pods/argocd/argocd_argocd-notifications-controller.log",
+   "logs/pods/argocd/argocd_argocd-repo-server.log",
+   "logs/pods/argocd/argocd_argocd-server.log",
+   "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log",
+   "logs/pods/ebs-csi/kube-system_ebs-csi-node-windows.log",
+   "logs/pods/ebs-csi/kube-system_ebs-csi-node.log",
+   "logs/pods/external-dns/kube-system_external-dns.log",
+   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log",
+   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log",
+   "logs/pods/external-secrets/external-secrets_external-secrets.log",
+   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log",
+   "logs/pods/karpenter/karpenter_karpenter.log",
+   "logs/pods/keda/keda_keda-operator.log",
+   "logs/pods/kube-proxy/kube-system_kube-proxy.log",
+   "logs/pods/loki/monitoring_loki-stack.log",
+   "logs/pods/metrics-server/kube-system_metrics-server.log",
+   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log",
+   "logs/pods/promtail/monitoring_loki-stack-promtail.log",
+   "logs/pods/vpc-cni/kube-system_aws-node.log"
+  ],
+  "lines_scanned": 23380,
+  "error_lines_unclassified": 24,
+  "signatures": [
+   {
+    "id": "external-secrets.provider-error",
+    "name": "External Secrets cannot fetch a value from the secret store",
+    "component": "external-secrets",
+    "area": "security",
+    "severity": "high",
+    "sources": [
+     "logs/pods/external-secrets/*.log"
+    ],
+    "pattern": "\"msg\":\"Reconciler error\"(?!.*Operation cannot be fulfilled).*\"controller\":\"externalsecret\"|\"controller\":\"externalsecret\"(?!.*Operation cannot be fulfilled).*\"msg\":\"Reconciler error\"|could not get secret data from provider|unable to create session|Secret does not exist",
+    "meaning": "The ExternalSecret has SecretSynced=False. New pods use the old Secret, or there is no Secret at all and they fail to start. The line is controller-runtime's Reconciler error for the externalsecret controller (every version; the provider error is in its \"error\" field), plus the operator's own `could not get secret data from provider` line that only versions up to 0.10.0 print. Both signatures of this collector count the Reconciler error line; this one adds the AWS session and missing-secret texts.",
+    "cause": "IRSA role permissions, secret renamed or deleted, region mismatch, expired token.",
+    "verify": "kubectl get externalsecrets -A | grep -v SecretSynced",
+    "warn_at": 1,
+    "fail_at": 10,
+    "count": 62,
+    "first": "2026-11-06T17:31:20Z",
+    "last": "2026-11-07T01:34:43Z",
+    "files": {
+     "logs/pods/external-secrets/external-secrets_external-secrets.log": 62
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/external-secrets-7859bcd5c-g8z4q/external-secrets] 2026-11-06T17:31:20.550454017Z {\"level\":\"error\",\"ts\":1793986280.5503237,\"logger\":\"controllers.ExternalSecret\",\"msg\":\"could not get secret data from provider\",\"ExternalSecret\":{\"name\":\"",
+     "[pod/external-secrets-7859bcd5c-g8z4q/external-secrets] 2026-11-06T17:31:20.562309177Z {\"level\":\"error\",\"ts\":1793986280.5622146,\"msg\":\"Reconciler error\",\"controller\":\"externalsecret\",\"controllerGroup\":\"external-secrets.io\",\"controllerKind\":",
+     "[pod/external-secrets-7859bcd5c-g8z4q/external-secrets] 2026-11-06T17:48:00.658098468Z {\"level\":\"error\",\"ts\":1793987280.6579707,\"logger\":\"controllers.ExternalSecret\",\"msg\":\"could not get secret data from provider\",\"ExternalSecret\":{\"name\":\"",
+     "[pod/external-secrets-7859bcd5c-g8z4q/external-secrets] 2026-11-06T17:48:00.669209677Z {\"level\":\"error\",\"ts\":1793987280.669104,\"msg\":\"Reconciler error\",\"controller\":\"externalsecret\",\"controllerGroup\":\"external-secrets.io\",\"controllerKind\":\"",
+     "[pod/external-secrets-7859bcd5c-g8z4q/external-secrets] 2026-11-06T18:04:40.765776795Z {\"level\":\"error\",\"ts\":1793988280.7656457,\"logger\":\"controllers.ExternalSecret\",\"msg\":\"could not get secret data from provider\",\"ExternalSecret\":{\"name\":\""
+    ],
+    "status": "warn"
+   },
+   {
+    "id": "karpenter.version-unsupported",
+    "name": "Karpenter does not support the cluster Kubernetes version",
+    "component": "karpenter",
+    "area": "platform",
+    "severity": "high",
+    "sources": [
+     "logs/pods/karpenter/*.log"
+    ],
+    "pattern": "failed validating kubernetes version|validating kubernetes version, karpenter( version)? is not compatible with (K8s|kubernetes) version",
+    "meaning": "The Karpenter controller considers the EKS Kubernetes version outside its supported range (MinK8sVersion..MaxK8sVersion of the provider). Up to v1.0.x this is the \"failed validating kubernetes version\" error line; from v1.1.0 it is the error field of the version controller's \"Reconciler error\". The nodeclass.status controller stops resolving AMIs, so new nodes do not launch or launch only with old AMIs.",
+    "cause": "EKS was upgraded without upgrading the Karpenter chart (or vice versa), or 1.x version validation is on and the patch version is outside the support table.",
+    "verify": "kubectl logs -n karpenter -l app.kubernetes.io/name=karpenter --since=24h | grep -c 'validating kubernetes version'; helm list -n karpenter",
+    "warn_at": 1,
+    "fail_at": 10,
+    "count": 1,
+    "first": "2026-11-06T08:49:38Z",
+    "last": "2026-11-06T08:49:38Z",
+    "files": {
+     "logs/pods/karpenter/karpenter_karpenter.log": 1
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/karpenter-9769889bd-pkxd2/controller] 2026-11-06T08:49:38.045274596Z {\"level\":\"ERROR\",\"time\":\"2026-11-06T08:49:38.045Z\",\"logger\":\"controller\",\"message\":\"failed validating kubernetes version\",\"commit\":\"490ef94\",\"controller\":\"nodeclass.s"
+    ],
+    "status": "warn"
+   },
+   {
+    "id": "ebs-csi.snapshot-crd-missing",
+    "name": "EBS CSI cannot find the VolumeSnapshot CRD (snapshot controller not installed)",
+    "component": "ebs-csi",
+    "area": "storage",
+    "severity": "medium",
+    "sources": [
+     "logs/pods/ebs-csi/*.log"
+    ],
+    "pattern": "failed to list \\*v1\\.VolumeSnapshot(Class|Content)?: the server could not find the requested resource",
+    "meaning": "external-snapshotter (CRD + snapshot-controller) is missing, so VolumeSnapshots cannot be created. Velero/CSI snapshot backups are impossible and the csi-snapshotter sidecar logs the reflector error on every list retry (two lines per retry with client-go 0.31, one with 0.37).",
+    "cause": "Only the EBS CSI add-on was installed, without the snapshot-controller (separate add-on or kubernetes-csi/external-snapshotter).",
+    "verify": "kubectl get crd volumesnapshotclasses.snapshot.storage.k8s.io; kubectl get deploy -n kube-system snapshot-controller",
+    "warn_at": 1,
+    "fail_at": 100,
+    "count": 1500,
+    "first": "2026-11-06T20:55:55Z",
+    "last": "2026-11-07T01:36:03Z",
+    "files": {
+     "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log": 1500
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-snapshotter] 2026-11-06T20:55:55.112553385Z W1106 20:55:55.112429       1 reflector.go:561] k8s.io/client-go@v0.31.0/tools/cache/reflector.go:243: failed to list *v1.VolumeSnapshotClass: the serv",
+     "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-snapshotter] 2026-11-06T20:55:55.112601875Z E1106 20:55:55.112473       1 reflector.go:158] \"Unhandled Error\" err=\"k8s.io/client-go@v0.31.0/tools/cache/reflector.go:243: Failed to watch *v1.Volum",
+     "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-snapshotter] 2026-11-06T20:55:57.386869931Z W1106 20:55:57.386754       1 reflector.go:561] k8s.io/client-go@v0.31.0/tools/cache/reflector.go:243: failed to list *v1.VolumeSnapshotContent: the se",
+     "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-snapshotter] 2026-11-06T20:55:57.386946006Z E1106 20:55:57.386824       1 reflector.go:158] \"Unhandled Error\" err=\"k8s.io/client-go@v0.31.0/tools/cache/reflector.go:243: Failed to watch *v1.Volum",
+     "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-snapshotter] 2026-11-06T20:56:36.640879575Z W1106 20:56:36.640780       1 reflector.go:561] k8s.io/client-go@v0.31.0/tools/cache/reflector.go:243: failed to list *v1.VolumeSnapshotClass: the serv"
+    ],
+    "status": "warn"
+   },
+   {
+    "id": "metrics-server.scrape-failed",
+    "name": "metrics-server cannot scrape node kubelets",
+    "component": "metrics-server",
+    "area": "scaling",
+    "severity": "medium",
+    "sources": [
+     "logs/pods/metrics-server/*.log"
+    ],
+    "pattern": "Failed to scrape node|x509|certificate",
+    "meaning": "The CPU/memory metrics HPAs use are missing or stale. HPAs stall at \"unknown\". \"Failed to scrape node\" is the E line (klog V0) with the kubelet client error in err=; x509 and certificate match Go's TLS verification errors inside that value.",
+    "cause": "kubelet serving certificate verification failure (environments needing --kubelet-insecure-tls), network policy, node NotReady.",
+    "verify": "kubectl top nodes; kubectl get apiservice v1beta1.metrics.k8s.io",
+    "warn_at": 5,
+    "fail_at": 100,
+    "count": 31,
+    "first": "2026-11-06T01:43:11Z",
+    "last": "2026-11-06T10:09:11Z",
+    "files": {
+     "logs/pods/metrics-server/kube-system_metrics-server.log": 31
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/metrics-server-65d4b7df64-xxfjs/metrics-server] 2026-11-06T01:43:11.055572813Z E1106 01:43:11.055448       1 scraper.go:149] \"Failed to scrape node\" err=\"Get \\\"https://10.0.2.160:10250/metrics/resource\\\": remote error: tls: internal er",
+     "[pod/metrics-server-65d4b7df64-xxfjs/metrics-server] 2026-11-06T01:43:11.089988869Z E1106 01:43:11.089871       1 scraper.go:149] \"Failed to scrape node\" err=\"Get \\\"https://10.0.2.66:10250/metrics/resource\\\": remote error: tls: internal err",
+     "[pod/metrics-server-65d4b7df64-xxfjs/metrics-server] 2026-11-06T02:37:11.052418502Z E1106 02:37:11.052276       1 scraper.go:149] \"Failed to scrape node\" err=\"Get \\\"https://10.0.2.250:10250/metrics/resource\\\": remote error: tls: internal er",
+     "[pod/metrics-server-65d4b7df64-xxfjs/metrics-server] 2026-11-06T02:37:11.067373879Z E1106 02:37:11.066845       1 scraper.go:149] \"Failed to scrape node\" err=\"Get \\\"https://10.0.2.160:10250/metrics/resource\\\": remote error: tls: internal er",
+     "[pod/metrics-server-65d4b7df64-xxfjs/metrics-server] 2026-11-06T02:39:26.060463132Z E1106 02:39:26.060322       1 scraper.go:149] \"Failed to scrape node\" err=\"Get \\\"https://10.0.2.181:10250/metrics/resource\\\": remote error: tls: internal er"
+    ],
+    "status": "warn"
+   },
+   {
+    "id": "karpenter.spot-interruption",
+    "name": "Spot or capacity-reservation interruption notice",
+    "component": "karpenter",
+    "area": "resilience",
+    "severity": "low",
+    "sources": [
+     "logs/pods/karpenter/*.log"
+    ],
+    "pattern": "\"message\":\"initiating delete from interruption message\".*\"messageKind\":\"(SpotInterruptionKind|spot_interrupted|CapacityReservationInterruptionKind|capacity_reservation_interrupted)\"",
+    "meaning": "EC2 announced it will reclaim a spot node in 2 minutes and Karpenter deleted the NodeClaim (\"initiating delete from interruption message\" with messageKind spot_interrupted, SpotInterruptionKind on 0.37.x). Its pods get rescheduled. If frequent, widen the spot pool selection. Rebalance recommendations are Events only.",
+    "cause": "Spot market fluctuation. The narrower the instance types, the more frequent.",
+    "verify": "kubectl get events -A | grep -i interrupt",
+    "warn_at": 3,
+    "fail_at": 50,
+    "count": 2,
+    "first": "2026-11-06T02:44:15Z",
+    "last": "2026-11-06T09:09:11Z",
+    "files": {
+     "logs/pods/karpenter/karpenter_karpenter.log": 2
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/karpenter-9769889bd-pkxd2/controller] 2026-11-06T02:44:15.312621214Z {\"level\":\"INFO\",\"time\":\"2026-11-06T02:44:15.312Z\",\"logger\":\"controller\",\"message\":\"initiating delete from interruption message\",\"commit\":\"490ef94\",\"controller\":\"inter",
+     "[pod/karpenter-9769889bd-pkxd2/controller] 2026-11-06T09:09:11.705607329Z {\"level\":\"INFO\",\"time\":\"2026-11-06T09:09:11.705Z\",\"logger\":\"controller\",\"message\":\"initiating delete from interruption message\",\"commit\":\"490ef94\",\"controller\":\"inter"
+    ],
+    "status": "info"
+   }
+  ],
+  "unclassified_errors": [
+   {
+    "pattern": "ebs-csi | \"Unexpected failure when attempting to remove node taint(s)\" err=\"isAllocatableSet: driver not found on node …",
+    "count": 8,
+    "files": {
+     "logs/pods/ebs-csi/kube-system_ebs-csi-node-windows.log": 4,
+     "logs/pods/ebs-csi/kube-system_ebs-csi-node.log": 4
+    },
+    "sample": "[pod/ebs-csi-node-5942l/ebs-plugin] 2026-11-06T09:44:57.444277939Z E1106 09:44:57.444146       1 node.go:857] \"Unexpected failure when attempting to remove node taint(s)\" err=\"isAllocatableSet: driver not found on node ip-10-0-1-137.ap-nort"
+   },
+   {
+    "pattern": "ebs-csi | \"Volume deletion failed\" err=\"persistentvolume pvc-<uuid> is still attached to node ip-10-0-1-98.ap-northeast-2.compute.internal\" …",
+    "count": 4,
+    "files": {
+     "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log": 4
+    },
+    "sample": "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-provisioner] 2026-11-06T08:58:33.262342297Z E1106 08:58:33.262266       1 controller.go:1558] \"Volume deletion failed\" err=\"persistentvolume pvc-014f87e5-611a-4e1b-a8ca-7392e8b26757 is still atta"
+   },
+   {
+    "pattern": "ebs-csi | \"Unhandled Error\" err=\"error syncing volume \\\"pvc-<uuid>\\\": persistentvolume pvc-<uuid> is still attached to node …",
+    "count": 4,
+    "files": {
+     "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log": 4
+    },
+    "sample": "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-provisioner] 2026-11-06T08:58:33.262494744Z E1106 08:58:33.262448       1 controller.go:1025] \"Unhandled Error\" err=\"error syncing volume \\\"pvc-014f87e5-611a-4e1b-a8ca-7392e8b26757\\\": persistentv"
+   },
+   {
+    "pattern": "ebs-csi | \"Event occurred\" object=\"prod-app-x/app-x-api-usage\" fieldPath=\"\" kind=\"PersistentVolumeClaim\" apiVersion=\"v1\" type=\"Warning\" …",
+    "count": 3,
+    "files": {
+     "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log": 3
+    },
+    "sample": "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-provisioner] 2026-11-06T07:44:20.454991784Z I1106 07:44:20.454890       1 event.go:389] \"Event occurred\" object=\"prod-app-x/app-x-api-usage\" fieldPath=\"\" kind=\"PersistentVolumeClaim\" apiVersion=\""
+   },
+   {
+    "pattern": "ebs-csi | \"Unhandled Error\" err=\"error syncing claim \\\"<uuid>\\\": failed to provision volume with StorageClass \\\"gp3\\\": error generating accessibility …",
+    "count": 3,
+    "files": {
+     "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log": 3
+    },
+    "sample": "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-provisioner] 2026-11-06T07:44:20.455164108Z E1106 07:44:20.455119       1 controller.go:974] \"Unhandled Error\" err=\"error syncing claim \\\"014f87e5-611a-4e1b-a8ca-7392e8b26757\\\": failed to provisi"
+   },
+   {
+    "pattern": "kube-proxy | \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted on all …",
+    "count": 2,
+    "files": {
+     "logs/pods/kube-proxy/kube-system_kube-proxy.log": 2
+    },
+    "sample": "[pod/kube-proxy-46cc5/kube-proxy] 2026-11-06T08:59:05.940716243Z E1106 08:59:05.939170       1 server.go:234] \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted o"
+   }
+  ],
+  "boot_window_skipped": {},
+  "boot_window_seconds": 300,
+  "components_with_logs": [
+   "actions-runner-controller",
+   "alb-controller",
+   "argocd",
+   "ebs-csi",
+   "external-dns",
+   "external-secrets",
+   "grafana",
+   "karpenter",
+   "keda",
+   "kube-proxy",
+   "loki",
+   "metrics-server",
+   "prometheus",
+   "promtail",
+   "vpc-cni"
+  ],
+  "lines_by_file": {
+   "logs/pods/actions-runner-controller/arc-system_arc-gha-rs-controller.log": 823,
+   "logs/pods/alb-controller/kube-system_aws-load-balancer-controller.log": 273,
+   "logs/pods/argocd/argocd_argocd-application-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-applicationset-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-notifications-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-repo-server.log": 1068,
+   "logs/pods/argocd/argocd_argocd-server.log": 1131,
+   "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log": 1560,
+   "logs/pods/ebs-csi/kube-system_ebs-csi-node-windows.log": 57,
+   "logs/pods/ebs-csi/kube-system_ebs-csi-node.log": 57,
+   "logs/pods/external-dns/kube-system_external-dns.log": 1500,
+   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log": 1500,
+   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log": 576,
+   "logs/pods/external-secrets/external-secrets_external-secrets.log": 1500,
+   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 549,
+   "logs/pods/karpenter/karpenter_karpenter.log": 344,
+   "logs/pods/keda/keda_keda-operator.log": 47,
+   "logs/pods/kube-proxy/kube-system_kube-proxy.log": 5097,
+   "logs/pods/loki/monitoring_loki-stack.log": 1500,
+   "logs/pods/metrics-server/kube-system_metrics-server.log": 31,
+   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log": 72,
+   "logs/pods/promtail/monitoring_loki-stack-promtail.log": 1153,
+   "logs/pods/vpc-cni/kube-system_aws-node.log": 42
+  },
+  "scan_signatures_version": "1.1.1"
+ },
+ "karpenter_logs": {
+  "latency_24h": {
+   "n": 30,
+   "p50_s": 63,
+   "max_s": 86,
+   "slowest": [
+    {
+     "nodeclaim": "build-arm64-frqjd",
+     "launched_to_initialized_s": 86,
+     "launched_to_registered_s": 68
+    },
+    {
+     "nodeclaim": "default-cw7qd",
+     "launched_to_initialized_s": 79,
+     "launched_to_registered_s": 64
+    },
+    {
+     "nodeclaim": "default-2q5h6",
+     "launched_to_initialized_s": 77,
+     "launched_to_registered_s": 63
+    },
+    {
+     "nodeclaim": "build-arm64-9c4kc",
+     "launched_to_initialized_s": 74,
+     "launched_to_registered_s": 58
+    },
+    {
+     "nodeclaim": "build-arm64-88w98",
+     "launched_to_initialized_s": 71,
+     "launched_to_registered_s": 55
+    },
+    {
+     "nodeclaim": "default-k48s5",
+     "launched_to_initialized_s": 71,
+     "launched_to_registered_s": 61
+    },
+    {
+     "nodeclaim": "build-arm64-fxkbg",
+     "launched_to_initialized_s": 71,
+     "launched_to_registered_s": 56
+    },
+    {
+     "nodeclaim": "build-arm64-np4mt",
+     "launched_to_initialized_s": 69,
+     "launched_to_registered_s": 54
+    },
+    {
+     "nodeclaim": "default-jbfcl",
+     "launched_to_initialized_s": 69,
+     "launched_to_registered_s": 51
+    },
+    {
+     "nodeclaim": "default-lvf7c",
+     "launched_to_initialized_s": 68,
+     "launched_to_registered_s": 55
+    },
+    {
+     "nodeclaim": "default-gzfb4",
+     "launched_to_initialized_s": 66,
+     "launched_to_registered_s": 56
+    },
+    {
+     "nodeclaim": "build-arm64-bd8w9",
+     "launched_to_initialized_s": 66,
+     "launched_to_registered_s": 52
+    },
+    {
+     "nodeclaim": "default-v7c46",
+     "launched_to_initialized_s": 64,
+     "launched_to_registered_s": 54
+    },
+    {
+     "nodeclaim": "build-arm64-7svvl",
+     "launched_to_initialized_s": 64,
+     "launched_to_registered_s": 50
+    },
+    {
+     "nodeclaim": "default-vz69n",
+     "launched_to_initialized_s": 63,
+     "launched_to_registered_s": 48
+    },
+    {
+     "nodeclaim": "default-td9kt",
+     "launched_to_initialized_s": 61,
+     "launched_to_registered_s": 45
+    },
+    {
+     "nodeclaim": "build-arm64-jqpc8",
+     "launched_to_initialized_s": 60,
+     "launched_to_registered_s": 43
+    },
+    {
+     "nodeclaim": "default-wwhg5",
+     "launched_to_initialized_s": 58,
+     "launched_to_registered_s": 47
+    },
+    {
+     "nodeclaim": "default-z9z9h",
+     "launched_to_initialized_s": 56,
+     "launched_to_registered_s": 45
+    },
+    {
+     "nodeclaim": "default-tqfdp",
+     "launched_to_initialized_s": 55,
+     "launched_to_registered_s": 44
+    },
+    {
+     "nodeclaim": "build-arm64-zqkjw",
+     "launched_to_initialized_s": 55,
+     "launched_to_registered_s": 40
+    },
+    {
+     "nodeclaim": "default-2g8wm",
+     "launched_to_initialized_s": 55,
+     "launched_to_registered_s": 43
+    },
+    {
+     "nodeclaim": "default-dxghz",
+     "launched_to_initialized_s": 53,
+     "launched_to_registered_s": 42
+    },
+    {
+     "nodeclaim": "default-fdmww",
+     "launched_to_initialized_s": 50,
+     "launched_to_registered_s": 38
+    },
+    {
+     "nodeclaim": "build-arm64-l2zdc",
+     "launched_to_initialized_s": 48,
+     "launched_to_registered_s": 33
+    },
+    {
+     "nodeclaim": "default-6d76s",
+     "launched_to_initialized_s": 47,
+     "launched_to_registered_s": 37
+    },
+    {
+     "nodeclaim": "build-arm64-xlg9c",
+     "launched_to_initialized_s": 47,
+     "launched_to_registered_s": 32
+    },
+    {
+     "nodeclaim": "default-6mrpc",
+     "launched_to_initialized_s": 46,
+     "launched_to_registered_s": 35
+    },
+    {
+     "nodeclaim": "default-w2hnx",
+     "launched_to_initialized_s": 44,
+     "launched_to_registered_s": 34
+    },
+    {
+     "nodeclaim": "default-2957m",
+     "launched_to_initialized_s": 41,
+     "launched_to_registered_s": 29
+    }
+   ]
+  },
+  "nodeclaims_launched_24h": 30,
+  "disruptions_24h": {
+   "consolidation delete": 20,
+   "emptiness delete": 10
+  },
+  "disrupted_24h": [
+   {
+    "time": "2026-11-06T01:41:49.192935+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-209.ap-northeast-2.compute.internal/c9g.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T01:42:14.394477+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-116.ap-northeast-2.compute.internal/c9g.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T01:50:47.024573+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-160.ap-northeast-2.compute.internal/c9gd.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T01:56:57.307071+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-66.ap-northeast-2.compute.internal/c9g.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T02:01:26.830708+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-177.ap-northeast-2.compute.internal/c9gd.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T02:52:20.951542+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-160.ap-northeast-2.compute.internal/c9gd.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T02:54:09.551323+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-250.ap-northeast-2.compute.internal/c9g.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T02:56:30.001124+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-146.ap-northeast-2.compute.internal/c9gd.large/spot",
+    "pods": 1
+   },
+   {
+    "time": "2026-11-06T03:42:50.988567+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-45.ap-northeast-2.compute.internal/c6g.xlarge/spot",
+    "pods": 2
+   },
+   {
+    "time": "2026-11-06T03:54:57.268790+00:00",
+    "reason": "emptiness delete",
+    "nodes": "ip-10-0-2-10.ap-northeast-2.compute.internal/c6g.xlarge/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T05:30:00.219108+00:00",
+    "reason": "emptiness delete",
+    "nodes": "ip-10-0-1-162.ap-northeast-2.compute.internal/c9gd.xlarge/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T05:40:31.574394+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-32.ap-northeast-2.compute.internal/c9g.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T05:42:21.236748+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-43.ap-northeast-2.compute.internal/c9g.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T05:47:00.221148+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-89.ap-northeast-2.compute.internal/c9gd.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T05:53:03.513652+00:00",
+    "reason": "emptiness delete",
+    "nodes": "ip-10-0-2-209.ap-northeast-2.compute.internal/c6g.xlarge/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T06:25:51.585201+00:00",
+    "reason": "emptiness delete",
+    "nodes": "ip-10-0-1-132.ap-northeast-2.compute.internal/c6g.xlarge/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T07:13:26.470843+00:00",
+    "reason": "emptiness delete",
+    "nodes": "ip-10-0-2-51.ap-northeast-2.compute.internal/c6g.xlarge/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T07:49:45.133060+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-224.ap-northeast-2.compute.internal/c9g.medium/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T08:44:01.234233+00:00",
+    "reason": "emptiness delete",
+    "nodes": "ip-10-0-2-22.ap-northeast-2.compute.internal/c6gn.xlarge/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T08:58:55.796675+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-1-62.ap-northeast-2.compute.internal/r8gd.large/spot",
+    "pods": 14
+   },
+   {
+    "time": "2026-11-06T09:01:41.109791+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-1-98.ap-northeast-2.compute.internal/r8gd.medium/spot",
+    "pods": 3
+   },
+   {
+    "time": "2026-11-06T09:14:04.697713+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-1-104.ap-northeast-2.compute.internal/r8gd.medium/spot",
+    "pods": 1
+   },
+   {
+    "time": "2026-11-06T09:30:54.760663+00:00",
+    "reason": "emptiness delete",
+    "nodes": "ip-10-0-1-51.ap-northeast-2.compute.internal/c6g.xlarge/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T09:45:42.912179+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-217.ap-northeast-2.compute.internal/c9gd.large/spot",
+    "pods": 1
+   },
+   {
+    "time": "2026-11-06T09:56:36.109257+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-145.ap-northeast-2.compute.internal/c9g.large/spot",
+    "pods": 1
+   },
+   {
+    "time": "2026-11-06T10:01:39.155990+00:00",
+    "reason": "emptiness delete",
+    "nodes": "ip-10-0-1-42.ap-northeast-2.compute.internal/c9gd.xlarge/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T10:17:04.759715+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-160.ap-northeast-2.compute.internal/c9gd.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T10:24:55.961753+00:00",
+    "reason": "consolidation delete",
+    "nodes": "ip-10-0-2-64.ap-northeast-2.compute.internal/c9g.large/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T10:29:31.664158+00:00",
+    "reason": "emptiness delete",
+    "nodes": "ip-10-0-1-138.ap-northeast-2.compute.internal/c9g.xlarge/spot",
+    "pods": 0
+   },
+   {
+    "time": "2026-11-06T11:20:32.921539+00:00",
+    "reason": "emptiness delete",
+    "nodes": "ip-10-0-1-147.ap-northeast-2.compute.internal/c9g.xlarge/spot",
+    "pods": 0
+   }
+  ],
+  "launch_failures_24h": {}
+ },
+ "capped": []
+}
