@@ -26,7 +26,7 @@
 - id: cluster-objects
   reads: "Every kind the API server lists (kubectl get, list). Secrets are never requested."
   keeps: "Each object as the API returns it: spec, status, labels, annotations, image, resources, probes, volumes, references to Secrets and ConfigMaps by name."
-  drops: "ConfigMap values (replaced by length and shape; a few keys of platform components kubegap parses are kept, lib/foundations/scrub.py KEEP_VALUES). The value of an environment variable whose name looks like a credential. The copy of the manifest in kubectl.kubernetes.io/last-applied-configuration. Outside the system namespaces, unless app-settings is collected too: every literal environment value, every command and args list, and every key of a ConfigMap."
+  drops: "ConfigMap values (replaced by length and shape; a few keys of platform components kubegap parses are kept, lib/foundations/scrub.py KEEP_VALUES). The value of an environment variable whose name looks like a credential. The copy of the manifest in kubectl.kubernetes.io/last-applied-configuration. Outside the system namespaces, unless app-settings is collected too: every literal environment value, every command and args list, and every key of a ConfigMap, also where managedFields name it (a key a workload refers to stays in the workload's reference)."
   sensitivity: low
   modes: [daily, full]
 

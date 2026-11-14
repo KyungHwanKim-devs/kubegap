@@ -24,7 +24,8 @@ def _pod(ns: str) -> dict:
 
 
 def _cm(ns: str) -> dict:
-    return {"kind": "ConfigMap", "metadata": {"namespace": ns, "name": "settings", "labels": {"app": "x"}}, "data": {"DB_HOST": "db.internal", "app.ini": "password = secretsecret\n"}}
+    managed = [{"manager": "argocd-controller", "operation": "Apply", "time": "2026-11-01T00:00:00Z", "fieldsV1": {"f:data": {"f:DB_HOST": {}, "f:app.ini": {}}, "f:metadata": {"f:labels": {"f:app": {}}}}}]
+    return {"kind": "ConfigMap", "metadata": {"namespace": ns, "name": "settings", "labels": {"app": "x"}, "managedFields": managed}, "data": {"DB_HOST": "db.internal", "app.ini": "password = secretsecret\n"}}
 
 
 def test_a_daily_run_keeps_no_literal_environment_value_outside_the_system_namespaces():
@@ -60,7 +61,8 @@ def test_a_daily_run_keeps_no_command_no_args_and_no_configmap_key_of_an_applica
     assert system["spec"]["containers"][0]["args"] and system["spec"]["containers"][0]["livenessProbe"]["exec"]["command"]
     cm_app, cm_sys = scrub.scrub_objects({"kind": "List", "items": [_cm("shop"), _cm("kube-system")]}, app_settings=False)["items"]
     assert "data" not in cm_app and cm_app[scrub.MARK]["keys_dropped"] == 2 and cm_app[scrub.MARK]["data_chars"] > 0 and cm_app["metadata"]["labels"] == {"app": "x"}
-    assert "DB_HOST" not in json.dumps(cm_app) and "app.ini" not in json.dumps(cm_app)
+    assert "DB_HOST" not in json.dumps(cm_app) and "app.ini" not in json.dumps(cm_app)  # not in managedFields either, which name every key a manager wrote
+    assert cm_app["metadata"]["managedFields"][0] == {"manager": "argocd-controller", "operation": "Apply", "time": "2026-11-01T00:00:00Z", "fieldsV1": {"f:data": {}, "f:metadata": {}}}  # who wrote data, and when, stays
     assert set(cm_sys["data"]) == {"DB_HOST", "app.ini"} and "secretsecret" not in json.dumps(cm_sys)  # keys with length and shape, as in a full run
     full = scrub.scrub_objects({"kind": "List", "items": [_pod("shop"), _cm("shop")]})["items"]
     assert full[0]["spec"]["containers"][0]["command"] == ["sh", "-c"] and set(full[1]["data"]) == {"DB_HOST", "app.ini"}  # a full run collects app-settings

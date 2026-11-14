@@ -221,6 +221,11 @@ def scrub_configmap(cm: dict, *, app_settings: bool = True) -> dict:
         chars = sum(len(str(v)) for v in data.values()) + sum(len(str(v)) for v in binary.values())
         cm.pop("data", None)
         cm.pop("binaryData", None)
+        # managedFields name every key a manager wrote (`fieldsV1.f:data.f:<key>`). What lib/summaries/hygiene/configchanges reads of an entry is who
+        # wrote `data` and when, so each entry keeps its top-level field names and nothing below them.
+        for e in meta.get("managedFields") or []:
+            if isinstance(e, dict) and isinstance(e.get("fieldsV1"), dict):
+                e["fieldsV1"] = {k: {} for k in e["fieldsV1"]}
         cm[MARK] = {"values_dropped": True, "keys_dropped": len(data) + len(binary), "data_chars": chars, "annotations_dropped": dropped_ann}
         return cm
     keep = _keys_for(KEEP_VALUES, ns, name)

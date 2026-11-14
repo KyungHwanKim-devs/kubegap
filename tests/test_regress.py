@@ -151,6 +151,18 @@ def test_a_daily_snapshot_holds_nothing_an_application_is_configured_with(tmp_pa
         walk(json.loads(f.read_text(encoding="utf-8")), None)
         seen += 1
     assert seen > 10
+    # A key name must not survive anywhere in its own ConfigMap: on a live cluster the keys were found in metadata.managedFields
+    # (`fieldsV1.f:data.f:<key>`), which the walk above does not read (2026-11-14).
+    keys = {(o["metadata"]["namespace"], o["metadata"]["name"]): set(o.get("data") or {}) for o in json.loads((fixture / "objects" / "configmaps.json").read_text(encoding="utf-8"))["items"]}
+    checked = 0
+    for o in json.loads((snap / "objects" / "configmaps.json").read_text(encoding="utf-8"))["items"]:
+        ns, name = o["metadata"]["namespace"], o["metadata"]["name"]
+        if scrub.system_namespace(ns):
+            continue
+        text = json.dumps(o)
+        assert not [k for k in keys[(ns, name)] if f'"f:{k}"' in text or f'"{k}"' in text], (ns, name)
+        checked += len(keys[(ns, name)])
+    assert checked > 20
 
 
 def test_summary_shape_doc_matches_the_summaries(runs):
