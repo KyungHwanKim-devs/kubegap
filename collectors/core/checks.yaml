@@ -2318,11 +2318,12 @@
   name: Alertmanager notification delivery failures
   area: observability
   type: metric
-  inputs: [alertmanager_notifications_failed_1d]
+  inputs: [alertmanager_notifications_failed_1d, am_notifications_1d]
+  join_on: integration   # the second input only supplies how many were sent in all, so that "8 failed" is read as 8 of 62 and not as nothing arriving
   rule:
     expr: "value > 0"
   target: "labels.get('integration', 'unknown')"
-  evidence: "f\"{value:.0f} delivery failures in 24h (integration {labels.get('integration')})\""
+  evidence: "(f\"{value:.0f} of {v['am_notifications_1d']:.0f} notifications failed in 24h, the other {max(v['am_notifications_1d'] - value, 0):.0f} were delivered\" if 'am_notifications_1d' in v else f\"{value:.0f} delivery failures in 24h, how many were sent in all was not read\") + f\" (integration {labels.get('integration')}, which is how the receiver is configured and not necessarily where it delivers: a Discord webhook is often called through the slack integration)\""
   severity_default: high
   nature: occurrence
   symptom_linked: false
@@ -2338,6 +2339,10 @@
             - labels:
                 integration: "slack"
               value: 3
+          am_notifications_1d:
+            - labels:
+                integration: "slack"
+              value: 40
       - expect: "pass"
         metric:
           alertmanager_notifications_failed_1d:

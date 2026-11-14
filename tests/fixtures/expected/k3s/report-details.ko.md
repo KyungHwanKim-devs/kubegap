@@ -7,7 +7,7 @@
 | kube context / 클러스터 | `default` / default (k3s, v1.33.5+k3s1) |
 | 실행 시각 / 모드 | 2026-11-07T10:22:59+09:00 / full (수집 262.7초, 모드 때문에 건너뛴 단계 0개, 실패 0개) |
 | 운영 규모 | `small` (묻지 못해 노드 수로 짐작) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.93 / 1.1.0 |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.94 / 1.1.0 |
 | 검증한 버전 범위 | Kubernetes v1.33.5+k3s1 (검증 범위 안 1.30 ~ 1.37) · Prometheus 3.7.3 (검증 범위 안 2.49 ~ 3.15) · Alertmanager 0.29.0 (검증 범위 안 0.26 ~ 0.34) · Grafana 12.2.1 (검증 범위 안 10.2 ~ 13.3) |
 | 노드 / 네임스페이스 / 파드 / CRD | 2 (Ready 2) / 26 / 153 / 64 |
 | 컴포넌트 (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
@@ -86,7 +86,7 @@
 - full 모드에서 수집 안 함 0: 없음
 - 건너뛰었거나 오류가 난 점검 항목 9: `observability.log-volume-change` (skip: summary.logs.loki.volume_change missing), `observability.log-coverage-gap` (skip: summary.logs.loki.coverage missing), `observability.loki-not-ready` (skip: nothing to judge: loki not present), `observability.loki-ingest-discarded` (skip: summary.logs.agents.loki_metrics missing), `observability.promtail-dropped` (skip: summary.logs.agents.promtail missing), `observability.log-error-ratio-high` (skip: summary.logs.loki.namespaces_1h missing), `observability.unstructured-logs` (skip: summary.logs.loki.namespaces_1h missing), `traffic.ingress-5xx-ratio` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)), `traffic.ingress-p95-latency` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29))
 - 일부만 판정한 점검 항목 0 (판정에 필요한 자료가 없는 대상은 판정하지 않았고 통과로 세지 않았습니다): 없음
-- 질의 결과가 빈 항목 6 (질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻입니다. 이름 자체가 없으면 건너뜀으로 처리합니다): `resources.oomkilled`, `resources.large-request-binpacking`, `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `node.network-errors`, `scaling.pod-pending-long`
+- 질의 결과가 빈 항목 5 (질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻입니다. 이름 자체가 없으면 건너뜀으로 처리합니다): `resources.oomkilled`, `resources.large-request-binpacking`, `observability.scrape-targets-down`, `node.network-errors`, `scaling.pod-pending-long`
 
 ## 7. 부록
 

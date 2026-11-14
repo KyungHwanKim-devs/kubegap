@@ -7,7 +7,7 @@
 | kube context / 클러스터 | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
 | 실행 시각 / 모드 | 2026-11-07T10:33:37+09:00 / full (수집 300.7초, 모드 때문에 건너뛴 단계 0개, 실패 6개) |
 | 운영 규모 | `medium` (묻지 못해 노드 수로 짐작) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.93 / 1.1.0 |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.94 / 1.1.0 |
 | 검증한 버전 범위 | Kubernetes v1.32.13-eks-577a51e (검증 범위 안 1.30 ~ 1.37) · Prometheus 2.49.1 (검증 범위 안 2.49 ~ 3.15) · Alertmanager 0.26.0 (검증 범위 안 0.26 ~ 0.34) · Loki 2.6.1 (검증 범위 안 2.6 ~ 3.7) · Grafana 10.2.3 (검증 범위 안 10.2 ~ 13.3) |
 | 노드 / 네임스페이스 / 파드 / CRD | 9 (Ready 9) / 26 / 154 / 47 |
 | 컴포넌트 (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
@@ -110,7 +110,7 @@
 - full 모드에서 수집 안 함 0: 없음
 - 건너뛰었거나 오류가 난 점검 항목 3: `observability.fluentbit-output-errors` (skip: summary.logs.agents.fluent-bit missing), `traffic.ingress-nginx-vulnerable-version` (skip: summary.traffic.nginx missing), `traffic.ingress-nginx-retired` (skip: summary.traffic.nginx missing)
 - 일부만 판정한 점검 항목 23 (판정에 필요한 자료가 없는 대상은 판정하지 않았고 통과로 세지 않았습니다): `node.kernel-oom-node-level` (2 판정 안 함: node not read (2)), `node.kernel-lockup` (2 판정 안 함: node not read (2)), `node.kernel-io-fs-errors` (2 판정 안 함: node not read (2)), `node.kernel-nic-events` (2 판정 안 함: node not read (2)), `node.conntrack-table-full` (2 판정 안 함: node not read (2)), `node.kernel-net-mem-pressure` (2 판정 안 함: node not read (2)), `node.cgroup-v1` (2 판정 안 함: node not read (2)), `node.sysctl-tuning` (2 판정 안 함: node not read (2)), `node.cri-not-ready` (2 판정 안 함: node not read, or cri not read (2)), `node.cri-exited-containers` (2 판정 안 함: node not read (2)), `node.service-restarts` (2 판정 안 함: node not read (2)), `node.reboot-required` (2 판정 안 함: node not read (2)), `node.os-updates-pending` (2 판정 안 함: node not read (2)), `node.kubelet-reserved-missing` (2 판정 안 함: node not read, or kubelet not read (2)), `node.kubelet-eviction-memory-missing` (2 판정 안 함: node not read, or kubelet not read (2)), `node.clock-unsynced-os` (2 판정 안 함: node not read (2)), `node.zombie-processes` (2 판정 안 함: node not read (2)), `node.kubelet-api-qps-low` (2 판정 안 함: node not read, or kubelet not read (2)), `node.docker-and-containerd` (2 판정 안 함: node not read (2)), `node.container-writable-layer-large` (2 판정 안 함: node not read (2)), `node.large-images` (2 판정 안 함: node not read (2)), `vpccni.no-available-ip` (2 판정 안 함: VPC CNI metrics not read (awscni_no_available_ip_addresses) (2)), `vpccni.ec2-api-errors` (2 판정 안 함: metrics not read (2))
-- 질의 결과가 빈 항목 4 (질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻입니다. 이름 자체가 없으면 건너뜀으로 처리합니다): `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `controlplane.apiserver-401-rate`, `scaling.pod-pending-long`
+- 질의 결과가 빈 항목 3 (질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻입니다. 이름 자체가 없으면 건너뜀으로 처리합니다): `observability.scrape-targets-down`, `controlplane.apiserver-401-rate`, `scaling.pod-pending-long`
 
 ## 7. 부록
 

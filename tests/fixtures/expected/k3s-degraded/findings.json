@@ -5,7 +5,7 @@
   "source": "guessed",
   "nodes": 2
  },
- "rubric_version": "0.1.93",
+ "rubric_version": "0.1.94",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -204,7 +204,7 @@
   {
    "id": "observability.alertmanager-notification-failed",
    "status": "skip",
-   "reason": "metrics/alertmanager_notifications_failed_1d.json missing (not collected or no Prometheus)",
+   "reason": "metrics/alertmanager_notifications_failed_1d.json missing or failed",
    "counts": {}
   },
   {

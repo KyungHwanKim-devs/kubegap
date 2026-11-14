@@ -7,7 +7,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | kube context / cluster | `default` / default (k3s, v1.33.5+k3s1) |
 | Run time / mode | 2026-11-07T10:22:59+09:00 / full (collection 262.7 s, 0 steps skipped by mode, 0 failed) |
 | Scale | `small` (guessed) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.93 / 1.1.0 |
+| kubegap / rubric / signatures | <kubegap> / 0.1.94 / 1.1.0 |
 | Verified against | Kubernetes v1.33.5+k3s1 (verified 1.30 to 1.37) · Prometheus 3.7.3 (verified 2.49 to 3.15) · Alertmanager 0.29.0 (verified 0.26 to 0.34) · Grafana 12.2.1 (verified 10.2 to 13.3) |
 | Nodes / namespaces / pods / CRDs | 2 (Ready 2) / 26 / 153 / 64 |
 | Components (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
@@ -86,7 +86,7 @@ Expected families missing (inventory): backup.
 - Not collected in full mode 0: none
 - Skipped or errored 9: `observability.log-volume-change` (skip: summary.logs.loki.volume_change missing), `observability.log-coverage-gap` (skip: summary.logs.loki.coverage missing), `observability.loki-not-ready` (skip: nothing to judge: loki not present), `observability.loki-ingest-discarded` (skip: summary.logs.agents.loki_metrics missing), `observability.promtail-dropped` (skip: summary.logs.agents.promtail missing), `observability.log-error-ratio-high` (skip: summary.logs.loki.namespaces_1h missing), `observability.unstructured-logs` (skip: summary.logs.loki.namespaces_1h missing), `traffic.ingress-5xx-ratio` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)), `traffic.ingress-p95-latency` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29))
 - Judged in part 0 (some targets lacked what the rule needs; those are not judged, not passed): none
-- Query returned no series 6 (every metric name the query reads has series, so nothing happened; a name with no series would be a skip): `resources.oomkilled`, `resources.large-request-binpacking`, `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `node.network-errors`, `scaling.pod-pending-long`
+- Query returned no series 5 (every metric name the query reads has series, so nothing happened; a name with no series would be a skip): `resources.oomkilled`, `resources.large-request-binpacking`, `observability.scrape-targets-down`, `node.network-errors`, `scaling.pod-pending-long`
 
 ## 7. Appendix
 

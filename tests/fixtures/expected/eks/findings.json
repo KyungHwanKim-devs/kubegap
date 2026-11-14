@@ -5,7 +5,7 @@
   "source": "guessed",
   "nodes": 9
  },
- "rubric_version": "0.1.93",
+ "rubric_version": "0.1.94",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -263,9 +263,7 @@
    "id": "observability.alertmanager-notification-failed",
    "status": "done",
    "reason": null,
-   "counts": {
-    "empty": 1
-   }
+   "counts": {}
   },
   {
    "id": "observability.silence-forgotten",
