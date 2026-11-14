@@ -57,7 +57,7 @@
 | `resources.cpu-throttling.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | high |  | pod prometheus-kube-prometheus-stack-prometheus-0: throttling ratio now 0.28, 24 h or the pod's life 0.28: throttled through the day |
 | `resources.cpu-throttling.prod-app-s/deploy/app-s-frontend:frontend` | high |  | ["pod app-s-frontend-6d7ff4dcdb-wjjxj: throttling ratio now 0.00, 24 h or the pod's life 0.46: throttled through the day; no 5-minute value, under 0.01 now", "pod app-s-frontend-6d7ff4dcdb-h7hpl: throttling ratio now … |
 | `resources.memory-limit-near-p95.prod-app-z-backend/deploy/app-z-embedding-server:embedding` | high |  | pod app-z-embedding-server-8445d87f5-dwqrx: 7d memory working set p95 / limit = 0.94 |
-| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | high |  | kernel log not read in this mode. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (none of those pods is running now). cAdvisor counter 0 |
+| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | high |  | kernel log not read in this mode. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (none of those pods is running now). cAdvisor counter 0. Running now: app-t-ai-5469577cf8-7nwnb … |
 | `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | high |  | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago), 2 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
 | `security.networkpolicy-not-enforced.cluster` | high |  | 4 NetworkPolicies (['app-ab-prod', 'prod-app-r', 'prod-app-t', 'prod-app-x']), enforced False: aws-eks-nodeagent --enable-network-policy=false, 0 PolicyEndpoints |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | high |  | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
@@ -181,7 +181,7 @@
 | `resources.cpu-throttling.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | fail | high | pod prometheus-kube-prometheus-stack-prometheus-0: throttling ratio now 0.28, 24 h or the pod's life 0.28: throttled through the day |
 | `resources.cpu-throttling.prod-app-s/deploy/app-s-frontend:frontend` | fail | high | ["pod app-s-frontend-6d7ff4dcdb-wjjxj: throttling ratio now 0.00, 24 h or the pod's life 0.46: throttled through the day; no 5-minute value, under 0.01 now", "pod app-s-frontend-6d7ff4dcdb-h7hpl: throttling ratio now 0.38, 24 h or the pod's life 0.42: throttled through the day", "pod … |
 | `resources.memory-limit-near-p95.prod-app-z-backend/deploy/app-z-embedding-server:embedding` | fail | high | pod app-z-embedding-server-8445d87f5-dwqrx: 7d memory working set p95 / limit = 0.94 |
-| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | fail | high | kernel log not read in this mode. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (none of those pods is running now). cAdvisor counter 0 |
+| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | fail | high | kernel log not read in this mode. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (none of those pods is running now). cAdvisor counter 0. Running now: app-t-ai-5469577cf8-7nwnb (created 2026-11-06T08:26:51Z, 0 restarts of this container since) |
 | `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | fail | high | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago), 2 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
 | `security.networkpolicy-not-enforced.cluster` | fail | high | 4 NetworkPolicies (['app-ab-prod', 'prod-app-r', 'prod-app-t', 'prod-app-x']), enforced False: aws-eks-nodeagent --enable-network-policy=false, 0 PolicyEndpoints |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | high | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
@@ -205,7 +205,7 @@
 | `resources.cpu-throttling.dev-app-s/deploy/app-s-frontend:frontend` | warn | high | ["pod app-s-frontend-6578574c-qx5nj: throttling ratio now 0.00, 24 h or the pod's life 0.23: throttled through the day, below the fail line; no 5-minute value, under 0.01 now", "pod app-s-frontend-999976975-nf4rv: throttling ratio now 0.12, 24 h or the pod's life 0.11: throttled through the day … |
 | `resources.cpu-throttling.dev-app-v/deploy/app-v-frontend:frontend` | warn | high | ["pod app-v-frontend-f7b9d96d4-dn7qv: throttling ratio now 0.00, 24 h or the pod's life 0.23: throttled through the day, below the fail line; no 5-minute value, under 0.01 now", "pod app-v-frontend-f7b9d96d4-jl226: throttling ratio now 0.00, 24 h or the pod's life 0.21: throttled through the day … |
 | `resources.cpu-throttling.dev-app-y/deploy/app-y-frontend:frontend` | warn | high | pod app-y-frontend-7f6d6dc65b-lnmq4: throttling ratio now 0.16, 24 h or the pod's life 0.12: throttled through the day, below the fail line |
-| `resources.oomkilled-repeated.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | warn | high | kernel log not read in this mode. Prometheus: 1 pod ended by OOM in 7 days, 1 restarts in those pods. cAdvisor counter 1 |
+| `resources.oomkilled-repeated.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | warn | high | kernel log not read in this mode. Prometheus: 1 pod ended by OOM in 7 days, 1 restarts in those pods. cAdvisor counter 1. Running now: prometheus-kube-prometheus-stack-prometheus-0 (created 2026-09-08T12:47:49Z, 2 restarts of this container since) |
 | `resources.oomkilled.argocd/sts/argocd-application-controller:application-controller` | warn | high | pod argocd-application-controller-0: last termination reason OOMKilled, finished at 2026-10-30T09:00:04Z (7.7 days ago), 42 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
 | `resources.oomkilled.monitoring/sts/loki-stack:loki` | warn | high | pod loki-stack-0: last termination reason OOMKilled, finished at 2026-10-25T00:15:41Z (13.1 days ago), 1 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
 | `argocd.default-project-wildcard.cluster` | fail | medium | AppProjects 1, projects whose sourceRepos and destinations are all * ['default'], apps bound to the default project 13/13 (prod 9) |
@@ -889,6 +889,13 @@
  "kernel_log_read": false,
  "kernel_nodes_old_script": 0,
  "kernel_nodes_total": 2,
+ "pods_now": [
+  {
+   "pod": "app-t-ai-5469577cf8-7nwnb",
+   "created": "2026-11-06T08:26:51Z",
+   "restarts": 0
+  }
+ ],
  "pods_oomkilled": 3,
  "pods_replaced": 3,
  "restarts_of_those_pods": 13,
@@ -1370,6 +1377,13 @@
  "kernel_log_read": false,
  "kernel_nodes_old_script": 0,
  "kernel_nodes_total": 1,
+ "pods_now": [
+  {
+   "pod": "prometheus-kube-prometheus-stack-prometheus-0",
+   "created": "2026-09-08T12:47:49Z",
+   "restarts": 2
+  }
+ ],
  "pods_oomkilled": 1,
  "pods_replaced": 0,
  "restarts_of_those_pods": 1,

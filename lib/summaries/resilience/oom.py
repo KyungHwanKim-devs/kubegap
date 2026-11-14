@@ -184,6 +184,20 @@ def oom_7d(cx) -> dict:
         r["kernel_kill_times"] = sorted(r["kernel_kill_times"])
         r["last_kill"] = r["kernel_kill_times"][-1] if r["kernel_kill_times"] else None
         r["pods"].sort(key=lambda p: (-p["restarts_7d"], p["pod"]))
+        # The pods the workload runs now, with the restart count of this container as the pod object carries it. A report that says "the pods that were
+        # ended are gone" goes on to say how the present pod is doing; without the number it was guessed ("no restarts") twice, for a pod that had one.
+        r["pods_now"] = sorted(
+            (
+                {
+                    "pod": p["metadata"]["name"],
+                    "created": p["metadata"].get("creationTimestamp"),
+                    "restarts": next((int(c.get("restartCount") or 0) for c in (p.get("status") or {}).get("containerStatuses") or [] if c.get("name") == r["container"]), None),
+                }
+                for p in cx.pods
+                if p["metadata"]["namespace"] == r["namespace"] and (p.get("status") or {}).get("phase") == "Running" and owner_of_pod(cx, r["namespace"], p["metadata"]["name"], None) == r["workload"]
+            ),
+            key=lambda x: x["pod"],
+        )
     out_rows = sorted(rows.values(), key=lambda r: (-r["kernel_kills_24h"], -r["pods_oomkilled"], -r["restarts_of_those_pods"], r["target"]))
     prometheus_read = bool((metric_doc(cx.snap, "oom_pods_7d") or {}).get("ok"))
     return {

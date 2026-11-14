@@ -74,7 +74,13 @@ def oom_text(item: dict) -> str:
         # of the pods that were ended by OOM, not of the workload's current pod: a replacement pod's own restarts are not counted here
         + ((" (none of those pods is running now)" if rep >= pods else f" (those of them still running: {item.get('live_pod_restarts_max') or 0} at most)") if rep else "")
     )
-    return f"{kern}. {prom}. cAdvisor counter {item.get('cadvisor_oom_events_7d') or 0}"
+    now = item.get("pods_now")
+    running = ""
+    if now:
+        running = ". Running now: " + ", ".join(
+            f"{p['pod']} (created {p.get('created')}, {p['restarts']} restart{'s' if p['restarts'] != 1 else ''} of this container since)" if p.get("restarts") is not None else f"{p['pod']} (created {p.get('created')})" for p in now
+        )
+    return f"{kern}. {prom}. cAdvisor counter {item.get('cadvisor_oom_events_7d') or 0}{running}"
 
 
 def argocd_backend_text(item) -> str:

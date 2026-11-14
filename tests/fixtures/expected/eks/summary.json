@@ -61020,7 +61020,14 @@
      "nodes": [
       "ip-10-0-1-241.ap-northeast-2.compute.internal"
      ],
-     "last_kill": null
+     "last_kill": null,
+     "pods_now": [
+      {
+       "pod": "loki-stack-0",
+       "created": "2026-10-08T12:33:26Z",
+       "restarts": 1
+      }
+     ]
     },
     {
      "target": "prod-app-t/deploy/app-t-ai:ai",
@@ -61065,7 +61072,14 @@
       "ip-10-0-1-139.ap-northeast-2.compute.internal",
       "ip-10-0-1-62.ap-northeast-2.compute.internal"
      ],
-     "last_kill": null
+     "last_kill": null,
+     "pods_now": [
+      {
+       "pod": "app-t-ai-5469577cf8-7nwnb",
+       "created": "2026-11-06T08:26:51Z",
+       "restarts": 0
+      }
+     ]
     },
     {
      "target": "monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus",
@@ -61097,7 +61111,14 @@
      "nodes": [
       "ip-10-0-1-117.ap-northeast-2.compute.internal"
      ],
-     "last_kill": null
+     "last_kill": null,
+     "pods_now": [
+      {
+       "pod": "prometheus-kube-prometheus-stack-prometheus-0",
+       "created": "2026-09-08T12:47:49Z",
+       "restarts": 2
+      }
+     ]
     }
    ],
    "repeated": [

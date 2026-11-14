@@ -2863,7 +2863,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "occurrence",
-   "evidence": "kernel log not read in this mode. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (none of those pods is running now). cAdvisor counter 0",
+   "evidence": "kernel log not read in this mode. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (none of those pods is running now). cAdvisor counter 0. Running now: app-t-ai-5469577cf8-7nwnb (created 2026-11-06T08:26:51Z, 0 restarts of this container since)",
    "source": "summary.json:resilience.oom_7d.rows"
   },
   {
@@ -3086,7 +3086,7 @@
    "status": "warn",
    "severity_default": "high",
    "nature": "occurrence",
-   "evidence": "kernel log not read in this mode. Prometheus: 1 pod ended by OOM in 7 days, 1 restarts in those pods. cAdvisor counter 1",
+   "evidence": "kernel log not read in this mode. Prometheus: 1 pod ended by OOM in 7 days, 1 restarts in those pods. cAdvisor counter 1. Running now: prometheus-kube-prometheus-stack-prometheus-0 (created 2026-09-08T12:47:49Z, 2 restarts of this container since)",
    "source": "summary.json:resilience.oom_7d.rows"
   },
   {
