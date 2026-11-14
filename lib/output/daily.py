@@ -249,9 +249,19 @@ def verify_numbers(snap: Path, facts: dict) -> list[str]:
 _NUMBER = re.compile(r"(?<![A-Za-z_\-])\d+(?:[.,]\d+)*")  # not the digit inside a name: k3s, v1, tempo-0
 
 
+def _list_lengths(v) -> set[int]:
+    """The length of every list inside a value, however deep."""
+    if isinstance(v, list):
+        return {len(v)}.union(*(_list_lengths(x) for x in v)) if v else {0}
+    if isinstance(v, dict):
+        return set().union(*(_list_lengths(x) for x in v.values())) if v else set()
+    return set()
+
+
 def ungrounded_numbers(facts: dict, snap: Path) -> list[str]:
     """Numbers in the sentences of an entry (`what`, `why`) that stand nowhere: neither in the entry's `facts`, whose values `verify_numbers` holds
-    against the snapshot, nor in the evidence or target of the findings the entry names. A daily report once passed with every `facts` list
+    against the snapshot, nor in the evidence or target of the findings the entry names, nor a count of what those findings saw (how many findings, how long a list
+    in their details). A daily report once passed with every `facts` list
     empty, so nothing had compared its "8 notifications" and "22 GiB" with anything. A number inside backticks is a name (`1.33`, a port) and
     is not read; `do` is advice (a threshold to set) and is not read either."""
     fd = load_json(snap / "findings-draft.json") or {}
@@ -265,8 +275,15 @@ def ungrounded_numbers(facts: dict, snap: Path) -> list[str]:
             ground = " ".join(json.dumps(n.get("value"), ensure_ascii=False, default=str) for n in e.get("facts") or [] if isinstance(n, dict))
             ground += " " + " ".join(f"{f.get('evidence')} {f.get('target')} {json.dumps(f.get('details'), ensure_ascii=False, default=str)}" for f in findings if _facts._matches(ids, f.get("id") or ""))
             ground = ground.replace(",", "")
+            # how many of something a rule saw is a number too: the length of each list in the details of the entry's findings, and how many findings it names
+            counts = {str(sum(1 for f in findings if _facts._matches(ids, f.get("id") or "")))}
+            for f in findings:
+                if _facts._matches(ids, f.get("id") or ""):
+                    counts |= {str(n) for n in _list_lengths(f.get("details"))}
+                    # a list printed inside the evidence sentence (`['a', 'b', 'c']`): how many it names
+                    counts |= {str(len(re.findall(r"'[^']*'|\"[^\"]*\"", m.group(1)))) for m in re.finditer(r"\[([^\[\]]+)\]", str(f.get("evidence") or ""))}
             prose = re.sub(r"`[^`]*`", "", f"{e.get('what') or ''} {e.get('why') or ''}")
-            loose = sorted({m.group(0) for m in _NUMBER.finditer(prose) if m.group(0).replace(",", "").rstrip(".") not in ground})
+            loose = sorted({m.group(0) for m in _NUMBER.finditer(prose) if (t := m.group(0).replace(",", "").rstrip(".")) not in ground and t not in counts})
             if loose:
                 out.append(
                     f"{kind} {e.get('id') or e.get('title')}: the numbers {', '.join(loose)} are in `what` or `why` and in neither its `facts` nor the evidence of its findings. "

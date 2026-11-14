@@ -176,6 +176,13 @@ def test_a_number_in_a_sentence_has_to_stand_somewhere(tmp_path):
     assert not any("are in `what` or `why`" in e for e in daily.check(f, snap, "ko"))
     f["top"][1]["what"] = "`1.33`의 지원이 끝났습니다."  # a name in backticks is not a number to ground
     assert not any("are in `what` or `why`" in e for e in daily.check(f, snap, "ko"))
+    fd = json.loads((snap / "findings-draft.json").read_text())
+    for x in fd["findings"]:
+        if x["id"] == "platform.k8s-version-eol.cluster":
+            x["details"] = {"nodes_on_it": ["a", "b", "c", "d", "e", "f", "g"]}
+    (snap / "findings-draft.json").write_text(json.dumps(fd))
+    f["top"][1]["what"] = "노드 7대가 `1.33`을 씁니다."  # the length of a list the rule saw
+    assert not any("are in `what` or `why`" in e for e in daily.check(f, snap, "ko"))
     f = _facts()
     f["top"][1]["what"] = "노드 2대가 1.33을 씁니다."
     f["top"][1]["facts"].append({"what": "노드 수", "value": 2, "unit": "대", "source_file": "inventory.json", "json_path": "nodes.count"})
