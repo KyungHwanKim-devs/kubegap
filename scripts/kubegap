@@ -373,6 +373,7 @@ def cmd_diff(args) -> int:
             print(f"kubegap diff: no earlier {paths.snapshot_mode(b)} snapshot to compare {b.name} with (daily compares with daily, full with full). Only history.csv is updated.", file=sys.stderr)
             hp = _diff.append_history(b)
             print(f"history: {hp}" if hp else "history: not recorded (findings-draft.json or inventory.json missing)")
+            _slim_daily(b)
             return EXIT_OK
     if a == b:
         print("kubegap diff: A and B are the same snapshot.", file=sys.stderr)
@@ -381,7 +382,18 @@ def cmd_diff(args) -> int:
     _diff.print_summary(d)
     hp = _diff.append_history(b)
     print(f"saved: {b / 'diff.json'}" + (f", history: {hp}" if hp else ", history: not recorded (findings-draft.json missing)"))
+    if not args.snapshot_a:  # the run's own comparison, not a look back at two old snapshots
+        _slim_daily(b)
     return EXIT_OK
+
+
+def _slim_daily(snap) -> None:
+    """A daily run keeps no raw objects, events or logs once it is judged and compared (lib/output/slim.py)."""
+    from lib.output import slim as _slim
+
+    gone = _slim.slim(snap)
+    if gone:
+        print(f"daily: raw material deleted ({', '.join(gone)}); the summary, the findings and objects-digest.json stay")
 
 
 def cmd_render_details(args) -> int:

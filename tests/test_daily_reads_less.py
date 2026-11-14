@@ -43,3 +43,35 @@ def test_the_aws_steps_and_the_node_steps_do_not_run_in_a_daily_run():
         if st["type"] in ("aws", "alb-metrics", "cw-metrics", "cwlogs", "node", "tool"):
             assert st.get("modes") == ["full"], f"{collector}/{st['id']} ({st['type']}) would run in a daily run"
     assert "no AWS API call" in discover.DAILY_NO_AWS and "no node" in discover.DAILY_NO_NODES
+
+
+def _snap(root, name, mode, objs):
+    s = root / "c" / name
+    (s / "objects").mkdir(parents=True)
+    (s / "logs").mkdir()
+    (s / "MODE").write_text(mode + "\n")
+    (s / "events.json").write_text("{}")
+    for kind, its in objs.items():
+        (s / "objects" / f"{kind}.json").write_text(json.dumps({"kind": "List", "items": its}))
+    return s
+
+
+def _deploy(name, replicas, image="app:1"):
+    return {"kind": "Deployment", "metadata": {"namespace": "shop", "name": name, "generation": replicas}, "spec": {"replicas": replicas, "template": {"spec": {"containers": [{"name": "c", "image": image}]}}}}
+
+
+def test_a_daily_snapshot_keeps_a_digest_in_place_of_its_objects_and_the_next_run_still_sees_what_changed(tmp_path):
+    from lib.output import diff, slim
+
+    a = _snap(tmp_path, "2026-11-13T09-00-00", "daily", {"deployments.apps": [_deploy("web", 2), _deploy("old", 1)], "pods": [{"kind": "Pod", "metadata": {"namespace": "shop", "name": "p1"}}]})
+    b = _snap(tmp_path, "2026-11-14T09-00-00", "daily", {"deployments.apps": [_deploy("web", 3), _deploy("new", 1)], "pods": []})
+    before = diff.diff_objects(a, b)
+    assert slim.slim(a) == ["objects/", "events.json", "logs/"] and not (a / "objects").exists() and (a / diff.DIGEST_FILE).is_file()
+    assert "app:1" not in (a / diff.DIGEST_FILE).read_text()  # hashes, no value
+    after = diff.diff_objects(a, b)  # the earlier run has only its digest, the new one still has its objects
+    assert after == before
+    assert after["added"] == [{"kind": "deployments.apps", "name": "shop/new"}] and after["removed"] == [{"kind": "deployments.apps", "name": "shop/old"}]
+    assert after["changed"] == [{"kind": "deployments.apps", "name": "shop/web", "generation": [2, 3], "changed_fields": ["spec.replicas"]}]
+    assert after["count_only"] == {"pods": {"before": 1, "after": 0, "delta": -1}}
+    full = _snap(tmp_path, "2026-11-14T10-00-00", "full", {"pods": []})
+    assert slim.slim(full) == [] and (full / "objects").is_dir()  # a full run keeps everything

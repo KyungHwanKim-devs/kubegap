@@ -83,49 +83,61 @@ def _body_hash(o: dict) -> str:
     return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
+DIGEST_FILE = "objects-digest.json"
+
+
+def _field_hashes(o: dict) -> dict[str, str]:
+    """A short hash per changed-field path of one object: `spec.replicas`, `spec.template`, `data`, … The paths a reader is pointed to."""
+    out: dict[str, str] = {}
+    keys = [k for k in BODY_KEYS if k in o] or [k for k in o if k not in ("metadata", "status", "kind", "apiVersion")]
+    for k in keys:
+        v = o.get(k)
+        for path, val in [(f"{k}.{x}", v[x]) for x in sorted(v)] if isinstance(v, dict) else [(k, v)]:
+            out[path] = hashlib.sha256(json.dumps(val, sort_keys=True, default=str).encode()).hexdigest()[:8]
+    return out
+
+
+def object_digest(snap: Path) -> dict:
+    """What a later run needs of this run's objects to say what was added, removed and changed: per kind the number of items, and for the kinds
+    compared one by one a hash of the body, the generation and a hash per field path. No value is in it. A daily run keeps this file in place
+    of objects/ (lib/output/slim.py); for a snapshot that still has objects/ it is computed from them."""
+    if not (snap / "objects").is_dir():
+        return load_json(snap / DIGEST_FILE) or {}
+    out: dict = {}
+    for p in sorted((snap / "objects").glob("*.json")):
+        its = items(load_json(p))
+        if p.stem in COUNT_ONLY_KINDS:
+            out[p.stem] = {"count": len(its)}
+            continue
+        out[p.stem] = {
+            "count": len(its),
+            "items": {_key(o): {"h": _body_hash(o), "g": (o.get("metadata") or {}).get("generation"), "f": {"metadata.resourceVersion": _body_hash(o)} if o.get("kind") == "ConfigMap" else _field_hashes(o)} for o in its},
+        }
+    return out
+
+
 def diff_objects(a: Path, b: Path) -> dict:
     out: dict = {"kinds_compared": 0, "added": [], "removed": [], "changed": [], "count_only": {}, "kinds_only_in_a": [], "kinds_only_in_b": []}
-    fa = {p.stem: p for p in (a / "objects").glob("*.json")} if (a / "objects").is_dir() else {}
-    fb = {p.stem: p for p in (b / "objects").glob("*.json")} if (b / "objects").is_dir() else {}
+    fa, fb = object_digest(a), object_digest(b)
     out["kinds_only_in_a"] = sorted(set(fa) - set(fb))
     out["kinds_only_in_b"] = sorted(set(fb) - set(fa))
     for kind in sorted(set(fa) & set(fb)):
-        ia, ib = items(load_json(fa[kind])), items(load_json(fb[kind]))
-        if kind in COUNT_ONLY_KINDS:
-            if len(ia) != len(ib):
-                out["count_only"][kind] = {"before": len(ia), "after": len(ib), "delta": len(ib) - len(ia)}
+        if "items" not in fa[kind] or "items" not in fb[kind]:
+            if fa[kind]["count"] != fb[kind]["count"]:
+                out["count_only"][kind] = {"before": fa[kind]["count"], "after": fb[kind]["count"], "delta": fb[kind]["count"] - fa[kind]["count"]}
             continue
         out["kinds_compared"] += 1
-        ma = {_key(o): o for o in ia}
-        mb = {_key(o): o for o in ib}
+        ma, mb = fa[kind]["items"], fb[kind]["items"]
         for k in sorted(set(mb) - set(ma)):
             out["added"].append({"kind": kind, "name": k})
         for k in sorted(set(ma) - set(mb)):
             out["removed"].append({"kind": kind, "name": k})
         for k in sorted(set(ma) & set(mb)):
-            ha, hb = _body_hash(ma[k]), _body_hash(mb[k])
-            if ha != hb:
-                ga = (ma[k].get("metadata") or {}).get("generation")
-                gb = (mb[k].get("metadata") or {}).get("generation")
-                out["changed"].append({"kind": kind, "name": k, "generation": [ga, gb], "changed_fields": ["metadata.resourceVersion"] if ma[k].get("kind") == "ConfigMap" else _changed_fields(ma[k], mb[k])})
+            if ma[k]["h"] != mb[k]["h"]:
+                paths_ = [p for p in sorted(set(ma[k]["f"]) | set(mb[k]["f"])) if ma[k]["f"].get(p) != mb[k]["f"].get(p)]
+                out["changed"].append({"kind": kind, "name": k, "generation": [ma[k]["g"], mb[k]["g"]], "changed_fields": paths_[:12]})
     out["summary"] = {"added": len(out["added"]), "removed": len(out["removed"]), "changed": len(out["changed"])}
     return out
-
-
-def _changed_fields(a: dict, b: dict, prefix: str = "", depth: int = 0, limit: int = 12) -> list[str]:
-    """Record a few changed top-level and second-level field paths (so the LLM knows where to look)."""
-    out: list[str] = []
-    keys = [k for k in BODY_KEYS if k in a or k in b] or [k for k in set(a) | set(b) if k not in ("metadata", "status", "kind", "apiVersion")]
-    for k in keys:
-        va, vb = a.get(k), b.get(k)
-        if va == vb:
-            continue
-        if isinstance(va, dict) and isinstance(vb, dict) and depth < 2:
-            sub = [f"{k}.{x}" for x in sorted(set(va) | set(vb)) if va.get(x) != vb.get(x)]
-            out.extend(sub[:limit])
-        else:
-            out.append(k)
-    return out[:limit]
 
 
 def diff_findings(a: Path, b: Path) -> dict:
