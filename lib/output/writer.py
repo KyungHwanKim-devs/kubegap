@@ -58,10 +58,8 @@ HEADINGS = {
         "broken": "Broken now",
         "happened": "What already happened",
         "next": "The next largest problems",
-        "next_daily": "Serious and still there",
         "first_broken": "Broken now",
         "first_problems": "The {n} largest problems",
-        "first_problems_from": "The largest problems (full run of {when})",
         "first_happened": "What already happened",
         "first_scale": "Scale",
         "period": "This covers {start} to {end}.",
@@ -113,10 +111,8 @@ HEADINGS = {
         "broken": "지금 깨져 있는 것",
         "happened": "이미 일어난 일",
         "next": "그다음으로 큰 문제",
-        "next_daily": "지금 남아 있는 심각한 문제",
         "first_broken": "지금 깨져 있는 것",
         "first_problems": "가장 큰 문제 {n}개",
-        "first_problems_from": "가장 큰 문제 ({when} full 점검)",
         "first_happened": "이미 일어난 일",
         "first_scale": "운영 규모",
         "period": "{start}부터 {end}까지 본 것입니다.",
@@ -341,17 +337,7 @@ def _check_ids(facts: dict, h: dict) -> str:
     return f"{h['checks']}:\n\n" + "\n".join(rows) + "\n\n" if rows else ""
 
 
-def last_full_problems(snap: Path) -> tuple[str, list[str]] | None:
-    """(when, titles) of the problems the latest earlier full run of this cluster picked: a daily report shows them and picks none itself."""
-    for s in sorted((p for p in snap.parent.iterdir() if p.is_dir() and p.name < snap.name and paths.snapshot_mode(p) == "full"), reverse=True):
-        f = load_json(s / "llm" / "facts.json") or {}
-        titles = [str(p.get("title")) for p in f.get("problems") or [] if isinstance(p, dict) and p.get("title")]
-        if f.get("schema") == _facts.SCHEMA and titles and (s / "report.md").is_file():
-            return _when((load_json(s / "inventory.json") or {}).get("taken_at")) or s.name, titles
-    return None
-
-
-def first_screen(snap: Path, facts: dict, language: str, mode: str) -> str:
+def first_screen(facts: dict, language: str) -> str:
     """The lines a reader sees first, all from the facts' titles: what is broken now, the largest problems, what happened, and the scale the
     severities are for. No agent writes a summary of its own text here."""
     h = HEADINGS[language]
@@ -359,12 +345,7 @@ def first_screen(snap: Path, facts: dict, language: str, mode: str) -> str:
     incidents = [str(i.get("title")) for i in (facts.get("happened") or {}).get("incidents") or [] if i.get("title")]
     problems = [str(p.get("title")) for p in facts.get("problems") or [] if p.get("title")]
     lines = [f"{h['first_broken']}: " + (" · ".join(broken) or h["none"])]
-    if mode == "full":
-        lines.append(f"{h['first_problems'].format(n=len(problems))}: " + " ".join(f"{CIRCLED[i]} {t}" for i, t in enumerate(problems[: len(CIRCLED)])))
-    else:
-        last = last_full_problems(snap)
-        if last:
-            lines.append(f"{h['first_problems_from'].format(when=last[0])}: " + " ".join(f"{CIRCLED[i]} {t}" for i, t in enumerate(last[1][: len(CIRCLED)])))
+    lines.append(f"{h['first_problems'].format(n=len(problems))}: " + " ".join(f"{CIRCLED[i]} {t}" for i, t in enumerate(problems[: len(CIRCLED)])))
     lines.append(f"{h['first_happened']}: " + (" · ".join(incidents) or h["none"]))
     scale = facts.get("scale") or {}
     if scale.get("name"):
@@ -377,7 +358,7 @@ def period_line(facts: dict, h: dict) -> str:
     return h["period"].format(start=_when(p.get("from")), end=_when(p.get("to"))) if p.get("from") and p.get("to") else h["period_none"]
 
 
-def glance(snap: Path, h: dict) -> str:
+def glance(snap: Path, h: dict, *, names: bool = True) -> str:
     """The cluster at a glance, from the snapshot files: nodes, pods, namespaces, components, stores, version. A reader sees the size of the
     cluster before the problems, and nothing here is written by an agent."""
     inv = load_json(snap / "inventory.json") or {}
@@ -390,7 +371,7 @@ def glance(snap: Path, h: dict) -> str:
         [h["nodes"], h["ready"].format(count=nodes.get("count", 0), ready=nodes.get("ready", 0))],
         [h["pods"], h["pods_v"].format(running=phase.get("Running", 0), pending=phase.get("Pending", 0), failed=phase.get("Failed", 0))],
         [h["namespaces"], h["ns_v"].format(count=ns.get("count", 0), prod=len(ns.get("prod_like") or []))],
-        [h["components"], f"{len(inv.get('components_present') or [])}: " + ", ".join(inv.get("components_present") or [])],
+        [h["components"], f"{len(inv.get('components_present') or [])}: " + ", ".join(inv.get("components_present") or []) if names else str(len(inv.get("components_present") or []))],
         [h["stores"], f"{prom.get('kind') or h['no_store']} {prom.get('version') or ''}".strip() + " / " + (f"{loki.get('kind') or ''} {loki.get('version') or ''}".strip() if loki.get("ok") else h["no_store"])],
         [h["versions"], f"{cluster.get('server_version') or ''} ({cluster.get('platform') or ''})".strip()],
     ]
@@ -524,16 +505,15 @@ def assemble(snap: Path, facts: dict, overview: str, problems: list[str], langua
     mode = paths.snapshot_mode(snap)
     parts = _split_overview(overview, h)
     title = f"# {cluster.get('cluster_name') or inv.get('context') or snap.parent.name} — {mode} {h['audit']}, {_when(inv.get('taken_at')) or snap.name}"
-    out = [title, first_screen(snap, facts, language, mode), glance(snap, h)]
+    out = [title, first_screen(facts, language), glance(snap, h)]
     if parts.get("broken"):
         out.append(f"## {h['broken']}\n\n{parts['broken']}")
     out.append(f"## {h['happened']}\n\n{period_line(facts, h)}\n\n{parts.get('happened') or h['none']}")
     out += [p.strip() for p in problems]
-    out.append(f"## {h['next'] if mode == 'full' else h['next_daily']}\n\n{parts.get('next') or h['none']}")
+    out.append(f"## {h['next']}\n\n{parts.get('next') or h['none']}")
     out += [_sections.declined(snap, language), since_section(facts, h, snap, parts.get("since")), upcoming(facts, h)]
     out = [x for x in out if x]  # a section with nothing to say is left out (nothing was decided against)
-    if mode == "full":
-        out.append(area_lines(facts, h))
+    out.append(area_lines(facts, h))
     out += [_sections.limits(facts, snap, language, skipped), _sections.numbers(snap, language)]
     tail = f"{h['details']}: [`report-details.md`](report-details.md) · kubegap {version}, rubric {rubric} · {h['snapshot']} `{snap}`"
     return space_blocks("\n\n".join(out)) + f"\n\n{_check_ids(facts, h)}{tail}\n"
@@ -551,6 +531,21 @@ def write_report(snap: Path, language: str, host: str, rubric: str, version: str
         raise WriterError(f"{facts_path} does not exist. The analysis writes it first (references/facts-{language}.md)")
     if language not in HEADINGS:
         raise WriterError(f"no prompts for language {language}")
+    if paths.snapshot_mode(snap) == "daily":
+        # A daily report is short and no separate agent writes it: the session that analysed the run wrote its sentences into the facts, the
+        # checks below refuse what a reader should not get, and code prints the report (lib/output/daily.py).
+        from . import daily as _daily
+
+        if language not in _daily.TEXT:
+            raise WriterError(f"the daily report for language {language} is not written yet; the Korean report is settled first and the English one follows")
+        facts = json.loads(facts_path.read_text(encoding="utf-8"))
+        broken = _daily.check(facts, snap, language)
+        if broken:
+            raise WriterError(f"llm/facts.json breaks {len(broken)} rules of the daily contract; fix them and run `kubegap check-facts` until it prints none:\n" + "\n".join(f"- {b}" for b in broken[:20]))
+        report = snap / "report.md"
+        write_private(report, _daily.assemble(snap, facts, language, rubric, version))
+        say("daily: report assembled from the facts (no separate writer in a daily run)")
+        return report
     guides = {name: REFERENCES / f"{name}-{language}.md" for name in GUIDES}
     absent = [g.name for g in guides.values() if not g.is_file()]
     if absent:

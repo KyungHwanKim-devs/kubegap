@@ -455,6 +455,8 @@ def cmd_write_report(args) -> int:
     snap = _resolve_snapshot_arg(args, args.snapshot)
     host = None if args.host == "auto" else args.host
     host = host or _writer.detect_host()
+    if paths.snapshot_mode(snap) == "daily":
+        host = host or "none"  # a daily report is assembled by code from the facts; no agent is started
     if not host:
         print("kubegap write-report: neither claude nor codex can be started here. Do the steps in this session, each from a clean start: references/check-solutions-<language>.md on the solutions of the facts, references/write-overview-<language>.md and references/write-problem-<language>.md (once per problem) to write, references/check-facts-<language>.md to check the text, references/replace-<language>.md to replace what it named.", file=sys.stderr)
         return EXIT_ERROR
@@ -464,7 +466,10 @@ def cmd_write_report(args) -> int:
     except _writer.WriterError as e:
         print(f"kubegap write-report: {e}", file=sys.stderr)
         return EXIT_ERROR
-    print(f"saved: {p} (written with {host}; every agent's text is in llm/writing/, the facts as the analysis wrote them in llm/facts-analysis.json)")
+    if paths.snapshot_mode(snap) == "daily":
+        print(f"saved: {p}")
+    else:
+        print(f"saved: {p} (written with {host}; every agent's text is in llm/writing/, the facts as the analysis wrote them in llm/facts-analysis.json)")
     return EXIT_OK
 
 

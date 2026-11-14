@@ -71,6 +71,10 @@ def _inside(snap: Path, name: str) -> bool:
 
 def check(facts: dict, snap: Path, mode: str) -> list[str]:
     """Every rule the facts break, one line each, worded for the analysis that has to fix it."""
+    if mode == "daily":  # a daily run has its own, short shape and its own rules (lib/output/daily.py)
+        from . import daily as _daily
+
+        return _daily.check(facts, snap)
     out: list[str] = []
     if facts.get("schema") != SCHEMA:
         return [f"schema is {facts.get('schema')!r}; this kubegap reads facts of schema {SCHEMA} (references/facts-<language>.md)"]
@@ -109,13 +113,10 @@ def check(facts: dict, snap: Path, mode: str) -> list[str]:
             if str(pid) not in {str(p.get("id")) for p in problems} | {str(n.get("id")) for n in rest}:
                 out.append(f"incident {i.get('id')}: exposed names {pid}, which is neither a problem nor an entry of next")
 
-    if mode == "full":
-        if not problems:
-            out.append("problems is empty; a full run names the largest problems, up to five")
-        if len(problems) > PROBLEMS_FULL:
-            out.append(f"{len(problems)} problems; a full report carries {PROBLEMS_FULL} and the rest go to next")
-    elif problems:
-        out.append("a daily run does not pick problems; it reports what happened and what changed (the largest problems are picked by a full run)")
+    if not problems:
+        out.append("problems is empty; a full run names the largest problems, up to five")
+    if len(problems) > PROBLEMS_FULL:
+        out.append(f"{len(problems)} problems; a full report carries {PROBLEMS_FULL} and the rest go to next")
 
     rank: list[tuple[int, int]] = []
     for p in problems:

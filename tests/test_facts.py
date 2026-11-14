@@ -120,14 +120,6 @@ def test_limits_are_one_of_three_kinds_and_say_what_they_weaken(tmp_path):
     assert len(out) == 2 and "kind must be" in out[0] and "weakens" in out[1]
 
 
-def test_a_daily_run_reports_what_happened_and_picks_no_problems(tmp_path):
-    snap = _snap(tmp_path, mode="daily")
-    assert any("daily run does not pick problems" in e for e in F.check(_facts(), snap, "daily"))
-    f = _facts(problems=[], next=[{"id": "n1", "title": "rest", "finding_ids": ["resilience.no-backup.cluster", "resilience.replicas-same-node.*"]}])
-    f["happened"]["incidents"][0]["exposed"] = ["n1"]
-    assert F.check(f, snap, "daily") == []
-
-
 def test_who_declares_a_target_comes_from_the_snapshot_and_is_none_without_evidence(tmp_path):
     snap = _snap(tmp_path)
     summary = {

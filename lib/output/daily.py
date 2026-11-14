@@ -1,0 +1,282 @@
+"""The daily report: one or two screens that say what matters now.
+
+A daily run exists for three reasons: a full run takes too long, a full run reads more than a cautious user wants on their disk or in a
+model, and a full report holds too many kinds of information for someone new to see what matters today. So the daily report is not a short
+full report. It answers three questions: is something broken now, what happened since the last run, and which three things matter most.
+Each of the three is told in three short parts (what it is, why it matters, what to do) with one page to read.
+
+No separate agent writes it. The session that analysed the run writes `llm/facts.json` in the daily shape (references/daily-<language>.md),
+reading the summary and the findings only: the raw objects are already deleted (lib/output/slim.py). `check` refuses what a reader should not
+get (a number the summary does not hold, an address no learn topic carries, a made-up term, the conversational sentence ending, a part that
+runs long), and `assemble` prints the report from the facts with everything countable written by code.
+
+The facts of a daily run (schema 2):
+
+    {"schema": 2,
+     "broken_now": [{"title": "", "what": "", "finding_ids": []}],
+     "happened": {"incidents": [{"id": "A", "title": "", "what": "", "state": "ended|ongoing|unknown", "finding_ids": [], "facts": []}]},
+     "top": [{"id": "1", "title": "", "loss": "irreversible|outage|partial|degraded", "what": "", "why": "", "do": "",
+              "read": {"title": "", "url": ""}, "finding_ids": [], "facts": []}],
+     "rest": [{"title": "", "finding_ids": []}],
+     "since_last": {"appeared": [""], "gone": [""]},
+     "analysis": {"severity_changes": []}}
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+from ..foundations import paths
+from ..foundations.snapshot import load_json
+from . import facts as _facts
+from . import glossary as _glossary
+from . import sections as _sections
+from . import writer as _writer
+
+TOP = 3
+STATES = ("ended", "ongoing", "unknown")
+# How long each part may run, in sentences. A daily report is read in a minute; the long explanation is the full report's.
+SENTENCES = {"what": 4, "why": 3, "do": 4, "incident": 4, "broken": 3}
+# a sentence that ends in "~요" (사라져요, 있어요, 이에요); "~세요", "~까요" and "~나요" are requests and questions and stay
+HAEYO = re.compile(r"[가-힣]*[가-힣](?<![세까나])요(?=[.!]|\s*$)", re.MULTILINE)
+_SENTENCE_END = re.compile(r"[.?!](?=\s|$)")
+
+TEXT = {
+    "ko": {
+        "title": "# {cluster} — daily 점검, {when}",
+        "verdict": "지금 깨져 있는 것 {broken}개 · 지난 점검 이후 일어난 일 {happened}건 · 지금 가장 중요한 것 {top}개",
+        "first_broken": "지금 깨져 있는 것",
+        "first_happened": "지난 점검 이후 일어난 일",
+        "first_top": "지금 가장 중요한 것",
+        "first_scale": "운영 규모",
+        "none": "없음",
+        "broken": "지금 깨져 있는 것",
+        "happened": "지난 점검 이후 일어난 일",
+        "happened_none": "새로 일어난 일을 찾지 못했습니다.",
+        "top": "지금 가장 중요한 것",
+        "top_none": "심각도가 높은 문제를 찾지 못했습니다.",
+        "what": "무슨 일인가",
+        "why": "왜 중요한가",
+        "do": "무엇을 하면 되나",
+        "read": "더 읽기",
+        "since_new": "이번 점검에서 처음 나왔습니다.",
+        "since_old": "{when} 점검부터 그대로입니다. 이번이 {n}번째입니다.",
+        "ongoing": "지금도 계속되고 있습니다.",
+        "ended": "지금은 끝난 일입니다.",
+        "rest": "그 밖에 열려 있는 것",
+        "since": "지난 점검 이후 달라진 것",
+        "period": "{start} 점검과 비교했습니다.",
+        "no_previous": "이번이 이 클러스터의 첫 daily 점검이라 비교할 이전 점검이 없습니다. 수집한 기간 안에 일어난 일을 적었습니다.",
+        "appeared": "새로 생긴 것",
+        "gone": "없어진 것",
+        "objects": "오브젝트는 {added}개가 추가되고 {removed}개가 없어지고 {changed}개가 바뀌었습니다.",
+        "unseen": "이번 점검이 보지 않은 것",
+        "unseen_intro": "daily 점검은 가볍게 보는 점검입니다. Kubernetes API와 메트릭·로그 저장소만 읽었습니다.",
+        "unseen_nodes": "노드에 접속하지 않았습니다.",
+        "unseen_aws": "AWS API를 부르지 않았습니다.",
+        "unseen_logs": "컴포넌트 로그는 오류 종류별 개수만 셌고, 로그 글은 남기지 않았습니다.",
+        "unseen_values": "Secret 값과 ConfigMap 값은 읽지 않았고, 애플리케이션의 환경 변수 값은 남기지 않았습니다.",
+        "unseen_raw": "판정이 끝난 뒤 원본 오브젝트와 이벤트를 지웠습니다. 이 컴퓨터에는 요약과 판정 결과만 남아 있고, 모델에 전달된 것도 그것뿐입니다.",
+        "unseen_checks": "그래서 점검 항목 {total}개 가운데 {unseen}개는 이번에 보지 못했습니다. 노드 안쪽, 비용, 없어질 API 같은 항목이고, 문제로도 통과로도 세지 않았습니다.",
+        "unseen_full": "이 항목들을 보고, 원인을 원본까지 열어 따지고, 문제마다 원리와 점검 방법과 규모별 해결 방안을 길게 설명하는 것은 `/kubegap full`입니다.",
+        "ids": "점검 항목 id (`/kubegap explain <id>`)",
+        "tail": "kubegap {version}, rubric {rubric} · 스냅샷 `{snap}`",
+    }
+}
+
+
+def _prose(facts: dict):
+    """(label, part, text) for every sentence an agent wrote: what `check` reads for length, sentence ending and terms."""
+    for b in facts.get("broken_now") or []:
+        yield f"broken_now {b.get('title')!r}", "broken", str(b.get("what") or "")
+    for i in (facts.get("happened") or {}).get("incidents") or []:
+        yield f"incident {i.get('id')}", "incident", str(i.get("what") or "")
+    for t in facts.get("top") or []:
+        for part in ("what", "why", "do"):
+            yield f"top {t.get('id')} {part}", part, str(t.get(part) or "")
+    for kind in ("appeared", "gone"):
+        for line in (facts.get("since_last") or {}).get(kind) or []:
+            yield f"since_last.{kind}", "", str(line)
+
+
+def learn_urls(fd: dict) -> set[str]:
+    """Every address a learn topic of this run carries: the only pages a daily report may point to, because someone opened them."""
+    out: set[str] = set()
+    for t in fd.get("learn") or []:
+        for key in ("sources", "reading", "cases"):
+            out |= {str(x.get("url")) for x in t.get(key) or [] if isinstance(x, dict) and x.get("url")}
+    return out
+
+
+def check(facts: dict, snap: Path, language: str = "ko") -> list[str]:
+    """Every rule the daily facts break, one line each, worded for the session that has to fix it."""
+    if facts.get("schema") != _facts.SCHEMA:
+        return [f"schema is {facts.get('schema')!r}; this kubegap reads facts of schema {_facts.SCHEMA} (references/daily-<language>.md)"]
+    out: list[str] = []
+    if facts.get("problems") or facts.get("next"):
+        out.append("a daily run writes `top` (three at most) and `rest`, not `problems` and `next`: those are the full report's (references/daily-<language>.md)")
+    fd = load_json(snap / "findings-draft.json") or {}
+    findings = [f for f in fd.get("findings") or [] if f.get("status") in ("fail", "warn")]
+    known = {f["id"] for f in findings}
+    final = _facts.final_severities(facts, findings)
+    top = [t for t in facts.get("top") or [] if isinstance(t, dict)]
+    rest = [r for r in facts.get("rest") or [] if isinstance(r, dict)]
+    incidents = [i for i in (facts.get("happened") or {}).get("incidents") or [] if isinstance(i, dict)]
+    broken = [b for b in facts.get("broken_now") or [] if isinstance(b, dict)]
+
+    for kind, entries in (("top", top), ("rest", rest), ("incident", incidents), ("broken_now", broken)):
+        for e in entries:
+            label = f"{kind} {e.get('id') or e.get('title')!r}"
+            if not e.get("title"):
+                out.append(f"{label}: no title")
+            if not _facts._ids(e):
+                out.append(f"{label}: no finding_ids; every entry names the findings it stands for")
+            for pat in _facts._ids(e):
+                if not any(_facts._matches([pat], k) for k in known):
+                    out.append(f"{label}: finding id {pat} is not in findings-draft.json")
+    for e in incidents + broken:
+        if not e.get("what"):
+            out.append(f"{e.get('title')!r}: `what` is empty; say what happened in two or three sentences")
+    for i in incidents:
+        if i.get("state") not in STATES:
+            out.append(f"incident {i.get('id')}: state must be one of {', '.join(STATES)} (unknown when the summary does not say whether it still goes on)")
+
+    if len(top) > TOP:
+        out.append(f"{len(top)} entries in top; a daily report tells {TOP} and lists the others in rest")
+    allowed = learn_urls(fd)
+    rank: list[tuple[int, int]] = []
+    for t in top:
+        tid = t.get("id")
+        for part in ("what", "why", "do"):
+            if not t.get(part):
+                out.append(f"top {tid}: `{part}` is empty")
+        if t.get("loss") not in _facts.LOSSES:
+            out.append(f"top {tid}: loss must be one of {', '.join(_facts.LOSSES)}")
+        read = t.get("read")
+        if read is not None and (not isinstance(read, dict) or not read.get("title") or read.get("url") not in allowed):
+            out.append(f"top {tid}: read must be {{title, url}} with an address from `learn` in findings-draft.json (pages someone opened), or null when no topic covers it")
+        sev = _facts.problem_severity(t, final)
+        if sev and t.get("loss") in _facts.LOSSES:
+            late = any(f.get("overdue") and f["status"] == "fail" and _facts._matches(_facts._ids(t), f["id"]) for f in findings)
+            rank.append((_facts.SEVERITIES.index(sev), max(_facts.LOSSES.index(t["loss"]) - (1 if late else 0), 0)))
+    if rank != sorted(rank):
+        out.append("top is not in order: severity first (scale already applied), then what is lost (irreversible, outage, partial, degraded; an `overdue` failure counts one step higher)")
+
+    placed = [pat for e in top + rest + incidents + broken for pat in _facts._ids(e)]
+    lost = sorted(f["id"] for f in findings if f["status"] == "fail" and final[f["id"]] in ("critical", "high") and not _facts._matches(placed, f["id"]))
+    if lost:
+        out.append(f"{len(lost)} critical or high failures are in no list (top, rest, happened, broken_now): {', '.join(lost[:12])}{' …' if len(lost) > 12 else ''}")
+    if top and rest:
+        worst_rest = _facts._worst([s for r in rest for s in [_facts.problem_severity(r, final)] if s])
+        last = _facts.problem_severity(top[-1], final)
+        if worst_rest and last and _facts.SEVERITIES.index(worst_rest) < _facts.SEVERITIES.index(last):
+            out.append(f"rest holds a {worst_rest} entry while top {top[-1].get('id')} is {last}; the more severe one belongs in top")
+
+    terms = _glossary.load(language)
+    for label, part, text in _prose(facts):
+        if "```" in text:
+            out.append(f"{label}: no code block in a daily report; name the setting in a sentence")
+        n = len(_SENTENCE_END.findall(text))
+        if part and n > SENTENCES[part]:
+            out.append(f"{label}: {n} sentences; this part takes {SENTENCES[part]} at most (the long explanation is the full report's)")
+        if language == "ko" and HAEYO.search(text):
+            out.append(f"{label}: ends a sentence in 해요체 ({HAEYO.search(text).group(0)}); the report is written in 합니다체")
+        out += [f"{label}: {hit}" for hit in _glossary.find(text, terms)]
+
+    # a number is what the summary says it is: the raw files are gone, so every source is a file that stays
+    stand_in = {"broken_now": broken, "happened": {"incidents": incidents}, "problems": top}
+    out += _writer.verify_numbers(snap, stand_in)
+    for label, src in _facts._sources(stand_in):
+        if not _facts._inside(snap, src):
+            out.append(f"{label}: source {src} is outside the snapshot")
+    return out
+
+
+def first_seen(snap: Path, entry: dict, limit: int = 30) -> tuple[str, int] | None:
+    """(when, runs) for an entry that the earlier daily runs of this cluster already had, without a gap: the day of the first of them and how
+    many runs it has stood, this one included. None when the run before this one did not have it."""
+    pats = _facts._ids(entry)
+    earlier = sorted((p for p in snap.parent.iterdir() if p.is_dir() and paths.is_snapshot_name(p.name) and p.name < snap.name and paths.snapshot_mode(p) == "daily"), reverse=True)
+    since, runs = None, 1
+    for s in earlier[:limit]:
+        fd = load_json(s / "findings-draft.json") or {}
+        if not any(_facts._matches(pats, f.get("id", "")) for f in fd.get("findings") or [] if f.get("status") in ("fail", "warn")):
+            break
+        since, runs = s, runs + 1
+    if since is None:
+        return None
+    return _writer._when((load_json(since / "inventory.json") or {}).get("taken_at"))[:10] or since.name[:10], runs
+
+
+def _unseen(snap: Path, t: dict) -> str:
+    inv, fd = load_json(snap / "inventory.json") or {}, load_json(snap / "findings-draft.json") or {}
+    by = (fd.get("checks") or {}).get("by_status") or {}
+    lines = [t["unseen_intro"], "", f"- {t['unseen_nodes']}"]
+    if (inv.get("cluster") or {}).get("platform") == "eks":
+        lines.append(f"- {t['unseen_aws']}")
+    lines += [f"- {t['unseen_logs']}", f"- {t['unseen_values']}", f"- {t['unseen_raw']}", ""]
+    lines += [t["unseen_checks"].format(total=(fd.get("checks") or {}).get("total", 0), unseen=by.get("not-collected", 0)), "", t["unseen_full"]]
+    return f"## {t['unseen']}\n\n" + "\n".join(lines)
+
+
+def assemble(snap: Path, facts: dict, language: str, rubric: str, version: str) -> str:
+    """The daily report from the facts. Code writes the title, the first screen, the cluster at a glance, how long each thing has stood, what
+    changed in numbers, what the run did not read and the ids; the agent's sentences are printed as they were checked."""
+    t = TEXT[language]
+    h = _writer.HEADINGS[language]
+    inv, fd = load_json(snap / "inventory.json") or {}, load_json(snap / "findings-draft.json") or {}
+    broken = [b for b in facts.get("broken_now") or [] if isinstance(b, dict)]
+    incidents = [i for i in (facts.get("happened") or {}).get("incidents") or [] if isinstance(i, dict)]
+    top = [x for x in facts.get("top") or [] if isinstance(x, dict)][:TOP]
+    rest = [r for r in facts.get("rest") or [] if isinstance(r, dict)]
+    scale = (fd.get("scale") or {}).get("name")
+    out = [t["title"].format(cluster=(inv.get("cluster") or {}).get("cluster_name") or inv.get("context") or snap.parent.name, when=_writer._when(inv.get("taken_at")))]
+    first = [
+        t["verdict"].format(broken=len(broken), happened=len(incidents), top=len(top)),
+        "",
+        f"{t['first_broken']}: " + (" · ".join(str(b.get("title")) for b in broken) or t["none"]),
+        "",
+        f"{t['first_happened']}: " + (" · ".join(str(i.get("title")) for i in incidents) or t["none"]),
+        "",
+        f"{t['first_top']}: " + (" ".join(f"{_writer.CIRCLED[n]} {x.get('title')}" for n, x in enumerate(top)) or t["none"]),
+    ]
+    if scale:
+        first += ["", f"{t['first_scale']}: {_sections.SCALE_WORD[language].get(scale, scale)}"]
+    out += ["\n".join(first), _writer.glance(snap, h, names=False)]
+    if broken:
+        out.append(f"## {t['broken']}\n\n" + "\n\n".join(f"### {b.get('title')}\n\n{str(b.get('what') or '').strip()}" for b in broken))
+    prev = paths.previous_snapshot(snap)
+    period = t["period"].format(start=_writer._when((load_json(prev / "inventory.json") or {}).get("taken_at"))) if prev else t["no_previous"]
+    happened = "\n\n".join(f"### {i.get('title')}\n\n{str(i.get('what') or '').strip()} {t.get(str(i.get('state')), '')}".rstrip() for i in incidents)
+    out.append(f"## {t['happened']}\n\n{period}\n\n{happened or t['happened_none']}")
+    blocks = []
+    for n, x in enumerate(top, 1):
+        seen = first_seen(snap, x)
+        lines = [f"### {n}. {x.get('title')}", ""]
+        if prev:  # on the first run everything is new, and saying so under each title says nothing
+            lines += [t["since_old"].format(when=seen[0], n=seen[1]) if seen else t["since_new"], ""]
+        for part in ("what", "why", "do"):
+            lines += [f"**{t[part]}.** {str(x.get(part) or '').strip()}", ""]
+        read = x.get("read") or {}
+        if read.get("url"):
+            lines += [f"{t['read']}: [{read.get('title')}]({read['url']})", ""]
+        blocks.append("\n".join(lines).rstrip())
+    out.append(f"## {t['top']}\n\n" + ("\n\n".join(blocks) or t["top_none"]))
+    if rest:
+        out.append(f"## {t['rest']}\n\n" + "\n".join(f"- {r.get('title')}" for r in rest))
+    since = [period, ""]
+    if prev:
+        sl = facts.get("since_last") or {}
+        for key in ("appeared", "gone"):
+            since += [f"**{t[key]}**", "", *([f"- {x}" for x in sl.get(key) or []] or [f"- {t['none']}"]), ""]
+        osum = ((load_json(snap / "diff.json") or {}).get("objects") or {}).get("summary") or {}
+        if osum:
+            since += [t["objects"].format(added=osum.get("added", 0), removed=osum.get("removed", 0), changed=osum.get("changed", 0)), ""]
+        since += _writer.criteria_changes(snap, h)
+    if prev:
+        out.append(f"## {t['since']}\n\n" + "\n".join(since).rstrip())
+    out.append(_unseen(snap, t))
+    ids = [f"- {x.get('title')}: " + ", ".join(f"`{i}`" for i in _facts._ids(x)) for x in broken + incidents + top if _facts._ids(x)]
+    tail = t["tail"].format(version=version, rubric=rubric, snap=snap)
+    return _writer.space_blocks("\n\n".join(out)) + "\n\n" + (f"{t['ids']}:\n\n" + "\n".join(ids) + "\n\n" if ids else "") + tail + "\n"

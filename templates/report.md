@@ -66,3 +66,21 @@ This covers {{start}} to {{end}}.
 Checks behind each entry: … <!-- code -->
 
 Details and every table: [`report-details.md`](report-details.md) · kubegap {{version}}, rubric {{rubric}} · snapshot `{{path}}`
+
+<!-- ============================ the daily report ============================
+A daily report is assembled by lib/output/daily.py from llm/facts.json; no separate agent writes it and it has no report-details.md.
+
+# <cluster> — daily run, <when>
+<broken n> · <happened n> · <most important n>          code: the first screen, from the titles
+## The cluster at a glance                               code
+## Broken now                                            only when something is; the agent's `what`
+## What happened since the last run                      code: which run it is compared with; per incident the agent's `what` and whether it is over
+## What matters most now                                 three at most
+### 1. <title>
+<since which run it has stood>                           code
+**What it is.** / **Why it matters.** / **What to do.**  the agent's `what`, `why`, `do`, within their sentence limits
+Read more: [title](address from a learn topic)
+## Also open                                             titles only
+## What changed since the last run                       the agent's appeared/gone lines; code: objects added, removed, changed; criteria changes
+## What this run did not read                            code: no node, no AWS API, log counts only, no application values, raw material deleted; checks not seen; what a full run adds
+-->

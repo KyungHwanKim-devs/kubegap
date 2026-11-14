@@ -234,23 +234,6 @@ def test_a_replacement_that_drops_a_code_block_or_adds_an_address_is_refused(tmp
     assert writer.gate(before, before + "\n## 2. u\n", {URL}) == ["the number of problems changed"]
 
 
-def test_a_daily_report_picks_no_problems_and_shows_the_last_full_run_s(tmp_path):
-    full = tmp_path / "c" / "2026-11-10T09-00-00"
-    (full / "llm").mkdir(parents=True)
-    (full / "MODE").write_text("full")
-    (full / "report.md").write_text("r")
-    (full / "inventory.json").write_text(json.dumps({"taken_at": "2026-11-10T09:00:00+09:00"}))
-    (full / "llm" / "facts.json").write_text(json.dumps({"schema": 2, "problems": [{"title": "backups stay in the cluster"}, {"title": "replicas on one node"}]}))
-    daily = _facts(problems=[], next=[{"id": "N1", "title": "serious", "finding_ids": ["resilience.no-backup.cluster", "resilience.replicas-same-node.*"]}])
-    daily["happened"]["incidents"][0]["exposed"] = ["N1"]
-    s = _snap(tmp_path, daily, mode="daily")
-    r = Runner()
-    _said, text = _run(s, r)
-    assert r.guides() == ["check-facts-ko.md", "write-overview-ko.md"]  # no problems: no solution check, no problem writer
-    assert "가장 큰 문제 (2026-11-10 09:00 full 점검): ① backups stay in the cluster ② replicas on one node" in text
-    assert "## 지금 남아 있는 심각한 문제" in text and "## 그다음으로 큰 문제" not in text and "## 영역별 한 줄" not in text and "## 1. " not in text
-
-
 def test_a_failed_agent_stops_with_the_reason(tmp_path):
     s = _snap(tmp_path)
 
