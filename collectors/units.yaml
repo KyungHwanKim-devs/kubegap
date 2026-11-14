@@ -17,8 +17,9 @@
 #                 secret-adjacent  a tool that reads Secrets to answer
 #   modes         the modes that collect it
 #   full_only_because   for a unit of low sensitivity that the daily run still leaves out: why (it is slow)
-#   unseen        for a unit the daily run leaves out: what a reader cannot learn without it, as a phrase per language that completes
-#                 "this run did not look at …" (the daily report and docs/DATA.md print it)
+#   unseen        for a unit the daily run leaves out: what the run did not do and what a reader cannot learn for it, as whole sentences
+#                 per language (the daily report and docs/DATA.md print them as they are)
+#   platforms     the platforms the unit exists on, when not all (the cloud account of an EKS cluster)
 #
 # Rule (tests/test_units.py): every unit of the daily mode has sensitivity low.
 
@@ -35,8 +36,8 @@
   sensitivity: config
   modes: [full]
   unseen:
-    en: "how your applications are started and configured (command, arguments, environment values, ConfigMap keys): whether a database has a backup job, a credential written into a ConfigMap, a JVM heap larger than its limit"
-    ko: "애플리케이션이 어떻게 시작되고 설정되는지(command, args, 환경 변수 값, ConfigMap 키). 데이터베이스에 백업 작업이 있는지, ConfigMap에 적힌 비밀 값, 메모리 제한보다 큰 JVM 힙이 여기에 해당합니다"
+    en: "It did not keep how your applications are started and configured (command, arguments, environment values, ConfigMap keys). So it cannot tell whether a database has a backup job, whether a credential is written into a ConfigMap, or whether a JVM heap is larger than its memory limit."
+    ko: "애플리케이션이 어떻게 시작되고 설정되는지(command, args, 환경 변수 값, ConfigMap 키)를 남기지 않았습니다. 그래서 데이터베이스에 백업 작업이 있는지, ConfigMap에 비밀 값이 적혀 있는지, JVM 힙이 메모리 제한보다 큰지는 알 수 없습니다."
 
 - id: events
   reads: "Events of every namespace (kubectl get events)."
@@ -75,8 +76,8 @@
   sensitivity: logs
   modes: [full]
   unseen:
-    en: "the text of component log lines (only how many matched a known failure pattern is counted)"
-    ko: "플랫폼 구성 요소 로그의 문장(알려진 실패 패턴에 맞은 줄 수만 셉니다)"
+    en: "It counted how many lines of the platform components' logs match a known failure pattern and kept no text of any line. So an error that matches no known pattern is not in this report."
+    ko: "플랫폼 구성 요소의 로그는 알려진 실패 패턴에 맞는 줄이 몇 개인지만 셌고, 로그 문장은 남기지 않았습니다. 그래서 알려진 패턴에 맞지 않는 오류는 이 리포트에 나오지 않습니다."
 
 - id: node-os
   reads: "The inside of each node, over SSH or SSM when node access was chosen: kernel log, disk and inode use, kubelet and containerd journal, sysctl, the k3s server's files and certificates, the CNI's local state."
@@ -84,8 +85,8 @@
   sensitivity: node
   modes: [full]
   unseen:
-    en: "the inside of a node: a node disk filling up, kernel out-of-memory kills, certificates of a k3s server about to expire, etcd snapshots of k3s, kubelet and container runtime errors"
-    ko: "노드 안쪽. 노드 디스크가 차는 것, 커널의 메모리 부족 종료, k3s 서버 인증서 만료, k3s etcd 스냅샷, kubelet과 컨테이너 런타임 오류가 여기에 해당합니다"
+    en: "It contacted no node. So it cannot see a node disk filling up, the kernel ending processes for lack of memory, certificates of a k3s server about to expire, the etcd snapshots of k3s, or errors of the kubelet and the container runtime."
+    ko: "노드에 접속하지 않았습니다. 그래서 노드 디스크가 차는 것, 커널이 메모리가 모자라 프로세스를 끝낸 일, k3s 서버 인증서의 만료, k3s의 etcd 스냅샷, kubelet과 컨테이너 런타임의 오류는 알 수 없습니다."
 
 - id: kubelet-config
   reads: "The effective kubelet configuration of each node, through the API server's node proxy (get --raw /api/v1/nodes/<node>/proxy/configz)."
@@ -93,8 +94,8 @@
   sensitivity: node
   modes: [full]
   unseen:
-    en: "kubelet settings (eviction thresholds, reserved resources, maxPods)"
-    ko: "kubelet 설정(축출 기준, 예약 자원, maxPods)"
+    en: "It did not read the kubelet's settings (eviction thresholds, reserved resources, maxPods)."
+    ko: "kubelet 설정(파드를 내보내는 기준, 예약 자원, maxPods)을 읽지 않았습니다."
 
 - id: control-plane-logs
   reads: "Logs of the control plane: on EKS the CloudWatch log group of the cluster (API server, authenticator, controller manager, scheduler), on k3s the server's journal."
@@ -102,17 +103,18 @@
   sensitivity: logs
   modes: [full]
   unseen:
-    en: "control plane logs: slow API requests, failing admission webhooks, authentication failures, a slow etcd"
-    ko: "컨트롤 플레인 로그. 느린 API 요청, 실패하는 어드미션 웹훅, 인증 실패, 느린 etcd가 여기에 해당합니다"
+    en: "It did not read the control plane's logs. So it cannot see slow API requests, failing admission webhooks, authentication failures or a slow etcd."
+    ko: "컨트롤 플레인 로그를 읽지 않았습니다. 그래서 느린 API 요청, 실패하는 어드미션 웹훅, 인증 실패, 느린 etcd는 알 수 없습니다."
 
 - id: cloud-account
   reads: "The AWS account of an EKS cluster, read-only (aws CLI: EKS, EC2, ELB, ECR, ACM, Service Quotas, CloudWatch metrics, Cost Explorer, AWS Backup)."
   keeps: "The responses: cluster and node group settings, add-on versions, subnets and free addresses, security groups, volumes and snapshots, load balancer settings and metrics, image scan settings, certificates, quotas, cost of the last 30 days."
   sensitivity: cloud
+  platforms: [eks]
   modes: [full]
   unseen:
-    en: "the AWS account: whether backups exist (AWS Backup, snapshots), subnets running out of addresses, a public cluster endpoint, security groups open to the world, load balancer errors and settings, image scanning, certificates and quotas, cost"
-    ko: "AWS 계정. 백업이 있는지(AWS Backup, 스냅샷), 서브넷 주소 고갈, 공개된 클러스터 엔드포인트, 전체에 열린 보안 그룹, 로드밸런서 오류와 설정, 이미지 스캔, 인증서와 할당량, 비용이 여기에 해당합니다"
+    en: "It called no AWS API. So it cannot tell whether backups exist (AWS Backup, snapshots), whether a subnet is running out of addresses, whether the cluster endpoint or a security group is open to the world, how the load balancers are set and whether they return errors, or what the cluster costs."
+    ko: "AWS API를 부르지 않았습니다. 그래서 백업이 있는지(AWS Backup, 스냅샷), 서브넷의 주소가 모자란지, 클러스터 엔드포인트나 보안 그룹이 인터넷 전체에 열려 있는지, 로드밸런서의 설정과 오류, 비용은 알 수 없습니다."
 
 - id: workload-tools
   reads: "What four read-only tools find when they are installed: krr (request and limit recommendations from 7 days of Prometheus history), Polaris (workload best practices), kubent and pluto (API versions a later Kubernetes removes)."
@@ -121,8 +123,8 @@
   modes: [full]
   full_only_because: "the tools take minutes (krr about three on a two-node cluster)"
   unseen:
-    en: "what the extra tools find: request and limit recommendations from a week of use, API versions the next Kubernetes removes"
-    ko: "추가 도구가 찾는 것. 일주일 사용량으로 본 requests·limits 권고, 다음 Kubernetes 버전에서 없어지는 API 버전이 여기에 해당합니다"
+    en: "It did not run the extra tools, which take minutes. So it has no request and limit recommendations from a week of use and does not list the API versions the next Kubernetes removes."
+    ko: "몇 분씩 걸리는 추가 도구를 돌리지 않았습니다. 그래서 일주일 사용량으로 본 requests·limits 권고와, 다음 Kubernetes 버전에서 없어지는 API 버전 목록이 없습니다."
 
 - id: helm-releases
   reads: "The list of Helm releases (helm list). Helm keeps a release in a Secret, so this read needs permission to read Secrets; the shipped ClusterRole does not grant it."
@@ -130,5 +132,5 @@
   sensitivity: secret-adjacent
   modes: [full]
   unseen:
-    en: "Helm releases (a release that failed or was left half-installed)"
-    ko: "Helm 릴리스(실패했거나 설치 도중에 멈춘 릴리스)"
+    en: "It did not read the Helm releases. So a release that failed or was left half-installed is not in this report."
+    ko: "Helm 릴리스를 읽지 않았습니다. 그래서 실패했거나 설치 도중에 멈춘 릴리스는 이 리포트에 나오지 않습니다."

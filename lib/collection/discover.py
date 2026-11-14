@@ -331,6 +331,7 @@ def _eks_facts(eks: dict, cfg: Config, snap: Path, log: RunLog) -> dict:
     # ECR: repository name list (for_each input for collectors/ecr). Read-only; repository policies and images are fetched by the collector.
     d, r = aws.aws_json(["ecr", "describe-repositories", "--max-items", "500"], id="discover.ecr-repositories", out_path=snap / "aws" / "ecr-repositories.json", **kw)
     out["ecr_repositories"] = sorted(x.get("repositoryName") for x in ((d or {}).get("repositories") or []) if x.get("repositoryName"))
+    out["ecr_repositories_at_limit"] = bool(r.ok and aws.more_to_read(r.stdout))  # the account holds more repositories than the 500 that were listed
     return out
 
 

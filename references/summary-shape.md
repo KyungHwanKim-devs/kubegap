@@ -178,7 +178,7 @@ see `kubegap`
 
 ## collection
 
-`collection{mode, mode_skipped_steps[], failed_steps[], seconds_total, object_files{<stem>: ok | not-served | excluded | denied | failed | unlisted | no-record}}` (`object_files` is every `objects/<stem>.json` a summary module asked `snapshot.objects` for, with why it is missing when it is, judged against the `objects.dump-all` record of collect-result.json (#160): `not-served` is a kind this cluster does not have, normal; `unlisted` is a kind the API serves without a file of that name, a reader's spelling mistake that report section 7-1 and run.log name; `no-record` when the step did not run or its `kubectl api-resources` failed).
+`collection{mode, mode_skipped_steps[], failed_steps[], at_limit{<collector.step>: [the nodes, list items or workloads whose output stopped at a limit of the collection: the last N lines of a node log, a page of an AWS list, the tail of a component log]}, seconds_total, object_files{<stem>: ok | not-served | excluded | denied | failed | unlisted | no-record}}` (`object_files` is every `objects/<stem>.json` a summary module asked `snapshot.objects` for, with why it is missing when it is, judged against the `objects.dump-all` record of collect-result.json (#160): `not-served` is a kind this cluster does not have, normal; `unlisted` is a kind the API serves without a file of that name, a reader's spelling mistake that report section 7-1 and run.log name; `no-record` when the step did not run or its `kubectl api-resources` failed).
 
 ## run
 

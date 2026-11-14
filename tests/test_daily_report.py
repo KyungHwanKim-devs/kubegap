@@ -122,6 +122,19 @@ def test_every_serious_check_a_daily_run_cannot_judge_is_named_for_the_reader():
         assert missing == [], f"{platform}: add a phrase to daily.UNSEEN for {missing}"
 
 
+def test_the_daily_report_says_what_each_unit_it_left_out_would_have_shown(tmp_path):
+    """One line per collection unit the daily run leaves out, in the unit's own words (collectors/units.yaml), and none for a unit the platform
+    does not have: a k3s cluster has no AWS account."""
+    from lib.foundations import units
+
+    snap = _snap(tmp_path)
+    (snap / "MODE").write_text("daily\n")
+    section = daily.assemble(snap, _facts(), "ko", "0.1.93", "0.2.0").split("## 이번 점검이 보지 않은 것")[1].split("\n## ")[0]
+    left = units.left_out("daily", "k3s")
+    assert len(left) == 7 and all(f"- {u['unseen']['ko']}" in section for u in left)
+    assert "AWS API" not in section and "- 노드에 접속하지 않았습니다." in section and "- Secret 값은 어느 점검에서도 읽지 않습니다." in section
+
+
 def test_the_daily_report_lists_what_it_cannot_find_for_this_cluster(tmp_path):
     snap = _snap(tmp_path)
     inv = json.loads((snap / "inventory.json").read_text())

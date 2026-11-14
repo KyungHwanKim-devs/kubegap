@@ -43,6 +43,8 @@ TEXT = {
         "to_see": "To see it",
         "components": "{n} components were read only through their objects and metrics; kubegap has no checks of their own for them: {names}.",
         "components_weakens": "a fault inside one of these components is not in this report",
+        "at_limit": "The collection stopped at one of its own limits and read only part of: {names}.",
+        "at_limit_weakens": "a number counted from these is a lower bound, and the oldest lines of the day or the rest of a list are not in this report",
         "skipped_to_see": "`/kubegap setup` asks the question again",
         "none": "none",
     },
@@ -70,6 +72,8 @@ TEXT = {
         "to_see": "보려면",
         "components": "컴포넌트 {n}개는 오브젝트와 메트릭으로만 읽었습니다. kubegap에 전용 점검 항목이 없습니다: {names}.",
         "components_weakens": "이 컴포넌트 안에서 생긴 이상은 이 리포트에 나오지 않습니다",
+        "at_limit": "수집이 자체 제한에 걸려 일부만 읽은 것이 있습니다: {names}.",
+        "at_limit_weakens": "여기에서 센 숫자는 실제보다 적을 수 있고, 하루 가운데 앞쪽 로그나 목록의 나머지는 이 리포트에 없습니다",
         "skipped_to_see": "`/kubegap setup`에서 다시 고를 수 있습니다",
         "none": "없음",
     },
@@ -172,6 +176,9 @@ def limits(facts: dict, snap: Path, language: str, skipped: list[dict] | None = 
     comps = unsupported_components(snap)
     if comps:
         groups["unsupported"].append(line(t["components"].format(n=len(comps), names=", ".join(comps)), t["components_weakens"], None))
+    at_limit = ((load_json(snap / "summary.json") or {}).get("collection") or {}).get("at_limit") or {}
+    if at_limit:
+        groups["unsupported"].append(line(t["at_limit"].format(names="; ".join(f"`{step}` ({', '.join(map(str, what)) if isinstance(what, list) else what})" for step, what in sorted(at_limit.items()))), t["at_limit_weakens"], None))
     for s in skipped or []:
         groups["skipped"].append(line(f"{s.get('header')}.", "; ".join(s.get("gain") or []).rstrip("."), t["skipped_to_see"].rstrip("."), "gain"))
     out = [f"## {t['limits']}", ""]

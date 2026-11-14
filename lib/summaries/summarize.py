@@ -437,7 +437,7 @@ def _collection_meta(snap: Path) -> dict:
     """Mode of this snapshot and the steps the mode skipped, so the report can say "not collected in daily mode" instead of treating the gaps as defects."""
     cr = load_json(snap / "collect-result.json") or {}
     s = cr.get("_summary") or {}
-    return {"mode": paths.snapshot_mode(snap), "mode_skipped_steps": s.get("mode_skipped") or [], "failed_steps": s.get("failed") or [], "seconds_total": s.get("seconds_total")}
+    return {"mode": paths.snapshot_mode(snap), "mode_skipped_steps": s.get("mode_skipped") or [], "failed_steps": s.get("failed") or [], "at_limit": s.get("at_limit") or {}, "seconds_total": s.get("seconds_total")}
 
 
 def summarize_tools(snap: Path) -> dict:

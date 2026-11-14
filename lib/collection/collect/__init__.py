@@ -150,6 +150,9 @@ def step_summary(results: dict, mode: str, seconds_total: float) -> dict:
         "mode_skipped": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("mode_skipped")],
         "failed": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("ok") is False and not st.get("skipped")],
         "skipped": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("skipped") and not st.get("mode_skipped")],
+        # steps whose output stopped at a limit of the collection (a page of an AWS list, the last N lines of a node log, the tail of a component log):
+        # what was read is not all there is, and a count made from it is a lower bound
+        "at_limit": {f"{cn}.{sid}": lim for cn, sid, st in steps if isinstance(st, dict) and (lim := (st.get("at_limit") or st.get("capped")))},
         "seconds_total": seconds_total,
     }
 

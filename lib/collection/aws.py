@@ -29,6 +29,17 @@ def aws_json(args: list[str], **kw) -> tuple[dict | list | None, shell.Result]:
         return None, r
 
 
+def more_to_read(stdout: str) -> bool:
+    """Whether an AWS CLI list stopped before the end. When `--max-items` prints fewer items than the service holds, the output carries a `NextToken`
+    for the rest (AWS CLI User Guide, "Using the pagination options in the AWS CLI", https://docs.aws.amazon.com/cli/latest/userguide/cli-usage-pagination.html,
+    read 2026-11-14); an operation the CLI does not paginate returns the service's own token (`nextToken`) the same way."""
+    try:
+        d = json.loads(stdout) if stdout.strip() else {}
+    except json.JSONDecodeError:
+        return False
+    return isinstance(d, dict) and bool(d.get("NextToken") or d.get("nextToken"))
+
+
 def _why(r: shell.Result) -> str:
     text = (r.error or "") + " " + (r.stderr or "")
     t = text.strip()

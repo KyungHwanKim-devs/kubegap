@@ -15,7 +15,7 @@ from . import paths, yamlite
 
 FILE = paths.COLLECTORS_DIR / "units.yaml"
 SENSITIVITIES = ("low", "config", "logs", "node", "cloud", "secret-adjacent")
-FIELDS = {"id", "reads", "keeps", "drops", "sensitivity", "modes", "full_only_because", "unseen"}
+FIELDS = {"id", "reads", "keeps", "drops", "sensitivity", "modes", "platforms", "full_only_because", "unseen"}
 
 
 @lru_cache(maxsize=1)
@@ -64,9 +64,9 @@ def missing(needs: list[str] | None, mode: str) -> list[str]:
     return [n for n in needs or [] if n not in have]
 
 
-def left_out(mode: str) -> list[dict]:
-    """The units a mode does not collect, in the file's order."""
-    return [u for u in _load() if mode not in (u.get("modes") or [])]
+def left_out(mode: str, platform: str | None = None) -> list[dict]:
+    """The units a mode does not collect, in the file's order. With `platform`, only those that exist on it (a k3s cluster has no cloud account)."""
+    return [u for u in _load() if mode not in (u.get("modes") or []) and (platform is None or not u.get("platforms") or platform in u["platforms"])]
 
 
 def validate() -> list[str]:

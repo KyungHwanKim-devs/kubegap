@@ -74,10 +74,8 @@ TEXT = {
         "objects": "오브젝트는 {added}개가 추가되고 {removed}개가 없어지고 {changed}개가 바뀌었습니다.",
         "unseen": "이번 점검이 보지 않은 것",
         "unseen_intro": "daily 점검은 가볍게 보는 점검입니다. Kubernetes API와 메트릭·로그 저장소만 읽었습니다.",
-        "unseen_nodes": "노드에 접속하지 않았습니다.",
-        "unseen_aws": "AWS API를 부르지 않았습니다.",
-        "unseen_logs": "컴포넌트 로그는 오류 종류별 개수만 셌고, 로그 글은 남기지 않았습니다.",
-        "unseen_values": "Secret 값과 ConfigMap 값은 읽지 않았고, 애플리케이션의 환경 변수 값은 남기지 않았습니다.",
+        "unseen_secrets": "Secret 값은 어느 점검에서도 읽지 않습니다.",
+        "unseen_at_limit": "수집이 자체 제한에 걸려 일부만 읽은 것이 있습니다: {names}. 여기에서 센 숫자는 실제보다 적을 수 있습니다.",
         "unseen_checks": "그래서 점검 항목 {total}개 가운데 {unseen}개는 이번에 보지 못했습니다. 노드 안쪽, 비용, 없어질 API 같은 항목이고, 문제로도 통과로도 세지 않았습니다.",
         "unseen_serious": "특히 아래와 같은 문제는 심각할 수 있는데도 노드 안쪽이나 클라우드 계정을 읽어야 보여서 daily 점검으로는 알 수 없습니다. 이 리포트에 없다고 해서 문제가 없다는 뜻이 아닙니다.",
         "unseen_full": "이것들을 확인하고, 원인을 원본까지 열어 따지고, 문제마다 원리와 점검 방법과 규모별 해결 방안을 길게 설명하는 것은 `/kubegap full`입니다.",
@@ -310,10 +308,13 @@ def first_seen(snap: Path, entry: dict, limit: int = 30) -> tuple[str, int] | No
 def _unseen(snap: Path, t: dict, language: str) -> str:
     inv, fd = load_json(snap / "inventory.json") or {}, load_json(snap / "findings-draft.json") or {}
     by = (fd.get("checks") or {}).get("by_status") or {}
-    lines = [t["unseen_intro"], "", f"- {t['unseen_nodes']}"]
-    if (inv.get("cluster") or {}).get("platform") == "eks":
-        lines.append(f"- {t['unseen_aws']}")
-    lines += [f"- {t['unseen_logs']}", f"- {t['unseen_values']}", ""]
+    # one line per collection unit this run left out, in the words the unit itself carries (collectors/units.yaml): the list cannot drift from what was read
+    left = _units.left_out(paths.snapshot_mode(snap), (inv.get("cluster") or {}).get("platform"))
+    lines = [t["unseen_intro"], "", *(f"- {u['unseen'][language]}" for u in left), f"- {t['unseen_secrets']}"]
+    at_limit = ((load_json(snap / "summary.json") or {}).get("collection") or {}).get("at_limit") or {}
+    if at_limit:
+        lines.append("- " + t["unseen_at_limit"].format(names="; ".join(f"`{step}` ({', '.join(map(str, what)) if isinstance(what, list) else what})" for step, what in sorted(at_limit.items()))))
+    lines.append("")
     lines += [t["unseen_checks"].format(total=(fd.get("checks") or {}).get("total", 0), unseen=by.get("not-collected", 0)), ""]
     serious = unseen_phrases(snap, language)
     if serious:
