@@ -47,6 +47,20 @@ def shown(xs, n: int) -> str:
     return str(xs) if len(xs) <= n else f"{xs[:n]} and {len(xs) - n} more"
 
 
+def placement_text(item: dict) -> str:
+    """Evidence of resilience.replicas-same-node. The check fires in two cases that read very differently, so the sentence says which one first: every
+    replica is on one node now, or they are apart now and nothing declares that they must be. A report once said four Deployments had every
+    replica on one node where each had its replicas on two nodes of one zone."""
+    case = (
+        "every replica is on one node now. " if item.get("all_same_node") else "the replicas are on different nodes now, but nothing declares that they must be (no topologySpread, no podAntiAffinity), so a reschedule may put them on one. "
+    )
+    tail = " — only one eligible node, so a spread declaration still lands on the same node" if item.get("single_eligible_node") else ""
+    return (
+        f"{case}replicas {item['replicas']} (Running {item['running']}), node distribution {item['nodes']}, AZ distribution {item['zones']}, "
+        f"topologySpread {item['topology_spread']}, podAntiAffinity {item['anti_affinity']}, nodes eligible under scheduling constraints {item['eligible_nodes']}{tail}"
+    )
+
+
 def oom_text(item: dict) -> str:
     """The evidence of resources.oomkilled-repeated from a `resilience.oom_7d` row: both sources with their windows, never one number standing for the other."""
     total = item.get("kernel_nodes_total") or 0

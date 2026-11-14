@@ -15102,7 +15102,7 @@
     expr: "item['all_same_node'] and item['prod']"
     warn_expr: "item['all_same_node'] or (item['prod'] and not item['spread_declared'])"
   target: "item['workload']"
-  evidence: "f\"replicas {item['replicas']} (Running {item['running']}), node distribution {item['nodes']}, AZ distribution {item['zones']}, topologySpread {item['topology_spread']}, podAntiAffinity {item['anti_affinity']}, nodes eligible under scheduling constraints {item['eligible_nodes']}{' — only one eligible node, so a spread declaration still lands on the same node' if item['single_eligible_node'] else ''}\""
+  evidence: "_placement_text(item)"
   severity_default: { small: medium, medium: high, large: high }
   symptom_linked: true
   why: >

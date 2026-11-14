@@ -27,6 +27,7 @@ from .evidence import (
     no_backup_text,
     oom_last_text,
     oom_text,
+    placement_text,
     sg_text,
     shown,
     snat_private_routes_text,
@@ -454,6 +455,7 @@ class Context:
             "_sg_text": sg_text,
             "shown": shown,
             "_oom_text": oom_text,
+            "_placement_text": placement_text,
             # the twelve long evidence sentences of #24, one helper each (lib/judgement/evaluate/evidence.py)
             "_argocd_backend_text": argocd_backend_text,
             "_throttling_text": throttling_text,

@@ -2793,7 +2793,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4",
+   "evidence": "every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4",
    "source": "summary.json:resilience.placement.rows"
   },
   {
@@ -2802,7 +2802,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4",
+   "evidence": "every replica is on one node now. replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4",
    "source": "summary.json:resilience.placement.rows"
   },
   {
@@ -2811,7 +2811,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4",
+   "evidence": "every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4",
    "source": "summary.json:resilience.placement.rows"
   },
   {
@@ -2820,7 +2820,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling constraints 4",
+   "evidence": "every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling constraints 4",
    "source": "summary.json:resilience.placement.rows"
   },
   {
@@ -3032,7 +3032,7 @@
    "status": "warn",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-137.ap-northeast-2.compute.internal': 1}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4",
+   "evidence": "the replicas are on different nodes now, but nothing declares that they must be (no topologySpread, no podAntiAffinity), so a reschedule may put them on one. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-137.ap-northeast-2.compute.internal': 1}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4",
    "source": "summary.json:resilience.placement.rows"
   },
   {

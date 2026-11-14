@@ -3392,7 +3392,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
+   "evidence": "every replica is on one node now. replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
    "source": "summary.json:resilience.placement.rows"
   },
   {
@@ -3401,7 +3401,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
+   "evidence": "every replica is on one node now. replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
    "source": "summary.json:resilience.placement.rows"
   },
   {
@@ -3410,7 +3410,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
+   "evidence": "every replica is on one node now. replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
    "source": "summary.json:resilience.placement.rows"
   },
   {
@@ -3419,7 +3419,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
+   "evidence": "every replica is on one node now. replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
    "source": "summary.json:resilience.placement.rows"
   },
   {
@@ -4544,7 +4544,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "replicas 2 (Running 2), node distribution {'node-b': 1, 'node-a': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
+   "evidence": "the replicas are on different nodes now, but nothing declares that they must be (no topologySpread, no podAntiAffinity), so a reschedule may put them on one. replicas 2 (Running 2), node distribution {'node-b': 1, 'node-a': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
    "source": "summary.json:resilience.placement.rows"
   },
   {
@@ -4553,7 +4553,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "replicas 2 (Running 2), node distribution {'node-b': 1, 'node-a': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
+   "evidence": "the replicas are on different nodes now, but nothing declares that they must be (no topologySpread, no podAntiAffinity), so a reschedule may put them on one. replicas 2 (Running 2), node distribution {'node-b': 1, 'node-a': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
    "source": "summary.json:resilience.placement.rows"
   },
   {
@@ -4562,7 +4562,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "replicas 2 (Running 2), node distribution {'node-a': 1, 'node-b': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
+   "evidence": "the replicas are on different nodes now, but nothing declares that they must be (no topologySpread, no podAntiAffinity), so a reschedule may put them on one. replicas 2 (Running 2), node distribution {'node-a': 1, 'node-b': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
    "source": "summary.json:resilience.placement.rows"
   },
   {
@@ -4571,7 +4571,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "replicas 2 (Running 2), node distribution {'node-b': 2}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
+   "evidence": "every replica is on one node now. replicas 2 (Running 2), node distribution {'node-b': 2}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
    "source": "summary.json:resilience.placement.rows"
   },
   {
