@@ -2800,7 +2800,7 @@
   rule:
     warn_expr: "len(item['prod_tracking_moving_ref']) > 0 and len(item['prod_tracking_moving_ref']) >= item['applications_prod']"
   target: "'cluster'"
-  evidence: "f\"prod apps {item['applications_prod']}, apps whose targetRevision is a branch or HEAD {len(item['prod_tracking_moving_ref'])} {item['prod_tracking_moving_ref'][:8]}, apps using ignoreDifferences {item['ignore_differences_apps']}\""
+  evidence: "f\"prod apps {item['applications_prod']}, apps whose targetRevision is a branch or HEAD {len(item['prod_tracking_moving_ref'])} {shown(item['prod_tracking_moving_ref'], 8)}, apps using ignoreDifferences {item['ignore_differences_apps']}\""
   severity_default: low
   symptom_linked: false
   why: >

@@ -2889,7 +2889,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default, spot) holds prod pods 23/45 (0.51), 18 workloads: ['app-ab-prod/app-ab-backend', 'app-ab-prod/app-ab-frontend', 'prod-app-s/app-s-admin', 'prod-app-s/app-s-api', 'prod-app-s/app-s-backend', 'prod-app-s/app-s-frontend', 'prod-app-v/app-v-admin-frontend', 'prod-app-v/app-v-backend', 'prod-app-v/app-v-frontend', 'prod-app-w/app-w']. Nodes 9, autoscaler True",
+   "evidence": "Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default, spot) holds prod pods 23/45 (0.51), 18 workloads: ['app-ab-prod/app-ab-backend', 'app-ab-prod/app-ab-frontend', 'prod-app-s/app-s-admin', 'prod-app-s/app-s-api', 'prod-app-s/app-s-backend', 'prod-app-s/app-s-frontend', 'prod-app-v/app-v-admin-frontend', 'prod-app-v/app-v-backend', 'prod-app-v/app-v-frontend', 'prod-app-w/app-w'] and 8 more. Nodes 9, autoscaler True",
    "source": "summary.json:resilience.placement.prod_by_node"
   },
   {
@@ -3105,7 +3105,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'memoryLimitsMissing', 'memoryRequestsMissing']. Security-category danger ['dangerousCapabilities', 'privilegeEscalationAllowed', 'runAsRootAllowed'] is in the security section",
+   "evidence": "Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'memoryLimitsMissing', 'memoryRequestsMissing'] and 6 more. Security-category danger ['dangerousCapabilities', 'privilegeEscalationAllowed', 'runAsRootAllowed'] is in the security section",
    "source": "summary.json:hygiene.polaris.workloads"
   },
   {
@@ -3672,7 +3672,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Polaris score 79. Security danger workloads 74 (prod 29): per check {'dangerousCapabilities': 2, 'hostNetworkSet': 2, 'privilegeEscalationAllowed': 59, 'runAsPrivileged': 2, 'runAsRootAllowed': 58, 'hostPIDSet': 1, 'rolebindingClusterAdminRole': 2, 'rolebindingRolePodExecAttach': 2, 'clusterrolebindingClusterAdmin': 2, 'clusterrolebindingPodExecAttach': 4, 'sensitiveContainerEnvVar': 1, 'rolePodExecAttach': 2, 'clusterrolePodExecAttach': 4}. prod list ['prod-app-z-backend/deployment/tts-proxy', 'prod-app-v/deployment/app-v-admin-frontend', 'prod-app-y/deployment/app-y-admin', 'prod-app-y/deployment/app-y-frontend', 'prod-app-v/deployment/app-v-backend', 'prod-app-v/deployment/app-v-frontend', 'prod-app-y/deployment/app-y-ai', 'prod-app-y/deployment/app-y-backend', 'prod-app-z-backend/deployment/app-z-pg-proxy', 'prod-app-z-backend/deployment/app-z-graph-worker', 'app-ab-prod/deployment/app-ab-frontend', 'prod-app-z-backend/deployment/app-z-file-worker']",
+   "evidence": "Polaris score 79. Security danger workloads 74 (prod 29): per check {'dangerousCapabilities': 2, 'hostNetworkSet': 2, 'privilegeEscalationAllowed': 59, 'runAsPrivileged': 2, 'runAsRootAllowed': 58, 'hostPIDSet': 1, 'rolebindingClusterAdminRole': 2, 'rolebindingRolePodExecAttach': 2, 'clusterrolebindingClusterAdmin': 2, 'clusterrolebindingPodExecAttach': 4, 'sensitiveContainerEnvVar': 1, 'rolePodExecAttach': 2, 'clusterrolePodExecAttach': 4}. prod list ['prod-app-z-backend/deployment/tts-proxy', 'prod-app-v/deployment/app-v-admin-frontend', 'prod-app-y/deployment/app-y-admin', 'prod-app-y/deployment/app-y-frontend', 'prod-app-v/deployment/app-v-backend', 'prod-app-v/deployment/app-v-frontend', 'prod-app-y/deployment/app-y-ai', 'prod-app-y/deployment/app-y-backend', 'prod-app-z-backend/deployment/app-z-pg-proxy', 'prod-app-z-backend/deployment/app-z-graph-worker', 'app-ab-prod/deployment/app-ab-frontend', 'prod-app-z-backend/deployment/app-z-file-worker'] and 17 more",
    "source": "summary.json:security.polaris"
   },
   {
@@ -3888,7 +3888,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Label app-u.ai/role: 34 workloads (production 9) depend on it via nodeSelector/affinity, present on 5/9 nodes — e.g. argocd/deployment/argocd-applicationset-controller, argocd/deployment/argocd-dex-server, argocd/deployment/argocd-notifications-controller",
+   "evidence": "Label app-u.ai/role: 34 workloads (production 9) depend on it via nodeSelector/affinity, present on 5/9 nodes — e.g. [, ', a, r, g, o, c, d, /, d, e, p, l, o, y, m, e, n, t, /, a, r, g, o, c, d, -, a, p, p, l, i, c, a, t, i, o, n, s, e, t, -, c, o, n, t, r, o, l, l, e, r, ', ,,  , ', a, r, g, o, c, d, /, d, e, p, l, o, y, m, e, n, t, /, a, r, g, o, c, d, -, d, e, x, -, s, e, r, v, e, r, ', ,,  , ', a, r, g, o, c, d, /, d, e, p, l, o, y, m, e, n, t, /, a, r, g, o, c, d, -, n, o, t, i, f, i, c, a, t, i, o, n, s, -, c, o, n, t, r, o, l, l, e, r, ', ],  , a, n, d,  , 3, 1,  , m, o, r, e",
    "source": "summary.json:hygiene.node_labels.rows"
   },
   {
@@ -3897,7 +3897,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Label workload-type: 39 workloads (production 26) depend on it via nodeSelector/affinity, present on 4/9 nodes — e.g. dev-app-s/deployment/app-s-admin, dev-app-s/deployment/app-s-api, dev-app-s/deployment/app-s-backend",
+   "evidence": "Label workload-type: 39 workloads (production 26) depend on it via nodeSelector/affinity, present on 4/9 nodes — e.g. [, ', d, e, v, -, a, p, p, -, s, /, d, e, p, l, o, y, m, e, n, t, /, a, p, p, -, s, -, a, d, m, i, n, ', ,,  , ', d, e, v, -, a, p, p, -, s, /, d, e, p, l, o, y, m, e, n, t, /, a, p, p, -, s, -, a, p, i, ', ,,  , ', d, e, v, -, a, p, p, -, s, /, d, e, p, l, o, y, m, e, n, t, /, a, p, p, -, s, -, b, a, c, k, e, n, d, ', ],  , a, n, d,  , 3, 6,  , m, o, r, e",
    "source": "summary.json:hygiene.node_labels.rows"
   },
   {
@@ -3924,7 +3924,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'metadataAndInstanceMismatched', 'missingPodDisruptionBudget', 'priorityClassNotSet']. Security-category danger ['privilegeEscalationAllowed', 'runAsRootAllowed'] is in the security section",
+   "evidence": "Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'metadataAndInstanceMismatched', 'missingPodDisruptionBudget', 'priorityClassNotSet'] and 2 more. Security-category danger ['privilegeEscalationAllowed', 'runAsRootAllowed'] is in the security section",
    "source": "summary.json:hygiene.polaris.workloads"
   },
   {
@@ -3996,7 +3996,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "of 157 alert rules, 36 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerClusterDown', 'AlertmanagerClusterCrashlooping', 'etcdMembersDown', 'etcdInsufficientMembers']), classes {'app-cause': 5, 'app': 22, 'cause': 130}, severity distribution {'critical': 48, 'warning': 97, 'page': 2, 'high': 3, 'none': 2, 'info': 5}",
+   "evidence": "of 157 alert rules, 36 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerClusterDown', 'AlertmanagerClusterCrashlooping', 'etcdMembersDown', 'etcdInsufficientMembers'] and 30 more), classes {'app-cause': 5, 'app': 22, 'cause': 130}, severity distribution {'critical': 48, 'warning': 97, 'page': 2, 'high': 3, 'none': 2, 'info': 5}",
    "source": "summary.json:observability.rules"
   },
   {
@@ -4356,7 +4356,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Workloads with token mounted 86/92, of which 30 prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: ['prod-app-w/deployment/app-w', 'prod-app-t/deployment/app-t-ai', 'prod-app-t/deployment/app-t-backend', 'prod-app-t/deployment/app-t-studio', 'prod-app-t/deployment/app-t-web', 'prod-app-x/deployment/app-x-api', 'prod-app-s/deployment/app-s-admin', 'prod-app-s/deployment/app-s-api', 'prod-app-s/deployment/app-s-backend', 'prod-app-s/statefulset/app-s-backend-mysql', 'prod-app-s/deployment/app-s-frontend', 'prod-app-y/deployment/app-y-admin']. SAs with automount false 7/113",
+   "evidence": "Workloads with token mounted 86/92, of which 30 prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: ['prod-app-w/deployment/app-w', 'prod-app-t/deployment/app-t-ai', 'prod-app-t/deployment/app-t-backend', 'prod-app-t/deployment/app-t-studio', 'prod-app-t/deployment/app-t-web', 'prod-app-x/deployment/app-x-api', 'prod-app-s/deployment/app-s-admin', 'prod-app-s/deployment/app-s-api', 'prod-app-s/deployment/app-s-backend', 'prod-app-s/statefulset/app-s-backend-mysql', 'prod-app-s/deployment/app-s-frontend', 'prod-app-y/deployment/app-y-admin'] and 18 more. SAs with automount false 7/113",
    "source": "summary.json:security.service_accounts"
   },
   {
@@ -4509,7 +4509,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Node ip-10-0-1-117.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): tenant kinds ['dev', 'prod'], namespaces ['kube-system', 'keda', 'monitoring', 'argocd', 'dev-app-y', 'dev-app-aa']. Memory limit total 11.6GB / allocatable 6.9GB = 1.68x, request total 4.7GB, containers without a limit 3",
+   "evidence": "Node ip-10-0-1-117.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): tenant kinds ['dev', 'prod'], namespaces ['kube-system', 'keda', 'monitoring', 'argocd', 'dev-app-y', 'dev-app-aa'] and 3 more. Memory limit total 11.6GB / allocatable 6.9GB = 1.68x, request total 4.7GB, containers without a limit 3",
    "source": "summary.json:tenancy.isolation.nodes"
   },
   {
@@ -4518,7 +4518,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default): tenant kinds ['dev', 'prod'], namespaces ['prod-app-y', 'dev-app-y', 'prod-app-s', 'prod-app-z-backend', 'dev-app-s', 'prod-app-v']. Memory limit total 47.0GB / allocatable 29.8GB = 1.58x, request total 18.9GB, containers without a limit 0",
+   "evidence": "Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default): tenant kinds ['dev', 'prod'], namespaces ['prod-app-y', 'dev-app-y', 'prod-app-s', 'prod-app-z-backend', 'dev-app-s', 'prod-app-v'] and 6 more. Memory limit total 47.0GB / allocatable 29.8GB = 1.58x, request total 18.9GB, containers without a limit 0",
    "source": "summary.json:tenancy.isolation.nodes"
   },
   {
@@ -4527,7 +4527,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Node ip-10-0-2-218.ap-northeast-2.compute.internal (pool system-ondemand): tenant kinds ['dev', 'other', 'prod'], namespaces ['monitoring', 'argocd', 'dev-app-aa', 'keda', 'kube-system', 'middleware']. Memory limit total 5.7GB / allocatable 3.2GB = 1.79x, request total 2.0GB, containers without a limit 1",
+   "evidence": "Node ip-10-0-2-218.ap-northeast-2.compute.internal (pool system-ondemand): tenant kinds ['dev', 'other', 'prod'], namespaces ['monitoring', 'argocd', 'dev-app-aa', 'keda', 'kube-system', 'middleware'] and 2 more. Memory limit total 5.7GB / allocatable 3.2GB = 1.79x, request total 2.0GB, containers without a limit 1",
    "source": "summary.json:tenancy.isolation.nodes"
   },
   {
@@ -4743,7 +4743,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "AWS API calls since leader start 242614, top [['Elastic Load Balancing v2/DescribeTargetHealth', 76055], ['Elastic Load Balancing v2/DescribeTargetGroupAttributes', 43347], ['EC2/DescribeInstances', 38801], ['EC2/DescribeSecurityGroups', 24999], ['Elastic Load Balancing v2/RegisterTargets', 11793]], average retries per call 0.0, slowest by average latency [['Shield/GetSubscriptionState', 0.759], ['EC2/RevokeSecurityGroupIngress', 0.317], ['EC2/AuthorizeSecurityGroupIngress', 0.295]], apiserver 429/503 126",
+   "evidence": "AWS API calls since leader start 242614, top [['Elastic Load Balancing v2/DescribeTargetHealth', 76055], ['Elastic Load Balancing v2/DescribeTargetGroupAttributes', 43347], ['EC2/DescribeInstances', 38801], ['EC2/DescribeSecurityGroups', 24999], ['Elastic Load Balancing v2/RegisterTargets', 11793]] and 25 more, average retries per call 0.0, slowest by average latency [['Shield/GetSubscriptionState', 0.759], ['EC2/RevokeSecurityGroupIngress', 0.317], ['EC2/AuthorizeSecurityGroupIngress', 0.295]] and 23 more, apiserver 429/503 126",
    "source": "summary.json:albctl.summary"
   },
   {
@@ -4770,7 +4770,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "prod apps 9, apps whose targetRevision is a branch or HEAD 9 ['argocd/application/app-w-prod', 'argocd/application/app-t-prod', 'argocd/application/app-x-prod', 'argocd/application/app-s-prod', 'argocd/application/app-y-prod', 'argocd/application/app-ab-prod', 'argocd/application/app-z-backend-prod', 'argocd/application/app-r-prod'], apps using ignoreDifferences 3",
+   "evidence": "prod apps 9, apps whose targetRevision is a branch or HEAD 9 ['argocd/application/app-w-prod', 'argocd/application/app-t-prod', 'argocd/application/app-x-prod', 'argocd/application/app-s-prod', 'argocd/application/app-y-prod', 'argocd/application/app-ab-prod', 'argocd/application/app-z-backend-prod', 'argocd/application/app-r-prod'] and 1 more, apps using ignoreDifferences 3",
    "source": "summary.json:argocdctl.summary"
   },
   {
@@ -4941,7 +4941,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "28 dashboards (196 panel metrics) — 153 of 194 alert-rule metrics have no panel: Without, aggregator_unavailable_apiservice, aggregator_unavailable_apiservice_total, alerting, alertmanager_cluster_members, alertmanager_config_hash",
+   "evidence": "28 dashboards (196 panel metrics) — 153 of 194 alert-rule metrics have no panel: [, ', W, i, t, h, o, u, t, ', ,,  , ', a, g, g, r, e, g, a, t, o, r, _, u, n, a, v, a, i, l, a, b, l, e, _, a, p, i, s, e, r, v, i, c, e, ', ,,  , ', a, g, g, r, e, g, a, t, o, r, _, u, n, a, v, a, i, l, a, b, l, e, _, a, p, i, s, e, r, v, i, c, e, _, t, o, t, a, l, ', ,,  , ', a, l, e, r, t, i, n, g, ', ,,  , ', a, l, e, r, t, m, a, n, a, g, e, r, _, c, l, u, s, t, e, r, _, m, e, m, b, e, r, s, ', ,,  , ', a, l, e, r, t, m, a, n, a, g, e, r, _, c, o, n, f, i, g, _, h, a, s, h, ', ],  , a, n, d,  , 1, 4, 7,  , m, o, r, e",
    "source": "summary.json:observability.grafana.dashboards_json"
   },
   {
@@ -4950,7 +4950,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "139 of 141 rules did not fire in 15 days (['AlertmanagerClusterCrashlooping', 'AlertmanagerClusterDown', 'AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerFailedReload', 'AlertmanagerFailedToSendAlerts', 'AlertmanagerMembersInconsistent', 'CPUThrottlingHigh', 'ConfigReloaderSidecarErrors', 'DmmConsumerLagHigh', 'DmmConsumerMembersBelowExpected', 'IlAngleBridgeMembersBelowExpected']…). Fired: []",
+   "evidence": "139 of 141 rules did not fire in 15 days (['AlertmanagerClusterCrashlooping', 'AlertmanagerClusterDown', 'AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerFailedReload', 'AlertmanagerFailedToSendAlerts', 'AlertmanagerMembersInconsistent', 'CPUThrottlingHigh', 'ConfigReloaderSidecarErrors', 'DmmConsumerLagHigh', 'DmmConsumerMembersBelowExpected', 'IlAngleBridgeMembersBelowExpected'] and 127 more). Fired: []",
    "source": "summary.json:observability.alerts"
   },
   {
@@ -4959,7 +4959,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "41 of 41 ingress backends have no saturation metric (e.g. [('argocd', 'argocd-server'), ('dev-app-s', 'app-s-admin'), ('dev-app-s', 'app-s-api'), ('dev-app-s', 'app-s-backend'), ('dev-app-s', 'app-s-frontend'), ('dev-app-y', 'app-y-admin')]), namespaces with saturation metrics []",
+   "evidence": "41 of 41 ingress backends have no saturation metric (e.g. [('argocd', 'argocd-server'), ('dev-app-s', 'app-s-admin'), ('dev-app-s', 'app-s-api'), ('dev-app-s', 'app-s-backend'), ('dev-app-s', 'app-s-frontend'), ('dev-app-y', 'app-y-admin')] and 35 more), namespaces with saturation metrics []",
    "source": "summary.json:observability.golden_signals"
   },
   {
@@ -5751,7 +5751,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "9 of 9 nodes without readable ipamd metrics (localhost:61678): ['ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-1-137.ap-northeast-2.compute.internal', 'ip-10-0-1-139.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal', 'ip-10-0-1-245.ap-northeast-2.compute.internal', 'ip-10-0-2-100.ap-northeast-2.compute.internal']",
+   "evidence": "9 of 9 nodes without readable ipamd metrics (localhost:61678): ['ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-1-137.ap-northeast-2.compute.internal', 'ip-10-0-1-139.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal', 'ip-10-0-1-245.ap-northeast-2.compute.internal', 'ip-10-0-2-100.ap-northeast-2.compute.internal'] and 3 more",
    "source": "summary.json:vpccni.warm.summary"
   },
   {

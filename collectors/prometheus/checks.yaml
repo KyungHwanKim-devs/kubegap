@@ -1017,7 +1017,7 @@
     expr: "(item['head_series'] or 0) >= 2000000"
     warn_expr: "((item['head_series'] or 0) >= 1000000 or (item['top_metric_share'] or 0) >= 0.25)"
   target: "item['target']"
-  evidence: "f\"active series {item['head_series']} (label pairs {item['label_pairs']}), top metrics {[(x['name'], x['series']) for x in (item['top_metrics'] or [])[:5]]}, share of the top metric {item['top_metric_share']}, histogram bucket series among the top 10 {item['top10_bucket_series']}, labels with many values {item['top_labels_by_values']}\""
+  evidence: "f\"active series {item['head_series']} (label pairs {item['label_pairs']}), top metrics {shown([(x['name'], x['series']) for x in (item['top_metrics'] or [])], 5)}, share of the top metric {item['top_metric_share']}, histogram bucket series among the top 10 {item['top10_bucket_series']}, labels with many values {item['top_labels_by_values']}\""
   severity_default: medium
   symptom_linked: false
   why: >

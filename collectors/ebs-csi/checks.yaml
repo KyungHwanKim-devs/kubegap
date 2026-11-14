@@ -376,7 +376,7 @@
     expr: "len(item['va_stuck']) > 0"
     warn_expr: "len(item['va_orphan']) > 0"
   target: "'cluster'"
-  evidence: "f\"VolumeAttachments {item['volume_attachments']}, incomplete or errored {item['va_stuck']} ({[(d['pv'], d['node'], d['age_min'], d['error']) for d in item['va_stuck_detail']][:3]}), orphans whose PV or node is gone {item['va_orphan']}\""
+  evidence: "f\"VolumeAttachments {item['volume_attachments']}, incomplete or errored {item['va_stuck']} ({shown([(d['pv'], d['node'], d['age_min'], d['error']) for d in item['va_stuck_detail']], 3)}), orphans whose PV or node is gone {item['va_orphan']}\""
   severity_default: high
   symptom_linked: true
   why: >

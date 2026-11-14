@@ -796,7 +796,7 @@
     expr: "len(item.get('near_limit') or []) > 0"
     warn_expr: "len(item.get('over_60') or []) > 0"
   target: "'aws-account'"
-  evidence: "f\"quotas with a usage metric {item.get('with_usage')}/{item.get('quotas')}, at 80% or more {item.get('near_limit')}, at 60% or more {item.get('over_60')}, top operational quotas {item.get('watched_top')[:6]}\""
+  evidence: "f\"quotas with a usage metric {item.get('with_usage')}/{item.get('quotas')}, at 80% or more {item.get('near_limit')}, at 60% or more {item.get('over_60')}, top operational quotas {shown(item.get('watched_top'), 6)}\""
   severity_default: high
   symptom_linked: false
   why: >

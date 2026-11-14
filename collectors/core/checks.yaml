@@ -2127,7 +2127,7 @@
     expr: "item.get('alerting', 0) > 0 and item['by_class'].get('symptom', 0) + item['by_class'].get('app', 0) == 0"  # app = rules on the app's own metrics that look at errors, latency, success or lag; app-cause = the app's other metrics, not counted
     warn_expr: "item.get('alerting', 0) > 0 and (item['by_class'].get('symptom', 0) + item['by_class'].get('app', 0)) / max(item.get('alerting', 1), 1) < 0.15"
   target: "'cluster'"
-  evidence: "f\"{item['alerting']} alert rules: symptom {item['by_class'].get('symptom', 0)}, cause {item['by_class'].get('cause', 0)}, app metrics (assumed symptom) {item['by_class'].get('app', 0)}. Symptom ratio {item.get('symptom_ratio')}. Symptom rules: {item['symptom_rules'][:8]}\""
+  evidence: "f\"{item['alerting']} alert rules: symptom {item['by_class'].get('symptom', 0)}, cause {item['by_class'].get('cause', 0)}, app metrics (assumed symptom) {item['by_class'].get('app', 0)}. Symptom ratio {item.get('symptom_ratio')}. Symptom rules: {shown(item['symptom_rules'], 8)}\""
   severity_default: { small: medium, medium: high, large: critical }
   symptom_linked: false
   why: >
@@ -2179,7 +2179,7 @@
     # warn-only (no expr): in a healthy cluster most rules do not fire within 15 days, which is normal; no fail by ratio
     warn_expr: "item['never_fired_count'] > 0"
   target: "'cluster'"
-  evidence: "f\"{item['never_fired_count']} of {item['rules_total']} rules did not fire in 15 days ({item['never_fired_15d'][:12]}{'…' if item['never_fired_count'] > 12 else ''}). Fired: {item['fired_15d'][:10]}\""
+  evidence: "f\"{item['never_fired_count']} of {item['rules_total']} rules did not fire in 15 days ({shown(item['never_fired_15d'], 12)}). Fired: {shown(item['fired_15d'], 10)}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -2352,7 +2352,7 @@
   each: observability.alertmanager.silences_forgotten
   rule:
     expr: "True"
-  target: "(item.get('created_by') or 'unknown') + ':' + str(item.get('matchers'))[:50]"
+  target: "(item.get('created_by') or 'unknown') + ':' + shown(str(item.get('matchers')), 50)"
   evidence: "f\"created {item['age_days']} days ago, {item['remaining_days']} days remaining, matchers {item['matchers']}, comment '{item['comment']}'\""
   severity_default: medium
   symptom_linked: false
@@ -2473,7 +2473,7 @@
   rule:
     warn_expr: "item.get('prev_snapshot') is not None and (len(item.get('surge') or []) + len(item.get('vanished') or [])) > 0"
   target: "'cluster'"
-  evidence: "f\"vs previous snapshot {item.get('prev_snapshot')}: 1h log surge {item.get('surge')}, vanished {item.get('vanished')} — details {[(c['namespace'], c['prev_lines_1h'], c['lines_1h'], c['ratio']) for c in (item.get('changes') or [])][:6]}\""
+  evidence: "f\"vs previous snapshot {item.get('prev_snapshot')}: 1h log surge {item.get('surge')}, vanished {item.get('vanished')} — details {shown([(c['namespace'], c['prev_lines_1h'], c['lines_1h'], c['ratio']) for c in (item.get('changes') or [])], 6)}\""
   severity_default: low
   symptom_linked: true
   why: >
@@ -2537,7 +2537,7 @@
     needs_reason: "Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)"
     warn_expr: "item.get('routes') is not None and not any(any('severity' in (mm or '') for mm in (r.get('matchers') or [])) and r.get('receiver') not in (None, 'null') for r in item['routes'])"
   target: "'cluster'"
-  evidence: "f\"routes {[(r.get('receiver'), r.get('matchers')) for r in (item.get('routes') or [])][:6]}, receivers {list((item.get('receivers') or {}).keys())}, default receiver {item.get('default_receiver')}\""
+  evidence: "f\"routes {shown([(r.get('receiver'), r.get('matchers')) for r in (item.get('routes') or [])], 6)}, receivers {list((item.get('receivers') or {}).keys())}, default receiver {item.get('default_receiver')}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -2717,7 +2717,7 @@
   rule:
     warn_expr: "len(item.get('page_severity_cause') or []) >= 10"
   target: "'cluster'"
-  evidence: "f\"of {item.get('alerting')} alert rules, {len(item.get('page_severity_cause') or [])} are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. {(item.get('page_severity_cause') or [])[:6]}), classes {item.get('by_class')}, severity distribution {item.get('by_severity')}\""
+  evidence: "f\"of {item.get('alerting')} alert rules, {len(item.get('page_severity_cause') or [])} are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. {shown((item.get('page_severity_cause') or []), 6)}), classes {item.get('by_class')}, severity distribution {item.get('by_severity')}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -2826,7 +2826,7 @@
   rule:
     warn_expr: "len(item.get('missing_saturation') or []) > 0 and (item.get('ingresses') or 0) > 0"
   target: "'cluster'"
-  evidence: "f\"{len(item.get('missing_saturation') or [])} of {item.get('ingresses')} ingress backends have no saturation metric (e.g. {[(r.get('namespace'), r.get('ingress')) for r in (item.get('missing_saturation') or [])][:6]}), namespaces with saturation metrics {item.get('namespaces_with_saturation_metrics')}\""
+  evidence: "f\"{len(item.get('missing_saturation') or [])} of {item.get('ingresses')} ingress backends have no saturation metric (e.g. {shown([(r.get('namespace'), r.get('ingress')) for r in (item.get('missing_saturation') or [])], 6)}), namespaces with saturation metrics {item.get('namespaces_with_saturation_metrics')}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -3618,7 +3618,7 @@
     expr: "item['type'] == 'Warning' and item['severity_hint'] in ('critical', 'high') and item['occurrences'] >= 3 and item.get('trend') != 'quiet'"
     warn_expr: "item['type'] == 'Warning' and item['occurrences'] >= 1 and item.get('trend') != 'quiet'"  # an event that stopped growing across recent snapshots (quiet) is history and does not even warn
   target: "item['reason']"
-  evidence: "f\"{item['meaning']}. {item['occurrences']} occurrences total ({item['events']} events, trend over {len(item['per_snapshot'])} snapshots {item['per_snapshot']}, {item['trend']}), first {item['first']} last {item['last']}. Top objects: {[o['object'] for o in item['objects_top'][:3]]}\""
+  evidence: "f\"{item['meaning']}. {item['occurrences']} occurrences total ({item['events']} events, trend over {len(item['per_snapshot'])} snapshots {item['per_snapshot']}, {item['trend']}), first {item['first']} last {item['last']}. Top objects: {shown([o['object'] for o in item['objects_top']], 3)}\""
   severity_default: high
   nature: occurrence
   symptom_linked: true
@@ -3810,7 +3810,7 @@
     expr: "prod and item['count'] >= 5"
     warn_expr: "True"
   target: "item['workload']"
-  evidence: "f\"24h 'Unable to schedule pod; no fit' {item['count']} times (control plane log). Top reason from summary.controlplane.scheduler.reasons: {(((summary.get('controlplane') or {}).get('scheduler') or {}).get('reasons') or [{}])[0].get('reason', '?')[:140]}\""
+  evidence: "f\"24h 'Unable to schedule pod; no fit' {item['count']} times (control plane log). Top reason from summary.controlplane.scheduler.reasons: {shown((((summary.get('controlplane') or {}).get('scheduler') or {}).get('reasons') or [{}])[0].get('reason', '?'), 140)}\""
   severity_default: high
   nature: occurrence
   symptom_linked: true
@@ -4157,7 +4157,7 @@
     expr: "item.get('failures_total', 0) >= 100"
     warn_expr: "item.get('failures_total', 0) >= 1"
   target: "'cluster'"
-  evidence: "f\"24h authentication failures {item.get('failures_total')}: {item.get('failures')[:5]}\""
+  evidence: "f\"24h authentication failures {item.get('failures_total')}: {shown(item.get('failures'), 5)}\""
   severity_default: medium
   nature: occurrence
   symptom_linked: false
@@ -4291,7 +4291,7 @@
     needs_reason: "node not read"
     expr: "item['kernel']['counts'].get('oom_node', 0) >= 1"
   target: "item['node']"
-  evidence: "f\"kernel log ({item['kernel']['window']}) 'Out of memory: Kill' {item['kernel']['counts'].get('oom_node')} times, system process victims (kubelet, containerd, k3s) {item['kernel']['counts'].get('oom_system_victim', 0)}, cgroup OOM (container) {item['kernel']['counts'].get('oom_cgroup', 0)}. Samples: {[s[:120] for s in item['kernel']['samples'] if 'Out of memory' in s][:3]}\""
+  evidence: "f\"kernel log ({item['kernel']['window']}) 'Out of memory: Kill' {item['kernel']['counts'].get('oom_node')} times, system process victims (kubelet, containerd, k3s) {item['kernel']['counts'].get('oom_system_victim', 0)}, cgroup OOM (container) {item['kernel']['counts'].get('oom_cgroup', 0)}. Samples: {shown([s[:120] for s in item['kernel']['samples'] if 'Out of memory' in s], 3)}\""
   severity_default: high
   nature: occurrence
   symptom_linked: true
@@ -4520,7 +4520,7 @@
     needs_reason: "node not read"
     expr: "item['kernel']['counts'].get('lockup', 0) >= 1"
   target: "item['node']"
-  evidence: "f\"kernel log ({item['kernel']['window']}) lockup/hung task/rcu stall {item['kernel']['counts'].get('lockup')} times. Samples: {[s[:140] for s in item['kernel']['samples'] if any(k in s for k in ('lockup','hung_task','blocked for','rcu'))][:3]}\""
+  evidence: "f\"kernel log ({item['kernel']['window']}) lockup/hung task/rcu stall {item['kernel']['counts'].get('lockup')} times. Samples: {shown([s[:140] for s in item['kernel']['samples'] if any(k in s for k in ('lockup','hung_task','blocked for','rcu'))], 3)}\""
   severity_default: high
   nature: occurrence
   symptom_linked: true
@@ -4743,7 +4743,7 @@
     needs_reason: "node not read"
     expr: "item['kernel']['counts'].get('io_error', 0) + item['kernel']['counts'].get('fs_error', 0) >= 1"
   target: "item['node']"
-  evidence: "f\"kernel log ({item['kernel']['window']}) I/O errors {item['kernel']['counts'].get('io_error')}, filesystem errors {item['kernel']['counts'].get('fs_error')}. Samples: {[s[:140] for s in item['kernel']['samples'] if any(k in s for k in ('I/O error','EXT4','XFS','nvme','read-only','Read-only'))][:3]}\""
+  evidence: "f\"kernel log ({item['kernel']['window']}) I/O errors {item['kernel']['counts'].get('io_error')}, filesystem errors {item['kernel']['counts'].get('fs_error')}. Samples: {shown([s[:140] for s in item['kernel']['samples'] if any(k in s for k in ('I/O error','EXT4','XFS','nvme','read-only','Read-only'))], 3)}\""
   severity_default: high
   nature: occurrence
   symptom_linked: true
@@ -4966,7 +4966,7 @@
     expr: "item['kernel']['counts'].get('nic', 0) >= 3"
     warn_expr: "item['kernel']['counts'].get('nic', 0) >= 1"
   target: "item['node']"
-  evidence: "f\"kernel log ({item['kernel']['window']}) NIC events {item['kernel']['counts'].get('nic')}. Samples: {[s[:140] for s in item['kernel']['samples'] if any(k in s for k in ('Link','link','Tx','ena','WATCHDOG','eth','ens'))][:3]}\""
+  evidence: "f\"kernel log ({item['kernel']['window']}) NIC events {item['kernel']['counts'].get('nic')}. Samples: {shown([s[:140] for s in item['kernel']['samples'] if any(k in s for k in ('Link','link','Tx','ena','WATCHDOG','eth','ens'))], 3)}\""
   severity_default: medium
   nature: occurrence
   symptom_linked: true
@@ -6957,7 +6957,7 @@
   rule:
     expr: "item['mb'] >= 10240"
     warn_expr: "item['mb'] >= 2048"
-  target: "item['workload'] if item.get('workload') else item['node'] + '/uid:' + item['uid'][:8]"
+  target: "item['workload'] if item.get('workload') else item['node'] + '/uid:' + shown(item['uid'], 8)"
   evidence: "f\"node {item['node']} /var/lib/kubelet/pods/{item['uid']}/volumes/kubernetes.io~empty-dir {item['mb']}MB ({item.get('pod') or 'uid not in the current pod list = leftover that was not cleaned up'})\""
   severity_default: medium
   symptom_linked: false
@@ -9457,7 +9457,7 @@
     expr: "sum(e['count'] for e in item.get('unclassified_errors') or []) >= 2000"
     warn_expr: "len(item.get('unclassified_errors') or []) > 0"
   target: "'cluster'"
-  evidence: "f\"{item.get('error_lines_unclassified')} unclassified error lines ({item.get('lines_scanned')} lines scanned, {len(item.get('files_scanned') or [])} files). Top: {[(e['pattern'][:100], e['count']) for e in (item.get('unclassified_errors') or [])[:6]]}\""
+  evidence: "f\"{item.get('error_lines_unclassified')} unclassified error lines ({item.get('lines_scanned')} lines scanned, {len(item.get('files_scanned') or [])} files). Top: {shown([(e['pattern'][:100], e['count']) for e in (item.get('unclassified_errors') or [])], 6)}\""
   severity_default: low
   nature: occurrence
   symptom_linked: false
@@ -10402,7 +10402,7 @@
   rule:
     expr: "bool(item['cluster_admin_non_system']) or bool(item['cluster_admin_namespace_bindings'])"
   target: "'cluster'"
-  evidence: "f\"cluster-admin ClusterRoleBindings {[(b['binding'], b['non_system']) for b in item['cluster_admin_non_system']]}, namespace RoleBindings -> cluster-admin {item['cluster_admin_namespace_bindings'][:5]}. All cluster-admin bindings {[(b['binding'], [s['name'] for s in b['subjects']]) for b in item['cluster_admin_bindings']]}\""
+  evidence: "f\"cluster-admin ClusterRoleBindings {[(b['binding'], b['non_system']) for b in item['cluster_admin_non_system']]}, namespace RoleBindings -> cluster-admin {shown(item['cluster_admin_namespace_bindings'], 5)}. All cluster-admin bindings {[(b['binding'], [s['name'] for s in b['subjects']]) for b in item['cluster_admin_bindings']]}\""
   severity_default: { small: medium, medium: high, large: high }
   symptom_linked: false
   why: cluster-admin reads and changes every resource (Secrets included) in every namespace. The system:masters group and the EKS add-on manager are defaults; anything else bound to a user, group or ServiceAccount needs an individual reason. Bound to a CI runner or an ops tool SA, the whole cluster falls the moment that pod is compromised.
@@ -10489,7 +10489,7 @@
     expr: "item['bound'] and (item.get('prod') or item.get('clusterrole') is not None) and not any((sub.get('namespace') or '') in ('argocd', 'flux-system', 'kube-system', 'karpenter', 'cert-manager', 'external-secrets', 'monitoring', 'metallb-system') for sub in (item.get('bound_subjects') or []))"  # wildcards on platform controllers (e.g. Argo CD application-controller) are the upstream default -- warn
     warn_expr: "item['bound']"
   target: "item.get('clusterrole') or item.get('role')"
-  evidence: "f\"{'ClusterRole ' + item['clusterrole'] if item.get('clusterrole') else 'Role ' + str(item.get('role'))}: * in verbs and resources, bound subjects {[(s.get('kind'), s.get('namespace'), s.get('name')) for s in item['bound_subjects'][:5]]}\""
+  evidence: "f\"{'ClusterRole ' + item['clusterrole'] if item.get('clusterrole') else 'Role ' + str(item.get('role'))}: * in verbs and resources, bound subjects {shown([(s.get('kind'), s.get('namespace'), s.get('name')) for s in item['bound_subjects']], 5)}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -10549,7 +10549,7 @@
     expr: "any(s.get('kind') == 'ServiceAccount' for s in item['bound_subjects'])"
     warn_expr: "True"
   target: "item['clusterrole']"
-  evidence: "f\"ClusterRole {item['clusterrole']}: secrets get/list, bound subjects {[(s.get('kind'), s.get('namespace'), s.get('name')) for s in item['bound_subjects'][:5]]}\""
+  evidence: "f\"ClusterRole {item['clusterrole']}: secrets get/list, bound subjects {shown([(s.get('kind'), s.get('namespace'), s.get('name')) for s in item['bound_subjects']], 5)}\""
   severity_default: medium
   symptom_linked: false
   why: Cluster-wide `secrets list` can pull every secret in every namespace at once. Operators (Argo CD, External Secrets, cert-manager, KEDA) need it by design and are excluded; only SAs in user namespaces are considered.
@@ -10585,7 +10585,7 @@
   rule:
     warn_expr: "len(item['token_mounted_without_rbac_prod']) > 0"
   target: "'cluster'"
-  evidence: "f\"Workloads with token mounted {item['token_mounted']}/{item['workloads']}, of which {len(item['token_mounted_without_rbac_prod'])} prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: {item['token_mounted_without_rbac_prod'][:12]}. SAs with automount false {item['automount_false_sa']}/{item['service_accounts']}\""
+  evidence: "f\"Workloads with token mounted {item['token_mounted']}/{item['workloads']}, of which {len(item['token_mounted_without_rbac_prod'])} prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: {shown(item['token_mounted_without_rbac_prod'], 12)}. SAs with automount false {item['automount_false_sa']}/{item['service_accounts']}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -11031,7 +11031,7 @@
     expr: "any(x.get('tokens') != 'required' for x in (item.get('imds_hop_limit_gt1') or []))"  # only IMDSv1 allowed (tokens optional) fails -- hop 2 + tokens required is the EKS managed node group default, so warn
     warn_expr: "len(item.get('imds_hop_limit_gt1') or []) > 0"
   target: "'cluster'"
-  evidence: "f\"Of {item.get('instances')} instances, {len(item.get('imds_hop_limit_gt1') or [])} with IMDS hop limit > 1 or tokens optional: {item.get('imds_by_setting')}. Examples {[(i['name'], i['type'], i['hop_limit'], i['tokens']) for i in (item.get('imds_hop_limit_gt1') or [])[:4]]}. EC2NodeClass metadataOptions {item.get('ec2nodeclass_metadata')}. IRSA SAs {len(item.get('irsa_service_accounts') or [])}, Pod Identity {item.get('pod_identity_associations')}\""
+  evidence: "f\"Of {item.get('instances')} instances, {len(item.get('imds_hop_limit_gt1') or [])} with IMDS hop limit > 1 or tokens optional: {item.get('imds_by_setting')}. Examples {shown([(i['name'], i['type'], i['hop_limit'], i['tokens']) for i in (item.get('imds_hop_limit_gt1') or [])], 4)}. EC2NodeClass metadataOptions {item.get('ec2nodeclass_metadata')}. IRSA SAs {len(item.get('irsa_service_accounts') or [])}, Pod Identity {item.get('pod_identity_associations')}\""
   severity_default: high
   symptom_linked: false
   why: >
@@ -11098,7 +11098,7 @@
     expr: "len(item.get('danger_workloads_prod') or []) > 0"
     warn_expr: "len(item.get('danger_workloads') or []) > 0"
   target: "'cluster'"
-  evidence: "f\"Polaris score {item.get('score')}. Security danger workloads {len(item.get('danger_workloads') or [])} (prod {len(item.get('danger_workloads_prod') or [])}): per check {item.get('danger_check_counts')}. prod list {(item.get('danger_workloads_prod') or [])[:12]}\""
+  evidence: "f\"Polaris score {item.get('score')}. Security danger workloads {len(item.get('danger_workloads') or [])} (prod {len(item.get('danger_workloads_prod') or [])}): per check {item.get('danger_check_counts')}. prod list {shown((item.get('danger_workloads_prod') or []), 12)}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -11558,7 +11558,7 @@
   rule:
     warn_expr: "bool(item['prod_db_delete_reclaim'])"
   target: "'cluster'"
-  evidence: "f\"DB-like prod PVCs whose PV reclaimPolicy is Delete: {item['prod_db_delete_reclaim'][:12]} ({len(item['prod_db_delete_reclaim'])} in total / {sum(1 for r in item['rows'] if r['prod'])} prod PVCs)\""
+  evidence: "f\"DB-like prod PVCs whose PV reclaimPolicy is Delete: {shown(item['prod_db_delete_reclaim'], 12)} ({len(item['prod_db_delete_reclaim'])} in total / {sum(1 for r in item['rows'] if r['prod'])} prod PVCs)\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -11631,7 +11631,7 @@
     needs_reason: "ebs not available"
     expr: "len(item.get('unattached') or []) > 0"
   target: "'cluster'"
-  evidence: "f\"{len(item.get('unattached') or [])} volumes in available state, {item.get('unattached_gb')}GB, about ${item.get('unattached_monthly_usd_est')}/month: {[(v['id'], v['size_gb'], v['type'], v['age_days'], v['name']) for v in (item.get('unattached') or [])[:8]]}\""
+  evidence: "f\"{len(item.get('unattached') or [])} volumes in available state, {item.get('unattached_gb')}GB, about ${item.get('unattached_monthly_usd_est')}/month: {shown([(v['id'], v['size_gb'], v['type'], v['age_days'], v['name']) for v in (item.get('unattached') or [])], 8)}\""
   severity_default: medium
   symptom_linked: false
   why: A PVC deleted with reclaim Retain, a volume left after a node disappeared, or a volume created by hand and forgotten. gp3 keeps costing about 0.09 USD per GB-month. There may be data inside, so snapshot before deleting.
@@ -11704,7 +11704,7 @@
     needs_reason: "ebs not available"
     warn_expr: "len(item.get('gp2') or []) > 0"
   target: "'cluster'"
-  evidence: "f\"{len(item.get('gp2') or [])} gp2 volumes: {[(v['id'], v['size_gb'], v['namespace'], v['pvc']) for v in (item.get('gp2') or [])[:8]]}. All {item.get('by_type')}\""
+  evidence: "f\"{len(item.get('gp2') or [])} gp2 volumes: {shown([(v['id'], v['size_gb'], v['namespace'], v['pvc']) for v in (item.get('gp2') or [])], 8)}. All {item.get('by_type')}\""
   severity_default: low
   symptom_linked: false
   why: gp3 is 20% cheaper per GB than gp2 and guarantees a baseline 3000 IOPS and 125MB/s regardless of size (gp2 gives 3 IOPS per GB, so small volumes are slow). Changing the volume type is online (ModifyVolume).
@@ -11774,7 +11774,7 @@
     needs_reason: "ebs not available"
     warn_expr: "len(item.get('unencrypted') or []) > 0"
   target: "'cluster'"
-  evidence: "f\"{len(item.get('unencrypted') or [])} of {item.get('volumes')} volumes unencrypted: {(item.get('unencrypted') or [])[:8]}\""
+  evidence: "f\"{len(item.get('unencrypted') or [])} of {item.get('volumes')} volumes unencrypted: {shown((item.get('unencrypted') or []), 8)}\""
   severity_default: medium
   symptom_linked: false
   why: EBS encryption has no performance cost and carries over to snapshots and copies. Enabling account default encryption (ebs encryption-by-default) makes new volumes automatic; existing volumes can only be converted by snapshot -> encrypted copy. Enforce with StorageClass parameters.encrypted "true".
@@ -12018,7 +12018,7 @@
     expr: "bool(item['non_security_danger']) and item['prod']"
     warn_expr: "bool(item['non_security_danger'])"
   target: "item['target']"
-  evidence: "f\"Polaris danger (Reliability, Efficiency) {item['non_security_danger']}, warning {item['non_security_warning'][:6]}. Security-category danger {item['security_danger']} is in the security section\""
+  evidence: "f\"Polaris danger (Reliability, Efficiency) {item['non_security_danger']}, warning {shown(item['non_security_warning'], 6)}. Security-category danger {item['security_danger']} is in the security section\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -12452,7 +12452,7 @@
     expr: "item['standard_label_ratio'] is not None and item['standard_label_ratio'] < 0.5"
     warn_expr: "item['standard_label_ratio'] is not None and item['standard_label_ratio'] < 0.8"
   target: "'cluster'"
-  evidence: "f\"Of {item['workloads']} workloads, share with standard labels {item['standard_label_ratio']}. prod workloads without: {[w['workload'] for w in item['without_standard_labels'] if w['prod']][:12]} ({len(item['without_standard_labels'])} in total)\""
+  evidence: "f\"Of {item['workloads']} workloads, share with standard labels {item['standard_label_ratio']}. prod workloads without: {shown([w['workload'] for w in item['without_standard_labels'] if w['prod']], 12)} ({len(item['without_standard_labels'])} in total)\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -12520,7 +12520,7 @@
     expr: "len(item['orphan_configmaps']) >= 50"
     warn_expr: "len(item['orphan_configmaps']) >= 5"
   target: "'cluster'"
-  evidence: "f\"Of {item['configmaps_total']} ConfigMaps, {len(item['orphan_configmaps'])} unreferenced candidates: {[(c['namespace'], c['name']) for c in item['orphan_configmaps'][:10]]}\""
+  evidence: "f\"Of {item['configmaps_total']} ConfigMaps, {len(item['orphan_configmaps'])} unreferenced candidates: {shown([(c['namespace'], c['name']) for c in item['orphan_configmaps']], 10)}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -12993,7 +12993,7 @@
     expr: "len(item['orphan_secrets']) >= 50"
     warn_expr: "len(item['orphan_secrets']) >= 5"
   target: "'cluster'"
-  evidence: "f\"Of {item['secrets_total']} Secrets (metric kube_secret_info), {len(item['orphan_secrets'])} unreferenced candidates: {[(s['namespace'], s['name'], s['type']) for s in item['orphan_secrets'][:10]]}\""
+  evidence: "f\"Of {item['secrets_total']} Secrets (metric kube_secret_info), {len(item['orphan_secrets'])} unreferenced candidates: {shown([(s['namespace'], s['name'], s['type']) for s in item['orphan_secrets']], 10)}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -13315,7 +13315,7 @@
     expr: "any(p['prod'] for p in item['pvc_unbound']) or bool(item['pv_released'])"
     warn_expr: "bool(item['pvc_unbound']) or bool(item['pvc_unused'])"
   target: "'cluster'"
-  evidence: "f\"Non-Bound PVCs {[(p['namespace'], p['name'], p['phase'], p['storage_class']) for p in item['pvc_unbound']]}, Released/Failed PVs {[(p['name'], p['capacity'], p['claim'], p['reclaim']) for p in item['pv_released']]}, Bound PVCs used by no pod {[(p['namespace'], p['name']) for p in item['pvc_unused'][:10]]}\""
+  evidence: "f\"Non-Bound PVCs {[(p['namespace'], p['name'], p['phase'], p['storage_class']) for p in item['pvc_unbound']]}, Released/Failed PVs {[(p['name'], p['capacity'], p['claim'], p['reclaim']) for p in item['pv_released']]}, Bound PVCs used by no pod {shown([(p['namespace'], p['name']) for p in item['pvc_unused']], 10)}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -14075,7 +14075,7 @@
   rule:
     warn_expr: "item['restart_needed_pods'] > 0"
   target: "f\"{item['namespace']}/configmap/{item['configmap']}\""
-  evidence: "f\"ConfigMap {item['namespace']}/{item['configmap']} changed {item['changed_at'][:16]} by {item['changed_by']}, {item['stale_hours']} h after the oldest pod started; {item['restart_needed_pods']} running pods still hold the old value through {', '.join(m for m in item['ref_modes'] if m != 'file')}: {', '.join(item['workloads'][:4])}\""
+  evidence: "f\"ConfigMap {item['namespace']}/{item['configmap']} changed {item['changed_at'][:16]} by {item['changed_by']}, {item['stale_hours']} h after the oldest pod started; {item['restart_needed_pods']} running pods still hold the old value through {', '.join(m for m in item['ref_modes'] if m != 'file')}: {', '.join(shown(item['workloads'], 4))}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -15997,7 +15997,7 @@
     expr: "bool(item['inversion']) or item['preempted_events'] >= 5"
     warn_expr: "item['no_user_classes_with_prod'] or item['preempted_events'] > 0"
   target: "'cluster'"
-  evidence: "f\"User-defined PriorityClasses {item['user_classes']}, pod distribution {item['pods_by_class']}, prod pods without a class {item['prod_pods_without_class']} of {item['prod_pods']}, prod max priority {item['prod_max_priority']}, non-prod max {item['nonprod_max_priority']}, inversions {item['inversion'][:5]}, Preempted events {item['preempted_events']}\""
+  evidence: "f\"User-defined PriorityClasses {item['user_classes']}, pod distribution {item['pods_by_class']}, prod pods without a class {item['prod_pods_without_class']} of {item['prod_pods']}, prod max priority {item['prod_max_priority']}, non-prod max {item['nonprod_max_priority']}, inversions {shown(item['inversion'], 5)}, Preempted events {item['preempted_events']}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -17428,7 +17428,7 @@
   rule:
     warn_expr: "item['admin_like'] and not item['has_auth_hint'] and item.get('scheme') not in ('internal', 'lan')"
   target: "item['target']"
-  evidence: "f\"{item['type']} {item['hosts'][:2]}: exposure {item.get('scheme')}, TLS {item.get('tls')}, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check\""
+  evidence: "f\"{item['type']} {shown(item['hosts'], 2)}: exposure {item.get('scheme')}, TLS {item.get('tls')}, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -19975,7 +19975,7 @@
     expr: "item['shares_ci_prod'] and item['ci_heavy'] and item['separation_possible']"
     warn_expr: "item['shares_ci_prod']"
   target: "item['node']"
-  evidence: "f\"Node {item['node']} (pool {item['pool']}): prod pods {item['prod_pods']} ({item['prod_namespaces']}) together with CI pods {item['ci_pods']} ({[c['pod'] for c in item['ci_pod_list']][:5]}). Heavy runners {item['ci_heavy']}, minutes above 90% node CPU in 7d {item['cpu_saturated_minutes_7d']}, memory limit total/allocatable {item['memory_limit_overcommit']}\""
+  evidence: "f\"Node {item['node']} (pool {item['pool']}): prod pods {item['prod_pods']} ({item['prod_namespaces']}) together with CI pods {item['ci_pods']} ({shown([c['pod'] for c in item['ci_pod_list']], 5)}). Heavy runners {item['ci_heavy']}, minutes above 90% node CPU in 7d {item['cpu_saturated_minutes_7d']}, memory limit total/allocatable {item['memory_limit_overcommit']}\""
   severity_default: { small: low, medium: medium, large: high }
   symptom_linked: true
   why: >
@@ -20699,7 +20699,7 @@
     expr: "item['tenant_count'] >= 2 and item['prod_pods'] > 0 and (item['memory_limit_overcommit'] or 0) >= 2.0"
     warn_expr: "item['tenant_count'] >= 2 and (item['memory_limit_overcommit'] or 0) >= 1.5"
   target: "item['node']"
-  evidence: "f\"Node {item['node']} (pool {item['pool']}): tenant kinds {item['tenant_kinds']}, namespaces {list(item['namespaces'])[:6]}. Memory limit total {item['memory_limits_gb']}GB / allocatable {item['allocatable_memory_gb']}GB = {item['memory_limit_overcommit']}x, request total {item['memory_requests_gb']}GB, containers without a limit {item['containers_without_memory_limit']}\""
+  evidence: "f\"Node {item['node']} (pool {item['pool']}): tenant kinds {item['tenant_kinds']}, namespaces {shown(list(item['namespaces']), 6)}. Memory limit total {item['memory_limits_gb']}GB / allocatable {item['allocatable_memory_gb']}GB = {item['memory_limit_overcommit']}x, request total {item['memory_requests_gb']}GB, containers without a limit {item['containers_without_memory_limit']}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -21943,7 +21943,7 @@
     expr: "(item['share'] or 0) >= 0.5 and item['prod_total'] >= 10 and (item['spot'] or item['nodes_total'] >= 3)"
     warn_expr: "(item['share'] or 0) >= 0.4 and item['prod_total'] >= 10 and item['nodes_total'] >= 3"
   target: "item['node']"
-  evidence: "f\"Node {item['node']} (pool {item['pool']}, {item['capacity_type']}) holds prod pods {item['prod_pods']}/{item['prod_total']} ({item['share']}), {item['workload_count']} workloads: {item['prod_workloads'][:10]}. Nodes {item['nodes_total']}, autoscaler {item['autoscaler']}\""
+  evidence: "f\"Node {item['node']} (pool {item['pool']}, {item['capacity_type']}) holds prod pods {item['prod_pods']}/{item['prod_total']} ({item['share']}), {item['workload_count']} workloads: {shown(item['prod_workloads'], 10)}. Nodes {item['nodes_total']}, autoscaler {item['autoscaler']}\""
   severity_default: { small: medium, medium: high, large: high }
   symptom_linked: true
   why: >
@@ -23086,7 +23086,7 @@
     expr: "(item['writable_layer_max_mb'] or 0) >= 5000"
     warn_expr: "(item['writable_layer_max_mb'] or 0) >= 1000"
   target: "item['node']"
-  evidence: "f\"Node {item['node']}: top writable layers {[(l['workload'], l['container'], l['mb']) for l in item['writable_layers_top'][:5]]} MB (max {item['writable_layer_max_mb']}MB)\""
+  evidence: "f\"Node {item['node']}: top writable layers {shown([(l['workload'], l['container'], l['mb']) for l in item['writable_layers_top']], 5)} MB (max {item['writable_layer_max_mb']}MB)\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -23202,7 +23202,7 @@
     needs_reason: "node not read"
     warn_expr: "bool(((item.get('cri') or {}).get('images_over_3gb')) or [])"
   target: "item['node']"
-  evidence: "f\"Node {item['node']}: images of 3 GiB or more {len((item.get('cri') or {}).get('images_over_3gb') or [])} — {', '.join(((item.get('cri') or {}).get('images_over_3gb') or [])[:3])} (largest {(item.get('cri') or {}).get('largest_image_mb')} MiB)\""
+  evidence: "f\"Node {item['node']}: images of 3 GiB or more {len((item.get('cri') or {}).get('images_over_3gb') or [])} — {', '.join(shown(((item.get('cri') or {}).get('images_over_3gb') or []), 3))} (largest {(item.get('cri') or {}).get('largest_image_mb')} MiB)\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -23247,7 +23247,7 @@
     expr: "(not item['well_known']) and item['nodes_with_label'] == 0"
     warn_expr: "(not item['well_known']) and (item['prod_workloads'] > 0 or (item['nodes_with_label'] == 1 and item['nodes_total'] > 1))"
   target: "item['key']"
-  evidence: "f\"Label {item['key']}: {item['workload_count']} workloads (production {item['prod_workloads']}) depend on it via nodeSelector/affinity, present on {item['nodes_with_label']}/{item['nodes_total']} nodes — e.g. {', '.join(item['workloads'][:3])}\""
+  evidence: "f\"Label {item['key']}: {item['workload_count']} workloads (production {item['prod_workloads']}) depend on it via nodeSelector/affinity, present on {item['nodes_with_label']}/{item['nodes_total']} nodes — e.g. {', '.join(shown(item['workloads'], 3))}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -23322,7 +23322,7 @@
     needs_reason: "dashboards json not available"
     warn_expr: "(item.get('alert_metrics') or 0) > 0 and (item.get('alert_metrics_without_panel_count') or 0) / max(item.get('alert_metrics') or 1, 1) >= 0.3"
   target: "'grafana'"
-  evidence: "f\"{item.get('read')} dashboards ({item.get('panel_metrics')} panel metrics) — {item.get('alert_metrics_without_panel_count')} of {item.get('alert_metrics')} alert-rule metrics have no panel: {', '.join((item.get('alert_metrics_without_panel') or [])[:6])}\" if item.get('available') else 'no dashboard JSON (grafana_api_token required)'"
+  evidence: "f\"{item.get('read')} dashboards ({item.get('panel_metrics')} panel metrics) — {item.get('alert_metrics_without_panel_count')} of {item.get('alert_metrics')} alert-rule metrics have no panel: {', '.join(shown((item.get('alert_metrics_without_panel') or []), 6))}\" if item.get('available') else 'no dashboard JSON (grafana_api_token required)'"
   severity_default: low
   symptom_linked: false
   why: >

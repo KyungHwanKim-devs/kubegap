@@ -37,6 +37,16 @@ def sg_text(item: dict) -> str:
     return "not applicable"
 
 
+def shown(xs, n: int) -> str:
+    """The first `n` of a list for an evidence sentence, always with how many were left out: `['a', 'b'] and 8 more`. An evidence sentence is
+    something to read; the finding's `details` and the summary keep the whole list. A cut list without its remainder reads as the whole
+    (a report once said 11 workloads where there were 15). A text is cut to `n` characters with an ellipsis."""
+    if isinstance(xs, str):
+        return xs if len(xs) <= n else xs[:n].rstrip() + "…"
+    xs = list(xs or [])
+    return str(xs) if len(xs) <= n else f"{xs[:n]} and {len(xs) - n} more"
+
+
 def oom_text(item: dict) -> str:
     """The evidence of resources.oomkilled-repeated from a `resilience.oom_7d` row: both sources with their windows, never one number standing for the other."""
     total = item.get("kernel_nodes_total") or 0

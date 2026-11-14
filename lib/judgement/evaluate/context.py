@@ -28,6 +28,7 @@ from .evidence import (
     oom_last_text,
     oom_text,
     sg_text,
+    shown,
     snat_private_routes_text,
     throttling_text,
 )
@@ -451,6 +452,7 @@ class Context:
             "serves_traffic": self.serves_traffic,
             "db_like": self.db_like,
             "_sg_text": sg_text,
+            "shown": shown,
             "_oom_text": oom_text,
             # the twelve long evidence sentences of #24, one helper each (lib/judgement/evaluate/evidence.py)
             "_argocd_backend_text": argocd_backend_text,

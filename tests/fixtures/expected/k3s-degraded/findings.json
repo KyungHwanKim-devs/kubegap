@@ -2852,7 +2852,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['deploymentMissingReplicas', 'livenessProbeMissing', 'metadataAndInstanceMismatched', 'missingPodDisruptionBudget', 'priorityClassNotSet', 'readinessProbeMissing']. Security-category danger ['hostNetworkSet', 'privilegeEscalationAllowed', 'runAsRootAllowed'] is in the security section",
+   "evidence": "Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['deploymentMissingReplicas', 'livenessProbeMissing', 'metadataAndInstanceMismatched', 'missingPodDisruptionBudget', 'priorityClassNotSet', 'readinessProbeMissing'] and 1 more. Security-category danger ['hostNetworkSet', 'privilegeEscalationAllowed', 'runAsRootAllowed'] is in the security section",
    "source": "summary.json:hygiene.polaris.workloads"
   },
   {
@@ -3293,7 +3293,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Polaris score 75. Security danger workloads 102 (prod 68): per check {'privilegeEscalationAllowed': 87, 'runAsRootAllowed': 82, 'sensitiveContainerEnvVar': 12, 'hostNetworkSet': 3, 'hostPIDSet': 3, 'runAsPrivileged': 2, 'clusterrolebindingClusterAdmin': 1, 'clusterrolebindingPodExecAttach': 3, 'rolebindingClusterAdminRole': 1, 'rolebindingRolePodExecAttach': 2, 'sensitiveConfigmapContent': 1, 'rolePodExecAttach': 2, 'clusterrolePodExecAttach': 3}. prod list ['app-a-prod/daemonset/app-a-sandbox-prepull', 'app-f-prod/deployment/app-f', 'app-f-prod/deployment/app-f-mx', 'app-c-prod/deployment/app-c-coturn', 'app-f-prod/deployment/app-f-vn', 'app-a-prod/deployment/app-a-phoenix', 'app-a-prod/pod/app-a-experiment', 'app-i-prod/deployment/app-i', 'app-a-prod/deployment/app-a-backend', 'app-a-prod/deployment/app-m', 'app-f-prod/deployment/app-f-sales-bot', 'app-i-prod/job/app-i-postgres-manual-backup']",
+   "evidence": "Polaris score 75. Security danger workloads 102 (prod 68): per check {'privilegeEscalationAllowed': 87, 'runAsRootAllowed': 82, 'sensitiveContainerEnvVar': 12, 'hostNetworkSet': 3, 'hostPIDSet': 3, 'runAsPrivileged': 2, 'clusterrolebindingClusterAdmin': 1, 'clusterrolebindingPodExecAttach': 3, 'rolebindingClusterAdminRole': 1, 'rolebindingRolePodExecAttach': 2, 'sensitiveConfigmapContent': 1, 'rolePodExecAttach': 2, 'clusterrolePodExecAttach': 3}. prod list ['app-a-prod/daemonset/app-a-sandbox-prepull', 'app-f-prod/deployment/app-f', 'app-f-prod/deployment/app-f-mx', 'app-c-prod/deployment/app-c-coturn', 'app-f-prod/deployment/app-f-vn', 'app-a-prod/deployment/app-a-phoenix', 'app-a-prod/pod/app-a-experiment', 'app-i-prod/deployment/app-i', 'app-a-prod/deployment/app-a-backend', 'app-a-prod/deployment/app-m', 'app-f-prod/deployment/app-f-sales-bot', 'app-i-prod/job/app-i-postgres-manual-backup'] and 56 more",
    "source": "summary.json:security.polaris"
   },
   {
@@ -3536,7 +3536,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Label role: 7 workloads (production 0) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. logging/deployment/kibana, monitoring/deployment/kube-prometheus-stack-grafana, monitoring/deployment/kube-prometheus-stack-kube-state-metrics",
+   "evidence": "Label role: 7 workloads (production 0) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. [, ', l, o, g, g, i, n, g, /, d, e, p, l, o, y, m, e, n, t, /, k, i, b, a, n, a, ', ,,  , ', m, o, n, i, t, o, r, i, n, g, /, d, e, p, l, o, y, m, e, n, t, /, k, u, b, e, -, p, r, o, m, e, t, h, e, u, s, -, s, t, a, c, k, -, g, r, a, f, a, n, a, ', ,,  , ', m, o, n, i, t, o, r, i, n, g, /, d, e, p, l, o, y, m, e, n, t, /, k, u, b, e, -, p, r, o, m, e, t, h, e, u, s, -, s, t, a, c, k, -, k, u, b, e, -, s, t, a, t, e, -, m, e, t, r, i, c, s, ', ],  , a, n, d,  , 4,  , m, o, r, e",
    "source": "summary.json:hygiene.node_labels.rows"
   },
   {
@@ -3545,7 +3545,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Label storage: 10 workloads (production 7) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. app-a-prod/statefulset/app-a-postgres, app-a-prod/statefulset/app-a-redis, app-f-prod/statefulset/app-f-postgres",
+   "evidence": "Label storage: 10 workloads (production 7) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. [, ', a, p, p, -, a, -, p, r, o, d, /, s, t, a, t, e, f, u, l, s, e, t, /, a, p, p, -, a, -, p, o, s, t, g, r, e, s, ', ,,  , ', a, p, p, -, a, -, p, r, o, d, /, s, t, a, t, e, f, u, l, s, e, t, /, a, p, p, -, a, -, r, e, d, i, s, ', ,,  , ', a, p, p, -, f, -, p, r, o, d, /, s, t, a, t, e, f, u, l, s, e, t, /, a, p, p, -, f, -, p, o, s, t, g, r, e, s, ', ],  , a, n, d,  , 7,  , m, o, r, e",
    "source": "summary.json:hygiene.node_labels.rows"
   },
   {
@@ -3887,7 +3887,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "of 161 alert rules, 38 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AppQGatewayDown', 'AppQBackendDown', 'AppQFrontendDown', 'AppQPostgresDown', 'AppQClusterCPU80', 'AppQClusterMem80']), classes {'app-cause': 3, 'app': 15, 'cause': 143}, severity distribution {'warning': 106, 'critical': 46, 'none': 2, 'info': 7}",
+   "evidence": "of 161 alert rules, 38 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AppQGatewayDown', 'AppQBackendDown', 'AppQFrontendDown', 'AppQPostgresDown', 'AppQClusterCPU80', 'AppQClusterMem80'] and 32 more), classes {'app-cause': 3, 'app': 15, 'cause': 143}, severity distribution {'warning': 106, 'critical': 46, 'none': 2, 'info': 7}",
    "source": "summary.json:observability.rules"
   },
   {
@@ -4634,7 +4634,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Workloads with token mounted 79/81, of which 37 prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: ['app-a-prod/deployment/app-a-frontend', 'app-a-prod/deployment/app-a-gateway', 'app-a-prod/deployment/app-a-phoenix', 'app-a-prod/statefulset/app-a-postgres', 'app-a-prod/statefulset/app-a-redis', 'app-a-prod/daemonset/app-a-sandbox-prepull', 'app-a-prod/deployment/app-a-umami', 'app-b-prod/deployment/app-b-backend', 'app-b-prod/deployment/app-b-frontend', 'app-c-prod/deployment/app-c-coturn', 'app-c-prod/statefulset/app-c-postgres', 'app-c-prod/deployment/app-c-signaling']. SAs with automount false 1/91",
+   "evidence": "Workloads with token mounted 79/81, of which 37 prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: ['app-a-prod/deployment/app-a-frontend', 'app-a-prod/deployment/app-a-gateway', 'app-a-prod/deployment/app-a-phoenix', 'app-a-prod/statefulset/app-a-postgres', 'app-a-prod/statefulset/app-a-redis', 'app-a-prod/daemonset/app-a-sandbox-prepull', 'app-a-prod/deployment/app-a-umami', 'app-b-prod/deployment/app-b-backend', 'app-b-prod/deployment/app-b-frontend', 'app-c-prod/deployment/app-c-coturn', 'app-c-prod/statefulset/app-c-postgres', 'app-c-prod/deployment/app-c-signaling'] and 25 more. SAs with automount false 1/91",
    "source": "summary.json:security.service_accounts"
   },
   {
@@ -4643,7 +4643,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "DB-like prod PVCs whose PV reclaimPolicy is Delete: ['app-a-prod/app-a-postgres-backup-pvc', 'app-a-prod/data-app-a-postgres-0', 'app-a-prod/data-app-a-redis-0', 'app-c-prod/postgres-data-app-c-postgres-0', 'app-f-prod/app-f-postgres-backup-pvc', 'app-f-prod/app-f-postgres-data-app-f-postgres-0', 'app-f-prod/app-f-postgres-mx-backup-pvc', 'app-f-prod/app-f-postgres-mx-data-app-f-postgres-mx-0', 'app-f-prod/app-f-postgres-vn-backup-pvc', 'app-f-prod/app-f-postgres-vn-data-app-f-postgres-vn-0', 'app-f-prod/app-f-redis-data-app-f-redis-0', 'app-h-prod/app-h-qdrant-data-app-h-qdrant-0'] (17 in total / 19 prod PVCs)",
+   "evidence": "DB-like prod PVCs whose PV reclaimPolicy is Delete: ['app-a-prod/app-a-postgres-backup-pvc', 'app-a-prod/data-app-a-postgres-0', 'app-a-prod/data-app-a-redis-0', 'app-c-prod/postgres-data-app-c-postgres-0', 'app-f-prod/app-f-postgres-backup-pvc', 'app-f-prod/app-f-postgres-data-app-f-postgres-0', 'app-f-prod/app-f-postgres-mx-backup-pvc', 'app-f-prod/app-f-postgres-mx-data-app-f-postgres-mx-0', 'app-f-prod/app-f-postgres-vn-backup-pvc', 'app-f-prod/app-f-postgres-vn-data-app-f-postgres-vn-0', 'app-f-prod/app-f-redis-data-app-f-redis-0', 'app-h-prod/app-h-qdrant-data-app-h-qdrant-0'] and 5 more (17 in total / 19 prod PVCs)",
    "source": "summary.json:storage.pvcs"
   },
   {
@@ -4751,7 +4751,7 @@
    "status": "fail",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "Of 110 workloads, share with standard labels 0.23. prod workloads without: ['app-a-prod/deployment/app-a-backend', 'app-a-prod/deployment/app-a-frontend', 'app-a-prod/deployment/app-a-gateway', 'app-a-prod/deployment/app-a-phoenix', 'app-a-prod/deployment/app-a-umami', 'app-a-prod/deployment/app-m', 'app-b-prod/deployment/app-b-backend', 'app-b-prod/deployment/app-b-frontend', 'app-c-prod/deployment/app-c-coturn', 'app-c-prod/deployment/app-c-signaling', 'app-c-prod/deployment/app-c-web', 'app-f-prod/deployment/app-f'] (85 in total)",
+   "evidence": "Of 110 workloads, share with standard labels 0.23. prod workloads without: ['app-a-prod/deployment/app-a-backend', 'app-a-prod/deployment/app-a-frontend', 'app-a-prod/deployment/app-a-gateway', 'app-a-prod/deployment/app-a-phoenix', 'app-a-prod/deployment/app-a-umami', 'app-a-prod/deployment/app-m', 'app-b-prod/deployment/app-b-backend', 'app-b-prod/deployment/app-b-frontend', 'app-c-prod/deployment/app-c-coturn', 'app-c-prod/deployment/app-c-signaling', 'app-c-prod/deployment/app-c-web', 'app-f-prod/deployment/app-f'] and 51 more (85 in total)",
    "source": "summary.json:hygiene.labels"
   },
   {
@@ -4796,7 +4796,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "prod apps 10, apps whose targetRevision is a branch or HEAD 10 ['argocd/application/app-a-prod', 'argocd/application/app-b-prod', 'argocd/application/app-c', 'argocd/application/app-f-kr', 'argocd/application/app-f-mx', 'argocd/application/app-f-shared', 'argocd/application/app-f-vn', 'argocd/application/app-h'], apps using ignoreDifferences 16",
+   "evidence": "prod apps 10, apps whose targetRevision is a branch or HEAD 10 ['argocd/application/app-a-prod', 'argocd/application/app-b-prod', 'argocd/application/app-c', 'argocd/application/app-f-kr', 'argocd/application/app-f-mx', 'argocd/application/app-f-shared', 'argocd/application/app-f-vn', 'argocd/application/app-h'] and 2 more, apps using ignoreDifferences 16",
    "source": "summary.json:argocdctl.summary"
   },
   {
@@ -5021,7 +5021,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "25 dashboards (170 panel metrics) — 167 of 205 alert-rule metrics have no panel: HA, Non, Skip, Without, aggregator_unavailable_apiservice, aggregator_unavailable_apiservice_total",
+   "evidence": "25 dashboards (170 panel metrics) — 167 of 205 alert-rule metrics have no panel: [, ', H, A, ', ,,  , ', N, o, n, ', ,,  , ', S, k, i, p, ', ,,  , ', W, i, t, h, o, u, t, ', ,,  , ', a, g, g, r, e, g, a, t, o, r, _, u, n, a, v, a, i, l, a, b, l, e, _, a, p, i, s, e, r, v, i, c, e, ', ,,  , ', a, g, g, r, e, g, a, t, o, r, _, u, n, a, v, a, i, l, a, b, l, e, _, a, p, i, s, e, r, v, i, c, e, _, t, o, t, a, l, ', ],  , a, n, d,  , 1, 6, 1,  , m, o, r, e",
    "source": "summary.json:observability.grafana.dashboards_json"
   },
   {
@@ -5030,7 +5030,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "143 of 145 rules did not fire in 15 days (['AlertmanagerClusterCrashlooping', 'AlertmanagerClusterDown', 'AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerFailedReload', 'AlertmanagerFailedToSendAlerts', 'AlertmanagerMembersInconsistent', 'AppQBackendDown', 'AppQClusterCPU50', 'AppQClusterCPU80', 'AppQClusterMem50', 'AppQClusterMem80']…). Fired: []",
+   "evidence": "143 of 145 rules did not fire in 15 days (['AlertmanagerClusterCrashlooping', 'AlertmanagerClusterDown', 'AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerFailedReload', 'AlertmanagerFailedToSendAlerts', 'AlertmanagerMembersInconsistent', 'AppQBackendDown', 'AppQClusterCPU50', 'AppQClusterCPU80', 'AppQClusterMem50', 'AppQClusterMem80'] and 131 more). Fired: []",
    "source": "summary.json:observability.alerts"
   },
   {
@@ -5039,7 +5039,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "29 of 29 ingress backends have no saturation metric (e.g. [('app-a-prod', 'app-a-backend'), ('app-a-prod', 'app-a-frontend'), ('app-a-prod', 'app-a-phoenix'), ('app-a-prod', 'app-a-umami'), ('argocd', 'argocd-server-ingress'), ('app-b-prod', 'app-b-backend')]), namespaces with saturation metrics []",
+   "evidence": "29 of 29 ingress backends have no saturation metric (e.g. [('app-a-prod', 'app-a-backend'), ('app-a-prod', 'app-a-frontend'), ('app-a-prod', 'app-a-phoenix'), ('app-a-prod', 'app-a-umami'), ('argocd', 'argocd-server-ingress'), ('app-b-prod', 'app-b-backend')] and 23 more), namespaces with saturation metrics []",
    "source": "summary.json:observability.golden_signals"
   },
   {
@@ -5048,7 +5048,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "occurrence",
-   "evidence": "202 unclassified error lines (19941 lines scanned, 19 files). Top: [('grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Failed to get settings\" err', 62), ('grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Request error\" error=\"Conte', 62), ('grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Request Completed\" method=G', 62), ('cert-manager | \"challenge in work queue no longer exists\" err=\"challenge.acme.cert-manager.io \\\\\"app-', 3), ('cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certific', 2), ('cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certific', 1)]",
+   "evidence": "202 unclassified error lines (19941 lines scanned, 19 files). Top: [('grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Failed to get settings\" err', 62), ('grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Request error\" error=\"Conte', 62), ('grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Request Completed\" method=G', 62), ('cert-manager | \"challenge in work queue no longer exists\" err=\"challenge.acme.cert-manager.io \\\\\"app-', 3), ('cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certific', 2), ('cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certific', 1)] and 10 more",
    "source": "summary.json:logs"
   },
   {
@@ -5606,7 +5606,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "26 local-path PVs, by node {'node-a': 7, 'node-b': 19}, node disk used {'node-a': None, 'node-b': None}MB. top: [('app-k', 'app-k-postgres-data', 'node-a', None, ['app-k/app-k-postgres']), ('registry', 'registry-data-registry-0', 'node-b', None, ['registry/registry-0']), ('app-g-api', 'app-g-postgres-backup-pvc', 'node-b', None, ['app-g-api/app-g-postgres-backup']), ('app-l-prod', 'app-l-postgres-data', 'node-a', None, ['app-l-prod/app-l-postgres']), ('app-f-prod', 'app-f-postgres-mx-backup-pvc', 'node-a', None, ['app-f-prod/app-f-postgres-mx-backup']), ('app-i-prod', 'app-i-postgres-backup-pvc', 'node-b', None, ['app-i-prod/app-i-postgres-backup']), ('app-f-prod', 'app-f-postgres-vn-data-app-f-postgres-vn-0', 'node-b', None, ['app-f-prod/app-f-postgres-vn-0']), ('app-b-prod', 'app-b-artifacts', 'node-a', None, ['app-b-prod/app-b-backend'])]",
+   "evidence": "26 local-path PVs, by node {'node-a': 7, 'node-b': 19}, node disk used {'node-a': None, 'node-b': None}MB. top: [('app-k', 'app-k-postgres-data', 'node-a', None, \"['app-k/app-k-postgres']\"), ('registry', 'registry-data-registry-0', 'node-b', None, \"['registry/registry-0'] and 1 more\"), ('app-g-api', 'app-g-postgres-backup-pvc', 'node-b', None, \"['app-g-api/app-g-postgres-backup']\"), ('app-l-prod', 'app-l-postgres-data', 'node-a', None, \"['app-l-prod/app-l-postgres']\"), ('app-f-prod', 'app-f-postgres-mx-backup-pvc', 'node-a', None, \"['app-f-prod/app-f-postgres-mx-backup']\"), ('app-i-prod', 'app-i-postgres-backup-pvc', 'node-b', None, \"['app-i-prod/app-i-postgres-backup']\"), ('app-f-prod', 'app-f-postgres-vn-data-app-f-postgres-vn-0', 'node-b', None, \"['app-f-prod/app-f-postgres-vn-0']\"), ('app-b-prod', 'app-b-artifacts', 'node-a', None, \"['app-b-prod/app-b-backend']\")] and 18 more",
    "source": "summary.json:local_path.summary"
   },
   {
@@ -5615,7 +5615,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "19 of 19 prod PVs are Delete ['app-l-prod/app-l-postgres-data', 'app-f-prod/app-f-postgres-mx-backup-pvc', 'app-i-prod/app-i-postgres-backup-pvc', 'app-f-prod/app-f-postgres-vn-data-app-f-postgres-vn-0', 'app-b-prod/app-b-artifacts', 'app-a-prod/data-app-a-redis-0', 'app-f-prod/app-f-postgres-vn-backup-pvc', 'app-h-prod/app-h-qdrant-data-app-h-qdrant-0', 'app-i-prod/app-i-postgres-data-app-i-postgres-0', 'app-f-prod/app-f-redis-data-app-f-redis-0'], StorageClass reclaim {'local-path': 'Delete', 'local-path-node-b': 'Delete'}, default class local-path",
+   "evidence": "19 of 19 prod PVs are Delete ['app-l-prod/app-l-postgres-data', 'app-f-prod/app-f-postgres-mx-backup-pvc', 'app-i-prod/app-i-postgres-backup-pvc', 'app-f-prod/app-f-postgres-vn-data-app-f-postgres-vn-0', 'app-b-prod/app-b-artifacts', 'app-a-prod/data-app-a-redis-0', 'app-f-prod/app-f-postgres-vn-backup-pvc', 'app-h-prod/app-h-qdrant-data-app-h-qdrant-0', 'app-i-prod/app-i-postgres-data-app-i-postgres-0', 'app-f-prod/app-f-redis-data-app-f-redis-0'] and 9 more, StorageClass reclaim {'local-path': 'Delete', 'local-path-node-b': 'Delete'}, default class local-path",
    "source": "summary.json:local_path.summary"
   },
   {

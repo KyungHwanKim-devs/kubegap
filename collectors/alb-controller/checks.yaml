@@ -1232,7 +1232,7 @@
     needs_reason: "metrics not read"
     warn_expr: "((item['aws_api_retries_avg'] or 0) >= 0.1 or (item['rest_client_429_503'] or 0) >= 100)"
   target: "'cluster'"
-  evidence: "f\"AWS API calls since leader start {item['aws_api_calls_total']}, top {item['aws_api_top_ops'][:5] if item['aws_api_top_ops'] else None}, average retries per call {item['aws_api_retries_avg']}, slowest by average latency {item['aws_api_slow_ops_avg_s'][:3] if item['aws_api_slow_ops_avg_s'] else None}, apiserver 429/503 {item['rest_client_429_503']}\""
+  evidence: "f\"AWS API calls since leader start {item['aws_api_calls_total']}, top {shown(item['aws_api_top_ops'], 5) if item['aws_api_top_ops'] else None}, average retries per call {item['aws_api_retries_avg']}, slowest by average latency {shown(item['aws_api_slow_ops_avg_s'], 3) if item['aws_api_slow_ops_avg_s'] else None}, apiserver 429/503 {item['rest_client_429_503']}\""
   severity_default: low
   symptom_linked: false
   why: >

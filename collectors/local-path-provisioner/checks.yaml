@@ -41,7 +41,7 @@
   rule:
     warn_expr: "(item.get('pv_count') or 0) > 0"
   target: "'cluster'"
-  evidence: "f\"{item.get('pv_count')} local-path PVs, by node {item.get('by_node')}, node disk used {item.get('node_total_mb')}MB. top: {[(p['namespace'], p['pvc'], p['node'], p['used_mb'], p['workloads'][:1]) for p in (item.get('pinned') or [])[:8]]}\""
+  evidence: "f\"{item.get('pv_count')} local-path PVs, by node {item.get('by_node')}, node disk used {item.get('node_total_mb')}MB. top: {shown([(p['namespace'], p['pvc'], p['node'], p['used_mb'], shown(p['workloads'], 1)) for p in (item.get('pinned') or [])], 8)}\""
   severity_default: low
   symptom_linked: false
   why: A local-path volume is a node directory and cannot move. If that node dies, the StatefulSet or DB using it cannot start on another node. This is the small k3s cluster's "N+1" list. The longer the list, the larger the blast radius of a single node.
@@ -750,7 +750,7 @@
   rule:
     warn_expr: "len(item['orphan_dirs']) > 0 or len(item['released']) > 0"
   target: "'cluster'"
-  evidence: "f\"directories without a PV {[(o['node'], o['dir'], o['mb']) for o in item['orphan_dirs']][:8]} (total {item['orphan_mb']}MB), Released/Failed PVs {item['released']}, directories per node {item['node_dirs']} vs PVs {item['by_node']}\""
+  evidence: "f\"directories without a PV {shown([(o['node'], o['dir'], o['mb']) for o in item['orphan_dirs']], 8)} (total {item['orphan_mb']}MB), Released/Failed PVs {item['released']}, directories per node {item['node_dirs']} vs PVs {item['by_node']}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -1163,7 +1163,7 @@
   rule:
     warn_expr: "len(item['prod_pvs_delete_reclaim']) > 0"
   target: "'cluster'"
-  evidence: "f\"{len(item['prod_pvs_delete_reclaim'])} of {item['prod_pvs']} prod PVs are Delete {item['prod_pvs_delete_reclaim'][:10]}, StorageClass reclaim {item['reclaim_policies']}, default class {item['default_class']}\""
+  evidence: "f\"{len(item['prod_pvs_delete_reclaim'])} of {item['prod_pvs']} prod PVs are Delete {shown(item['prod_pvs_delete_reclaim'], 10)}, StorageClass reclaim {item['reclaim_policies']}, default class {item['default_class']}\""
   severity_default: low
   symptom_linked: false
   why: >

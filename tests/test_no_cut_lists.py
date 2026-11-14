@@ -68,3 +68,19 @@ def test_a_summary_row_holds_as_many_as_the_raw_objects_do():
                     if o["metadata"]["namespace"] == ns and f'"{name}"' in json.dumps(o.get("spec")):
                         users.add(o["metadata"]["name"])
             assert len(row["mounted_by"]) == len(users), (row["target"], sorted(users), row["mounted_by"])
+
+
+def test_an_evidence_sentence_that_shows_part_of_a_list_says_how_many_more():
+    from lib.judgement.evaluate.evidence import shown
+
+    assert shown(["a", "b"], 6) == "['a', 'b']"
+    assert shown(list("abcdefgh"), 3) == "['a', 'b', 'c'] and 5 more"
+    assert shown("x" * 10, 4) == "xxxx…" and shown(None, 3) == "[]"
+    # the check definitions do not cut a list by hand: they call shown(), which names the remainder
+    import re
+
+    for path in sorted(Path("collectors").glob("*/checks.yaml")):
+        for n, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if line.lstrip().startswith(("evidence:", "target:")):
+                left = [m.group(0) for m in re.finditer(r"\w+(?:\['\w+'\])?\[:\d+\]", line) if not m.group(0).startswith(("s[", "e['pattern']", "item['changed_at']"))]
+                assert left == [], f"{path}:{n}: {left} cuts a list in an evidence sentence; use shown(list, n)"

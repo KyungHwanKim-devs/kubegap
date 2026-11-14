@@ -925,7 +925,7 @@
     expr: "item.get('role') == 'server' and ((item.get('server') or {}).get('certificates_min_days_left') is not None) and (item.get('server') or {}).get('certificates_min_days_left') < 30"
     warn_expr: "item.get('role') == 'server' and ((item.get('server') or {}).get('certificates_min_days_left') is not None) and (item.get('server') or {}).get('certificates_min_days_left') < 90"
   target: "item['node']"
-  evidence: "f\"earliest expiry in {(item.get('server') or {}).get('certificates_min_days_left')} days. Expiring within 90 days: {[(c['file'], c['name'], c['days_left']) for c in (item.get('server') or {}).get('certificates_expiring_90d') or []][:6]}\""
+  evidence: "f\"earliest expiry in {(item.get('server') or {}).get('certificates_min_days_left')} days. Expiring within 90 days: {shown([(c['file'], c['name'], c['days_left']) for c in (item.get('server') or {}).get('certificates_expiring_90d') or []], 6)}\""
   severity_default: high
   symptom_linked: false
   why: k3s renews certificates that are expired or within 120 days of expiring every time it starts (90 days before the May 2025 releases v1.33.1+k3s1, v1.32.5+k3s1, v1.31.9+k3s1, v1.30.13+k3s1; https://docs.k3s.io/cli/certificate). Certificates are valid for 365 days. So if it runs a year without a restart, the certificates simply expire and the cluster stops (a classic failure in small k3s clusters where k3s has been up for over a year).

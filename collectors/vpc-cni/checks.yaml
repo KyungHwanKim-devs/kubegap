@@ -824,7 +824,7 @@
   rule:
     warn_expr: "len(item['metrics_unavailable_nodes']) > 0"
   target: "'cluster'"
-  evidence: "f\"{len(item['metrics_unavailable_nodes'])} of {item['nodes']} nodes without readable ipamd metrics (localhost:61678): {item['metrics_unavailable_nodes'][:6]}\""
+  evidence: "f\"{len(item['metrics_unavailable_nodes'])} of {item['nodes']} nodes without readable ipamd metrics (localhost:61678): {shown(item['metrics_unavailable_nodes'], 6)}\""
   severity_default: low
   symptom_linked: false
   why: >

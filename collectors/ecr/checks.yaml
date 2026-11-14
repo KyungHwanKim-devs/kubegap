@@ -10,7 +10,7 @@
     expr: "len(item['repos_scan_off_prod']) > 0 and not item['registry_scan_on_push']"
     warn_expr: "len(item['repos_scan_off']) > 0 and not item['registry_scan_on_push']"
   target: "'ecr/registry/' + str(item['account'])"
-  evidence: "f\"registry scanning {item['scan_type']} (rules {item['scan_rules']}), repositories with scanOnPush off {len(item['repos_scan_off'])}/{item['repositories']} (used by prod {len(item['repos_scan_off_prod'])}: {item['repos_scan_off_prod'][:6]}…), scanned images {item['images_scanned']}/{item['images']}, CRITICAL+HIGH {item['critical_high_findings']}\""
+  evidence: "f\"registry scanning {item['scan_type']} (rules {item['scan_rules']}), repositories with scanOnPush off {len(item['repos_scan_off'])}/{item['repositories']} (used by prod {len(item['repos_scan_off_prod'])}: {shown(item['repos_scan_off_prod'], 6)}), scanned images {item['images_scanned']}/{item['images']}, CRITICAL+HIGH {item['critical_high_findings']}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -753,7 +753,7 @@
   rule:
     warn_expr: "len(item['repos_mutable_prod']) > 0"
   target: "'ecr/registry/' + str(item['account'])"
-  evidence: "f\"MUTABLE repositories {len(item['repos_mutable'])}/{item['repositories']}, used by prod {len(item['repos_mutable_prod'])}: {item['repos_mutable_prod'][:8]}…, digest-pinned containers {item['digest_pinned']}/{item['images_in_use']}, repositories with a latest tag {item['repos_with_latest_tag']}\""
+  evidence: "f\"MUTABLE repositories {len(item['repos_mutable'])}/{item['repositories']}, used by prod {len(item['repos_mutable_prod'])}: {shown(item['repos_mutable_prod'], 8)}, digest-pinned containers {item['digest_pinned']}/{item['images_in_use']}, repositories with a latest tag {item['repos_with_latest_tag']}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -2612,7 +2612,7 @@
   rule:
     warn_expr: "(item['dockerhub_images'] or 0) >= 5 and len(item['pull_through_cache_rules']) == 0"
   target: "'ecr/registry/' + str(item['account'])"
-  evidence: "f\"registry distribution of container images {item['images_by_registry']}, docker.io images {item['dockerhub_images']} (e.g. {item['dockerhub_sample'][:4]}), pull-through cache rules {item['pull_through_cache_rules']}, replication rules {item['replication_rules']}\""
+  evidence: "f\"registry distribution of container images {item['images_by_registry']}, docker.io images {item['dockerhub_images']} (e.g. {shown(item['dockerhub_sample'], 4)}), pull-through cache rules {item['pull_through_cache_rules']}, replication rules {item['replication_rules']}\""
   severity_default: medium
   symptom_linked: false
   why: >
