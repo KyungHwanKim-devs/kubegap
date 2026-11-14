@@ -21,7 +21,7 @@
   cases:
     - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-25-prometheus-on-live-cluster-down.html }
     - { who: Saifeddine Rajhi 2024, url: https://seifrajhi.github.io/blog/prometheus-manage-memory-overload/ }
-  suggest: "Raise the limit (head series × about 8KB + compaction headroom) or reduce cardinality (prometheus.cardinality). Precompute long-range Grafana panels with recording rules."
+  suggest: "Raise the limit (about 2GiB per million head series for cardinality plus about 2.5GiB per million for ingestion at a 15s scrape interval, https://www.robustperception.io/how-much-ram-does-prometheus-2-x-need-for-cardinality-and-ingestion/, with headroom for compaction and queries) or reduce cardinality (prometheus.cardinality). Precompute long-range Grafana panels with recording rules."
   verify:
     - "kubectl -n monitoring top pod -l app.kubernetes.io/name=prometheus --containers"
     - "kubectl -n monitoring get pod -l app.kubernetes.io/name=prometheus -o jsonpath='{.items[*].status.containerStatuses[?(@.name==\"prometheus\")].lastState}'"

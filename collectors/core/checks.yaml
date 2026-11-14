@@ -49,7 +49,7 @@
     - { who: Airbnb 2020, url: https://www.youtube.com/watch?v=4CT0cI62YHk }
     - { who: Airbnb 2019, url: https://www.youtube.com/watch?v=QXApVwRBeys }
   suggest: >
-    Remove the CPU limit and keep only the request, or set request=limit (Guaranteed). For JVM and Go, first align the thread count (GOMAXPROCS) with the limit.
+    Remove the CPU limit and keep only the request. Setting request=limit does not help: a CPU limit is enforced by throttling whatever the QoS class. For JVM and Go, first align the thread count (GOMAXPROCS) with the limit.
     A warn that says "this moment" needs no change yet; watch whether the 24-hour value follows.
   verify:
     - "sum by (namespace, pod, container) (increase(container_cpu_cfs_throttled_periods_total[24h])) / sum by (namespace, pod, container) (increase(container_cpu_cfs_periods_total[24h]))"
@@ -1789,7 +1789,7 @@
   evidence: "f\"conntrack usage {value:.2f}\""
   severity_default: high
   symptom_linked: true
-  why: When the conntrack table is full, new connections are silently dropped. No error logs, only more timeouts. The kube-proxy default is 32768 per core, which is too small for network-heavy nodes.
+  why: When the conntrack table is full, new connections are silently dropped. No error logs, only more timeouts. kube-proxy sets the limit to 32768 per core (--conntrack-max-per-core) with a floor of 131072 (--conntrack-min), so nodes of up to 4 cores get 131072; that is small for network-heavy nodes.
   cases:
     - { who: loveholidays 2020, url: https://deploy.live/blog/kubernetes-networking-problems-due-to-the-conntrack/ }
   suggest: "Raise the node sysctl net.netfilter.nf_conntrack_max (kube-proxy --conntrack-max-per-core) and shorten timeouts."
@@ -1842,7 +1842,7 @@
   evidence: "f\"usage {value:.2f}\""
   severity_default: high
   symptom_linked: false
-  why: The kubelet raises DiskPressure and evicts pods at nodefs.available<10% and imagefs.available<15%. Container logs (/var/log/pods) and images are the usual culprits.
+  why: The kubelet raises DiskPressure and evicts pods at nodefs.available<10%, imagefs.available<15% and nodefs.inodesFree<5% (the Linux defaults). Image garbage collection starts earlier, at 85% usage. Container logs (/var/log/pods) and images are the usual culprits.
   cases:
     - { who: Saltside 2017, url: https://medium.com/saltside-engineering/our-first-kubernetes-outage-c6b9249cfd3a }
     - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-09-18-lack-of-diskspace.html }
@@ -10825,12 +10825,12 @@
   each: security.secrets
   cluster_level: true
   rule:
-    expr: "item.get('platform') == 'eks' and item.get('kms_encryption') is not None and not item['kms_encryption'].get('enabled')"
+    expr: "item.get('platform') == 'eks' and item.get('kms_encryption') is not None and not item['kms_encryption'].get('enabled') and item['kms_encryption'].get('default_envelope') is False"
   target: "'cluster'"
   evidence: "f\"describe-cluster encryptionConfig {item.get('kms_encryption')}\""
   severity_default: high
   symptom_linked: false
-  why: Secrets in etcd are base64 by default (not encryption). EKS encrypts the etcd disk on every cluster, and on Kubernetes 1.28 and later it envelope-encrypts all API data by default with an AWS owned key (https://docs.aws.amazon.com/eks/latest/userguide/envelope-encryption.html). What this check reports is that no customer managed KMS key is associated: the key cannot be audited in CloudTrail or disabled by the account. On 1.27 and lower nothing is envelope-encrypted without it. A key can be associated after creation and not removed.
+  why: Secrets in etcd are base64 by default (not encryption). EKS encrypts the etcd disk on every cluster, and on Kubernetes 1.28 and later it envelope-encrypts all API data by default with an AWS owned key (https://docs.aws.amazon.com/eks/latest/userguide/envelope-encryption.html). So the check fails only on 1.27 and lower with no KMS key associated, where nothing is envelope-encrypted. On 1.28 and later a cluster without a key of its own is encrypted with the AWS owned key and passes; a customer managed key adds CloudTrail records of its use and the power to disable it. A key can be associated after creation and not removed.
   suggest: "aws eks associate-encryption-config --cluster-name <c> --encryption-config '[{\"resources\":[\"secrets\"],\"provider\":{\"keyArn\":\"<kms>\"}}]' (suggestion only)."
   verify:
     - "aws eks describe-cluster --name <c> --query 'cluster.encryptionConfig'"
@@ -10849,6 +10849,15 @@
             enabled: false
             resources: []
             key: null
+            default_envelope: false
+          platform: "eks"
+      - expect: "pass"  # 1.28 and later: encrypted with the AWS owned key although no key is associated
+        item:
+          kms_encryption:
+            enabled: false
+            resources: []
+            key: null
+            default_envelope: true
           platform: "eks"
       - expect: "pass"
         item:
@@ -11027,7 +11036,7 @@
     Workloads using IRSA or Pod Identity do not need IMDS.
   measured: >
     Measured on a 7-node EKS cluster: all nodes at hop 2 (tokens required), 6 IRSA SAs.
-  suggest: "Karpenter EC2NodeClass spec.metadataOptions.httpPutResponseHopLimit 1, and 1 in the managed node group launch template as well. Only hostNetwork pods (CNI, CSI) need IMDS and they work with hop 1."
+  suggest: "Karpenter EC2NodeClass spec.metadataOptions.httpPutResponseHopLimit 1, and 1 in the managed node group launch template as well. Only hostNetwork pods (CNI, CSI) need IMDS and they work with hop 1. The AWS Load Balancer Controller reads the region and the VPC from IMDS unless `--aws-region` and `--aws-vpc-id` are set; set them before lowering the hop limit."
   verify:
     - "aws ec2 describe-instances --filters Name=tag:kubernetes.io/cluster/<c>,Values=owned --query 'Reservations[].Instances[].MetadataOptions.HttpPutResponseHopLimit'"
   platforms: [eks, other]
@@ -11147,10 +11156,12 @@
   symptom_linked: true
   why: >
     When a DB volume fills up, writes fail and the DB usually drops to read-only or dies. 85% is the line where expansion (allowVolumeExpansion) should start; expansion is online but the filesystem resize takes a few minutes.
-    kubelet only reports mounted volumes (kubelet_volume_stats), so PVCs without metrics are not judged, and local-path is excluded because it reports the whole node disk (node.disk-usage covers that).
+    kubelet only reports mounted volumes (kubelet_volume_stats), so PVCs without metrics are not judged, and local-path is excluded: where the kubelet reports stats for such a volume they are those of the node filesystem, and for others it reports none (node.disk-usage covers the node disk).
   cases:
     - { who: BC Government 2025, url: https://github.com/bcgov/klamm/wiki/Incident-Post%E2%80%90Mortem-Template }
     - { who: AdGuard VPN 2025, url: https://adguard-vpn.com/en/blog/redis-kubernetes-vpn-incident-post-mortem.html }
+  measured: >
+    Measured on a k3s cluster (2026-11-14): three local-path PVCs on one node all showed the same used ratio, 0.684, the node filesystem's; other local-path PVCs had no kubelet_volume_stats series.
   suggest: "Raise PVC spec.resources.requests.storage (needs StorageClass allowVolumeExpansion -- storage.no-volume-expansion). For a DB, also clean up old data and logs."
   verify:
     - "kubelet_volume_stats_used_bytes{persistentvolumeclaim=\"<pvc>\"} / kubelet_volume_stats_capacity_bytes"
@@ -11821,8 +11832,8 @@
   evidence: "f\"Node {item['node']}: attached {item['attached']}/{item['limit']} ({item['ratio']}), pods using PVCs {item['pvc_pods']}, driver {item['driver']}\""
   severity_default: high
   symptom_linked: true
-  why: Each instance type has a fixed number of attachable volumes (CSINode allocatable.count, usually 25-28, shared with ENIs). At the limit, PVC pods scheduled to that node stay Pending with FailedAttachVolume. It happens on nodes where StatefulSets concentrate.
-  suggest: "Spread PVC pods across nodes with topologySpread, use larger instances or add nodes. VPC CNI prefix delegation reduces ENI consumption and raises the limit."
+  why: Each instance type has a fixed number of attachable volumes (CSINode allocatable.count). Most Nitro types allow 28 attachments shared between EBS volumes, network interfaces and NVMe instance store volumes; M7i, C7i, R7i and newer families have a dedicated EBS limit that grows with the size (https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html). At the limit, PVC pods scheduled to that node stay Pending with FailedAttachVolume. It happens on nodes where StatefulSets concentrate.
+  suggest: "Spread PVC pods across nodes with topologySpread, use larger instances or add nodes. On shared-limit instance types every network interface takes one of the slots."
   verify:
     - "kubectl get csinodes -o custom-columns=NODE:.metadata.name,LIMIT:.spec.drivers[0].allocatable.count; kubectl get volumeattachments | awk '{print $4}' | sort | uniq -c"
   platforms: [eks, other]
@@ -14013,7 +14024,7 @@
   severity_default: high
   symptom_linked: false
   why: >
-    EKS etcd is invisible, but the apiserver reports the DB size as apiserver_storage_size_bytes. EKS etcd becomes read-only at 8GiB and the cluster stops. Events, completed Jobs and CR status (Argo CD Application, cert-manager Order, etc.) are the usual culprits. For the small k3s cluster's embedded etcd, platform.k3s-datastore-large sees the same via du.
+    EKS etcd is invisible, but the apiserver reports the size of the database file as apiserver_storage_size_bytes. That is the file on disk, free space left by compaction included. What makes EKS etcd read-only is the space in use, etcd_mvcc_db_total_size_in_use_in_bytes, which AWS publishes only in CloudWatch (AWS/EKS) and kubegap does not read (https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html). So this check can fail on a file that is large from fragmentation while the space in use is smaller: it says the database is large, and the CloudWatch metric says how close the quota is. Events, completed Jobs and CR status (Argo CD Application, cert-manager Order, etc.) are the usual culprits. For the small k3s cluster's embedded etcd, platform.k3s-datastore-large sees the same via du.
   measured: >
     Measured: apiserver_storage_size_bytes was exposed on EKS 1.32.
     Measured: 108 MiB on the EKS cluster, 38 MiB on the small k3s cluster -> pass.
@@ -14023,6 +14034,7 @@
   suggest: "Clean up the resources that pile up per summary.controlplane.apiserver_metrics.storage_objects_top (ttlSecondsAfterFinished, event TTL, CR retention count). If self-managed, etcdctl defrag."
   verify:
     - "apiserver_storage_size_bytes"
+    - "CloudWatch AWS/EKS etcd_mvcc_db_total_size_in_use_in_bytes (the size the quota is enforced on)"
     - "topk(10, apiserver_resource_objects) (apiserver_storage_objects before Kubernetes 1.34)"
   test:
     cases:
@@ -17100,7 +17112,7 @@
   severity_default: { small: medium, medium: high, large: high }
   symptom_linked: false
   why: >
-    If ports like 5432, 3306, 6379, 27017 or 9092 are open on an internet-facing LB or a NodePort, which listens on every node interface, a single password is all that stands in the way.
+    If ports like 5432, 3306, 6379, 27017 or 9092 are open on an internet-facing LB or a NodePort, which kube-proxy's iptables mode makes reachable on all local addresses of every node (the nftables mode defaults to the node's primary addresses), a single password is all that stands in the way.
     On AWS the security groups of the load balancer decide who can connect, so the check reads their inbound TCP rules against the listener ports: a database port reachable from everywhere, through 0.0.0.0/0, ::/0 or CIDRs that together cover the whole space, is open and fails;
     a load balancer without security groups of its own fails too, since only the targets' groups filter it and the check does not read those; rules that could not be read, or a Service whose address matches no described load balancer, fail with that said in the evidence, since the Service definition alone cannot clear it.
     Only the database ports decide: an open 443 next to an allow-listed 5432 does not make the row open.
@@ -17654,7 +17666,7 @@
   severity_default: high
   nature: occurrence
   symptom_linked: true
-  why: SERVFAIL means upstream DNS failure, a plugin error or a loop. Apps experience it as connection failures or 5-second retries. It is a shared dependency that affects every external and internal call in the cluster.
+  why: SERVFAIL means the upstream DNS failed or a plugin returned an error. (A forwarding loop shows differently: the loop plugin halts CoreDNS and the pod goes into CrashLoopBackOff, https://coredns.io/plugins/loop/.) Apps experience it as connection failures or 5-second retries. It is a shared dependency that affects every external and internal call in the cluster.
   suggest: "CoreDNS logs `kubectl -n kube-system logs deploy/coredns | grep SERVFAIL`, upstream health (the VPC resolver in /etc/resolv.conf), replicas and CPU limit."
   verify:
     - "sum(rate(coredns_dns_responses_total{rcode=\"SERVFAIL\"}[5m])) / sum(rate(coredns_dns_responses_total[5m]))"
@@ -17795,7 +17807,7 @@
           note: null
 
 - id: scaling.metrics-api-unavailable
-  name: Metrics API (metrics-server, external metrics) is not responding (all HPAs stopped)
+  name: Metrics API (metrics-server, external metrics) is not responding (HPAs that read it stop)
   area: scaling
   type: summary
   each: scaling.metrics_api.unavailable
@@ -17806,7 +17818,7 @@
   severity_default: critical
   symptom_linked: true
   why: >
-    CPU and memory HPAs read the values metrics-server serves at `v1beta1.metrics.k8s.io` every 15 seconds. If this APIService is not Available, every HPA freezes at `unknown` and `kubectl top` fails too.
+    CPU and memory HPAs read the values metrics-server serves at `v1beta1.metrics.k8s.io` every 15 seconds. If this APIService is not Available, an HPA whose metrics all come from it shows `unknown` and stops scaling, and `kubectl top` fails too. An HPA with several metrics still scales up when one that works asks for it, and skips every scale-down (https://kubernetes.io/docs/concepts/workloads/autoscaling/horizontal-pod-autoscale/).
     With KEDA the same applies to `v1beta1.external.metrics.k8s.io`. It is the quietest reason replicas do not grow when traffic does.
   suggest: "Check the conditions in `kubectl get apiservice v1beta1.metrics.k8s.io -o yaml` and the metrics-server pod logs. Look at certificates, network policies and access to kubelet port 10250."
   verify:
@@ -17835,7 +17847,7 @@
   symptom_linked: true
   why: >
     ScalingActive=False means the HPA cannot compute its target metric (FailedGetResourceMetric: missing requests or a metrics-server problem; FailedGetExternalMetric: a KEDA/adapter problem).
-    In this state replicas stay frozen at the current value. HPAs created by KEDA (keda-hpa-*) are excluded because ScalingDisabled is normal while the ScaledObject is inactive.
+    In this state replicas stay frozen at the current value. The condition is also False when the target was scaled to 0 by hand while minReplicas is above 0: the HPA is then paused on purpose until the replica count is set again. HPAs created by KEDA (keda-hpa-*) are excluded because ScalingDisabled is normal while the ScaledObject is inactive.
   suggest: "Conditions and Events in `kubectl describe hpa -n <ns> <name>`. Add requests if missing; for external metrics, look at the ScaledObject and TriggerAuthentication."
   verify:
     - "kubectl get hpa -A | grep -i unknown"

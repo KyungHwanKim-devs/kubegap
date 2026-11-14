@@ -293,7 +293,7 @@
     - { who: Freshworks 2025, url: https://medium.com/freshworks-engineering-blog/decoding-coredns-failures-75ebdc89ac0b }
     - { who: Backpackr 2025, url: https://aws.amazon.com/ko/blogs/tech/optimizing-amazon-eks-journey-of-backpackr-part1 }
     - { who: Oath 2018, url: https://www.youtube.com/watch?v=likHm-KHGWQ }
-  suggest: "replicas 2 or more + podAntiAffinity (hostname) or topologySpread + PDB (minAvailable 1). On k3s, override the coredns Deployment with HelmChartConfig/kustomize."
+  suggest: "replicas 2 or more + podAntiAffinity (hostname) or topologySpread + PDB (minAvailable 1). On k3s the packaged coredns manifest is rewritten at every start, so an edit does not last (https://docs.k3s.io/installation/packaged-components): start k3s with --disable=coredns and deploy your own CoreDNS."
   verify:
     - "kubectl get pods -n kube-system -l k8s-app=kube-dns -o wide ; kubectl get pdb -n kube-system"
   test:

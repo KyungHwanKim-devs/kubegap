@@ -1146,10 +1146,10 @@
   severity_default: high
   symptom_linked: true
   why: >
-    Certificates from the staging ACME server chain to the "(STAGING) Let's Encrypt" root, so every browser warns. A common incident is an ingress whose issuerRef was never switched to production after testing. cert-manager may not reissue the Secret after the change, so the Secret may need deleting.
+    Certificates from the staging ACME server chain to the "(STAGING) Let's Encrypt" root, so every browser warns. A common incident is an ingress whose issuerRef was never switched to production after testing. After the issuerRef is changed cert-manager reissues, because the issuer annotations on the Secret no longer match the Certificate (https://cert-manager.io/docs/faq/).
   measured: >
     Measured on a real k3s cluster: 0 → pass.
-  suggest: "Change the Certificate's issuerRef to production and trigger reissuance with kubectl delete secret <tls>."
+  suggest: "Change the Certificate's issuerRef to production; cert-manager reissues on its own. If it does not, `cmctl renew <certificate>`."
   verify:
     - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ISSUER:.spec.issuerRef.name | grep -i staging"
   test:

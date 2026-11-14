@@ -193,7 +193,8 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
                 "imds_tokens": md.get("httpTokens"),
                 "root_volume_gb": quantity(root.get("volumeSize")) / 1024**3 if root.get("volumeSize") else None,
                 "root_volume_type": root.get("volumeType"),
-                "root_encrypted": root.get("encrypted"),
+                # no mapping written: Karpenter applies its default, encrypted for every family but Custom (https://karpenter.sh/docs/concepts/nodeclasses/)
+                "root_encrypted": root.get("encrypted") if bdms else (None if str(sp.get("amiFamily") or "").lower() == "custom" else True),
                 "detailed_monitoring": sp.get("detailedMonitoring"),
                 "user_data": bool(sp.get("userData")),
                 "ready": conds.get("Ready") == "True",

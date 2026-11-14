@@ -62524,7 +62524,8 @@
     "resources": [
      "secrets"
     ],
-    "key": "arn:aws:kms:ap-northeast-2:<account>:key/70d52ce2-3322-4ba1-8896-2fa69c88d29b"
+    "key": "arn:aws:kms:ap-northeast-2:<account>:key/70d52ce2-3322-4ba1-8896-2fa69c88d29b",
+    "default_envelope": true
    },
    "platform": "eks"
   },

@@ -1074,7 +1074,7 @@
     - { who: Skyscanner 2021, url: https://medium.com/@SkyscannerEng/how-a-couple-of-characters-brought-down-our-site-356ccaf1fbc3 }
     - { who: InfluxData 2023, url: https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/ }
     - { who: Argo CD issue 28630 2026, url: https://github.com/argoproj/argo-cd/issues/28630 }
-  suggest: "Annotate Namespaces with argocd.argoproj.io/sync-options: Prune=false, or create namespaces via syncOptions CreateNamespace=true and remove them from the manifests. Move CRDs into a separate Application with prune off. Also review the Application finalizer in Argo CD 2.6+ and preservedResourcesOnDeletion on ApplicationSets."
+  suggest: "Annotate Namespaces with argocd.argoproj.io/sync-options: Prune=false, or create namespaces via syncOptions CreateNamespace=true and remove them from the manifests. Prune=false guards the prune path only: a sync with force replaces the object and can still delete and recreate a Namespace another Application shares (argo-cd issue 28630, closed as a duplicate of 29739). Move CRDs into a separate Application with prune off. Also review the Application finalizer in Argo CD 2.6+ and preservedResourcesOnDeletion on ApplicationSets."
   verify:
     - "kubectl get applications.argoproj.io -A -o json | jq -r '.items[] | select(.spec.syncPolicy.automated.prune==true) | .metadata.name as $n | .status.resources[]? | select(.kind==\"Namespace\" or .kind==\"CustomResourceDefinition\") | $n+\" \"+.kind+\"/\"+.name'"
   test:

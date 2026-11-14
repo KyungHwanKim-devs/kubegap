@@ -128,7 +128,7 @@
     - "node_nf_conntrack_entries: prometheus/node_exporter collector/conntrack_linux.go:63@v1.7.0, :62@v1.10.2, :49@v1.12.1 (conntrack collector, on by default: collector/conntrack_linux.go:56@v1.7.0, :55@v1.10.2, :44@v1.12.1)"
     - "node_nf_conntrack_entries_limit: prometheus/node_exporter collector/conntrack_linux.go:68@v1.7.0, :67@v1.10.2, :54@v1.12.1 (conntrack collector, on by default: collector/conntrack_linux.go:56@v1.7.0, :55@v1.10.2, :44@v1.12.1)"
 - id: disk_usage_ratio
-  why: Node filesystem usage (root, container data). From 0.85 the kubelet starts image GC and eviction
+  why: Node filesystem usage (root, container data). From 0.85 the kubelet starts image GC (imageGCHighThresholdPercent 85); eviction starts when 10% is left
   query: >
     max by (instance, mountpoint) (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660", mountpoint!~"/boot.*|/run.*|/snap.*"}
       / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs|iso9660", mountpoint!~"/boot.*|/run.*|/snap.*"})

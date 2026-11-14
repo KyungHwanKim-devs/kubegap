@@ -18,7 +18,7 @@
     Without the controller, new PVC provisioning, attach after node replacement, snapshots and expansion all stop — when a node dies and a StatefulSet moves, the PV cannot attach to the new node and the pod stays Pending. The default is 2 replicas with leader election; if both are on the same node, both disappear when that node fails.
   measured: >
     Measured on a real EKS cluster: 2/2 on different nodes (both system nodes without SSM registration).
-  suggest: "Keep replicas 2 and confirm podAntiAffinity (present in the defaults). Also check that the node plugin (ebs-csi-node) is Ready on every node."
+  suggest: "Keep replicas 2 and make the podAntiAffinity required or add a topology spread constraint: the chart default is a preferred anti-affinity on the host name, which still lets both replicas share a node. Also check that the node plugin (ebs-csi-node) is Ready on every node."
   verify:
     - "kubectl get deploy -n kube-system ebs-csi-controller -o wide ; kubectl get ds -n kube-system ebs-csi-node"
   platforms: [eks]

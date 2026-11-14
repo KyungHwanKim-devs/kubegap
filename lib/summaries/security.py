@@ -9,6 +9,7 @@ secrets (plaintext env candidates, variable names only; ExternalSecrets not sync
 
 from __future__ import annotations
 
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -260,7 +261,15 @@ def _secrets(snap: Path, prod: set, platform: str | None) -> dict:
     dc = load_json(snap / "aws" / "describe-cluster.json")
     if dc:
         enc = (dc.get("cluster") or {}).get("encryptionConfig") or []
-        kms = {"enabled": bool(enc), "resources": [r for e in enc for r in (e.get("resources") or [])], "key": ((enc[0].get("provider") or {}).get("keyArn") if enc else None)}
+        # EKS envelope-encrypts all API data with an AWS owned key from Kubernetes 1.28 on, whether or not a key is associated
+        # (https://docs.aws.amazon.com/eks/latest/userguide/envelope-encryption.html); describe-cluster shows encryptionConfig only for a customer managed key
+        minor = re.match(r"1\.(\d+)", str((dc.get("cluster") or {}).get("version") or ""))
+        kms = {
+            "enabled": bool(enc),
+            "resources": [r for e in enc for r in (e.get("resources") or [])],
+            "key": ((enc[0].get("provider") or {}).get("keyArn") if enc else None),
+            "default_envelope": (int(minor.group(1)) >= 28) if minor else None,
+        }
     return {
         "plaintext_env": plain,
         "plaintext_env_prod": [p["workload"] + ":" + p["container"] for p in plain if p["prod"]],
