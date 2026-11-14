@@ -98,7 +98,7 @@ def main() -> None:
                     page.screenshot(path=f"{tmp}/f{n:04d}.png")
                     n += 1
                 flt = "fps=6,scale=720:-1:flags=lanczos,split[s0][s1];[s0]palettegen=max_colors=24[p];[s1][p]paletteuse=dither=none"
-                r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", "6", "-i", f"{tmp}/f%04d.png", "-vf", flt, str(MEDIA / name)], capture_output=True, text=True)
+                r = subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-framerate", "6", "-i", f"{tmp}/f%04d.png", "-vf", flt, str(MEDIA / name)], check=False, capture_output=True, text=True)
                 if r.returncode:
                     sys.exit(f"ffmpeg failed: {r.stderr[-300:]}")
             page.close()
