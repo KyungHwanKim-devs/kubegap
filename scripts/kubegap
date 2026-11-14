@@ -108,11 +108,14 @@ def cmd_questions(args) -> int:
 
     ctx, ctx_dir, setup, cfg = _first_run_state(args)
     lang = _language(args, cfg)
-    qs = _firstrun.questions(setup, cfg, ctx_dir, all_=args.all, language=lang)
+    # the questions of the run that `setup` was made for: a daily run asks only its two (setup.json records the mode); --all lists every one
+    mode = "full" if args.all else setup.get("mode") or "full"
+    qs = _firstrun.questions(setup, cfg, ctx_dir, all_=args.all, language=lang, mode=mode)
     if args.json:
         print(json.dumps(qs, ensure_ascii=False, indent=1))
     else:
-        print(_firstrun.render(qs, ctx, _firstrun.skipped(setup, cfg, ctx_dir, language=lang), _firstrun.noted(setup, cfg, ctx_dir, language=lang), language=lang))
+        daily = mode == "daily"
+        print(_firstrun.render(qs, ctx, [] if daily else _firstrun.skipped(setup, cfg, ctx_dir, language=lang), [] if daily else _firstrun.noted(setup, cfg, ctx_dir, language=lang), language=lang))
     return EXIT_OK
 
 
@@ -353,6 +356,7 @@ def cmd_evaluate(args) -> int:
     _evaluate.evaluate(snap, cfg, scale_answer=_firstrun.scale_decision(snap.parent), tools_present=tools_present)
     from lib.output import diff as _diff
 
+    paths.ensure_private_dir(snap / "llm", base=snap)  # where the analysis writes facts.json next: made here, private like the rest of the snapshot
     _diff.append_history(snap)  # the row is written as soon as the verdicts exist: a run that stops before `diff` used to leave no line in history.csv
     return EXIT_OK
 

@@ -112,8 +112,4 @@ $KUBEGAP/scripts/kubegap check-facts --context <name> --snapshot "$SNAP"
 
 ## daily 모드
 
-daily 리포트는 "이미 일어난 일"과 "지난 리포트 이후 달라진 것"만 낸다. 가장 큰 문제 다섯은 full 점검이 고르고, daily는 고르지 않는다.
-
-같은 순서로 읽되 필요한 데까지만 간다. `diff.json`(새로 생김·해결·재발, 바뀐 오브젝트, 새 Warning 이벤트), `nature`가 `occurrence`인 fail 항목, 기본 심각도가 critical·high인 fail 항목, 그 뒤의 원본 파일만 본다. 사건을 묶어 `happened.incidents`에 적고, 지금도 계속되는 것은 `broken_now`에, 사건이 드러낸 상태와 fail인 critical·high는 `next`에 적는다. `problems`는 비운다.
-
-`findings-draft.json`의 `checks.by_status["not-collected"]`가 daily에서 판단하지 못하는 체크 수이고, `summary.collection.mode`로 모드를, `summary.collection.mode_skipped_steps`로 건너뛴 단계를 확인한다. `summary.collection.object_files`는 요약이 찾은 오브젝트 종류마다 파일이 있었는지를 말한다. `not-served`는 이 클러스터에 그 종류가 없다는 뜻이라 정상이고, `unlisted`는 종류는 있는데 kubegap이 잘못된 파일 이름을 찾았다는 뜻이라 kubegap 결함이다. 도구 메모에 적는다. daily에서 거의 모으지 않는 영역은 노드 OS, 컨트롤 플레인 로그(EKS), ECR, 비용, k3s 노드 내부, flannel과 local-path 노드 데이터다. `logs.signatures`는 daily에서 보는 소스가 적다(노드 저널 없음). 그 차이를 나빠진 것으로 쓰지 않는다.
+daily 점검은 이 문서를 따르지 않는다. daily의 분석과 글쓰기는 `daily-ko.md` 하나에 전부 있다.

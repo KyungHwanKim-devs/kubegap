@@ -61,7 +61,7 @@ TEXT = {
         "do": "무엇을 하면 되나",
         "read": "더 읽기",
         "since_new": "이번 점검에서 처음 나왔습니다.",
-        "since_old": "{when} 점검부터 그대로입니다. 이번이 {n}번째입니다.",
+        "since_old": "{when} 점검부터 그대로입니다. 이번이 {n}번째 점검입니다.",
         "ongoing": "지금도 계속되고 있습니다.",
         "ended": "지금은 끝난 일입니다.",
         "rest": "그 밖에 열려 있는 것",
@@ -206,7 +206,7 @@ def first_seen(snap: Path, entry: dict, limit: int = 30) -> tuple[str, int] | No
         since, runs = s, runs + 1
     if since is None:
         return None
-    return _writer._when((load_json(since / "inventory.json") or {}).get("taken_at"))[:10] or since.name[:10], runs
+    return _writer._when((load_json(since / "inventory.json") or {}).get("taken_at")) or since.name, runs  # with the time: two runs may share a day
 
 
 def _unseen(snap: Path, t: dict) -> str:

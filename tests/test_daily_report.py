@@ -107,7 +107,7 @@ def test_the_report_is_printed_from_the_facts_with_what_code_knows(tmp_path):
     first = daily.assemble(_snap(tmp_path / "first"), _facts(), "ko", "0.1.91", "0.2.0")  # the first run of a cluster: nothing to compare with
     assert "첫 daily 점검이라" in first and "처음 나왔습니다" not in first and "## 지난 점검 이후 달라진 것" not in first
     assert at == sorted(at) and "## 지금 깨져 있는 것" not in text and "## 그 밖에 열려 있는 것" not in text
-    assert "### 1. 백업이 클러스터 밖에 없음\n\n2026-11-12 점검부터 그대로입니다. 이번이 3번째입니다." in text
+    assert "### 1. 백업이 클러스터 밖에 없음\n\n2026-11-12 09:00 점검부터 그대로입니다. 이번이 3번째 점검입니다." in text
     assert "### 2. Kubernetes 지원이 끝남\n\n이번 점검에서 처음 나왔습니다." in text
     assert "**무슨 일인가.** 백업 CronJob 7개가" in text and "**왜 중요한가.** 두 노드를" in text and "**무엇을 하면 되나.** 덤프를" in text
     assert f"더 읽기: [k3s 문서]({URL})" in text

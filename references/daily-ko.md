@@ -35,7 +35,7 @@ daily는 세 가지 이유로 있다. full은 오래 걸린다. full은 클러�
 - **지난 점검 이후 일어난 일(`happened.incidents`).** `nature`가 `occurrence`인 발견과 `diff.json`의 새 이벤트에서 찾는다. 재시작, OOM, 노드 재부팅, 전달 실패 같은 것이다. 끝났으면 `state`는 `ended`, 지금도 이어지면 `ongoing`, 요약으로는 알 수 없으면 `unknown`이다. 지난 점검에도 같은 수준으로 있던 것은 새로 일어난 일이 아니다.
 - **지금 가장 중요한 것(`top`).** 세 개까지. 아래 순서로 고른다.
   1. 심각도. 운영 규모가 이미 반영된 값이다.
-  2. 일어났을 때 잃는 것(`loss`). `irreversible`(되돌릴 수 없는 손실: 데이터, 비밀 유출), `outage`(서비스 전체 중단), `partial`(일부 중단), `degraded`(느려지거나 불편함) 순이다. 발견에 `overdue: true`가 붙은 fail(지원이 끝난 버전)이 들어 있으면 코드가 한 단계 위로 쳐서 비교한다. `loss`에는 올리기 전의 값을 적는다.
+  2. 일어났을 때 잃는 것(`loss`). `irreversible`(되돌릴 수 없는 손실: 데이터, 비밀 유출), `outage`(서비스 전체 중단), `partial`(일부 중단), `degraded`(느려지거나 불편함) 순이다. 발견에 `overdue: true`가 붙은 fail(지원이 끝난 버전)이 들어 있으면, 코드가 그 항목의 `loss`를 한 단계 위인 것처럼 쳐서 비교한다. 심각도를 올리는 것이 아니다. 예를 들어 `partial`인 지원 종료 문제는 같은 심각도의 `outage` 문제와 같은 자리에서 비교된다. `loss`에는 올리기 전의 값을 적는다.
   3. 이번에 새로 생겼거나 나빠진 것이 그대로인 것보다 앞이다.
 - **그 밖에 열려 있는 것(`rest`).** 나머지 critical·high fail을 제목만으로 묶어 적는다. fail인 critical·high 발견은 전부 네 목록 중 한 곳의 `finding_ids`에 들어 있어야 한다. 한 체크의 발견이 여럿이면 `resilience.single-eligible-node.*`처럼 `*`로 끝나는 접두어로 적는다.
 
