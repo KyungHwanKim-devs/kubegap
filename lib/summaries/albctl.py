@@ -52,8 +52,8 @@ def _pod_metrics(snap: Path) -> dict:
             recon_err[labels.get("controller")] = recon_err.get(labels.get("controller"), 0) + int(v)
         wq = {labels.get("name"): v for labels, v in lb.get("workqueue_depth", [])}
         total_calls = sum(api_calls.values())
-        slow_ops = sorted(((k, round(api_dur[k] / api_calls[k], 3)) for k in api_calls if api_calls[k] >= 20 and k in api_dur), key=lambda kv: -kv[1])[:5]
-        top_ops = sorted(api_calls.items(), key=lambda kv: -kv[1])[:8]
+        slow_ops = sorted(((k, round(api_dur[k] / api_calls[k], 3)) for k in api_calls if api_calls[k] >= 20 and k in api_dur), key=lambda kv: -kv[1])
+        top_ops = sorted(api_calls.items(), key=lambda kv: -kv[1])
         start = sg.get("process_start_time_seconds")
         pods[f.stem] = {
             "leader": leader,
@@ -262,7 +262,7 @@ def analyze(snap: Path, inv: dict | None, traffic: dict | None = None) -> dict:
         "ingress_class_params": len(params),
         "alb_ingresses": len(alb_ings),
         "ingresses_without_lb": no_lb,
-        "ingress_annotations_top": dict(ann_counter.most_common(8)),
+        "ingress_annotations_top": dict(ann_counter.most_common()),
         "tgb_count": len(tgb_rows),
         "tgb_by_target_type": dict(Counter(t["target_type"] for t in tgb_rows)),
         "tgb_stale": [f"{t['namespace']}/{t['name']}" for t in tgb_rows if t["stale"]],
@@ -290,8 +290,8 @@ def analyze(snap: Path, inv: dict | None, traffic: dict | None = None) -> dict:
         "webhooks": webhooks,
         "ingress_classes": classes,
         "ingress_class_params": params,
-        "ingresses": {"alb": len(alb_ings), "without_lb": no_lb, "annotations_top": dict(ann_counter.most_common(12))},
-        "target_group_bindings": {"count": len(tgb_rows), "rows": tgb_rows[:60]},
+        "ingresses": {"alb": len(alb_ings), "without_lb": no_lb, "annotations_top": dict(ann_counter.most_common())},
+        "target_group_bindings": {"count": len(tgb_rows), "rows": tgb_rows},
         "lb_services": lb_svcs,
         "metrics": metrics,
         "summary": summary,

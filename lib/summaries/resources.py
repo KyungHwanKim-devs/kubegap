@@ -138,9 +138,9 @@ def analyze_krr(snap: Path) -> dict:
             unknown_reasons[w] += 1
         rows.append(row)
     rows.sort(key=lambda r: (SEV_ORDER.get(r["severity"], 9), -abs(r.get("cpu_request_delta") or 0) - abs(r.get("memory_request_delta_mb") or 0) / 1024))
-    over_cpu = sorted([r for r in rows if (r.get("cpu_request_delta") or 0) > 0.05], key=lambda r: -r["cpu_request_delta"])[:20]
-    under_mem = sorted([r for r in rows if (r.get("memory_request_delta_mb") or 0) < -64], key=lambda r: r["memory_request_delta_mb"])[:20]
-    over_mem = sorted([r for r in rows if (r.get("memory_request_delta_mb") or 0) > 256], key=lambda r: -r["memory_request_delta_mb"])[:20]
+    over_cpu = sorted([r for r in rows if (r.get("cpu_request_delta") or 0) > 0.05], key=lambda r: -r["cpu_request_delta"])
+    under_mem = sorted([r for r in rows if (r.get("memory_request_delta_mb") or 0) < -64], key=lambda r: r["memory_request_delta_mb"])
+    over_mem = sorted([r for r in rows if (r.get("memory_request_delta_mb") or 0) > 256], key=lambda r: -r["memory_request_delta_mb"])
     limit_remove = [r["target"] for r in rows if r["cpu_limit"] is not None and r["cpu_limit_rec"] is None and r["cpu_limit_sev"] in ("WARNING", "CRITICAL")]
     totals = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in totals.items()}
     totals["cpu_request_saving_cores"] = round(totals["cpu_request_current"] - totals["cpu_request_recommended"], 2)
@@ -184,8 +184,9 @@ def analyze_p95(snap: Path, inv: dict | None) -> dict:
     if not available:
         return {"available": False, "note": "metrics/*_p95_*_7d.json missing (no Prometheus or not collected yet)"}
 
-    def top(d, reverse, n=20):
-        return [{"workload": k, "ratio": v} for k, v in sorted(d.items(), key=lambda kv: kv[1], reverse=reverse)[:n]]
+    def top(d, reverse):
+        """Every workload of `d`, the most extreme first. All of them: a reader counts the list."""
+        return [{"workload": k, "ratio": v} for k, v in sorted(d.items(), key=lambda kv: kv[1], reverse=reverse)]
 
     large = [{"workload": f"{workload_of(lab.get('namespace', '') + '/' + lab.get('pod', ''))}:{lab.get('container', '')}", "ratio_of_median_node": round(v, 2)} for lab, v in metric_rows(snap, "large_request_containers")]
     return {

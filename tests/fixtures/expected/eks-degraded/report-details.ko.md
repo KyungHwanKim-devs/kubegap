@@ -1154,7 +1154,11 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   "karpenter": 2,
   "prod-app-y": 2,
   "prod-app-r": 2,
-  "prod-app-v": 2
+  "prod-app-v": 2,
+  "app-ab-prod": 2,
+  "arc-system": 1,
+  "dev-app-aa": 1,
+  "prod-app-x": 1
  },
  "gap_ratio": 0.565,
  "nodes_all_missing": [],
@@ -2661,7 +2665,33 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   "argocd/deployment/argocd-repo-server",
   "argocd/deployment/argocd-server",
   "kube-system/deployment/external-dns",
-  "middleware/deployment/kafka-exporter"
+  "middleware/deployment/kafka-exporter",
+  "middleware/deployment/kafka-ui",
+  "middleware/deployment/redis-insight",
+  "monitoring/deployment/kube-prometheus-stack-grafana",
+  "monitoring/deployment/kube-prometheus-stack-operator",
+  "monitoring/deployment/vmalert",
+  "prod-app-z-backend/deployment/app-z-pg-proxy",
+  "argocd/statefulset/argocd-application-controller",
+  "dev-app-s/statefulset/app-s-backend-mysql",
+  "dev-app-y/statefulset/app-y-backend-mysql",
+  "dev-app-v/statefulset/app-v-backend-dev-mysql",
+  "dev-app-aa/statefulset/app-aa-mysql",
+  "dev-app-aa/statefulset/app-aa-postgres",
+  "middleware/statefulset/kafka-controller",
+  "middleware/statefulset/redis-master",
+  "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager",
+  "monitoring/statefulset/loki-stack",
+  "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus",
+  "monitoring/statefulset/vm-single",
+  "prod-app-t/statefulset/app-t-backend-postgresql",
+  "prod-app-x/statefulset/app-x-postgresql",
+  "prod-app-s/statefulset/app-s-backend-mysql",
+  "prod-app-y/statefulset/app-y-backend-mysql",
+  "prod-app-z-backend/statefulset/app-z-neo4j",
+  "prod-app-r/statefulset/app-r-postgresql",
+  "prod-app-v/statefulset/app-v-backend-prod-mysql",
+  "app-ab-prod/statefulset/app-ab-backend-postgresql"
  ]
 }
 ```
@@ -2685,7 +2715,38 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   "dev-app-y/deployment/app-y-admin",
   "dev-app-y/deployment/app-y-ai",
   "dev-app-y/deployment/app-y-backend",
-  "dev-app-y/deployment/app-y-frontend"
+  "dev-app-y/deployment/app-y-frontend",
+  "dev-app-v/deployment/app-v-admin-frontend",
+  "dev-app-v/deployment/app-v-backend",
+  "dev-app-v/deployment/app-v-frontend",
+  "dev-app-aa/deployment/app-aa-backend",
+  "dev-app-aa/deployment/app-aa-frontend",
+  "prod-app-w/deployment/app-w",
+  "prod-app-t/deployment/app-t-ai",
+  "prod-app-t/deployment/app-t-backend",
+  "prod-app-t/deployment/app-t-studio",
+  "prod-app-t/deployment/app-t-web",
+  "prod-app-x/deployment/app-x-api",
+  "prod-app-s/deployment/app-s-admin",
+  "prod-app-s/deployment/app-s-api",
+  "prod-app-s/deployment/app-s-backend",
+  "prod-app-s/deployment/app-s-frontend",
+  "prod-app-y/deployment/app-y-admin",
+  "prod-app-y/deployment/app-y-ai",
+  "prod-app-y/deployment/app-y-backend",
+  "prod-app-y/deployment/app-y-frontend",
+  "prod-app-z-backend/deployment/app-z-backend",
+  "prod-app-z-backend/deployment/app-z-embedding-server",
+  "prod-app-z-backend/deployment/app-z-file-worker",
+  "prod-app-z-backend/deployment/app-z-frontend",
+  "prod-app-z-backend/deployment/app-z-graph-worker",
+  "prod-app-r/deployment/app-r-backend",
+  "prod-app-r/deployment/app-r-web",
+  "prod-app-v/deployment/app-v-admin-frontend",
+  "prod-app-v/deployment/app-v-backend",
+  "prod-app-v/deployment/app-v-frontend",
+  "app-ab-prod/deployment/app-ab-backend",
+  "app-ab-prod/deployment/app-ab-frontend"
  ]
 }
 ```
@@ -5178,6 +5239,90 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   [
    "Elastic Load Balancing v2/CreateTargetGroup",
    0.265
+  ],
+  [
+   "EC2/DescribeSubnets",
+   0.138
+  ],
+  [
+   "Elastic Load Balancing v2/CreateRule",
+   0.103
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyRule",
+   0.096
+  ],
+  [
+   "ACM/ListCertificates",
+   0.087
+  ],
+  [
+   "EC2/DescribeVpcs",
+   0.084
+  ],
+  [
+   "EC2/DescribeInstances",
+   0.082
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroups",
+   0.081
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeRules",
+   0.08
+  ],
+  [
+   "EC2/DescribeSecurityGroups",
+   0.076
+  ],
+  [
+   "WAFV2/GetWebACLForResource",
+   0.075
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTags",
+   0.071
+  ],
+  [
+   "ACM/DescribeCertificate",
+   0.07
+  ],
+  [
+   "EC2/DescribeNetworkInterfaces",
+   0.065
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancers",
+   0.064
+  ],
+  [
+   "WAF Regional/GetWebACLForResource",
+   0.059
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListeners",
+   0.057
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListenerCertificates",
+   0.052
+  ],
+  [
+   "Elastic Load Balancing v2/DeregisterTargets",
+   0.05
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+   0.047
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+   0.042
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetHealth",
+   0.036
   ]
  ],
  "aws_api_top_ops": [
@@ -5212,6 +5357,94 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   [
    "Elastic Load Balancing v2/DescribeLoadBalancers",
    3732
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeRules",
+   3732
+  ],
+  [
+   "ACM/DescribeCertificate",
+   3509
+  ],
+  [
+   "EC2/DescribeVpcs",
+   2989
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroups",
+   1880
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListeners",
+   1866
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+   1866
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListenerCertificates",
+   1280
+  ],
+  [
+   "Shield/GetSubscriptionState",
+   1221
+  ],
+  [
+   "EC2/DescribeNetworkInterfaces",
+   1080
+  ],
+  [
+   "ACM/ListCertificates",
+   660
+  ],
+  [
+   "WAF Regional/GetWebACLForResource",
+   644
+  ],
+  [
+   "WAFV2/GetWebACLForResource",
+   644
+  ],
+  [
+   "EC2/DescribeSubnets",
+   586
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyRule",
+   557
+  ],
+  [
+   "EC2/AuthorizeSecurityGroupIngress",
+   195
+  ],
+  [
+   "EC2/RevokeSecurityGroupIngress",
+   194
+  ],
+  [
+   "Elastic Load Balancing v2/CreateRule",
+   30
+  ],
+  [
+   "Elastic Load Balancing v2/CreateTargetGroup",
+   30
+  ],
+  [
+   "Elastic Load Balancing v2/DeleteRule",
+   14
+  ],
+  [
+   "Elastic Load Balancing v2/DeleteTargetGroup",
+   14
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyTargetGroup",
+   13
+  ],
+  [
+   "EC2/DescribeAvailabilityZones",
+   2
   ]
  ],
  "metrics_available": true,
@@ -5650,7 +5883,80 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   "kubelet_certificate_manager_server_ttl_seconds",
   "kubelet_server_expiration_renew_errors",
   "kubelet_volume_stats_inodes_free",
-  "kubelet_volume_stats_used_bytes"
+  "kubelet_volume_stats_used_bytes",
+  "kubernetes_build_info",
+  "namespace",
+  "negatives",
+  "node_bonding_active",
+  "node_bonding_slaves",
+  "node_disk_io_time_weighted_seconds_total",
+  "node_filefd_allocated",
+  "node_filefd_maximum",
+  "node_filesystem_files",
+  "node_filesystem_files_free",
+  "node_filesystem_readonly",
+  "node_md_disks",
+  "node_md_disks_required",
+  "node_network_receive_errs_total",
+  "node_network_receive_packets_total",
+  "node_network_transmit_errs_total",
+  "node_network_transmit_packets_total",
+  "node_network_up",
+  "node_nf_conntrack_entries",
+  "node_nf_conntrack_entries_limit",
+  "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile",
+  "node_systemd_unit_state",
+  "node_textfile_scrape_error",
+  "node_timex_maxerror_seconds",
+  "node_timex_offset_seconds",
+  "node_timex_sync_status",
+  "node_vmstat_pgmajfault",
+  "prometheus",
+  "prometheus_config_last_reload_successful",
+  "prometheus_engine_queries",
+  "prometheus_engine_queries_concurrent_max",
+  "prometheus_notifications_alertmanagers_discovered",
+  "prometheus_notifications_errors_total",
+  "prometheus_notifications_queue_capacity",
+  "prometheus_notifications_queue_length",
+  "prometheus_notifications_sent_total",
+  "prometheus_operator_list_operations_failed_total",
+  "prometheus_operator_list_operations_total",
+  "prometheus_operator_managed_resources",
+  "prometheus_operator_node_address_lookup_errors_total",
+  "prometheus_operator_ready",
+  "prometheus_operator_reconcile_errors_total",
+  "prometheus_operator_reconcile_operations_total",
+  "prometheus_operator_status_update_errors_total",
+  "prometheus_operator_status_update_operations_total",
+  "prometheus_operator_syncs",
+  "prometheus_operator_watch_operations_failed_total",
+  "prometheus_operator_watch_operations_total",
+  "prometheus_remote_storage_failed_samples_total",
+  "prometheus_remote_storage_highest_timestamp_in_seconds",
+  "prometheus_remote_storage_queue_highest_sent_timestamp_seconds",
+  "prometheus_remote_storage_samples_failed_total",
+  "prometheus_remote_storage_samples_total",
+  "prometheus_remote_storage_shards_desired",
+  "prometheus_remote_storage_shards_max",
+  "prometheus_remote_storage_succeeded_samples_total",
+  "prometheus_rule_evaluation_failures_total",
+  "prometheus_rule_group_iterations_missed_total",
+  "prometheus_rule_group_rules",
+  "prometheus_sd_refresh_failures_total",
+  "prometheus_target_metadata_cache_entries",
+  "prometheus_target_scrape_pool_exceeded_label_limits_total",
+  "prometheus_target_scrape_pool_exceeded_target_limit_total",
+  "prometheus_target_sync_failed_total",
+  "prometheus_tsdb_compactions_failed_total",
+  "prometheus_tsdb_reloads_failures_total",
+  "reloader_last_reload_successful",
+  "robustperception",
+  "s_failure_total",
+  "scrapes",
+  "see",
+  "service",
+  "www"
  ],
  "alert_metrics_without_panel_count": 153,
  "available": true,

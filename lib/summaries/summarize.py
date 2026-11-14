@@ -80,10 +80,10 @@ def summarize_events(snap: Path) -> dict:
         objects[obj] += 1
         if typ == "Warning" and len(samples[reason]) < 3:
             samples[reason].append({"object": obj, "message": (e.get("message") or "")[:300], "last": last})
-    out["reasons"] = sorted([{**r, "objects_top": [o for o, _ in r["objects"].most_common(5)]} for r in reasons.values()], key=lambda r: (-r["occurrences"], r["reason"]))
+    out["reasons"] = sorted([{**r, "objects_top": [o for o, _ in r["objects"].most_common()]} for r in reasons.values()], key=lambda r: (-r["occurrences"], r["reason"]))
     for r in out["reasons"]:
         r.pop("objects", None)
-    out["top_objects"] = [{"object": o, "events": n} for o, n in objects.most_common(10)]
+    out["top_objects"] = [{"object": o, "events": n} for o, n in objects.most_common()]
     out["warning_samples"] = dict(samples)
     # per-Reason trend across every snapshot in the context folder (lib/summaries/events.py)
     try:
@@ -96,7 +96,7 @@ def summarize_events(snap: Path) -> dict:
             "unique_events": h["unique_events"],
             "tracked_hits": [{k: r[k] for k in ("reason", "type", "severity_hint", "meaning", "occurrences", "events", "first", "last", "trend", "per_snapshot", "objects_top")} for r in h["tracked_hits"]],
             "tracked_silent": h["tracked_silent"],
-            "top_warning_reasons": [{k: r[k] for k in ("reason", "occurrences", "trend", "per_snapshot")} for r in h["reasons"] if r["type"] == "Warning"][:15],
+            "top_warning_reasons": [{k: r[k] for k in ("reason", "occurrences", "trend", "per_snapshot")} for r in h["reasons"] if r["type"] == "Warning"],
         }
     except Exception as e:  # a failure in the trend analysis must not block the whole summary
         out["history"] = {"error": f"{type(e).__name__}: {e}"}
@@ -170,7 +170,7 @@ def summarize_objects(snap: Path, inv: dict | None) -> dict:
         "source": "objects/pods.json",
         "count": len(pods),
         "by_phase": dict(Counter((p.get("status") or {}).get("phase") or "Unknown" for p in pods)),
-        "restarts_top": [r for r in restarts[:20] if r["restarts"] > 0],
+        "restarts_top": [r for r in restarts if r["restarts"] > 0],
         "pending": [
             {
                 "namespace": p["metadata"]["namespace"],
@@ -366,7 +366,7 @@ def summarize_webhooks(snap: Path) -> dict:
                         "timeout_seconds": w.get("timeoutSeconds"),
                         "service": f"{sns}/{sname}" if sns else (cc.get("url") or "?"),
                         "ready_endpoints": ready,
-                        "resources": resources[:8],
+                        "resources": resources,
                         "namespace_selector": ns_sel or None,
                         "object_selector": obj_sel or None,
                         "self_lock_risk": self_lock_risk,
@@ -438,7 +438,7 @@ def summarize_recent_changes(snap: Path, now: _dt.datetime, hours: int = 24) -> 
         "hours": hours,
         "workloads": changed,
         "namespaces": sorted({c["namespace"] for c in changed}),
-        "event_targets": sorted(set(ev_targets))[:50],
+        "event_targets": sorted(set(ev_targets)),
         "count": len(changed),
     }
 

@@ -181,7 +181,7 @@ def oom_7d(cx) -> dict:
         r["kernel_cgroup_ooms_on_nodes"] = sum(kernel[n]["oom_cgroup_count"] for n in read if not kernel[n]["oom_section"])
         r["kernel_log_read"] = r["kernel_nodes_read"] > 0
         r["kernel_any_node_read"] = any(rec["source"] in ("journalctl", "dmesg") for rec in kernel.values())  # False in daily mode, where no node log is collected at all
-        r["kernel_kill_times"] = sorted(r["kernel_kill_times"])[-10:]
+        r["kernel_kill_times"] = sorted(r["kernel_kill_times"])
         r["last_kill"] = r["kernel_kill_times"][-1] if r["kernel_kill_times"] else None
         r["pods"].sort(key=lambda p: (-p["restarts_7d"], p["pod"]))
     out_rows = sorted(rows.values(), key=lambda r: (-r["kernel_kills_24h"], -r["pods_oomkilled"], -r["restarts_of_those_pods"], r["target"]))

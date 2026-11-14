@@ -115,7 +115,7 @@ def build_history(context_root: Path, current: Path | None = None) -> dict:
     out_reasons = []
     for r in reasons.values():
         series = [per_snapshot.get(sp.name, {}).get(r["reason"], 0) for sp in snaps]
-        top = sorted(r["objects"].items(), key=lambda kv: -kv[1])[:5]
+        top = sorted(r["objects"].items(), key=lambda kv: -kv[1])
         trend = "flat"
         if len(series) >= 2:
             if series[-1] > series[-2]:

@@ -131,7 +131,8 @@
      "Node/ip-10-0-1-139.ap-northeast-2.compute.internal",
      "NodePool/app-amd64-fallback",
      "NodePool/build-arm64",
-     "NodeClaim/default-vz69n"
+     "NodeClaim/default-vz69n",
+     "Node/ip-10-0-1-137.ap-northeast-2.compute.internal"
     ]
    },
    {
@@ -146,7 +147,50 @@
      "ExternalSecret/dev-app-s/app-s-admin",
      "ExternalSecret/dev-app-s/app-s-api",
      "ExternalSecret/dev-app-s/app-s-backend-db-secret",
-     "ExternalSecret/dev-app-s/app-s-backend"
+     "ExternalSecret/dev-app-s/app-s-backend",
+     "ExternalSecret/dev-app-s/app-s-frontend",
+     "ExternalSecret/dev-app-y/app-y-admin",
+     "ExternalSecret/dev-app-y/app-y-ai",
+     "ExternalSecret/dev-app-y/app-y-backend-db-secret",
+     "ExternalSecret/dev-app-y/app-y-backend",
+     "ExternalSecret/dev-app-y/app-y-frontend",
+     "ExternalSecret/dev-app-v/app-v-admin-frontend",
+     "ExternalSecret/dev-app-v/app-v-backend-db-secret",
+     "ExternalSecret/dev-app-v/app-v-backend",
+     "ExternalSecret/dev-app-v/app-v-frontend",
+     "ExternalSecret/dev-app-aa/app-aa-backend-db-secret",
+     "ExternalSecret/dev-app-aa/app-aa-backend",
+     "ExternalSecret/monitoring/alertmanager-slack",
+     "ExternalSecret/monitoring/vmauth-auth",
+     "ExternalSecret/prod-app-w/app-w",
+     "ExternalSecret/prod-app-t/app-t-ai",
+     "ExternalSecret/prod-app-t/app-t-backend-db-secret",
+     "ExternalSecret/prod-app-t/app-t-backend",
+     "ExternalSecret/prod-app-x/app-x-api-db-secret",
+     "ExternalSecret/prod-app-x/app-x-api",
+     "ExternalSecret/prod-app-s/app-s-admin",
+     "ExternalSecret/prod-app-s/app-s-api",
+     "ExternalSecret/prod-app-s/app-s-backend-db-secret",
+     "ExternalSecret/prod-app-s/app-s-backend",
+     "ExternalSecret/prod-app-s/app-s-frontend",
+     "ExternalSecret/prod-app-y/app-y-admin",
+     "ExternalSecret/prod-app-y/app-y-ai",
+     "ExternalSecret/prod-app-y/app-y-backend-db-secret",
+     "ExternalSecret/prod-app-y/app-y-backend",
+     "ExternalSecret/prod-app-y/app-y-frontend",
+     "ExternalSecret/prod-app-z-backend/app-z-backend",
+     "ExternalSecret/prod-app-z-backend/app-z-embedding-server",
+     "ExternalSecret/prod-app-z-backend/app-z-file-worker",
+     "ExternalSecret/prod-app-z-backend/app-z-graph-worker",
+     "ExternalSecret/prod-app-r/app-r-backend-db-secret",
+     "ExternalSecret/prod-app-r/app-r-backend",
+     "ExternalSecret/prod-app-v/app-v-admin-frontend",
+     "ExternalSecret/prod-app-v/app-v-backend-db-secret",
+     "ExternalSecret/prod-app-v/app-v-backend",
+     "ExternalSecret/prod-app-v/app-v-frontend",
+     "ExternalSecret/app-ab-prod/app-ab-backend-db-secret",
+     "ExternalSecret/app-ab-prod/app-ab-backend",
+     "ExternalSecret/app-ab-prod/app-ab-frontend"
     ]
    },
    {
@@ -258,6 +302,214 @@
    },
    {
     "object": "NodeClaim/default-vz69n",
+    "events": 1
+   },
+   {
+    "object": "Node/ip-10-0-1-137.ap-northeast-2.compute.internal",
+    "events": 1
+   },
+   {
+    "object": "Node/ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "events": 1
+   },
+   {
+    "object": "Node/ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-s/app-s-admin",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-s/app-s-api",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-s/app-s-backend-db-secret",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-s/app-s-backend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-s/app-s-frontend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-y/app-y-admin",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-y/app-y-ai",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-y/app-y-backend-db-secret",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-y/app-y-backend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-y/app-y-frontend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-v/app-v-admin-frontend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-v/app-v-backend-db-secret",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-v/app-v-backend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-v/app-v-frontend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-aa/app-aa-backend-db-secret",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/dev-app-aa/app-aa-backend",
+    "events": 1
+   },
+   {
+    "object": "Service/middleware/kafka-controller-0-external",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/monitoring/alertmanager-slack",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/monitoring/vmauth-auth",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-w/app-w",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-t/app-t-ai",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-t/app-t-backend-db-secret",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-t/app-t-backend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-x/app-x-api-db-secret",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-x/app-x-api",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-s/app-s-admin",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-s/app-s-api",
+    "events": 1
+   },
+   {
+    "object": "Pod/prod-app-s/app-s-backend-7c46f75bf6-ljlnl",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-s/app-s-backend-db-secret",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-s/app-s-backend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-s/app-s-frontend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-y/app-y-admin",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-y/app-y-ai",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-y/app-y-backend-db-secret",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-y/app-y-backend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-y/app-y-frontend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-z-backend/app-z-backend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-z-backend/app-z-embedding-server",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-z-backend/app-z-file-worker",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-z-backend/app-z-graph-worker",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-r/app-r-backend-db-secret",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-r/app-r-backend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-v/app-v-admin-frontend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-v/app-v-backend-db-secret",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-v/app-v-backend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/prod-app-v/app-v-frontend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/app-ab-prod/app-ab-backend-db-secret",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/app-ab-prod/app-ab-backend",
+    "events": 1
+   },
+   {
+    "object": "ExternalSecret/app-ab-prod/app-ab-frontend",
     "events": 1
    }
   ],
@@ -381,6 +633,10 @@
       },
       {
        "object": "NodeClaim/default-vz69n",
+       "occurrences": 455
+      },
+      {
+       "object": "Node/ip-10-0-1-137.ap-northeast-2.compute.internal",
        "occurrences": 455
       }
      ]
@@ -15651,7 +15907,10 @@
       "KubePersistentVolumeInodesFillingUp",
       "KubePersistentVolumeInodesFillingUp",
       "KubePersistentVolumeErrors",
-      "NodeFilesystemSpaceFillingUp"
+      "NodeFilesystemSpaceFillingUp",
+      "NodeFilesystemSpaceFillingUp",
+      "NodeFilesystemAlmostOutOfSpace",
+      "NodeFilesystemAlmostOutOfSpace"
      ]
     },
     {
@@ -15706,7 +15965,8 @@
       "etcdHighFsyncDurations",
       "etcdHighFsyncDurations",
       "etcdHighCommitDurations",
-      "KubeletPodStartUpLatencyHigh"
+      "KubeletPodStartUpLatencyHigh",
+      "LoraTrainingDurationP95High"
      ]
     },
     {
@@ -17724,7 +17984,59 @@
      "node_md_disks",
      "node_md_disks_required",
      "node_network_receive_errs_total",
-     "node_network_receive_packets_total"
+     "node_network_receive_packets_total",
+     "node_network_transmit_errs_total",
+     "node_network_transmit_packets_total",
+     "node_network_up",
+     "node_nf_conntrack_entries",
+     "node_nf_conntrack_entries_limit",
+     "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile",
+     "node_systemd_unit_state",
+     "node_textfile_scrape_error",
+     "node_timex_maxerror_seconds",
+     "node_timex_offset_seconds",
+     "node_timex_sync_status",
+     "node_vmstat_pgmajfault",
+     "prometheus_config_last_reload_successful",
+     "prometheus_engine_queries",
+     "prometheus_engine_queries_concurrent_max",
+     "prometheus_notifications_alertmanagers_discovered",
+     "prometheus_notifications_errors_total",
+     "prometheus_notifications_queue_capacity",
+     "prometheus_notifications_queue_length",
+     "prometheus_notifications_sent_total",
+     "prometheus_operator_list_operations_failed_total",
+     "prometheus_operator_list_operations_total",
+     "prometheus_operator_managed_resources",
+     "prometheus_operator_node_address_lookup_errors_total",
+     "prometheus_operator_ready",
+     "prometheus_operator_reconcile_errors_total",
+     "prometheus_operator_reconcile_operations_total",
+     "prometheus_operator_status_update_errors_total",
+     "prometheus_operator_status_update_operations_total",
+     "prometheus_operator_syncs",
+     "prometheus_operator_watch_operations_failed_total",
+     "prometheus_operator_watch_operations_total",
+     "prometheus_remote_storage_failed_samples_total",
+     "prometheus_remote_storage_highest_timestamp_in_seconds",
+     "prometheus_remote_storage_queue_highest_sent_timestamp_seconds",
+     "prometheus_remote_storage_samples_failed_total",
+     "prometheus_remote_storage_samples_total",
+     "prometheus_remote_storage_shards_desired",
+     "prometheus_remote_storage_shards_max",
+     "prometheus_remote_storage_succeeded_samples_total",
+     "prometheus_rule_evaluation_failures_total",
+     "prometheus_rule_group_iterations_missed_total",
+     "prometheus_rule_group_rules",
+     "prometheus_sd_refresh_failures_total",
+     "prometheus_target_metadata_cache_entries",
+     "prometheus_target_scrape_pool_exceeded_label_limits_total",
+     "prometheus_target_scrape_pool_exceeded_target_limit_total",
+     "prometheus_target_sync_failed_total",
+     "prometheus_tsdb_compactions_failed_total",
+     "prometheus_tsdb_reloads_failures_total",
+     "reloader_last_reload_successful",
+     "s_failure_total"
     ],
     "alert_metrics_without_panel_count": 132,
     "empty_dashboards": [],
@@ -18038,6 +18350,18 @@
     },
     {
      "reason": "<n>/<n> nodes are available: <n> Insufficient cpu, <n> Insufficient memory, <n> node(s) didn't match Pod's node affinity/selector. preemption: <n>/<n> ",
+     "samples": 1
+    },
+    {
+     "reason": "<n>/<n> nodes are available: <n> Too many pods, <n> node(s) had untolerated taint {node.kubernetes.io/not-ready: }, <n> Insufficient cpu, <n> node(s) h",
+     "samples": 1
+    },
+    {
+     "reason": "<n>/<n> nodes are available: <n> Too many pods, <n> node(s) had untolerated taint {node.cloudprovider.kubernetes.io/uninitialized: true}, <n> Insuffi",
+     "samples": 1
+    },
+    {
+     "reason": "<n>/<n> nodes are available: <n> Too many pods, <n> Insufficient cpu, <n> node(s) had untolerated taint {workload-type: build}, <n> Insufficient memory",
      "samples": 1
     }
    ]
@@ -21470,6 +21794,267 @@
     "workload": "kube-system/aws-node",
     "mb": 1,
     "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-1-241.ap-northeast-2.compute.internal",
+    "namespace": "argocd",
+    "pod": "argocd-redis-dcc78d79c-5pvs6",
+    "uid": "9f51ae2f-eda2-4674-bad7-d33f216fb18a",
+    "workload": "argocd/argocd-redis",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-1-241.ap-northeast-2.compute.internal",
+    "namespace": "arc-runners",
+    "pod": "arc-warm-up-29898750-phgb6",
+    "uid": "92274d3f-39b7-411c-bba6-85617f32d47d",
+    "workload": "arc-runners/arc-warm-up",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-1-241.ap-northeast-2.compute.internal",
+    "namespace": "arc-runners",
+    "pod": "arc-warm-up-29897310-8px49",
+    "uid": "d8a342a1-bc5c-4773-bc2c-7c3b0fb2979a",
+    "workload": "arc-runners/arc-warm-up",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "namespace": "prod-app-z-backend",
+    "pod": "app-z-embedding-server-8445d87f5-sbzpj",
+    "uid": "e1d4b385-4b22-438b-a967-0b2844c8761b",
+    "workload": "prod-app-z-backend/app-z-embedding-server",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "namespace": "prod-app-t",
+    "pod": "app-t-backend-5f6c75bd56-9mfgv",
+    "uid": "7d482aa8-28cf-4be8-818b-adc32f585a2a",
+    "workload": "prod-app-t/app-t-backend",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "namespace": "monitoring",
+    "pod": "loki-stack-promtail-znqtm",
+    "uid": "59fe8213-5dc5-4ba1-9751-b11d1190cd8c",
+    "workload": "monitoring/loki-stack-promtail",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "namespace": "monitoring",
+    "pod": "kube-prometheus-stack-prometheus-node-exporter-qq2lr",
+    "uid": "ea53a752-95a7-4728-8257-2ad72265216c",
+    "workload": "monitoring/kube-prometheus-stack-prometheus-node-exporter",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "namespace": "kube-system",
+    "pod": "kube-proxy-46cc5",
+    "uid": "511e6e79-af56-4f6f-b778-f2c572cc5ee0",
+    "workload": "kube-system/kube-proxy",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "namespace": "kube-system",
+    "pod": "ebs-csi-node-bdkzl",
+    "uid": "57532a03-8da3-4ab3-9015-d7e50586f6e3",
+    "workload": "kube-system/ebs-csi-node",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "namespace": "kube-system",
+    "pod": "aws-node-hqzj5",
+    "uid": "878fd07c-4aaa-4d11-9e65-805884c9dd71",
+    "workload": "kube-system/aws-node",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "namespace": "dev-app-s",
+    "pod": "app-s-frontend-999976975-nf4rv",
+    "uid": "86c7ad32-d10c-4573-b489-9049b55482b6",
+    "workload": "dev-app-s/app-s-frontend",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "namespace": "prod-app-r",
+    "pod": "app-r-web-cc4989d9-x46dr",
+    "uid": "94e7b475-d5c6-4eca-8601-8572e2936fa3",
+    "workload": "prod-app-r/app-r-web",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "namespace": "prod-app-s",
+    "pod": "app-s-frontend-6d7ff4dcdb-h7hpl",
+    "uid": "f53ce3c1-ebd1-4757-bf69-5dc45b667317",
+    "workload": "prod-app-s/app-s-frontend",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "namespace": "prod-app-t",
+    "pod": "app-t-web-5d9cd7dc4f-qgs8p",
+    "uid": "9ac6ab32-bddd-4ff2-814d-440398c7b650",
+    "workload": "prod-app-t/app-t-web",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "namespace": "prod-app-t",
+    "pod": "app-t-studio-6f4c7b95b8-djsbw",
+    "uid": "a931865d-4eae-46c3-9965-b0cfa0e2f0ea",
+    "workload": "prod-app-t/app-t-studio",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "namespace": "prod-app-z-backend",
+    "pod": "tts-proxy-7b6db97b69-4bbjf",
+    "uid": "99b58936-3d63-43b5-8ffe-c9ceb4353c71",
+    "workload": "prod-app-z-backend/tts-proxy",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "namespace": "prod-app-z-backend",
+    "pod": "app-z-pg-proxy-5ff994445f-qsklv",
+    "uid": "4c687978-7f44-4eb1-b52f-4fbae96372bc",
+    "workload": "prod-app-z-backend/app-z-pg-proxy",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "namespace": "prod-app-z-backend",
+    "pod": "app-z-neo4j-0",
+    "uid": "75094165-87bd-40b0-8f12-a57fee309ac9",
+    "workload": "prod-app-z-backend/app-z-neo4j-0",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "namespace": "monitoring",
+    "pod": "loki-stack-promtail-rr6mb",
+    "uid": "66a0a1fe-02d3-46cf-b5ce-043779b6ff2d",
+    "workload": "monitoring/loki-stack-promtail",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "namespace": "monitoring",
+    "pod": "kube-prometheus-stack-prometheus-node-exporter-655q4",
+    "uid": "851d0930-06b7-4582-8f1a-744e0c9da0fa",
+    "workload": "monitoring/kube-prometheus-stack-prometheus-node-exporter",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "namespace": "monitoring",
+    "pod": "kube-prometheus-stack-operator-f5866d8f9-jgndx",
+    "uid": "f09818af-5eb3-4c55-a336-f434b562e1d6",
+    "workload": "monitoring/kube-prometheus-stack-operator",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "namespace": "prod-app-x",
+    "pod": "app-x-postgresql-0",
+    "uid": "4b2e7a69-8924-4ad7-ac4b-665b16913466",
+    "workload": "prod-app-x/app-x-postgresql-0",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "namespace": "prod-app-t",
+    "pod": "app-t-backend-postgresql-0",
+    "uid": "cf119b61-ed7f-4bf9-b8b4-d2ee11da45ca",
+    "workload": "prod-app-t/app-t-backend-postgresql-0",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "namespace": "monitoring",
+    "pod": "vm-single-0",
+    "uid": "4567e80f-1c49-416e-a8e1-322d06ca9a23",
+    "workload": "monitoring/vm-single-0",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "namespace": "monitoring",
+    "pod": "vmauth-68ff56844c-2n9br",
+    "uid": "d929cb41-57b0-40f9-88b6-29cec93562b4",
+    "workload": "monitoring/vmauth",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "namespace": "monitoring",
+    "pod": "vmalert-6cbc4d679c-wfnqh",
+    "uid": "d95e2e72-f6e0-4185-b69b-143b311aab4a",
+    "workload": "monitoring/vmalert",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "namespace": "monitoring",
+    "pod": "loki-stack-promtail-gwf2q",
+    "uid": "e85c471e-99ee-4748-883e-e2e083b03c02",
+    "workload": "monitoring/loki-stack-promtail",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "namespace": "monitoring",
+    "pod": "kube-prometheus-stack-prometheus-node-exporter-csn7r",
+    "uid": "e0022cff-0be2-4944-a0d0-2e29bb567566",
+    "workload": "monitoring/kube-prometheus-stack-prometheus-node-exporter",
+    "mb": 1,
+    "log_cap_mb": 50
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "namespace": "monitoring",
+    "pod": "alertmanager-kube-prometheus-stack-alertmanager-0",
+    "uid": "01078159-fa38-4078-b52a-a750d1d0acfe",
+    "workload": "monitoring/alertmanager-kube-prometheus-stack-alertmanager-0",
+    "mb": 1,
+    "log_cap_mb": 50
    }
   ],
   "pod_dirs": [
@@ -21787,6 +22372,206 @@
    },
    {
     "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "uid": "cab3faee-d38d-4e11-bd46-7756d882c2ee",
+    "namespace": "kube-system",
+    "pod": "ebs-csi-node-6vdld",
+    "workload": "kube-system/ebs-csi-node",
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "uid": "b55333a9-0979-49ea-b572-372474326cbb",
+    "namespace": "prod-app-r",
+    "pod": "app-r-backend-76f5f87fc8-xhgwr",
+    "workload": "prod-app-r/app-r-backend",
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "uid": "dca03b59-648a-4e15-8d8a-d897a4120941",
+    "namespace": "argocd",
+    "pod": "argocd-applicationset-controller-56677d8bb4-wrpvr",
+    "workload": "argocd/argocd-applicationset-controller",
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "uid": "e780edc6-03c3-4fb7-a792-7e3048efde6a",
+    "namespace": "argocd",
+    "pod": "argocd-server-f79fdb4f4-gzsh8",
+    "workload": "argocd/argocd-server",
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+    "uid": "kubernetes.io~empty-dir",
+    "namespace": null,
+    "pod": null,
+    "workload": null,
+    "mb": 0
+   },
+   {
+    "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
     "uid": "kubernetes.io~empty-dir",
     "namespace": null,
     "pod": null,
@@ -22679,6 +23464,454 @@
      "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
     },
     "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:40.046841    1516 kubelet_node_status.go:466] \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-1-137.ap-northeast-2.compute.in"
+   },
+   {
+    "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 == IN_CREATE|IN_ISDIR): …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: W1106 09:44:40.113696    1516 watcher.go:93] Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 ="
+   },
+   {
+    "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no imagefs label for configured runtime\"",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:40.119869    1516 eviction_manager.go:267] \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no ima"
+   },
+   {
+    "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-<n>.ap-northeast-2.compute.internal\\\": node …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:40.504397    1516 kubelet_node_status.go:554] \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-137.ap-northeast-2."
+   },
+   {
+    "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | object-\"prod-app-x\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is forbidden: User …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: W1106 09:44:54.753733    1516 reflector.go:569] object-\"prod-app-x\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is for"
+   },
+   {
+    "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed to list *v1.ConfigMap: configmaps …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:54.754115    1516 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed t"
+   },
+   {
+    "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | object-\"prod-app-x\"/\"app-x-api-secret\": failed to list *v1.Secret: <masked> \"app-x-api-secret\" is forbidden: User …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: W1106 09:44:54.755274    1516 reflector.go:569] object-\"prod-app-x\"/\"app-x-api-secret\": failed to list *v1.Secret: <masked> \"app-x-api-secret\" is forbidde"
+   },
+   {
+    "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"app-x-api-secret\\\": Failed to watch *v1.Secret: <masked> to list *v1.Secret: <masked> …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:54.755506    1516 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"app-x-api-secret\\\": Failed to watch *v1.Secret: <masked> to"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"abc5268c5ac596430d283957517cc0207cc7f278e8884875dfc0b98c7549acfb\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T02:44:53+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T02:44:53.275389812Z\" level=error msg=\"ContainerStatus for \\\"abc5268c5ac596430d283957517cc0207cc7f278e8884875dfc0b98c7549acfb\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"4e304ff10e36ad4aeb0e57d765bb833d72e80e8d80bffb57f0a9ccfbf999c672\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T03:38:51+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T03:38:51.751608465Z\" level=error msg=\"ContainerStatus for \\\"4e304ff10e36ad4aeb0e57d765bb833d72e80e8d80bffb57f0a9ccfbf999c672\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"e43b801de41fa6648a82bb085f7f0e99e732943205567f534ee48c0fed379257\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T05:35:52+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T05:35:52.259128796Z\" level=error msg=\"ContainerStatus for \\\"e43b801de41fa6648a82bb085f7f0e99e732943205567f534ee48c0fed379257\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"8dad2fea42b4343ede88bf973fb15b28e182373f790dde7c51586e7a668cc21d\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T06:08:53+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T06:08:53.088785825Z\" level=error msg=\"ContainerStatus for \\\"8dad2fea42b4343ede88bf973fb15b28e182373f790dde7c51586e7a668cc21d\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"e8d53d577bcb44ac16cb7a18c3dc22c1bd721b33df9837b1b11575edd02c5fdc\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T06:56:54+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T06:56:54.672356630Z\" level=error msg=\"ContainerStatus for \\\"e8d53d577bcb44ac16cb7a18c3dc22c1bd721b33df9837b1b11575edd02c5fdc\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"fc17dddfb93ac007ddd787b67a63aacfb13050a318379ccf784a32128ef88aa5\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T07:35:52+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T07:35:52.103369442Z\" level=error msg=\"ContainerStatus for \\\"fc17dddfb93ac007ddd787b67a63aacfb13050a318379ccf784a32128ef88aa5\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"b7a42a9dbe0a983a99b214b3e16f7a9c42bb307095e26ffbfce33a9bb36ab2b4\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T07:49:04+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T07:49:04.608734122Z\" level=error msg=\"ContainerStatus for \\\"b7a42a9dbe0a983a99b214b3e16f7a9c42bb307095e26ffbfce33a9bb36ab2b4\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=35",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170195308Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=35"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=39",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170249646Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=39"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=41",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170256090Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=41"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=43",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170261943Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=43"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=3",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229252943Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=3"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229296400Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=7",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229305511Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=7"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=9",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229313655Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=9"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=11",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229321043Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=11"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=17",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229328307Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=17"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"c8415f5426a522cb9bee5c935ff2230ac490b988d775b9cb963ab71527c6d7ce\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.824526503Z\" level=error msg=\"ContainerStatus for \\\"c8415f5426a522cb9bee5c935ff2230ac490b988d775b9cb963ab71527c6d7ce\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"459b6a4dc7daaeefdc0907db37479094ae0e3e43df5c859dbf00e3da5818ae94\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:54+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:54.833959892Z\" level=error msg=\"ContainerStatus for \\\"459b6a4dc7daaeefdc0907db37479094ae0e3e43df5c859dbf00e3da5818ae94\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"d5529bd0e89f949ab998b9c017fd992eb12f4ed4cc1e04ae26135c6a115462d3\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T09:00:58+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T09:00:58.951499999Z\" level=error msg=\"ContainerStatus for \\\"d5529bd0e89f949ab998b9c017fd992eb12f4ed4cc1e04ae26135c6a115462d3\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"852ec3e1ee4c664f330cfa008d437d795f7d193953dd1b0e4f9514cabb250f54\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T09:45:38+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T09:45:38.203672949Z\" level=error msg=\"ContainerStatus for \\\"852ec3e1ee4c664f330cfa008d437d795f7d193953dd1b0e4f9514cabb250f54\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | object-\"app-ab-prod\"/\"app-ab-frontend-secret\": failed to list *v1.Secret: <masked> \"app-ab-frontend-secret\" is forbidden: User …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:58:58+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: W1106 08:58:58.339227    1593 reflector.go:569] object-\"app-ab-prod\"/\"app-ab-frontend-secret\": failed to list *v1.Secret: <masked> \"app-ab-frontend-secret"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"app-ab-prod\\\"/\\\"app-ab-frontend-secret\\\": Failed to watch *v1.Secret: <masked> to list *v1.Secret: <masked> …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:58:58+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: E1106 08:58:58.339256    1593 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"app-ab-prod\\\"/\\\"app-ab-frontend-secret\\\": Failed to watch *v1.Secret: <masked>"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | Failed to process watch event {EventType:0 …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:45+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: W1106 08:59:45.050377    1593 manager.go:1169] Failed to process watch event {EventType:0 Name:/kubepods.slice/kubepods-burstable.slice/kubepods-burstable"
+   },
+   {
+    "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | E1106 13:52:11.<n>    <n> k--output truncated--",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T13:52:11+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: E1106 13:52:11.348616    1593 k--output truncated--"
+   },
+   {
+    "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"failed to reload cni configuration after receiving fs change event(WRITE         …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:59:12+0000 ip-10-0-1-245.ap-northeast-2.compute.internal containerd[1412]: time=\"2026-11-06T08:59:12.117442953Z\" level=error msg=\"failed to reload cni configuration after receiving fs change event(WRITE         \\\"/etc/cni/net."
+   },
+   {
+    "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | {\"level\":\"error\",\"ts\":\"<ts>\",\"caller\":\"awsutils/awsutils.go:<n>\",\"msg\":\"r8gd.medium: instance type does not exist\"}",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/ipamd-24h.log": 1
+    },
+    "sample": "{\"level\":\"error\",\"ts\":\"2026-11-06T08:59:10.241Z\",\"caller\":\"awsutils/awsutils.go:1618\",\"msg\":\"r8gd.medium: instance type does not exist\"}"
+   },
+   {
+    "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeConfig for service …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.243281    1530 log.go:32] \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeCon"
+   },
+   {
+    "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-1-<n>.ap-northeast-2.compute.internal\\\" not found\"",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.334735    1530 kubelet_node_status.go:466] \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-1-245.ap-northeast-2.compute.in"
+   },
+   {
+    "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 == IN_CREATE|IN_ISDIR): …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: W1106 08:58:59.417259    1530 watcher.go:93] Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 ="
+   },
+   {
+    "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no imagefs label for configured runtime\"",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.421858    1530 eviction_manager.go:267] \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no ima"
+   },
+   {
+    "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-<n>.ap-northeast-2.compute.internal\\\": node …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.822990    1530 kubelet_node_status.go:554] \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-245.ap-northeast-2."
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:08:25+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:08:25.977046136Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5"
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"721c86c2ddbbd259576a3a8177dff00ae3aa79d43d5f628bbcff16fe78222132\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:20:21+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:20:21.504893358Z\" level=error msg=\"ContainerStatus for \\\"721c86c2ddbbd259576a3a8177dff00ae3aa79d43d5f628bbcff16fe78222132\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"8ddd23774d613913174fa77e1e3bd8e9567b6632ceb85f2f12e7338a7cb87a2d\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:26:50+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:26:50.137843966Z\" level=error msg=\"ContainerStatus for \\\"8ddd23774d613913174fa77e1e3bd8e9567b6632ceb85f2f12e7338a7cb87a2d\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"219c9fc551ba1c733e3d07dcaee99d0b3811671d94fb3124fec511822ab0140d\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:49:40+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:49:40.394713697Z\" level=error msg=\"ContainerStatus for \\\"219c9fc551ba1c733e3d07dcaee99d0b3811671d94fb3124fec511822ab0140d\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"f1ba92141f3eba4d5d473111043ca30f667cfc27de7df02897e22e2c46ee27c6\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T08:51:49+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:51:49.609971021Z\" level=error msg=\"ContainerStatus for \\\"f1ba92141f3eba4d5d473111043ca30f667cfc27de7df02897e22e2c46ee27c6\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"9b73872e00d5d10bc91e7baa651281abb1ffda16703f690ae41a2b3bbc9108f1\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T09:00:56+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:00:56.605922288Z\" level=error msg=\"ContainerStatus for \\\"9b73872e00d5d10bc91e7baa651281abb1ffda16703f690ae41a2b3bbc9108f1\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"collecting metrics for e944d40b8100456ffa7df69e3ad60466efd7dd536a10f463b4dacefb9c21b7ef\" error=\"cgroups: …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T09:01:51+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:01:51.831406365Z\" level=error msg=\"collecting metrics for e944d40b8100456ffa7df69e3ad60466efd7dd536a10f463b4dacefb9c21b7ef\" error=\""
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeConfig for service …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.186466    1556 log.go:32] \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeCon"
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-2-<n>.ap-northeast-2.compute.internal\\\" not found\"",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.229753    1556 kubelet_node_status.go:466] \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-2-100.ap-northeast-2.compute.in"
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no imagefs label for configured runtime\"",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.259727    1556 eviction_manager.go:267] \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no ima"
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-2-<n>.ap-northeast-2.compute.internal\\\": node …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.648702    1556 kubelet_node_status.go:554] \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-2-100.ap-northeast-2."
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | object-\"prod-app-r\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is forbidden: User …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: W1106 08:58:58.062271    1556 reflector.go:569] object-\"prod-app-r\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is for"
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-r\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed to list *v1.ConfigMap: configmaps …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:58:58.062308    1556 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-r\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed t"
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | object-\"prod-app-z-backend\"/\"app-z-backend-secret\": failed to list *v1.Secret: <masked> \"app-z-backend-secret\" is forbidden: User …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: W1106 08:58:58.191724    1556 reflector.go:569] object-\"prod-app-z-backend\"/\"app-z-backend-secret\": failed to list *v1.Secret: <masked> \"app-z-backend-sec"
+   },
+   {
+    "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-z-backend\\\"/\\\"app-z-backend-secret\\\": Failed to watch *v1.Secret: <masked> to list *v1.Secret: …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:58:58.191765    1556 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-z-backend\\\"/\\\"app-z-backend-secret\\\": Failed to watch *v1.Secret:"
+   },
+   {
+    "pattern": "node:ip-10-0-2-218.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"9f3b8870257f34f53f016fd834a86f3d978f55b40048ebc36f5451b848914f55\\\" failed\" error=\"rpc …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/containerd-24h.log": 1
+    },
+    "sample": "2026-11-06T11:00:11+0000 ip-10-0-2-218.ap-northeast-2.compute.internal containerd[3613]: time=\"2026-11-06T11:00:11.286783531Z\" level=error msg=\"ContainerStatus for \\\"9f3b8870257f34f53f016fd834a86f3d978f55b40048ebc36f5451b848914f55\\\" failed\""
+   },
+   {
+    "pattern": "node:ip-10-0-2-218.ap-northeast-2.compute.internal | \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = an error occurred when try to find container …",
+    "count": 1,
+    "files": {
+     "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+    },
+    "sample": "2026-11-06T11:00:11+0000 ip-10-0-2-218.ap-northeast-2.compute.internal kubelet[3748]: E1106 11:00:11.287025    3748 log.go:32] \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = an error occurred when try t"
    }
   ],
   "boot_window_skipped": {
@@ -22926,7 +24159,11 @@
      "karpenter": 2,
      "prod-app-y": 2,
      "prod-app-r": 2,
-     "prod-app-v": 2
+     "prod-app-v": 2,
+     "app-ab-prod": 2,
+     "arc-system": 1,
+     "dev-app-aa": 1,
+     "prod-app-x": 1
     },
     "pods_without_logs": [
      {
@@ -23348,6 +24585,167 @@
       "workload": "monitoring/loki-stack-promtail",
       "node": "ip-10-0-2-60.ap-northeast-2.compute.internal",
       "age_h": 5732.7
+     },
+     {
+      "namespace": "monitoring",
+      "pod": "loki-stack-promtail-mncnw",
+      "workload": "monitoring/loki-stack-promtail",
+      "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+      "age_h": 17.4
+     },
+     {
+      "namespace": "monitoring",
+      "pod": "loki-stack-promtail-znqtm",
+      "workload": "monitoring/loki-stack-promtail",
+      "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "monitoring",
+      "pod": "vm-single-0",
+      "workload": "monitoring/vm-single-0",
+      "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+      "age_h": 709.0
+     },
+     {
+      "namespace": "monitoring",
+      "pod": "vmalert-6cbc4d679c-wfnqh",
+      "workload": "monitoring/vmalert",
+      "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+      "age_h": 709.0
+     },
+     {
+      "namespace": "monitoring",
+      "pod": "vmauth-68ff56844c-2n9br",
+      "workload": "monitoring/vmauth",
+      "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+      "age_h": 709.0
+     },
+     {
+      "namespace": "prod-app-r",
+      "pod": "app-r-postgresql-0",
+      "workload": "prod-app-r/app-r-postgresql-0",
+      "node": "ip-10-0-1-241.ap-northeast-2.compute.internal",
+      "age_h": 357.9
+     },
+     {
+      "namespace": "prod-app-r",
+      "pod": "app-r-web-cc4989d9-x46dr",
+      "workload": "prod-app-r/app-r-web",
+      "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "prod-app-s",
+      "pod": "app-s-admin-57f5fcc58d-khsh5",
+      "workload": "prod-app-s/app-s-admin",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 757.3
+     },
+     {
+      "namespace": "prod-app-s",
+      "pod": "app-s-frontend-6d7ff4dcdb-h7hpl",
+      "workload": "prod-app-s/app-s-frontend",
+      "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+      "age_h": 16.5
+     },
+     {
+      "namespace": "prod-app-s",
+      "pod": "app-s-frontend-6d7ff4dcdb-qfmxq",
+      "workload": "prod-app-s/app-s-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 1056.5
+     },
+     {
+      "namespace": "prod-app-t",
+      "pod": "app-t-backend-5f6c75bd56-9mfgv",
+      "workload": "prod-app-t/app-t-backend",
+      "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "prod-app-t",
+      "pod": "app-t-backend-postgresql-0",
+      "workload": "prod-app-t/app-t-backend-postgresql-0",
+      "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+      "age_h": 709.0
+     },
+     {
+      "namespace": "prod-app-t",
+      "pod": "app-t-studio-6f4c7b95b8-djsbw",
+      "workload": "prod-app-t/app-t-studio",
+      "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "prod-app-v",
+      "pod": "app-v-admin-frontend-57fc4745bc-cxwvc",
+      "workload": "prod-app-v/app-v-admin-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 757.1
+     },
+     {
+      "namespace": "prod-app-v",
+      "pod": "app-v-frontend-64c9f4f4b5-n9gh2",
+      "workload": "prod-app-v/app-v-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "prod-app-x",
+      "pod": "app-x-postgresql-0",
+      "workload": "prod-app-x/app-x-postgresql-0",
+      "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "prod-app-y",
+      "pod": "app-y-admin-b7c6d74b5-d849g",
+      "workload": "prod-app-y/app-y-admin",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 699.3
+     },
+     {
+      "namespace": "prod-app-y",
+      "pod": "app-y-frontend-7d5fc5c884-hrllj",
+      "workload": "prod-app-y/app-y-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 521.9
+     },
+     {
+      "namespace": "prod-app-z-backend",
+      "pod": "app-z-frontend-6d58bbfcfc-2qgs6",
+      "workload": "prod-app-z-backend/app-z-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 361.3
+     },
+     {
+      "namespace": "prod-app-z-backend",
+      "pod": "app-z-frontend-6d58bbfcfc-nfk9x",
+      "workload": "prod-app-z-backend/app-z-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 361.3
+     },
+     {
+      "namespace": "prod-app-z-backend",
+      "pod": "app-z-neo4j-0",
+      "workload": "prod-app-z-backend/app-z-neo4j-0",
+      "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+      "age_h": 691.1
+     },
+     {
+      "namespace": "prod-app-z-backend",
+      "pod": "app-z-pg-proxy-5ff994445f-qsklv",
+      "workload": "prod-app-z-backend/app-z-pg-proxy",
+      "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+      "age_h": 691.1
+     },
+     {
+      "namespace": "prod-app-z-backend",
+      "pod": "tts-proxy-7b6db97b69-4bbjf",
+      "workload": "prod-app-z-backend/tts-proxy",
+      "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+      "age_h": 691.1
      }
     ],
     "note": "A pod that wrote no log lines in an hour may be fine (idle). If a whole node is missing (nodes_all_missing), that node's promtail is dead; if a whole namespace is missing, promtail's exclusion config is the cause",
@@ -26772,6 +28170,354 @@
      "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.5 → none, memory request 256 → 100 MB, memory limit 768 → 100 MB",
      "kubegap_level": null,
      "kubegap_reason": ""
+    },
+    {
+     "target": "prod-app-r/statefulset/app-r-postgresql:postgresql",
+     "kind": "StatefulSet",
+     "namespace": "prod-app-r",
+     "name": "app-r-postgresql",
+     "container": "postgresql",
+     "severity": "CRITICAL",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 256,
+     "memory_request_rec_mb": 202,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 768,
+     "memory_limit_rec_mb": 202,
+     "memory_limit_sev": "CRITICAL",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": 54,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.5 → none, memory request 256 → 202 MB, memory limit 768 → 202 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "keda/deployment/keda-operator:keda-operator",
+     "kind": "Deployment",
+     "namespace": "keda",
+     "name": "keda-operator",
+     "container": "keda-operator",
+     "severity": "CRITICAL",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 1.0,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 100,
+     "memory_request_rec_mb": 139,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 1000,
+     "memory_limit_rec_mb": 139,
+     "memory_limit_sev": "CRITICAL",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": -39,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 1.0 → none, memory request 100 → 139 MB, memory limit 1000 → 139 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "keda/deployment/keda-admission-webhooks:keda-admission-webhooks",
+     "kind": "Deployment",
+     "namespace": "keda",
+     "name": "keda-admission-webhooks",
+     "container": "keda-admission-webhooks",
+     "severity": "CRITICAL",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 1.0,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 100,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 1000,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "CRITICAL",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": 0,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 1.0 → none, memory request 100 → 100 MB, memory limit 1000 → 100 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "keda/deployment/keda-operator-metrics-apiserver:keda-operator-metrics-apiserver",
+     "kind": "Deployment",
+     "namespace": "keda",
+     "name": "keda-operator-metrics-apiserver",
+     "container": "keda-operator-metrics-apiserver",
+     "severity": "CRITICAL",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 1.0,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 100,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 1000,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "CRITICAL",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": 0,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 1.0 → none, memory request 100 → 100 MB, memory limit 1000 → 100 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "dev-app-y/statefulset/app-y-backend-mysql:mysql",
+     "kind": "StatefulSet",
+     "namespace": "dev-app-y",
+     "name": "app-y-backend-mysql",
+     "container": "mysql",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 512,
+     "memory_request_rec_mb": 867,
+     "memory_request_sev": "WARNING",
+     "memory_limit_mb": 1024,
+     "memory_limit_rec_mb": 867,
+     "memory_limit_sev": "OK",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": -355,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.5 → none, memory request 512 → 867 MB",
+     "kubegap_level": "fail",
+     "kubegap_reason": "memory request under by 355 MB"
+    },
+    {
+     "target": "monitoring/deployment/kube-prometheus-stack-grafana:grafana",
+     "kind": "Deployment",
+     "namespace": "monitoring",
+     "name": "kube-prometheus-stack-grafana",
+     "container": "grafana",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.2,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 384,
+     "memory_request_rec_mb": 184,
+     "memory_request_sev": "OK",
+     "memory_limit_mb": 512,
+     "memory_limit_rec_mb": 184,
+     "memory_limit_sev": "WARNING",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": 200,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.2 → none, memory request 384 → 184 MB, memory limit 512 → 184 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "app-ab-prod/statefulset/app-ab-backend-postgresql:postgresql",
+     "kind": "StatefulSet",
+     "namespace": "app-ab-prod",
+     "name": "app-ab-backend-postgresql",
+     "container": "postgresql",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 256,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "OK",
+     "memory_limit_mb": 512,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "WARNING",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": 156,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.5 → none, memory request 256 → 100 MB, memory limit 512 → 100 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "middleware/deployment/kafka-ui:kafka-ui",
+     "kind": "Deployment",
+     "namespace": "middleware",
+     "name": "kafka-ui",
+     "container": "kafka-ui",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.2,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 256,
+     "memory_request_rec_mb": 285,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 512,
+     "memory_limit_rec_mb": 285,
+     "memory_limit_sev": "OK",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": -29,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.2 → none, memory request 256 → 285 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "dev-app-v/statefulset/app-v-backend-dev-mysql:mysql",
+     "kind": "StatefulSet",
+     "namespace": "dev-app-v",
+     "name": "app-v-backend-dev-mysql",
+     "container": "mysql",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.012,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 512,
+     "memory_request_rec_mb": 793,
+     "memory_request_sev": "WARNING",
+     "memory_limit_mb": 1024,
+     "memory_limit_rec_mb": 793,
+     "memory_limit_sev": "OK",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.088,
+     "memory_request_delta_mb": -281,
+     "summary": "CPU request 0.1 → 0.012 cores, CPU limit 0.5 → none, memory request 512 → 793 MB",
+     "kubegap_level": "fail",
+     "kubegap_reason": "memory request under by 281 MB"
+    },
+    {
+     "target": "dev-app-s/statefulset/app-s-backend-mysql:mysql",
+     "kind": "StatefulSet",
+     "namespace": "dev-app-s",
+     "name": "app-s-backend-mysql",
+     "container": "mysql",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.012,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 512,
+     "memory_request_rec_mb": 626,
+     "memory_request_sev": "OK",
+     "memory_limit_mb": 1024,
+     "memory_limit_rec_mb": 626,
+     "memory_limit_sev": "WARNING",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.088,
+     "memory_request_delta_mb": -114,
+     "summary": "CPU request 0.1 → 0.012 cores, CPU limit 0.5 → none, memory request 512 → 626 MB, memory limit 1024 → 626 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 114 MB"
+    },
+    {
+     "target": "monitoring/statefulset/loki-stack:loki",
+     "kind": "StatefulSet",
+     "namespace": "monitoring",
+     "name": "loki-stack",
+     "container": "loki",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.021,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.2,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 256,
+     "memory_request_rec_mb": 529,
+     "memory_request_sev": "WARNING",
+     "memory_limit_mb": 512,
+     "memory_limit_rec_mb": 529,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.079,
+     "memory_request_delta_mb": -273,
+     "summary": "CPU request 0.1 → 0.021 cores, CPU limit 0.2 → none, memory request 256 → 529 MB",
+     "kubegap_level": "fail",
+     "kubegap_reason": "memory request under by 273 MB"
+    },
+    {
+     "target": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus:prometheus",
+     "kind": "StatefulSet",
+     "namespace": "monitoring",
+     "name": "prometheus-kube-prometheus-stack-prometheus",
+     "container": "prometheus",
+     "severity": "CRITICAL",
+     "cpu_request": 0.2,
+     "cpu_request_rec": 0.137,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 800,
+     "memory_request_rec_mb": 1651,
+     "memory_request_sev": "CRITICAL",
+     "memory_limit_mb": 1536,
+     "memory_limit_rec_mb": 1651,
+     "memory_limit_sev": "OK",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.063,
+     "memory_request_delta_mb": -851,
+     "summary": "CPU request 0.2 → 0.137 cores, CPU limit 0.5 → none, memory request 800 → 1651 MB",
+     "kubegap_level": "fail",
+     "kubegap_reason": "memory request under by 851 MB"
     }
    ],
    "top_over_memory": [
@@ -27782,6 +29528,78 @@
     {
      "workload": "prod-app-t/app-t-backend-postgresql-0:postgresql",
      "ratio": 0.051
+    },
+    {
+     "workload": "prod-app-s/app-s-backend-mysql-0:mysql",
+     "ratio": 0.052
+    },
+    {
+     "workload": "kube-system/metrics-server:metrics-server",
+     "ratio": 0.054
+    },
+    {
+     "workload": "kube-system/coredns:coredns",
+     "ratio": 0.069
+    },
+    {
+     "workload": "monitoring/loki-stack-0:loki",
+     "ratio": 0.069
+    },
+    {
+     "workload": "app-ab-prod/app-ab-backend-postgresql-0:postgresql",
+     "ratio": 0.07
+    },
+    {
+     "workload": "dev-app-aa/app-aa-postgres-0:postgres",
+     "ratio": 0.075
+    },
+    {
+     "workload": "dev-app-y/app-y-backend-mysql-0:mysql",
+     "ratio": 0.089
+    },
+    {
+     "workload": "prod-app-y/app-y-backend:backend",
+     "ratio": 0.097
+    },
+    {
+     "workload": "dev-app-s/app-s-backend-mysql-0:mysql",
+     "ratio": 0.101
+    },
+    {
+     "workload": "dev-app-v/app-v-backend-dev-mysql-0:mysql",
+     "ratio": 0.103
+    },
+    {
+     "workload": "dev-app-y/app-y-backend:backend",
+     "ratio": 0.111
+    },
+    {
+     "workload": "dev-app-s/app-s-api:api",
+     "ratio": 0.114
+    },
+    {
+     "workload": "dev-app-v/app-v-backend:backend",
+     "ratio": 0.126
+    },
+    {
+     "workload": "app-ab-prod/app-ab-backend:backend",
+     "ratio": 0.144
+    },
+    {
+     "workload": "dev-app-s/app-s-backend:backend",
+     "ratio": 0.173
+    },
+    {
+     "workload": "argocd/argocd-application-controller-0:application-controller",
+     "ratio": 0.181
+    },
+    {
+     "workload": "prod-app-z-backend/app-z-embedding-server:embedding",
+     "ratio": 0.279
+    },
+    {
+     "workload": "middleware/kafka-controller-0:kafka",
+     "ratio": 0.341
     }
    ],
    "cpu_near_limit_top": [],
@@ -29478,6 +31296,131 @@
       "nodeclaim": "build-arm64-88w98",
       "launched_to_initialized_s": 71,
       "launched_to_registered_s": 55
+     },
+     {
+      "nodeclaim": "default-k48s5",
+      "launched_to_initialized_s": 71,
+      "launched_to_registered_s": 61
+     },
+     {
+      "nodeclaim": "build-arm64-fxkbg",
+      "launched_to_initialized_s": 71,
+      "launched_to_registered_s": 56
+     },
+     {
+      "nodeclaim": "build-arm64-np4mt",
+      "launched_to_initialized_s": 69,
+      "launched_to_registered_s": 54
+     },
+     {
+      "nodeclaim": "default-jbfcl",
+      "launched_to_initialized_s": 69,
+      "launched_to_registered_s": 51
+     },
+     {
+      "nodeclaim": "default-lvf7c",
+      "launched_to_initialized_s": 68,
+      "launched_to_registered_s": 55
+     },
+     {
+      "nodeclaim": "default-gzfb4",
+      "launched_to_initialized_s": 66,
+      "launched_to_registered_s": 56
+     },
+     {
+      "nodeclaim": "build-arm64-bd8w9",
+      "launched_to_initialized_s": 66,
+      "launched_to_registered_s": 52
+     },
+     {
+      "nodeclaim": "default-v7c46",
+      "launched_to_initialized_s": 64,
+      "launched_to_registered_s": 54
+     },
+     {
+      "nodeclaim": "build-arm64-7svvl",
+      "launched_to_initialized_s": 64,
+      "launched_to_registered_s": 50
+     },
+     {
+      "nodeclaim": "default-vz69n",
+      "launched_to_initialized_s": 63,
+      "launched_to_registered_s": 48
+     },
+     {
+      "nodeclaim": "default-td9kt",
+      "launched_to_initialized_s": 61,
+      "launched_to_registered_s": 45
+     },
+     {
+      "nodeclaim": "build-arm64-jqpc8",
+      "launched_to_initialized_s": 60,
+      "launched_to_registered_s": 43
+     },
+     {
+      "nodeclaim": "default-wwhg5",
+      "launched_to_initialized_s": 58,
+      "launched_to_registered_s": 47
+     },
+     {
+      "nodeclaim": "default-z9z9h",
+      "launched_to_initialized_s": 56,
+      "launched_to_registered_s": 45
+     },
+     {
+      "nodeclaim": "default-tqfdp",
+      "launched_to_initialized_s": 55,
+      "launched_to_registered_s": 44
+     },
+     {
+      "nodeclaim": "build-arm64-zqkjw",
+      "launched_to_initialized_s": 55,
+      "launched_to_registered_s": 40
+     },
+     {
+      "nodeclaim": "default-2g8wm",
+      "launched_to_initialized_s": 55,
+      "launched_to_registered_s": 43
+     },
+     {
+      "nodeclaim": "default-dxghz",
+      "launched_to_initialized_s": 53,
+      "launched_to_registered_s": 42
+     },
+     {
+      "nodeclaim": "default-fdmww",
+      "launched_to_initialized_s": 50,
+      "launched_to_registered_s": 38
+     },
+     {
+      "nodeclaim": "build-arm64-l2zdc",
+      "launched_to_initialized_s": 48,
+      "launched_to_registered_s": 33
+     },
+     {
+      "nodeclaim": "default-6d76s",
+      "launched_to_initialized_s": 47,
+      "launched_to_registered_s": 37
+     },
+     {
+      "nodeclaim": "build-arm64-xlg9c",
+      "launched_to_initialized_s": 47,
+      "launched_to_registered_s": 32
+     },
+     {
+      "nodeclaim": "default-6mrpc",
+      "launched_to_initialized_s": 46,
+      "launched_to_registered_s": 35
+     },
+     {
+      "nodeclaim": "default-w2hnx",
+      "launched_to_initialized_s": 44,
+      "launched_to_registered_s": 34
+     },
+     {
+      "nodeclaim": "default-2957m",
+      "launched_to_initialized_s": 41,
+      "launched_to_registered_s": 29
      }
     ]
    },
@@ -29487,6 +31430,66 @@
     "emptiness delete": 10
    },
    "disrupted_24h": [
+    {
+     "time": "2026-11-06T01:41:49.192935+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-209.ap-northeast-2.compute.internal/c9g.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T01:42:14.394477+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-116.ap-northeast-2.compute.internal/c9g.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T01:50:47.024573+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-160.ap-northeast-2.compute.internal/c9gd.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T01:56:57.307071+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-66.ap-northeast-2.compute.internal/c9g.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T02:01:26.830708+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-177.ap-northeast-2.compute.internal/c9gd.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T02:52:20.951542+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-160.ap-northeast-2.compute.internal/c9gd.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T02:54:09.551323+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-250.ap-northeast-2.compute.internal/c9g.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T02:56:30.001124+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-146.ap-northeast-2.compute.internal/c9gd.large/spot",
+     "pods": 1
+    },
+    {
+     "time": "2026-11-06T03:42:50.988567+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-45.ap-northeast-2.compute.internal/c6g.xlarge/spot",
+     "pods": 2
+    },
+    {
+     "time": "2026-11-06T03:54:57.268790+00:00",
+     "reason": "emptiness delete",
+     "nodes": "ip-10-0-2-10.ap-northeast-2.compute.internal/c6g.xlarge/spot",
+     "pods": 0
+    },
     {
      "time": "2026-11-06T05:30:00.219108+00:00",
      "reason": "emptiness delete",
@@ -59849,7 +61852,38 @@
       "dev-app-y/deployment/app-y-admin",
       "dev-app-y/deployment/app-y-ai",
       "dev-app-y/deployment/app-y-backend",
-      "dev-app-y/deployment/app-y-frontend"
+      "dev-app-y/deployment/app-y-frontend",
+      "dev-app-v/deployment/app-v-admin-frontend",
+      "dev-app-v/deployment/app-v-backend",
+      "dev-app-v/deployment/app-v-frontend",
+      "dev-app-aa/deployment/app-aa-backend",
+      "dev-app-aa/deployment/app-aa-frontend",
+      "prod-app-w/deployment/app-w",
+      "prod-app-t/deployment/app-t-ai",
+      "prod-app-t/deployment/app-t-backend",
+      "prod-app-t/deployment/app-t-studio",
+      "prod-app-t/deployment/app-t-web",
+      "prod-app-x/deployment/app-x-api",
+      "prod-app-s/deployment/app-s-admin",
+      "prod-app-s/deployment/app-s-api",
+      "prod-app-s/deployment/app-s-backend",
+      "prod-app-s/deployment/app-s-frontend",
+      "prod-app-y/deployment/app-y-admin",
+      "prod-app-y/deployment/app-y-ai",
+      "prod-app-y/deployment/app-y-backend",
+      "prod-app-y/deployment/app-y-frontend",
+      "prod-app-z-backend/deployment/app-z-backend",
+      "prod-app-z-backend/deployment/app-z-embedding-server",
+      "prod-app-z-backend/deployment/app-z-file-worker",
+      "prod-app-z-backend/deployment/app-z-frontend",
+      "prod-app-z-backend/deployment/app-z-graph-worker",
+      "prod-app-r/deployment/app-r-backend",
+      "prod-app-r/deployment/app-r-web",
+      "prod-app-v/deployment/app-v-admin-frontend",
+      "prod-app-v/deployment/app-v-backend",
+      "prod-app-v/deployment/app-v-frontend",
+      "app-ab-prod/deployment/app-ab-backend",
+      "app-ab-prod/deployment/app-ab-frontend"
      ],
      "prod_workloads": 26,
      "nodes_with_label": 4,
@@ -59867,7 +61901,33 @@
       "argocd/deployment/argocd-repo-server",
       "argocd/deployment/argocd-server",
       "kube-system/deployment/external-dns",
-      "middleware/deployment/kafka-exporter"
+      "middleware/deployment/kafka-exporter",
+      "middleware/deployment/kafka-ui",
+      "middleware/deployment/redis-insight",
+      "monitoring/deployment/kube-prometheus-stack-grafana",
+      "monitoring/deployment/kube-prometheus-stack-operator",
+      "monitoring/deployment/vmalert",
+      "prod-app-z-backend/deployment/app-z-pg-proxy",
+      "argocd/statefulset/argocd-application-controller",
+      "dev-app-s/statefulset/app-s-backend-mysql",
+      "dev-app-y/statefulset/app-y-backend-mysql",
+      "dev-app-v/statefulset/app-v-backend-dev-mysql",
+      "dev-app-aa/statefulset/app-aa-mysql",
+      "dev-app-aa/statefulset/app-aa-postgres",
+      "middleware/statefulset/kafka-controller",
+      "middleware/statefulset/redis-master",
+      "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager",
+      "monitoring/statefulset/loki-stack",
+      "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus",
+      "monitoring/statefulset/vm-single",
+      "prod-app-t/statefulset/app-t-backend-postgresql",
+      "prod-app-x/statefulset/app-x-postgresql",
+      "prod-app-s/statefulset/app-s-backend-mysql",
+      "prod-app-y/statefulset/app-y-backend-mysql",
+      "prod-app-z-backend/statefulset/app-z-neo4j",
+      "prod-app-r/statefulset/app-r-postgresql",
+      "prod-app-v/statefulset/app-v-backend-prod-mysql",
+      "app-ab-prod/statefulset/app-ab-backend-postgresql"
      ],
      "prod_workloads": 9,
      "nodes_with_label": 5,
@@ -59909,7 +61969,10 @@
       "kube-system/deployment/coredns",
       "kube-system/deployment/ebs-csi-controller",
       "kube-system/daemonset/aws-node",
-      "kube-system/daemonset/ebs-csi-node"
+      "kube-system/daemonset/ebs-csi-node",
+      "kube-system/daemonset/ebs-csi-node-windows",
+      "kube-system/daemonset/kube-proxy",
+      "monitoring/daemonset/kube-prometheus-stack-prometheus-node-exporter"
      ],
      "prod_workloads": 0,
      "nodes_with_label": 9,
@@ -65389,7 +67452,8 @@
       "User:eks:network-policy-controller",
       "User:eks:node-manager",
       "User:eks:vpc-resource-controller",
-      "User:system:kube-controller-manager"
+      "User:system:kube-controller-manager",
+      "User:system:kube-scheduler"
      ],
      "rbac_subject_count": 11,
      "nodes": {
@@ -66207,7 +68271,10 @@
       "kube-system": 0.008,
       "dev-app-aa": 0.005,
       "prod-app-y": 0.005,
-      "dev-app-y": 0.005
+      "dev-app-y": 0.005,
+      "app-ab-prod": 0.004,
+      "keda": 0.001,
+      "argocd": 0.0
      },
      "shares_ci_prod": false,
      "shares_dev_prod": true,
@@ -66328,7 +68395,17 @@
       "dev-app-s": 0.011,
       "prod-app-y": 0.007,
       "dev-app-y": 0.007,
-      "monitoring": 0.005
+      "monitoring": 0.005,
+      "app-ab-prod": 0.004,
+      "dev-app-v": 0.003,
+      "prod-app-v": 0.003,
+      "prod-app-w": 0.001,
+      "kube-system": 0.001,
+      "prod-app-t": 0.0,
+      "prod-app-r": 0.0,
+      "prod-app-x": 0.0,
+      "dev-app-aa": 0.0,
+      "external-secrets": 0.0
      },
      "shares_ci_prod": false,
      "shares_dev_prod": true,
@@ -66501,7 +68578,12 @@
       "arc-runners": 0.005,
       "monitoring": 0.002,
       "kube-system": 0.001,
-      "prod-app-t": 0.001
+      "prod-app-t": 0.001,
+      "prod-app-x": 0.001,
+      "dev-app-v": 0.0,
+      "prod-app-r": 0.0,
+      "arc-system": 0.0,
+      "dev-app-aa": 0.0
      },
      "shares_ci_prod": false,
      "shares_dev_prod": true,
@@ -66619,7 +68701,10 @@
       "prod-app-t": 0.003,
       "prod-app-x": 0.002,
       "kube-system": 0.002,
-      "keda": 0.001
+      "keda": 0.001,
+      "argocd": 0.0,
+      "middleware": 0.0,
+      "arc-system": 0.0
      },
      "shares_ci_prod": false,
      "shares_dev_prod": true,
@@ -66687,7 +68772,12 @@
       "middleware": 0.009,
       "monitoring": 0.006,
       "prod-app-s": 0.005,
-      "dev-app-v": 0.005
+      "dev-app-v": 0.005,
+      "dev-app-s": 0.005,
+      "prod-app-v": 0.005,
+      "external-secrets": 0.001,
+      "arc-system": 0.0,
+      "karpenter": 0.0
      },
      "shares_ci_prod": false,
      "shares_dev_prod": true,
@@ -66753,7 +68843,10 @@
       "kube-system": 0.008,
       "dev-app-aa": 0.005,
       "prod-app-y": 0.005,
-      "dev-app-y": 0.005
+      "dev-app-y": 0.005,
+      "app-ab-prod": 0.004,
+      "keda": 0.001,
+      "argocd": 0.0
      },
      "shares_ci_prod": false,
      "shares_dev_prod": true,
@@ -66827,7 +68920,17 @@
       "dev-app-s": 0.011,
       "prod-app-y": 0.007,
       "dev-app-y": 0.007,
-      "monitoring": 0.005
+      "monitoring": 0.005,
+      "app-ab-prod": 0.004,
+      "dev-app-v": 0.003,
+      "prod-app-v": 0.003,
+      "prod-app-w": 0.001,
+      "kube-system": 0.001,
+      "prod-app-t": 0.0,
+      "prod-app-r": 0.0,
+      "prod-app-x": 0.0,
+      "dev-app-aa": 0.0,
+      "external-secrets": 0.0
      },
      "shares_ci_prod": false,
      "shares_dev_prod": true,
@@ -67000,7 +69103,12 @@
       "arc-runners": 0.005,
       "monitoring": 0.002,
       "kube-system": 0.001,
-      "prod-app-t": 0.001
+      "prod-app-t": 0.001,
+      "prod-app-x": 0.001,
+      "dev-app-v": 0.0,
+      "prod-app-r": 0.0,
+      "arc-system": 0.0,
+      "dev-app-aa": 0.0
      },
      "shares_ci_prod": false,
      "shares_dev_prod": true,
@@ -67118,7 +69226,10 @@
       "prod-app-t": 0.003,
       "prod-app-x": 0.002,
       "kube-system": 0.002,
-      "keda": 0.001
+      "keda": 0.001,
+      "argocd": 0.0,
+      "middleware": 0.0,
+      "arc-system": 0.0
      },
      "shares_ci_prod": false,
      "shares_dev_prod": true,
@@ -67186,7 +69297,12 @@
       "middleware": 0.009,
       "monitoring": 0.006,
       "prod-app-s": 0.005,
-      "dev-app-v": 0.005
+      "dev-app-v": 0.005,
+      "dev-app-s": 0.005,
+      "prod-app-v": 0.005,
+      "external-secrets": 0.001,
+      "arc-system": 0.0,
+      "karpenter": 0.0
      },
      "shares_ci_prod": false,
      "shares_dev_prod": true,
@@ -67344,6 +69460,114 @@
      "kind": "system",
      "cpu_p95_7d": 0.042,
      "share": 0.019
+    },
+    {
+     "namespace": "prod-app-y",
+     "kind": "prod",
+     "cpu_p95_7d": 0.037,
+     "share": 0.017
+    },
+    {
+     "namespace": "dev-app-y",
+     "kind": "dev",
+     "cpu_p95_7d": 0.035,
+     "share": 0.016
+    },
+    {
+     "namespace": "dev-app-v",
+     "kind": "dev",
+     "cpu_p95_7d": 0.024,
+     "share": 0.011
+    },
+    {
+     "namespace": "prod-app-v",
+     "kind": "prod",
+     "cpu_p95_7d": 0.024,
+     "share": 0.011
+    },
+    {
+     "namespace": "app-ab-prod",
+     "kind": "prod",
+     "cpu_p95_7d": 0.023,
+     "share": 0.01
+    },
+    {
+     "namespace": "karpenter",
+     "kind": "system",
+     "cpu_p95_7d": 0.02,
+     "share": 0.009
+    },
+    {
+     "namespace": "dev-app-aa",
+     "kind": "dev",
+     "cpu_p95_7d": 0.017,
+     "share": 0.008
+    },
+    {
+     "namespace": "prod-app-t",
+     "kind": "prod",
+     "cpu_p95_7d": 0.009,
+     "share": 0.004
+    },
+    {
+     "namespace": "prod-app-x",
+     "kind": "prod",
+     "cpu_p95_7d": 0.007,
+     "share": 0.003
+    },
+    {
+     "namespace": "prod-app-r",
+     "kind": "prod",
+     "cpu_p95_7d": 0.006,
+     "share": 0.003
+    },
+    {
+     "namespace": "keda",
+     "kind": "system",
+     "cpu_p95_7d": 0.004,
+     "share": 0.002
+    },
+    {
+     "namespace": "prod-app-w",
+     "kind": "prod",
+     "cpu_p95_7d": 0.004,
+     "share": 0.002
+    },
+    {
+     "namespace": "external-secrets",
+     "kind": "system",
+     "cpu_p95_7d": 0.002,
+     "share": 0.001
+    },
+    {
+     "namespace": "arc-system",
+     "kind": "system",
+     "cpu_p95_7d": 0.001,
+     "share": 0.0
+    },
+    {
+     "namespace": "database",
+     "kind": "other",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "default",
+     "kind": "other",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "kube-node-lease",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "kube-public",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
     }
    ],
    "dominated_shared_nodes": [],
@@ -69891,6 +72115,94 @@
       [
        "Elastic Load Balancing v2/DescribeLoadBalancers",
        3732
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeRules",
+       3732
+      ],
+      [
+       "ACM/DescribeCertificate",
+       3509
+      ],
+      [
+       "EC2/DescribeVpcs",
+       2989
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeTargetGroups",
+       1880
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeListeners",
+       1866
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+       1866
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeListenerCertificates",
+       1280
+      ],
+      [
+       "Shield/GetSubscriptionState",
+       1221
+      ],
+      [
+       "EC2/DescribeNetworkInterfaces",
+       1080
+      ],
+      [
+       "ACM/ListCertificates",
+       660
+      ],
+      [
+       "WAF Regional/GetWebACLForResource",
+       644
+      ],
+      [
+       "WAFV2/GetWebACLForResource",
+       644
+      ],
+      [
+       "EC2/DescribeSubnets",
+       586
+      ],
+      [
+       "Elastic Load Balancing v2/ModifyRule",
+       557
+      ],
+      [
+       "EC2/AuthorizeSecurityGroupIngress",
+       195
+      ],
+      [
+       "EC2/RevokeSecurityGroupIngress",
+       194
+      ],
+      [
+       "Elastic Load Balancing v2/CreateRule",
+       30
+      ],
+      [
+       "Elastic Load Balancing v2/CreateTargetGroup",
+       30
+      ],
+      [
+       "Elastic Load Balancing v2/DeleteRule",
+       14
+      ],
+      [
+       "Elastic Load Balancing v2/DeleteTargetGroup",
+       14
+      ],
+      [
+       "Elastic Load Balancing v2/ModifyTargetGroup",
+       13
+      ],
+      [
+       "EC2/DescribeAvailabilityZones",
+       2
       ]
      ],
      "aws_api_slow_ops_avg_s": [
@@ -69913,6 +72225,90 @@
       [
        "Elastic Load Balancing v2/CreateTargetGroup",
        0.265
+      ],
+      [
+       "EC2/DescribeSubnets",
+       0.138
+      ],
+      [
+       "Elastic Load Balancing v2/CreateRule",
+       0.103
+      ],
+      [
+       "Elastic Load Balancing v2/ModifyRule",
+       0.096
+      ],
+      [
+       "ACM/ListCertificates",
+       0.087
+      ],
+      [
+       "EC2/DescribeVpcs",
+       0.084
+      ],
+      [
+       "EC2/DescribeInstances",
+       0.082
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeTargetGroups",
+       0.081
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeRules",
+       0.08
+      ],
+      [
+       "EC2/DescribeSecurityGroups",
+       0.076
+      ],
+      [
+       "WAFV2/GetWebACLForResource",
+       0.075
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeTags",
+       0.071
+      ],
+      [
+       "ACM/DescribeCertificate",
+       0.07
+      ],
+      [
+       "EC2/DescribeNetworkInterfaces",
+       0.065
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeLoadBalancers",
+       0.064
+      ],
+      [
+       "WAF Regional/GetWebACLForResource",
+       0.059
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeListeners",
+       0.057
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeListenerCertificates",
+       0.052
+      ],
+      [
+       "Elastic Load Balancing v2/DeregisterTargets",
+       0.05
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+       0.047
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+       0.042
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeTargetHealth",
+       0.036
       ]
      ],
      "aws_api_retries_avg": 0.0,
@@ -70014,6 +72410,94 @@
     [
      "Elastic Load Balancing v2/DescribeLoadBalancers",
      3732
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeRules",
+     3732
+    ],
+    [
+     "ACM/DescribeCertificate",
+     3509
+    ],
+    [
+     "EC2/DescribeVpcs",
+     2989
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroups",
+     1880
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListeners",
+     1866
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+     1866
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListenerCertificates",
+     1280
+    ],
+    [
+     "Shield/GetSubscriptionState",
+     1221
+    ],
+    [
+     "EC2/DescribeNetworkInterfaces",
+     1080
+    ],
+    [
+     "ACM/ListCertificates",
+     660
+    ],
+    [
+     "WAF Regional/GetWebACLForResource",
+     644
+    ],
+    [
+     "WAFV2/GetWebACLForResource",
+     644
+    ],
+    [
+     "EC2/DescribeSubnets",
+     586
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyRule",
+     557
+    ],
+    [
+     "EC2/AuthorizeSecurityGroupIngress",
+     195
+    ],
+    [
+     "EC2/RevokeSecurityGroupIngress",
+     194
+    ],
+    [
+     "Elastic Load Balancing v2/CreateRule",
+     30
+    ],
+    [
+     "Elastic Load Balancing v2/CreateTargetGroup",
+     30
+    ],
+    [
+     "Elastic Load Balancing v2/DeleteRule",
+     14
+    ],
+    [
+     "Elastic Load Balancing v2/DeleteTargetGroup",
+     14
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyTargetGroup",
+     13
+    ],
+    [
+     "EC2/DescribeAvailabilityZones",
+     2
     ]
    ],
    "aws_api_slow_ops_avg_s": [
@@ -70036,6 +72520,90 @@
     [
      "Elastic Load Balancing v2/CreateTargetGroup",
      0.265
+    ],
+    [
+     "EC2/DescribeSubnets",
+     0.138
+    ],
+    [
+     "Elastic Load Balancing v2/CreateRule",
+     0.103
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyRule",
+     0.096
+    ],
+    [
+     "ACM/ListCertificates",
+     0.087
+    ],
+    [
+     "EC2/DescribeVpcs",
+     0.084
+    ],
+    [
+     "EC2/DescribeInstances",
+     0.082
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroups",
+     0.081
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeRules",
+     0.08
+    ],
+    [
+     "EC2/DescribeSecurityGroups",
+     0.076
+    ],
+    [
+     "WAFV2/GetWebACLForResource",
+     0.075
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTags",
+     0.071
+    ],
+    [
+     "ACM/DescribeCertificate",
+     0.07
+    ],
+    [
+     "EC2/DescribeNetworkInterfaces",
+     0.065
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancers",
+     0.064
+    ],
+    [
+     "WAF Regional/GetWebACLForResource",
+     0.059
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListeners",
+     0.057
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListenerCertificates",
+     0.052
+    ],
+    [
+     "Elastic Load Balancing v2/DeregisterTargets",
+     0.05
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+     0.047
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+     0.042
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetHealth",
+     0.036
     ]
    ],
    "aws_api_retries_avg": 0.0,
@@ -70075,7 +72643,10 @@
     "healthcheck-path": 22,
     "healthy-threshold-count": 12,
     "success-codes": 12,
-    "unhealthy-threshold-count": 12
+    "unhealthy-threshold-count": 12,
+    "certificate-arn": 6,
+    "ssl-redirect": 6,
+    "backend-protocol": 3
    },
    "tgb_count": 52,
    "tgb_by_target_type": {
@@ -70121,6 +72692,90 @@
     [
      "Elastic Load Balancing v2/CreateTargetGroup",
      0.265
+    ],
+    [
+     "EC2/DescribeSubnets",
+     0.138
+    ],
+    [
+     "Elastic Load Balancing v2/CreateRule",
+     0.103
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyRule",
+     0.096
+    ],
+    [
+     "ACM/ListCertificates",
+     0.087
+    ],
+    [
+     "EC2/DescribeVpcs",
+     0.084
+    ],
+    [
+     "EC2/DescribeInstances",
+     0.082
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroups",
+     0.081
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeRules",
+     0.08
+    ],
+    [
+     "EC2/DescribeSecurityGroups",
+     0.076
+    ],
+    [
+     "WAFV2/GetWebACLForResource",
+     0.075
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTags",
+     0.071
+    ],
+    [
+     "ACM/DescribeCertificate",
+     0.07
+    ],
+    [
+     "EC2/DescribeNetworkInterfaces",
+     0.065
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancers",
+     0.064
+    ],
+    [
+     "WAF Regional/GetWebACLForResource",
+     0.059
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListeners",
+     0.057
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListenerCertificates",
+     0.052
+    ],
+    [
+     "Elastic Load Balancing v2/DeregisterTargets",
+     0.05
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+     0.047
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+     0.042
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetHealth",
+     0.036
     ]
    ],
    "aws_api_top_ops": [
@@ -70155,6 +72810,94 @@
     [
      "Elastic Load Balancing v2/DescribeLoadBalancers",
      3732
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeRules",
+     3732
+    ],
+    [
+     "ACM/DescribeCertificate",
+     3509
+    ],
+    [
+     "EC2/DescribeVpcs",
+     2989
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroups",
+     1880
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListeners",
+     1866
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+     1866
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListenerCertificates",
+     1280
+    ],
+    [
+     "Shield/GetSubscriptionState",
+     1221
+    ],
+    [
+     "EC2/DescribeNetworkInterfaces",
+     1080
+    ],
+    [
+     "ACM/ListCertificates",
+     660
+    ],
+    [
+     "WAF Regional/GetWebACLForResource",
+     644
+    ],
+    [
+     "WAFV2/GetWebACLForResource",
+     644
+    ],
+    [
+     "EC2/DescribeSubnets",
+     586
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyRule",
+     557
+    ],
+    [
+     "EC2/AuthorizeSecurityGroupIngress",
+     195
+    ],
+    [
+     "EC2/RevokeSecurityGroupIngress",
+     194
+    ],
+    [
+     "Elastic Load Balancing v2/CreateRule",
+     30
+    ],
+    [
+     "Elastic Load Balancing v2/CreateTargetGroup",
+     30
+    ],
+    [
+     "Elastic Load Balancing v2/DeleteRule",
+     14
+    ],
+    [
+     "Elastic Load Balancing v2/DeleteTargetGroup",
+     14
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyTargetGroup",
+     13
+    ],
+    [
+     "EC2/DescribeAvailabilityZones",
+     2
     ]
    ],
    "rest_client_429_503": 126,
@@ -73426,6 +76169,306 @@
      "ratio": null,
      "adjustable": true,
      "watched": false
+    },
+    {
+     "code": "L-43872EB7",
+     "service": "ec2",
+     "name": "Route Tables per transit gateway",
+     "label": null,
+     "limit": 20.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-B665C33B",
+     "service": "ec2",
+     "name": "AMIs",
+     "label": null,
+     "limit": 50000.0,
+     "unit": "None",
+     "used": 2.0,
+     "ratio": 0.0,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-74FC7D96",
+     "service": "ec2",
+     "name": "Running On-Demand F instances",
+     "label": null,
+     "limit": 128.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-BE3AA8E7",
+     "service": "ec2",
+     "name": "Application Status Checks Targets per account",
+     "label": null,
+     "limit": 5000.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-1945791B",
+     "service": "ec2",
+     "name": "Running On-Demand Inf instances",
+     "label": null,
+     "limit": 128.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-A1B5A36F",
+     "service": "ec2",
+     "name": "Peering attachments per transit gateway",
+     "label": null,
+     "limit": 50.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-43DA4232",
+     "service": "ec2",
+     "name": "Running On-Demand High Memory instances",
+     "label": null,
+     "limit": 448.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-6B0D517C",
+     "service": "ec2",
+     "name": "All Trn Spot Instance Requests",
+     "label": null,
+     "limit": 256.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-B5D1601B",
+     "service": "ec2",
+     "name": "All Inf Spot Instance Requests",
+     "label": null,
+     "limit": 128.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-7C6BAEAA",
+     "service": "ec2",
+     "name": "Application Status Checks Associations per health check",
+     "label": null,
+     "limit": 50.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-F7808C92",
+     "service": "ec2",
+     "name": "Running On-Demand HPC instances",
+     "label": null,
+     "limit": 768.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-A2478D36",
+     "service": "ec2",
+     "name": "Transit gateways per account",
+     "label": null,
+     "limit": 5.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-B91E5754",
+     "service": "ec2",
+     "name": "VPN connections per VGW",
+     "label": null,
+     "limit": 10.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-2C3B7624",
+     "service": "ec2",
+     "name": "Running On-Demand Trn instances",
+     "label": null,
+     "limit": 256.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-29B6F2EB",
+     "service": "vpc",
+     "name": "Interface VPC endpoints per VPC",
+     "label": null,
+     "limit": 50.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-83CA0A9D",
+     "service": "vpc",
+     "name": "IPv4 CIDR blocks per VPC",
+     "label": null,
+     "limit": 5.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-93826ACB",
+     "service": "vpc",
+     "name": "Routes per route table",
+     "label": null,
+     "limit": 500.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-0EA8095F",
+     "service": "vpc",
+     "name": "Inbound or outbound rules per security group",
+     "label": null,
+     "limit": 60.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-8A66D0E6",
+     "service": "elasticloadbalancing",
+     "name": "Reserved Application Load Balancer Capacity Units (LCU) per Region",
+     "label": null,
+     "limit": 0.0,
+     "unit": "None",
+     "used": 0.0,
+     "ratio": null,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-CE3125E5",
+     "service": "elasticloadbalancing",
+     "name": "Registered Instances per Classic Load Balancer",
+     "label": null,
+     "limit": 1000.0,
+     "unit": "None",
+     "used": 0.0,
+     "ratio": 0.0,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-52964454",
+     "service": "elasticloadbalancing",
+     "name": "Certificates per Network Load Balancer",
+     "label": null,
+     "limit": 25.0,
+     "unit": "None",
+     "used": 0.0,
+     "ratio": 0.0,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-E9E9831D",
+     "service": "elasticloadbalancing",
+     "name": "Classic Load Balancers per Region",
+     "label": null,
+     "limit": 20.0,
+     "unit": "None",
+     "used": 0.0,
+     "ratio": 0.0,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-1A491844",
+     "service": "elasticloadbalancing",
+     "name": "Listeners per Classic Load Balancer",
+     "label": null,
+     "limit": 100.0,
+     "unit": "None",
+     "used": 0.0,
+     "ratio": 0.0,
+     "adjustable": true,
+     "watched": false
+    },
+    {
+     "code": "L-AFEBDF7A",
+     "service": "ebs",
+     "name": "StartSnapshot requests per account",
+     "label": null,
+     "limit": 10.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": false,
+     "watched": false
+    },
+    {
+     "code": "L-1D4D9345",
+     "service": "ebs",
+     "name": "CompleteSnapshot requests per account",
+     "label": null,
+     "limit": 10.0,
+     "unit": "None",
+     "used": null,
+     "ratio": null,
+     "adjustable": false,
+     "watched": false
     }
    ],
    "near_limit": [],
@@ -74075,6 +77118,166 @@
     {
      "name": "ecr-app-y-ai-prod",
      "gib": 29.75
+    },
+    {
+     "name": "ecr-app-y-ai-dev",
+     "gib": 28.88
+    },
+    {
+     "name": "ecr-app-ab-backend-eks-prod",
+     "gib": 23.82
+    },
+    {
+     "name": "ecr-app-s-frontend-dev",
+     "gib": 23.53
+    },
+    {
+     "name": "ecr-app-x-api-eks-prod",
+     "gib": 14.46
+    },
+    {
+     "name": "app-aa-backend",
+     "gib": 13.25
+    },
+    {
+     "name": "ecr-app-t-backend-eks-prod",
+     "gib": 12.86
+    },
+    {
+     "name": "ecr-app-r-backend-eks-prod",
+     "gib": 10.15
+    },
+    {
+     "name": "app-v",
+     "gib": 8.82
+    },
+    {
+     "name": "ecr-app-s-frontend-eks-prod",
+     "gib": 6.77
+    },
+    {
+     "name": "ecr-app-s-admin-eks-prod",
+     "gib": 6.41
+    },
+    {
+     "name": "ecr-app-y-frontend-eks-prod",
+     "gib": 5.82
+    },
+    {
+     "name": "ecr-app-y-backend-eks-prod",
+     "gib": 4.27
+    },
+    {
+     "name": "ecr-app-s-backend-eks-prod",
+     "gib": 4.23
+    },
+    {
+     "name": "ecr-app-t-studio-eks-prod",
+     "gib": 3.94
+    },
+    {
+     "name": "ecr-app-z-frontend-eks-prod",
+     "gib": 3.69
+    },
+    {
+     "name": "ecr-app-s-admin-dev",
+     "gib": 3.19
+    },
+    {
+     "name": "ecr-app-w-eks-prod",
+     "gib": 3.13
+    },
+    {
+     "name": "ecr-app-y-frontend-dev",
+     "gib": 2.89
+    },
+    {
+     "name": "ecr-app-t-web-eks-prod",
+     "gib": 2.22
+    },
+    {
+     "name": "ecr-app-y-backend-dev",
+     "gib": 2.14
+    },
+    {
+     "name": "ecr-app-s-backend-dev",
+     "gib": 1.83
+    },
+    {
+     "name": "ecr-app-y-admin-dev",
+     "gib": 1.47
+    },
+    {
+     "name": "ecr-app-y-admin-eks-prod",
+     "gib": 1.47
+    },
+    {
+     "name": "ecr-app-s-api-eks-prod",
+     "gib": 1.46
+    },
+    {
+     "name": "app-v-frontend-prod",
+     "gib": 1.37
+    },
+    {
+     "name": "app-v-backend-prod",
+     "gib": 1.34
+    },
+    {
+     "name": "app-aa-frontend",
+     "gib": 1.15
+    },
+    {
+     "name": "bitnami/kafka",
+     "gib": 0.99
+    },
+    {
+     "name": "ecr-app-r-postgresql-prod",
+     "gib": 0.97
+    },
+    {
+     "name": "ecr-app-t-postgresql-prod",
+     "gib": 0.97
+    },
+    {
+     "name": "ecr-app-x-postgresql-prod",
+     "gib": 0.97
+    },
+    {
+     "name": "app-v-frontend",
+     "gib": 0.78
+    },
+    {
+     "name": "app-v-backend",
+     "gib": 0.77
+    },
+    {
+     "name": "ecr-app-r-web-eks-prod",
+     "gib": 0.72
+    },
+    {
+     "name": "bitnami/mysql",
+     "gib": 0.61
+    },
+    {
+     "name": "ecr-app-s-api-dev",
+     "gib": 0.49
+    },
+    {
+     "name": "ecr-app-ab-postgresql-pgvector",
+     "gib": 0.48
+    },
+    {
+     "name": "app-v-admin-frontend-prod",
+     "gib": 0.26
+    },
+    {
+     "name": "app-v-admin-frontend",
+     "gib": 0.25
+    },
+    {
+     "name": "ecr-app-s-frontend-prod",
+     "gib": 0.0
     }
    ],
    "scan_type": "BASIC",
@@ -74285,7 +77488,20 @@
     "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4",
     "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3",
     "docker.io/bitnamilegacy/kubectl:1.32.4",
-    "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+    "docker.io/bitnamilegacy/os-shell:11-debian-11-r95",
+    "docker.io/danielqsj/kafka-exporter:v1.7.0",
+    "docker.io/grafana/grafana:10.2.3",
+    "docker.io/grafana/promtail:2.9.2",
+    "docker.io/library/busybox:1.31.1",
+    "docker.io/provectuslabs/kafka-ui:v0.7.1",
+    "grafana/loki:2.6.1",
+    "neo4j:2026.05.0-community",
+    "pgvector/pgvector:pg16",
+    "redis/redisinsight:latest",
+    "tailscale/tailscale:latest",
+    "victoriametrics/victoria-metrics:v1.132.0",
+    "victoriametrics/vmalert:v1.97.0",
+    "victoriametrics/vmauth:v1.132.0"
    ],
    "digest_pinned": 2,
    "pull_failure_events": 0,
@@ -75917,6 +79133,26 @@
     {
      "label": "le",
      "values": 339
+    },
+    {
+     "label": "resource",
+     "values": 301
+    },
+    {
+     "label": "uid",
+     "values": 262
+    },
+    {
+     "label": "type",
+     "values": 236
+    },
+    {
+     "label": "container_id",
+     "values": 215
+    },
+    {
+     "label": "owner_name",
+     "values": 164
     }
    ],
    "rss_vs_limit": 0.655,
@@ -75954,6 +79190,31 @@
     {
      "job": "kube-prometheus-stack-prometheus",
      "seconds": 0.58,
+     "interval": 30
+    },
+    {
+     "job": "app-s-backend",
+     "seconds": 0.51,
+     "interval": 15
+    },
+    {
+     "job": "kube-proxy",
+     "seconds": 0.5,
+     "interval": 30
+    },
+    {
+     "job": "node-exporter",
+     "seconds": 0.41,
+     "interval": 30
+    },
+    {
+     "job": "kube-prometheus-stack-alertmanager",
+     "seconds": 0.38,
+     "interval": 30
+    },
+    {
+     "job": "kube-prometheus-stack-operator",
+     "seconds": 0.22,
      "interval": 30
     }
    ],
@@ -76623,6 +79884,48 @@
     "share": 0.022,
     "monthly_usd_est": 10.03,
     "prod": false
+   },
+   {
+    "namespace": "prod-app-t",
+    "cpu_request": 0.29,
+    "share": 0.021,
+    "monthly_usd_est": 9.69,
+    "prod": true
+   },
+   {
+    "namespace": "prod-app-v",
+    "cpu_request": 0.25,
+    "share": 0.018,
+    "monthly_usd_est": 8.35,
+    "prod": true
+   },
+   {
+    "namespace": "app-ab-prod",
+    "cpu_request": 0.25,
+    "share": 0.018,
+    "monthly_usd_est": 8.35,
+    "prod": true
+   },
+   {
+    "namespace": "external-secrets",
+    "cpu_request": 0.15,
+    "share": 0.011,
+    "monthly_usd_est": 5.01,
+    "prod": false
+   },
+   {
+    "namespace": "prod-app-w",
+    "cpu_request": 0.1,
+    "share": 0.007,
+    "monthly_usd_est": 3.34,
+    "prod": true
+   },
+   {
+    "namespace": "arc-system",
+    "cpu_request": 0.05,
+    "share": 0.004,
+    "monthly_usd_est": 1.67,
+    "prod": false
    }
   ],
   "bill": {
@@ -76679,6 +79982,46 @@
     {
      "service": "Amazon Route 53",
      "usd": 0.25
+    },
+    {
+     "service": "AWS Cost Explorer",
+     "usd": 0.21
+    },
+    {
+     "service": "Amazon Simple Email Service",
+     "usd": 0.05
+    },
+    {
+     "service": "AWS Amplify",
+     "usd": 0.0
+    },
+    {
+     "service": "Amazon CloudFront",
+     "usd": 0.0
+    },
+    {
+     "service": "Amazon DynamoDB",
+     "usd": 0.0
+    },
+    {
+     "service": "Amazon Elastic File System",
+     "usd": 0.0
+    },
+    {
+     "service": "AWS CloudTrail",
+     "usd": 0.0
+    },
+    {
+     "service": "AWS Glue",
+     "usd": 0.0
+    },
+    {
+     "service": "Amazon Simple Notification Service",
+     "usd": 0.0
+    },
+    {
+     "service": "Amazon Simple Queue Service",
+     "usd": 0.0
     }
    ],
    "note": "Cost Explorer covers the whole account (including RDS, S3 etc. outside this cluster). 0.01 USD per request"

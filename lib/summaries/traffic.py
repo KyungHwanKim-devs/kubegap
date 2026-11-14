@@ -393,7 +393,7 @@ def _ingresses(snap: Path, objs: _Objects, alb: dict) -> list[dict]:
                 "alb_group": ann.get("alb.ingress.kubernetes.io/group.name"),
                 "tls": tls,
                 "scheme": scheme,
-                "lb": lb_hosts[:2],
+                "lb": lb_hosts,
                 "auth_hint": auth,
                 "has_auth_hint": bool(auth),
                 "admin_like": any(ADMIN_HOST_RE.search(h or "") for h in hosts),
@@ -474,7 +474,7 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
                 "namespace": ns,
                 "name": name,
                 "target": f"{t.lower()}/{ns}/{name}",
-                "hosts": addrs[:2],
+                "hosts": addrs,
                 "ports": ports,
                 "node_ports": node_ports,
                 "scheme": scheme,
@@ -586,7 +586,7 @@ def _pod_skew(snap: Path, objs: _Objects) -> dict:
             }
         )
     rows.sort(key=lambda r: -(r["skew_ratio"] or 0))
-    return {"available": metric_doc(snap, "pod_network_rx_bytes_1h") is not None, "workloads_measured": len(rows), "rows": rows[:30]}
+    return {"available": metric_doc(snap, "pod_network_rx_bytes_1h") is not None, "workloads_measured": len(rows), "rows": rows}
 
 
 def _readiness(snap: Path, objs: _Objects) -> dict:
@@ -631,7 +631,7 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
     available = bool((metric_doc(snap, "pod_ready_ratio_24h") or {}).get("ok"))
     return {
         "available": available,
-        "rows": rows[:40] if available else None,  # None, not []: without the readiness ratio the rows judge nothing (#141)
+        "rows": rows if available else None,  # None, not []: without the readiness ratio the rows judge nothing (#141)
         "skip_reason": None if available else "pod readiness ratio not read (metrics/pod_ready_ratio_24h.json missing or failed)",
         "unhealthy_events_total": sum(unhealthy.values()),
         "endpoints_not_ready": not_ready_eps,

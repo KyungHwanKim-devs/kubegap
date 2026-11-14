@@ -380,7 +380,7 @@
 | `observability.golden-signals-missing.monitoring/monitoring-grafana-ingress` | warn | medium | hosts ['grafana.lab-a.example'], backends ['kube-prometheus-stack-grafana'], no app http_* metrics, no ingress controller metrics, source none |
 | `observability.golden-signals-missing.registry/registry` | warn | medium | hosts ['registry.lab-a.example'], backends ['registry'], no app http_* metrics, no ingress controller metrics, source none |
 | `observability.no-symptom-alerts.cluster` | warn | medium | 161 alert rules: symptom 0, cause 153, app metrics (assumed symptom) 7. Symptom ratio 0.0. Symptom rules: [] |
-| `observability.page-severity-cause-alerts.cluster` | warn | medium | of 161 alert rules, 40 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AppQClusterCPU80', 'AppQClusterMem80', 'AppQBackendDown', 'AppQFrontendDown', 'AppQPostgresDown', 'AppQGatewayDown']), classes {'cause': 153, 'app-cause': 1, 'app': 7}, severity … |
+| `observability.page-severity-cause-alerts.cluster` | warn | medium | of 161 alert rules, 42 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AppQClusterCPU80', 'AppQClusterMem80', 'AppQBackendDown', 'AppQFrontendDown', 'AppQPostgresDown', 'AppQGatewayDown']), classes {'cause': 153, 'app-cause': 1, 'app': 7}, severity … |
 | `operators.unhealthy-condition.deployments/app-c-prod/app-c-coturn` | warn | medium | Available=False (MinimumReplicasUnavailable) for 0.6 hours: Deployment does not have minimum availability. |
 | `resilience.cronjob-policy.app-f-prod/app-f-postgres-backup` | warn | medium | schedule '30 3 * * *', concurrencyPolicy Allow, activeDeadlineSeconds None, backoffLimit None, podFailurePolicy False, startingDeadlineSeconds None, ttl None, active Jobs 0. Gaps: ['concurrencyPolicy Allow (overlap allowed)', 'activeDeadlineSeconds missing (a stuck Job runs forever)', 'backoffLimit … |
 | `resilience.cronjob-policy.app-f-prod/app-f-postgres-mx-backup` | warn | medium | schedule '30 3 * * *', concurrencyPolicy Allow, activeDeadlineSeconds None, backoffLimit None, podFailurePolicy False, startingDeadlineSeconds None, ttl None, active Jobs 0. Gaps: ['concurrencyPolicy Allow (overlap allowed)', 'activeDeadlineSeconds missing (a stuck Job runs forever)', 'backoffLimit … |
@@ -901,7 +901,11 @@
   "app-a-prod/cronjob/marketing-digest-day",
   "app-a-prod/cronjob/marketing-digest-month",
   "app-a-prod/cronjob/marketing-digest-week",
-  "app-a-prod/cronjob/marketing-radar-global"
+  "app-a-prod/cronjob/marketing-radar-global",
+  "app-a-prod/cronjob/marketing-radar-global-eu",
+  "app-a-prod/cronjob/marketing-radar-japan",
+  "app-a-prod/cronjob/marketing-radar-japan-noon",
+  "app-a-prod/deployment/app-m"
  ],
  "prod": true,
  "target": "app-a-prod/configmap/marketing-scripts"
@@ -4985,7 +4989,9 @@
   "app-f-prod/statefulset/app-f-postgres-vn",
   "app-f-prod/statefulset/app-f-redis",
   "app-g-api/statefulset/app-g-minio",
-  "app-g-api/statefulset/app-g-postgres"
+  "app-g-api/statefulset/app-g-postgres",
+  "app-i-prod/statefulset/app-i-postgres",
+  "app-g-api/cronjob/app-g-postgres-backup"
  ]
 }
 ```
@@ -6455,7 +6461,9 @@
   "PrometheusBadConfig",
   "PrometheusRemoteStorageFailures",
   "PrometheusRemoteWriteBehind",
-  "PrometheusRuleFailures"
+  "PrometheusRuleFailures",
+  "PrometheusTargetSyncFailure",
+  "PrometheusErrorSendingAlertsToAnyAlertmanager"
  ]
 }
 ```
@@ -11345,7 +11353,64 @@
   "node_filefd_maximum",
   "node_filesystem_files",
   "node_filesystem_files_free",
-  "node_filesystem_readonly"
+  "node_filesystem_readonly",
+  "node_md_disks",
+  "node_md_disks_required",
+  "node_network_receive_errs_total",
+  "node_network_receive_packets_total",
+  "node_network_transmit_errs_total",
+  "node_network_transmit_packets_total",
+  "node_network_up",
+  "node_nf_conntrack_entries",
+  "node_nf_conntrack_entries_limit",
+  "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile",
+  "node_systemd_service_restart_total",
+  "node_systemd_unit_state",
+  "node_textfile_scrape_error",
+  "node_timex_maxerror_seconds",
+  "node_timex_offset_seconds",
+  "node_timex_sync_status",
+  "node_vmstat_pgmajfault",
+  "prometheus_config_last_reload_successful",
+  "prometheus_engine_queries",
+  "prometheus_engine_queries_concurrent_max",
+  "prometheus_notifications_alertmanagers_discovered",
+  "prometheus_notifications_errors_total",
+  "prometheus_notifications_queue_capacity",
+  "prometheus_notifications_queue_length",
+  "prometheus_notifications_sent_total",
+  "prometheus_operator_list_operations_failed_total",
+  "prometheus_operator_list_operations_total",
+  "prometheus_operator_managed_resources",
+  "prometheus_operator_node_address_lookup_errors_total",
+  "prometheus_operator_ready",
+  "prometheus_operator_reconcile_errors_total",
+  "prometheus_operator_reconcile_operations_total",
+  "prometheus_operator_status_update_errors_total",
+  "prometheus_operator_status_update_operations_total",
+  "prometheus_operator_syncs",
+  "prometheus_operator_watch_operations_failed_total",
+  "prometheus_operator_watch_operations_total",
+  "prometheus_remote_storage_failed_samples_total",
+  "prometheus_remote_storage_queue_highest_sent_timestamp_seconds",
+  "prometheus_remote_storage_queue_highest_timestamp_seconds",
+  "prometheus_remote_storage_samples_failed_total",
+  "prometheus_remote_storage_samples_total",
+  "prometheus_remote_storage_shards_desired",
+  "prometheus_remote_storage_shards_max",
+  "prometheus_remote_storage_succeeded_samples_total",
+  "prometheus_rule_evaluation_failures_total",
+  "prometheus_rule_group_iterations_missed_total",
+  "prometheus_rule_group_rules",
+  "prometheus_sd_kubernetes_failures_total",
+  "prometheus_sd_refresh_failures_total",
+  "prometheus_target_metadata_cache_entries",
+  "prometheus_target_scrape_pool_exceeded_label_limits_total",
+  "prometheus_target_scrape_pool_exceeded_target_limit_total",
+  "prometheus_target_sync_failed_total",
+  "prometheus_tsdb_compactions_failed_total",
+  "prometheus_tsdb_reloads_failures_total",
+  "reloader_last_reload_successful"
  ],
  "alert_metrics_without_panel_count": 137,
  "available": true,

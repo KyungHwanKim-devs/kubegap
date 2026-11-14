@@ -381,7 +381,7 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
                 "expire_after_h": exp_h,
                 "hours_past_expiry": round(age_h - exp_h, 1) if (age_h is not None and exp_h) and age_h > exp_h else None,
                 "disruption_blocked": dict(blocked.get(f"NodeClaim/{md['name']}", {})) or dict(blocked.get(f"Node/{st.get('nodeName')}", {})),
-                "do_not_disrupt_pods": sorted(dnd_by_node.get(st.get("nodeName") or "", []))[:8],
+                "do_not_disrupt_pods": sorted(dnd_by_node.get(st.get("nodeName") or "", [])),
                 "do_not_disrupt_pod_count": len(dnd_by_node.get(st.get("nodeName") or "", [])),
                 "allocatable_cpu": (st.get("allocatable") or {}).get("cpu"),
             }
@@ -411,7 +411,7 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
             if d:
                 reason, decision, n_nodes, n_pods, names = d
                 disruptions[f"{reason} {decision}"] += n_nodes
-                disrupted_nodes.append({"time": ts.isoformat() if ts else None, "reason": f"{reason} {decision}", "nodes": names[:200], "pods": n_pods})
+                disrupted_nodes.append({"time": ts.isoformat() if ts else None, "reason": f"{reason} {decision}", "nodes": names, "pods": n_pods})
                 continue
             key = launch_failure_key(line)
             if key:
@@ -423,7 +423,7 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
                 {"nodeclaim": name, "launched_to_initialized_s": round((d["initialized"] - d["launched"]).total_seconds()), "launched_to_registered_s": round((d["registered"] - d["launched"]).total_seconds()) if "registered" in d else None}
             )
     lat_vals = sorted(r["launched_to_initialized_s"] for r in lat_rows)
-    lat_stats = {"n": len(lat_vals), "p50_s": lat_vals[len(lat_vals) // 2] if lat_vals else None, "max_s": lat_vals[-1] if lat_vals else None, "slowest": sorted(lat_rows, key=lambda r: -r["launched_to_initialized_s"])[:5]}
+    lat_stats = {"n": len(lat_vals), "p50_s": lat_vals[len(lat_vals) // 2] if lat_vals else None, "max_s": lat_vals[-1] if lat_vals else None, "slowest": sorted(lat_rows, key=lambda r: -r["launched_to_initialized_s"])}
     cur_lat = sorted(r["initialized_s"] for r in claim_rows if r.get("initialized_s") is not None)
     spot = sum(1 for r in claim_rows if r["capacity_type"] == "spot")
     # Karpenter version vs cluster Kubernetes version (rubric/karpenter-compat.yaml). Input for a proper check rather than a one-line log signature
@@ -472,7 +472,7 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
         "latency_24h": lat_stats,
         "nodeclaims_launched_24h": created_24h,
         "disruptions_24h": dict(disruptions),
-        "disrupted_24h": disrupted_nodes[-20:],
+        "disrupted_24h": disrupted_nodes,
         "launch_failures_24h": dict(launch_failures),
         "expired_not_replaced": [r for r in claim_rows if r["expired"] and (r["hours_past_expiry"] or 0) >= 24],
         "drifted": [r["name"] for r in claim_rows if r["drifted"]],
@@ -489,7 +489,7 @@ def _karpenter(snap: Path, inv: dict | None, now: _dt.datetime) -> dict:
 def _pending(snap: Path) -> dict:
     rows = [{"namespace": lab.get("namespace"), "pod": lab.get("pod"), "pending_s": round(v)} for lab, v in metric_rows(snap, "pod_pending_seconds")]
     rows.sort(key=lambda r: -r["pending_s"])
-    return {"available": metric_doc(snap, "pod_pending_seconds") is not None, "count": len(rows), "rows": rows[:30]}
+    return {"available": metric_doc(snap, "pod_pending_seconds") is not None, "count": len(rows), "rows": rows}
 
 
 # Karpenter keys computed from logs/pods/karpenter/*.log. summarize saves them to logs/pods/AGGREGATED.json before deleting the logs; analyze() restores them on a rerun.

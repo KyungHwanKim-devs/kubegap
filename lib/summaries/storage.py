@@ -207,7 +207,7 @@ def _ebs(snap: Path, now: _dt.datetime) -> dict:
         "unattached_monthly_usd_est": round(sum(v.get("size") or 0 for v in unattached) * 0.0912, 2),
         "snapshots_30d": len(snaps),
         "snapshots_30d_gb": sum(s.get("size") or 0 for s in snaps),
-        "snapshot_descriptions": dict(Counter((s.get("description") or "")[:40] for s in snaps).most_common(5)),
+        "snapshot_descriptions": dict(Counter((s.get("description") or "")[:40] for s in snaps).most_common()),
         "snapshot_latest": max((s.get("start") or "" for s in snaps), default=None),
         "snapshotted_volumes": len({s.get("volume") for s in snaps}),
     }

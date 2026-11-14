@@ -247,7 +247,7 @@ def scan(snap: Path, sigs: list[Signature], *, keep_lines: bool = True) -> dict:
                 "count": h["count"],
                 "first": h["first"],
                 "last": h["last"],
-                "files": dict(h["files"].most_common(6)),
+                "files": dict(h["files"].most_common()),
                 "targets": targets,
                 "samples": h["samples"] if keep_lines else [],
                 "status": "fail" if (h["count"] >= s.fail_at and targets >= 2) else ("warn" if h["count"] >= s.warn_at else "info"),
@@ -255,7 +255,7 @@ def scan(snap: Path, sigs: list[Signature], *, keep_lines: bool = True) -> dict:
         )
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     sig_rows.sort(key=lambda r: (order.get(r["severity"], 9), -r["count"]))
-    uncl_rows = [{"pattern": k, "count": c, "files": dict(uncl_files[k].most_common(3)), "sample": uncl_sample.get(k)} for k, c in unclassified.most_common(30)]
+    uncl_rows = [{"pattern": k, "count": c, "files": dict(uncl_files[k].most_common()), "sample": uncl_sample.get(k)} for k, c in unclassified.most_common()]
     if not keep_lines:  # a daily run counts and keeps no log text: neither a sample line nor a pattern cut from one
         uncl_rows = []
     return {
@@ -372,8 +372,8 @@ def analyze_loki(snap: Path, inv: dict) -> dict:
         "pods_without_logs_1h": len(missing),
         "gap_ratio": round(len(missing) / running_old, 3) if running_old else None,
         "nodes_all_missing": nodes_all_missing,
-        "by_namespace_missing": dict(by_ns_missing.most_common(15)),
-        "pods_without_logs": sorted(missing, key=lambda m: (m["namespace"], m["pod"]))[:60],
+        "by_namespace_missing": dict(by_ns_missing.most_common()),
+        "pods_without_logs": sorted(missing, key=lambda m: (m["namespace"], m["pod"])),
         "note": "A pod that wrote no log lines in an hour may be fine (idle). If a whole node is missing (nodes_all_missing), that node's promtail is dead; if a whole namespace is missing, promtail's exclusion config is the cause",
         "available": bool(pods_lbl),
     }

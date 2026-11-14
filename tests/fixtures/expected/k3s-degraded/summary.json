@@ -448,6 +448,342 @@
      "pod": "app-f-mx-worker-76547bbd84-mzxhn",
      "restarts": 5,
      "node": "node-a"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-vn-766644b56d-dhklj",
+     "restarts": 5,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-excel-agent-fd75f7986-8v9zq",
+     "restarts": 5,
+     "node": "node-a"
+    },
+    {
+     "namespace": "logging",
+     "pod": "fluent-bit-nnsb5",
+     "restarts": 5,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-k",
+     "pod": "app-k-postgres-557c6964d6-c7hzd",
+     "restarts": 5,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-l-prod",
+     "pod": "app-l-postgres-76b69b654d-lzf4d",
+     "restarts": 5,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-a-prod",
+     "pod": "app-a-gateway-6d898d5f68-5sd56",
+     "restarts": 4,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-d",
+     "pod": "app-d-b6cc95769-4w9mf",
+     "restarts": 4,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-mx-7f466df4fb-dsdpw",
+     "restarts": 4,
+     "node": "node-a"
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "prometheus-kube-prometheus-stack-prometheus-0",
+     "restarts": 4,
+     "node": "node-b"
+    },
+    {
+     "namespace": "argocd",
+     "pod": "argocd-application-controller-0",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "cert-manager",
+     "pod": "cert-manager-webhook-596c6cdc7b-lz6vt",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-app-q-client-7599c7f5f-79njd",
+     "restarts": 3,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-qdrant-0",
+     "restarts": 3,
+     "node": "node-a"
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "local-path-provisioner-774c6665dc-lrslx",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "metrics-server-7bfffcd44-fkpfm",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "metallb-system",
+     "pod": "controller-654858564f-cpj5c",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "metallb-system",
+     "pod": "speaker-lqmcg",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-i-prod",
+     "pod": "app-i-84cc888b48-xwcpb",
+     "restarts": 3,
+     "node": "node-a"
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "kube-prometheus-stack-operator-74656dd4f5-5fmv5",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-a-prod",
+     "pod": "app-a-frontend-574ff75654-rjbzg",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "argocd",
+     "pod": "argocd-applicationset-controller-cdc6ffd77-sq64x",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "argocd",
+     "pod": "argocd-dex-server-7b868d86fb-hrb9f",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "argocd",
+     "pod": "argocd-notifications-controller-59f6949d7-rkdp8",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "argocd",
+     "pod": "argocd-repo-server-848dcbb4db-jz8xs",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-postgres-0",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-postgres-vn-0",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "external-secrets",
+     "pod": "external-secrets-74b997bf86-96bd5",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "external-secrets",
+     "pod": "external-secrets-cert-controller-7d7cc86594-8bdst",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-g-api",
+     "pod": "app-g-api-7cb685d8cf-zxqt7",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-admin-7fd8789559-k5mhl",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-api-server-5d6b56f78b-fd59m",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-api-server-5d6b56f78b-srwnk",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-app-p-7b944d986b-9v85l",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "ingress-nginx",
+     "pod": "nginx-ingress-ingress-nginx-controller-86f8b99dfd-6kgsq",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "ingress-nginx",
+     "pod": "nginx-ingress-ingress-nginx-controller-86f8b99dfd-lkdwm",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "keda",
+     "pod": "keda-admission-webhooks-5d67c9bcfb-8fcdl",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "keda",
+     "pod": "keda-operator-metrics-apiserver-7ff5758fd7-gq7g7",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "nvidia-device-plugin-rhjfx",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "logging",
+     "pod": "kibana-59c97cdf75-ht2zf",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "alertmanager-kube-prometheus-stack-alertmanager-0",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "kube-prometheus-stack-prometheus-node-exporter-rsgt8",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-a-prod",
+     "pod": "app-a-phoenix-56ddc584cf-znjvs",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-a-prod",
+     "pod": "app-a-postgres-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-a-prod",
+     "pod": "app-a-redis-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-b-prod",
+     "pod": "app-b-frontend-8544fb6d67-v47q2",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-c-prod",
+     "pod": "app-c-postgres-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-postgres-mx-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-redis-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "external-secrets",
+     "pod": "external-secrets-webhook-76d5b49f6-62nfg",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-g-api",
+     "pod": "app-g-minio-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-g-api",
+     "pod": "app-g-postgres-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "coredns-59d4d457d-qjng8",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-i-prod",
+     "pod": "app-i-postgres-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "registry",
+     "pod": "registry-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "reloader",
+     "pod": "reloader-reloader-787b597f5c-d6nsn",
+     "restarts": 1,
+     "node": "node-b"
     }
    ],
    "pending": [
@@ -1324,7 +1660,11 @@
       "KubePersistentVolumeInodesFillingUp",
       "KubePersistentVolumeInodesFillingUp",
       "KubePersistentVolumeErrors",
-      "KubeNodePressure"
+      "KubeNodePressure",
+      "NodeFilesystemSpaceFillingUp",
+      "NodeFilesystemSpaceFillingUp",
+      "NodeFilesystemAlmostOutOfSpace",
+      "NodeFilesystemAlmostOutOfSpace"
      ]
     },
     {
@@ -3424,7 +3764,94 @@
      "kube_statefulset_replicas",
      "kube_statefulset_status_current_revision",
      "kube_statefulset_status_observed_generation",
-     "kube_statefulset_status_replicas_ready"
+     "kube_statefulset_status_replicas_ready",
+     "kube_statefulset_status_replicas_updated",
+     "kube_statefulset_status_update_revision",
+     "kubelet_certificate_manager_client_expiration_renew_errors",
+     "kubelet_certificate_manager_client_ttl_seconds",
+     "kubelet_certificate_manager_server_ttl_seconds",
+     "kubelet_evictions",
+     "kubelet_server_expiration_renew_errors",
+     "kubelet_volume_stats_inodes_free",
+     "kubelet_volume_stats_used_bytes",
+     "kubernetes_build_info",
+     "namespace",
+     "negatives",
+     "node",
+     "node_bonding_active",
+     "node_bonding_slaves",
+     "node_disk_io_time_weighted_seconds_total",
+     "node_filefd_allocated",
+     "node_filefd_maximum",
+     "node_filesystem_files",
+     "node_filesystem_files_free",
+     "node_filesystem_readonly",
+     "node_md_disks",
+     "node_md_disks_required",
+     "node_network_receive_errs_total",
+     "node_network_receive_packets_total",
+     "node_network_transmit_errs_total",
+     "node_network_transmit_packets_total",
+     "node_network_up",
+     "node_nf_conntrack_entries",
+     "node_nf_conntrack_entries_limit",
+     "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile",
+     "node_systemd_service_restart_total",
+     "node_systemd_unit_state",
+     "node_textfile_scrape_error",
+     "node_timex_maxerror_seconds",
+     "node_timex_offset_seconds",
+     "node_timex_sync_status",
+     "node_vmstat_pgmajfault",
+     "one",
+     "only",
+     "prometheus",
+     "prometheus_config_last_reload_successful",
+     "prometheus_engine_queries",
+     "prometheus_engine_queries_concurrent_max",
+     "prometheus_notifications_alertmanagers_discovered",
+     "prometheus_notifications_errors_total",
+     "prometheus_notifications_queue_capacity",
+     "prometheus_notifications_queue_length",
+     "prometheus_notifications_sent_total",
+     "prometheus_operator_list_operations_failed_total",
+     "prometheus_operator_list_operations_total",
+     "prometheus_operator_managed_resources",
+     "prometheus_operator_node_address_lookup_errors_total",
+     "prometheus_operator_ready",
+     "prometheus_operator_reconcile_errors_total",
+     "prometheus_operator_reconcile_operations_total",
+     "prometheus_operator_status_update_errors_total",
+     "prometheus_operator_status_update_operations_total",
+     "prometheus_operator_syncs",
+     "prometheus_operator_watch_operations_failed_total",
+     "prometheus_operator_watch_operations_total",
+     "prometheus_remote_storage_failed_samples_total",
+     "prometheus_remote_storage_queue_highest_sent_timestamp_seconds",
+     "prometheus_remote_storage_queue_highest_timestamp_seconds",
+     "prometheus_remote_storage_samples_failed_total",
+     "prometheus_remote_storage_samples_total",
+     "prometheus_remote_storage_shards_desired",
+     "prometheus_remote_storage_shards_max",
+     "prometheus_remote_storage_succeeded_samples_total",
+     "prometheus_rule_evaluation_failures_total",
+     "prometheus_rule_group_iterations_missed_total",
+     "prometheus_rule_group_rules",
+     "prometheus_sd_kubernetes_failures_total",
+     "prometheus_sd_refresh_failures_total",
+     "prometheus_target_metadata_cache_entries",
+     "prometheus_target_scrape_pool_exceeded_label_limits_total",
+     "prometheus_target_scrape_pool_exceeded_target_limit_total",
+     "prometheus_target_sync_failed_total",
+     "prometheus_tsdb_compactions_failed_total",
+     "prometheus_tsdb_reloads_failures_total",
+     "reloader_last_reload_successful",
+     "robustperception",
+     "scrapes",
+     "see",
+     "service",
+     "with",
+     "www"
     ],
     "alert_metrics_without_panel_count": 167,
     "empty_dashboards": [],
@@ -9267,6 +9694,209 @@
      "summary": "CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB",
      "kubegap_level": "warn",
      "kubegap_reason": "memory request under by 84 MB"
+    },
+    {
+     "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-todo",
+     "kind": "DaemonSet",
+     "namespace": "app-a-prod",
+     "name": "app-a-sandbox-prepull",
+     "container": "hold-todo",
+     "severity": "WARNING",
+     "cpu_request": 0.01,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.05,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 16,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 64,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 2,
+     "cpu_request_delta": 0.0,
+     "memory_request_delta_mb": -84,
+     "summary": "CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 84 MB"
+    },
+    {
+     "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-network",
+     "kind": "DaemonSet",
+     "namespace": "app-a-prod",
+     "name": "app-a-sandbox-prepull",
+     "container": "hold-network",
+     "severity": "WARNING",
+     "cpu_request": 0.01,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.05,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 16,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 64,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 2,
+     "cpu_request_delta": 0.0,
+     "memory_request_delta_mb": -84,
+     "summary": "CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 84 MB"
+    },
+    {
+     "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-sql",
+     "kind": "DaemonSet",
+     "namespace": "app-a-prod",
+     "name": "app-a-sandbox-prepull",
+     "container": "hold-sql",
+     "severity": "WARNING",
+     "cpu_request": 0.01,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.05,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 16,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 64,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 2,
+     "cpu_request_delta": 0.0,
+     "memory_request_delta_mb": -84,
+     "summary": "CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 84 MB"
+    },
+    {
+     "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-go",
+     "kind": "DaemonSet",
+     "namespace": "app-a-prod",
+     "name": "app-a-sandbox-prepull",
+     "container": "hold-go",
+     "severity": "WARNING",
+     "cpu_request": 0.01,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.05,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 16,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 64,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 2,
+     "cpu_request_delta": 0.0,
+     "memory_request_delta_mb": -84,
+     "summary": "CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 84 MB"
+    },
+    {
+     "target": "app-l-prod/deployment/app-l-web:web",
+     "kind": "Deployment",
+     "namespace": "app-l-prod",
+     "name": "app-l-web",
+     "container": "web",
+     "severity": "WARNING",
+     "cpu_request": 0.05,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.3,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 128,
+     "memory_request_rec_mb": 204,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 512,
+     "memory_limit_rec_mb": 204,
+     "memory_limit_sev": "WARNING",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.04,
+     "memory_request_delta_mb": -76,
+     "summary": "CPU request 0.05 → 0.01 cores, CPU limit 0.3 → none, memory request 128 → 204 MB, memory limit 512 → 204 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 76 MB"
+    },
+    {
+     "target": "app-a-prod/statefulset/app-a-redis:redis",
+     "kind": "StatefulSet",
+     "namespace": "app-a-prod",
+     "name": "app-a-redis",
+     "container": "redis",
+     "severity": "WARNING",
+     "cpu_request": 0.02,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.1,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 32,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 192,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.01,
+     "memory_request_delta_mb": -68,
+     "summary": "CPU request 0.02 → 0.01 cores, CPU limit 0.1 → none, memory request 32 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 68 MB"
+    },
+    {
+     "target": "app-f-prod/statefulset/app-f-redis:redis",
+     "kind": "StatefulSet",
+     "namespace": "app-f-prod",
+     "name": "app-f-redis",
+     "container": "redis",
+     "severity": "WARNING",
+     "cpu_request": 0.02,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.1,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 32,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 64,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.01,
+     "memory_request_delta_mb": -68,
+     "summary": "CPU request 0.02 → 0.01 cores, CPU limit 0.1 → none, memory request 32 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 68 MB"
     }
    ],
    "cpu_limit_remove_recommended": [
@@ -20292,6 +20922,159 @@
      "unhealthy_events": 0,
      "unhealthy_by_probe": {},
      "cause": "crash (exit 1)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-app-q-client-7599c7f5f-79njd",
+     "container": "app",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Unknown",
+     "exit_code": 255,
+     "last_finished": "2026-10-28T22:06:17Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "Unknown",
+     "prod": true,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-qdrant-0",
+     "container": "qdrant",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Unknown",
+     "exit_code": 255,
+     "last_finished": "2026-10-28T22:06:17Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "Unknown",
+     "prod": true,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "local-path-provisioner-774c6665dc-lrslx",
+     "container": "local-path-provisioner",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 1,
+     "last_finished": "2026-07-11T00:27:14Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 1)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "metrics-server-7bfffcd44-fkpfm",
+     "container": "metrics-server",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 2,
+     "last_finished": "2026-07-11T00:27:15Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 2)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "metallb-system",
+     "pod": "controller-654858564f-cpj5c",
+     "container": "controller",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 1,
+     "last_finished": "2026-07-11T00:27:13Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 1)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "metallb-system",
+     "pod": "speaker-lqmcg",
+     "container": "speaker",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 1,
+     "last_finished": "2026-07-11T00:27:11Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 1)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "app-i-prod",
+     "pod": "app-i-84cc888b48-xwcpb",
+     "container": "app",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Unknown",
+     "exit_code": 255,
+     "last_finished": "2026-10-28T22:06:17Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "Unknown",
+     "prod": true,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2",
+     "container": "kube-state-metrics",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 2,
+     "last_finished": "2026-07-11T00:27:15Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 2)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "kube-prometheus-stack-operator-74656dd4f5-5fmv5",
+     "container": "kube-prometheus-stack",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 2,
+     "last_finished": "2026-07-11T00:27:12Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 2)",
      "prod": false,
      "node_rebooted_at": null,
      "rebooted": false,
@@ -38831,7 +39614,9 @@
       "app-f-prod/statefulset/app-f-postgres-vn",
       "app-f-prod/statefulset/app-f-redis",
       "app-g-api/statefulset/app-g-minio",
-      "app-g-api/statefulset/app-g-postgres"
+      "app-g-api/statefulset/app-g-postgres",
+      "app-i-prod/statefulset/app-i-postgres",
+      "app-g-api/cronjob/app-g-postgres-backup"
      ],
      "prod_workloads": 7,
      "nodes_with_label": 1,
@@ -38866,7 +39651,21 @@
       "app-f-prod/deployment/app-f-vn",
       "app-h-prod/deployment/app-h-admin",
       "app-h-prod/deployment/app-h-api-server",
-      "app-h-prod/deployment/app-h-app-q-client"
+      "app-h-prod/deployment/app-h-app-q-client",
+      "app-h-prod/deployment/app-h-embed",
+      "app-h-prod/deployment/app-h-app-p",
+      "kube-system/deployment/coredns",
+      "app-i-prod/deployment/app-i",
+      "app-c-prod/statefulset/app-c-postgres",
+      "app-h-prod/statefulset/app-h-mysql",
+      "app-h-prod/statefulset/app-h-qdrant",
+      "registry/statefulset/registry",
+      "kube-system/daemonset/nvidia-device-plugin",
+      "app-a-prod/cronjob/app-a-postgres-backup",
+      "app-h-prod/cronjob/app-h-mysql-backup",
+      "kube-system/cronjob/containerd-cleanup-node-a",
+      "kube-system/cronjob/containerd-cleanup-node-b",
+      "registry/cronjob/registry-gc"
      ],
      "prod_workloads": 16,
      "nodes_with_label": 2,
@@ -38884,7 +39683,19 @@
       "argocd/deployment/argocd-repo-server",
       "argocd/deployment/argocd-server",
       "cert-manager/deployment/cert-manager",
-      "cert-manager/deployment/cert-manager-cainjector"
+      "cert-manager/deployment/cert-manager-cainjector",
+      "cert-manager/deployment/cert-manager-webhook",
+      "ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller",
+      "keda/deployment/keda-admission-webhooks",
+      "keda/deployment/keda-operator",
+      "keda/deployment/keda-operator-metrics-apiserver",
+      "kube-system/deployment/coredns",
+      "kube-system/deployment/local-path-provisioner",
+      "kube-system/deployment/metrics-server",
+      "metallb-system/deployment/controller",
+      "argocd/statefulset/argocd-application-controller",
+      "metallb-system/daemonset/speaker",
+      "monitoring/daemonset/kube-prometheus-stack-prometheus-node-exporter"
      ],
      "prod_workloads": 0,
      "nodes_with_label": 2,
@@ -38940,7 +39751,41 @@
       "CORS_ALLOWED_ORIGINS",
       "DATABASE_URL",
       "DETECTION_FALLBACK_TO_FULL",
-      "DETECTION_IOU"
+      "DETECTION_IOU",
+      "DETECTION_MAX_DETECTIONS",
+      "DETECTION_MIN_CONFIDENCE",
+      "DETECTION_MIN_SIZE",
+      "DETECTION_SERVICE_URL",
+      "DETECTION_TIMEOUT_MS",
+      "EMBEDDING_MODE",
+      "JINA_EMBEDDING_DIMENSION",
+      "JINA_EMBEDDING_MODELS",
+      "JINA_IMAGE_EMBEDDING_MODEL",
+      "JWT_EXPIRES_IN",
+      "JWT_RELAY_EXPIRES_IN",
+      "JWT_RELAY_SECRET",
+      "JWT_SECRET",
+      "NODE_ENV",
+      "PORT",
+      "PUBLIC_ASSET_BASE_URL",
+      "QDRANT_API_KEY",
+      "QDRANT_COLLECTION",
+      "QDRANT_DEFAULT_LIMIT",
+      "QDRANT_SCORE_THRESHOLD",
+      "QDRANT_URL",
+      "QDRANT_VECTOR_SIZE",
+      "RUN_SCHEMA_SYNC",
+      "S3_BUCKET",
+      "S3_UPLOAD_PREFIX",
+      "TWITTER_CLIENT_ID",
+      "TWITTER_CLIENT_ID_RELAY",
+      "TWITTER_CLIENT_SECRET",
+      "TWITTER_CLIENT_SECRET_RELAY",
+      "TWITTER_REDIRECT_URI",
+      "TWITTER_REDIRECT_URI_RELAY",
+      "TWITTER_SCOPES",
+      "TWITTER_SCOPES_RELAY",
+      "UPLOAD_URL_TTL"
      ],
      "age_days": 311
     }
@@ -41947,7 +42792,11 @@
       "app-a-prod/cronjob/marketing-digest-day",
       "app-a-prod/cronjob/marketing-digest-month",
       "app-a-prod/cronjob/marketing-digest-week",
-      "app-a-prod/cronjob/marketing-radar-global"
+      "app-a-prod/cronjob/marketing-radar-global",
+      "app-a-prod/cronjob/marketing-radar-global-eu",
+      "app-a-prod/cronjob/marketing-radar-japan",
+      "app-a-prod/cronjob/marketing-radar-japan-noon",
+      "app-a-prod/deployment/app-m"
      ]
     },
     {
@@ -45975,6 +46824,114 @@
     {
      "namespace": "app-i-prod",
      "kind": "prod",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "app-k",
+     "kind": "other",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "app-l-prod",
+     "kind": "prod",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "app-n",
+     "kind": "other",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "arc-systems",
+     "kind": "ci",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "argocd",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "cert-manager",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "default",
+     "kind": "other",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "external-secrets",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "ingress-nginx",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "keda",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "kube-node-lease",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "kube-public",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "kube-system",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "logging",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "metallb-system",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "monitoring",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "registry",
+     "kind": "other",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "reloader",
+     "kind": "system",
      "cpu_p95_7d": null,
      "share": null
     }

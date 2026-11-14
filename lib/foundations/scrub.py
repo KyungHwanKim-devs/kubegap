@@ -81,8 +81,8 @@ def _keys_for(table: list[tuple[str, str, tuple[str, ...]]], ns: str, name: str)
     return out
 
 
-def secret_like_keys(data: dict, limit: int = 8) -> list[str]:
-    """Key names (or `key:line-key` inside config files) whose value looks like a credential. Values are inspected but never returned."""
+def secret_like_keys(data: dict) -> list[str]:
+    """Key names (or `key:line-key` inside config files) whose value looks like a credential, all of them. Values are inspected but never returned."""
     keys: list[str] = []
     for k, v in (data or {}).items():
         v = str(v)
@@ -96,11 +96,7 @@ def secret_like_keys(data: dict, limit: int = 8) -> list[str]:
                 if ENV_SKIP_RE.search(m.group(1)) or m.group(1).lower().endswith(("name", "ref", "path", "file")):  # secretName, tokenPath: where a secret is, not the secret (istio-sidecar-injector's template)
                     continue
                 keys.append(f"{k}:{m.group(1)}")
-                if len(keys) >= limit:
-                    break
-        if len(keys) >= limit:
-            break
-    return list(dict.fromkeys(keys))[:limit]  # dedupe (the same password line can appear in several blocks) while keeping order
+    return list(dict.fromkeys(keys))  # dedupe (the same password line can appear in several blocks) while keeping order
 
 
 def env_name_secret_like(name: str) -> bool:

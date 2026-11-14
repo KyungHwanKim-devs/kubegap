@@ -2821,7 +2821,11 @@
   "karpenter": 2,
   "prod-app-y": 2,
   "prod-app-r": 2,
-  "prod-app-v": 2
+  "prod-app-v": 2,
+  "app-ab-prod": 2,
+  "arc-system": 1,
+  "dev-app-aa": 1,
+  "prod-app-x": 1
  },
  "gap_ratio": 0.565,
  "nodes_all_missing": [],
@@ -4734,7 +4738,20 @@
   "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4",
   "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3",
   "docker.io/bitnamilegacy/kubectl:1.32.4",
-  "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+  "docker.io/bitnamilegacy/os-shell:11-debian-11-r95",
+  "docker.io/danielqsj/kafka-exporter:v1.7.0",
+  "docker.io/grafana/grafana:10.2.3",
+  "docker.io/grafana/promtail:2.9.2",
+  "docker.io/library/busybox:1.31.1",
+  "docker.io/provectuslabs/kafka-ui:v0.7.1",
+  "grafana/loki:2.6.1",
+  "neo4j:2026.05.0-community",
+  "pgvector/pgvector:pg16",
+  "redis/redisinsight:latest",
+  "tailscale/tailscale:latest",
+  "victoriametrics/victoria-metrics:v1.132.0",
+  "victoriametrics/vmalert:v1.97.0",
+  "victoriametrics/vmauth:v1.132.0"
  ],
  "images_by_registry": {
   "602401143452.dkr.ecr.ap-northeast-2.amazonaws.com": 77,
@@ -4861,7 +4878,33 @@
   "argocd/deployment/argocd-repo-server",
   "argocd/deployment/argocd-server",
   "kube-system/deployment/external-dns",
-  "middleware/deployment/kafka-exporter"
+  "middleware/deployment/kafka-exporter",
+  "middleware/deployment/kafka-ui",
+  "middleware/deployment/redis-insight",
+  "monitoring/deployment/kube-prometheus-stack-grafana",
+  "monitoring/deployment/kube-prometheus-stack-operator",
+  "monitoring/deployment/vmalert",
+  "prod-app-z-backend/deployment/app-z-pg-proxy",
+  "argocd/statefulset/argocd-application-controller",
+  "dev-app-s/statefulset/app-s-backend-mysql",
+  "dev-app-y/statefulset/app-y-backend-mysql",
+  "dev-app-v/statefulset/app-v-backend-dev-mysql",
+  "dev-app-aa/statefulset/app-aa-mysql",
+  "dev-app-aa/statefulset/app-aa-postgres",
+  "middleware/statefulset/kafka-controller",
+  "middleware/statefulset/redis-master",
+  "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager",
+  "monitoring/statefulset/loki-stack",
+  "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus",
+  "monitoring/statefulset/vm-single",
+  "prod-app-t/statefulset/app-t-backend-postgresql",
+  "prod-app-x/statefulset/app-x-postgresql",
+  "prod-app-s/statefulset/app-s-backend-mysql",
+  "prod-app-y/statefulset/app-y-backend-mysql",
+  "prod-app-z-backend/statefulset/app-z-neo4j",
+  "prod-app-r/statefulset/app-r-postgresql",
+  "prod-app-v/statefulset/app-v-backend-prod-mysql",
+  "app-ab-prod/statefulset/app-ab-backend-postgresql"
  ]
 }
 ```
@@ -4885,7 +4928,38 @@
   "dev-app-y/deployment/app-y-admin",
   "dev-app-y/deployment/app-y-ai",
   "dev-app-y/deployment/app-y-backend",
-  "dev-app-y/deployment/app-y-frontend"
+  "dev-app-y/deployment/app-y-frontend",
+  "dev-app-v/deployment/app-v-admin-frontend",
+  "dev-app-v/deployment/app-v-backend",
+  "dev-app-v/deployment/app-v-frontend",
+  "dev-app-aa/deployment/app-aa-backend",
+  "dev-app-aa/deployment/app-aa-frontend",
+  "prod-app-w/deployment/app-w",
+  "prod-app-t/deployment/app-t-ai",
+  "prod-app-t/deployment/app-t-backend",
+  "prod-app-t/deployment/app-t-studio",
+  "prod-app-t/deployment/app-t-web",
+  "prod-app-x/deployment/app-x-api",
+  "prod-app-s/deployment/app-s-admin",
+  "prod-app-s/deployment/app-s-api",
+  "prod-app-s/deployment/app-s-backend",
+  "prod-app-s/deployment/app-s-frontend",
+  "prod-app-y/deployment/app-y-admin",
+  "prod-app-y/deployment/app-y-ai",
+  "prod-app-y/deployment/app-y-backend",
+  "prod-app-y/deployment/app-y-frontend",
+  "prod-app-z-backend/deployment/app-z-backend",
+  "prod-app-z-backend/deployment/app-z-embedding-server",
+  "prod-app-z-backend/deployment/app-z-file-worker",
+  "prod-app-z-backend/deployment/app-z-frontend",
+  "prod-app-z-backend/deployment/app-z-graph-worker",
+  "prod-app-r/deployment/app-r-backend",
+  "prod-app-r/deployment/app-r-web",
+  "prod-app-v/deployment/app-v-admin-frontend",
+  "prod-app-v/deployment/app-v-backend",
+  "prod-app-v/deployment/app-v-frontend",
+  "app-ab-prod/deployment/app-ab-backend",
+  "app-ab-prod/deployment/app-ab-frontend"
  ]
 }
 ```
@@ -9151,6 +9225,90 @@
   [
    "Elastic Load Balancing v2/CreateTargetGroup",
    0.265
+  ],
+  [
+   "EC2/DescribeSubnets",
+   0.138
+  ],
+  [
+   "Elastic Load Balancing v2/CreateRule",
+   0.103
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyRule",
+   0.096
+  ],
+  [
+   "ACM/ListCertificates",
+   0.087
+  ],
+  [
+   "EC2/DescribeVpcs",
+   0.084
+  ],
+  [
+   "EC2/DescribeInstances",
+   0.082
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroups",
+   0.081
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeRules",
+   0.08
+  ],
+  [
+   "EC2/DescribeSecurityGroups",
+   0.076
+  ],
+  [
+   "WAFV2/GetWebACLForResource",
+   0.075
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTags",
+   0.071
+  ],
+  [
+   "ACM/DescribeCertificate",
+   0.07
+  ],
+  [
+   "EC2/DescribeNetworkInterfaces",
+   0.065
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancers",
+   0.064
+  ],
+  [
+   "WAF Regional/GetWebACLForResource",
+   0.059
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListeners",
+   0.057
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListenerCertificates",
+   0.052
+  ],
+  [
+   "Elastic Load Balancing v2/DeregisterTargets",
+   0.05
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+   0.047
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+   0.042
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetHealth",
+   0.036
   ]
  ],
  "aws_api_top_ops": [
@@ -9185,6 +9343,94 @@
   [
    "Elastic Load Balancing v2/DescribeLoadBalancers",
    3732
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeRules",
+   3732
+  ],
+  [
+   "ACM/DescribeCertificate",
+   3509
+  ],
+  [
+   "EC2/DescribeVpcs",
+   2989
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroups",
+   1880
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListeners",
+   1866
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+   1866
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListenerCertificates",
+   1280
+  ],
+  [
+   "Shield/GetSubscriptionState",
+   1221
+  ],
+  [
+   "EC2/DescribeNetworkInterfaces",
+   1080
+  ],
+  [
+   "ACM/ListCertificates",
+   660
+  ],
+  [
+   "WAF Regional/GetWebACLForResource",
+   644
+  ],
+  [
+   "WAFV2/GetWebACLForResource",
+   644
+  ],
+  [
+   "EC2/DescribeSubnets",
+   586
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyRule",
+   557
+  ],
+  [
+   "EC2/AuthorizeSecurityGroupIngress",
+   195
+  ],
+  [
+   "EC2/RevokeSecurityGroupIngress",
+   194
+  ],
+  [
+   "Elastic Load Balancing v2/CreateRule",
+   30
+  ],
+  [
+   "Elastic Load Balancing v2/CreateTargetGroup",
+   30
+  ],
+  [
+   "Elastic Load Balancing v2/DeleteRule",
+   14
+  ],
+  [
+   "Elastic Load Balancing v2/DeleteTargetGroup",
+   14
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyTargetGroup",
+   13
+  ],
+  [
+   "EC2/DescribeAvailabilityZones",
+   2
   ]
  ],
  "metrics_available": true,
@@ -9848,7 +10094,59 @@
   "node_md_disks",
   "node_md_disks_required",
   "node_network_receive_errs_total",
-  "node_network_receive_packets_total"
+  "node_network_receive_packets_total",
+  "node_network_transmit_errs_total",
+  "node_network_transmit_packets_total",
+  "node_network_up",
+  "node_nf_conntrack_entries",
+  "node_nf_conntrack_entries_limit",
+  "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile",
+  "node_systemd_unit_state",
+  "node_textfile_scrape_error",
+  "node_timex_maxerror_seconds",
+  "node_timex_offset_seconds",
+  "node_timex_sync_status",
+  "node_vmstat_pgmajfault",
+  "prometheus_config_last_reload_successful",
+  "prometheus_engine_queries",
+  "prometheus_engine_queries_concurrent_max",
+  "prometheus_notifications_alertmanagers_discovered",
+  "prometheus_notifications_errors_total",
+  "prometheus_notifications_queue_capacity",
+  "prometheus_notifications_queue_length",
+  "prometheus_notifications_sent_total",
+  "prometheus_operator_list_operations_failed_total",
+  "prometheus_operator_list_operations_total",
+  "prometheus_operator_managed_resources",
+  "prometheus_operator_node_address_lookup_errors_total",
+  "prometheus_operator_ready",
+  "prometheus_operator_reconcile_errors_total",
+  "prometheus_operator_reconcile_operations_total",
+  "prometheus_operator_status_update_errors_total",
+  "prometheus_operator_status_update_operations_total",
+  "prometheus_operator_syncs",
+  "prometheus_operator_watch_operations_failed_total",
+  "prometheus_operator_watch_operations_total",
+  "prometheus_remote_storage_failed_samples_total",
+  "prometheus_remote_storage_highest_timestamp_in_seconds",
+  "prometheus_remote_storage_queue_highest_sent_timestamp_seconds",
+  "prometheus_remote_storage_samples_failed_total",
+  "prometheus_remote_storage_samples_total",
+  "prometheus_remote_storage_shards_desired",
+  "prometheus_remote_storage_shards_max",
+  "prometheus_remote_storage_succeeded_samples_total",
+  "prometheus_rule_evaluation_failures_total",
+  "prometheus_rule_group_iterations_missed_total",
+  "prometheus_rule_group_rules",
+  "prometheus_sd_refresh_failures_total",
+  "prometheus_target_metadata_cache_entries",
+  "prometheus_target_scrape_pool_exceeded_label_limits_total",
+  "prometheus_target_scrape_pool_exceeded_target_limit_total",
+  "prometheus_target_sync_failed_total",
+  "prometheus_tsdb_compactions_failed_total",
+  "prometheus_tsdb_reloads_failures_total",
+  "reloader_last_reload_successful",
+  "s_failure_total"
  ],
  "alert_metrics_without_panel_count": 132,
  "available": true,
@@ -11056,6 +11354,454 @@
     "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
    },
    "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:40.046841    1516 kubelet_node_status.go:466] \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-1-137.ap-northeast-2.compute.in"
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 == IN_CREATE|IN_ISDIR): …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: W1106 09:44:40.113696    1516 watcher.go:93] Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 ="
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no imagefs label for configured runtime\"",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:40.119869    1516 eviction_manager.go:267] \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no ima"
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-<n>.ap-northeast-2.compute.internal\\\": node …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:40.504397    1516 kubelet_node_status.go:554] \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-137.ap-northeast-2."
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | object-\"prod-app-x\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is forbidden: User …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: W1106 09:44:54.753733    1516 reflector.go:569] object-\"prod-app-x\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is for"
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed to list *v1.ConfigMap: configmaps …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:54.754115    1516 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed t"
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | object-\"prod-app-x\"/\"app-x-api-secret\": failed to list *v1.Secret: <masked> \"app-x-api-secret\" is forbidden: User …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: W1106 09:44:54.755274    1516 reflector.go:569] object-\"prod-app-x\"/\"app-x-api-secret\": failed to list *v1.Secret: <masked> \"app-x-api-secret\" is forbidde"
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"app-x-api-secret\\\": Failed to watch *v1.Secret: <masked> to list *v1.Secret: <masked> …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:54.755506    1516 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"app-x-api-secret\\\": Failed to watch *v1.Secret: <masked> to"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"abc5268c5ac596430d283957517cc0207cc7f278e8884875dfc0b98c7549acfb\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T02:44:53+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T02:44:53.275389812Z\" level=error msg=\"ContainerStatus for \\\"abc5268c5ac596430d283957517cc0207cc7f278e8884875dfc0b98c7549acfb\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"4e304ff10e36ad4aeb0e57d765bb833d72e80e8d80bffb57f0a9ccfbf999c672\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T03:38:51+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T03:38:51.751608465Z\" level=error msg=\"ContainerStatus for \\\"4e304ff10e36ad4aeb0e57d765bb833d72e80e8d80bffb57f0a9ccfbf999c672\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"e43b801de41fa6648a82bb085f7f0e99e732943205567f534ee48c0fed379257\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T05:35:52+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T05:35:52.259128796Z\" level=error msg=\"ContainerStatus for \\\"e43b801de41fa6648a82bb085f7f0e99e732943205567f534ee48c0fed379257\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"8dad2fea42b4343ede88bf973fb15b28e182373f790dde7c51586e7a668cc21d\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T06:08:53+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T06:08:53.088785825Z\" level=error msg=\"ContainerStatus for \\\"8dad2fea42b4343ede88bf973fb15b28e182373f790dde7c51586e7a668cc21d\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"e8d53d577bcb44ac16cb7a18c3dc22c1bd721b33df9837b1b11575edd02c5fdc\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T06:56:54+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T06:56:54.672356630Z\" level=error msg=\"ContainerStatus for \\\"e8d53d577bcb44ac16cb7a18c3dc22c1bd721b33df9837b1b11575edd02c5fdc\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"fc17dddfb93ac007ddd787b67a63aacfb13050a318379ccf784a32128ef88aa5\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T07:35:52+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T07:35:52.103369442Z\" level=error msg=\"ContainerStatus for \\\"fc17dddfb93ac007ddd787b67a63aacfb13050a318379ccf784a32128ef88aa5\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"b7a42a9dbe0a983a99b214b3e16f7a9c42bb307095e26ffbfce33a9bb36ab2b4\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T07:49:04+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T07:49:04.608734122Z\" level=error msg=\"ContainerStatus for \\\"b7a42a9dbe0a983a99b214b3e16f7a9c42bb307095e26ffbfce33a9bb36ab2b4\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=35",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170195308Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=35"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=39",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170249646Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=39"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=41",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170256090Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=41"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=43",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170261943Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=43"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=3",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229252943Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=3"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229296400Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=7",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229305511Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=7"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=9",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229313655Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=9"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=11",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229321043Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=11"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=17",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229328307Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=17"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"c8415f5426a522cb9bee5c935ff2230ac490b988d775b9cb963ab71527c6d7ce\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.824526503Z\" level=error msg=\"ContainerStatus for \\\"c8415f5426a522cb9bee5c935ff2230ac490b988d775b9cb963ab71527c6d7ce\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"459b6a4dc7daaeefdc0907db37479094ae0e3e43df5c859dbf00e3da5818ae94\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:54+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:54.833959892Z\" level=error msg=\"ContainerStatus for \\\"459b6a4dc7daaeefdc0907db37479094ae0e3e43df5c859dbf00e3da5818ae94\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"d5529bd0e89f949ab998b9c017fd992eb12f4ed4cc1e04ae26135c6a115462d3\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T09:00:58+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T09:00:58.951499999Z\" level=error msg=\"ContainerStatus for \\\"d5529bd0e89f949ab998b9c017fd992eb12f4ed4cc1e04ae26135c6a115462d3\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"852ec3e1ee4c664f330cfa008d437d795f7d193953dd1b0e4f9514cabb250f54\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T09:45:38+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T09:45:38.203672949Z\" level=error msg=\"ContainerStatus for \\\"852ec3e1ee4c664f330cfa008d437d795f7d193953dd1b0e4f9514cabb250f54\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | object-\"app-ab-prod\"/\"app-ab-frontend-secret\": failed to list *v1.Secret: <masked> \"app-ab-frontend-secret\" is forbidden: User …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: W1106 08:58:58.339227    1593 reflector.go:569] object-\"app-ab-prod\"/\"app-ab-frontend-secret\": failed to list *v1.Secret: <masked> \"app-ab-frontend-secret"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"app-ab-prod\\\"/\\\"app-ab-frontend-secret\\\": Failed to watch *v1.Secret: <masked> to list *v1.Secret: <masked> …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: E1106 08:58:58.339256    1593 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"app-ab-prod\\\"/\\\"app-ab-frontend-secret\\\": Failed to watch *v1.Secret: <masked>"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | Failed to process watch event {EventType:0 …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:45+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: W1106 08:59:45.050377    1593 manager.go:1169] Failed to process watch event {EventType:0 Name:/kubepods.slice/kubepods-burstable.slice/kubepods-burstable"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | E1106 13:52:11.<n>    <n> k--output truncated--",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T13:52:11+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: E1106 13:52:11.348616    1593 k--output truncated--"
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"failed to reload cni configuration after receiving fs change event(WRITE         …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:12+0000 ip-10-0-1-245.ap-northeast-2.compute.internal containerd[1412]: time=\"2026-11-06T08:59:12.117442953Z\" level=error msg=\"failed to reload cni configuration after receiving fs change event(WRITE         \\\"/etc/cni/net."
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | {\"level\":\"error\",\"ts\":\"<ts>\",\"caller\":\"awsutils/awsutils.go:<n>\",\"msg\":\"r8gd.medium: instance type does not exist\"}",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/ipamd-24h.log": 1
+   },
+   "sample": "{\"level\":\"error\",\"ts\":\"2026-11-06T08:59:10.241Z\",\"caller\":\"awsutils/awsutils.go:1618\",\"msg\":\"r8gd.medium: instance type does not exist\"}"
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeConfig for service …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.243281    1530 log.go:32] \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeCon"
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-1-<n>.ap-northeast-2.compute.internal\\\" not found\"",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.334735    1530 kubelet_node_status.go:466] \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-1-245.ap-northeast-2.compute.in"
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 == IN_CREATE|IN_ISDIR): …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: W1106 08:58:59.417259    1530 watcher.go:93] Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 ="
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no imagefs label for configured runtime\"",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.421858    1530 eviction_manager.go:267] \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no ima"
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-<n>.ap-northeast-2.compute.internal\\\": node …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.822990    1530 kubelet_node_status.go:554] \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-245.ap-northeast-2."
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:08:25+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:08:25.977046136Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"721c86c2ddbbd259576a3a8177dff00ae3aa79d43d5f628bbcff16fe78222132\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:20:21+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:20:21.504893358Z\" level=error msg=\"ContainerStatus for \\\"721c86c2ddbbd259576a3a8177dff00ae3aa79d43d5f628bbcff16fe78222132\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"8ddd23774d613913174fa77e1e3bd8e9567b6632ceb85f2f12e7338a7cb87a2d\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:26:50+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:26:50.137843966Z\" level=error msg=\"ContainerStatus for \\\"8ddd23774d613913174fa77e1e3bd8e9567b6632ceb85f2f12e7338a7cb87a2d\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"219c9fc551ba1c733e3d07dcaee99d0b3811671d94fb3124fec511822ab0140d\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:49:40+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:49:40.394713697Z\" level=error msg=\"ContainerStatus for \\\"219c9fc551ba1c733e3d07dcaee99d0b3811671d94fb3124fec511822ab0140d\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"f1ba92141f3eba4d5d473111043ca30f667cfc27de7df02897e22e2c46ee27c6\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:51:49+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:51:49.609971021Z\" level=error msg=\"ContainerStatus for \\\"f1ba92141f3eba4d5d473111043ca30f667cfc27de7df02897e22e2c46ee27c6\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"9b73872e00d5d10bc91e7baa651281abb1ffda16703f690ae41a2b3bbc9108f1\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T09:00:56+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:00:56.605922288Z\" level=error msg=\"ContainerStatus for \\\"9b73872e00d5d10bc91e7baa651281abb1ffda16703f690ae41a2b3bbc9108f1\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"collecting metrics for e944d40b8100456ffa7df69e3ad60466efd7dd536a10f463b4dacefb9c21b7ef\" error=\"cgroups: …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T09:01:51+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:01:51.831406365Z\" level=error msg=\"collecting metrics for e944d40b8100456ffa7df69e3ad60466efd7dd536a10f463b4dacefb9c21b7ef\" error=\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeConfig for service …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.186466    1556 log.go:32] \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeCon"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-2-<n>.ap-northeast-2.compute.internal\\\" not found\"",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.229753    1556 kubelet_node_status.go:466] \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-2-100.ap-northeast-2.compute.in"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no imagefs label for configured runtime\"",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.259727    1556 eviction_manager.go:267] \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no ima"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-2-<n>.ap-northeast-2.compute.internal\\\": node …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.648702    1556 kubelet_node_status.go:554] \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-2-100.ap-northeast-2."
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | object-\"prod-app-r\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is forbidden: User …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: W1106 08:58:58.062271    1556 reflector.go:569] object-\"prod-app-r\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is for"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-r\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed to list *v1.ConfigMap: configmaps …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:58:58.062308    1556 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-r\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed t"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | object-\"prod-app-z-backend\"/\"app-z-backend-secret\": failed to list *v1.Secret: <masked> \"app-z-backend-secret\" is forbidden: User …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: W1106 08:58:58.191724    1556 reflector.go:569] object-\"prod-app-z-backend\"/\"app-z-backend-secret\": failed to list *v1.Secret: <masked> \"app-z-backend-sec"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-z-backend\\\"/\\\"app-z-backend-secret\\\": Failed to watch *v1.Secret: <masked> to list *v1.Secret: …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:58:58.191765    1556 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-z-backend\\\"/\\\"app-z-backend-secret\\\": Failed to watch *v1.Secret:"
+  },
+  {
+   "pattern": "node:ip-10-0-2-218.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"9f3b8870257f34f53f016fd834a86f3d978f55b40048ebc36f5451b848914f55\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T11:00:11+0000 ip-10-0-2-218.ap-northeast-2.compute.internal containerd[3613]: time=\"2026-11-06T11:00:11.286783531Z\" level=error msg=\"ContainerStatus for \\\"9f3b8870257f34f53f016fd834a86f3d978f55b40048ebc36f5451b848914f55\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-218.ap-northeast-2.compute.internal | \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = an error occurred when try to find container …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T11:00:11+0000 ip-10-0-2-218.ap-northeast-2.compute.internal kubelet[3748]: E1106 11:00:11.287025    3748 log.go:32] \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = an error occurred when try t"
   }
  ]
 }

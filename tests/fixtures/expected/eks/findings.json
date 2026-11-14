@@ -656,7 +656,7 @@
    "status": "done",
    "reason": null,
    "counts": {
-    "pass": 40
+    "pass": 69
    }
   },
   {
@@ -664,7 +664,7 @@
    "status": "done",
    "reason": null,
    "counts": {
-    "pass": 40
+    "pass": 65
    }
   },
   {
@@ -3834,7 +3834,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Of 147 pods Running for over 1h, 83 are absent from Loki pod labels (ratio 0.565). Nodes with every pod missing: []. By namespace: {'kube-system': 23, 'monitoring': 22, 'prod-app-z-backend': 5, 'keda': 3, 'middleware': 3, 'prod-app-t': 3, 'prod-app-s': 3, 'argocd': 2, 'dev-app-s': 2, 'dev-app-y': 2, 'dev-app-v': 2, 'karpenter': 2, 'prod-app-y': 2, 'prod-app-r': 2, 'prod-app-v': 2}",
+   "evidence": "Of 147 pods Running for over 1h, 83 are absent from Loki pod labels (ratio 0.565). Nodes with every pod missing: []. By namespace: {'kube-system': 23, 'monitoring': 22, 'prod-app-z-backend': 5, 'keda': 3, 'middleware': 3, 'prod-app-t': 3, 'prod-app-s': 3, 'argocd': 2, 'dev-app-s': 2, 'dev-app-y': 2, 'dev-app-v': 2, 'karpenter': 2, 'prod-app-y': 2, 'prod-app-r': 2, 'prod-app-v': 2, 'app-ab-prod': 2, 'arc-system': 1, 'dev-app-aa': 1, 'prod-app-x': 1}",
    "source": "summary.json:logs.loki.coverage"
   },
   {

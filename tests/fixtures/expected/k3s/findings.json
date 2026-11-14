@@ -1331,7 +1331,7 @@
    "reason": null,
    "counts": {
     "fail": 1,
-    "pass": 36,
+    "pass": 45,
     "warn": 3
    }
   },
@@ -2782,7 +2782,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "app-a-prod/configmap/marketing-scripts: keys ['discord_sales_bot.py:TOKEN', 'discord_sales_bot.py:OPENAI_API_KEY', 'marketing_autopost.py:client_secret', 'marketing_autopost.py:resource_owner_secret'], mounted/referenced by ['app-a-prod/cronjob/marketing-autopost-en', 'app-a-prod/cronjob/marketing-autopost-ja', 'app-a-prod/cronjob/marketing-digest-day', 'app-a-prod/cronjob/marketing-digest-month', 'app-a-prod/cronjob/marketing-digest-week', 'app-a-prod/cronjob/marketing-radar-global']",
+   "evidence": "app-a-prod/configmap/marketing-scripts: keys ['discord_sales_bot.py:TOKEN', 'discord_sales_bot.py:OPENAI_API_KEY', 'marketing_autopost.py:client_secret', 'marketing_autopost.py:resource_owner_secret'], mounted/referenced by ['app-a-prod/cronjob/marketing-autopost-en', 'app-a-prod/cronjob/marketing-autopost-ja', 'app-a-prod/cronjob/marketing-digest-day', 'app-a-prod/cronjob/marketing-digest-month', 'app-a-prod/cronjob/marketing-digest-week', 'app-a-prod/cronjob/marketing-radar-global', 'app-a-prod/cronjob/marketing-radar-global-eu', 'app-a-prod/cronjob/marketing-radar-japan', 'app-a-prod/cronjob/marketing-radar-japan-noon', 'app-a-prod/deployment/app-m']",
    "source": "summary.json:security.secrets.plaintext_configmap"
   },
   {
@@ -4411,7 +4411,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "of 161 alert rules, 40 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AppQClusterCPU80', 'AppQClusterMem80', 'AppQBackendDown', 'AppQFrontendDown', 'AppQPostgresDown', 'AppQGatewayDown']), classes {'cause': 153, 'app-cause': 1, 'app': 7}, severity distribution {'warning': 106, 'critical': 46, 'none': 2, 'info': 7}",
+   "evidence": "of 161 alert rules, 42 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AppQClusterCPU80', 'AppQClusterMem80', 'AppQBackendDown', 'AppQFrontendDown', 'AppQPostgresDown', 'AppQGatewayDown']), classes {'cause': 153, 'app-cause': 1, 'app': 7}, severity distribution {'warning': 106, 'critical': 46, 'none': 2, 'info': 7}",
    "source": "summary.json:observability.rules"
   },
   {

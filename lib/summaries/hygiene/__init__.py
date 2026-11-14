@@ -121,7 +121,7 @@ def _node_labels(cx: Ctx) -> dict:
     rows = sorted(used.values(), key=lambda r: (r["well_known"], -r["prod_workloads"], r["key"]))  # full key: deterministic output
     for r in rows:
         r["workload_count"] = len(r["workloads"])
-        r["workloads"] = r["workloads"][:8]
+        r["workloads"] = r["workloads"]
     return {
         "keys_used": len(rows),
         "rows": rows,
@@ -195,7 +195,7 @@ def _labels(cx: Ctx) -> dict:
         labels = md.get("labels") or {}
         tl = (((o.get("spec") or {}).get("template") or {}).get("metadata") or {}).get("labels") or {} if kind != "CronJob" else {}
         if not any(k.startswith("app.kubernetes.io/") for k in list(labels) + list(tl)):
-            no_std.append({"workload": wl_key(kind, o), "namespace": md["namespace"], "prod": md["namespace"] in cx.prod, "labels": dict(list(labels.items())[:5])})
+            no_std.append({"workload": wl_key(kind, o), "namespace": md["namespace"], "prod": md["namespace"] in cx.prod, "labels": dict(list(labels.items()))})
         if md["namespace"] == "default":
             default_ns.append({"workload": wl_key(kind, o), "prod": md["namespace"] in cx.prod})
     ns_names = [n["metadata"]["name"] for n in objects(cx.snap, "namespaces")]
@@ -319,7 +319,7 @@ def _orphans(cx: Ctx) -> dict:
                 "namespace": ns,
                 "name": name,
                 "prod": ns in cx.prod,
-                "keys": sorted((cm.get("data") or {}).keys())[:5],
+                "keys": sorted((cm.get("data") or {}).keys()),
                 "age_days": round((cx.now - parse_ts(md.get("creationTimestamp"))).total_seconds() / 86400) if parse_ts(md.get("creationTimestamp")) else None,
             }
         )
@@ -549,15 +549,15 @@ def _failed_pods(cx: Ctx, now) -> dict:
         "count": len(rows),
         "by_reason": dict(by_reason),
         "by_namespace": dict(by_ns.most_common()),
-        "rows": rows[:40],
+        "rows": rows,
         "oldest_h": rows[0]["age_h"] if rows else None,
         "summary": {
             "count": len(rows),
             "by_reason": dict(by_reason),
-            "by_namespace": dict(by_ns.most_common(8)),
+            "by_namespace": dict(by_ns.most_common()),
             "oldest_h": rows[0]["age_h"] if rows else None,
             "prod": sum(1 for r in rows if r["prod"]),
-            "sample": [f"{r['namespace']}/{r['pod']}" for r in rows[:6]],
+            "sample": [f"{r['namespace']}/{r['pod']}" for r in rows],
         },
     }
 
@@ -603,6 +603,6 @@ def _ephemeral(cx: Ctx) -> dict:
             "request_ratio": round(with_req / containers, 3) if containers else None,
             "prod_without_request": len(no_req_prod),
             "emptydir_without_sizelimit": len(emptydir_nolimit),
-            "emptydir_without_sizelimit_prod": sorted(emptydir_nolimit_prod)[:10],
+            "emptydir_without_sizelimit_prod": sorted(emptydir_nolimit_prod),
         },
     }

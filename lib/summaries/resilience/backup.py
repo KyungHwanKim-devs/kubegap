@@ -142,7 +142,7 @@ def backup_locality(cx) -> dict:
                 "dest_nodes": sorted(n for n in dest_nodes if n),
                 "host_paths": host_paths,
                 "offsite_hint": offsite,
-                "source_db": [{"workload": w, "pvc": c, "node": n} for w, c, n in src][:6],
+                "source_db": [{"workload": w, "pvc": c, "node": n} for w, c, n in src],
                 "source_nodes": sorted(src_nodes),
                 "same_node_as_source": same_node,
                 "local_only": not offsite and (bool(claims) or bool(host_paths)),

@@ -35,7 +35,7 @@ def _storage_objects_top(snap: Path) -> list[dict]:
         counts = {(f"{lab.get('resource')}.{lab['group']}" if lab.get("group") else lab.get("resource")): max(int(v), 0) for lab, v in rows}
     else:
         counts = {lab.get("resource"): max(int(v), 0) for lab, v in metric_rows(snap, "apiserver_storage_objects_top")}
-    return sorted(({"resource": k, "count": v} for k, v in counts.items()), key=lambda x: -x["count"])[:15]
+    return sorted(({"resource": k, "count": v} for k, v in counts.items()), key=lambda x: -x["count"])
 
 
 def analyze(snap: Path, inv: dict | None) -> dict:
@@ -60,7 +60,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "p99_max": p99[0] if p99 else None,
         "watch_count": metric_sum(snap, "apiserver_watch_count"),
         "storage_objects_top": _storage_objects_top(snap),
-        "webhook_p99": webhook_p99[:10],
+        "webhook_p99": webhook_p99,
         "top_requests": [{"resource": lab.get("resource"), "verb": lab.get("verb"), "rps": round(v, 2)} for lab, v in metric_rows(snap, "apiserver_top_requests")],
         "inflight": {lab.get("request_kind"): int(v) for lab, v in metric_rows(snap, "apiserver_inflight")},
     }
@@ -87,7 +87,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         cm_samples = Counter(normalize_message(r.get("@message", "")) for r in _cw_rows(snap, "controller_manager_error_samples"))
         out["controller_manager"] = {
             "errors_by_source": [{"level": r.get("lvl"), "source": r.get("src"), "count": to_int(r.get("c"))} for r in _cw_rows(snap, "controller_manager_errors_by_source")],
-            "top_errors": [{"message": m, "sample_count": c} for m, c in cm_samples.most_common(10)],
+            "top_errors": [{"message": m, "sample_count": c} for m, c in cm_samples.most_common()],
         }
         by_wl: dict[str, int] = defaultdict(int)
         for r in _cw_rows(snap, "scheduler_unschedulable"):
@@ -100,7 +100,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         out["scheduler"] = {
             "unschedulable_total_24h": sum(to_int(r.get("c")) for r in _cw_rows(snap, "scheduler_unschedulable")),
             "by_workload": [{"workload": w, "namespace": w.split("/")[0], "count": c} for w, c in sorted(by_wl.items(), key=lambda kv: -kv[1])],
-            "reasons": [{"reason": k, "samples": v} for k, v in reasons.most_common(8)],
+            "reasons": [{"reason": k, "samples": v} for k, v in reasons.most_common()],
         }
         out["authenticator"] = {
             "failures": [{"message": r.get("msg"), "count": to_int(r.get("c"))} for r in _cw_rows(snap, "authenticator_failures")],
@@ -129,13 +129,13 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                     m = re.match(r"\s*(\d+)\s+(.*)$", line)
                     if m:
                         rows.append({"count": int(m.group(1)), "kind": m.group(2).strip()})
-                rec["stats"] = rows[:20]
+                rec["stats"] = rows
                 rec["errors_24h"] = sum(r["count"] for r in rows if re.match(r"klog [EF]|etcd-json (warn|error)|logrus (warning|error)", r["kind"]))
             err = nd / "k3s-errors-24h.log"
             if err.is_file():
                 lines = err.read_text(encoding="utf-8", errors="replace").splitlines()
                 rec["error_lines_captured"] = len(lines)
-                rec["top_errors"] = [{"message": m_, "count": c} for m_, c in Counter(normalize_message(ln) for ln in lines).most_common(10)]
+                rec["top_errors"] = [{"message": m_, "count": c} for m_, c in Counter(normalize_message(ln) for ln in lines).most_common()]
             su = nd / "k3s-scheduler-unschedulable-24h.log"
             if su.is_file():
                 lines = su.read_text(encoding="utf-8", errors="replace").splitlines()

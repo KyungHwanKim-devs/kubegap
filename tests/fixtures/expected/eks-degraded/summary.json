@@ -1117,7 +1117,10 @@
       "KubePersistentVolumeInodesFillingUp",
       "KubePersistentVolumeInodesFillingUp",
       "KubePersistentVolumeErrors",
-      "NodeFilesystemSpaceFillingUp"
+      "NodeFilesystemSpaceFillingUp",
+      "NodeFilesystemSpaceFillingUp",
+      "NodeFilesystemAlmostOutOfSpace",
+      "NodeFilesystemAlmostOutOfSpace"
      ]
     },
     {
@@ -1172,7 +1175,8 @@
       "etcdHighFsyncDurations",
       "etcdHighFsyncDurations",
       "etcdHighCommitDurations",
-      "KubeletPodStartUpLatencyHigh"
+      "KubeletPodStartUpLatencyHigh",
+      "LoraTrainingDurationP95High"
      ]
     },
     {
@@ -3139,7 +3143,80 @@
      "kubelet_certificate_manager_server_ttl_seconds",
      "kubelet_server_expiration_renew_errors",
      "kubelet_volume_stats_inodes_free",
-     "kubelet_volume_stats_used_bytes"
+     "kubelet_volume_stats_used_bytes",
+     "kubernetes_build_info",
+     "namespace",
+     "negatives",
+     "node_bonding_active",
+     "node_bonding_slaves",
+     "node_disk_io_time_weighted_seconds_total",
+     "node_filefd_allocated",
+     "node_filefd_maximum",
+     "node_filesystem_files",
+     "node_filesystem_files_free",
+     "node_filesystem_readonly",
+     "node_md_disks",
+     "node_md_disks_required",
+     "node_network_receive_errs_total",
+     "node_network_receive_packets_total",
+     "node_network_transmit_errs_total",
+     "node_network_transmit_packets_total",
+     "node_network_up",
+     "node_nf_conntrack_entries",
+     "node_nf_conntrack_entries_limit",
+     "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile",
+     "node_systemd_unit_state",
+     "node_textfile_scrape_error",
+     "node_timex_maxerror_seconds",
+     "node_timex_offset_seconds",
+     "node_timex_sync_status",
+     "node_vmstat_pgmajfault",
+     "prometheus",
+     "prometheus_config_last_reload_successful",
+     "prometheus_engine_queries",
+     "prometheus_engine_queries_concurrent_max",
+     "prometheus_notifications_alertmanagers_discovered",
+     "prometheus_notifications_errors_total",
+     "prometheus_notifications_queue_capacity",
+     "prometheus_notifications_queue_length",
+     "prometheus_notifications_sent_total",
+     "prometheus_operator_list_operations_failed_total",
+     "prometheus_operator_list_operations_total",
+     "prometheus_operator_managed_resources",
+     "prometheus_operator_node_address_lookup_errors_total",
+     "prometheus_operator_ready",
+     "prometheus_operator_reconcile_errors_total",
+     "prometheus_operator_reconcile_operations_total",
+     "prometheus_operator_status_update_errors_total",
+     "prometheus_operator_status_update_operations_total",
+     "prometheus_operator_syncs",
+     "prometheus_operator_watch_operations_failed_total",
+     "prometheus_operator_watch_operations_total",
+     "prometheus_remote_storage_failed_samples_total",
+     "prometheus_remote_storage_highest_timestamp_in_seconds",
+     "prometheus_remote_storage_queue_highest_sent_timestamp_seconds",
+     "prometheus_remote_storage_samples_failed_total",
+     "prometheus_remote_storage_samples_total",
+     "prometheus_remote_storage_shards_desired",
+     "prometheus_remote_storage_shards_max",
+     "prometheus_remote_storage_succeeded_samples_total",
+     "prometheus_rule_evaluation_failures_total",
+     "prometheus_rule_group_iterations_missed_total",
+     "prometheus_rule_group_rules",
+     "prometheus_sd_refresh_failures_total",
+     "prometheus_target_metadata_cache_entries",
+     "prometheus_target_scrape_pool_exceeded_label_limits_total",
+     "prometheus_target_scrape_pool_exceeded_target_limit_total",
+     "prometheus_target_sync_failed_total",
+     "prometheus_tsdb_compactions_failed_total",
+     "prometheus_tsdb_reloads_failures_total",
+     "reloader_last_reload_successful",
+     "robustperception",
+     "s_failure_total",
+     "scrapes",
+     "see",
+     "service",
+     "www"
     ],
     "alert_metrics_without_panel_count": 153,
     "empty_dashboards": [],
@@ -3985,7 +4062,11 @@
      "karpenter": 2,
      "prod-app-y": 2,
      "prod-app-r": 2,
-     "prod-app-v": 2
+     "prod-app-v": 2,
+     "app-ab-prod": 2,
+     "arc-system": 1,
+     "dev-app-aa": 1,
+     "prod-app-x": 1
     },
     "pods_without_logs": [
      {
@@ -4407,6 +4488,167 @@
       "workload": "monitoring/loki-stack-promtail",
       "node": "ip-10-0-2-60.ap-northeast-2.compute.internal",
       "age_h": 5732.7
+     },
+     {
+      "namespace": "monitoring",
+      "pod": "loki-stack-promtail-mncnw",
+      "workload": "monitoring/loki-stack-promtail",
+      "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+      "age_h": 17.4
+     },
+     {
+      "namespace": "monitoring",
+      "pod": "loki-stack-promtail-znqtm",
+      "workload": "monitoring/loki-stack-promtail",
+      "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "monitoring",
+      "pod": "vm-single-0",
+      "workload": "monitoring/vm-single-0",
+      "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+      "age_h": 709.0
+     },
+     {
+      "namespace": "monitoring",
+      "pod": "vmalert-6cbc4d679c-wfnqh",
+      "workload": "monitoring/vmalert",
+      "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+      "age_h": 709.0
+     },
+     {
+      "namespace": "monitoring",
+      "pod": "vmauth-68ff56844c-2n9br",
+      "workload": "monitoring/vmauth",
+      "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+      "age_h": 709.0
+     },
+     {
+      "namespace": "prod-app-r",
+      "pod": "app-r-postgresql-0",
+      "workload": "prod-app-r/app-r-postgresql-0",
+      "node": "ip-10-0-1-241.ap-northeast-2.compute.internal",
+      "age_h": 357.9
+     },
+     {
+      "namespace": "prod-app-r",
+      "pod": "app-r-web-cc4989d9-x46dr",
+      "workload": "prod-app-r/app-r-web",
+      "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "prod-app-s",
+      "pod": "app-s-admin-57f5fcc58d-khsh5",
+      "workload": "prod-app-s/app-s-admin",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 757.3
+     },
+     {
+      "namespace": "prod-app-s",
+      "pod": "app-s-frontend-6d7ff4dcdb-h7hpl",
+      "workload": "prod-app-s/app-s-frontend",
+      "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+      "age_h": 16.5
+     },
+     {
+      "namespace": "prod-app-s",
+      "pod": "app-s-frontend-6d7ff4dcdb-qfmxq",
+      "workload": "prod-app-s/app-s-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 1056.5
+     },
+     {
+      "namespace": "prod-app-t",
+      "pod": "app-t-backend-5f6c75bd56-9mfgv",
+      "workload": "prod-app-t/app-t-backend",
+      "node": "ip-10-0-1-245.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "prod-app-t",
+      "pod": "app-t-backend-postgresql-0",
+      "workload": "prod-app-t/app-t-backend-postgresql-0",
+      "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+      "age_h": 709.0
+     },
+     {
+      "namespace": "prod-app-t",
+      "pod": "app-t-studio-6f4c7b95b8-djsbw",
+      "workload": "prod-app-t/app-t-studio",
+      "node": "ip-10-0-2-100.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "prod-app-v",
+      "pod": "app-v-admin-frontend-57fc4745bc-cxwvc",
+      "workload": "prod-app-v/app-v-admin-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 757.1
+     },
+     {
+      "namespace": "prod-app-v",
+      "pod": "app-v-frontend-64c9f4f4b5-n9gh2",
+      "workload": "prod-app-v/app-v-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "prod-app-x",
+      "pod": "app-x-postgresql-0",
+      "workload": "prod-app-x/app-x-postgresql-0",
+      "node": "ip-10-0-2-218.ap-northeast-2.compute.internal",
+      "age_h": 16.6
+     },
+     {
+      "namespace": "prod-app-y",
+      "pod": "app-y-admin-b7c6d74b5-d849g",
+      "workload": "prod-app-y/app-y-admin",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 699.3
+     },
+     {
+      "namespace": "prod-app-y",
+      "pod": "app-y-frontend-7d5fc5c884-hrllj",
+      "workload": "prod-app-y/app-y-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 521.9
+     },
+     {
+      "namespace": "prod-app-z-backend",
+      "pod": "app-z-frontend-6d58bbfcfc-2qgs6",
+      "workload": "prod-app-z-backend/app-z-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 361.3
+     },
+     {
+      "namespace": "prod-app-z-backend",
+      "pod": "app-z-frontend-6d58bbfcfc-nfk9x",
+      "workload": "prod-app-z-backend/app-z-frontend",
+      "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+      "age_h": 361.3
+     },
+     {
+      "namespace": "prod-app-z-backend",
+      "pod": "app-z-neo4j-0",
+      "workload": "prod-app-z-backend/app-z-neo4j-0",
+      "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+      "age_h": 691.1
+     },
+     {
+      "namespace": "prod-app-z-backend",
+      "pod": "app-z-pg-proxy-5ff994445f-qsklv",
+      "workload": "prod-app-z-backend/app-z-pg-proxy",
+      "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+      "age_h": 691.1
+     },
+     {
+      "namespace": "prod-app-z-backend",
+      "pod": "tts-proxy-7b6db97b69-4bbjf",
+      "workload": "prod-app-z-backend/tts-proxy",
+      "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+      "age_h": 691.1
      }
     ],
     "note": "A pod that wrote no log lines in an hour may be fine (idle). If a whole node is missing (nodes_all_missing), that node's promtail is dead; if a whole namespace is missing, promtail's exclusion config is the cause",
@@ -7831,6 +8073,354 @@
      "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.5 → none, memory request 256 → 100 MB, memory limit 768 → 100 MB",
      "kubegap_level": null,
      "kubegap_reason": ""
+    },
+    {
+     "target": "prod-app-r/statefulset/app-r-postgresql:postgresql",
+     "kind": "StatefulSet",
+     "namespace": "prod-app-r",
+     "name": "app-r-postgresql",
+     "container": "postgresql",
+     "severity": "CRITICAL",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 256,
+     "memory_request_rec_mb": 202,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 768,
+     "memory_limit_rec_mb": 202,
+     "memory_limit_sev": "CRITICAL",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": 54,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.5 → none, memory request 256 → 202 MB, memory limit 768 → 202 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "keda/deployment/keda-operator:keda-operator",
+     "kind": "Deployment",
+     "namespace": "keda",
+     "name": "keda-operator",
+     "container": "keda-operator",
+     "severity": "CRITICAL",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 1.0,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 100,
+     "memory_request_rec_mb": 139,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 1000,
+     "memory_limit_rec_mb": 139,
+     "memory_limit_sev": "CRITICAL",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": -39,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 1.0 → none, memory request 100 → 139 MB, memory limit 1000 → 139 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "keda/deployment/keda-admission-webhooks:keda-admission-webhooks",
+     "kind": "Deployment",
+     "namespace": "keda",
+     "name": "keda-admission-webhooks",
+     "container": "keda-admission-webhooks",
+     "severity": "CRITICAL",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 1.0,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 100,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 1000,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "CRITICAL",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": 0,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 1.0 → none, memory request 100 → 100 MB, memory limit 1000 → 100 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "keda/deployment/keda-operator-metrics-apiserver:keda-operator-metrics-apiserver",
+     "kind": "Deployment",
+     "namespace": "keda",
+     "name": "keda-operator-metrics-apiserver",
+     "container": "keda-operator-metrics-apiserver",
+     "severity": "CRITICAL",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 1.0,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 100,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 1000,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "CRITICAL",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": 0,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 1.0 → none, memory request 100 → 100 MB, memory limit 1000 → 100 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "dev-app-y/statefulset/app-y-backend-mysql:mysql",
+     "kind": "StatefulSet",
+     "namespace": "dev-app-y",
+     "name": "app-y-backend-mysql",
+     "container": "mysql",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 512,
+     "memory_request_rec_mb": 867,
+     "memory_request_sev": "WARNING",
+     "memory_limit_mb": 1024,
+     "memory_limit_rec_mb": 867,
+     "memory_limit_sev": "OK",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": -355,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.5 → none, memory request 512 → 867 MB",
+     "kubegap_level": "fail",
+     "kubegap_reason": "memory request under by 355 MB"
+    },
+    {
+     "target": "monitoring/deployment/kube-prometheus-stack-grafana:grafana",
+     "kind": "Deployment",
+     "namespace": "monitoring",
+     "name": "kube-prometheus-stack-grafana",
+     "container": "grafana",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.2,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 384,
+     "memory_request_rec_mb": 184,
+     "memory_request_sev": "OK",
+     "memory_limit_mb": 512,
+     "memory_limit_rec_mb": 184,
+     "memory_limit_sev": "WARNING",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": 200,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.2 → none, memory request 384 → 184 MB, memory limit 512 → 184 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "app-ab-prod/statefulset/app-ab-backend-postgresql:postgresql",
+     "kind": "StatefulSet",
+     "namespace": "app-ab-prod",
+     "name": "app-ab-backend-postgresql",
+     "container": "postgresql",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 256,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "OK",
+     "memory_limit_mb": 512,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "WARNING",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": 156,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.5 → none, memory request 256 → 100 MB, memory limit 512 → 100 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "middleware/deployment/kafka-ui:kafka-ui",
+     "kind": "Deployment",
+     "namespace": "middleware",
+     "name": "kafka-ui",
+     "container": "kafka-ui",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.2,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 256,
+     "memory_request_rec_mb": 285,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 512,
+     "memory_limit_rec_mb": 285,
+     "memory_limit_sev": "OK",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.09,
+     "memory_request_delta_mb": -29,
+     "summary": "CPU request 0.1 → 0.01 cores, CPU limit 0.2 → none, memory request 256 → 285 MB",
+     "kubegap_level": null,
+     "kubegap_reason": ""
+    },
+    {
+     "target": "dev-app-v/statefulset/app-v-backend-dev-mysql:mysql",
+     "kind": "StatefulSet",
+     "namespace": "dev-app-v",
+     "name": "app-v-backend-dev-mysql",
+     "container": "mysql",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.012,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 512,
+     "memory_request_rec_mb": 793,
+     "memory_request_sev": "WARNING",
+     "memory_limit_mb": 1024,
+     "memory_limit_rec_mb": 793,
+     "memory_limit_sev": "OK",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.088,
+     "memory_request_delta_mb": -281,
+     "summary": "CPU request 0.1 → 0.012 cores, CPU limit 0.5 → none, memory request 512 → 793 MB",
+     "kubegap_level": "fail",
+     "kubegap_reason": "memory request under by 281 MB"
+    },
+    {
+     "target": "dev-app-s/statefulset/app-s-backend-mysql:mysql",
+     "kind": "StatefulSet",
+     "namespace": "dev-app-s",
+     "name": "app-s-backend-mysql",
+     "container": "mysql",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.012,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 512,
+     "memory_request_rec_mb": 626,
+     "memory_request_sev": "OK",
+     "memory_limit_mb": 1024,
+     "memory_limit_rec_mb": 626,
+     "memory_limit_sev": "WARNING",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.088,
+     "memory_request_delta_mb": -114,
+     "summary": "CPU request 0.1 → 0.012 cores, CPU limit 0.5 → none, memory request 512 → 626 MB, memory limit 1024 → 626 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 114 MB"
+    },
+    {
+     "target": "monitoring/statefulset/loki-stack:loki",
+     "kind": "StatefulSet",
+     "namespace": "monitoring",
+     "name": "loki-stack",
+     "container": "loki",
+     "severity": "WARNING",
+     "cpu_request": 0.1,
+     "cpu_request_rec": 0.021,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.2,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 256,
+     "memory_request_rec_mb": 529,
+     "memory_request_sev": "WARNING",
+     "memory_limit_mb": 512,
+     "memory_limit_rec_mb": 529,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.079,
+     "memory_request_delta_mb": -273,
+     "summary": "CPU request 0.1 → 0.021 cores, CPU limit 0.2 → none, memory request 256 → 529 MB",
+     "kubegap_level": "fail",
+     "kubegap_reason": "memory request under by 273 MB"
+    },
+    {
+     "target": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus:prometheus",
+     "kind": "StatefulSet",
+     "namespace": "monitoring",
+     "name": "prometheus-kube-prometheus-stack-prometheus",
+     "container": "prometheus",
+     "severity": "CRITICAL",
+     "cpu_request": 0.2,
+     "cpu_request_rec": 0.137,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.5,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 800,
+     "memory_request_rec_mb": 1651,
+     "memory_request_sev": "CRITICAL",
+     "memory_limit_mb": 1536,
+     "memory_limit_rec_mb": 1651,
+     "memory_limit_sev": "OK",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.063,
+     "memory_request_delta_mb": -851,
+     "summary": "CPU request 0.2 → 0.137 cores, CPU limit 0.5 → none, memory request 800 → 1651 MB",
+     "kubegap_level": "fail",
+     "kubegap_reason": "memory request under by 851 MB"
     }
    ],
    "top_over_memory": [
@@ -10343,6 +10933,131 @@
       "nodeclaim": "build-arm64-88w98",
       "launched_to_initialized_s": 71,
       "launched_to_registered_s": 55
+     },
+     {
+      "nodeclaim": "default-k48s5",
+      "launched_to_initialized_s": 71,
+      "launched_to_registered_s": 61
+     },
+     {
+      "nodeclaim": "build-arm64-fxkbg",
+      "launched_to_initialized_s": 71,
+      "launched_to_registered_s": 56
+     },
+     {
+      "nodeclaim": "build-arm64-np4mt",
+      "launched_to_initialized_s": 69,
+      "launched_to_registered_s": 54
+     },
+     {
+      "nodeclaim": "default-jbfcl",
+      "launched_to_initialized_s": 69,
+      "launched_to_registered_s": 51
+     },
+     {
+      "nodeclaim": "default-lvf7c",
+      "launched_to_initialized_s": 68,
+      "launched_to_registered_s": 55
+     },
+     {
+      "nodeclaim": "default-gzfb4",
+      "launched_to_initialized_s": 66,
+      "launched_to_registered_s": 56
+     },
+     {
+      "nodeclaim": "build-arm64-bd8w9",
+      "launched_to_initialized_s": 66,
+      "launched_to_registered_s": 52
+     },
+     {
+      "nodeclaim": "default-v7c46",
+      "launched_to_initialized_s": 64,
+      "launched_to_registered_s": 54
+     },
+     {
+      "nodeclaim": "build-arm64-7svvl",
+      "launched_to_initialized_s": 64,
+      "launched_to_registered_s": 50
+     },
+     {
+      "nodeclaim": "default-vz69n",
+      "launched_to_initialized_s": 63,
+      "launched_to_registered_s": 48
+     },
+     {
+      "nodeclaim": "default-td9kt",
+      "launched_to_initialized_s": 61,
+      "launched_to_registered_s": 45
+     },
+     {
+      "nodeclaim": "build-arm64-jqpc8",
+      "launched_to_initialized_s": 60,
+      "launched_to_registered_s": 43
+     },
+     {
+      "nodeclaim": "default-wwhg5",
+      "launched_to_initialized_s": 58,
+      "launched_to_registered_s": 47
+     },
+     {
+      "nodeclaim": "default-z9z9h",
+      "launched_to_initialized_s": 56,
+      "launched_to_registered_s": 45
+     },
+     {
+      "nodeclaim": "default-tqfdp",
+      "launched_to_initialized_s": 55,
+      "launched_to_registered_s": 44
+     },
+     {
+      "nodeclaim": "build-arm64-zqkjw",
+      "launched_to_initialized_s": 55,
+      "launched_to_registered_s": 40
+     },
+     {
+      "nodeclaim": "default-2g8wm",
+      "launched_to_initialized_s": 55,
+      "launched_to_registered_s": 43
+     },
+     {
+      "nodeclaim": "default-dxghz",
+      "launched_to_initialized_s": 53,
+      "launched_to_registered_s": 42
+     },
+     {
+      "nodeclaim": "default-fdmww",
+      "launched_to_initialized_s": 50,
+      "launched_to_registered_s": 38
+     },
+     {
+      "nodeclaim": "build-arm64-l2zdc",
+      "launched_to_initialized_s": 48,
+      "launched_to_registered_s": 33
+     },
+     {
+      "nodeclaim": "default-6d76s",
+      "launched_to_initialized_s": 47,
+      "launched_to_registered_s": 37
+     },
+     {
+      "nodeclaim": "build-arm64-xlg9c",
+      "launched_to_initialized_s": 47,
+      "launched_to_registered_s": 32
+     },
+     {
+      "nodeclaim": "default-6mrpc",
+      "launched_to_initialized_s": 46,
+      "launched_to_registered_s": 35
+     },
+     {
+      "nodeclaim": "default-w2hnx",
+      "launched_to_initialized_s": 44,
+      "launched_to_registered_s": 34
+     },
+     {
+      "nodeclaim": "default-2957m",
+      "launched_to_initialized_s": 41,
+      "launched_to_registered_s": 29
      }
     ]
    },
@@ -10352,6 +11067,66 @@
     "emptiness delete": 10
    },
    "disrupted_24h": [
+    {
+     "time": "2026-11-06T01:41:49.192935+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-209.ap-northeast-2.compute.internal/c9g.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T01:42:14.394477+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-116.ap-northeast-2.compute.internal/c9g.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T01:50:47.024573+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-160.ap-northeast-2.compute.internal/c9gd.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T01:56:57.307071+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-66.ap-northeast-2.compute.internal/c9g.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T02:01:26.830708+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-177.ap-northeast-2.compute.internal/c9gd.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T02:52:20.951542+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-160.ap-northeast-2.compute.internal/c9gd.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T02:54:09.551323+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-250.ap-northeast-2.compute.internal/c9g.large/spot",
+     "pods": 0
+    },
+    {
+     "time": "2026-11-06T02:56:30.001124+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-146.ap-northeast-2.compute.internal/c9gd.large/spot",
+     "pods": 1
+    },
+    {
+     "time": "2026-11-06T03:42:50.988567+00:00",
+     "reason": "consolidation delete",
+     "nodes": "ip-10-0-2-45.ap-northeast-2.compute.internal/c6g.xlarge/spot",
+     "pods": 2
+    },
+    {
+     "time": "2026-11-06T03:54:57.268790+00:00",
+     "reason": "emptiness delete",
+     "nodes": "ip-10-0-2-10.ap-northeast-2.compute.internal/c6g.xlarge/spot",
+     "pods": 0
+    },
     {
      "time": "2026-11-06T05:30:00.219108+00:00",
      "reason": "emptiness delete",
@@ -36042,7 +36817,38 @@
       "dev-app-y/deployment/app-y-admin",
       "dev-app-y/deployment/app-y-ai",
       "dev-app-y/deployment/app-y-backend",
-      "dev-app-y/deployment/app-y-frontend"
+      "dev-app-y/deployment/app-y-frontend",
+      "dev-app-v/deployment/app-v-admin-frontend",
+      "dev-app-v/deployment/app-v-backend",
+      "dev-app-v/deployment/app-v-frontend",
+      "dev-app-aa/deployment/app-aa-backend",
+      "dev-app-aa/deployment/app-aa-frontend",
+      "prod-app-w/deployment/app-w",
+      "prod-app-t/deployment/app-t-ai",
+      "prod-app-t/deployment/app-t-backend",
+      "prod-app-t/deployment/app-t-studio",
+      "prod-app-t/deployment/app-t-web",
+      "prod-app-x/deployment/app-x-api",
+      "prod-app-s/deployment/app-s-admin",
+      "prod-app-s/deployment/app-s-api",
+      "prod-app-s/deployment/app-s-backend",
+      "prod-app-s/deployment/app-s-frontend",
+      "prod-app-y/deployment/app-y-admin",
+      "prod-app-y/deployment/app-y-ai",
+      "prod-app-y/deployment/app-y-backend",
+      "prod-app-y/deployment/app-y-frontend",
+      "prod-app-z-backend/deployment/app-z-backend",
+      "prod-app-z-backend/deployment/app-z-embedding-server",
+      "prod-app-z-backend/deployment/app-z-file-worker",
+      "prod-app-z-backend/deployment/app-z-frontend",
+      "prod-app-z-backend/deployment/app-z-graph-worker",
+      "prod-app-r/deployment/app-r-backend",
+      "prod-app-r/deployment/app-r-web",
+      "prod-app-v/deployment/app-v-admin-frontend",
+      "prod-app-v/deployment/app-v-backend",
+      "prod-app-v/deployment/app-v-frontend",
+      "app-ab-prod/deployment/app-ab-backend",
+      "app-ab-prod/deployment/app-ab-frontend"
      ],
      "prod_workloads": 26,
      "nodes_with_label": 4,
@@ -36060,7 +36866,33 @@
       "argocd/deployment/argocd-repo-server",
       "argocd/deployment/argocd-server",
       "kube-system/deployment/external-dns",
-      "middleware/deployment/kafka-exporter"
+      "middleware/deployment/kafka-exporter",
+      "middleware/deployment/kafka-ui",
+      "middleware/deployment/redis-insight",
+      "monitoring/deployment/kube-prometheus-stack-grafana",
+      "monitoring/deployment/kube-prometheus-stack-operator",
+      "monitoring/deployment/vmalert",
+      "prod-app-z-backend/deployment/app-z-pg-proxy",
+      "argocd/statefulset/argocd-application-controller",
+      "dev-app-s/statefulset/app-s-backend-mysql",
+      "dev-app-y/statefulset/app-y-backend-mysql",
+      "dev-app-v/statefulset/app-v-backend-dev-mysql",
+      "dev-app-aa/statefulset/app-aa-mysql",
+      "dev-app-aa/statefulset/app-aa-postgres",
+      "middleware/statefulset/kafka-controller",
+      "middleware/statefulset/redis-master",
+      "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager",
+      "monitoring/statefulset/loki-stack",
+      "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus",
+      "monitoring/statefulset/vm-single",
+      "prod-app-t/statefulset/app-t-backend-postgresql",
+      "prod-app-x/statefulset/app-x-postgresql",
+      "prod-app-s/statefulset/app-s-backend-mysql",
+      "prod-app-y/statefulset/app-y-backend-mysql",
+      "prod-app-z-backend/statefulset/app-z-neo4j",
+      "prod-app-r/statefulset/app-r-postgresql",
+      "prod-app-v/statefulset/app-v-backend-prod-mysql",
+      "app-ab-prod/statefulset/app-ab-backend-postgresql"
      ],
      "prod_workloads": 9,
      "nodes_with_label": 5,
@@ -36102,7 +36934,10 @@
       "kube-system/deployment/coredns",
       "kube-system/deployment/ebs-csi-controller",
       "kube-system/daemonset/aws-node",
-      "kube-system/daemonset/ebs-csi-node"
+      "kube-system/daemonset/ebs-csi-node",
+      "kube-system/daemonset/ebs-csi-node-windows",
+      "kube-system/daemonset/kube-proxy",
+      "monitoring/daemonset/kube-prometheus-stack-prometheus-node-exporter"
      ],
      "prod_workloads": 0,
      "nodes_with_label": 9,
@@ -41493,7 +42328,8 @@
       "User:eks:network-policy-controller",
       "User:eks:node-manager",
       "User:eks:vpc-resource-controller",
-      "User:system:kube-controller-manager"
+      "User:system:kube-controller-manager",
+      "User:system:kube-scheduler"
      ],
      "rbac_subject_count": 11,
      "nodes": {
@@ -43317,6 +44153,114 @@
     {
      "namespace": "dev-app-s",
      "kind": "dev",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "dev-app-v",
+     "kind": "dev",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "dev-app-y",
+     "kind": "dev",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "external-secrets",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "karpenter",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "keda",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "kube-node-lease",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "kube-public",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "kube-system",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "middleware",
+     "kind": "other",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "monitoring",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "prod-app-r",
+     "kind": "prod",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "prod-app-s",
+     "kind": "prod",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "prod-app-t",
+     "kind": "prod",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "prod-app-v",
+     "kind": "prod",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "prod-app-w",
+     "kind": "prod",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "prod-app-x",
+     "kind": "prod",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "prod-app-y",
+     "kind": "prod",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "prod-app-z-backend",
+     "kind": "prod",
      "cpu_p95_7d": null,
      "share": null
     }
@@ -45587,6 +46531,94 @@
       [
        "Elastic Load Balancing v2/DescribeLoadBalancers",
        3732
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeRules",
+       3732
+      ],
+      [
+       "ACM/DescribeCertificate",
+       3509
+      ],
+      [
+       "EC2/DescribeVpcs",
+       2989
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeTargetGroups",
+       1880
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeListeners",
+       1866
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+       1866
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeListenerCertificates",
+       1280
+      ],
+      [
+       "Shield/GetSubscriptionState",
+       1221
+      ],
+      [
+       "EC2/DescribeNetworkInterfaces",
+       1080
+      ],
+      [
+       "ACM/ListCertificates",
+       660
+      ],
+      [
+       "WAF Regional/GetWebACLForResource",
+       644
+      ],
+      [
+       "WAFV2/GetWebACLForResource",
+       644
+      ],
+      [
+       "EC2/DescribeSubnets",
+       586
+      ],
+      [
+       "Elastic Load Balancing v2/ModifyRule",
+       557
+      ],
+      [
+       "EC2/AuthorizeSecurityGroupIngress",
+       195
+      ],
+      [
+       "EC2/RevokeSecurityGroupIngress",
+       194
+      ],
+      [
+       "Elastic Load Balancing v2/CreateRule",
+       30
+      ],
+      [
+       "Elastic Load Balancing v2/CreateTargetGroup",
+       30
+      ],
+      [
+       "Elastic Load Balancing v2/DeleteRule",
+       14
+      ],
+      [
+       "Elastic Load Balancing v2/DeleteTargetGroup",
+       14
+      ],
+      [
+       "Elastic Load Balancing v2/ModifyTargetGroup",
+       13
+      ],
+      [
+       "EC2/DescribeAvailabilityZones",
+       2
       ]
      ],
      "aws_api_slow_ops_avg_s": [
@@ -45609,6 +46641,90 @@
       [
        "Elastic Load Balancing v2/CreateTargetGroup",
        0.265
+      ],
+      [
+       "EC2/DescribeSubnets",
+       0.138
+      ],
+      [
+       "Elastic Load Balancing v2/CreateRule",
+       0.103
+      ],
+      [
+       "Elastic Load Balancing v2/ModifyRule",
+       0.096
+      ],
+      [
+       "ACM/ListCertificates",
+       0.087
+      ],
+      [
+       "EC2/DescribeVpcs",
+       0.084
+      ],
+      [
+       "EC2/DescribeInstances",
+       0.082
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeTargetGroups",
+       0.081
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeRules",
+       0.08
+      ],
+      [
+       "EC2/DescribeSecurityGroups",
+       0.076
+      ],
+      [
+       "WAFV2/GetWebACLForResource",
+       0.075
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeTags",
+       0.071
+      ],
+      [
+       "ACM/DescribeCertificate",
+       0.07
+      ],
+      [
+       "EC2/DescribeNetworkInterfaces",
+       0.065
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeLoadBalancers",
+       0.064
+      ],
+      [
+       "WAF Regional/GetWebACLForResource",
+       0.059
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeListeners",
+       0.057
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeListenerCertificates",
+       0.052
+      ],
+      [
+       "Elastic Load Balancing v2/DeregisterTargets",
+       0.05
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+       0.047
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+       0.042
+      ],
+      [
+       "Elastic Load Balancing v2/DescribeTargetHealth",
+       0.036
       ]
      ],
      "aws_api_retries_avg": 0.0,
@@ -45710,6 +46826,94 @@
     [
      "Elastic Load Balancing v2/DescribeLoadBalancers",
      3732
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeRules",
+     3732
+    ],
+    [
+     "ACM/DescribeCertificate",
+     3509
+    ],
+    [
+     "EC2/DescribeVpcs",
+     2989
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroups",
+     1880
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListeners",
+     1866
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+     1866
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListenerCertificates",
+     1280
+    ],
+    [
+     "Shield/GetSubscriptionState",
+     1221
+    ],
+    [
+     "EC2/DescribeNetworkInterfaces",
+     1080
+    ],
+    [
+     "ACM/ListCertificates",
+     660
+    ],
+    [
+     "WAF Regional/GetWebACLForResource",
+     644
+    ],
+    [
+     "WAFV2/GetWebACLForResource",
+     644
+    ],
+    [
+     "EC2/DescribeSubnets",
+     586
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyRule",
+     557
+    ],
+    [
+     "EC2/AuthorizeSecurityGroupIngress",
+     195
+    ],
+    [
+     "EC2/RevokeSecurityGroupIngress",
+     194
+    ],
+    [
+     "Elastic Load Balancing v2/CreateRule",
+     30
+    ],
+    [
+     "Elastic Load Balancing v2/CreateTargetGroup",
+     30
+    ],
+    [
+     "Elastic Load Balancing v2/DeleteRule",
+     14
+    ],
+    [
+     "Elastic Load Balancing v2/DeleteTargetGroup",
+     14
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyTargetGroup",
+     13
+    ],
+    [
+     "EC2/DescribeAvailabilityZones",
+     2
     ]
    ],
    "aws_api_slow_ops_avg_s": [
@@ -45732,6 +46936,90 @@
     [
      "Elastic Load Balancing v2/CreateTargetGroup",
      0.265
+    ],
+    [
+     "EC2/DescribeSubnets",
+     0.138
+    ],
+    [
+     "Elastic Load Balancing v2/CreateRule",
+     0.103
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyRule",
+     0.096
+    ],
+    [
+     "ACM/ListCertificates",
+     0.087
+    ],
+    [
+     "EC2/DescribeVpcs",
+     0.084
+    ],
+    [
+     "EC2/DescribeInstances",
+     0.082
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroups",
+     0.081
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeRules",
+     0.08
+    ],
+    [
+     "EC2/DescribeSecurityGroups",
+     0.076
+    ],
+    [
+     "WAFV2/GetWebACLForResource",
+     0.075
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTags",
+     0.071
+    ],
+    [
+     "ACM/DescribeCertificate",
+     0.07
+    ],
+    [
+     "EC2/DescribeNetworkInterfaces",
+     0.065
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancers",
+     0.064
+    ],
+    [
+     "WAF Regional/GetWebACLForResource",
+     0.059
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListeners",
+     0.057
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListenerCertificates",
+     0.052
+    ],
+    [
+     "Elastic Load Balancing v2/DeregisterTargets",
+     0.05
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+     0.047
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+     0.042
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetHealth",
+     0.036
     ]
    ],
    "aws_api_retries_avg": 0.0,
@@ -45771,7 +47059,10 @@
     "healthcheck-path": 22,
     "healthy-threshold-count": 12,
     "success-codes": 12,
-    "unhealthy-threshold-count": 12
+    "unhealthy-threshold-count": 12,
+    "certificate-arn": 6,
+    "ssl-redirect": 6,
+    "backend-protocol": 3
    },
    "tgb_count": 52,
    "tgb_by_target_type": {
@@ -45817,6 +47108,90 @@
     [
      "Elastic Load Balancing v2/CreateTargetGroup",
      0.265
+    ],
+    [
+     "EC2/DescribeSubnets",
+     0.138
+    ],
+    [
+     "Elastic Load Balancing v2/CreateRule",
+     0.103
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyRule",
+     0.096
+    ],
+    [
+     "ACM/ListCertificates",
+     0.087
+    ],
+    [
+     "EC2/DescribeVpcs",
+     0.084
+    ],
+    [
+     "EC2/DescribeInstances",
+     0.082
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroups",
+     0.081
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeRules",
+     0.08
+    ],
+    [
+     "EC2/DescribeSecurityGroups",
+     0.076
+    ],
+    [
+     "WAFV2/GetWebACLForResource",
+     0.075
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTags",
+     0.071
+    ],
+    [
+     "ACM/DescribeCertificate",
+     0.07
+    ],
+    [
+     "EC2/DescribeNetworkInterfaces",
+     0.065
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancers",
+     0.064
+    ],
+    [
+     "WAF Regional/GetWebACLForResource",
+     0.059
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListeners",
+     0.057
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListenerCertificates",
+     0.052
+    ],
+    [
+     "Elastic Load Balancing v2/DeregisterTargets",
+     0.05
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+     0.047
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+     0.042
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetHealth",
+     0.036
     ]
    ],
    "aws_api_top_ops": [
@@ -45851,6 +47226,94 @@
     [
      "Elastic Load Balancing v2/DescribeLoadBalancers",
      3732
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeRules",
+     3732
+    ],
+    [
+     "ACM/DescribeCertificate",
+     3509
+    ],
+    [
+     "EC2/DescribeVpcs",
+     2989
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeTargetGroups",
+     1880
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListeners",
+     1866
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+     1866
+    ],
+    [
+     "Elastic Load Balancing v2/DescribeListenerCertificates",
+     1280
+    ],
+    [
+     "Shield/GetSubscriptionState",
+     1221
+    ],
+    [
+     "EC2/DescribeNetworkInterfaces",
+     1080
+    ],
+    [
+     "ACM/ListCertificates",
+     660
+    ],
+    [
+     "WAF Regional/GetWebACLForResource",
+     644
+    ],
+    [
+     "WAFV2/GetWebACLForResource",
+     644
+    ],
+    [
+     "EC2/DescribeSubnets",
+     586
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyRule",
+     557
+    ],
+    [
+     "EC2/AuthorizeSecurityGroupIngress",
+     195
+    ],
+    [
+     "EC2/RevokeSecurityGroupIngress",
+     194
+    ],
+    [
+     "Elastic Load Balancing v2/CreateRule",
+     30
+    ],
+    [
+     "Elastic Load Balancing v2/CreateTargetGroup",
+     30
+    ],
+    [
+     "Elastic Load Balancing v2/DeleteRule",
+     14
+    ],
+    [
+     "Elastic Load Balancing v2/DeleteTargetGroup",
+     14
+    ],
+    [
+     "Elastic Load Balancing v2/ModifyTargetGroup",
+     13
+    ],
+    [
+     "EC2/DescribeAvailabilityZones",
+     2
     ]
    ],
    "rest_client_429_503": 126,
@@ -49117,6 +50580,48 @@
     "namespace": "dev-app-v",
     "cpu_request": 0.3,
     "share": 0.022,
+    "monthly_usd_est": null,
+    "prod": false
+   },
+   {
+    "namespace": "prod-app-t",
+    "cpu_request": 0.29,
+    "share": 0.021,
+    "monthly_usd_est": null,
+    "prod": true
+   },
+   {
+    "namespace": "prod-app-v",
+    "cpu_request": 0.25,
+    "share": 0.018,
+    "monthly_usd_est": null,
+    "prod": true
+   },
+   {
+    "namespace": "app-ab-prod",
+    "cpu_request": 0.25,
+    "share": 0.018,
+    "monthly_usd_est": null,
+    "prod": true
+   },
+   {
+    "namespace": "external-secrets",
+    "cpu_request": 0.15,
+    "share": 0.011,
+    "monthly_usd_est": null,
+    "prod": false
+   },
+   {
+    "namespace": "prod-app-w",
+    "cpu_request": 0.1,
+    "share": 0.007,
+    "monthly_usd_est": null,
+    "prod": true
+   },
+   {
+    "namespace": "arc-system",
+    "cpu_request": 0.05,
+    "share": 0.004,
     "monthly_usd_est": null,
     "prod": false
    }

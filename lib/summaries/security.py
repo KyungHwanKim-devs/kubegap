@@ -69,15 +69,15 @@ def _rbac(snap: Path, prod: set) -> dict:
             continue
         subs = bound_cr.get(name, [])
         if wildcard(c.get("rules")):
-            wild.append({"clusterrole": name, "role": None, "bound_subjects": subs[:8], "bound": bool(subs), "prod": False})
+            wild.append({"clusterrole": name, "role": None, "bound_subjects": subs, "bound": bool(subs), "prod": False})
         elif reads_secrets(c.get("rules")) and subs and not any(k.get("via_rolebinding") for k in subs):
             user_subs = [s for s in subs if not is_system(s) and not str(s.get("namespace") or "").startswith(SYSTEM_NS_PREFIX)]  # operators (argocd, ESO, cert-manager, KEDA, monitoring) read secrets by design
             if user_subs:
-                secret_readers.append({"clusterrole": name, "bound_subjects": user_subs[:8]})
+                secret_readers.append({"clusterrole": name, "bound_subjects": user_subs})
     for (ns, name), r in roles.items():
         if wildcard(r.get("rules")):
             subs = [subjects(b) for b in rbs if b["metadata"]["namespace"] == ns and (b.get("roleRef") or {}).get("kind") == "Role" and (b.get("roleRef") or {}).get("name") == name]
-            wild.append({"clusterrole": None, "role": f"{ns}/{name}", "bound_subjects": [s for ss in subs for s in ss][:8], "bound": bool(subs), "prod": ns in prod})
+            wild.append({"clusterrole": None, "role": f"{ns}/{name}", "bound_subjects": [s for ss in subs for s in ss], "bound": bool(subs), "prod": ns in prod})
     bound_sa = {(s["namespace"], s["name"]) for subs in bound_cr.values() for s in subs if s.get("kind") == "ServiceAccount"}
     for b in rbs:
         for s in subjects(b):
@@ -219,7 +219,7 @@ def _secrets(snap: Path, prod: set, platform: str | None) -> dict:
                 # the value of a credential-like variable was dropped at collection time with its verdict kept (lib/foundations/scrub.py)
                 names = [e["name"] for e in c.get("env") or [] if scrub.entry_secret_like(e)]
                 if names:
-                    plain.append({"workload": wl_key(kind, o), "namespace": ns, "prod": ns in prod, "container": c["name"], "env_names": names[:8]})  # values are not recorded
+                    plain.append({"workload": wl_key(kind, o), "namespace": ns, "prod": ns in prod, "container": c["name"], "env_names": names})  # values are not recorded
     # A ConfigMap key is a candidate when its name looks secret-like and its value looks like a secret (key name only is recorded, never the value; e.g. fluent-bit HTTP_Passwd)
     cm_rows = []
     cm_used: dict[tuple, set] = {}
@@ -245,7 +245,7 @@ def _secrets(snap: Path, prod: set, platform: str | None) -> dict:
         # The detection ran at collection time, before the values were dropped from the snapshot (lib/foundations/scrub.py); only key names are recorded.
         keys = scrub.configmap_secret_like_keys(cm)
         if keys:
-            cm_rows.append({"namespace": ns, "name": name, "target": f"{ns}/configmap/{name}", "prod": ns in prod, "keys": keys[:8], "mounted_by": sorted(cm_used.get((ns, name), set()))[:6]})
+            cm_rows.append({"namespace": ns, "name": name, "target": f"{ns}/configmap/{name}", "prod": ns in prod, "keys": keys, "mounted_by": sorted(cm_used.get((ns, name), set()))})
     es_bad = []
     es_total = 0
     for es in objects(snap, "externalsecrets.external-secrets.io"):
@@ -379,7 +379,7 @@ def analyze(snap: Path, inv: dict | None, k3s_summary: dict | None = None, hygie
             "score": pol.get("score"),
             "security_checks": [c for c in pol.get("checks") or [] if c.get("category") == "Security"],
             "workloads": [
-                {"target": r["target"], "namespace": r["namespace"], "prod": r["prod"], "security_danger": r["security_danger"], "security_warning": r["security_warning"][:6]}
+                {"target": r["target"], "namespace": r["namespace"], "prod": r["prod"], "security_danger": r["security_danger"], "security_warning": r["security_warning"]}
                 for r in pol.get("workloads") or []
                 if r.get("security_danger") or r.get("security_warning")
             ],

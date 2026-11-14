@@ -1,0 +1,84 @@
+# Constant cuts allowed under lib/summaries (tests/test_no_cut_lists.py). Columns: file, the expression that is cut, how, why.
+# Everything here is text, a tuple, a strip of a known prefix or suffix, or a sample that carries its total. No list of facts is cut.
+albctl.py	spec.get('targetGroupARN') or ''	[-24:]	text or a fixed-format prefix/suffix
+argocdctl.py	(st.get('sync') or {}).get('revision', '')	[:12]	text or a fixed-format prefix/suffix
+argocdctl.py	src.get('repoURL') or ''	[-60:]	text or a fixed-format prefix/suffix
+certmanager.py	(o.get('status') or {}).get('reason') or ''	[:100]	text or a fixed-format prefix/suffix
+certmanager.py	(o.get('status') or {}).get('reason') or ''	[:160]	text or a fixed-format prefix/suffix
+certmanager.py	_conds(o).get('Ready', (None, None))	[:2]	text or a fixed-format prefix/suffix
+certmanager.py	c.get('message') or ''	[:160]	text or a fixed-format prefix/suffix
+certmanager.py	r['issuing_message']	[:80]	text or a fixed-format prefix/suffix
+certmanager.py	st.get('notAfter') or ''	[:10]	text or a fixed-format prefix/suffix
+certmanager.py	st.get('renewalTime') or ''	[:10]	text or a fixed-format prefix/suffix
+controlplane.py	lines	[:3]	three raw log lines as a sample; the count is in the same record
+controlplane.py	ln	[-160:]	text or a fixed-format prefix/suffix
+coredns.py	ln	[:-1]	text or a fixed-format prefix/suffix
+coredns.py	ln.split()	[1:]	text or a fixed-format prefix/suffix
+coredns.py	tok	[1:]	text or a fixed-format prefix/suffix
+coredns.py	tok	[2:]	text or a fixed-format prefix/suffix
+ebscsi.py	err or ''	[:200]	text or a fixed-format prefix/suffix
+ecr.py	last_pull.isoformat()	[:10]	text or a fixed-format prefix/suffix
+ecr.py	last_push.isoformat()	[:10]	text or a fixed-format prefix/suffix
+ecr.py	r.get('createdAt') or ''	[:10]	text or a fixed-format prefix/suffix
+eksplatform.py	c.get('CertificateArn') or ''	[-12:]	text or a fixed-format prefix/suffix
+eksplatform.py	c.get('NotAfter') or ''	[:10]	text or a fixed-format prefix/suffix
+eksplatform.py	str(cw['errors'][0])	[:200]	text or a fixed-format prefix/suffix
+eksplatform.py	str(usage['errors'][0])	[:200]	text or a fixed-format prefix/suffix
+esoctl.py	ready[2] or ''	[:160]	text or a fixed-format prefix/suffix
+events.py	e.get('message') or ''	[:200]	text or a fixed-format prefix/suffix
+events.py	series	[:-1]	text or a fixed-format prefix/suffix
+hygiene/__init__.py	f	[:-5]	text or a fixed-format prefix/suffix
+hygiene/__init__.py	img	[:160]	text or a fixed-format prefix/suffix
+hygiene/__init__.py	str(st.get('message') or '')	[:160]	text or a fixed-format prefix/suffix
+hygiene/toolreports.py	(i.get('insightStatus') or {}).get('reason') or ''	[:200]	text or a fixed-format prefix/suffix
+hygiene/toolreports.py	err	[:200]	text or a fixed-format prefix/suffix
+k3s.py	lines[-1]	[:15]	text or a fixed-format prefix/suffix
+k3s.py	lines[0]	[:15]	text or a fixed-format prefix/suffix
+k3s.py	ln	[:9]	text or a fixed-format prefix/suffix
+k3s.py	snaps	[-2:]	the last two snapshots, to compute their spacing
+logs.py	kind	[:-1]	text or a fixed-format prefix/suffix
+logs.py	line	[:240]	text or a fixed-format prefix/suffix
+logs.py	msg	[:140]	text or a fixed-format prefix/suffix
+logs.py	s.pattern	[4:]	text or a fixed-format prefix/suffix
+logs.py	tz	[-2:]	text or a fixed-format prefix/suffix
+logs.py	tz	[1:3]	text or a fixed-format prefix/suffix
+metallbctl.py	by_node	.most_common(1)	picks the leader node, a computation
+metallbctl.py	r.get('error') or r.get('skipped') or ''	[:160]	text or a fixed-format prefix/suffix
+metallbctl.py	strip_control(st.get('errorSummary') or '')[0]	[:200]	text or a fixed-format prefix/suffix
+nodeos.py	k	[6:]	text or a fixed-format prefix/suffix
+nodeos.py	s.split()	[1:]	text or a fixed-format prefix/suffix
+nodeos.py	s.split()[0]	[3:]	text or a fixed-format prefix/suffix
+nodeos.py	s.split()[0]	[6:]	text or a fixed-format prefix/suffix
+nodeos.py	str(reason)	[:200]	text or a fixed-format prefix/suffix
+observability.py	(r.get('annotations') or {}).get('summary') or ''	[:160]	text or a fixed-format prefix/suffix
+observability.py	(r.get('annotations') or {}).get('summary') or (r.get('annotations') or {}).get('description') or ''	[:160]	text or a fixed-format prefix/suffix
+observability.py	cfg_text	[:300]	text or a fixed-format prefix/suffix
+observability.py	r.get('last_error') or ''	[:160]	text or a fixed-format prefix/suffix
+observability.py	s_.get('comment') or ''	[:120]	text or a fixed-format prefix/suffix
+observability.py	t.get('lastError') or ''	[:140]	text or a fixed-format prefix/suffix
+resilience/__init__.py	json.dumps(req, ensure_ascii=False)	[:160]	text or a fixed-format prefix/suffix
+resilience/__init__.py	mn	[:-1]	text or a fixed-format prefix/suffix
+resilience/backup.py	text	[:400]	text or a fixed-format prefix/suffix
+resources.py	(c.get('image') or '').split('/')[-1]	[:60]	text or a fixed-format prefix/suffix
+resources.py	kind	[:-1]	text or a fixed-format prefix/suffix
+scaling.py	((m.get('external') or {}).get('metric') or {}).get('name', '?')	[:40]	text or a fixed-format prefix/suffix
+scaling.py	((m.get(t.lower()) or {}).get('metric') or {}).get('name') or '?'	[:40]	text or a fixed-format prefix/suffix
+scaling.py	c.get('message') or ''	[:160]	text or a fixed-format prefix/suffix
+scaling.py	msg	[:60]	text or a fixed-format prefix/suffix
+security.py	r.get('message') or ''	[:160]	text or a fixed-format prefix/suffix
+stackhealth.py	Counter(job_intervals.values())	.most_common(1)	picks the usual scrape interval, a computation
+storage.py	e.get('message') or ''	[:140]	text or a fixed-format prefix/suffix
+storage.py	s.get('description') or ''	[:40]	text or a fixed-format prefix/suffix
+storage.py	str(((va.get('status') or {}).get('attachError') or (va.get('status') or {}).get('detachError') or {}).get('message'))	[:160]	text or a fixed-format prefix/suffix
+summarize.py	c.get('message') or ''	[:240]	text or a fixed-format prefix/suffix
+summarize.py	e.get('message') or ''	[:300]	text or a fixed-format prefix/suffix
+summarize.py	e['reasons']	[:5]	console progress line, not stored
+summarize.py	lines	[:30]	the head of a raw text file; `lines` carries the total
+summarize.py	list(c['by_kind'].items())	[:6]	console progress line, not stored
+summarize.py	next((c.get('message') for c in (p.get('status') or {}).get('conditions') or [] if c.get('type') == 'PodScheduled' and c.get('status') == 'False'), '')	[:200]	text or a fixed-format prefix/suffix
+summarize.py	r.get('error') or ''	[:200]	text or a fixed-format prefix/suffix
+summarize.py	rows	[:30]	the metric digest shown to the reader: the largest 30, with `truncated` and `stats.n` next to it; checks read metrics/ whole
+summarize.py	w.get('message') or ''	[:200]	text or a fixed-format prefix/suffix
+traffic.py	bound	[:6]	a sentence that names six and says how many more
+traffic.py	t	[:2]	text or a fixed-format prefix/suffix
+traffic.py	v	[:80]	text or a fixed-format prefix/suffix
