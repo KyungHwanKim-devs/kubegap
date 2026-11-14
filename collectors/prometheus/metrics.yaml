@@ -6,7 +6,7 @@
     - "ALERTS: prometheus/prometheus rules/alerting.go:41,232-234@v2.49.1, :41,236-238@v3.7.3, :41,244-246@v3.15.1 (written by every alerting rule evaluation for each pending or firing alert, value 1, labels alertname, alertstate = pending or firing :46 at every version, and the alert's own labels)"
 - id: alerts_firing_samples_7d
   why: Top alerts by samples observed firing over 7 days (fatigue). At a 30s evaluation interval one day is 2,880; 20,160 means firing for all 7 days
-  query: topk(20, sum by (alertname) (count_over_time(ALERTS{alertstate="firing"}[7d])))
+  query: sum by (alertname) (count_over_time(ALERTS{alertstate="firing"}[7d]))
   source:
     - "ALERTS: prometheus/prometheus rules/alerting.go:41,232-234@v2.49.1, :41,236-238@v3.7.3, :41,244-246@v3.15.1 (written by every alerting rule evaluation for each pending or firing alert, value 1, labels alertname, alertstate = pending or firing :46 at every version, and the alert's own labels)"
 - id: alerts_firing_now

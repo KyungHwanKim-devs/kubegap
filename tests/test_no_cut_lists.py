@@ -84,3 +84,16 @@ def test_an_evidence_sentence_that_shows_part_of_a_list_says_how_many_more():
             if line.lstrip().startswith(("evidence:", "target:")):
                 left = [m.group(0) for m in re.finditer(r"\w+(?:\['\w+'\])?\[:\d+\]", line) if not m.group(0).startswith(("s[", "e['pattern']", "item['changed_at']"))]
                 assert left == [], f"{path}:{n}: {left} cuts a list in an evidence sentence; use shown(list, n)"
+
+
+def test_a_query_that_feeds_a_verdict_does_not_ask_for_the_top_n_only():
+    """`topk(300, ratio)` kept the 300 largest ratios, so on a cluster with more containers the check for the smallest ratios
+    (over-provisioned requests) saw none of them. Only a query that is a ranking by its name (…_top, …_slow_…) may ask for the top N."""
+    import re
+
+    from lib.foundations import yamlite
+
+    for path in sorted(Path("collectors").glob("*/metrics.yaml")):
+        for q in yamlite.load_file(path) or []:
+            if re.search(r"\b(topk|bottomk)\(", str(q.get("query") or "")):
+                assert re.search(r"(^|_)(top|slow)(_|$)", q["id"]), f"{path}: {q['id']} cuts its result with topk; filter by a condition instead, or name it a ranking"
