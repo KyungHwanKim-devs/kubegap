@@ -57,7 +57,7 @@
 | `resources.cpu-throttling.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | high |  | pod prometheus-kube-prometheus-stack-prometheus-0: throttling ratio now 0.28, 24 h or the pod's life 0.28: throttled through the day |
 | `resources.cpu-throttling.prod-app-s/deploy/app-s-frontend:frontend` | high |  | ["pod app-s-frontend-6d7ff4dcdb-wjjxj: throttling ratio now 0.00, 24 h or the pod's life 0.46: throttled through the day; no 5-minute value, under 0.01 now", "pod app-s-frontend-6d7ff4dcdb-h7hpl: throttling ratio now … |
 | `resources.memory-limit-near-p95.prod-app-z-backend/deploy/app-z-embedding-server:embedding` | high |  | pod app-z-embedding-server-8445d87f5-dwqrx: 7d memory working set p95 / limit = 0.94 |
-| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | high |  | kernel log not read in this mode. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (the pods running now: 0 at most). cAdvisor counter 0 |
+| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | high |  | kernel log not read in this mode. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (none of those pods is running now). cAdvisor counter 0 |
 | `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | high |  | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago), 2 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
 | `security.networkpolicy-not-enforced.cluster` | high |  | 4 NetworkPolicies (['app-ab-prod', 'prod-app-r', 'prod-app-t', 'prod-app-x']), enforced False: aws-eks-nodeagent --enable-network-policy=false, 0 PolicyEndpoints |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | high |  | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
@@ -181,7 +181,7 @@
 | `resources.cpu-throttling.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | fail | high | pod prometheus-kube-prometheus-stack-prometheus-0: throttling ratio now 0.28, 24 h or the pod's life 0.28: throttled through the day |
 | `resources.cpu-throttling.prod-app-s/deploy/app-s-frontend:frontend` | fail | high | ["pod app-s-frontend-6d7ff4dcdb-wjjxj: throttling ratio now 0.00, 24 h or the pod's life 0.46: throttled through the day; no 5-minute value, under 0.01 now", "pod app-s-frontend-6d7ff4dcdb-h7hpl: throttling ratio now 0.38, 24 h or the pod's life 0.42: throttled through the day", "pod … |
 | `resources.memory-limit-near-p95.prod-app-z-backend/deploy/app-z-embedding-server:embedding` | fail | high | pod app-z-embedding-server-8445d87f5-dwqrx: 7d memory working set p95 / limit = 0.94 |
-| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | fail | high | kernel log not read in this mode. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (the pods running now: 0 at most). cAdvisor counter 0 |
+| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | fail | high | kernel log not read in this mode. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (none of those pods is running now). cAdvisor counter 0 |
 | `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | fail | high | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago), 2 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
 | `security.networkpolicy-not-enforced.cluster` | fail | high | 4 NetworkPolicies (['app-ab-prod', 'prod-app-r', 'prod-app-t', 'prod-app-x']), enforced False: aws-eks-nodeagent --enable-network-policy=false, 0 PolicyEndpoints |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | high | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
@@ -889,7 +889,6 @@
  "kernel_log_read": false,
  "kernel_nodes_old_script": 0,
  "kernel_nodes_total": 2,
- "live_pod_restarts_max": 0,
  "pods_oomkilled": 3,
  "pods_replaced": 3,
  "restarts_of_those_pods": 13,

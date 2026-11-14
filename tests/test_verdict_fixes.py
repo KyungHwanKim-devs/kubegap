@@ -39,8 +39,12 @@ def test_a_copy_to_another_node_of_the_cluster_is_not_off_the_cluster():
 
 
 def test_oom_evidence_tells_the_history_of_replaced_pods_from_the_pod_running_now():
-    item = {"kernel_any_node_read": False, "pods_oomkilled": 1, "pods_replaced": 1, "restarts_of_those_pods": 163, "live_pod_restarts_max": 1}
-    assert "1 already replaced, 163 restarts in those pods (the pods running now: 1 at most)" in evidence.oom_text(item)
+    """`live_pod_restarts_max` counts the pods that were ended by OOM and still run (lib/summaries/resilience/oom.py), never the pod that replaced
+    one. A daily run read "(the pods running now: 0 at most)" as the current pod's restart count and wrote 0 for a pod that had restarted once."""
+    gone = {"kernel_any_node_read": False, "pods_oomkilled": 1, "pods_replaced": 1, "restarts_of_those_pods": 163, "live_pod_restarts_max": 0}
+    assert "1 already replaced, 163 restarts in those pods (none of those pods is running now)" in evidence.oom_text(gone)
+    some = {"kernel_any_node_read": False, "pods_oomkilled": 2, "pods_replaced": 1, "restarts_of_those_pods": 11, "live_pod_restarts_max": 9}
+    assert "1 already replaced, 11 restarts in those pods (those of them still running: 9 at most)" in evidence.oom_text(some)
 
 
 def test_a_line_of_code_that_reads_a_credential_is_not_one():

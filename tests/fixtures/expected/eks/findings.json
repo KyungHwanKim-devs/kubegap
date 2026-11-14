@@ -3224,7 +3224,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "occurrence",
-   "evidence": "kernel log: 0 kills in 24 h on 1 of 2 nodes read. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (the pods running now: 0 at most). cAdvisor counter 0",
+   "evidence": "kernel log: 0 kills in 24 h on 1 of 2 nodes read. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (none of those pods is running now). cAdvisor counter 0",
    "source": "summary.json:resilience.oom_7d.rows"
   },
   {

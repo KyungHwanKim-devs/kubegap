@@ -144,7 +144,7 @@ def test_oom_text_names_both_sources_with_windows():
     }
     assert (
         oom_text(row)
-        == "kernel log: 5 kills in 24 h on 2 of 2 nodes read, last 2026-11-02T09:38:06+0000. Prometheus: 3 pods ended by OOM in 7 days, 2 already replaced, 13 restarts in those pods (the pods running now: 0 at most). cAdvisor counter 0"
+        == "kernel log: 5 kills in 24 h on 2 of 2 nodes read, last 2026-11-02T09:38:06+0000. Prometheus: 3 pods ended by OOM in 7 days, 2 already replaced, 13 restarts in those pods (those of them still running: 0 at most). cAdvisor counter 0"
     )
 
 

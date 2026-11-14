@@ -71,7 +71,8 @@ def oom_text(item: dict) -> str:
         f"Prometheus: {pods} pod{'s' if pods != 1 else ''} ended by OOM in 7 days"
         + (f", {rep} already replaced" if rep else "")
         + f", {item.get('restarts_of_those_pods') or 0} restarts in those pods"
-        + (f" (the pods running now: {item.get('live_pod_restarts_max') or 0} at most)" if rep else "")
+        # of the pods that were ended by OOM, not of the workload's current pod: a replacement pod's own restarts are not counted here
+        + ((" (none of those pods is running now)" if rep >= pods else f" (those of them still running: {item.get('live_pod_restarts_max') or 0} at most)") if rep else "")
     )
     return f"{kern}. {prom}. cAdvisor counter {item.get('cadvisor_oom_events_7d') or 0}"
 
