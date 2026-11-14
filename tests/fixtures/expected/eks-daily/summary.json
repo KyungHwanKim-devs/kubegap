@@ -46853,10 +46853,11 @@
    "no_user_classes_with_prod": true
   },
   "backup": {
+   "commands_kept": false,
    "rows": [],
    "count": 0,
-   "local_only": [],
-   "same_node": [],
+   "local_only": null,
+   "same_node": null,
    "databases": [
     {
      "namespace": "dev-app-s",
@@ -46871,7 +46872,7 @@
       "app-s-backend-mysql",
       "app-s-backend-mysql-headless"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -46887,7 +46888,7 @@
       "app-y-backend-mysql",
       "app-y-backend-mysql-headless"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -46903,7 +46904,7 @@
       "app-v-backend-dev-mysql",
       "app-v-backend-dev-mysql-headless"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -46919,7 +46920,7 @@
       "app-aa-mysql",
       "app-aa-mysql-headless"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -46934,7 +46935,7 @@
      "services": [
       "app-aa-postgres"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -46950,7 +46951,7 @@
       "app-t-backend-postgresql",
       "app-t-backend-postgresql-hl"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -46966,7 +46967,7 @@
       "app-x-postgresql",
       "app-x-postgresql-hl"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -46982,7 +46983,7 @@
       "app-s-backend-mysql",
       "app-s-backend-mysql-headless"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -46998,7 +46999,7 @@
       "app-y-backend-mysql",
       "app-y-backend-mysql-headless"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -47013,7 +47014,7 @@
      "services": [
       "app-z-neo4j"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -47029,7 +47030,7 @@
       "app-r-postgresql",
       "app-r-postgresql-hl"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -47045,7 +47046,7 @@
       "app-v-backend-prod-mysql",
       "app-v-backend-prod-mysql-headless"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -47061,7 +47062,7 @@
       "app-ab-backend-postgresql",
       "app-ab-backend-postgresql-hl"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     }
    ],

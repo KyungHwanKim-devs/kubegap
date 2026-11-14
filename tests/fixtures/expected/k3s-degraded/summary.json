@@ -22201,6 +22201,7 @@
    "no_user_classes_with_prod": true
   },
   "backup": {
+   "commands_kept": true,
    "rows": [
     {
      "namespace": "app-a-prod",

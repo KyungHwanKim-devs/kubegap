@@ -238,9 +238,40 @@ def verify_numbers(snap: Path, facts: dict) -> list[str]:
             out.append(f"{label}: {path} is not in {src}")
             continue
         value = n.get("value")
+        if isinstance(found, list) and isinstance(value, int) and not isinstance(value, bool) and value == len(found):
+            continue  # a count: the fact is how many entries the list at that path has
         wanted = [str(v) for v in value] if isinstance(value, list) else [str(value)]
         if not all(w in json.dumps(found, ensure_ascii=False, default=str) for w in wanted):
             out.append(f"{label}: facts say {value}, {src} {path} says {str(found)[:120]}")
+    return out
+
+
+_NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
+
+
+def ungrounded_numbers(facts: dict, snap: Path) -> list[str]:
+    """Numbers in the sentences of an entry (`what`, `why`) that stand nowhere: neither in the entry's `facts`, whose values `verify_numbers` holds
+    against the snapshot, nor in the evidence or target of the findings the entry names. A daily report once passed with every `facts` list
+    empty, so nothing had compared its "8 notifications" and "22 GiB" with anything. A number inside backticks is a name (`1.33`, a port) and
+    is not read; `do` is advice (a threshold to set) and is not read either."""
+    fd = load_json(snap / "findings-draft.json") or {}
+    findings = [f for f in fd.get("findings") or [] if isinstance(f, dict)]
+    out: list[str] = []
+    for kind, entries in (("broken_now", facts.get("broken_now") or []), ("incident", (facts.get("happened") or {}).get("incidents") or []), ("top", facts.get("top") or [])):
+        for e in entries:
+            if not isinstance(e, dict):
+                continue
+            ids = _facts._ids(e)
+            ground = " ".join(json.dumps(n.get("value"), ensure_ascii=False, default=str) for n in e.get("facts") or [] if isinstance(n, dict))
+            ground += " " + " ".join(f"{f.get('evidence')} {f.get('target')} {json.dumps(f.get('details'), ensure_ascii=False, default=str)}" for f in findings if _facts._matches(ids, f.get("id") or ""))
+            ground = ground.replace(",", "")
+            prose = re.sub(r"`[^`]*`", "", f"{e.get('what') or ''} {e.get('why') or ''}")
+            loose = sorted({m.group(0) for m in _NUMBER.finditer(prose) if m.group(0).replace(",", "").rstrip(".") not in ground})
+            if loose:
+                out.append(
+                    f"{kind} {e.get('id') or e.get('title')}: the numbers {', '.join(loose)} are in `what` or `why` and in neither its `facts` nor the evidence of its findings. "
+                    "Add a `facts` entry with the file and path each was read from, or take the number out"
+                )
     return out
 
 
@@ -322,6 +353,7 @@ def check(facts: dict, snap: Path, language: str = "ko") -> list[str]:
         if n.get("derived"):
             out.append(f"{_label}: `derived` is not accepted in a daily report; give the file and the path the number is at, or leave the number out")
     out += verify_numbers(snap, facts)
+    out += ungrounded_numbers(facts, snap)
     for label, n in _numbered(facts):
         if n.get("source_file") and not _facts._inside(snap, str(n["source_file"])):
             out.append(f"{label}: source {n['source_file']} is outside the snapshot")

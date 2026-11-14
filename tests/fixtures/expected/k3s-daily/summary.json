@@ -40845,6 +40845,7 @@
    "no_user_classes_with_prod": true
   },
   "backup": {
+   "commands_kept": false,
    "rows": [
     {
      "namespace": "app-a-prod",
@@ -40853,7 +40854,7 @@
      "prod": true,
      "schedule": "15 3 * * *",
      "suspend": false,
-     "targets_db": [],
+     "targets_db": null,
      "dest_pvcs": [
       "app-a-postgres-backup-pvc"
      ],
@@ -40861,26 +40862,13 @@
       "node-a"
      ],
      "host_paths": [],
-     "offsite_hint": false,
-     "source_db": [
-      {
-       "workload": "app-a-prod/statefulset/app-a-postgres",
-       "pvc": "data-app-a-postgres-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-a-prod/statefulset/app-a-redis",
-       "pvc": "data-app-a-redis-0",
-       "node": "node-b"
-      }
-     ],
-     "source_by": "every store of the namespace (the command names none)",
-     "source_nodes": [
-      "node-b"
-     ],
-     "same_node_as_source": false,
-     "local_only": true,
-     "note": "offsite_hint = whether command, args or env values contain strings such as s3, rclone or restic (names only, values are not recorded)"
+     "offsite_hint": null,
+     "source_db": null,
+     "source_by": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)",
+     "source_nodes": null,
+     "same_node_as_source": null,
+     "local_only": null,
+     "note": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)"
     },
     {
      "namespace": "app-f-prod",
@@ -40889,7 +40877,7 @@
      "prod": true,
      "schedule": "30 3 * * *",
      "suspend": false,
-     "targets_db": [],
+     "targets_db": null,
      "dest_pvcs": [
       "app-f-postgres-backup-pvc"
      ],
@@ -40897,36 +40885,13 @@
       "node-b"
      ],
      "host_paths": [],
-     "offsite_hint": false,
-     "source_db": [
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres",
-       "pvc": "app-f-postgres-data-app-f-postgres-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres-mx",
-       "pvc": "app-f-postgres-mx-data-app-f-postgres-mx-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres-vn",
-       "pvc": "app-f-postgres-vn-data-app-f-postgres-vn-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-redis",
-       "pvc": "app-f-redis-data-app-f-redis-0",
-       "node": "node-b"
-      }
-     ],
-     "source_by": "every store of the namespace (the command names none)",
-     "source_nodes": [
-      "node-b"
-     ],
-     "same_node_as_source": true,
-     "local_only": true,
-     "note": "offsite_hint = whether command, args or env values contain strings such as s3, rclone or restic (names only, values are not recorded)"
+     "offsite_hint": null,
+     "source_db": null,
+     "source_by": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)",
+     "source_nodes": null,
+     "same_node_as_source": null,
+     "local_only": null,
+     "note": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)"
     },
     {
      "namespace": "app-f-prod",
@@ -40935,7 +40900,7 @@
      "prod": true,
      "schedule": "30 3 * * *",
      "suspend": false,
-     "targets_db": [],
+     "targets_db": null,
      "dest_pvcs": [
       "app-f-postgres-mx-backup-pvc"
      ],
@@ -40943,36 +40908,13 @@
       "node-a"
      ],
      "host_paths": [],
-     "offsite_hint": false,
-     "source_db": [
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres",
-       "pvc": "app-f-postgres-data-app-f-postgres-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres-mx",
-       "pvc": "app-f-postgres-mx-data-app-f-postgres-mx-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres-vn",
-       "pvc": "app-f-postgres-vn-data-app-f-postgres-vn-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-redis",
-       "pvc": "app-f-redis-data-app-f-redis-0",
-       "node": "node-b"
-      }
-     ],
-     "source_by": "every store of the namespace (the command names none)",
-     "source_nodes": [
-      "node-b"
-     ],
-     "same_node_as_source": false,
-     "local_only": true,
-     "note": "offsite_hint = whether command, args or env values contain strings such as s3, rclone or restic (names only, values are not recorded)"
+     "offsite_hint": null,
+     "source_db": null,
+     "source_by": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)",
+     "source_nodes": null,
+     "same_node_as_source": null,
+     "local_only": null,
+     "note": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)"
     },
     {
      "namespace": "app-f-prod",
@@ -40981,7 +40923,7 @@
      "prod": true,
      "schedule": "30 3 * * *",
      "suspend": false,
-     "targets_db": [],
+     "targets_db": null,
      "dest_pvcs": [
       "app-f-postgres-vn-backup-pvc"
      ],
@@ -40989,36 +40931,13 @@
       "node-b"
      ],
      "host_paths": [],
-     "offsite_hint": false,
-     "source_db": [
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres",
-       "pvc": "app-f-postgres-data-app-f-postgres-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres-mx",
-       "pvc": "app-f-postgres-mx-data-app-f-postgres-mx-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres-vn",
-       "pvc": "app-f-postgres-vn-data-app-f-postgres-vn-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-redis",
-       "pvc": "app-f-redis-data-app-f-redis-0",
-       "node": "node-b"
-      }
-     ],
-     "source_by": "every store of the namespace (the command names none)",
-     "source_nodes": [
-      "node-b"
-     ],
-     "same_node_as_source": true,
-     "local_only": true,
-     "note": "offsite_hint = whether command, args or env values contain strings such as s3, rclone or restic (names only, values are not recorded)"
+     "offsite_hint": null,
+     "source_db": null,
+     "source_by": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)",
+     "source_nodes": null,
+     "same_node_as_source": null,
+     "local_only": null,
+     "note": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)"
     },
     {
      "namespace": "app-g-api",
@@ -41027,7 +40946,7 @@
      "prod": false,
      "schedule": "50 3 * * *",
      "suspend": false,
-     "targets_db": [],
+     "targets_db": null,
      "dest_pvcs": [
       "app-g-postgres-backup-pvc"
      ],
@@ -41035,26 +40954,13 @@
       "node-b"
      ],
      "host_paths": [],
-     "offsite_hint": false,
-     "source_db": [
-      {
-       "workload": "app-g-api/statefulset/app-g-minio",
-       "pvc": "app-g-minio-data-app-g-minio-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-g-api/statefulset/app-g-postgres",
-       "pvc": "app-g-postgres-data-app-g-postgres-0",
-       "node": "node-b"
-      }
-     ],
-     "source_by": "every store of the namespace (the command names none)",
-     "source_nodes": [
-      "node-b"
-     ],
-     "same_node_as_source": true,
-     "local_only": true,
-     "note": "offsite_hint = whether command, args or env values contain strings such as s3, rclone or restic (names only, values are not recorded)"
+     "offsite_hint": null,
+     "source_db": null,
+     "source_by": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)",
+     "source_nodes": null,
+     "same_node_as_source": null,
+     "local_only": null,
+     "note": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)"
     },
     {
      "namespace": "app-h-prod",
@@ -41063,7 +40969,7 @@
      "prod": true,
      "schedule": "50 2 * * *",
      "suspend": false,
-     "targets_db": [],
+     "targets_db": null,
      "dest_pvcs": [
       "mysql-backup-app-h-mysql-0"
      ],
@@ -41071,32 +40977,13 @@
       "node-b"
      ],
      "host_paths": [],
-     "offsite_hint": false,
-     "source_db": [
-      {
-       "workload": "app-h-prod/statefulset/app-h-mysql",
-       "pvc": "mysql-backup-app-h-mysql-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-h-prod/statefulset/app-h-mysql",
-       "pvc": "mysql-data-app-h-mysql-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-h-prod/statefulset/app-h-qdrant",
-       "pvc": "app-h-qdrant-data-app-h-qdrant-0",
-       "node": "node-a"
-      }
-     ],
-     "source_by": "every store of the namespace (the command names none)",
-     "source_nodes": [
-      "node-a",
-      "node-b"
-     ],
-     "same_node_as_source": true,
-     "local_only": true,
-     "note": "offsite_hint = whether command, args or env values contain strings such as s3, rclone or restic (names only, values are not recorded)"
+     "offsite_hint": null,
+     "source_db": null,
+     "source_by": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)",
+     "source_nodes": null,
+     "same_node_as_source": null,
+     "local_only": null,
+     "note": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)"
     },
     {
      "namespace": "app-i-prod",
@@ -41105,7 +40992,7 @@
      "prod": true,
      "schedule": "0 3 * * *",
      "suspend": false,
-     "targets_db": [],
+     "targets_db": null,
      "dest_pvcs": [
       "app-i-postgres-backup-pvc"
      ],
@@ -41113,40 +41000,18 @@
       "node-b"
      ],
      "host_paths": [],
-     "offsite_hint": false,
-     "source_db": [
-      {
-       "workload": "app-i-prod/statefulset/app-i-postgres",
-       "pvc": "app-i-postgres-data-app-i-postgres-0",
-       "node": "node-b"
-      }
-     ],
-     "source_by": "every store of the namespace (the command names none)",
-     "source_nodes": [
-      "node-b"
-     ],
-     "same_node_as_source": true,
-     "local_only": true,
-     "note": "offsite_hint = whether command, args or env values contain strings such as s3, rclone or restic (names only, values are not recorded)"
+     "offsite_hint": null,
+     "source_db": null,
+     "source_by": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)",
+     "source_nodes": null,
+     "same_node_as_source": null,
+     "local_only": null,
+     "note": "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)"
     }
    ],
    "count": 7,
-   "local_only": [
-    "app-a-prod/app-a-postgres-backup",
-    "app-f-prod/app-f-postgres-backup",
-    "app-f-prod/app-f-postgres-mx-backup",
-    "app-f-prod/app-f-postgres-vn-backup",
-    "app-g-api/app-g-postgres-backup",
-    "app-h-prod/app-h-mysql-backup",
-    "app-i-prod/app-i-postgres-backup"
-   ],
-   "same_node": [
-    "app-f-prod/app-f-postgres-backup",
-    "app-f-prod/app-f-postgres-vn-backup",
-    "app-g-api/app-g-postgres-backup",
-    "app-h-prod/app-h-mysql-backup",
-    "app-i-prod/app-i-postgres-backup"
-   ],
+   "local_only": null,
+   "same_node": null,
    "databases": [
     {
      "namespace": "app-k",
@@ -41160,7 +41025,7 @@
      "services": [
       "app-k-postgres"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -41175,7 +41040,7 @@
      "services": [
       "app-l-postgres"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -41190,12 +41055,12 @@
      "services": [
       "app-a-postgres"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": [
       {
        "name": "app-a-postgres-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       }
      ]
     },
@@ -41211,7 +41076,7 @@
      "services": [
       "app-c-postgres"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -41227,22 +41092,22 @@
       "app-f-postgres",
       "app-f-postgres-external"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": [
       {
        "name": "app-f-postgres-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       },
       {
        "name": "app-f-postgres-mx-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       },
       {
        "name": "app-f-postgres-vn-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       }
      ]
     },
@@ -41259,22 +41124,22 @@
       "app-f-postgres-mx",
       "app-f-postgres-mx-external"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": [
       {
        "name": "app-f-postgres-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       },
       {
        "name": "app-f-postgres-mx-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       },
       {
        "name": "app-f-postgres-vn-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       }
      ]
     },
@@ -41291,22 +41156,22 @@
       "app-f-postgres-vn",
       "app-f-postgres-vn-external"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": [
       {
        "name": "app-f-postgres-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       },
       {
        "name": "app-f-postgres-mx-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       },
       {
        "name": "app-f-postgres-vn-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       }
      ]
     },
@@ -41322,12 +41187,12 @@
      "services": [
       "app-g-postgres"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": [
       {
        "name": "app-g-postgres-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       }
      ]
     },
@@ -41344,12 +41209,12 @@
      "services": [
       "app-h-mysql"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": [
       {
        "name": "app-h-mysql-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       }
      ]
     },
@@ -41365,12 +41230,12 @@
      "services": [
       "app-h-qdrant"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": [
       {
        "name": "app-h-mysql-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       }
      ]
     },
@@ -41386,7 +41251,7 @@
      "services": [
       "elasticsearch-master"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": []
     },
     {
@@ -41402,12 +41267,12 @@
       "app-i-postgres",
       "app-i-postgres-external"
      ],
-     "backup_cronjobs": [],
+     "backup_cronjobs": null,
      "other_backup_cronjobs_in_namespace": [
       {
        "name": "app-i-postgres-backup",
        "suspend": false,
-       "targets_db": []
+       "targets_db": null
       }
      ]
     }

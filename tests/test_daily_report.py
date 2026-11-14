@@ -57,6 +57,7 @@ def _facts(**over) -> dict:
                 "do": "마이너 버전을 하나씩 올립니다.",
                 "read": None,
                 "finding_ids": ["platform.k8s-version-eol.cluster"],
+                "facts": [{"what": "서버 버전", "value": "v1.33.5+k3s1", "unit": "", "source_file": "inventory.json", "json_path": "cluster.server_version"}],
             },
         ],
         "rest": [],
@@ -162,3 +163,25 @@ def test_an_english_daily_report_is_assembled(tmp_path):
     assert "- It contacted no node." in section and "- Secret values are not read by any audit." in section and "run `/kubegap full`" in section
     # the serious things it cannot see are named by the checks' own English names
     assert any(f"- {c['name']}" in section for c in daily.serious_full_only("k3s", None))
+
+
+def test_a_number_in_a_sentence_has_to_stand_somewhere(tmp_path):
+    """A daily report passed with every `facts` list empty: nothing had compared its numbers with anything. A number in `what` or `why` is in the
+    entry's facts or in the evidence of its findings; a count of a list is a fact whose value is the list's length."""
+    snap = _snap(tmp_path)
+    f = _facts()
+    f["top"][1]["facts"] = []
+    assert any("the numbers 1.33 are in `what` or `why`" in e for e in daily.check(f, snap, "ko"))
+    f["top"][1]["what"] = "`1.33`의 지원이 끝났습니다."  # a name in backticks is not a number to ground
+    assert not any("are in `what` or `why`" in e for e in daily.check(f, snap, "ko"))
+    f = _facts()
+    f["top"][1]["what"] = "노드 2대가 1.33을 씁니다."
+    f["top"][1]["facts"].append({"what": "노드 수", "value": 2, "unit": "대", "source_file": "inventory.json", "json_path": "nodes.count"})
+    assert daily.check(f, snap, "ko") == []
+    summary = json.loads((snap / "summary.json").read_text())
+    (snap / "summary.json").write_text(json.dumps({**summary, "apps": ["a", "b", "c"]}))
+    f["top"][1]["what"] = "노드 2대가 1.33을 쓰고 앱은 3개입니다."
+    f["top"][1]["facts"].append({"what": "앱 수", "value": 3, "unit": "개", "source_file": "summary.json", "json_path": "apps"})
+    assert daily.check(f, snap, "ko") == []  # the length of the list at that path
+    f["top"][1]["facts"][-1]["value"] = 4
+    assert any("facts say 4" in e for e in daily.check(f, snap, "ko"))

@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
+from ...foundations import units
 from ...foundations.snapshot import objects
 from ...foundations.workload import image_repo, is_db_like
 from ...foundations.workload import key as wl_key
@@ -156,11 +157,23 @@ def backup_locality(cx) -> dict:
     for db in databases:
         own = {b["name"] for b in db["backup_cronjobs"]}
         db["other_backup_cronjobs_in_namespace"] = [{"name": r["name"], "suspend": r["suspend"], "targets_db": [t["target"] for t in r["targets_db"]]} for r in rows if r["namespace"] == db["namespace"] and r["name"] not in own]
+    commands_kept = units.collected(cx.snap, "app-settings")
+    if not commands_kept:
+        # Which database a CronJob dumps and whether it sends a copy elsewhere are read from its command, args and env values, which this run did not
+        # keep. An empty command is not "sends nothing off the node": the fields say they are not known (None), so that neither a check nor a reader
+        # of the table takes them for an answer. A daily report once said eight backup jobs "show no copy going off the nodes" from these fields.
+        why = "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)"
+        for r in rows:
+            r.update(targets_db=None, offsite_hint=None, source_db=None, source_nodes=None, same_node_as_source=None, local_only=None, source_by=why, note=why)
+        for db in databases:
+            db["backup_cronjobs"] = None
+            db["other_backup_cronjobs_in_namespace"] = [{"name": r["name"], "suspend": r["suspend"], "targets_db": None} for r in rows if r["namespace"] == db["namespace"]]
     return {
+        "commands_kept": commands_kept,
         "rows": rows,
         "count": len(rows),
-        "local_only": [r["target"] for r in rows if r["local_only"]],
-        "same_node": [r["target"] for r in rows if r["same_node_as_source"]],
+        "local_only": [r["target"] for r in rows if r["local_only"]] if commands_kept else None,
+        "same_node": [r["target"] for r in rows if r["same_node_as_source"]] if commands_kept else None,
         "databases": databases,
         "excluded_stores": sorted(excluded),
         "note": "databases: every store that needs a dump (BACKUP_TARGET_RE) with a PVC, and the backup CronJobs whose command, args or env name its Service, its workload or its first pod; excluded_stores: caches, queues, monitoring stores and MinIO with a PVC, which this check does not ask a dump of",

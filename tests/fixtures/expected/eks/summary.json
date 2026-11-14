@@ -61242,6 +61242,7 @@
    "no_user_classes_with_prod": true
   },
   "backup": {
+   "commands_kept": true,
    "rows": [],
    "count": 0,
    "local_only": [],
