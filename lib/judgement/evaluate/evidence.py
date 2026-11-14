@@ -131,7 +131,7 @@ def oom_last_text(summary, labels) -> str:
     """resources.oomkilled: when the container was last OOMKilled, from summary.resilience.restarts.oom_last keyed namespace/pod/container."""
     key = f"{labels['namespace']}/{labels['pod']}/{labels['container']}"
     last = ((summary.get("resilience") or {}).get("restarts") or {}).get("oom_last", {}).get(key, {})
-    return f"pod {labels['pod']}: last termination reason OOMKilled, finished at {last.get('finished')} ({last.get('age_days')} days ago), {last.get('restarts')} restarts. An OOM older than 7 days is warn, older than 30 days is excluded"
+    return f"pod {labels['pod']}: last termination reason OOMKilled, finished at {last.get('finished')} ({last.get('age_days')} days ago). The container has restarted {last.get('restarts')} times since the pod was created, for any reason and not only in the last 7 days. An OOM older than 7 days is warn, older than 30 days is excluded"
 
 
 def no_backup_text(signals: dict) -> str:

@@ -119,7 +119,7 @@ def finding(snap: Path, ident: str, *, limit: int = 5, all_: bool = False) -> st
         if f.get("source"):
             out.append(f"source: {f['source']}" + (f"  (kubegap show table {str(f['source']).split(':', 1)[1]})" if str(f["source"]).startswith("summary.json:") else ""))
         if "/" in str(f.get("target")):
-            who = _outline.declared_in(owners, str(f["target"]).split(":")[0])
+            who = _outline.declared_in(owners, str(f["target"]).split(":")[0]) or _outline.declared_by_marks(snap, str(f["target"]))
             out.append(
                 f"declared in: {json.dumps(who, ensure_ascii=False)}"
                 if who

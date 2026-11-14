@@ -59,3 +59,22 @@ def test_a_line_of_code_that_reads_a_credential_is_not_one():
         ]
     )
     assert scrub.secret_like_keys({"bot.py": script}) == ["bot.py:API_KEY"]
+
+
+def test_a_variable_that_names_a_secret_object_is_not_a_credential():
+    assert not scrub.env_secret_like("TS_KUBE_SECRET", "tailscale-state-proxy")  # tailscale containerboot: the name of the Secret the state goes to
+    assert scrub.env_secret_like("APP_SECRET", "tailscale-state-proxy")
+
+
+def test_a_service_of_a_helm_release_is_declared_by_its_marks(tmp_path):
+    import json
+
+    from lib.output import outline
+
+    (tmp_path / "objects").mkdir()
+    svc = {"metadata": {"namespace": "middleware", "name": "kafka-external", "labels": {"app.kubernetes.io/managed-by": "Helm"}, "annotations": {"meta.helm.sh/release-name": "kafka", "meta.helm.sh/release-namespace": "middleware"}}}
+    plain = {"metadata": {"namespace": "middleware", "name": "by-hand"}}
+    (tmp_path / "objects" / "services.json").write_text(json.dumps({"items": [svc, plain]}))
+    who = outline.declared_by_marks(tmp_path, "loadbalancer/middleware/kafka-external")
+    assert who["helm_release"] == "middleware/kafka" and who["managed_by"] == "helm" and "services" in who["read_from"]
+    assert outline.declared_by_marks(tmp_path, "loadbalancer/middleware/by-hand") is None

@@ -3231,7 +3231,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "occurrence",
-   "evidence": "pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago), 2 restarts. An OOM older than 7 days is warn, older than 30 days is excluded",
+   "evidence": "pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago). The container has restarted 2 times since the pod was created, for any reason and not only in the last 7 days. An OOM older than 7 days is warn, older than 30 days is excluded",
    "source": "metrics/oomkilled_last_terminated.json"
   },
   {
@@ -3571,7 +3571,7 @@
    "status": "warn",
    "severity_default": "high",
    "nature": "occurrence",
-   "evidence": "pod argocd-application-controller-0: last termination reason OOMKilled, finished at 2026-10-30T09:00:04Z (7.7 days ago), 42 restarts. An OOM older than 7 days is warn, older than 30 days is excluded",
+   "evidence": "pod argocd-application-controller-0: last termination reason OOMKilled, finished at 2026-10-30T09:00:04Z (7.7 days ago). The container has restarted 42 times since the pod was created, for any reason and not only in the last 7 days. An OOM older than 7 days is warn, older than 30 days is excluded",
    "source": "metrics/oomkilled_last_terminated.json"
   },
   {
@@ -3580,7 +3580,7 @@
    "status": "warn",
    "severity_default": "high",
    "nature": "occurrence",
-   "evidence": "pod loki-stack-0: last termination reason OOMKilled, finished at 2026-10-25T00:15:41Z (13.1 days ago), 1 restarts. An OOM older than 7 days is warn, older than 30 days is excluded",
+   "evidence": "pod loki-stack-0: last termination reason OOMKilled, finished at 2026-10-25T00:15:41Z (13.1 days ago). The container has restarted 1 times since the pod was created, for any reason and not only in the last 7 days. An OOM older than 7 days is warn, older than 30 days is excluded",
    "source": "metrics/oomkilled_last_terminated.json"
   },
   {

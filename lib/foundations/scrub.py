@@ -106,6 +106,11 @@ def secret_like_keys(data: dict) -> list[str]:
     return list(dict.fromkeys(keys))  # dedupe (the same password line can appear in several blocks) while keeping order
 
 
+# Variables whose value is the name of a Secret object, not a credential, although their own name says SECRET.
+# TS_KUBE_SECRET: "the name of the Kubernetes secret in which to store tailscaled state" (tailscale/tailscale cmd/containerboot/main.go:38@v1.90.6).
+SECRET_NAME_VARS = frozenset({"TS_KUBE_SECRET"})
+
+
 def env_name_secret_like(name: str) -> bool:
     """A variable name that may carry a credential, so its value is not written (the name rule of security.plaintext-env-secret)."""
     return bool(SECRET_ENV_RE.search(name)) and not ENV_SKIP_RE.search(name)
@@ -113,11 +118,11 @@ def env_name_secret_like(name: str) -> bool:
 
 def env_secret_like(name: str, value) -> bool:
     """Whether an env entry's literal value looks like a credential. Numeric limits (TOKEN_CAP), flags (ALLOW_EMPTY_PASSWORD=yes), paths and
-    short values are not; neither is Reloader's STAKATER_* variable, which names a Secret to watch."""
+    short values are not; neither is a variable that names a Secret object (Reloader's STAKATER_*, SECRET_NAME_VARS)."""
     v = str(value)
     if not v or v == "None" or v.startswith("/") or v.isdigit() or v.lower() in ("true", "false", "yes", "no", "on", "off") or len(v) < 8:
         return False
-    if name.startswith("STAKATER_"):
+    if name.startswith("STAKATER_") or name in SECRET_NAME_VARS:
         return False
     if _ENV_REF_RE.fullmatch(v):  # `$(REDIS_PASSWORD)`: Kubernetes expands it from another variable of the container, which may come from a Secret
         return False

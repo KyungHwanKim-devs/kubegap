@@ -814,6 +814,7 @@ libraries:
   - slok/sloth
   - spring-projects/spring-framework
   - stephenhillier/starlette_exporter
+  - tailscale/tailscale
   - thanos-io/thanos
   - tigera/operator
   - trallnag/prometheus-fastapi-instrumentator

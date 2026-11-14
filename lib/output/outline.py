@@ -120,6 +120,37 @@ def declared_in(owners_: dict[str, dict], target: str) -> dict | None:
     return None
 
 
+def declared_by_marks(snap: Path, target: str) -> dict | None:
+    """Who declares an object that is not a workload (a Service behind a load balancer, an Ingress, a ConfigMap), read from the marks the object
+    itself carries: Helm's `app.kubernetes.io/managed-by: Helm` with `meta.helm.sh/release-name`, Argo CD's tracking annotation or instance label.
+    `target` ends in `<namespace>/<name>`; whatever stands before it is how the finding names the kind. A Service of a Helm release was once
+    reported as declared nowhere because only workloads were looked up."""
+    parts = str(target).split(":")[0].split("/")
+    if len(parts) < 2:
+        return None
+    ns, name = parts[-2], parts[-1]
+    apps = {a.get("name"): a for a in ((((load_json(snap / "summary.json") or {}).get("argocdctl") or {}).get("applications") or {}).get("rows")) or [] if isinstance(a, dict)}
+    for f in sorted((snap / "objects").glob("*.json")) if (snap / "objects").is_dir() else []:
+        for o in (load_json(f) or {}).get("items") or []:
+            md = o.get("metadata") or {}
+            if md.get("name") != name or (md.get("namespace") or "") != ns:
+                continue
+            labels, ann = md.get("labels") or {}, md.get("annotations") or {}
+            row: dict = {}
+            if labels.get("app.kubernetes.io/managed-by") == "Helm" and ann.get("meta.helm.sh/release-name"):
+                row.update(managed_by="helm", helm_release=f"{ann.get('meta.helm.sh/release-namespace') or ns}/{ann['meta.helm.sh/release-name']}")
+            app = str(ann.get("argocd.argoproj.io/tracking-id") or "").split(":")[0] or labels.get("argocd.argoproj.io/instance")
+            if app and (app in apps or ann.get("argocd.argoproj.io/tracking-id")):
+                row.update(managed_by="argocd", argocd_app=app)
+                if app in apps:
+                    row.update({k: apps[app][k] for k in ("repo_url", "path", "chart", "target_revision") if apps[app].get(k)})
+                    row["self_heal"] = bool(apps[app].get("self_heal"))
+            if row:
+                row["read_from"] = f"the marks on {f.stem} {ns}/{name}"
+                return row
+    return None
+
+
 def load(snap: Path) -> dict:
     return load_json(snap / PATH) or {}
 
