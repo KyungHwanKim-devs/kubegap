@@ -54,7 +54,8 @@ solutions:
   - scale: [small]
     approach: >
       Take the Namespace out of the manifests and let Argo CD create it with the sync option CreateNamespace=true, or keep the manifest and annotate
-      the Namespace with Prune=false. Do the same for CRDs that hold data you cannot recreate.
+      the Namespace with Prune=false,Delete=false: Prune=false stops the prune, and Delete=false keeps the Namespace when its Application is deleted.
+      Annotate CRDs that hold data you cannot recreate with Prune=false.
     tools: ["Argo CD"]
     tradeoff: >
       A manifest that goes missing no longer deletes the Namespace. The price is that a Namespace you really want gone has to be deleted by hand, and
@@ -65,7 +66,7 @@ solutions:
       metadata:
         name: shop
         annotations:
-          argocd.argoproj.io/sync-options: Prune=false
+          argocd.argoproj.io/sync-options: Prune=false,Delete=false
   - scale: [medium, large]
     approach: >
       Require a person to confirm the deletion of containers: annotate Namespaces and CRDs with Prune=confirm and Delete=confirm, so that a sync that
