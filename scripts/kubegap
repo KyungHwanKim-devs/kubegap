@@ -743,6 +743,14 @@ def cmd_verified(args) -> int:
     return EXIT_OK
 
 
+def cmd_units(args) -> int:
+    """The table of collection units of docs/DATA.md (collectors/units.yaml), to paste between the units-table markers; a test compares the two."""
+    from lib.foundations import units as _units
+
+    sys.stdout.write(_units.render_table(args.language))
+    return EXIT_OK
+
+
 def cmd_regress(args) -> int:
     """End-to-end regression on the committed snapshot fixtures (lib/commands/regress.py). --update rewrites the expectation, the one way it changes."""
     import tempfile as _tf
@@ -984,6 +992,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--snapshot", action="append", help="real snapshot folder (repeatable). Verifies that keys referenced by summary-type check expressions exist in that summary.json")
     s.set_defaults(func=cmd_selftest)
 
+    s = sub.add_parser("units", help="print the table of collection units of docs/DATA.md from collectors/units.yaml (paste between the units-table markers; a test compares)")
+    s.add_argument("--markdown", action="store_true", help="the only output form; kept so the command reads like `checks --markdown`")
+    s.add_argument("--language", choices=["en", "ko"], default="en")
+    s.set_defaults(func=cmd_units)
     s = sub.add_parser("verified", help="print README's Verified-against table from references/verified-versions.yaml (paste between the verified-table markers; a test compares)")
     s.add_argument("--markdown", action="store_true", help="Markdown table (the only format)")
     s.add_argument("--language", choices=["en", "ko"], default="en")

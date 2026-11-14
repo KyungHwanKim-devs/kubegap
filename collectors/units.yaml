@@ -9,6 +9,7 @@
 #   reads         what is asked of the cluster or the account, in one sentence a user can read (docs/DATA.md and the report quote it)
 #   keeps         what of it is written to the snapshot
 #   drops         what is read and not written (dropped in memory, before a file exists)
+#   ko            reads, keeps and drops in Korean, for docs/ko/DATA.md
 #   sensitivity   low              what runs, in what state, with what numbers
 #                 config           settings of the user's own applications, which can hold a credential or business detail
 #                 logs             log lines
@@ -27,12 +28,19 @@
   reads: "Every kind the API server lists (kubectl get, list). Secrets are never requested."
   keeps: "Each object as the API returns it: spec, status, labels, annotations, image, resources, probes, volumes, references to Secrets and ConfigMaps by name."
   drops: "ConfigMap values (replaced by length and shape; a few keys of platform components kubegap parses are kept, lib/foundations/scrub.py KEEP_VALUES). The value of an environment variable whose name looks like a credential. The copy of the manifest in kubectl.kubernetes.io/last-applied-configuration. Outside the system namespaces, unless app-settings is collected too: every literal environment value, every command and args list, and every key of a ConfigMap, also where managedFields name it (a key a workload refers to stays in the workload's reference)."
+  ko:
+    reads: "API 서버가 목록으로 내주는 모든 종류의 오브젝트(kubectl get, list). Secret은 요청하지 않습니다."
+    keeps: "API가 돌려준 오브젝트 그대로. spec, status, 라벨, 어노테이션, 이미지, 리소스, 프로브, 볼륨, Secret과 ConfigMap을 이름으로 가리키는 참조."
+    drops: "ConfigMap 값(길이와 형태만 남깁니다. kubegap이 분석하는 플랫폼 구성 요소의 키 몇 개는 값을 남깁니다). 이름이 비밀 값처럼 보이는 환경 변수의 값. `kubectl.kubernetes.io/last-applied-configuration`에 들어 있는 매니페스트 사본. 그리고 app-settings를 함께 모으지 않을 때는, 시스템 네임스페이스 밖의 환경 변수 값 전부, command와 args 전부, ConfigMap 키 전부."
   sensitivity: low
   modes: [daily, full]
 
 - id: app-settings
   reads: "Nothing more from the cluster: of the objects above, outside the system namespaces, it keeps what cluster-objects drops."
   keeps: "command and args of containers and probes, literal environment values (never one whose name looks like a credential), and of each ConfigMap the key names with the length and shape of each value."
+  ko:
+    reads: "클러스터에서 더 읽는 것은 없습니다. 위 오브젝트 가운데 시스템 네임스페이스 밖의 것에서, cluster-objects가 버리는 것을 남깁니다."
+    keeps: "컨테이너와 프로브의 command와 args, 환경 변수 값(이름이 비밀 값처럼 보이는 것은 제외), ConfigMap의 키 이름과 값마다의 길이와 형태."
   sensitivity: config
   modes: [full]
   unseen:
@@ -42,24 +50,36 @@
 - id: events
   reads: "Events of every namespace (kubectl get events)."
   keeps: "Each event: reason, message, count, the object it is about, first and last time."
+  ko:
+    reads: "모든 네임스페이스의 이벤트(kubectl get events)."
+    keeps: "이벤트마다 reason, 메시지, 횟수, 대상 오브젝트, 처음과 마지막 시각."
   sensitivity: low
   modes: [daily, full]
 
 - id: live-usage
   reads: "CPU and memory in use now, per node and per container (kubectl top, from metrics-server)."
   keeps: "The lines kubectl prints."
+  ko:
+    reads: "노드와 컨테이너가 지금 쓰고 있는 CPU와 메모리(kubectl top, metrics-server)."
+    keeps: "kubectl이 찍은 줄."
   sensitivity: low
   modes: [daily, full]
 
 - id: metrics
   reads: "Prometheus instant queries (collectors/*/metrics.yaml) and the /metrics page of platform components (collectors/*/pod-metrics.yaml)."
   keeps: "The series each query returns, and of a /metrics page the series the file names."
+  ko:
+    reads: "Prometheus에 보내는 즉시 질의(`collectors/*/metrics.yaml`)와 플랫폼 구성 요소의 /metrics 페이지(`collectors/*/pod-metrics.yaml`)."
+    keeps: "질의마다 돌아온 시계열, /metrics 페이지에서는 파일에 적힌 시계열."
   sensitivity: low
   modes: [daily, full]
 
 - id: component-apis
   reads: "The read-only HTTP APIs of Prometheus, Alertmanager, Grafana and Loki: rules, targets, flags, the Alertmanager configuration (Alertmanager masks its own secrets), silences, datasource and dashboard definitions, Loki label and volume queries."
   keeps: "The responses."
+  ko:
+    reads: "Prometheus, Alertmanager, Grafana, Loki의 읽기 전용 HTTP API. 규칙, 타깃, 플래그, Alertmanager 설정(비밀 값은 Alertmanager가 가려서 내줍니다), silence, 데이터소스와 대시보드 정의, Loki의 라벨·용량 질의."
+    keeps: "응답."
   sensitivity: low
   modes: [daily, full]
 
@@ -67,12 +87,19 @@
   reads: "The last 24 hours of logs of the platform components found in the cluster (kubectl logs; CoreDNS, the ingress controller, Argo CD, Karpenter and the like). Application logs are not read."
   keeps: "How many lines matched each known failure pattern, the first and last time, and which workload. For Karpenter, the times it took to bring a node up and why it removed one."
   drops: "Every log line. The lines are counted in memory and no file of them is written."
+  ko:
+    reads: "클러스터에서 찾은 플랫폼 구성 요소(CoreDNS, 인그레스 컨트롤러, Argo CD, Karpenter 등)의 최근 24시간 로그(kubectl logs). 애플리케이션 로그는 읽지 않습니다."
+    keeps: "알려진 실패 패턴마다 맞은 줄 수, 처음과 마지막 시각, 어느 워크로드인지. Karpenter는 노드를 띄우는 데 걸린 시간과 노드를 없앤 이유."
+    drops: "로그의 모든 줄. 메모리에서 세고, 줄을 담은 파일은 쓰지 않습니다."
   sensitivity: low
   modes: [daily, full]
 
 - id: component-log-samples
   reads: "Nothing more from the cluster: of the same component logs it keeps a little text."
   keeps: "Up to five masked sample lines per failure pattern, and the error lines that match no pattern, grouped by their text."
+  ko:
+    reads: "클러스터에서 더 읽는 것은 없습니다. 같은 구성 요소 로그에서 글을 조금 남깁니다."
+    keeps: "실패 패턴마다 마스킹한 샘플 줄 다섯 개까지, 그리고 어떤 패턴에도 맞지 않는 오류 줄을 문장별로 묶은 것."
   sensitivity: logs
   modes: [full]
   unseen:
@@ -82,6 +109,9 @@
 - id: node-os
   reads: "The inside of each node, over SSH or SSM when node access was chosen: kernel log, disk and inode use, kubelet and containerd journal, sysctl, the k3s server's files and certificates, the CNI's local state."
   keeps: "The output of the read-only script collectors/core/node-os.sh and of the node steps of the platform collectors."
+  ko:
+    reads: "노드 접근을 골랐을 때 SSH나 SSM으로 읽는 노드 안쪽. 커널 로그, 디스크와 inode 사용량, kubelet과 containerd 저널, sysctl, k3s 서버의 파일과 인증서, CNI의 로컬 상태."
+    keeps: "읽기 전용 스크립트 `collectors/core/node-os.sh`와 플랫폼별 노드 단계의 출력."
   sensitivity: node
   modes: [full]
   unseen:
@@ -91,6 +121,9 @@
 - id: kubelet-config
   reads: "The effective kubelet configuration of each node, through the API server's node proxy (get --raw /api/v1/nodes/<node>/proxy/configz)."
   keeps: "The configuration: eviction thresholds, reserved resources, log rotation, maxPods."
+  ko:
+    reads: "노드마다 실제로 적용된 kubelet 설정. API 서버의 노드 프록시로 읽습니다(get --raw /api/v1/nodes/<노드>/proxy/configz)."
+    keeps: "설정 내용. 축출 기준, 예약 자원, 로그 로테이션, maxPods."
   sensitivity: node
   modes: [full]
   unseen:
@@ -100,6 +133,9 @@
 - id: control-plane-logs
   reads: "Logs of the control plane: on EKS the CloudWatch log group of the cluster (API server, authenticator, controller manager, scheduler), on k3s the server's journal."
   keeps: "The lines the queries select: slow requests, failed webhook calls, authentication failures, repeated controller errors, slow etcd."
+  ko:
+    reads: "컨트롤 플레인 로그. EKS에서는 클러스터의 CloudWatch 로그 그룹(API 서버, authenticator, 컨트롤러 매니저, 스케줄러), k3s에서는 서버의 저널."
+    keeps: "질의가 고른 줄. 느린 요청, 실패한 웹훅 호출, 인증 실패, 반복되는 컨트롤러 오류, 느린 etcd."
   sensitivity: logs
   modes: [full]
   unseen:
@@ -109,6 +145,9 @@
 - id: cloud-account
   reads: "The AWS account of an EKS cluster, read-only (aws CLI: EKS, EC2, ELB, ECR, ACM, Service Quotas, CloudWatch metrics, Cost Explorer, AWS Backup)."
   keeps: "The responses: cluster and node group settings, add-on versions, subnets and free addresses, security groups, volumes and snapshots, load balancer settings and metrics, image scan settings, certificates, quotas, cost of the last 30 days."
+  ko:
+    reads: "EKS 클러스터의 AWS 계정, 읽기 전용(aws CLI: EKS, EC2, ELB, ECR, ACM, Service Quotas, CloudWatch 메트릭, Cost Explorer, AWS Backup)."
+    keeps: "응답. 클러스터와 노드 그룹 설정, 애드온 버전, 서브넷과 남은 주소, 보안 그룹, 볼륨과 스냅샷, 로드밸런서 설정과 메트릭, 이미지 스캔 설정, 인증서, 할당량, 최근 30일 비용."
   sensitivity: cloud
   platforms: [eks]
   modes: [full]
@@ -119,6 +158,9 @@
 - id: workload-tools
   reads: "What four read-only tools find when they are installed: krr (request and limit recommendations from 7 days of Prometheus history), Polaris (workload best practices), kubent and pluto (API versions a later Kubernetes removes)."
   keeps: "Each tool's JSON output."
+  ko:
+    reads: "설치돼 있을 때 읽기 전용 도구 넷이 찾아낸 것. krr(Prometheus 7일 기록으로 본 requests·limits 권고), Polaris(워크로드 모범 사례), kubent와 pluto(다음 Kubernetes에서 없어지는 API 버전)."
+    keeps: "도구마다의 JSON 출력."
   sensitivity: low
   modes: [full]
   full_only_because: "the tools take minutes (krr about three on a two-node cluster)"
@@ -129,6 +171,9 @@
 - id: helm-releases
   reads: "The list of Helm releases (helm list). Helm keeps a release in a Secret, so this read needs permission to read Secrets; the shipped ClusterRole does not grant it."
   keeps: "What helm list prints: name, namespace, status, revision, chart and app version, time. Values are not read."
+  ko:
+    reads: "Helm 릴리스 목록(helm list). Helm은 릴리스를 Secret에 보관하므로 이 읽기에는 Secret을 읽는 권한이 필요하고, kubegap에 들어 있는 ClusterRole은 그 권한을 주지 않습니다."
+    keeps: "helm list가 찍는 것. 이름, 네임스페이스, 상태, 리비전, 차트와 앱 버전, 시각. values는 읽지 않습니다."
   sensitivity: secret-adjacent
   modes: [full]
   unseen:

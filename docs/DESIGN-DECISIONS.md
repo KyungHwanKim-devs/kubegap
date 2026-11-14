@@ -74,7 +74,7 @@ A check that is right in theory and noisy in practice gets suppressed, and then 
 
 ## 15. Two modes, daily by default, compared with the same mode
 
-`daily` collects a reduced set, evaluates the checks that make sense on it, and compares with the previous daily run. `full` collects everything and compares with the previous full run. Checks that need data a daily run does not collect are reported as not collected, not as passed. A daily run has to be short enough to happen every day, and comparing a daily run with a full run produces false "resolved" findings by the hundred.
+What a mode reads is a list of collection units (`collectors/units.yaml`). `daily` collects the units of low sensitivity: no node, no cloud account, no application setting, no log text. It evaluates the checks that can be judged on that and compares with the previous daily run. `full` collects every unit and compares with the previous full run. A check names the units it needs, and one that needs a unit the run did not collect is reported as not collected, not as passed. Nothing is collected and then deleted: what a mode should not hold is dropped in memory before a file exists. A daily run has to be short enough to happen every day, and comparing a daily run with a full run produces false "resolved" findings by the hundred.
 
 ## 16. Collection runs in parallel, with low concurrency
 
@@ -82,7 +82,7 @@ Collectors, items within a collector and PromQL queries run concurrently with sm
 
 ## 17. Two report files: one for a person, one for the record
 
-`report.md` is written by the LLM for a person: the top problems, each with the problem, the evidence, the cause, the action, why this happens, and the checks it rests on. `report-details.md` is assembled by code from the snapshot: every table, every first-pass result, every adjustment the LLM made.
+`report.md` is written for a person by the agent that analysed the run, and assembled by code, which refuses a text whose numbers, links, order or headings do not hold. A full report explains up to five problems (what is the matter, why it comes about, how to watch it, how it is solved, evidence, further reading); a daily report is one or two screens. `report-details.md`, full only, is assembled by code from the snapshot: every table, every first-pass result, every adjustment the agent made.
 
 The first version was one long file, and the parts a person needs were buried under the parts an agent needs. Splitting them also makes the code-assembled half reproducible by construction.
 

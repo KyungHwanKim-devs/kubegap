@@ -15,7 +15,7 @@ from . import paths, yamlite
 
 FILE = paths.COLLECTORS_DIR / "units.yaml"
 SENSITIVITIES = ("low", "config", "logs", "node", "cloud", "secret-adjacent")
-FIELDS = {"id", "reads", "keeps", "drops", "sensitivity", "modes", "platforms", "full_only_because", "unseen"}
+FIELDS = {"id", "reads", "keeps", "drops", "ko", "sensitivity", "modes", "platforms", "full_only_because", "unseen"}
 
 
 @lru_cache(maxsize=1)
@@ -69,6 +69,25 @@ def left_out(mode: str, platform: str | None = None) -> list[dict]:
     return [u for u in _load() if mode not in (u.get("modes") or []) and (platform is None or not u.get("platforms") or platform in u["platforms"])]
 
 
+TABLE = {
+    "en": {"head": ["Unit", "What is read", "What is written to the snapshot", "What is read and not written", "Sensitivity", "Daily", "Full"], "yes": "yes", "no": "no", "nothing": "—"},
+    "ko": {"head": ["수집 단위", "읽는 것", "스냅샷에 쓰는 것", "읽지만 쓰지 않는 것", "민감도", "daily", "full"], "yes": "모음", "no": "모으지 않음", "nothing": "—"},
+}
+
+
+def render_table(language: str) -> str:
+    """The table of docs/DATA.md and docs/ko/DATA.md: what each unit reads, keeps and drops, and which mode collects it. Printed from the
+    declarations the collection obeys, so the document cannot say something else (tests/test_units.py compares)."""
+    t = TABLE[language]
+    rows = []
+    for u in _load():
+        said = u.get("ko") or {} if language == "ko" else u
+        cell = lambda k: str(said.get(k) or t["nothing"]).replace("|", "\\|")  # noqa: E731
+        rows.append([f"`{u['id']}`", cell("reads"), cell("keeps"), cell("drops"), u["sensitivity"], *(t["yes"] if m in u["modes"] else t["no"] for m in paths.MODES)])
+    lines = ["| " + " | ".join(t["head"]) + " |", "|" + "---|" * len(t["head"])]
+    return "\n".join(lines + ["| " + " | ".join(r) + " |" for r in rows]) + "\n"
+
+
 def validate() -> list[str]:
     """What is wrong with units.yaml and with the steps that name its units, one line each."""
     errs: list[str] = []
@@ -87,6 +106,10 @@ def validate() -> list[str]:
         for f in ("reads", "keeps"):
             if not (isinstance(u.get(f), str) and u[f].strip()):
                 errs.append(f"{FILE.name}: {uid} needs `{f}`, a sentence")
+            if not (isinstance(u.get("ko"), dict) and isinstance(u["ko"].get(f), str) and u["ko"][f].strip()):
+                errs.append(f"{FILE.name}: {uid} needs `ko.{f}`, the same in Korean")
+        if u.get("drops") and not (u.get("ko") or {}).get("drops"):
+            errs.append(f"{FILE.name}: {uid} has `drops` and no `ko.drops`")
         if u.get("sensitivity") not in SENSITIVITIES:
             errs.append(f"{FILE.name}: {uid} sensitivity must be one of {SENSITIVITIES}")
         modes = u.get("modes")

@@ -46,7 +46,7 @@ codex exec --sandbox danger-full-access --skip-git-repo-check -C ~ \
 
 작은따옴표는 셸이 `$kubegap`을 변수로 풀지 못하게 막습니다. Codex 프롬프트에서는 스킬을 `$kubegap`처럼 부릅니다. `-o`는 에이전트의 마지막 메시지를 파일로 저장합니다. 마지막 메시지는 스킬이 리포트를 저장한 뒤 출력하는 브리핑이고, 이 파일을 읽거나 다른 사람에게 전달할 수 있습니다.
 
-리포트 글은 이 실행이 같은 CLI로 띄우는 에이전트들이 씁니다. 조치 검증, 글쓴이, 사실 대조, 문장 교체가 단계마다 `claude -p`나 `codex exec` 하나씩 돕니다. 같은 로그인을 쓰고, 셸은 없고, 답변 말고는 아무것도 쓰지 않습니다. `workspace-write`처럼 이걸 허용하지 않는 Codex 샌드박스에서는 스킬이 그 단계를 직접 하고 브리핑에 그렇게 적습니다.
+리포트는 점검을 돌린 에이전트가 직접 씁니다. kubegap이 따로 에이전트를 띄우지 않습니다. full 리포트는 다 쓴 뒤에, 에이전트가 자기 환경의 서브에이전트 둘에게 검토를 맡깁니다(하나는 사실, 하나는 해결 방안). 서브에이전트를 부를 수 없는 환경에서는 에이전트가 그 두 가지를 직접 읽고 브리핑에 그렇게 적습니다.
 
 예약하기 전에 명령을 손으로 한 번 실행하세요. `install_tools: always`라면 첫 실행에서 추가 도구를 설치하고, EKS에서는 SSM 문서가 필요할 수 있습니다. 둘 다 cron 로그로 디버깅하는 것보다 직접 지켜보는 편이 쉽습니다.
 
@@ -76,7 +76,7 @@ Codex를 쓴다면 `claude -p …` 부분을 위의 `codex exec …` 줄로 바�
 
 ## 4. 리포트가 저장되는 곳
 
-점검할 때마다 `~/.kubegap/snapshots/<context>/<YYYY-MM-DDTHH-MM-SS>/` 폴더가 하나 생깁니다. 이 폴더에 `report.md`, `report-details.md`, 모은 데이터가 들어 있습니다. 컨텍스트 `prod`의 가장 최근 리포트는 이렇게 볼 수 있습니다.
+점검할 때마다 `~/.kubegap/snapshots/<context>/<YYYY-MM-DDTHH-MM-SS>/` 폴더가 하나 생깁니다. 이 폴더에 `report.md`와 모은 데이터가 들어 있고, full 점검이면 `report-details.md`도 있습니다. 컨텍스트 `prod`의 가장 최근 리포트는 이렇게 볼 수 있습니다.
 
 ```bash
 cat "$(ls -dt ~/.kubegap/snapshots/prod/*/ | head -1)report.md"

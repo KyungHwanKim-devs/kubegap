@@ -37,3 +37,14 @@ def test_every_need_of_a_check_is_a_unit_and_a_misspelt_unit_is_an_error():
         assert "node-oss" in str(e)
     else:
         raise AssertionError("a misspelt unit must not read as not collected")
+
+
+def test_the_data_documents_carry_the_table_the_declarations_print():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    begin, end = "<!-- units-table:begin -->\n", "<!-- units-table:end -->\n"
+    for language, doc in (("en", "docs/DATA.md"), ("ko", "docs/ko/DATA.md")):
+        text = (root / doc).read_text(encoding="utf-8")
+        assert begin in text and end in text, f"{doc} lost the units-table markers"
+        assert text.split(begin, 1)[1].split(end, 1)[0] == units.render_table(language), f"regenerate: scripts/kubegap units --markdown --language {language}, pasted between the markers of {doc}"
