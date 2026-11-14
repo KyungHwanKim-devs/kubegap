@@ -29,14 +29,13 @@ TEXT = {
         "criteria": "{n} findings differ because the checks or the scale changed, not the cluster; they are not counted in the two columns on the right.",
         "scale": "Severity is for a cluster run at scale {scale}{source}.",
         "guessed": " (nobody answered the question, so this is a guess from {nodes} nodes; `/kubegap setup` asks)",
-        "declined": "Decided not to do",
-        "declined_none": "Nothing is recorded. A decision not to act on a finding goes into `suppress` in the config file with its reason, and is listed here.",
+        "declined": "Findings you decided not to fix",
         "until": "until {until}",
         "no_reason": "no reason recorded",
         "limits": "Limits of this run",
         "no-data": "Not judged because the cluster does not hold the data",
         "unsupported": "Not read by kubegap yet",
-        "skipped": "Left out by choice",
+        "skipped": "What you answered not to read at the first-run questions",
         "weakens": "Weaker for it",
         "to_see": "To see it",
         "components": "{n} components were read only through their objects and metrics; kubegap has no checks of their own for them: {names}.",
@@ -55,19 +54,18 @@ TEXT = {
         "criteria": "{n}건은 클러스터가 아니라 점검 기준이나 운영 규모가 바뀌어서 달라진 것이라 오른쪽 두 칸에 세지 않았습니다.",
         "scale": "심각도는 운영 규모 {scale} 기준입니다{source}.",
         "guessed": " (규모를 묻지 못해 노드 {nodes}대로 짐작했습니다. `/kubegap setup`에서 고를 수 있습니다)",
-        "declined": "하지 않기로 한 것",
-        "declined_none": "기록된 것이 없습니다. 어떤 항목을 조치하지 않기로 정했다면 설정 파일의 `suppress`에 이유와 함께 적어 주세요. 그러면 여기에 나옵니다.",
+        "declined": "고치지 않기로 정해 둔 항목",
         "until": "{until}까지",
         "no_reason": "이유가 적혀 있지 않습니다",
         "limits": "이번 점검의 한계",
         "no-data": "클러스터에 데이터가 없어서 판단하지 못한 것",
         "unsupported": "kubegap이 아직 읽지 못하는 것",
-        "skipped": "보지 않기로 고른 것",
+        "skipped": "첫 실행 질문에서 읽지 않기로 답하신 것",
         "weakens": "약해지는 결론",
         "to_see": "보려면",
         "components": "컴포넌트 {n}개는 오브젝트와 메트릭으로만 읽었습니다. kubegap에 전용 점검 항목이 없습니다: {names}.",
         "components_weakens": "이 컴포넌트 안에서 생긴 이상은 이 리포트에 나오지 않습니다",
-        "skipped_to_see": "`/kubegap setup`에서 다시 고르기",
+        "skipped_to_see": "`/kubegap setup`에서 다시 고를 수 있습니다",
         "none": "없음",
     },
 }
@@ -131,9 +129,9 @@ def declined(snap: Path, language: str) -> str:
     for f in fd.get("suppressed") or []:
         by = f.get("suppressed_by") or {}
         groups.setdefault((f.get("check"), by.get("reason"), by.get("until")), []).append(f.get("target"))
-    lines = [f"## {t['declined']}", ""]
     if not groups:
-        return "\n".join([*lines, t["declined_none"]])
+        return ""  # nothing was decided against: no section, rather than a heading over an instruction
+    lines = [f"## {t['declined']}", ""]
     for (check_id, reason, until), targets in sorted(groups.items(), key=lambda kv: str(kv[0][0])):
         tail = f" ({t['until'].format(until=until)})" if until else ""
         lines.append(f"- `{check_id}` — {', '.join(str(x) for x in targets[:8])}{' …' if len(targets) > 8 else ''}: {reason or t['no_reason']}{tail}")

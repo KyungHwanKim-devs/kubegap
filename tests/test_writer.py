@@ -164,7 +164,6 @@ def test_the_report_is_assembled_in_its_order_with_what_code_writes(tmp_path):
         "## 1. title 1",
         "## 2. title 2",
         "## 그다음으로 큰 문제",
-        "## 하지 않기로 한 것",
         "## 지난 리포트 이후",
         "## 다가오는 일",
         "## 영역별 한 줄",
@@ -178,7 +177,7 @@ def test_the_report_is_assembled_in_its_order_with_what_code_writes(tmp_path):
     assert "## 이미 일어난 일\n\n2026-11-11 14:08부터 2026-11-14 12:00까지 본 것입니다." in text
     assert "## 지금 깨져 있는 것" not in text  # nothing broken: the section is not there, the first screen says so
     assert "| move the dumps | 반영됨 | 7 CronJobs on n1 |" in text and "**새로 생긴 것**\n\n- two nodes rebooted" in text and "**없어진 것**\n\n- 없음" in text
-    assert "**두 점검 사이에 판정 규칙이 바뀐 항목**\n\n- `x.y` 2" in text  # counted per check; the ids are in report-details.md
+    assert "**클러스터는 그대로인데 kubegap의 기준이 바뀌어 달라진 것**\n\n판정 기준이 바뀐 점검:\n\n- `x.y` 2" in text  # counted per check; the ids are in report-details.md
     assert "| 2026-11-20 | certificate renews | summary.json |" in text and "| security | one plaintext token |" in text
     assert "- Grafana 토큰.\n  - 약해지는 결론: 대시보드 목록." in text and "kubegap에 전용 점검 항목이 없습니다: istio." in text
     assert "비교 기준은 2026-11-11 14:08 full 점검입니다." in text and "| critical | 1 | 0 | 0 | 0 |" in text
@@ -339,7 +338,9 @@ def test_code_prints_the_findings_the_checks_changed_from_diff_json(tmp_path):
     }
     (s / "diff.json").write_text(json.dumps({"findings": {"criteria_changes": crit}}))
     out = "\n".join(writer.criteria_changes(s, writer.HEADINGS["ko"]))
-    assert "운영 규모나 점검 기준이 바뀌어 심각도가 달라진 항목**\n\n- `resilience.single-eligible-node` 42" in out  # one line for forty-two findings; the ids are in report-details.md
-    assert "클러스터가 아니라 점검에 새로 보인 것**\n\n- `traffic.ingress-nginx-retired` 1" in out
-    assert "이번에 돌지 않은 점검 항목" not in out  # an empty bucket prints nothing
+    assert (
+        out.startswith("**클러스터는 그대로인데 kubegap의 기준이 바뀌어 달라진 것**") and "운영 규모나 기준이 바뀌어 심각도가 달라진 점검:\n\n- `resilience.single-eligible-node` 42" in out
+    )  # one line for forty-two findings; the ids are in report-details.md
+    assert "이번에 처음 실행한 점검:\n\n- `traffic.ingress-nginx-retired` 1" in out
+    assert "이번에 실행하지 않은 점검" not in out  # an empty bucket prints nothing
     assert writer.criteria_changes(tmp_path, writer.HEADINGS["en"]) == []  # no diff.json, no lines

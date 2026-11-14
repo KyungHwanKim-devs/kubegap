@@ -178,17 +178,18 @@ def test_what_was_decided_not_to_do_is_only_what_the_config_records(tmp_path):
     sup = [{"check": "coredns.availability", "target": "cluster", "suppressed_by": {"reason": "two nodes; control plane stays single", "until": "2027-01-01"}}]
     text = S.declined(_snap(tmp_path, suppressed=sup), "ko")
     assert "`coredns.availability` — cluster: two nodes; control plane stays single (2027-01-01까지)" in text
-    assert "`suppress`에 이유와 함께" in S.declined(_snap(tmp_path / "none"), "ko")
+    assert text.startswith("## 고치지 않기로 정해 둔 항목")
+    assert S.declined(_snap(tmp_path / "none"), "ko") == ""  # nothing decided: no section
 
 
 def test_limits_come_in_three_groups_with_what_code_knows_added(tmp_path):
     snap = _snap(tmp_path)
     f = {"limits": [{"kind": "no-data", "what": "인그레스 요청 메트릭이 없습니다.", "weakens": "재부팅 동안 사용자가 받은 오류 수를 모릅니다", "to_see": "ingress-nginx 컨트롤러 메트릭을 켭니다"}]}
     text = S.limits(f, snap, "ko", skipped=[{"id": "grafana-token", "header": "Grafana 토큰", "gain": ["Grafana에서 직접 만든 대시보드 목록"]}])
-    assert text.index("클러스터에 데이터가 없어서") < text.index("kubegap이 아직 읽지 못하는 것") < text.index("보지 않기로 고른 것")
+    assert text.index("클러스터에 데이터가 없어서") < text.index("kubegap이 아직 읽지 못하는 것") < text.index("첫 실행 질문에서 읽지 않기로 답하신 것")
     assert "- 인그레스 요청 메트릭이 없습니다.\n  - 약해지는 결론: 재부팅 동안 사용자가 받은 오류 수를 모릅니다.\n  - 보려면: ingress-nginx 컨트롤러 메트릭을 켭니다." in text
     assert "컴포넌트 2개는 오브젝트와 메트릭으로만 읽었습니다. kubegap에 전용 점검 항목이 없습니다: istio, reloader." in text  # coredns has checks; k3s is the platform
-    assert "- Grafana 토큰.\n  - 약해지는 결론: Grafana에서 직접 만든 대시보드 목록.\n  - 보려면: `/kubegap setup`에서 다시 고르기." in text
+    assert "- Grafana 토큰.\n  - 약해지는 결론: Grafana에서 직접 만든 대시보드 목록.\n  - 보려면: `/kubegap setup`에서 다시 고를 수 있습니다." in text
 
 
 def test_a_version_past_its_end_of_support_is_weighed_one_step_higher(tmp_path):

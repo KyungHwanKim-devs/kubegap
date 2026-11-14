@@ -91,11 +91,12 @@ HEADINGS = {
         "appeared": "Appeared",
         "gone": "Went away",
         "no_report": "No earlier run of this mode has a report, so there is no advice to follow up.",
-        "crit_new": "Checks that did not run last time, so these findings are new to the audit, not to the cluster",
+        "crit_head": "The cluster is the same; these differ because what kubegap checks changed",
+        "crit_new": "Checks that ran for the first time",
         "crit_dropped": "Checks that did not run this time",
-        "crit_rule": "Checks whose rule changed between the runs",
-        "crit_thresholds": "Checks whose thresholds changed between the runs",
-        "crit_severity": "Checks whose severity changed between the runs because the scale of the cluster or the check did",
+        "crit_rule": "Checks whose rule changed",
+        "crit_thresholds": "Checks whose thresholds changed",
+        "crit_severity": "Checks whose severity changed because the scale or the check did",
         "none": "none",
     },
     "ko": {
@@ -145,11 +146,12 @@ HEADINGS = {
         "appeared": "새로 생긴 것",
         "gone": "없어진 것",
         "no_report": "리포트가 있는 이전 점검이 없어서 이어서 볼 권고가 없습니다.",
-        "crit_new": "지난번에는 돌지 않은 점검 항목이라 클러스터가 아니라 점검에 새로 보인 것",
-        "crit_dropped": "이번에 돌지 않은 점검 항목",
-        "crit_rule": "두 점검 사이에 판정 규칙이 바뀐 항목",
-        "crit_thresholds": "두 점검 사이에 임계값이 바뀐 항목",
-        "crit_severity": "두 점검 사이에 운영 규모나 점검 기준이 바뀌어 심각도가 달라진 항목",
+        "crit_head": "클러스터는 그대로인데 kubegap의 기준이 바뀌어 달라진 것",
+        "crit_new": "이번에 처음 실행한 점검",
+        "crit_dropped": "이번에 실행하지 않은 점검",
+        "crit_rule": "판정 기준이 바뀐 점검",
+        "crit_thresholds": "임계값이 바뀐 점검",
+        "crit_severity": "운영 규모나 기준이 바뀌어 심각도가 달라진 점검",
         "none": "없음",
     },
 }
@@ -414,8 +416,8 @@ def criteria_changes(snap: Path, h: dict) -> list[str]:
                 check_id = str(r.get("check") or r["id"])
                 per_check[check_id] = per_check.get(check_id, 0) + 1
         if per_check:
-            out += [f"**{h[label]}**", "", *(f"- `{c}` {n}" for c, n in sorted(per_check.items())), ""]
-    return out
+            out += [f"{h[label]}:", "", *(f"- `{c}` {n}" for c, n in sorted(per_check.items())), ""]
+    return [f"**{h['crit_head']}**", "", *out] if out else out
 
 
 def since_section(facts: dict, h: dict, snap: Path, written: str | None) -> str:
@@ -529,6 +531,7 @@ def assemble(snap: Path, facts: dict, overview: str, problems: list[str], langua
     out += [p.strip() for p in problems]
     out.append(f"## {h['next'] if mode == 'full' else h['next_daily']}\n\n{parts.get('next') or h['none']}")
     out += [_sections.declined(snap, language), since_section(facts, h, snap, parts.get("since")), upcoming(facts, h)]
+    out = [x for x in out if x]  # a section with nothing to say is left out (nothing was decided against)
     if mode == "full":
         out.append(area_lines(facts, h))
     out += [_sections.limits(facts, snap, language, skipped), _sections.numbers(snap, language)]
