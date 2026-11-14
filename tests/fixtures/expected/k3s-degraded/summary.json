@@ -62,7 +62,7 @@
   "count": 0,
   "by_type": {},
   "reasons": [],
-  "top_objects": [],
+  "objects_by_events": [],
   "warning_samples": {},
   "missing": "events.json missing. Either collect did not run on this snapshot (discover-only folder) or event collection failed"
  },
@@ -328,7 +328,7 @@
     "Failed": 4,
     "Pending": 1
    },
-   "restarts_top": [
+   "restarts_by_pod": [
     {
      "namespace": "app-c-prod",
      "pod": "app-c-coturn-549854dfcb-jgp4h",
@@ -1605,7 +1605,7 @@
    "rules_total": 145,
    "firing_now": [],
    "firing_now_by_name": {},
-   "top_firing_7d": [],
+   "firing_7d_by_alert": [],
    "always_firing_7d": null,
    "skip_reason": "alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)",
    "watchdog_samples_7d": null,
@@ -3890,7 +3890,7 @@
   "webhook_failures_total": 0,
   "etcd": null,
   "controller_manager": {
-   "note": "k3s runs as one process, so controller-manager errors are mixed into nodes[<server>].top_errors"
+   "note": "k3s runs as one process, so controller-manager errors are mixed into nodes[<server>].errors_by_count"
   }
  },
  "nodeos": {
@@ -8673,7 +8673,7 @@
      "kubegap_reason": ""
     }
    ],
-   "top_over_cpu": [
+   "over_cpu": [
     {
      "target": "app-h-prod/deployment/app-h-embed:app",
      "kind": "Deployment",
@@ -9081,7 +9081,7 @@
      "kubegap_reason": "memory request under by 520 MB"
     }
    ],
-   "top_over_memory": [
+   "over_memory": [
     {
      "target": "app-h-prod/deployment/app-h-embed:app",
      "kind": "Deployment",
@@ -9112,7 +9112,7 @@
      "kubegap_reason": "CPU request over by 0.49 cores, memory request over by 1301 MB"
     }
    ],
-   "top_under_memory": [
+   "under_memory": [
     {
      "target": "app-a-prod/statefulset/app-a-postgres:postgres",
      "kind": "StatefulSet",
@@ -46778,7 +46778,7 @@
    "nodes_saturated_7d": [],
    "burst_tenants": [],
    "throttled_prod": [],
-   "top_cpu_share": [
+   "cpu_share": [
     {
      "namespace": "app-a-prod",
      "kind": "prod",

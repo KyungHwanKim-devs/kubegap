@@ -401,9 +401,9 @@
 | `argocd.admin-account-no-sso.cluster` | warn | medium | admin.enabled True, SSO (dex/oidc) False, anonymous False, RBAC policy.default '' / policy.csv 0 lines, exec.enabled False, URL https://deploy.lab-k.example |
 | `argocd.components-not-ha.cluster` | warn | medium | components (ready/replicas) {'applicationset-controller': '1/1', 'dex-server': '1/1', 'notifications-controller': '1/1', 'redis': '1/1', 'repo-server': '1/1', 'server': '1/1', 'application-controller': '1/1'}, not ready [], single replica (server, repo-server) ['repo-server', 'server'], version … |
 | `controlplane.authenticator-failures.cluster` | warn | medium | 24h authentication failures 8: [{'message': 'access denied', 'count': 8}] |
-| `controlplane.controller-error-repeat.gc_controller.go` | warn | medium | 24h E lines 6 times (gc_controller.go). Samples: summary.controlplane.controller_manager.top_errors |
-| `controlplane.controller-error-repeat.horizontal.go` | warn | medium | 24h E lines 11 times (horizontal.go). Samples: summary.controlplane.controller_manager.top_errors |
-| `controlplane.controller-error-repeat.type.go` | warn | medium | 24h W lines 80479 times (type.go). Samples: summary.controlplane.controller_manager.top_errors |
+| `controlplane.controller-error-repeat.gc_controller.go` | warn | medium | 24h E lines 6 times (gc_controller.go). Samples: summary.controlplane.controller_manager.errors_by_count |
+| `controlplane.controller-error-repeat.horizontal.go` | warn | medium | 24h E lines 11 times (horizontal.go). Samples: summary.controlplane.controller_manager.errors_by_count |
+| `controlplane.controller-error-repeat.type.go` | warn | medium | 24h W lines 80479 times (type.go). Samples: summary.controlplane.controller_manager.errors_by_count |
 | `coredns.nxdomain-ratio-high.cluster` | warn | medium | NXDOMAIN share of responses in 1h 0.503, queries per second 75.8, NXDOMAIN share of queries forwarded upstream 0.442 (upstreams ['10.0.0.2:53']), pods with default ndots (5) 154, autopath False, cache hit ratio 0.9237 |
 | `ecr.dockerhub-dependency.ecr/registry/<account>` | warn | medium | registry distribution of container images {'602401143452.dkr.ecr.ap-northeast-2.amazonaws.com': 77, '<account>.dkr.ecr.ap-northeast-2.amazonaws.com': 59, 'docker.io': 34, 'quay.io': 25, 'ghcr.io': 9, 'public.ecr.aws': 8, 'registry.k8s.io': 3}, docker.io images 19 (e.g. ['alpine/socat:1.8.0.0' … |
 | `eks.addon-outdated.coredns` | warn | medium | installed v1.11.3-eksbuild.1, latest available v1.11.4-eksbuild.104, default v1.11.4-eksbuild.104 |
@@ -773,7 +773,7 @@
  "first": "2026-10-23T01:20:23Z",
  "last": "2026-11-07T01:32:11Z",
  "meaning": "kubelet image GC could not free space. Disk is full of in-use images and logs",
- "objects_top": [
+ "objects_by_count": [
   {
    "object": "Node/ip-10-0-1-139.ap-northeast-2.compute.internal",
    "occurrences": 1338
@@ -1584,7 +1584,7 @@
   "VPCs 0.6"
  ],
  "quotas": 65,
- "watched_top": [
+ "watched_quotas": [
   [
    "VPCs",
    3.0,
@@ -1653,7 +1653,7 @@
  "first": "2026-11-07T00:48:24Z",
  "last": "2026-11-07T00:48:24Z",
  "meaning": "Probe failure. Readiness removes it from traffic, liveness restarts it",
- "objects_top": [
+ "objects_by_count": [
   {
    "object": "Pod/prod-app-s/app-s-backend-7c46f75bf6-ljlnl",
    "occurrences": 1
@@ -1679,7 +1679,7 @@
  "first": "2026-10-08T12:31:38Z",
  "last": "2026-11-07T01:18:03Z",
  "meaning": "Operator reconcile failure (ExternalSecret etc.)",
- "objects_top": [
+ "objects_by_count": [
   {
    "object": "ExternalSecret/database/mysql-app-v-secret",
    "occurrences": 2711
@@ -9204,114 +9204,7 @@
 ```json
 {
  "aws_api_calls_total": 242614,
- "aws_api_retries_avg": 0.0,
- "aws_api_slow_ops_avg_s": [
-  [
-   "Shield/GetSubscriptionState",
-   0.759
-  ],
-  [
-   "EC2/RevokeSecurityGroupIngress",
-   0.317
-  ],
-  [
-   "EC2/AuthorizeSecurityGroupIngress",
-   0.295
-  ],
-  [
-   "Elastic Load Balancing v2/RegisterTargets",
-   0.283
-  ],
-  [
-   "Elastic Load Balancing v2/CreateTargetGroup",
-   0.265
-  ],
-  [
-   "EC2/DescribeSubnets",
-   0.138
-  ],
-  [
-   "Elastic Load Balancing v2/CreateRule",
-   0.103
-  ],
-  [
-   "Elastic Load Balancing v2/ModifyRule",
-   0.096
-  ],
-  [
-   "ACM/ListCertificates",
-   0.087
-  ],
-  [
-   "EC2/DescribeVpcs",
-   0.084
-  ],
-  [
-   "EC2/DescribeInstances",
-   0.082
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeTargetGroups",
-   0.081
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeRules",
-   0.08
-  ],
-  [
-   "EC2/DescribeSecurityGroups",
-   0.076
-  ],
-  [
-   "WAFV2/GetWebACLForResource",
-   0.075
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeTags",
-   0.071
-  ],
-  [
-   "ACM/DescribeCertificate",
-   0.07
-  ],
-  [
-   "EC2/DescribeNetworkInterfaces",
-   0.065
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeLoadBalancers",
-   0.064
-  ],
-  [
-   "WAF Regional/GetWebACLForResource",
-   0.059
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeListeners",
-   0.057
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeListenerCertificates",
-   0.052
-  ],
-  [
-   "Elastic Load Balancing v2/DeregisterTargets",
-   0.05
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
-   0.047
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
-   0.042
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeTargetHealth",
-   0.036
-  ]
- ],
- "aws_api_top_ops": [
+ "aws_api_ops_by_calls": [
   [
    "Elastic Load Balancing v2/DescribeTargetHealth",
    76055
@@ -9431,6 +9324,113 @@
   [
    "EC2/DescribeAvailabilityZones",
    2
+  ]
+ ],
+ "aws_api_retries_avg": 0.0,
+ "aws_api_slow_ops_avg_s": [
+  [
+   "Shield/GetSubscriptionState",
+   0.759
+  ],
+  [
+   "EC2/RevokeSecurityGroupIngress",
+   0.317
+  ],
+  [
+   "EC2/AuthorizeSecurityGroupIngress",
+   0.295
+  ],
+  [
+   "Elastic Load Balancing v2/RegisterTargets",
+   0.283
+  ],
+  [
+   "Elastic Load Balancing v2/CreateTargetGroup",
+   0.265
+  ],
+  [
+   "EC2/DescribeSubnets",
+   0.138
+  ],
+  [
+   "Elastic Load Balancing v2/CreateRule",
+   0.103
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyRule",
+   0.096
+  ],
+  [
+   "ACM/ListCertificates",
+   0.087
+  ],
+  [
+   "EC2/DescribeVpcs",
+   0.084
+  ],
+  [
+   "EC2/DescribeInstances",
+   0.082
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroups",
+   0.081
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeRules",
+   0.08
+  ],
+  [
+   "EC2/DescribeSecurityGroups",
+   0.076
+  ],
+  [
+   "WAFV2/GetWebACLForResource",
+   0.075
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTags",
+   0.071
+  ],
+  [
+   "ACM/DescribeCertificate",
+   0.07
+  ],
+  [
+   "EC2/DescribeNetworkInterfaces",
+   0.065
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancers",
+   0.064
+  ],
+  [
+   "WAF Regional/GetWebACLForResource",
+   0.059
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListeners",
+   0.057
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListenerCertificates",
+   0.052
+  ],
+  [
+   "Elastic Load Balancing v2/DeregisterTargets",
+   0.05
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+   0.047
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+   0.042
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetHealth",
+   0.036
   ]
  ],
  "metrics_available": true,

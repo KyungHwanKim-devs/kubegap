@@ -659,7 +659,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "first": "2026-10-28T22:06:36Z",
  "last": "2026-11-07T01:21:42Z",
  "meaning": "Container keeps dying and the restart interval grows (CrashLoopBackOff)",
- "objects_top": [
+ "objects_by_count": [
   {
    "object": "Pod/app-c-prod/app-c-coturn-549854dfcb-jgp4h",
    "occurrences": 60363

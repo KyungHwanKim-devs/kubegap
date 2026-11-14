@@ -87,7 +87,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         cm_samples = Counter(normalize_message(r.get("@message", "")) for r in _cw_rows(snap, "controller_manager_error_samples"))
         out["controller_manager"] = {
             "errors_by_source": [{"level": r.get("lvl"), "source": r.get("src"), "count": to_int(r.get("c"))} for r in _cw_rows(snap, "controller_manager_errors_by_source")],
-            "top_errors": [{"message": m, "sample_count": c} for m, c in cm_samples.most_common()],
+            "errors_by_count": [{"message": m, "sample_count": c} for m, c in cm_samples.most_common()],
         }
         by_wl: dict[str, int] = defaultdict(int)
         for r in _cw_rows(snap, "scheduler_unschedulable"):
@@ -135,7 +135,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             if err.is_file():
                 lines = err.read_text(encoding="utf-8", errors="replace").splitlines()
                 rec["error_lines_captured"] = len(lines)
-                rec["top_errors"] = [{"message": m_, "count": c} for m_, c in Counter(normalize_message(ln) for ln in lines).most_common()]
+                rec["errors_by_count"] = [{"message": m_, "count": c} for m_, c in Counter(normalize_message(ln) for ln in lines).most_common()]
             su = nd / "k3s-scheduler-unschedulable-24h.log"
             if su.is_file():
                 lines = su.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -175,7 +175,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         out["scheduler"] = {"unschedulable_total_24h": total_unsched, "by_workload": [{"workload": w, "namespace": w.split("/")[0], "count": c} for w, c in sorted(sched_by_wl.items(), key=lambda kv: -kv[1])]}
         out["webhook_failures_total"] = total_webhook
         out["etcd"] = etcd if nodes else None  # None, not zeros: nothing was read (#141)
-        out["controller_manager"] = {"note": "k3s runs as one process, so controller-manager errors are mixed into nodes[<server>].top_errors"}
+        out["controller_manager"] = {"note": "k3s runs as one process, so controller-manager errors are mixed into nodes[<server>].errors_by_count"}
     else:
         out["source"] = None
         out["available"] = False

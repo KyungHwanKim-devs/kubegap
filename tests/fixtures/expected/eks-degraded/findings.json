@@ -4375,7 +4375,7 @@
    "severity_default": "medium",
    "nature": "state",
    "evidence": "A noisy neighbor cannot be caught by one rule. The code gathers the material: (1) minutes a node spent above 90% CPU (7 days), (2) the namespace that dominates that node and its share, (3) bursty tenants (7-day max/median), (4) CPU throttle ratio of production namespaces, (5) the tenant mix on each node. If (1) is 0, the LLM writes \"no room for neighbor damage in this window\" and stops. If (1) > 0, it notes whether the dominant namespace (2) and the throttling (4) or ingress p95 (traffic section) of production on that node overlap on the same node, and because the material is instant values it writes \"insufficient evidence — a range query at that time is needed\" for time correlation. It does not assert. Throttling inside one production namespace is more likely caused by its own limit (resources section) than by a neighbor — write it that way.\n",
-   "source": "summary.json tenancy.noisy (nodes_saturated_7d, dominated_shared_nodes, burst_tenants, throttled_prod, top_cpu_share) · tenancy.isolation.nodes · traffic.ingresses[].metrics(p95) · resources.p95 · metrics/namespace_node_cpu_share_p95_7d.json · metrics/node_cpu_saturated_minutes_7d.json · metrics/namespace_cpu_throttled_ratio_7d.json"
+   "source": "summary.json tenancy.noisy (nodes_saturated_7d, dominated_shared_nodes, burst_tenants, throttled_prod, cpu_share) · tenancy.isolation.nodes · traffic.ingresses[].metrics(p95) · resources.p95 · metrics/namespace_node_cpu_share_p95_7d.json · metrics/node_cpu_saturated_minutes_7d.json · metrics/namespace_cpu_throttled_ratio_7d.json"
   },
   {
    "check": "tenancy.prod-without-quota",

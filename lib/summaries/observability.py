@@ -291,7 +291,7 @@ def _alerts(snap: Path, alerting: list[dict]) -> dict:
         "rules_total": len(names),
         "firing_now": firing_now,
         "firing_now_by_name": dict(Counter(a["alertname"] for a in firing_now)),
-        "top_firing_7d": samples,
+        "firing_7d_by_alert": samples,
         "always_firing_7d": always,
         "skip_reason": None if samples_read else "alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)",
         "watchdog_samples_7d": wd,

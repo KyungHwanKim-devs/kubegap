@@ -1128,7 +1128,7 @@
     It asks the same question as the kubegap p95 checks (cpu/memory-*-p95) over a different window (14 days) with a different calculation, so a workload flagged by both is certain.
   measured: >
     Measured on a 2-node small k3s cluster: most of the 19 KRR CRITICALs were this memory-limit noise.
-  suggest: "Look at the saved cores and MB in summary.resources.krr.totals first, then fix requests in top_over_cpu, top_under_memory order. Handle the CPU limit removal list (cpu_limit_remove_recommended) together with the throttling check."
+  suggest: "Look at the saved cores and MB in summary.resources.krr.totals first, then fix requests in over_cpu, under_memory order. Handle the CPU limit removal list (cpu_limit_remove_recommended) together with the throttling check."
   verify:
     - "krr simple -n <ns> -p http://localhost:9090"
   notes: tool-missing when krr is not installed. Install with `kubegap setup --install-only krr`
@@ -3618,7 +3618,7 @@
     expr: "item['type'] == 'Warning' and item['severity_hint'] in ('critical', 'high') and item['occurrences'] >= 3 and item.get('trend') != 'quiet'"
     warn_expr: "item['type'] == 'Warning' and item['occurrences'] >= 1 and item.get('trend') != 'quiet'"  # an event that stopped growing across recent snapshots (quiet) is history and does not even warn
   target: "item['reason']"
-  evidence: "f\"{item['meaning']}. {item['occurrences']} occurrences total ({item['events']} events, trend over {len(item['per_snapshot'])} snapshots {item['per_snapshot']}, {item['trend']}), first {item['first']} last {item['last']}. Top objects: {shown([o['object'] for o in item['objects_top']], 3)}\""
+  evidence: "f\"{item['meaning']}. {item['occurrences']} occurrences total ({item['events']} events, trend over {len(item['per_snapshot'])} snapshots {item['per_snapshot']}, {item['trend']}), first {item['first']} last {item['last']}. Top objects: {shown([o['object'] for o in item['objects_by_count']], 3)}\""
   severity_default: high
   nature: occurrence
   symptom_linked: true
@@ -3648,7 +3648,7 @@
           trend: "new"
           first: "x"
           last: "y"
-          objects_top:
+          objects_by_count:
             - object: "Pod/prod-a/web"
               occurrences: 36
       - expect: "warn"
@@ -3664,7 +3664,7 @@
           trend: "flat"
           first: "x"
           last: "y"
-          objects_top: []
+          objects_by_count: []
       - expect: "pass"
         item:
           reason: "Killing"
@@ -3678,7 +3678,7 @@
           trend: "flat"
           first: "x"
           last: "y"
-          objects_top: []
+          objects_by_count: []
 
 - id: operators.unhealthy-condition
   name: Unhealthy object status.conditions
@@ -4071,14 +4071,14 @@
     expr: "item['level'] == 'E' and item['count'] >= 100"
     warn_expr: "item['count'] >= 1000 or (item['level'] == 'E' and item['count'] >= 5)"
   target: "item['source']"
-  evidence: "f\"24h {item['level']} lines {item['count']} times ({item['source']}). Samples: summary.controlplane.controller_manager.top_errors\""
+  evidence: "f\"24h {item['level']} lines {item['count']} times ({item['source']}). Samples: summary.controlplane.controller_manager.errors_by_count\""
   severity_default: medium
   nature: occurrence
   symptom_linked: false
   why: >
     A controller fails to reconcile and keeps requeuing (for example disruption.go = PDB sync failure, usually a selector matching no pods or overlapping PDBs).
     Tens of thousands of W-level lines are usually client compatibility warnings (watchlist feature gate): noise, but they cost log volume.
-  suggest: Identify the resource from the top_errors messages and fix it. Reduce noise warnings by aligning component versions.
+  suggest: Identify the resource from the errors_by_count messages and fix it. Reduce noise warnings by aligning component versions.
   verify:
     - "logs/cloudwatch/controller_manager_error_samples.json"
   platforms: [eks, other]
@@ -21796,7 +21796,7 @@
   name: Noisy neighbor — does a tenant's usage spike coincide in time with another tenant's latency or throttling (LLM judgement)
   area: tenancy
   type: llm
-  inputs: "summary.json tenancy.noisy (nodes_saturated_7d, dominated_shared_nodes, burst_tenants, throttled_prod, top_cpu_share) · tenancy.isolation.nodes · traffic.ingresses[].metrics(p95) · resources.p95 · metrics/namespace_node_cpu_share_p95_7d.json · metrics/node_cpu_saturated_minutes_7d.json · metrics/namespace_cpu_throttled_ratio_7d.json"
+  inputs: "summary.json tenancy.noisy (nodes_saturated_7d, dominated_shared_nodes, burst_tenants, throttled_prod, cpu_share) · tenancy.isolation.nodes · traffic.ingresses[].metrics(p95) · resources.p95 · metrics/namespace_node_cpu_share_p95_7d.json · metrics/node_cpu_saturated_minutes_7d.json · metrics/namespace_cpu_throttled_ratio_7d.json"
   target: "'cluster'"
   severity_default: medium
   symptom_linked: true

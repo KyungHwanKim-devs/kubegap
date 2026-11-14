@@ -48,7 +48,7 @@ def _rel(snap: Path, p: Path) -> str:
 
 def summarize_events(snap: Path) -> dict:
     path = snap / "events.json"
-    out: dict = {"source": _rel(snap, path), "count": 0, "by_type": {}, "reasons": [], "top_objects": [], "warning_samples": {}}
+    out: dict = {"source": _rel(snap, path), "count": 0, "by_type": {}, "reasons": [], "objects_by_events": [], "warning_samples": {}}
     if not path.is_file():
         out["missing"] = "events.json missing. Either collect did not run on this snapshot (discover-only folder) or event collection failed"
         return out
@@ -80,10 +80,10 @@ def summarize_events(snap: Path) -> dict:
         objects[obj] += 1
         if typ == "Warning" and len(samples[reason]) < 3:
             samples[reason].append({"object": obj, "message": (e.get("message") or "")[:300], "last": last})
-    out["reasons"] = sorted([{**r, "objects_top": [o for o, _ in r["objects"].most_common()]} for r in reasons.values()], key=lambda r: (-r["occurrences"], r["reason"]))
+    out["reasons"] = sorted([{**r, "objects_by_count": [o for o, _ in r["objects"].most_common()]} for r in reasons.values()], key=lambda r: (-r["occurrences"], r["reason"]))
     for r in out["reasons"]:
         r.pop("objects", None)
-    out["top_objects"] = [{"object": o, "events": n} for o, n in objects.most_common()]
+    out["objects_by_events"] = [{"object": o, "events": n} for o, n in objects.most_common()]
     out["warning_samples"] = dict(samples)
     # per-Reason trend across every snapshot in the context folder (lib/summaries/events.py)
     try:
@@ -94,9 +94,9 @@ def summarize_events(snap: Path) -> dict:
             "source": "../events-history.json",
             "snapshots": h["snapshot_count"],
             "unique_events": h["unique_events"],
-            "tracked_hits": [{k: r[k] for k in ("reason", "type", "severity_hint", "meaning", "occurrences", "events", "first", "last", "trend", "per_snapshot", "objects_top")} for r in h["tracked_hits"]],
+            "tracked_hits": [{k: r[k] for k in ("reason", "type", "severity_hint", "meaning", "occurrences", "events", "first", "last", "trend", "per_snapshot", "objects_by_count")} for r in h["tracked_hits"]],
             "tracked_silent": h["tracked_silent"],
-            "top_warning_reasons": [{k: r[k] for k in ("reason", "occurrences", "trend", "per_snapshot")} for r in h["reasons"] if r["type"] == "Warning"],
+            "warning_reasons": [{k: r[k] for k in ("reason", "occurrences", "trend", "per_snapshot")} for r in h["reasons"] if r["type"] == "Warning"],
         }
     except Exception as e:  # a failure in the trend analysis must not block the whole summary
         out["history"] = {"error": f"{type(e).__name__}: {e}"}
@@ -170,7 +170,7 @@ def summarize_objects(snap: Path, inv: dict | None) -> dict:
         "source": "objects/pods.json",
         "count": len(pods),
         "by_phase": dict(Counter((p.get("status") or {}).get("phase") or "Unknown" for p in pods)),
-        "restarts_top": [r for r in restarts if r["restarts"] > 0],
+        "restarts_by_pod": [r for r in restarts if r["restarts"] > 0],
         "pending": [
             {
                 "namespace": p["metadata"]["namespace"],
@@ -655,7 +655,7 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
         else:
             echo(f"events {e['count']} (Warning {e['by_type'].get('Warning', 0)}), {len(e['reasons'])} distinct Reasons. top: " + ", ".join(f"{x['reason']}x{x['occurrences']}" for x in e["reasons"][:5]))
         echo(
-            f"objects {o['kind_count']} kinds, pods {o['pods']['count']}: top restarts {len(o['pods']['restarts_top'])}, Pending {len(o['pods']['pending'])}, "
+            f"objects {o['kind_count']} kinds, pods {o['pods']['count']}: top restarts {len(o['pods']['restarts_by_pod'])}, Pending {len(o['pods']['pending'])}, "
             f"waiting reasons {len(o['pods']['waiting'])}, Failed {len(o['pods']['failed'])}; Deployment unavailable {len(o['deployments']['unavailable'])}, "
             f"replicas=1 {o['deployments']['replicas_1']}; Services without ready endpoints {len(o['services']['no_ready_endpoints']) if o['services']['no_ready_endpoints'] is not None else '(no endpoints)'}"
         )

@@ -291,7 +291,7 @@ def diff_events(a: Path, b: Path) -> dict:
         if oa != ob or (x is None) != (y is None):
             # A count that dropped to 0 after the retention window (default 1 hour) is expiry, not a cluster change (seen on a real cluster: SuccessfullyReconciled 38,473 -> 0)
             kind = "expired" if (oa > 0 and ob == 0) else ("new" if (oa == 0 and ob > 0) else "changed")
-            rows.append({"reason": reason, "type": typ, "occurrences": [oa, ob], "delta": ob - oa, "kind": kind, "objects_top_after": (y or {}).get("objects_top", [])[:3]})
+            rows.append({"reason": reason, "type": typ, "occurrences": [oa, ob], "delta": ob - oa, "kind": kind, "objects_top_after": (y or {}).get("objects_by_count", [])[:3]})
     rows.sort(key=lambda r: (r["type"] != "Warning", -abs(r["delta"])))
     return {
         "changed": rows[:40],

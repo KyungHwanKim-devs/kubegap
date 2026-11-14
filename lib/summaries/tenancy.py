@@ -667,7 +667,7 @@ def _noisy(cx: _Ctx, nodes_out: list[dict], ns_rows: list[dict]) -> dict:
             [{"namespace": r["namespace"], "throttled_ratio_7d": r["throttled_ratio_7d"], "shares_nodes_with_prod": r["shares_nodes_with_prod"], "nodes": r["nodes"]} for r in ns_rows if r["prod"] and (r["throttled_ratio_7d"] or 0) >= 0.1],
             key=lambda x: -(x["throttled_ratio_7d"] or 0),
         ),
-        "top_cpu_share": [{"namespace": r["namespace"], "kind": r["kind"], "cpu_p95_7d": r["cpu_p95_7d"], "share": r["cpu_share_of_cluster_p95"]} for r in sorted(ns_rows, key=lambda r: -(r["cpu_p95_7d"] or 0))],
+        "cpu_share": [{"namespace": r["namespace"], "kind": r["kind"], "cpu_p95_7d": r["cpu_p95_7d"], "share": r["cpu_share_of_cluster_p95"]} for r in sorted(ns_rows, key=lambda r: -(r["cpu_p95_7d"] or 0))],
         "dominated_shared_nodes": [
             {
                 "node": r["node"],

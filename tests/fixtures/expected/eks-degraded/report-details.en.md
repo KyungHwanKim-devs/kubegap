@@ -5218,114 +5218,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```json
 {
  "aws_api_calls_total": 242614,
- "aws_api_retries_avg": 0.0,
- "aws_api_slow_ops_avg_s": [
-  [
-   "Shield/GetSubscriptionState",
-   0.759
-  ],
-  [
-   "EC2/RevokeSecurityGroupIngress",
-   0.317
-  ],
-  [
-   "EC2/AuthorizeSecurityGroupIngress",
-   0.295
-  ],
-  [
-   "Elastic Load Balancing v2/RegisterTargets",
-   0.283
-  ],
-  [
-   "Elastic Load Balancing v2/CreateTargetGroup",
-   0.265
-  ],
-  [
-   "EC2/DescribeSubnets",
-   0.138
-  ],
-  [
-   "Elastic Load Balancing v2/CreateRule",
-   0.103
-  ],
-  [
-   "Elastic Load Balancing v2/ModifyRule",
-   0.096
-  ],
-  [
-   "ACM/ListCertificates",
-   0.087
-  ],
-  [
-   "EC2/DescribeVpcs",
-   0.084
-  ],
-  [
-   "EC2/DescribeInstances",
-   0.082
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeTargetGroups",
-   0.081
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeRules",
-   0.08
-  ],
-  [
-   "EC2/DescribeSecurityGroups",
-   0.076
-  ],
-  [
-   "WAFV2/GetWebACLForResource",
-   0.075
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeTags",
-   0.071
-  ],
-  [
-   "ACM/DescribeCertificate",
-   0.07
-  ],
-  [
-   "EC2/DescribeNetworkInterfaces",
-   0.065
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeLoadBalancers",
-   0.064
-  ],
-  [
-   "WAF Regional/GetWebACLForResource",
-   0.059
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeListeners",
-   0.057
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeListenerCertificates",
-   0.052
-  ],
-  [
-   "Elastic Load Balancing v2/DeregisterTargets",
-   0.05
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
-   0.047
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
-   0.042
-  ],
-  [
-   "Elastic Load Balancing v2/DescribeTargetHealth",
-   0.036
-  ]
- ],
- "aws_api_top_ops": [
+ "aws_api_ops_by_calls": [
   [
    "Elastic Load Balancing v2/DescribeTargetHealth",
    76055
@@ -5445,6 +5338,113 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   [
    "EC2/DescribeAvailabilityZones",
    2
+  ]
+ ],
+ "aws_api_retries_avg": 0.0,
+ "aws_api_slow_ops_avg_s": [
+  [
+   "Shield/GetSubscriptionState",
+   0.759
+  ],
+  [
+   "EC2/RevokeSecurityGroupIngress",
+   0.317
+  ],
+  [
+   "EC2/AuthorizeSecurityGroupIngress",
+   0.295
+  ],
+  [
+   "Elastic Load Balancing v2/RegisterTargets",
+   0.283
+  ],
+  [
+   "Elastic Load Balancing v2/CreateTargetGroup",
+   0.265
+  ],
+  [
+   "EC2/DescribeSubnets",
+   0.138
+  ],
+  [
+   "Elastic Load Balancing v2/CreateRule",
+   0.103
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyRule",
+   0.096
+  ],
+  [
+   "ACM/ListCertificates",
+   0.087
+  ],
+  [
+   "EC2/DescribeVpcs",
+   0.084
+  ],
+  [
+   "EC2/DescribeInstances",
+   0.082
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroups",
+   0.081
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeRules",
+   0.08
+  ],
+  [
+   "EC2/DescribeSecurityGroups",
+   0.076
+  ],
+  [
+   "WAFV2/GetWebACLForResource",
+   0.075
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTags",
+   0.071
+  ],
+  [
+   "ACM/DescribeCertificate",
+   0.07
+  ],
+  [
+   "EC2/DescribeNetworkInterfaces",
+   0.065
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancers",
+   0.064
+  ],
+  [
+   "WAF Regional/GetWebACLForResource",
+   0.059
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListeners",
+   0.057
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListenerCertificates",
+   0.052
+  ],
+  [
+   "Elastic Load Balancing v2/DeregisterTargets",
+   0.05
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+   0.047
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+   0.042
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetHealth",
+   0.036
   ]
  ],
  "metrics_available": true,

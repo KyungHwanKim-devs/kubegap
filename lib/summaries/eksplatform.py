@@ -105,7 +105,7 @@ def _quotas(snap: Path) -> dict:
         "rows": rows,
         "near_limit": [f"{r['label'] or r['name']} {r['used']:.0f}/{r['limit']:.0f}" for r in rows if (r["ratio"] or 0) >= 0.8],
         "over_60": [f"{r['label'] or r['name']} {r['ratio']}" for r in rows if (r["ratio"] or 0) >= 0.6],
-        "watched_top": [(r["label"], r["used"], r["limit"], r["ratio"]) for r in rows if r["watched"] and r["used"] is not None],
+        "watched_quotas": [(r["label"], r["used"], r["limit"], r["ratio"]) for r in rows if r["watched"] and r["used"] is not None],
         "max_ratio": max([r["ratio"] for r in rows if r["ratio"] is not None], default=None),
         "max_ratio_name": next((r["label"] or r["name"] for r in rows if r["ratio"] is not None), None),
     }

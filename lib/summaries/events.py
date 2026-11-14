@@ -126,7 +126,7 @@ def build_history(context_root: Path, current: Path | None = None) -> dict:
                 trend = "new"
             if len(series) >= 3 and series[-1] == 0 and series[-2] == 0 and sum(series) > 0:
                 trend = "quiet"  # zero in the last two snapshots — only past incidents remain (e.g. Unhealthy at 0 but flagged warn/high)
-        out_reasons.append({**{k: v for k, v in r.items() if k != "objects"}, "objects_top": [{"object": o, "occurrences": n} for o, n in top], "per_snapshot": series, "trend": trend})
+        out_reasons.append({**{k: v for k, v in r.items() if k != "objects"}, "objects_by_count": [{"object": o, "occurrences": n} for o, n in top], "per_snapshot": series, "trend": trend})
     out_reasons.sort(key=lambda r: (r["type"] != "Warning", -r["occurrences"]))
 
     tracked_hits = [r for r in out_reasons if r["tracked"] and r["occurrences"] > 0]

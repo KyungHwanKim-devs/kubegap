@@ -126,7 +126,7 @@
     "occurrences": 216948,
     "first": "2026-08-28T08:15:49Z",
     "last": "2026-11-07T01:33:30Z",
-    "objects_top": [
+    "objects_by_count": [
      "NodeClaim/default-n44bh",
      "Node/ip-10-0-1-139.ap-northeast-2.compute.internal",
      "NodePool/app-amd64-fallback",
@@ -142,7 +142,7 @@
     "occurrences": 31582,
     "first": "2026-10-08T12:32:07Z",
     "last": "2026-11-07T01:33:46Z",
-    "objects_top": [
+    "objects_by_count": [
      "ExternalSecret/arc-runners/arc-github-auth",
      "ExternalSecret/dev-app-s/app-s-admin",
      "ExternalSecret/dev-app-s/app-s-api",
@@ -200,7 +200,7 @@
     "occurrences": 8572,
     "first": "2026-10-08T12:31:38Z",
     "last": "2026-11-07T01:30:56Z",
-    "objects_top": [
+    "objects_by_count": [
      "ClusterSecretStore/aws-secrets-manager"
     ]
    },
@@ -211,7 +211,7 @@
     "occurrences": 2711,
     "first": "2026-10-08T12:31:38Z",
     "last": "2026-11-07T01:18:03Z",
-    "objects_top": [
+    "objects_by_count": [
      "ExternalSecret/database/mysql-app-v-secret"
     ]
    },
@@ -222,7 +222,7 @@
     "occurrences": 1338,
     "first": "2026-10-23T01:20:23Z",
     "last": "2026-11-07T01:32:11Z",
-    "objects_top": [
+    "objects_by_count": [
      "Node/ip-10-0-1-139.ap-northeast-2.compute.internal"
     ]
    },
@@ -233,7 +233,7 @@
     "occurrences": 586,
     "first": "2026-03-13T04:58:45Z",
     "last": "2026-11-07T01:20:11Z",
-    "objects_top": [
+    "objects_by_count": [
      "Service/middleware/kafka-controller-0-external"
     ]
    },
@@ -244,7 +244,7 @@
     "occurrences": 260,
     "first": "2026-11-06T08:11:49Z",
     "last": "2026-11-07T01:32:50Z",
-    "objects_top": [
+    "objects_by_count": [
      "NodeClaim/default-jbfcl",
      "NodeClaim/default-lvf7c",
      "Node/ip-10-0-1-245.ap-northeast-2.compute.internal",
@@ -258,12 +258,12 @@
     "occurrences": 1,
     "first": "2026-11-07T00:48:24Z",
     "last": "2026-11-07T00:48:24Z",
-    "objects_top": [
+    "objects_by_count": [
      "Pod/prod-app-s/app-s-backend-7c46f75bf6-ljlnl"
     ]
    }
   ],
-  "top_objects": [
+  "objects_by_events": [
    {
     "object": "Node/ip-10-0-1-139.ap-northeast-2.compute.internal",
     "events": 3
@@ -554,7 +554,7 @@
      "per_snapshot": [
       2711
      ],
-     "objects_top": [
+     "objects_by_count": [
       {
        "object": "ExternalSecret/database/mysql-app-v-secret",
        "occurrences": 2711
@@ -574,7 +574,7 @@
      "per_snapshot": [
       1338
      ],
-     "objects_top": [
+     "objects_by_count": [
       {
        "object": "Node/ip-10-0-1-139.ap-northeast-2.compute.internal",
        "occurrences": 1338
@@ -594,7 +594,7 @@
      "per_snapshot": [
       1
      ],
-     "objects_top": [
+     "objects_by_count": [
       {
        "object": "Pod/prod-app-s/app-s-backend-7c46f75bf6-ljlnl",
        "occurrences": 1
@@ -614,7 +614,7 @@
      "per_snapshot": [
       216948
      ],
-     "objects_top": [
+     "objects_by_count": [
       {
        "object": "NodePool/app-amd64-fallback",
        "occurrences": 100717
@@ -666,7 +666,7 @@
     "Rebooted",
     "SystemOOM"
    ],
-   "top_warning_reasons": [
+   "warning_reasons": [
     {
      "reason": "UpdateFailed",
      "occurrences": 2711,
@@ -14865,7 +14865,7 @@
     "Running": 147,
     "Failed": 1
    },
-   "restarts_top": [
+   "restarts_by_pod": [
     {
      "namespace": "argocd",
      "pod": "argocd-application-controller-0",
@@ -15804,7 +15804,7 @@
     "KubeletTooManyPods": 1,
     "Watchdog": 1
    },
-   "top_firing_7d": [
+   "firing_7d_by_alert": [
     {
      "alertname": "InfoInhibitor",
      "samples_7d": 30781.0
@@ -18250,7 +18250,7 @@
      "count": 1
     }
    ],
-   "top_errors": [
+   "errors_by_count": [
     {
      "message": "\"Unhandled Error\" err=\"failed to compute desired number of replicas based on listed metrics for Deployment/dev-app-v/app-v-frontend: invalid metrics (1 invalid ",
      "sample_count": 5
@@ -27590,7 +27590,7 @@
      "kubegap_reason": ""
     }
    ],
-   "top_over_cpu": [
+   "over_cpu": [
     {
      "target": "prod-app-z-backend/deployment/app-z-file-worker:file-worker",
      "kind": "Deployment",
@@ -28520,7 +28520,7 @@
      "kubegap_reason": "memory request under by 851 MB"
     }
    ],
-   "top_over_memory": [
+   "over_memory": [
     {
      "target": "prod-app-z-backend/statefulset/app-z-neo4j:neo4j",
      "kind": "StatefulSet",
@@ -28843,7 +28843,7 @@
      "kubegap_reason": "CPU request over by 0.29 cores, memory request over by 316 MB"
     }
    ],
-   "top_under_memory": [
+   "under_memory": [
     {
      "target": "prod-app-z-backend/deployment/app-z-embedding-server:embedding",
      "kind": "Deployment",
@@ -29448,7 +29448,7 @@
     "memory_vs_request": 34,
     "memory_vs_limit": 80
    },
-   "cpu_overprovisioned_top": [
+   "cpu_overprovisioned": [
     {
      "workload": "keda/keda-admission-webhooks:keda-admission-webhooks",
      "ratio": 0.003
@@ -29602,8 +29602,8 @@
      "ratio": 0.341
     }
    ],
-   "cpu_near_limit_top": [],
-   "memory_overprovisioned_top": [
+   "cpu_near_limit": [],
+   "memory_overprovisioned": [
     {
      "workload": "middleware/redis-master-0:redis",
      "ratio": 0.021
@@ -29653,7 +29653,7 @@
      "ratio": 0.334
     }
    ],
-   "memory_near_limit_top": [
+   "memory_near_limit": [
     {
      "workload": "prod-app-z-backend/app-z-embedding-server:embedding",
      "ratio": 0.943
@@ -69412,7 +69412,7 @@
     }
    ],
    "throttled_prod": [],
-   "top_cpu_share": [
+   "cpu_share": [
     {
      "namespace": "prod-app-z-backend",
      "kind": "prod",
@@ -71312,7 +71312,7 @@
   "ingresses": {
    "alb": 41,
    "without_lb": [],
-   "annotations_top": {
+   "annotations_by_count": {
     "group.name": 41,
     "listen-ports": 41,
     "scheme": 41,
@@ -72026,7 +72026,7 @@
      "leader": false,
      "process_start": 1773377919.08,
      "aws_api_calls_total": 22,
-     "aws_api_top_ops": [
+     "aws_api_ops_by_calls": [
       [
        "Elastic Load Balancing v2/DescribeTargetGroups",
        22
@@ -72083,7 +72083,7 @@
      "leader": true,
      "process_start": 1773377734.58,
      "aws_api_calls_total": 242592,
-     "aws_api_top_ops": [
+     "aws_api_ops_by_calls": [
       [
        "Elastic Load Balancing v2/DescribeTargetHealth",
        76055
@@ -72378,7 +72378,7 @@
     "success": 55806
    },
    "aws_api_calls_total": 242614,
-   "aws_api_top_ops": [
+   "aws_api_ops_by_calls": [
     [
      "Elastic Load Balancing v2/DescribeTargetHealth",
      76055
@@ -72635,7 +72635,7 @@
    "ingress_class_params": 1,
    "alb_ingresses": 41,
    "ingresses_without_lb": [],
-   "ingress_annotations_top": {
+   "ingress_annotations_by_count": {
     "group.name": 41,
     "listen-ports": 41,
     "scheme": 41,
@@ -72778,7 +72778,7 @@
      0.036
     ]
    ],
-   "aws_api_top_ops": [
+   "aws_api_ops_by_calls": [
     [
      "Elastic Load Balancing v2/DescribeTargetHealth",
      76055
@@ -76475,7 +76475,7 @@
    "over_60": [
     "VPCs 0.6"
    ],
-   "watched_top": [
+   "watched_quotas": [
     [
      "VPCs",
      3.0,

@@ -100,7 +100,7 @@
   "count": 0,
   "by_type": {},
   "reasons": [],
-  "top_objects": [],
+  "objects_by_events": [],
   "warning_samples": {},
   "missing": "events.json missing. Either collect did not run on this snapshot (discover-only folder) or event collection failed"
  },
@@ -354,7 +354,7 @@
     "Running": 147,
     "Failed": 1
    },
-   "restarts_top": [
+   "restarts_by_pod": [
     {
      "namespace": "argocd",
      "pod": "argocd-application-controller-0",
@@ -1064,7 +1064,7 @@
    "rules_total": 141,
    "firing_now": [],
    "firing_now_by_name": {},
-   "top_firing_7d": [],
+   "firing_7d_by_alert": [],
    "always_firing_7d": null,
    "skip_reason": "alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)",
    "watchdog_samples_7d": null,
@@ -7493,7 +7493,7 @@
      "kubegap_reason": ""
     }
    ],
-   "top_over_cpu": [
+   "over_cpu": [
     {
      "target": "prod-app-z-backend/deployment/app-z-file-worker:file-worker",
      "kind": "Deployment",
@@ -8423,7 +8423,7 @@
      "kubegap_reason": "memory request under by 851 MB"
     }
    ],
-   "top_over_memory": [
+   "over_memory": [
     {
      "target": "prod-app-z-backend/statefulset/app-z-neo4j:neo4j",
      "kind": "StatefulSet",
@@ -8746,7 +8746,7 @@
      "kubegap_reason": "CPU request over by 0.29 cores, memory request over by 316 MB"
     }
    ],
-   "top_under_memory": [
+   "under_memory": [
     {
      "target": "prod-app-z-backend/deployment/app-z-embedding-server:embedding",
      "kind": "Deployment",
@@ -44107,7 +44107,7 @@
    "nodes_saturated_7d": [],
    "burst_tenants": [],
    "throttled_prod": [],
-   "top_cpu_share": [
+   "cpu_share": [
     {
      "namespace": "app-ab-prod",
      "kind": "prod",
@@ -45728,7 +45728,7 @@
   "ingresses": {
    "alb": 41,
    "without_lb": [],
-   "annotations_top": {
+   "annotations_by_count": {
     "group.name": 41,
     "listen-ports": 41,
     "scheme": 41,
@@ -46442,7 +46442,7 @@
      "leader": false,
      "process_start": 1773377919.08,
      "aws_api_calls_total": 22,
-     "aws_api_top_ops": [
+     "aws_api_ops_by_calls": [
       [
        "Elastic Load Balancing v2/DescribeTargetGroups",
        22
@@ -46499,7 +46499,7 @@
      "leader": true,
      "process_start": 1773377734.58,
      "aws_api_calls_total": 242592,
-     "aws_api_top_ops": [
+     "aws_api_ops_by_calls": [
       [
        "Elastic Load Balancing v2/DescribeTargetHealth",
        76055
@@ -46794,7 +46794,7 @@
     "success": 55806
    },
    "aws_api_calls_total": 242614,
-   "aws_api_top_ops": [
+   "aws_api_ops_by_calls": [
     [
      "Elastic Load Balancing v2/DescribeTargetHealth",
      76055
@@ -47051,7 +47051,7 @@
    "ingress_class_params": 1,
    "alb_ingresses": 41,
    "ingresses_without_lb": [],
-   "ingress_annotations_top": {
+   "ingress_annotations_by_count": {
     "group.name": 41,
     "listen-ports": 41,
     "scheme": 41,
@@ -47194,7 +47194,7 @@
      0.036
     ]
    ],
-   "aws_api_top_ops": [
+   "aws_api_ops_by_calls": [
     [
      "Elastic Load Balancing v2/DescribeTargetHealth",
      76055
