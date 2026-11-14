@@ -40,7 +40,7 @@ $KUBEGAP/scripts/kubegap show learn     <주제 | 체크 id>
   2. 일어났을 때 잃는 것(`loss`). `irreversible`(되돌릴 수 없는 손실: 데이터, 비밀 유출), `outage`(서비스 전체 중단), `partial`(일부 중단), `degraded`(느려지거나 불편함) 순이다. 발견에 `overdue`가 붙은 fail(지원이 끝난 버전)이 들어 있으면 코드가 그 문제의 `loss`를 한 단계 위인 것처럼 쳐서 비교한다. 심각도를 올리는 것이 아니다. `loss`에는 올리기 전의 값을 적는다.
   3. 이번 기간의 사건이 그 문제를 실제로 건드렸는가.
   고치기 어려운지, 오늘 할 수 있는지는 순서에 넣지 않는다.
-- **그다음으로 큰 문제.** 나머지 critical·high fail.
+- **그다음으로 큰 문제.** 나머지 critical·high fail과 critical warn. 가장 큰 문제를 고를 때는 fail과 warn을 가리지 않고 심각도와 잃는 것으로 고른다. critical warn은 high fail보다 앞이다.
 
 **리포트에 싣는 것은 하나도 빠짐없이 `show finding`으로 확인한다.** 위 네 목록에 넣는 발견이 대상이다. 근거와 규칙이 본 자료를 읽고, 필요하면 `show object`로 원본 오브젝트를, `show table`로 요약의 그 줄을 연다. 확인해 보니 자동 판정이 틀렸으면(시작 로그를 오류로 읽은 것, 이미 없어진 파드의 기록) 싣지 않고 `severity_changes`에 낮춘 값과 이유를 적는다. 싣지 않는 medium 이하의 발견은 하나씩 열 필요가 없다. 개수는 코드가 숫자 표에 싣는다.
 
@@ -66,7 +66,7 @@ $KUBEGAP/scripts/kubegap show learn     <주제 | 체크 id>
 ```
 
 - `title`은 리포트에 실리는 제목 그대로다. 명사로 끝나는 짧은 제목으로 쓴다. 첫 화면, 본문의 제목, 리포트 끝의 id 목록이 전부 여기서 나온다. 본문 파일의 제목이 이것과 다르면 조립이 거부된다.
-- `finding_ids`: 그 항목이 대표하는 발견. 한 체크의 발견이 여럿이면 `resilience.single-eligible-node.*`처럼 `*`로 끝나는 접두어로 적는다. fail인 critical·high 발견은 전부 네 목록 중 한 곳에 들어 있어야 한다.
+- `finding_ids`: 그 항목이 대표하는 발견. 한 체크의 발견이 여럿이면 `resilience.single-eligible-node.*`처럼 `*`로 끝나는 접두어로 적는다. fail인 critical·high 발견과 warn인 critical 발견은 전부 네 목록 중 한 곳에 들어 있어야 한다. 백업 수단이 아예 없다는 것처럼 "없음"을 알리는 점검은 warn으로만 나오지만 심각도는 critical일 수 있다.
 - `since_last`: 지난 리포트가 권한 것마다 한 줄. 반영됐으면 `done`, 남아 있으면 `not_done`. 지난 리포트가 없으면 비운다.
 - `upcoming`: 가까운 날짜에 일어날 일(인증서 갱신, 디스크가 차는 날, 예약된 정리 작업). `what`은 리포트에 그대로 실리니 합니다체 문장으로 쓴다.
 - `area_summary`: 열두 영역마다 한 줄, 합니다체. 문제를 찾지 못한 영역은 "이번 점검에서 문제를 찾지 못했습니다."로, 보지 못한 영역은 왜 못 봤는지를 쓴다.

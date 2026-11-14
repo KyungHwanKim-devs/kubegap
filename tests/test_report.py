@@ -140,7 +140,7 @@ def test_an_outline_that_keeps_its_promises_has_nothing_to_fix(tmp_path):
 def test_the_outline_is_refused_for_what_it_leaves_out_or_puts_in_the_wrong_order(tmp_path):
     snap = _snap(tmp_path)
     one = _outline()["problems"]
-    assert any("1 critical or high failures are in no list" in e and "resilience.replicas-same-node.prod/deployment/api" in e for e in F.check(_outline(problems=one[:1]), snap))
+    assert any("1 critical or high failures or critical warnings are in no list" in e and "resilience.replicas-same-node.prod/deployment/api" in e for e in F.check(_outline(problems=one[:1]), snap))
     assert any("not in order" in e for e in F.check(_outline(problems=[one[1], one[0]]), snap))  # high before critical
     assert any("finding id no.such.id is not in findings-draft.json" in e for e in F.check(_outline(next=[{"title": "x", "finding_ids": ["no.such.id"]}]), snap))
     assert any("problems is empty" in e for e in F.check(_outline(problems=[], next=[{"title": "x", "finding_ids": ["resilience.no-backup.cluster", "resilience.replicas-same-node.*"]}]), snap))
@@ -244,3 +244,20 @@ def test_an_english_report_is_assembled_from_english_files(tmp_path):
     guide = (Path(__file__).resolve().parent.parent / "references" / "full-en.md").read_text(encoding="utf-8")
     for name in (*h["sections"], h["broken"], h["happened"], h["next"], h["since"]):
         assert f"## {name}\n" in guide or f"### {name}\n" in guide, name
+
+
+def test_a_critical_warning_may_not_be_left_out_and_a_high_warning_may(tmp_path):
+    """A check that reports an absence can only warn. The first English full report did not mention backups at all, although "no backup leaves the
+    cluster" was the one critical finding of the run: only failures had to be placed."""
+    findings = [
+        _finding("resilience.no-backup", "cluster", "critical", status="warn"),
+        _finding("resilience.backup-same-node", "prod/db-backup", "high", status="warn"),
+        _finding("resilience.replicas-same-node", "prod/deployment/api", "high"),
+    ]
+    snap = _snap(tmp_path, findings=findings)
+    o = _outline(happened=[], problems=[{"title": "레플리카가 한 노드에 있음", "loss": "outage", "finding_ids": ["resilience.replicas-same-node.*"]}])
+    issues = F.check(o, snap)
+    assert any("1 critical or high failures or critical warnings are in no list" in e and "resilience.no-backup.cluster" in e for e in issues)
+    assert not any("backup-same-node" in e for e in issues)
+    o["problems"].insert(0, {"title": "백업이 클러스터 밖에 없음", "loss": "irreversible", "finding_ids": ["resilience.no-backup.cluster"]})
+    assert F.check(o, snap) == []

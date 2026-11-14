@@ -49,7 +49,7 @@ daily 점검의 스냅샷에는 애플리케이션이 어떻게 설정되어 있
   1. 심각도. 운영 규모가 이미 반영된 값이다.
   2. 일어났을 때 잃는 것(`loss`). `irreversible`(되돌릴 수 없는 손실: 데이터, 비밀 유출), `outage`(서비스 전체 중단), `partial`(일부 중단), `degraded`(느려지거나 불편함) 순이다. 발견에 `overdue: true`가 붙은 fail(지원이 끝난 버전)이 들어 있으면, 코드가 그 항목의 `loss`를 한 단계 위인 것처럼 쳐서 비교한다. 심각도를 올리는 것이 아니다. 예를 들어 `partial`인 지원 종료 문제는 같은 심각도의 `outage` 문제와 같은 자리에서 비교된다. `loss`에는 올리기 전의 값을 적는다.
   3. 이번에 새로 생겼거나 나빠진 것이 그대로인 것보다 앞이다.
-- **그 밖에 열려 있는 것(`rest`).** 나머지 critical·high fail을 제목만으로 묶어 적는다. fail인 critical·high 발견은 전부 네 목록 중 한 곳의 `finding_ids`에 들어 있어야 한다. 한 체크의 발견이 여럿이면 `resilience.single-eligible-node.*`처럼 `*`로 끝나는 접두어로 적는다.
+- **그 밖에 열려 있는 것(`rest`).** 나머지 critical·high fail과 critical warn을 제목만으로 묶어 적는다. fail인 critical·high 발견과 warn인 critical 발견은 전부 네 목록 중 한 곳의 `finding_ids`에 들어 있어야 한다. `top`을 고를 때는 fail과 warn을 가리지 않고 심각도로 고른다. 한 체크의 발견이 여럿이면 `resilience.single-eligible-node.*`처럼 `*`로 끝나는 접두어로 적는다.
 
 며칠째 그대로인 문제도 가장 중요하면 `top`에 둔다. 언제부터 그대로인지는 코드가 붙인다.
 

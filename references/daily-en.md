@@ -49,7 +49,7 @@ Go through the fail and warn findings and sort them into four groups. Findings t
   1. Severity, with the scale already applied.
   2. What is lost when it happens (`loss`): `irreversible` (data, a leaked secret), `outage` (the whole service down), `partial` (part of it down), `degraded` (slower or less convenient). When an entry holds a failure marked `overdue: true` (a version past its end of support), code compares it as if its `loss` were one step higher; it does not raise the severity. Write the `loss` as it is.
   3. What appeared or got worse this time comes before what stayed the same.
-- **What else is open (`rest`).** The remaining critical and high failures, grouped, by title only. Every critical or high failure must be in the `finding_ids` of one of the four lists. Several findings of one check are written as a prefix ending in `*`, such as `resilience.single-eligible-node.*`.
+- **What else is open (`rest`).** The remaining critical and high failures and critical warnings, grouped, by title only. Every critical or high failure and every critical warning must be in the `finding_ids` of one of the four lists. Choose `top` by severity, whether the finding is a failure or a warning. Several findings of one check are written as a prefix ending in `*`, such as `resilience.single-eligible-node.*`.
 
 A problem that has stood for days still goes in `top` when it matters most. Code adds since when it has stood.
 

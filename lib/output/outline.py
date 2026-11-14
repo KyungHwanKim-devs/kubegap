@@ -27,6 +27,15 @@ from pathlib import Path
 from ..foundations.snapshot import load_json
 
 SEVERITIES = ("critical", "high", "medium", "low", "info")
+
+
+def must_be_placed(finding: dict, severity: str) -> bool:
+    """Whether a finding may not be left out of a report: a failure that is critical or high, and a warning that is critical. A check that can only
+    warn (the absence of any backup tool, of any alert route) is as serious as its severity says; the first English full report left "no backup
+    leaves the cluster" out altogether because only failures were required (2026-11-15). High warnings stay a matter of judgement: there are many."""
+    return (finding.get("status") == "fail" and severity in ("critical", "high")) or (finding.get("status") == "warn" and severity == "critical")
+
+
 # What is lost when the problem happens, worst first. A problem that can lose data for good outranks one that takes the service down for a
 # while at the same severity; "how hard is the fix" and "can it be done today" are not part of the order.
 LOSSES = ("irreversible", "outage", "partial", "degraded")
@@ -155,9 +164,9 @@ def check(outline: dict, snap: Path) -> list[str]:
             "problems are not in order: severity first (scale already applied), then what is lost (irreversible, outage, partial, degraded; a problem with an `overdue` failure, such as a version past its end of support, counts one step higher in what is lost)"
         )
     placed = [pat for entries in lists.values() for e in entries for pat in _ids(e)]
-    lost = sorted(f["id"] for f in findings if f["status"] == "fail" and final[f["id"]] in ("critical", "high") and not _matches(placed, f["id"]))
+    lost = sorted(f["id"] for f in findings if must_be_placed(f, final[f["id"]]) and not _matches(placed, f["id"]))
     if lost:
-        out.append(f"{len(lost)} critical or high failures are in no list (problems, happened, broken_now, next): {', '.join(lost[:12])}{' …' if len(lost) > 12 else ''}")
+        out.append(f"{len(lost)} critical or high failures or critical warnings are in no list (problems, happened, broken_now, next): {', '.join(lost[:12])}{' …' if len(lost) > 12 else ''}")
     if problems and lists["next"]:
         worst_rest = _worst([s for n in lists["next"] for s in [problem_severity(n, final)] if s])
         last = problem_severity(problems[-1], final)

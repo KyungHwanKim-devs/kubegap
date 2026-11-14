@@ -40,7 +40,7 @@ Sort the findings into four groups. Findings that share a cause are one entry: "
   2. What is lost when it happens (`loss`): `irreversible` (a loss that cannot be undone: data, a leaked secret), `outage` (the whole service down), `partial` (part of it down), `degraded` (slower or less convenient), in that order. When a problem holds a failure marked `overdue` (a version past its end of support), code compares it as if its `loss` were one step higher. That does not raise the severity. Write the `loss` as it is, before the step.
   3. Whether an incident of this period actually touched the problem.
   How hard it is to fix, and whether it can be done today, are not part of the order.
-- **The next largest problems.** The remaining critical and high failures.
+- **The next largest problems.** The remaining critical and high failures and critical warnings. When choosing the largest problems, go by severity and by what is lost, whether the finding is a failure or a warning: a critical warning comes before a high failure.
 
 **Confirm everything you put in the report with `show finding`**, every finding you place in one of the four groups. Read its evidence and what its rule saw, and where needed open the object with `show object` and the summary row with `show table`. If the automatic verdict turns out to be wrong (a start-up log line read as an error, the record of a pod that no longer exists), leave it out and write the lowered severity and the reason under `severity_changes`. Findings of medium severity and below that you do not include need not be opened one by one; code prints their counts in the numbers table.
 
@@ -66,7 +66,7 @@ Write `$SNAP/report/outline.json`: what goes where. No sentences, only titles an
 ```
 
 - `title` is the title as the report prints it: short, a noun phrase or a plain statement ("Backups never leave the cluster"). The first screen, the headings of the text and the list of ids at the end all come from here. A heading in a text file that differs from it is refused at assembly.
-- `finding_ids`: the findings the entry stands for. Several findings of one check are written as a prefix ending in `*`, such as `resilience.single-eligible-node.*`. Every critical or high failure must be in one of the four lists.
+- `finding_ids`: the findings the entry stands for. Several findings of one check are written as a prefix ending in `*`, such as `resilience.single-eligible-node.*`. Every critical or high failure and every critical warning must be in one of the four lists. A check that reports an absence (no backup of any kind) can only warn, and can still be critical.
 - `since_last`: one line per thing the previous report advised: `done` when it shows, `not_done` when it is still there. Empty when there is no previous report.
 - `upcoming`: what will happen on a date that is near (a certificate renewal, the day a disk fills, a scheduled clean-up). `what` is printed as it is, so write it as a sentence.
 - `area_summary`: one line for each of the twelve areas. "This audit found no problem here." for an area with none; for an area that was not looked at, why.

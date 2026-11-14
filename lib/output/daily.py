@@ -297,9 +297,9 @@ def check(facts: dict, snap: Path, language: str = "ko") -> list[str]:
         out.append("top is not in order: severity first (scale already applied), then what is lost (irreversible, outage, partial, degraded; an `overdue` failure counts one step higher)")
 
     placed = [pat for e in top + rest + incidents + broken for pat in _facts._ids(e)]
-    lost = sorted(f["id"] for f in findings if f["status"] == "fail" and final[f["id"]] in ("critical", "high") and not _facts._matches(placed, f["id"]))
+    lost = sorted(f["id"] for f in findings if _facts.must_be_placed(f, final[f["id"]]) and not _facts._matches(placed, f["id"]))
     if lost:
-        out.append(f"{len(lost)} critical or high failures are in no list (top, rest, happened, broken_now): {', '.join(lost[:12])}{' …' if len(lost) > 12 else ''}")
+        out.append(f"{len(lost)} critical or high failures or critical warnings are in no list (top, rest, happened, broken_now): {', '.join(lost[:12])}{' …' if len(lost) > 12 else ''}")
     if top and rest:
         worst_rest = _facts._worst([s for r in rest for s in [_facts.problem_severity(r, final)] if s])
         last = _facts.problem_severity(top[-1], final)
