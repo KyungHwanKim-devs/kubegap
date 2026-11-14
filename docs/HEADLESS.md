@@ -40,7 +40,7 @@ codex exec --sandbox danger-full-access --skip-git-repo-check -C ~ \
 
 Single quotes keep the shell from expanding `$kubegap`, which is how a Codex skill is named in a prompt. `-o` saves the agent's final message, the briefing the skill prints after saving the report, to a file you can read or forward.
 
-The report itself is written by further agents that the run starts with the same CLI, one `claude -p` or `codex exec` per step: a step checker that reads the objects, a writer, a fact checker, and a replacer for the sentences the fact checker named. They use the same login, get no shell, and write nothing but their answer. Inside a Codex sandbox that does not allow this, such as `workspace-write`, the skill does those steps itself and says so in its briefing.
+The agent that runs the audit writes the report itself; kubegap starts no agent of its own. For a full report the skill asks its host for two subagents to review the finished text (one for the facts, one for the solutions) where the host can start them; where it cannot, the agent does the two readings itself and says so in its briefing.
 
 Run the command once by hand before scheduling it. The first run installs optional tools, if `install_tools: always`, and on EKS may need the SSM document, and both are easier to watch than to debug from a cron log.
 
@@ -68,7 +68,7 @@ Credentials have to work without a browser. `claude` and `codex` must already be
 
 ## 4. Where the report lands
 
-Every run writes one folder, `~/.kubegap/snapshots/<context>/<YYYY-MM-DDTHH-MM-SS>/`, with `report.md`, `report-details.md` and the collected data. The newest report of a context:
+Every run writes one folder, `~/.kubegap/snapshots/<context>/<YYYY-MM-DDTHH-MM-SS>/`, with `report.md`, for a full audit `report-details.md` too, and the collected data. The newest report of a context:
 
 ```bash
 cat "$(ls -dt ~/.kubegap/snapshots/prod/*/ | head -1)report.md"

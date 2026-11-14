@@ -34,7 +34,7 @@ When the number of findings moves between two runs, the reader needs to know whe
 
 ## 6. Absence is a finding
 
-A separate check type, `absence`, fails when something the profile expects is not installed at all: a metrics store, a log store, alert routing, backups, event retention, SLO definitions. The most expensive gaps in small operations are the things nobody set up, and no metric can show that because the metric does not exist.
+A separate check type, `absence`, fails when something expected at the cluster's scale is not installed at all: a metrics store, a log store, alert routing, backups, event retention, SLO definitions. The most expensive gaps in small operations are the things nobody set up, and no metric can show that because the metric does not exist.
 
 ## 7. EKS is the baseline, k3s is the variant, built together
 
@@ -74,7 +74,7 @@ A check that is right in theory and noisy in practice gets suppressed, and then 
 
 ## 15. Two modes, daily by default, compared with the same mode
 
-`daily` collects a reduced set, evaluates the checks that make sense on it, and compares with the previous daily run. `full` collects everything and compares with the previous full run. Checks that need data a daily run does not collect are reported as not collected, not as passed. A daily run has to be short enough to happen every day, and comparing a daily run with a full run produces false "resolved" findings by the hundred.
+What a mode reads is a list of collection units (`collectors/units.yaml`). `daily` collects the units of low sensitivity: no node, no cloud account, no application setting, no log text. It evaluates the checks that can be judged on that and compares with the previous daily run. `full` collects every unit and compares with the previous full run. A check names the units it needs, and one that needs a unit the run did not collect is reported as not collected, not as passed. Nothing is collected and then deleted: what a mode should not hold is dropped in memory before a file exists. A daily run has to be short enough to happen every day, and comparing a daily run with a full run produces false "resolved" findings by the hundred.
 
 ## 16. Collection runs in parallel, with low concurrency
 
@@ -82,13 +82,13 @@ Collectors, items within a collector and PromQL queries run concurrently with sm
 
 ## 17. Two report files: one for a person, one for the record
 
-`report.md` is written by the LLM for a person: the top problems, each with the problem, the evidence, the cause, the action, why this happens, and the checks it rests on. `report-details.md` is assembled by code from the snapshot: every table, every first-pass result, every adjustment the LLM made.
+`report.md` is written for a person by the agent that analysed the run, and assembled by code, which refuses a text whose numbers, links, order or headings do not hold. A full report explains up to five problems (what is the matter, why it comes about, how to watch it, how it is solved, evidence, further reading); a daily report is one or two screens. `report-details.md`, full only, is assembled by code from the snapshot: every table, every first-pass result, every adjustment the agent made.
 
 The first version was one long file, and the parts a person needs were buried under the parts an agent needs. Splitting them also makes the code-assembled half reproducible by construction.
 
 ## 18. Profiles are expectation levels, not platforms
 
-A profile says how strict to be: `prod`, `lab`, `small-prod`, `multi-az-prod`, `dev`. The platform is detected separately and gates platform collectors. Earlier profile names that mixed the two are kept as aliases. A production k3s cluster and a lab EKS cluster both exist; naming profiles after platforms judged the first too gently and the second too harshly.
+How strict to be is the scale: small, medium or large, asked once per cluster because it cannot be read from the cluster (who runs it, who depends on it, what an outage costs). The platform is detected separately and decides only which checks can run. A check states its severity per scale. A production k3s cluster and a two-node EKS cluster both exist; deriving the expectation from the platform or the node count judged the first too gently and the second too harshly, and one fixed severity per check held a personal cluster to an SLA team's standard.
 
 ## 19. English is the repository language; the report language is asked for
 

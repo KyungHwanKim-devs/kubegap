@@ -1,0 +1,108 @@
+# What a report teaches when the cluster datastore (etcd, or k3s's kine) is large or slow. Every page below was opened and read (2026-11-14).
+topic: etcd-datastore-size-and-latency
+checks: [controlplane.etcd-db-size, platform.k3s-datastore-large, platform.k3s-datastore-slow]
+mechanism: >
+  Every Kubernetes object lives in one datastore, and that datastore has two ways to stop the cluster: it fills up, or its disk is too slow.
+
+
+  Size. etcd keeps the history of every key, so its database grows with updates as well as with new objects: an object patched again and again
+  leaves many revisions. Compaction drops the superseded revisions (the API server asks for one every 5 minutes by default), but it only leaves
+  gaps inside the database file; the file shrinks when a defragmentation hands the space back to the filesystem, and a defragmentation blocks the
+  member from reading and writing while it runs. etcd guards itself with a space quota, 2 GB by default with 8 GB as the suggested maximum. When
+  the database passes the quota, etcd raises a cluster-wide NOSPACE alarm and accepts only reads and deletes. For Kubernetes that means no pod can
+  be created and no Deployment scaled until someone compacts, defragments and disarms the alarm. EKS sets the quota to 8 GB and runs compaction
+  and defragmentation itself; what remains for the operator is the number of live objects.
+
+
+  What fills it is rarely the workloads. It is objects that accumulate with nothing deleting them: finished Jobs, events, status-heavy custom
+  resources, or one component that creates records with a very long lifetime.
+
+
+  Latency. etcd persists every proposal to its log with an fsync before it answers, and the leader sends a heartbeat every 100 ms; followers
+  start an election after 1000 ms without one. Disk activity of other processes makes fsync slow, etcd misses heartbeats, requests time out and
+  the leader is lost for a moment. etcd warns when applying a request takes more than 100 ms; the reference values are a 99th percentile below
+  10 ms for the WAL fsync and below 25 ms for the backend commit. This is the usual trouble of a small k3s server whose disk also carries
+  databases and a log store: k3s documents etcd as write intensive and recommends an SSD. A single-server k3s uses SQLite through kine by default
+  and logs slow SQL statements instead.
+sources:
+  - { title: "etcd: Maintenance", url: "https://etcd.io/docs/v3.5/op-guide/maintenance/" }
+  - { title: "etcd: Frequently Asked Questions", url: "https://etcd.io/docs/v3.5/faq/" }
+  - { title: "etcd: Tuning", url: "https://etcd.io/docs/v3.5/tuning/" }
+  - { title: "Kubernetes: kube-apiserver flags", url: "https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/" }
+  - { title: "AWS Containers blog: Managing etcd database size on Amazon EKS clusters", url: "https://aws.amazon.com/blogs/containers/managing-etcd-database-size-on-amazon-eks-clusters/" }
+  - { title: "Amazon EKS best practices: EKS Control Plane", url: "https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html" }
+  - { title: "k3s: Requirements", url: "https://docs.k3s.io/installation/requirements" }
+  - { title: "k3s: Cluster Datastore", url: "https://docs.k3s.io/datastore" }
+detect:
+  - kind: metric
+    what: >
+      The size of the database, as the API server reports it: apiserver_storage_size_bytes is the file physically allocated, including space that
+      compaction freed and no defragmentation returned. On EKS the number that decides whether the cluster goes read-only is the space in use,
+      etcd_mvcc_db_total_size_in_use_in_bytes, published in CloudWatch under the AWS/EKS namespace. What is taking the space shows in the object
+      counts per resource.
+    example: 'topk(10, apiserver_resource_objects)'
+  - kind: alert
+    what: >
+      Where etcd's own metrics are scraped (self-managed etcd, k3s with embedded etcd), the etcd mixin has the rules: etcdDatabaseQuotaLowSpace when
+      the database is above 95% of the quota for 10 minutes, etcdExcessiveDatabaseGrowth when the 4-hour trend reaches the quota within 4 hours,
+      etcdHighFsyncDurations when the 99th percentile of the WAL fsync stays above 0.5 s, etcdHighNumberOfLeaderChanges at 4 or more leader changes
+      in 15 minutes.
+    example: |
+      - alert: EtcdDatabaseNearQuota
+        expr: etcd_mvcc_db_total_size_in_bytes / etcd_server_quota_backend_bytes > 0.8
+        for: 10m
+      - alert: EtcdSlowFsync
+        expr: histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m])) > 0.5
+        for: 10m
+  - kind: command
+    what: >
+      On a k3s server without those metrics, the datastore speaks through the k3s journal: slow applies, slow fdatasync and leader changes for
+      etcd, slow SQL for kine.
+    example: "journalctl -u k3s --since -1h | grep -cE 'took too long|slow fdatasync|leader changed'"
+solutions:
+  - scale: [small]
+    approach: >
+      Keep the server's datastore on an SSD and keep the heavy writers (a log store, databases, backup jobs) off that disk or off that node. For
+      size, stop the accumulation at its source: a TTL on finished Jobs, a history limit on the custom resources that pile up. Then watch one
+      number, the database size, and defragment when the file is far larger than what is in use.
+    tools: ["ttlSecondsAfterFinished", etcdctl]
+    tradeoff: >
+      The control plane stops stalling when another workload writes, for the price of a second disk or of moving a workload. A defragmentation
+      blocks the member while it runs, so on a single server the API pauses for that time.
+    example: |
+      apiVersion: batch/v1
+      kind: Job
+      spec:
+        ttlSecondsAfterFinished: 86400
+  - scale: [medium]
+    approach: >
+      Alert on the size and on the latency of the datastore rather than finding out from a read-only cluster: the etcd mixin rules where etcd is
+      reachable, a rule on apiserver_storage_size_bytes where it is not. Review the object counts per resource when the size alert fires and give
+      the largest kind a retention setting in the tool that creates it.
+    tools: [Prometheus, "etcd mixin", kube-prometheus-stack]
+    tradeoff: >
+      Growth is seen weeks before the quota. The mixin rules judge the physical file, which overstates what is in use after a large cleanup until
+      the next defragmentation, so the alert can stay on after the cause is gone.
+  - scale: [large]
+    approach: >
+      On EKS, set a CloudWatch alarm on etcd_mvcc_db_total_size_in_use_in_bytes well below 8 GB and alert on sharp rises of create and update
+      requests in apiserver_request_total. Find the clients behind a rise from the audit log. If the live objects themselves need more room, a
+      provisioned control plane tier gives a higher quota.
+    tools: [CloudWatch, "EKS control plane logging", "EKS Provisioned Control Plane"]
+    tradeoff: >
+      The alarm follows the number EKS enforces, and compaction and defragmentation stay the platform's work. The audit log and a provisioned
+      control plane are both billed.
+cases:
+  - company: Fullstaq (client not named)
+    year: 2019
+    url: "https://pieterlange.github.io/failure-stories/2019-06.dex.html"
+    summary: >
+      Dex, an OIDC proxy that stored its state as Kubernetes resources, created a huge number of AuthRequest objects because of a very long TTL and
+      dashboards that kept refreshing. Listing them timed out, the load on the API masters went to about 60 and the masters went down. Deleting the
+      namespace hung on its finalizer; the team removed the finalizer through the API and redeployed Dex with sane defaults.
+    match: One component filled the datastore with objects that nothing deleted, and the control plane failed under their number.
+reading:
+  - { title: "etcd: Maintenance", url: "https://etcd.io/docs/v3.5/op-guide/maintenance/", why: "Compaction, defragmentation and the space quota, with the steps that bring a cluster back from the NOSPACE alarm." }
+  - { title: "etcd: Frequently Asked Questions", url: "https://etcd.io/docs/v3.5/faq/", why: "What each etcd warning means and the fsync and commit latencies a healthy disk stays under." }
+  - { title: "AWS Containers blog: Managing etcd database size on Amazon EKS clusters", url: "https://aws.amazon.com/blogs/containers/managing-etcd-database-size-on-amazon-eks-clusters/", why: "What fills etcd on a managed cluster and how to find the objects and the clients responsible." }
+  - { title: "etcd: Tuning", url: "https://etcd.io/docs/v3.5/tuning/", why: "Heartbeat interval, election timeout and why disk latency turns into leader loss." }

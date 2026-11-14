@@ -1,85 +1,83 @@
-"""Component pod logs are deleted after summarize, their aggregates saved to logs/pods/AGGREGATED.json, and a rerun of summarize gives the same logs and scaling sections."""
+"""Component logs are counted while they are collected and never written: the snapshot holds logs/pods/AGGREGATED.json, the summary reads it, and
+summarizing changes nothing in the snapshot."""
 
 from __future__ import annotations
 
 import json
 
+from lib.collection import collect
+from lib.foundations import snapshot
 from lib.summaries import summarize
 
-
-def test_component_logs_are_removed_and_marker_left(tmp_path):
-    d = tmp_path / "logs" / "pods" / "coredns"
-    d.mkdir(parents=True)
-    (d / "kube-system_coredns.log").write_text("line with token=abcdef123456\n", encoding="utf-8")
-    assert summarize.remove_component_logs(tmp_path) == 1
-    assert not (d / "kube-system_coredns.log").exists()
-    assert summarize.component_logs_removed(tmp_path)
-    assert "keep_component_logs" in (tmp_path / "logs" / "pods" / summarize.COMPONENT_LOGS_MARKER).read_text(encoding="utf-8")
-    assert summarize.remove_component_logs(tmp_path) == 0  # second call: nothing to remove, marker stays
-    assert summarize.component_logs_removed(tmp_path)
-
-
-def test_remove_without_logs_dir_is_a_noop(tmp_path):
-    assert summarize.remove_component_logs(tmp_path) == 0
-    assert not summarize.component_logs_removed(tmp_path)
+LINE = "2026-10-27T10:00:00Z [ERROR] plugin/errors: 2 example.com. A: read udp: i/o timeout token=abcdef1234567890\n"
+INV = {
+    "collectors_enabled": ["core", "coredns"],
+    "cluster": {"platform": "k3s"},
+    "scale": {"name": "small", "source": "guessed"},
+    "node_access": {"method": "none"},
+    "nodes": {"count": 1},
+    "namespaces": {"count": 1},
+    "crds": {"count": 0},
+    "taken_at": "2026-10-27T19:10:00+09:00",
+}
 
 
-def _fake_snapshot(tmp_path):
-    d = tmp_path / "logs" / "pods" / "coredns"
-    d.mkdir(parents=True)
-    (d / "kube-system_coredns.log").write_text("2026-10-27T10:00:00Z [ERROR] plugin/errors: 2 example.com. A: read udp: i/o timeout token=abcdef1234567890\n" * 3, encoding="utf-8")
-    (tmp_path / "inventory.json").write_text(
-        json.dumps({"collectors_enabled": ["core", "coredns"], "cluster": {"platform": "k3s"}, "profile": {"name": "lab"}, "node_access": {"method": "none"}, "nodes": {"count": 1}, "namespaces": {"count": 1}, "crds": {"count": 0}}),
-        encoding="utf-8",
-    )
+def _snapshot(tmp_path, *, keep_lines=True, mode="full"):
+    agg = collect.k8s_steps.component_logs_aggregate({"logs/pods/coredns/kube-system_coredns.log": LINE * 3}, INV, keep_lines=keep_lines, capped=[])
+    (tmp_path / "logs" / "pods").mkdir(parents=True)
+    (tmp_path / "logs" / "pods" / "AGGREGATED.json").write_text(json.dumps(agg), encoding="utf-8")
+    (tmp_path / "inventory.json").write_text(json.dumps(INV), encoding="utf-8")
+    (tmp_path / "MODE").write_text(mode + "\n")
     return tmp_path
 
 
-def test_summarize_deletes_logs_writes_aggregate_and_rerun_is_identical(tmp_path):
-    from lib.foundations import snapshot
-
-    snap = _fake_snapshot(tmp_path)
+def test_the_summary_reads_the_counts_and_leaves_the_snapshot_as_it_was(tmp_path):
+    snap = _snapshot(tmp_path)
+    before = {str(p.relative_to(snap)): p.read_bytes() for p in snap.rglob("*") if p.is_file()}
     s1 = summarize.summarize(snap, echo=None)
-    assert s1["logs"]["component_logs_removed"] is True
-    assert s1["logs"]["lines_scanned"] == 3
-    assert not list((snap / "logs" / "pods").rglob("*.log"))
-    agg = snapshot.component_logs_aggregate(snap)
-    assert agg and agg["log_scan"]["lines_scanned"] == 3 and agg["files_removed"] == ["logs/pods/coredns/kube-system_coredns.log"]
+    assert s1["logs"]["lines_scanned"] == 3 and s1["logs"]["components_with_logs"] == ["coredns"] and s1["logs"]["component_log_lines"] == {"logs/pods/coredns/kube-system_coredns.log": 3}
+    assert s1["logs"]["component_logs"].startswith("counted while they were collected")
     for u in s1["logs"]["unclassified_errors"]:
-        assert "abcdef1234567890" not in (u.get("sample") or "")  # samples are masked before they are kept
+        assert "abcdef1234567890" not in (u.get("sample") or "")  # a sample is masked before it is kept
+    assert {str(p.relative_to(snap)): p.read_bytes() for p in snap.rglob("*") if p.is_file() and str(p.relative_to(snap)) in before} == before  # nothing changed or removed
     s2 = summarize.summarize(snap, echo=None)
-    scan_keys = [k for k in s1["logs"] if k != "source_note"]
-    assert {k: s2["logs"].get(k) for k in scan_keys} == {k: s1["logs"].get(k) for k in scan_keys}
-    assert "AGGREGATED.json" in s2["logs"]["source_note"]
-    assert "scan_incomplete" not in s2["logs"]
-    # keep_component_logs flipped on after the deletion: the flag still tells the truth
-    s3 = summarize.summarize(snap, echo=None, keep_component_logs=True)
-    assert s3["logs"]["component_logs_removed"] is True
+    assert s2["logs"] == s1["logs"]  # and so a second summary is the same
 
 
-def test_summarize_marker_without_aggregate_is_flagged(tmp_path):
-    snap = _fake_snapshot(tmp_path)
-    summarize.summarize(snap, echo=None)
+def test_no_line_of_a_component_log_is_in_a_snapshot_of_either_mode(tmp_path):
+    full = _snapshot(tmp_path / "f")
+    text = "".join(p.read_text(encoding="utf-8") for p in full.rglob("*") if p.is_file())
+    assert "abcdef1234567890" not in text and not list(full.rglob("*.log"))  # a full run keeps masked samples, never the line as it was
+    daily = _snapshot(tmp_path / "d", keep_lines=False, mode="daily")
+    agg = snapshot.component_logs_aggregate(daily)
+    assert agg["log_scan"]["lines_scanned"] == 3 and agg["log_scan"]["lines_kept"] is False
+    assert agg["log_scan"]["unclassified_errors"] == [] and all(r["samples"] == [] for r in agg["log_scan"]["signatures"])
+    assert "example.com" not in json.dumps(agg)  # a daily run keeps counts and no text of any line
+
+
+def test_without_the_counts_file_the_summary_says_the_component_logs_were_not_counted(tmp_path):
+    snap = _snapshot(tmp_path)
     (snap / "logs" / "pods" / "AGGREGATED.json").unlink()
     s = summarize.summarize(snap, echo=None)
-    assert s["logs"]["scan_incomplete"] is True
-    assert s["logs"]["lines_scanned"] == 0
+    assert s["logs"]["lines_scanned"] == 0 and s["logs"]["component_logs"].startswith("not counted")
 
 
-def test_summarize_keep_component_logs(tmp_path):
-    snap = _fake_snapshot(tmp_path)
-    s = summarize.summarize(snap, echo=None, keep_component_logs=True)
-    assert s["logs"]["component_logs_removed"] is False
-    assert list((snap / "logs" / "pods").rglob("*.log"))
-    assert not summarize.component_logs_removed(snap)
+def test_node_logs_and_component_logs_add_up(tmp_path):
+    from lib.foundations import logscan, signatures
+
+    sigs, _ = signatures.load(["core", "coredns"])
+    a = logscan.scan_texts([("logs/pods/coredns/kube-system_coredns.log", LINE * 3)], sigs, taken=snapshot.taken_at(INV))
+    b = logscan.scan_texts([("logs/pods/coredns/kube-system_coredns-b.log", LINE * 2)], sigs, taken=snapshot.taken_at(INV))
+    m = logscan.merge([a, b], sigs)
+    assert m["lines_scanned"] == 5 and len(m["files_scanned"]) == 2
+    both = logscan.scan_texts([("logs/pods/coredns/kube-system_coredns.log", LINE * 3), ("logs/pods/coredns/kube-system_coredns-b.log", LINE * 2)], sigs, taken=snapshot.taken_at(INV))
+    assert [(r["id"], r["count"], r["targets"], r["status"]) for r in m["signatures"]] == [(r["id"], r["count"], r["targets"], r["status"]) for r in both["signatures"]]
+    assert [(u["pattern"], u["count"]) for u in m["unclassified_errors"]] == [(u["pattern"], u["count"]) for u in both["unclassified_errors"]]
 
 
 def test_logs_step_finds_the_workloads_of_present_components_with_the_shared_matcher(tmp_path, monkeypatch):
     """The step matches the detection rules' name patterns against the object dump through lib.foundations.components.match_name (the one matcher since #136; until then it
     imported a private one from lib.collection.discover inside the function, which no test ran, and the k3s full run of 2026-11-05 crashed on the stale import)."""
-    import json
-
-    from lib.collection import collect
     from lib.foundations import shell
     from lib.foundations.runlog import RunLog
 
@@ -95,13 +93,14 @@ def test_logs_step_finds_the_workloads_of_present_components_with_the_shared_mat
 
     def fake_kubectl(args, **kw):
         calls.append(args)
-        out = kw.get("out_path")
-        if out:
-            out.parent.mkdir(parents=True, exist_ok=True)
-            out.write_text("line\n")
-        return shell.Result(cmd=["kubectl"], code=0, stdout="line\n")
+        assert not kw.get("out_path"), "a component log is never written as a file"
+        return shell.Result(cmd=["kubectl"], code=0, stdout="[pod/argocd-server-1/server] line\n" * 3)
 
     monkeypatch.setattr(collect.k8s_steps.kube, "kubectl", fake_kubectl)
-    res = collect.k8s_steps.run_component_logs_step({"id": "component-logs", "type": "component-logs"}, "component-logs", "core", {"components_present": ["argocd"]}, None, None, tmp_path, RunLog(None), 10, None)
+    step = {"id": "component-logs", "type": "component-logs", "tail": 3}
+    res = collect.k8s_steps.run_component_logs_step(step, "component-logs", "core", {"components_present": ["argocd"], "taken_at": "2026-11-05T10:00:00+09:00"}, None, None, tmp_path, RunLog(None), 10, None, keep_lines=True)
     assert res["targets"] == 1 and res["components"]["argocd"]["gitops/argo-cd-argocd-server"]["ok"] is True
+    # the container returned exactly the tail limit: its log was cut there, and the record says so
+    assert res["components"]["argocd"]["gitops/argo-cd-argocd-server"]["capped_streams"] == 1 and res["capped"] == ["argocd: gitops/argo-cd-argocd-server"]
+    assert not list(tmp_path.rglob("*.log")) and json.loads((tmp_path / "logs" / "pods" / "AGGREGATED.json").read_text())["log_scan"]["lines_scanned"] == 3
     assert calls[0][:5] == ["logs", "-n", "gitops", "-l", "app.kubernetes.io/name=argocd-server"]

@@ -221,17 +221,12 @@ def taken_at(inv: dict | None) -> _dt.datetime:
 
 
 COMPONENT_LOGS_DIR = Path("logs") / "pods"
-COMPONENT_LOGS_MARKER = "REMOVED.txt"
 COMPONENT_LOGS_AGGREGATE = "AGGREGATED.json"
 
 
-def component_logs_removed(snap: Path) -> bool:
-    """True when summarize has deleted the component pod logs of this snapshot (marker file left in logs/pods/)."""
-    return (snap / COMPONENT_LOGS_DIR / COMPONENT_LOGS_MARKER).is_file()
-
-
 def component_logs_aggregate(snap: Path) -> dict | None:
-    """What summarize saved from the raw component logs before deleting them: {"log_scan": {...}, "karpenter_logs": {...}}. None when the logs are still there (or were never collected)."""
+    """What the component-logs step counted from the logs it read (lib/collection/collect): {"log_scan": {...}, "karpenter_logs": {...}, "capped": [...]}.
+    It is all a snapshot holds of a component log: the lines were never written. None when the step did not run."""
     d = load_json(snap / COMPONENT_LOGS_DIR / COMPONENT_LOGS_AGGREGATE)
     return d if isinstance(d, dict) else None
 

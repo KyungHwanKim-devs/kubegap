@@ -31,7 +31,7 @@ def test_details_keeps_the_whole_list_the_evidence_cut(tmp_path):
     workloads = [f"prod/app-{i}" for i in range(20)]
     item = {"node": "n1", "share": 0.48, "prod_pods": 20, "prod_workloads": workloads, "huge": list(range(10000)), "pool": "app"}
     summary = {"resilience": {"placement": {"prod_by_node": [item]}}}
-    cx = Context(tmp_path, {}, summary, {"name": "prod"})
+    cx = Context(tmp_path, {}, summary, "large")
     run = Run(CHECK, cx, {})
     r = eval_summary(cx, CHECK, run)
     f = r["findings"][0]
@@ -67,7 +67,7 @@ def test_details_keeps_what_a_helper_read(tmp_path):
         "pods": [{"pod": "p"}],
         "nodes": ["n1"],
     }
-    cx = Context(tmp_path, {}, {"resilience": {"oom_7d": {"rows": [item]}}}, {"name": "prod"})
+    cx = Context(tmp_path, {}, {"resilience": {"oom_7d": {"rows": [item]}}}, "large")
     run = Run(check, cx, {})
     f = eval_summary(cx, check, run)["findings"][0]
     assert {"last_kill", "pods_replaced", "cadvisor_oom_events_7d", "kernel_nodes_total"} <= set(f["details"])
@@ -85,7 +85,7 @@ def test_details_for_metric_object_and_inventory_items():
 def test_details_merge_into_a_list_when_instances_merge(tmp_path):
     check = {**CHECK, "target": "'cluster'"}
     items = [{"node": "n1", "share": 0.5, "prod_pods": 3, "prod_workloads": ["a"]}, {"node": "n2", "share": 0.6, "prod_pods": 4, "prod_workloads": ["b"]}]
-    cx = Context(tmp_path, {}, {"resilience": {"placement": {"prod_by_node": items}}}, {"name": "prod"})
+    cx = Context(tmp_path, {}, {"resilience": {"placement": {"prod_by_node": items}}}, "large")
     run = Run(check, cx, {})
     f = eval_summary(cx, check, run)["findings"][0]
     assert f["instances"] == 2 and [d["prod_pods"] for d in f["details"]] == [3, 4] and "node" not in f["details"][0]  # the target no longer reads node, so details does not carry it
@@ -101,14 +101,14 @@ def test_damaged_known_issues_file_is_an_error_not_a_crash(tmp_path, monkeypatch
 
 
 def test_rule_hash_is_pinned_and_ignores_gates_and_number_spelling():
-    base = {"id": "x", "type": "metric", "inputs": ["m"], "rule": {"expr": "value >= threshold", "threshold": {"prod": 0.25, "lab": 1}}, "target": "labels['pod']", "profiles": ["prod"], "modes": ["full"]}
-    assert rubric.rule_hash(base) == rubric.rule_hash({**base, "profiles": ["prod", "lab"], "modes": None, "requires_tool": "krr"})  # gates are read from check_results.status, not from the hash
+    base = {"id": "x", "type": "metric", "inputs": ["m"], "rule": {"expr": "value >= threshold", "threshold": {"prod": 0.25, "lab": 1}}, "target": "labels['pod']", "platforms": ["eks"], "modes": ["full"]}
+    assert rubric.rule_hash(base) == rubric.rule_hash({**base, "platforms": None, "scales": ["large"], "modes": None, "requires_tool": "krr"})  # gates are read from check_results.status, not from the hash
     assert rubric.rule_hash(base) == rubric.rule_hash({**base, "rule": {"expr": "value >= threshold", "threshold": {"prod": 0.25, "lab": 1.0}}})  # 1 and 1.0 are one number
     assert rubric.rule_hash(base) == "529422faedeb"  # pinned: a change here means every check will read as rule_changed in the next diff, so it must be deliberate
 
 
 def test_rule_hash_ignores_wording_and_follows_thresholds():
-    base = {"id": "x", "type": "metric", "inputs": ["m"], "rule": {"expr": "value >= threshold", "threshold": {"prod": 0.25, "lab": 0.25}}, "target": "labels['pod']", "evidence": 'f"{value}"', "why": "one", "profiles": ["prod"]}
+    base = {"id": "x", "type": "metric", "inputs": ["m"], "rule": {"expr": "value >= threshold", "threshold": {"prod": 0.25, "lab": 0.25}}, "target": "labels['pod']", "evidence": 'f"{value}"', "why": "one", "platforms": ["eks"]}
     reworded = {**base, "why": "two", "name": "other", "evidence": 'f"now {value}"', "suggest": "s", "cases": [{"who": "a", "url": "u"}]}
     retuned = {**base, "rule": {"expr": "value >= threshold", "threshold": {"prod": 0.30, "lab": 0.25}}}
     assert rubric.rule_hash(base) == rubric.rule_hash(reworded)
@@ -133,8 +133,8 @@ def test_known_issue_reaches_the_finding_and_its_evidence(tmp_path, monkeypatch)
     monkeypatch.setattr(rubric, "load_known_issues", lambda: ({"resilience.prod-concentration": [{"issue": 64, "note": "n"}]}, []))
     item = {"node": "n1", "share": 0.5, "prod_pods": 3, "prod_workloads": ["a"]}
     (tmp_path / "summary.json").write_text(json.dumps({"resilience": {"placement": {"prod_by_node": [item]}}}))
-    (tmp_path / "inventory.json").write_text(json.dumps({"profile": {"name": "prod"}, "cluster": {"platform": "eks"}}))
-    monkeypatch.setattr(rubric, "load_checks", lambda collectors: ([{**CHECK, "collector": "core", "profiles": ["prod", "lab"]}], []))
+    (tmp_path / "inventory.json").write_text(json.dumps({"scale": {"name": "large", "source": "guessed"}, "cluster": {"platform": "eks"}}))
+    monkeypatch.setattr(rubric, "load_checks", lambda collectors: ([{**CHECK, "collector": "core"}], []))
     from lib.foundations.config import load_config
 
     evaluate.evaluate(tmp_path, load_config(None), echo=None)

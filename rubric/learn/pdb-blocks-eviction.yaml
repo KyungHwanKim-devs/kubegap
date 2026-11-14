@@ -1,0 +1,81 @@
+# What a report teaches when a PodDisruptionBudget allows no disruption, or selects no pods. Every page below was opened and read (2026-11-14).
+topic: pdb-blocks-eviction
+checks: [resilience.pdb-blocks-drain]
+mechanism: >
+  A PodDisruptionBudget does one thing: it answers the Eviction API. A drain, a node upgrade and a node autoscaler removing a node do not delete pods,
+  they ask for an eviction, and the API server answers 200 when the budget allows it and 429 Too Many Requests when it does not. kubectl drain retries
+  the refused requests until every pod is gone or its timeout is reached. Karpenter does the same: it evicts through the Eviction API, and pods with a
+  blocking budget are not evicted by its termination controller.
+
+
+  The budget is counted from healthy pods, where healthy means the Ready condition is true. With minAvailable 5 an eviction is allowed as long as it
+  leaves 5 healthy pods. Setting maxUnavailable to 0, or minAvailable to 100% or to the number of replicas, requires zero voluntary evictions: the
+  Kubernetes documentation states that a drain of a node running such a pod never completes. A single-replica workload with minAvailable 1 is the
+  common way to get there. Involuntary disruptions cannot be prevented by a budget, but they count against it, so one crashed replica can bring an
+  otherwise sensible budget to zero until it is Ready again.
+
+
+  Unhealthy pods add a second trap. By default (IfHealthyBudget) a pod that is running but not Ready can be evicted only while the application is not
+  disrupted, so an application that is already broken blocks the drain of the node it sits on. The documentation recommends AlwaysAllow for that
+  reason.
+
+
+  The budget protects against nothing else: deleting a pod or a Deployment bypasses it, and a rolling update is not limited by it. A budget whose
+  selector matches no pods protects nothing at all. A budget without a supported owning workload can only use minAvailable with an integer.
+sources:
+  - { title: "Kubernetes: Specifying a Disruption Budget for your Application", url: "https://kubernetes.io/docs/tasks/run-application/configure-pdb/" }
+  - { title: "Kubernetes: Disruptions", url: "https://kubernetes.io/docs/concepts/workloads/pods/disruptions/" }
+  - { title: "Kubernetes: API-initiated Eviction", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/api-eviction/" }
+  - { title: "Kubernetes: Safely Drain a Node", url: "https://kubernetes.io/docs/tasks/administer-cluster/safely-drain-node/" }
+  - { title: "Karpenter: Disruption", url: "https://karpenter.sh/docs/concepts/disruption/" }
+detect:
+  - kind: metric
+    what: >
+      kube-state-metrics exports the status of every budget: kube_poddisruptionbudget_status_pod_disruptions_allowed, _current_healthy,
+      _desired_healthy and _expected_pods. A budget that shows 0 allowed disruptions while all its pods are healthy is zero by construction, not by
+      accident; expected pods 0 is a budget that selects nothing.
+    example: 'kube_poddisruptionbudget_status_pod_disruptions_allowed == 0 and on (namespace, poddisruptionbudget) kube_poddisruptionbudget_status_current_healthy >= kube_poddisruptionbudget_status_desired_healthy'
+  - kind: alert
+    what: >
+      The kubernetes-mixin rule KubePdbNotEnoughHealthyPods fires as a warning when a budget has fewer healthy pods than it desires for 15 minutes.
+      That is the other way to zero: the budget is fine and the application is not.
+    example: |
+      - alert: KubePdbNotEnoughHealthyPods
+        expr: kube_poddisruptionbudget_status_current_healthy < kube_poddisruptionbudget_status_desired_healthy and kube_poddisruptionbudget_status_expected_pods > 0
+        for: 15m
+  - kind: command
+    what: The ALLOWED DISRUPTIONS column, as a look at one moment.
+    example: "kubectl get pdb -A"
+solutions:
+  - scale: [small]
+    approach: >
+      For a workload with one replica, do not use a budget and tolerate the short downtime of a drain; that is the first option the Kubernetes
+      documentation gives for a single instance. Where a budget exists, express it as maxUnavailable 1 so it can never equal the replica count.
+    tools: [PodDisruptionBudget]
+    tradeoff: >
+      Node maintenance always finishes. The single replica is unavailable for as long as its replacement takes to start, at a moment the operator
+      chooses.
+  - scale: [medium, large]
+    approach: >
+      Run at least two replicas of anything that carries a budget, declare maxUnavailable 1, and set unhealthyPodEvictionPolicy to AlwaysAllow so
+      that a broken pod does not hold a node. With Karpenter, set terminationGracePeriod on the NodePool so that a drain has an upper bound: when the
+      period elapses the remaining pods are deleted and the instance is terminated.
+    tools: [PodDisruptionBudget, Karpenter]
+    tradeoff: >
+      Drains and consolidation proceed one pod at a time and cannot hang forever. A second replica is paid for all the time, and terminationGracePeriod
+      means a budget is eventually overridden.
+    example: |
+      apiVersion: policy/v1
+      kind: PodDisruptionBudget
+      metadata:
+        name: api
+      spec:
+        maxUnavailable: 1
+        unhealthyPodEvictionPolicy: AlwaysAllow
+        selector:
+          matchLabels: { app: api }
+cases: []
+reading:
+  - { title: "Kubernetes: Specifying a Disruption Budget for your Application", url: "https://kubernetes.io/docs/tasks/run-application/configure-pdb/", why: "How minAvailable and maxUnavailable are counted and rounded, and what to do with a single instance." }
+  - { title: "Kubernetes: API-initiated Eviction", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/api-eviction/", why: "The 200, 429 and 500 answers and what to do when evictions stay stuck." }
+  - { title: "Karpenter: Disruption", url: "https://karpenter.sh/docs/concepts/disruption/", why: "How consolidation and drift treat blocking budgets and what terminationGracePeriod changes." }

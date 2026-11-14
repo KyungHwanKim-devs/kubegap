@@ -1,0 +1,83 @@
+# What a report teaches when the Argo CD server is reachable without TLS. Every page below was opened and read (2026-11-14).
+topic: argocd-tls
+checks: [argocd.ingress-no-tls]
+mechanism: >
+  The Argo CD API server serves the web UI and the API, gRPC and HTTPS, on the same port. Out of the box it does this over TLS: if no certificate
+  is configured in the argocd-server-tls Secret, it generates a self-signed one. The flag --insecure, set as server.insecure in the
+  argocd-cmd-params-cm ConfigMap, disables TLS on the server completely.
+
+
+  That flag has a legitimate use. An ingress can either pass the TLS connection through to the Argo CD server, or terminate TLS itself; for the
+  second, the Argo CD documentation tells the operator to set server.insecure to true, because the ingress now holds the certificate and talks
+  plain HTTP to the server behind it. So server.insecure alone says nothing. What matters is the pair: insecure server and an ingress that
+  terminates TLS is the documented setup, while insecure server and an ingress without TLS (or a NodePort, or no ingress in between) means the
+  whole path from the browser to the server is plain text.
+
+
+  What travels on that path is what makes it serious. A login with the local admin user exchanges the username and password for a token that is
+  valid for 24 hours; SSO tokens and the project tokens used by automation pass the same way. Anyone who can read the traffic can replay them. And
+  Argo CD is not an ordinary application: by default it runs with a cluster-admin level role so that it can deploy anything to the cluster, and
+  whoever controls what it deploys controls the cluster.
+
+
+  Inside the installation the components also use TLS with each other, with self-signed certificates that are not validated by default; that is a
+  separate, smaller question than the user-facing endpoint.
+sources:
+  - { title: "Argo CD: TLS configuration", url: "https://argo-cd.readthedocs.io/en/stable/operator-manual/tls/" }
+  - { title: "Argo CD: Ingress configuration", url: "https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/" }
+  - { title: "Argo CD: Security", url: "https://argo-cd.readthedocs.io/en/stable/operator-manual/security/" }
+  - { title: "blackbox_exporter: configuration", url: "https://github.com/prometheus/blackbox_exporter/blob/master/CONFIGURATION.md" }
+detect:
+  - kind: alert
+    what: >
+      The Argo CD URL probed from outside the way a user reaches it. A blackbox_exporter HTTP module with fail_if_not_ssl makes the probe fail
+      when the answer comes without TLS, and probe_success is the series to alert on; the same probe exposes probe_ssl_earliest_cert_expiry for
+      the certificate it was shown.
+    example: |
+      modules:
+        http_tls_required:
+          prober: http
+          http:
+            fail_if_not_ssl: true
+  - kind: metric
+    what: Days left on the certificate the ingress presents for the Argo CD host, from the same probe.
+    example: '(probe_ssl_earliest_cert_expiry - time()) / 86400'
+  - kind: command
+    what: Whether the Ingress of Argo CD carries TLS, read from the object.
+    example: "kubectl -n argocd get ingress -o yaml | grep -A3 'tls:'"
+solutions:
+  - scale: [small]
+    approach: >
+      Put TLS on the Ingress that already exists: a tls section with a certificate from cert-manager, and keep server.insecure true so the ingress
+      terminates and the server speaks HTTP behind it. With ingress-nginx this takes two Ingress objects, one for HTTP and one with the GRPC
+      backend protocol for the CLI. If Argo CD does not need to be reachable from outside, remove the Ingress.
+    tools: [cert-manager, ingress-nginx]
+    tradeoff: >
+      Credentials are encrypted up to the ingress with a certificate that renews itself. The hop from the ingress to the server stays plain HTTP
+      inside the cluster network, which is the accepted cost of terminating at the ingress.
+    example: |
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: argocd-cmd-params-cm
+        namespace: argocd
+      data:
+        server.insecure: "true"
+  - scale: [medium, large]
+    approach: >
+      Terminate at the load balancer with an HTTPS listener on 443 and keep TLS to the server as well (HTTPS backend protocol on an ALB, with a
+      second Service for gRPC), or pass TLS through to a server that holds a real certificate in argocd-server-tls. Use SSO instead of the local
+      admin user, and narrow the ClusterRoles of argocd-server and the application controller where full write access is not needed.
+    tools: ["AWS Load Balancer Controller", "Argo CD SSO"]
+    tradeoff: >
+      No plain-text hop anywhere, and a stolen token is tied to an identity provider that can revoke it. Two target groups or passthrough rules to
+      maintain, and narrowed roles have to be widened by hand each time Argo CD manages a new kind of resource.
+    example: |
+      alb.ingress.kubernetes.io/backend-protocol: HTTPS
+      alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS":443}]'
+cases: []
+reading:
+  - { title: "Argo CD: Ingress configuration", url: "https://argo-cd.readthedocs.io/en/stable/operator-manual/ingress/", why: "The passthrough and termination variants per ingress controller, with the manifests for each." }
+  - { title: "Argo CD: TLS configuration", url: "https://argo-cd.readthedocs.io/en/stable/operator-manual/tls/", why: "Where the server takes its certificate from and what the insecure flag switches off." }
+  - { title: "Argo CD: Security", url: "https://argo-cd.readthedocs.io/en/stable/operator-manual/security/", why: "Which tokens exist, how long they live, and how much of the cluster Argo CD can change." }
+  - { title: "blackbox_exporter: configuration", url: "https://github.com/prometheus/blackbox_exporter/blob/master/CONFIGURATION.md", why: "The HTTP probe options, including the one that fails a probe answered without TLS." }

@@ -1,0 +1,98 @@
+# What a report teaches when pods can obtain the IAM role of their EKS node, or a controller borrows that role because it has none of its own.
+# Every page below was opened and read (2026-11-14).
+topic: node-role-reachable-from-pods
+checks: [security.imds-hop-limit, karpenter.ec2nodeclass-hardening, albctl.no-dedicated-role, karpenter.no-dedicated-role]
+mechanism: >
+  Every EC2 instance can ask the Instance Metadata Service at 169.254.169.254 for temporary credentials of the IAM role attached to it. On an EKS
+  node that is the node role, and a pod is a process on that node: unless something stops it, a container reaches the same address and receives the
+  same credentials. The node role is not small. With the default setup it carries the policies the VPC CNI and image pulls need, which effectively
+  lets every pod on the node attach and detach network interfaces, assign addresses and pull images from ECR.
+
+
+  Two instance settings decide whether a pod gets through. IMDSv1 answers a plain GET. IMDSv2 requires a session token, obtained with a PUT, and the
+  response to that PUT carries an IP hop limit, 1 by default. A container sits one network hop behind the node, so with a limit of 1 the token never
+  reaches it, while a limit of 2 lets it through; AWS mentions a larger limit for compatibility with container services. With tokens set to
+  optional, IMDSv1 still answers, and IMDSv1 uses no token for the hop limit to stop. Pods with hostNetwork true always have IMDS access.
+
+
+  IAM roles for service accounts and EKS Pod Identity give a pod its own role instead. Both documents state the condition: only when access to IMDS
+  is restricted can a container retrieve just the credentials of its own ServiceAccount's role; if IMDS is not restricted, the pod's containers
+  also have access to the node role. Using IRSA changes the order of the credential chain, not what is reachable.
+
+
+  This is why a controller without a dedicated role is a cluster problem. The AWS Load Balancer Controller or Karpenter need wide permissions (load
+  balancers and security groups; launching and terminating instances, passing IAM roles). If they have no role of their own, those permissions must
+  be attached to the node role, and the controller documentation says it plainly: the controller permissions may then be assumed by other users in
+  a pod after retrieving the node role credentials.
+
+
+  For nodes that Karpenter launches, the instance settings come from the EC2NodeClass. If metadataOptions is omitted, Karpenter applies hop limit 1
+  and tokens required, and the default block device mappings of the AL2, AL2023, Bottlerocket and Windows families encrypt the root volume; the
+  Custom family has no default mappings. A class that sets a hop limit of 2 gives every new node that value.
+sources:
+  - { title: "EC2: Use the Instance Metadata Service to access instance metadata", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-metadata-v2-how-it-works.html" }
+  - { title: "EKS Best Practices: Identity and Access Management", url: "https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html" }
+  - { title: "EKS: IAM roles for service accounts", url: "https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html" }
+  - { title: "EKS: EKS Pod Identity", url: "https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html" }
+  - { title: "AWS Load Balancer Controller: Installation", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/installation/" }
+  - { title: "Karpenter: NodeClasses", url: "https://karpenter.sh/docs/concepts/nodeclasses/" }
+  - { title: "Karpenter: Getting Started", url: "https://karpenter.sh/docs/getting-started/getting-started-with-karpenter/" }
+detect:
+  - kind: metric
+    what: >
+      Which instances still allow IMDSv1 and whether anything uses it. EC2 publishes three CloudWatch metrics per instance: ImdsV1Enabled is 1 when
+      tokens are optional (published from the configuration, even when no call is made), MetadataNoToken counts IMDSv1 calls, and
+      MetadataNoTokenRejected counts IMDSv1 calls refused after tokens became required. The sum of ImdsV1Enabled is the number of nodes left to fix.
+    example: 'SUM(ImdsV1Enabled) > 0'
+  - kind: dashboard
+    what: >
+      Which role made an AWS call. With IRSA or Pod Identity every call is logged in CloudTrail under the role of the ServiceAccount; calls to load
+      balancer or EC2 fleet APIs that appear under the node role show a controller or a pod that is using the node's credentials.
+    example: 'CloudTrail events grouped by the calling role: node role versus the roles of ServiceAccounts'
+  - kind: command
+    what: The instances that accept IMDSv1, listed once to see the scope.
+    example: 'aws ec2 describe-instances --filters "Name=metadata-options.http-tokens,Values=optional" --query "Reservations[*].Instances[*].[InstanceId]" --output text'
+solutions:
+  - scale: [small]
+    approach: >
+      Give the two controllers their own roles with an EKS Pod Identity association each (the Pod Identity Agent add-on once per cluster, no OIDC
+      provider to set up), take their permissions off the node role, and leave metadataOptions out of the EC2NodeClass or set it to hop limit 1
+      with tokens required. Application pods that call AWS get a role the same way when they need one.
+    tools: ["EKS Pod Identity", Karpenter]
+    tradeoff: >
+      Pods stop inheriting the node role, for one add-on and a few associations. Anything that silently relied on the node role fails at that
+      moment and needs its own role, and the Load Balancer Controller's installation page asks for hop limit 2 for its metadata introspection when
+      IMDSv2 is used, so check how the controller learns its region and VPC before lowering the limit.
+    example: |
+      spec:
+        metadataOptions:
+          httpEndpoint: enabled
+          httpProtocolIPv6: disabled
+          httpPutResponseHopLimit: 1
+          httpTokens: required
+  - scale: [medium, large]
+    approach: >
+      One IAM role per application through IRSA or Pod Identity, with the IRSA trust policy scoped to the ServiceAccount name and namespace; the
+      aws-node DaemonSet moved to its own role as well so that the node role shrinks. Set hop limit 1 and tokens required in the launch templates
+      of managed node groups, make IMDSv2 the account default, and enforce it with the account setting or an SCP on the ec2:MetadataHttpTokens and
+      ec2:MetadataHttpPutResponseHopLimit condition keys.
+    tools: [IRSA, "EKS Pod Identity", "AWS Organizations SCP", CloudTrail]
+    tradeoff: >
+      A compromised pod holds only its own application's permissions and every call is attributable in CloudTrail. It costs a role per application
+      to create and maintain, and an account-wide enforcement makes any launch that still asks for IMDSv1 fail.
+cases:
+  - company: Unit 42 (React2Shell campaign)
+    year: 2025
+    url: "https://unit42.paloaltonetworks.com/modern-kubernetes-threats/"
+    summary: >
+      After CVE-2025-55182 was disclosed on December 3, 2025, attackers ran code in containers, harvested the mounted service account tokens,
+      queried the Kubernetes API to learn their RBAC scope, and collected cloud credentials that were exposed in environment variables and cloud
+      metadata services.
+    match: >
+      Code execution in one container was enough to collect cloud credentials from the metadata service, which is exactly what a reachable node
+      role offers to every pod.
+reading:
+  - { title: "EKS Best Practices: Identity and Access Management", url: "https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html", why: "The section on restricting access to the node's instance profile, with the warning about what breaks." }
+  - { title: "EC2: Transition to using Instance Metadata Service Version 2", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-metadata-transition-to-version-2.html", why: "The metrics to watch while moving to IMDSv2 and the account-level defaults and enforcement." }
+  - { title: "EKS: EKS Pod Identity", url: "https://docs.aws.amazon.com/eks/latest/userguide/pod-identities.html", why: "How a role is attached to a ServiceAccount without an OIDC provider, and where it is not available." }
+  - { title: "Karpenter: NodeClasses", url: "https://karpenter.sh/docs/concepts/nodeclasses/", why: "The metadataOptions and blockDeviceMappings defaults every Karpenter node starts with." }

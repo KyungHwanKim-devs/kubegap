@@ -1,13 +1,13 @@
-# kubegap report details — arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (`app-u-cluster`), full mode
+# kubegap report details — app-u-cluster-eks (`app-u-cluster`), full mode
 
-Reference half of the report, assembled by `scripts/kubegap render-details` from the snapshot files plus the analysis block of `llm/facts.json`. The human report is `report.md` next to this file. Headings follow the report language; data inside tables is English.
+Reference half of the report, assembled by `scripts/kubegap render-details` from the snapshot files plus the analysis block of `report/outline.json`. The human report is `report.md` next to this file. Headings follow the report language; data inside tables is English.
 
 | Item | Value |
 |---|---|
 | kube context / cluster | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
 | Run time / mode | 2026-11-07T10:33:37+09:00 / full (collection 300.7 s, 0 steps skipped by mode, 40 failed) |
-| Profile | `prod` (detected) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.87 / 1.1.0 |
+| Scale | `medium` (guessed) |
+| kubegap / rubric / signatures | <kubegap> / 0.1.94 / 1.1.0 |
 | Verified against | Kubernetes v1.32.13-eks-577a51e (verified 1.30 to 1.37) · Loki 2.6.1 (verified 2.6 to 3.7) · Grafana 10.2.3 (verified 10.2 to 13.3) |
 | Nodes / namespaces / pods / CRDs | 9 (Ready 9) / 26 / 154 / 47 |
 | Components (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
@@ -20,13 +20,13 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 
 | Severity (default) | fail | warn | vs. previous run of this mode |
 |---|---|---|---|
-| critical | 1 | 3 | no previous run of this mode |
-| high | 16 | 8 | no previous run of this mode |
-| medium | 84 | 127 | no previous run of this mode |
+| critical | 1 | 0 | no previous run of this mode |
+| high | 15 | 11 | no previous run of this mode |
+| medium | 84 | 87 | no previous run of this mode |
 | low | 15 | 113 | no previous run of this mode |
-| info | 2 | 0 | no previous run of this mode |
+| info | 1 | 0 | no previous run of this mode |
 
-Checks 367: evaluated 231, disabled by profile 2, skipped 132, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
+Checks 367: evaluated 230, not run on this platform or at this scale 3, skipped 132, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
 
 ### 1-1. Final judgment vs. first pass (adjustments)
 
@@ -45,18 +45,17 @@ Checks 367: evaluated 231, disabled by profile 2, skipped 132, not collected in 
 | `karpenter.ec2nodeclass-al2.cluster` | high |  | EC2NodeClass 1 total, amiFamily AL2 ['default'], AMI families ['AL2'], AMI not pinned (auto-tracks latest) ['default'] |
 | `observability.failure-mode-uncovered.OOMKill` | high |  | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
 | `observability.loki-oomkilled.cluster` | high |  | Loki pods [('loki-stack-0', 1, 'OOMKilled', '2026-10-25T00:15:41Z')]. Storage {'tmp': 'emptyDir', 'config': 'secret', 'storage': 'emptyDir'}, memory RSS 289MB |
-| `observability.no-event-retention.cluster` | high |  | no component of family event-retention in inventory.components |
 | `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | high |  | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
 | `observability.stack-storage-emptydir.monitoring/loki-stack` | high |  | emptyDir volumes: tmp, storage, replicas 1 |
 | `platform.k8s-version-eol.cluster` | high |  | server v1.32.13-eks-577a51e: upstream end of life 2026-02-28, 252 days past |
 | `platform.karpenter-version-compat.cluster` | high |  | Karpenter 0.37.0 supports Kubernetes 1.23 to 1.30 (table row 0.37), the cluster runs 1.32.  |
 | `resilience.prod-concentration.ip-10-0-1-139.ap-northeast-2.compute.internal` | high |  | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default, spot) holds prod pods 23/45 (0.51), 18 workloads: ['app-ab-prod/app-ab-backend', 'app-ab-prod/app-ab-frontend', 'prod-app-s/app-s-admin' … |
-| `resilience.replicas-same-node.prod-app-w/deployment/app-w` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
-| `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | high |  | replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
-| `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
-| `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling … |
+| `resilience.replicas-same-node.prod-app-w/deployment/app-w` | high |  | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes … |
+| `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | high |  | every replica is on one node now. replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes … |
+| `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | high |  | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes … |
+| `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | high |  | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred … |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | high |  | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
-| `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
+| `security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 
 (consecutive-run counts need diff.json; none for this snapshot)
 
@@ -77,12 +76,11 @@ No earlier full snapshot to compare with.
 | Finding | Status | Severity | Why it should exist | Proposal |
 |---|---|---|---|---|
 | `resilience.no-backup.cluster` | fail | critical | There is no way to recover cluster state (objects) and PV data. Deleting a namespace by mistake or a broken etcd or PV is the end. A CronJob dump without a tool is often "a backup kept on the same … | Velero (plus EBS snapshots or PV backup). On EKS at least a DLM snapshot policy. In a small k3s cluster, k3s etcd-snapshot or a state.db copy plus PV directory backup. Test a restore; a dump that was … |
-| `observability.no-slo.cluster` | warn | critical | Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first. | Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress. |
-| `observability.no-event-retention.cluster` | fail | high | Kubernetes events are kept for only one hour by default. FailedScheduling, OOMKilling and Unhealthy from the night are gone by morning. The most undervalued material is lost. | Ship events to Loki or Elasticsearch with kubernetes-event-exporter. Alternatively, the promtail/alloy event source if Loki exists, or `[INPUT] kubernetes_events` with fluent-bit (detection … |
-| `security.no-certificate-manager.cluster` | fail | medium | When TLS certificate renewal is manual, services keep going down from expiry. cert-manager (or ACM plus ALB on EKS) automates renewal. On EKS, ALBs using ACM certificates work without cert-manager … | Install cert-manager, or if ACM is in use, suppress this check in config.yaml with a reason. |
-| `hygiene.no-progressive-delivery.cluster` | fail | info | A rolling update is "replace everything", so a defect in the new version reaches all traffic immediately. Without a canary tool (some traffic -> check metrics -> expand), deployment verification … | As services grow, automate canary judgment with Argo Rollouts (same ecosystem as Argo CD) + AnalysisTemplate (ALB 5xx, p95 Prometheus queries). |
+| `observability.no-slo.cluster` | warn | high | Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first. | Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress. |
+| `observability.no-event-retention.cluster` | fail | medium | Kubernetes events are kept for only one hour by default. FailedScheduling, OOMKilling and Unhealthy from the night are gone by morning. The most undervalued material is lost. | Ship events to Loki or Elasticsearch with kubernetes-event-exporter. Alternatively, the promtail/alloy event source if Loki exists, or `[INPUT] kubernetes_events` with fluent-bit (detection … |
+| `security.no-certificate-manager.cluster` | warn | medium | When TLS certificate renewal is manual, services keep going down from expiry. cert-manager (or ACM plus ALB on EKS) automates renewal. On EKS, ALBs using ACM certificates work without cert-manager … | Install cert-manager, or if ACM is in use, suppress this check in config.yaml with a reason. |
 
-Expected families missing (inventory): backup, event-retention, slo, certificates, progressive-delivery.
+Expected families missing (inventory): backup, certificates, event-retention, slo.
 
 ## 6. Suppressed, tool missing, not collected
 
@@ -90,7 +88,7 @@ Expected families missing (inventory): backup, event-retention, slo, certificate
 - Suppression expired 0: none
 - Tool missing 0: none
 - Not collected in full mode 0: none
-- Skipped or errored 132: `resources.cpu-throttling` (skip: metrics/cpu_throttle_ratio_24h,cpu_throttle_ratio_5m all missing or failed), `resources.oomkilled` (skip: metrics/oomkilled_last_terminated.json missing (not collected or no Prometheus)), `resources.oomkilled-repeated` (skip: summary.resilience.oom_7d.rows missing), `resources.node-memory-request-usage-gap` (skip: metrics/node_memory_request_ratio.json missing or failed), `resources.besteffort-in-prod` (skip: metrics/besteffort_pods.json missing (not collected or no Prometheus)), `resources.node-request-usage-gap` (skip: metrics/node_cpu_request_ratio.json missing or failed), `resources.cpu-request-overprovisioned` (skip: metrics/cpu_request_p95_ratio_7d.json missing or failed), `resources.cpu-limit-near-p95` (skip: metrics/cpu_limit_p95_ratio_7d.json missing (not collected or no Prometheus)), `resources.memory-request-overprovisioned` (skip: metrics/memory_request_p95_ratio_7d.json missing or failed), `resources.memory-limit-near-p95` (skip: metrics/memory_limit_p95_ratio_7d.json missing (not collected or no Prometheus)), `resources.large-request-binpacking` (skip: metrics/large_request_containers.json missing (not collected or no Prometheus)), `node.conntrack-usage` (skip: metrics/conntrack_ratio.json missing (not collected or no Prometheus)), `node.disk-usage` (skip: metrics/disk_usage_ratio.json missing (not collected or no Prometheus)), `node.inode-usage` (skip: metrics/inode_usage_ratio.json missing (not collected or no Prometheus)), `node.ntp-offset` (skip: metrics/ntp_offset_seconds.json missing (not collected or no Prometheus)), `node.ntp-unsynced` (skip: metrics/ntp_sync_status.json missing (not collected or no Prometheus)), `node.swap-enabled` (skip: metrics/node_swap_total_bytes.json missing (not collected or no Prometheus)), `observability.alerts-always-firing` (skip: alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)), `observability.alertmanager-default-null` (skip: nothing to judge: Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)), `observability.alertmanager-notification-failed` (skip: metrics/alertmanager_notifications_failed_1d.json missing (not collected or no Prometheus)), `observability.severity-channels-not-separated` (skip: nothing to judge: Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)), `observability.scrape-targets-down` (skip: metrics/scrape_targets_down_by_job.json missing (not collected or no Prometheus)), `security.networkpolicy-coverage` (skip: objects/networkpolicies.networking.k8s.io.json missing: the ClusterRole does not grant list on this kind), `events.tracked-warning-reasons` (skip: summary.events.history.tracked_hits missing), `controlplane.scheduler-unschedulable` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.apiserver-429` (skip: metrics/apiserver_429_rate.json missing (not collected or no Prometheus)), `controlplane.apiserver-5xx` (skip: metrics/apiserver_5xx_rate.json missing (not collected or no Prometheus)), `controlplane.apiserver-latency` (skip: metrics/apiserver_p99_latency_by_verb.json missing (not collected or no Prometheus)), `controlplane.webhook-latency` (skip: metrics/apiserver_webhook_p99_by_name.json missing (not collected or no Prometheus)), `controlplane.webhook-call-failures` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.controller-error-repeat` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.apiserver-slow-traces` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.authenticator-failures` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `node.kernel-oom-node-level` (skip: nothing to judge: node not read (9)), `node.kernel-lockup` (skip: nothing to judge: node not read (9)), `node.kernel-io-fs-errors` (skip: nothing to judge: node not read (9)), `node.kernel-nic-events` (skip: nothing to judge: node not read (9)), `node.conntrack-table-full` (skip: nothing to judge: node not read (9)), `node.kernel-net-mem-pressure` (skip: nothing to judge: node not read (9)), `node.cgroup-v1` (skip: nothing to judge: node not read (9)), `node.sysctl-tuning` (skip: nothing to judge: node not read (9)), `node.cri-not-ready` (skip: nothing to judge: node not read, or cri not read (9)), `node.cri-exited-containers` (skip: nothing to judge: node not read (9)), `node.pod-logs-large` (skip: summary.nodeos.pod_logs missing), `node.pod-dir-large` (skip: summary.nodeos.pod_dirs missing), `node.service-restarts` (skip: nothing to judge: node not read (9)), `node.reboot-required` (skip: nothing to judge: node not read (9)), `node.os-updates-pending` (skip: nothing to judge: node not read (9)), `node.kubelet-reserved-missing` (skip: nothing to judge: node not read, or kubelet not read (9)), `node.kubelet-eviction-memory-missing` (skip: nothing to judge: node not read, or kubelet not read (9)), `node.clock-unsynced-os` (skip: nothing to judge: node not read (9)), `node.zombie-processes` (skip: nothing to judge: node not read (9)), `observability.fluentbit-output-errors` (skip: summary.logs.agents.fluent-bit missing), `observability.alert-firing-stale` (skip: metrics/alerts_firing_stale_days.json missing (not collected or no Prometheus)), `cost.idle-compute-high` (skip: nothing to judge: pricing (pricing:GetProducts) or node CPU usage metrics (node_cpu_usage_ratio_p95_7d) not read), `cost.request-waste` (skip: nothing to judge: pricing (pricing:GetProducts) or the KRR totals not read), `cost.unused-eip` (skip: nothing to judge: EC2 addresses not read (ec2:DescribeAddresses)), `cost.idle-load-balancer` (skip: nothing to judge: load balancers not read (elasticloadbalancing:Describe*)), `cost.idle-node` (skip: node CPU usage metrics not read (node_cpu_usage_ratio_p95_7d)), `security.networkpolicy-not-enforced` (skip: nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)), `security.no-default-deny` (skip: nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)), `security.imds-hop-limit` (skip: nothing to judge: not EKS, or EC2 instance list not read (ec2:DescribeInstances)), `storage.pvc-usage-high` (skip: nothing to judge: PVC usage metrics not read (kubelet_volume_stats_*) (18)), `storage.ebs-unattached` (skip: nothing to judge: ebs not available), `storage.ebs-gp2-volumes` (skip: nothing to judge: ebs not available), `storage.ebs-unencrypted` (skip: nothing to judge: ebs not available), `hygiene.eks-upgrade-insight` (skip: EKS upgrade insights not read (aws/list-insights.json missing: eks:ListInsights refused or not an EKS cluster)), `hygiene.orphan-secrets` (skip: nothing to judge: Secret names not read (kube_secret_info through Prometheus)), `traffic.lb-idle-timeout-long` (skip: summary.traffic.alb.lbs missing), `traffic.alb-target-type-instance` (skip: summary.traffic.alb.target_groups missing), `node.memory-available-low` (skip: metrics/node_memory_available_ratio.json missing (not collected or no Prometheus)), `node.network-errors` (skip: metrics/node_network_errors_1d.json missing (not collected or no Prometheus)), `node.timewait-sockets-high` (skip: metrics/node_tcp_timewait.json missing (not collected or no Prometheus)), `node.kubelet-pleg-slow` (skip: metrics/kubelet_pleg_p99_1h.json missing (not collected or no Prometheus)), `controlplane.watch-count-high` (skip: metrics/apiserver_watch_per_node.json missing (not collected or no Prometheus)), `controlplane.apiserver-401-rate` (skip: metrics/apiserver_401_rate_1h.json missing (not collected or no Prometheus)), `controlplane.etcd-db-size` (skip: metrics/apiserver_storage_size_bytes.json missing (not collected or no Prometheus)), `node.kubelet-api-qps-low` (skip: nothing to judge: node not read, or kubelet not read (9)), `traffic.ingress-5xx-ratio` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (41)), `traffic.ingress-p95-latency` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (41)), `traffic.alb-elb-5xx` (skip: summary.traffic.alb.lbs missing), `traffic.alb-unhealthy-targets` (skip: summary.traffic.alb.unhealthy_target_groups missing), `traffic.alb-deregistration-vs-grace` (skip: summary.traffic.alb.target_groups missing), `traffic.alb-protection-off` (skip: summary.traffic.alb.lbs missing), `traffic.db-exposed` (skip: nothing to judge: load balancer security groups not read (elasticloadbalancing:Describe*, ec2:DescribeSecurityGroups)), `traffic.ingress-nginx-vulnerable-version` (skip: summary.traffic.nginx missing), `traffic.ingress-nginx-retired` (skip: summary.traffic.nginx missing), `traffic.pod-not-ready` (skip: pod readiness ratio not read (metrics/pod_ready_ratio_24h.json missing or failed)), `traffic.coredns-latency` (skip: nothing to judge: CoreDNS metrics not read (coredns_dns_request_duration_seconds)), `scaling.hpa-at-max` (skip: metrics/hpa_at_max_ratio_15d.json missing (not collected or no Prometheus)), `scaling.hpa-never-scaled` (skip: nothing to judge: HPA metrics not read (hpa_at_min_ratio_15d) (18)), `scaling.hpa-flapping` (skip: metrics/hpa_desired_changes_7d.json missing (not collected or no Prometheus)), `scaling.pod-pending-long` (skip: metrics/pod_pending_seconds.json missing (not collected or no Prometheus)), `tenancy.burst-tenant-unbounded` (skip: nothing to judge: namespace CPU metrics not read (namespace_cpu_max_7d, namespace_cpu_median_7d) (26)), `node.docker-and-containerd` (skip: nothing to judge: node not read (9)), `node.container-writable-layer-large` (skip: nothing to judge: node not read (9)), `node.large-images` (skip: nothing to judge: node not read (9)), `eks.addon-outdated` (skip: nothing to judge: add-on versions not read (eks:DescribeAddonVersions) (4)), `eks.ssm-unregistered` (skip: inventory.node_access.ssm_unregistered missing), `eks.no-backup-policy` (skip: nothing to judge: dlm get-lifecycle-policies or backup list-backup-plans not read), `eks.acm-certificate-expiring` (skip: nothing to judge: acm not available), `eks.service-quota-near-limit` (skip: nothing to judge: quotas not available), `storage.ebs-volume-io-saturated` (skip: nothing to judge: ebs not available), `eks.security-group-open-to-world` (skip: nothing to judge: security groups not available), `eks.nodegroup-ami-old` (skip: nothing to judge: nodegroups not available), `albctl.target-group-without-tgb` (skip: nothing to judge: ALB target groups not read (elasticloadbalancing:Describe*)), `alertmanager.receivers-unused-or-no-inhibit` (skip: nothing to judge: alertmanager not present, or its configuration could not be parsed (config_parse_error)), `alertmanager.notifications-silent` (skip: nothing to judge: alertmanager not present; metrics not read), `coredns.nxdomain-ratio-high` (skip: nothing to judge: metrics not read), `coredns.cache-hit-low` (skip: nothing to judge: metrics not read), `coredns.aaaa-noise` (skip: nothing to judge: metrics not read), `coredns.forward-upstream-errors` (skip: nothing to judge: metrics not read), `coredns.panic-or-reload-failed` (skip: nothing to judge: metrics not read), `coredns.pod-imbalance` (skip: nothing to judge: metrics not read), `ebscsi.node-ops-errors` (skip: nothing to judge: kubelet metrics not read), `ecr.scan-disabled` (skip: summary.ecr.summary missing), `ecr.tag-mutable-prod` (skip: summary.ecr.summary missing), `ecr.no-lifecycle-policy` (skip: summary.ecr.summary missing), `ecr.stale-storage` (skip: summary.ecr.summary missing), `ecr.dockerhub-dependency` (skip: summary.ecr.summary missing), `ecr.pull-failures` (skip: summary.ecr.summary missing), `ecr.no-replication` (skip: summary.ecr.summary missing), `ecr.untagged-images` (skip: summary.ecr.summary missing), `kubeproxy.sync-slow` (skip: nothing to judge: metrics not read), `kubeproxy.rules-pending` (skip: nothing to judge: metrics not read), `kubeproxy.restore-failures` (skip: nothing to judge: metrics not read), `kubeproxy.conntrack-invalid-drops` (skip: nothing to judge: conntrack INVALID counter not served: kube-proxy 1.30, ipvs or nftables mode, no nfacct, or the proxy mode not read (summary ct_invalid_reason says which)), `vpccni.node-ip-exhaustion` (skip: nothing to judge: pod IP usage not read (no ipamd metrics and the instance type's limits not read: ec2:DescribeInstanceTypes) (9)), `vpccni.no-available-ip` (skip: nothing to judge: VPC CNI metrics not read (awscni_no_available_ip_addresses) (9)), `vpccni.prefix-delegation-off` (skip: nothing to judge: pod IP usage of no node read (no ipamd metrics and the instance types' limits not read: ec2:DescribeInstanceTypes)), `vpccni.ec2-api-errors` (skip: nothing to judge: metrics not read (9)), `vpccni.external-snat-off-with-private-routes` (skip: summary.vpccni.snat missing)
+- Skipped or errored 132: `resources.cpu-throttling` (skip: metrics/cpu_throttle_ratio_24h,cpu_throttle_ratio_5m all missing or failed), `resources.oomkilled` (skip: metrics/oomkilled_last_terminated.json missing (not collected or no Prometheus)), `resources.oomkilled-repeated` (skip: summary.resilience.oom_7d.rows missing), `resources.node-memory-request-usage-gap` (skip: metrics/node_memory_request_ratio.json missing or failed), `resources.besteffort-in-prod` (skip: metrics/besteffort_pods.json missing (not collected or no Prometheus)), `resources.node-request-usage-gap` (skip: metrics/node_cpu_request_ratio.json missing or failed), `resources.cpu-request-overprovisioned` (skip: metrics/cpu_request_p95_ratio_7d.json missing or failed), `resources.cpu-limit-near-p95` (skip: metrics/cpu_limit_p95_ratio_7d.json missing (not collected or no Prometheus)), `resources.memory-request-overprovisioned` (skip: metrics/memory_request_p95_ratio_7d.json missing or failed), `resources.memory-limit-near-p95` (skip: metrics/memory_limit_p95_ratio_7d.json missing (not collected or no Prometheus)), `resources.large-request-binpacking` (skip: metrics/large_request_containers.json missing (not collected or no Prometheus)), `node.conntrack-usage` (skip: metrics/conntrack_ratio.json missing (not collected or no Prometheus)), `node.disk-usage` (skip: metrics/disk_usage_ratio.json missing (not collected or no Prometheus)), `node.inode-usage` (skip: metrics/inode_usage_ratio.json missing (not collected or no Prometheus)), `node.ntp-offset` (skip: metrics/ntp_offset_seconds.json missing (not collected or no Prometheus)), `node.ntp-unsynced` (skip: metrics/ntp_sync_status.json missing (not collected or no Prometheus)), `node.swap-enabled` (skip: metrics/node_swap_total_bytes.json missing (not collected or no Prometheus)), `observability.alerts-always-firing` (skip: alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)), `observability.alertmanager-default-null` (skip: nothing to judge: Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)), `observability.alertmanager-notification-failed` (skip: metrics/alertmanager_notifications_failed_1d.json missing or failed), `observability.severity-channels-not-separated` (skip: nothing to judge: Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)), `observability.scrape-targets-down` (skip: metrics/scrape_targets_down_by_job.json missing (not collected or no Prometheus)), `security.networkpolicy-coverage` (skip: objects/networkpolicies.networking.k8s.io.json missing: the ClusterRole does not grant list on this kind), `events.tracked-warning-reasons` (skip: summary.events.history.tracked_hits missing), `controlplane.scheduler-unschedulable` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.apiserver-429` (skip: metrics/apiserver_429_rate.json missing (not collected or no Prometheus)), `controlplane.apiserver-5xx` (skip: metrics/apiserver_5xx_rate.json missing (not collected or no Prometheus)), `controlplane.apiserver-latency` (skip: metrics/apiserver_p99_latency_by_verb.json missing (not collected or no Prometheus)), `controlplane.webhook-latency` (skip: metrics/apiserver_webhook_p99_by_name.json missing (not collected or no Prometheus)), `controlplane.webhook-call-failures` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.controller-error-repeat` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.apiserver-slow-traces` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `controlplane.authenticator-failures` (skip: control plane logs not read (CloudWatch Logs Insights: logs/cloudwatch/volume_by_stream.json missing)), `node.kernel-oom-node-level` (skip: nothing to judge: node not read (9)), `node.kernel-lockup` (skip: nothing to judge: node not read (9)), `node.kernel-io-fs-errors` (skip: nothing to judge: node not read (9)), `node.kernel-nic-events` (skip: nothing to judge: node not read (9)), `node.conntrack-table-full` (skip: nothing to judge: node not read (9)), `node.kernel-net-mem-pressure` (skip: nothing to judge: node not read (9)), `node.cgroup-v1` (skip: nothing to judge: node not read (9)), `node.sysctl-tuning` (skip: nothing to judge: node not read (9)), `node.cri-not-ready` (skip: nothing to judge: node not read, or cri not read (9)), `node.cri-exited-containers` (skip: nothing to judge: node not read (9)), `node.pod-logs-large` (skip: summary.nodeos.pod_logs missing), `node.pod-dir-large` (skip: summary.nodeos.pod_dirs missing), `node.service-restarts` (skip: nothing to judge: node not read (9)), `node.reboot-required` (skip: nothing to judge: node not read (9)), `node.os-updates-pending` (skip: nothing to judge: node not read (9)), `node.kubelet-reserved-missing` (skip: nothing to judge: node not read, or kubelet not read (9)), `node.kubelet-eviction-memory-missing` (skip: nothing to judge: node not read, or kubelet not read (9)), `node.clock-unsynced-os` (skip: nothing to judge: node not read (9)), `node.zombie-processes` (skip: nothing to judge: node not read (9)), `observability.fluentbit-output-errors` (skip: summary.logs.agents.fluent-bit missing), `observability.alert-firing-stale` (skip: metrics/alerts_firing_stale_days.json missing (not collected or no Prometheus)), `cost.idle-compute-high` (skip: nothing to judge: pricing (pricing:GetProducts) or node CPU usage metrics (node_cpu_usage_ratio_p95_7d) not read), `cost.request-waste` (skip: nothing to judge: pricing (pricing:GetProducts) or the KRR totals not read), `cost.unused-eip` (skip: nothing to judge: EC2 addresses not read (ec2:DescribeAddresses)), `cost.idle-load-balancer` (skip: nothing to judge: load balancers not read (elasticloadbalancing:Describe*)), `cost.idle-node` (skip: node CPU usage metrics not read (node_cpu_usage_ratio_p95_7d)), `security.networkpolicy-not-enforced` (skip: nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)), `security.no-default-deny` (skip: nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)), `security.imds-hop-limit` (skip: nothing to judge: not EKS, or EC2 instance list not read (ec2:DescribeInstances)), `storage.pvc-usage-high` (skip: nothing to judge: PVC usage metrics not read (kubelet_volume_stats_*) (18)), `storage.ebs-unattached` (skip: nothing to judge: ebs not available), `storage.ebs-gp2-volumes` (skip: nothing to judge: ebs not available), `storage.ebs-unencrypted` (skip: nothing to judge: ebs not available), `hygiene.eks-upgrade-insight` (skip: EKS upgrade insights not read (aws/list-insights.json missing: eks:ListInsights refused or not an EKS cluster)), `hygiene.orphan-secrets` (skip: nothing to judge: Secret names not read (kube_secret_info through Prometheus)), `traffic.lb-idle-timeout-long` (skip: summary.traffic.alb.lbs missing), `traffic.alb-target-type-instance` (skip: summary.traffic.alb.target_groups missing), `node.memory-available-low` (skip: metrics/node_memory_available_ratio.json missing (not collected or no Prometheus)), `node.network-errors` (skip: metrics/node_network_errors_1d.json missing (not collected or no Prometheus)), `node.timewait-sockets-high` (skip: metrics/node_tcp_timewait.json missing (not collected or no Prometheus)), `node.kubelet-pleg-slow` (skip: metrics/kubelet_pleg_p99_1h.json missing (not collected or no Prometheus)), `controlplane.watch-count-high` (skip: metrics/apiserver_watch_per_node.json missing (not collected or no Prometheus)), `controlplane.apiserver-401-rate` (skip: metrics/apiserver_401_rate_1h.json missing (not collected or no Prometheus)), `controlplane.etcd-db-size` (skip: metrics/apiserver_storage_size_bytes.json missing (not collected or no Prometheus)), `node.kubelet-api-qps-low` (skip: nothing to judge: node not read, or kubelet not read (9)), `traffic.ingress-5xx-ratio` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (41)), `traffic.ingress-p95-latency` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (41)), `traffic.alb-elb-5xx` (skip: summary.traffic.alb.lbs missing), `traffic.alb-unhealthy-targets` (skip: summary.traffic.alb.unhealthy_target_groups missing), `traffic.alb-deregistration-vs-grace` (skip: summary.traffic.alb.target_groups missing), `traffic.alb-protection-off` (skip: summary.traffic.alb.lbs missing), `traffic.db-exposed` (skip: nothing to judge: load balancer security groups not read (elasticloadbalancing:Describe*, ec2:DescribeSecurityGroups)), `traffic.ingress-nginx-vulnerable-version` (skip: summary.traffic.nginx missing), `traffic.ingress-nginx-retired` (skip: summary.traffic.nginx missing), `traffic.pod-not-ready` (skip: pod readiness ratio not read (metrics/pod_ready_ratio_24h.json missing or failed)), `traffic.coredns-latency` (skip: nothing to judge: CoreDNS metrics not read (coredns_dns_request_duration_seconds)), `scaling.hpa-at-max` (skip: metrics/hpa_at_max_ratio_15d.json missing (not collected or no Prometheus)), `scaling.hpa-never-scaled` (skip: nothing to judge: HPA metrics not read (hpa_at_min_ratio_15d) (18)), `scaling.hpa-flapping` (skip: metrics/hpa_desired_changes_7d.json missing (not collected or no Prometheus)), `scaling.pod-pending-long` (skip: metrics/pod_pending_seconds.json missing (not collected or no Prometheus)), `tenancy.burst-tenant-unbounded` (skip: nothing to judge: namespace CPU metrics not read (namespace_cpu_max_7d, namespace_cpu_median_7d) (26)), `node.docker-and-containerd` (skip: nothing to judge: node not read (9)), `node.container-writable-layer-large` (skip: nothing to judge: node not read (9)), `node.large-images` (skip: nothing to judge: node not read (9)), `eks.addon-outdated` (skip: nothing to judge: add-on versions not read (eks:DescribeAddonVersions) (4)), `eks.ssm-unregistered` (skip: inventory.node_access.ssm_unregistered missing), `eks.no-backup-policy` (skip: nothing to judge: dlm get-lifecycle-policies or backup list-backup-plans not read), `eks.acm-certificate-expiring` (skip: nothing to judge: acm not available), `eks.service-quota-near-limit` (skip: nothing to judge: quotas not available), `storage.ebs-volume-io-saturated` (skip: nothing to judge: ebs not available), `eks.security-group-open-to-world` (skip: nothing to judge: security groups not available), `eks.nodegroup-ami-old` (skip: nothing to judge: nodegroups not available), `albctl.target-group-without-tgb` (skip: nothing to judge: ALB target groups not read (elasticloadbalancing:Describe*)), `alertmanager.receivers-unused-or-no-inhibit` (skip: nothing to judge: alertmanager not present, or its configuration could not be parsed (config_parse_error)), `alertmanager.notifications-silent` (skip: nothing to judge: alertmanager not present; metrics not read), `coredns.nxdomain-ratio-high` (skip: nothing to judge: metrics not read), `coredns.cache-hit-low` (skip: nothing to judge: metrics not read), `coredns.aaaa-noise` (skip: nothing to judge: metrics not read), `coredns.forward-upstream-errors` (skip: nothing to judge: metrics not read), `coredns.panic-or-reload-failed` (skip: nothing to judge: metrics not read), `coredns.pod-imbalance` (skip: nothing to judge: metrics not read), `ebscsi.node-ops-errors` (skip: nothing to judge: kubelet metrics not read), `ecr.scan-disabled` (skip: summary.ecr.summary missing), `ecr.tag-mutable-prod` (skip: summary.ecr.summary missing), `ecr.no-lifecycle-policy` (skip: summary.ecr.summary missing), `ecr.stale-storage` (skip: summary.ecr.summary missing), `ecr.dockerhub-dependency` (skip: summary.ecr.summary missing), `ecr.pull-failures` (skip: summary.ecr.summary missing), `ecr.no-replication` (skip: summary.ecr.summary missing), `ecr.untagged-images` (skip: summary.ecr.summary missing), `kubeproxy.sync-slow` (skip: nothing to judge: metrics not read), `kubeproxy.rules-pending` (skip: nothing to judge: metrics not read), `kubeproxy.restore-failures` (skip: nothing to judge: metrics not read), `kubeproxy.conntrack-invalid-drops` (skip: nothing to judge: conntrack INVALID counter not served: kube-proxy 1.30, ipvs or nftables mode, no nfacct, or the proxy mode not read (summary ct_invalid_reason says which)), `vpccni.node-ip-exhaustion` (skip: nothing to judge: pod IP usage not read (no ipamd metrics and the instance type's limits not read: ec2:DescribeInstanceTypes) (9)), `vpccni.no-available-ip` (skip: nothing to judge: VPC CNI metrics not read (awscni_no_available_ip_addresses) (9)), `vpccni.prefix-delegation-off` (skip: nothing to judge: pod IP usage of no node read (no ipamd metrics and the instance types' limits not read: ec2:DescribeInstanceTypes)), `vpccni.ec2-api-errors` (skip: nothing to judge: metrics not read (9)), `vpccni.external-snat-off-with-private-routes` (skip: summary.vpccni.snat missing)
 - Judged in part 0 (some targets lacked what the rule needs; those are not judged, not passed): none
 - Query returned no series 0 (every metric name the query reads has series, so nothing happened; a name with no series would be a skip): none
 
@@ -137,11 +135,11 @@ Deprecated-API tools: kubent 28 of 41 Lists answered (13 refused or not served);
 
 ### 7-2. Checks evaluated
 
-367 checks: disabled 2, done 231, llm 2, skip 132. Load errors: none.
+367 checks: disabled 3, done 230, llm 2, skip 132. Load errors: none.
 
 ### 7-3. Signature matches and unclassified errors
 
-Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runner-controller, alb-controller, argocd, ebs-csi, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, loki, metrics-server, prometheus, promtail, vpc-cni). Unclassified error lines: 24.
+Signature catalog 1.1.1, 23 files, 23380 lines scanned (components: actions-runner-controller, alb-controller, argocd, ebs-csi, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, loki, metrics-server, prometheus, promtail, vpc-cni). Unclassified error lines: 24.
 
 | Signature | Component | Area | Severity | Status | Count | First, last | Sample |
 |---|---|---|---|---|---|---|---|
@@ -169,42 +167,42 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | id | Status | Default severity | Evidence |
 |---|---|---|---|
 | `resilience.no-backup.cluster` | fail | critical | no backup tool (family backup). Alternative signals: etcd snapshots 0, backup-like CronJobs that ran in the last 7 days [], VolumeSnapshots 0. If signals exist, the LLM checks whether copies leave the node |
-| `observability.no-slo.cluster` | warn | critical | no SLO tool. Signals: sli/slo recording rules [], burn rate alerts [], slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'] known issue #15 |
-| `observability.no-symptom-alerts.cluster` | warn | critical | 157 alert rules: symptom 0, cause 130, app metrics (assumed symptom) 22. Symptom ratio 0.0. Symptom rules: [] |
-| `resilience.n-plus-one.cluster` | warn | critical | Allocatable without the largest node ip-10-0-1-139.ap-northeast-2.compute.internal (3.92 cores, 29.8GB): CPU 15.45 cores vs total requests 11.51 (OK), memory 46.3GB vs 45.7GB (OK). Pods on that node 34 (prod 23). Pods that fit on no other node []. Pools short of room: 32 pods limited to … |
 | `eks.public-endpoint-open.cluster` | fail | high | public True, private True, allowed CIDRs ['0.0.0.0/0'] |
 | `karpenter.ec2nodeclass-al2.cluster` | fail | high | EC2NodeClass 1 total, amiFamily AL2 ['default'], AMI families ['AL2'], AMI not pinned (auto-tracks latest) ['default'] |
 | `observability.failure-mode-uncovered.OOMKill` | fail | high | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
 | `observability.loki-oomkilled.cluster` | fail | high | Loki pods [('loki-stack-0', 1, 'OOMKilled', '2026-10-25T00:15:41Z')]. Storage {'tmp': 'emptyDir', 'config': 'secret', 'storage': 'emptyDir'}, memory RSS 289MB |
-| `observability.no-event-retention.cluster` | fail | high | no component of family event-retention in inventory.components |
 | `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | fail | high | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
 | `observability.stack-storage-emptydir.monitoring/loki-stack` | fail | high | emptyDir volumes: tmp, storage, replicas 1 |
 | `platform.k8s-version-eol.cluster` | fail | high | server v1.32.13-eks-577a51e: upstream end of life 2026-02-28, 252 days past |
 | `platform.karpenter-version-compat.cluster` | fail | high | Karpenter 0.37.0 supports Kubernetes 1.23 to 1.30 (table row 0.37), the cluster runs 1.32.  |
 | `resilience.prod-concentration.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | high | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default, spot) holds prod pods 23/45 (0.51), 18 workloads: ['app-ab-prod/app-ab-backend', 'app-ab-prod/app-ab-frontend', 'prod-app-s/app-s-admin', 'prod-app-s/app-s-api', 'prod-app-s/app-s-backend', 'prod-app-s/app-s-frontend' … |
-| `resilience.replicas-same-node.prod-app-w/deployment/app-w` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
-| `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | fail | high | replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
-| `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
-| `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling constraints 4 |
+| `resilience.replicas-same-node.prod-app-w/deployment/app-w` | fail | high | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
+| `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | fail | high | every replica is on one node now. replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
+| `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | fail | high | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
+| `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | fail | high | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling constraints 4 |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | high | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
-| `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
+| `security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 | `karpenter.ec2nodeclass-hardening.cluster` | warn | high | IMDS hop limit 2 or more ['default'], tokens optional [], root volume encrypted not set ['default'] (size {'default': 50.0}GB) |
 | `logs.signatures.external-secrets.provider-error` | warn | high | 62 occurrences (2026-11-06T17:31:20Z ~ 2026-11-07T01:34:43Z), thresholds warn 1/fail 10. Files: ['logs/pods/external-secrets/external-secrets_external-secrets.log']. Samples: ['[pod/external-secrets-7859bcd5c-g8z4q/external-secrets] 2026-11-06T17:31:20.550454017Z … |
 | `logs.signatures.karpenter.version-unsupported` | warn | high | 1 occurrences (2026-11-06T08:49:38Z ~ 2026-11-06T08:49:38Z), thresholds warn 1/fail 10. Files: ['logs/pods/karpenter/karpenter_karpenter.log']. Samples: ['[pod/karpenter-9769889bd-pkxd2/controller] 2026-11-06T08:49:38.045274596Z … |
 | `observability.failure-mode-uncovered.Scheduling failure` | warn | high | user symptom: new pods do not start. No alert rule covers this failure mode |
 | `observability.failure-mode-uncovered.VPC CNI IP exhaustion` | warn | high | user symptom: pods Pending without network. No alert rule covers this failure mode |
+| `observability.no-slo.cluster` | warn | high | no SLO tool. Signals: sli/slo recording rules [], burn rate alerts [], slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'] known issue #15 |
+| `observability.no-symptom-alerts.cluster` | warn | high | 157 alert rules: symptom 0, cause 130, app metrics (assumed symptom) 22. Symptom ratio 0.0. Symptom rules: [] |
 | `prometheus.memory-pressure.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus` | warn | high | working set / limit None (limit 1536Mi), active series None, Prometheus container last terminated OOMKilled True (2026-11-05T08:21:29Z), restarts 2, OOMKilled containers in the monitoring namespace [], restarts over 7 days {} |
-| `resilience.replicas-same-node.prod-app-x/deployment/app-x-api` | warn | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-137.ap-northeast-2.compute.internal': 1}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
+| `resilience.n-plus-one.cluster` | warn | high | Allocatable without the largest node ip-10-0-1-139.ap-northeast-2.compute.internal (3.92 cores, 29.8GB): CPU 15.45 cores vs total requests 11.51 (OK), memory 46.3GB vs 45.7GB (OK). Pods on that node 34 (prod 23). Pods that fit on no other node []. Pools short of room: 32 pods limited to … |
+| `resilience.replicas-same-node.prod-app-x/deployment/app-x-api` | warn | high | the replicas are on different nodes now, but nothing declares that they must be (no topologySpread, no podAntiAffinity), so a reschedule may put them on one. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1 … |
 | `resilience.restarts-crashloop.argocd/argocd-application-controller-0:application-controller` | warn | high | 42 restarts, state Running, last termination OOMKilled (exit 137) 2026-10-30T09:00:04Z, cause class OOM (memory limit), Unhealthy events 0, node reboot time None |
 | `argocd.default-project-wildcard.cluster` | fail | medium | AppProjects 1, projects whose sourceRepos and destinations are all * ['default'], apps bound to the default project 13/13 (prod 9) |
 | `ebscsi.storageclass-unencrypted.cluster` | fail | medium | ebs.csi.aws.com StorageClasses 4, without encrypted ['gp3', 'gp3-2a', 'gp3-2c'] (default class gp3), in-tree leftovers ['gp2'], without allowVolumeExpansion ['gp2', 'gp3', 'gp3-2a', 'gp3-2c'] |
 | `eks.node-os-skew.cluster` | fail | medium | OS ['Amazon Linux 2', 'Amazon Linux 2023.9.20251208'], kernels ['5.10.245-245.983.amzn2.aarch64', '5.10.245-245.983.amzn2.x86_64', '6.1.158-180.294.amzn2023.x86_64'], runtimes ['containerd://1.7.29', 'containerd://2.1.5'], cgroup: AL2 may be v1, AL2023 is v2 |
 | `eso.provider-api-errors.cluster` | fail | medium | provider API calls since controller start: success 31963 / errors 2711 (ratio 0.0782), sync failures 2711/73134, reconcile errors 2711, ExternalSecrets not Ready ['database/externalsecret/mysql-app-v-secret'] (oldest refresh 7796.6 hours ago) |
 | `grafana.datasource-errors.monitoring/deployment/kube-prometheus-stack-grafana` | fail | medium | responses per datasource (cumulative since start) [('Loki(loki)', 2614, {'101': 4, '200': 2275, '400': 6, '429': 329}), ('Prometheus(prometheus)', 1535, {'200': 1349, '301': 186}), ('VictoriaMetrics_onprem(prometheus)', 142, {'200': 142})], error rate 1% or more ['Loki(loki)'] (max 0.1259), Grafana … |
-| `hygiene.mutable-image-tag.prod-app-z-backend/deployment/tts-proxy:tailscale` | fail | medium | image tailscale/tailscale:latest (tag latest, imagePullPolicy IfNotPresent, registry docker.io) |
-| `hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/tts-proxy` | fail | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'memoryLimitsMissing', 'memoryRequestsMissing']. Security-category danger ['dangerousCapabilities', 'privilegeEscalationAllowed' … |
+| `hygiene.mutable-image-tag.prod-app-z-backend/deployment/app-ad:tailscale` | fail | medium | image tailscale/tailscale:latest (tag latest, imagePullPolicy IfNotPresent, registry docker.io) |
+| `hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/app-ad` | fail | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'memoryLimitsMissing', 'memoryRequestsMissing'] and 6 more. Security-category danger ['dangerousCapabilities' … |
 | `observability.log-coverage-gap.cluster` | fail | medium | Of 147 pods Running for over 1h, 83 are absent from Loki pod labels (ratio 0.565). Nodes with every pod missing: []. By namespace: {'kube-system': 23, 'monitoring': 22, 'prod-app-z-backend': 5, 'keda': 3, 'middleware': 3, 'prod-app-t': 3, 'prod-app-s': 3, 'argocd': 2, 'dev-app-s': 2, 'dev-app-y' … |
 | `observability.loki-retention-unbounded.cluster` | fail | medium | Loki 2.6.1, retention_period 31d, retention_enabled false |
+| `observability.no-event-retention.cluster` | fail | medium | no component of family event-retention in inventory.components |
 | `operators.unhealthy-condition.externalsecrets/database/mysql-app-v-secret` | fail | medium | Ready=False (SecretSyncedError) for 7795.6 hours: could not get secret data from provider |
 | `resilience.db-probe-timeout.prod-app-s/statefulset/app-s-backend-mysql:mysql` | fail | medium | prod-app-s/statefulset/app-s-backend-mysql container mysql: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe present |
 | `resilience.db-probe-timeout.prod-app-v/statefulset/app-v-backend-prod-mysql:mysql` | fail | medium | prod-app-v/statefulset/app-v-backend-prod-mysql container mysql: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe present |
@@ -222,11 +220,11 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `resilience.no-readiness-probe.prod-app-y/app-y-ai` | fail | medium | containers without a readinessProbe: ai |
 | `resilience.no-readiness-probe.prod-app-y/app-y-backend` | fail | medium | containers without a readinessProbe: backend |
 | `resilience.no-readiness-probe.prod-app-y/app-y-frontend` | fail | medium | containers without a readinessProbe: frontend |
-| `resilience.no-readiness-probe.prod-app-z-backend/tts-proxy` | fail | medium | containers without a readinessProbe: tailscale, forwarder |
+| `resilience.no-readiness-probe.prod-app-z-backend/app-ad` | fail | medium | containers without a readinessProbe: tailscale, forwarder |
 | `resilience.recreate-strategy-serving.prod-app-r/deployment/app-r-backend` | fail | medium | strategy Recreate (justification none), replicas 1, preStop False, grace 30s |
 | `resilience.replicas-same-zone.prod-app-x/deployment/app-x-api` | fail | medium | replicas 2, AZ distribution {'ap-northeast-2a': 2}, node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-137.ap-northeast-2.compute.internal': 1}, topologySpread [] |
 | `resilience.replicas-same-zone.prod-app-z-backend/deployment/app-z-embedding-server` | fail | medium | replicas 2, AZ distribution {'ap-northeast-2a': 2}, node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-245.ap-northeast-2.compute.internal': 1}, topologySpread [] |
-| `resilience.single-node-dependency.prod-app-z-backend/deployment/tts-proxy` | fail | medium | ["hostPath volume ['dev-net-tun']"], replicas 1 |
+| `resilience.single-node-dependency.prod-app-z-backend/deployment/app-ad` | fail | medium | ["hostPath volume ['dev-net-tun']"], replicas 1 |
 | `resilience.single-replica-in-prod.app-ab-prod/app-ab-backend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.app-ab-prod/app-ab-frontend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-r/app-r-backend` | fail | medium | replicas 1, no HPA |
@@ -241,8 +239,8 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `resilience.single-replica-in-prod.prod-app-v/app-v-frontend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-y/app-y-admin` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-y/app-y-frontend` | fail | medium | replicas 1, no HPA |
+| `resilience.single-replica-in-prod.prod-app-z-backend/app-ad` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-z-backend/app-z-pg-proxy` | fail | medium | replicas 1, no HPA |
-| `resilience.single-replica-in-prod.prod-app-z-backend/tts-proxy` | fail | medium | replicas 1, no HPA |
 | `resources.jvm-heap-vs-limit.middleware/statefulset/kafka-controller:jmx-exporter` | fail | medium | middleware/statefulset/kafka-controller container jmx-exporter (jmx-exporter:0.20.0-debian-11-r4): -Xmx NoneMiB, MaxRAMPercentage 100.0, memory limit 128.0MiB -> heap/limit 1.0 (heap unset False) |
 | `resources.krr-recommendation.argocd/statefulset/argocd-application-controller:application-controller` | fail | medium | memory request under by 373 MB, CPU request over by 0.143 cores: CPU request 0.2 → 0.057 cores, CPU limit 0.5 → none, memory request 384 → 757 MB. KRR severity WARNING (CPU req OK, CPU limit WARNING, memory req WARNING, memory limit GOOD) |
 | `resources.krr-recommendation.dev-app-v/statefulset/app-v-backend-dev-mysql:mysql` | fail | medium | memory request under by 281 MB: CPU request 0.1 → 0.012 cores, CPU limit 0.5 → none, memory request 512 → 793 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req WARNING, memory limit OK) |
@@ -261,10 +259,9 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `resources.krr-recommendation.prod-app-z-backend/deployment/app-z-file-worker:file-worker` | fail | medium | CPU request over by 0.703 cores, memory request over by 337 MB: CPU request 1.0 → 0.297 cores, CPU limit 2.0 → none, memory request 2048 → 1711 MB, memory limit 4096 → 1711 MB. KRR severity CRITICAL (CPU req CRITICAL, CPU limit WARNING, memory req WARNING, memory limit CRITICAL) |
 | `resources.krr-recommendation.prod-app-z-backend/deployment/app-z-graph-worker:graph-worker` | fail | medium | CPU request over by 0.458 cores, memory request over by 670 MB: CPU request 1.0 → 0.542 cores, CPU limit 2.0 → none, memory request 2048 → 1378 MB, memory limit 6144 → 1378 MB. KRR severity CRITICAL (CPU req WARNING, CPU limit WARNING, memory req CRITICAL, memory limit CRITICAL) |
 | `resources.krr-recommendation.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | medium | CPU request over by 0.49 cores, memory request over by 2417 MB: CPU request 0.5 → 0.01 cores, CPU limit 2.0 → none, memory request 4096 → 1679 MB, memory limit 5120 → 1679 MB. KRR severity CRITICAL (CPU req WARNING, CPU limit WARNING, memory req CRITICAL, memory limit CRITICAL) |
-| `resources.no-memory-limit.prod-app-z-backend/tts-proxy` | fail | medium | containers without a limit: tailscale, forwarder |
+| `resources.no-memory-limit.prod-app-z-backend/app-ad` | fail | medium | containers without a limit: tailscale, forwarder |
 | `scaling.karpenter-expired-not-replaced.default-n44bh` | fail | medium | NodeClaim default-n44bh → node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge spot): age 1056.5h, 336.5h past expireAfter 720.0h. Blocking reason (DisruptionBlocked): {}. do-not-disrupt pods on this node 2: prod-app-s/app-s-admin-57f5fcc58d-khsh5, prod-app-x/app-x-api-5755745bc7-2sjvd |
 | `security.externalsecret-not-ready.database/mysql-app-v-secret` | fail | medium | Ready False (SecretSyncedError): could not get secret data from provider |
-| `security.no-certificate-manager.cluster` | fail | medium | no component of family certificates in inventory.components |
 | `security.polaris-security-danger.cluster` | fail | medium | Polaris score 79. Security danger workloads 74 (prod 29): per check {'dangerousCapabilities': 2, 'hostNetworkSet': 2, 'privilegeEscalationAllowed': 59, 'runAsPrivileged': 2, 'runAsRootAllowed': 58, 'hostPIDSet': 1, 'rolebindingClusterAdminRole': 2, 'rolebindingRolePodExecAttach': 2 … |
 | `storage.csi-snapshot-unavailable.cluster` | fail | medium | VolumeSnapshot CRD False, VolumeSnapshots 0 (0 in 7 days), VolumeSnapshotClasses 0, EBS snapshots in 30 days None None, prod PVCs 8 |
 | `storage.no-volume-expansion.gp3` | fail | medium | allowVolumeExpansion False, provisioner ebs.csi.aws.com |
@@ -288,11 +285,11 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `hygiene.mutable-image-tag.arc-runners/cronjob/arc-cool-down:kubectl` | warn | medium | image bitnami/kubectl:latest (tag latest, imagePullPolicy Always, registry docker.io) |
 | `hygiene.mutable-image-tag.arc-runners/cronjob/arc-warm-up:kubectl` | warn | medium | image bitnami/kubectl:latest (tag latest, imagePullPolicy Always, registry docker.io) |
 | `hygiene.mutable-image-tag.middleware/deployment/redis-insight:redis-insight` | warn | medium | image redis/redisinsight:latest (tag latest, imagePullPolicy Always, registry docker.io) |
-| `hygiene.node-label-dependency.app-u.ai/role` | warn | medium | Label app-u.ai/role: 34 workloads (production 9) depend on it via nodeSelector/affinity, present on 5/9 nodes — e.g. argocd/deployment/argocd-applicationset-controller, argocd/deployment/argocd-dex-server, argocd/deployment/argocd-notifications-controller |
-| `hygiene.node-label-dependency.workload-type` | warn | medium | Label workload-type: 39 workloads (production 26) depend on it via nodeSelector/affinity, present on 4/9 nodes — e.g. dev-app-s/deployment/app-s-admin, dev-app-s/deployment/app-s-api, dev-app-s/deployment/app-s-backend |
+| `hygiene.node-label-dependency.app-u.ai/role` | warn | medium | Label app-u.ai/role: 34 workloads (production 9) depend on it via nodeSelector/affinity, present on 5/9 nodes — e.g. ['argocd/deployment/argocd-applicationset-controller', 'argocd/deployment/argocd-dex-server', 'argocd/deployment/argocd-notifications-controller'] and 31 more |
+| `hygiene.node-label-dependency.workload-type` | warn | medium | Label workload-type: 39 workloads (production 26) depend on it via nodeSelector/affinity, present on 4/9 nodes — e.g. ['dev-app-s/deployment/app-s-admin', 'dev-app-s/deployment/app-s-api', 'dev-app-s/deployment/app-s-backend'] and 36 more |
 | `hygiene.polaris-reliability-danger.arc-runners/cronjob/arc-cool-down` | warn | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'memoryLimitsMissing', 'memoryRequestsMissing', 'metadataAndInstanceMismatched', 'priorityClassNotSet']. Security-category danger ['privilegeEscalationAllowed', 'runAsRootAllowed'] is in … |
 | `hygiene.polaris-reliability-danger.arc-runners/cronjob/arc-warm-up` | warn | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'memoryLimitsMissing', 'memoryRequestsMissing', 'metadataAndInstanceMismatched', 'priorityClassNotSet']. Security-category danger ['privilegeEscalationAllowed', 'runAsRootAllowed'] is in … |
-| `hygiene.polaris-reliability-danger.middleware/deployment/redis-insight` | warn | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'metadataAndInstanceMismatched', 'missingPodDisruptionBudget', 'priorityClassNotSet']. Security-category danger ['privilegeEscalationAllowed' … |
+| `hygiene.polaris-reliability-danger.middleware/deployment/redis-insight` | warn | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'metadataAndInstanceMismatched', 'missingPodDisruptionBudget', 'priorityClassNotSet'] and 2 more. Security-category danger ['privilegeEscalationAllowed' … |
 | `karpenter.consistency-errors.cluster` | warn | medium | cluster state synced True, consistency errors 3, reconcile errors {}, pod startup average 30.9s (8787 pods), node termination average 14.7s |
 | `keda.components-single-replica.cluster` | warn | medium | operator 1/1, metrics-apiserver 1/1, APIService v1beta1.external.metrics Available True, PDB False, prod ScaledObject 3 |
 | `keda.prod-external-trigger-no-fallback.cluster` | warn | medium | prod external-trigger ScaledObjects without fallback ['prod-app-y/scaledobject/app-y-ai-kafka-lag', 'prod-app-z-backend/scaledobject/app-z-file-worker', 'prod-app-z-backend/scaledobject/app-z-graph-worker'], trigger types {'kafka': 4, 'metrics-api': 2}, minimum pollingInterval 15s |
@@ -300,47 +297,6 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `logs.signatures.metrics-server.scrape-failed` | warn | medium | 31 occurrences (2026-11-06T01:43:11Z ~ 2026-11-06T10:09:11Z), thresholds warn 5/fail 100. Files: ['logs/pods/metrics-server/kube-system_metrics-server.log']. Samples: ['[pod/metrics-server-65d4b7df64-xxfjs/metrics-server] 2026-11-06T01:43:11.055572813Z E1106 01:43:11.055448       1 scraper.go:149] … |
 | `loki.memory-pressure.monitoring/statefulset/loki-stack` | warn | medium | RSS 289MiB / limit 512Mi = 0.565, in-memory streams 54, last termination OOMKilled True(2026-10-25T00:15:41Z), restarts 1, storage emptyDir |
 | `loki.request-errors.monitoring/statefulset/loki-stack` | warn | medium | 1 5xx out of 6899928 requests since start (by route {'loki_api_v1_series': 1}, excluding /ready 503 during startup), panics 0, WAL disk full 0, error log lines 11783, rejected {} |
-| `observability.golden-signals-missing.app-ab-prod/app-ab-backend` | warn | medium | hosts ['app-ab-tp-api.lab-k.example'], backends ['app-ab-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.app-ab-prod/app-ab-frontend` | warn | medium | hosts ['app-ab-tp-prod.lab-k.example'], backends ['app-ab-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.argocd/argocd-server` | warn | medium | hosts ['deploy.lab-k.example'], backends ['argocd-server'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-aa/app-aa-backend` | warn | medium | hosts ['demo-api.lab-m.example'], backends ['app-aa-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-aa/app-aa-frontend` | warn | medium | hosts ['demo.lab-m.example'], backends ['app-aa-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-s/app-s-admin` | warn | medium | hosts ['admin-dev.lab-l.example'], backends ['app-s-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-s/app-s-api` | warn | medium | hosts ['api-dev.v1.lab-l.example'], backends ['app-s-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-s/app-s-backend` | warn | medium | hosts ['api-dev.lab-l.example'], backends ['app-s-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-s/app-s-frontend` | warn | medium | hosts ['dev.lab-l.example'], backends ['app-s-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-v/app-v-admin-frontend` | warn | medium | hosts ['admin-dev.lab-n.example'], backends ['app-v-admin-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-v/app-v-backend` | warn | medium | hosts ['api-dev.lab-n.example'], backends ['app-v-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-v/app-v-frontend` | warn | medium | hosts ['dev.lab-n.example'], backends ['app-v-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-y/app-y-admin` | warn | medium | hosts ['admin-dev.lab-m.example'], backends ['app-y-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-y/app-y-ai` | warn | medium | hosts ['ai-dev.lab-m.example'], backends ['app-y-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-y/app-y-backend` | warn | medium | hosts ['app-y-api-dev.lab-k.example'], backends ['app-y-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-y/app-y-frontend` | warn | medium | hosts ['app-y-dev.lab-k.example'], backends ['app-y-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.middleware/kafka-ui` | warn | medium | hosts ['kafka.lab-k.example'], backends ['kafka-ui'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.middleware/redis-insight` | warn | medium | hosts ['redis.lab-k.example'], backends ['redis-insight'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.monitoring/kube-prometheus-stack-grafana` | warn | medium | hosts ['monitor.lab-k.example'], backends ['kube-prometheus-stack-grafana'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.monitoring/vmauth` | warn | medium | hosts ['metrics-write.lab-k.example'], backends ['vmauth'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-r/app-r-backend` | warn | medium | hosts ['app-r-api.lab-k.example'], backends ['app-r-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-r/app-r-web` | warn | medium | hosts ['app-r.lab-k.example'], backends ['app-r-web'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-s/app-s-admin` | warn | medium | hosts ['canary-admin.lab-l.example', 'admin.lab-l.example'], backends ['app-s-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-s/app-s-api` | warn | medium | hosts ['canary-api-v1.lab-l.example', 'api.v1.lab-l.example'], backends ['app-s-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-s/app-s-backend` | warn | medium | hosts ['canary-api.lab-l.example', 'api.lab-l.example'], backends ['app-s-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-s/app-s-frontend` | warn | medium | hosts ['canary.lab-l.example', 'www.lab-l.example', 'lab-l.example'], backends ['app-s-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-t/app-t-ai` | warn | medium | hosts ['app-t-ai.lab-k.example'], backends ['app-t-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-t/app-t-backend` | warn | medium | hosts ['app-t-api.lab-k.example'], backends ['app-t-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-t/app-t-studio` | warn | medium | hosts ['app-t-studio.lab-k.example'], backends ['app-t-studio'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-t/app-t-web` | warn | medium | hosts ['app-t.lab-k.example'], backends ['app-t-web'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-v/app-v-admin-frontend` | warn | medium | hosts ['admin.lab-n.example'], backends ['app-v-admin-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-v/app-v-backend` | warn | medium | hosts ['api.lab-n.example'], backends ['app-v-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-v/app-v-frontend` | warn | medium | hosts ['lab-n.example', 'www.lab-n.example'], backends ['app-v-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-w/app-w` | warn | medium | hosts ['app-w.lab-k.example'], backends ['app-w'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-x/app-x-api` | warn | medium | hosts ['app-x-api.lab-k.example'], backends ['app-x-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-y/app-y-admin` | warn | medium | hosts ['admin.lab-m.example'], backends ['app-y-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-y/app-y-ai` | warn | medium | hosts ['ai.lab-m.example'], backends ['app-y-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-y/app-y-backend` | warn | medium | hosts ['api.lab-m.example'], backends ['app-y-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-y/app-y-frontend` | warn | medium | hosts ['lab-m.example', 'www.lab-m.example'], backends ['app-y-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-z-backend/app-z-backend` | warn | medium | hosts ['app-z-api.lab-k.example'], backends ['app-z-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-z-backend/app-z-frontend` | warn | medium | hosts ['app-z.lab-k.example'], backends ['app-z-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
 | `observability.page-severity-cause-alerts.cluster` | warn | medium | of 157 alert rules, 36 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerClusterDown', 'AlertmanagerClusterCrashlooping', 'etcdMembersDown' … |
 | `observability.promtail-dropped.cluster` | warn | medium | Lines dropped in 1h None, non-2xx sends None, active targets total None -- promtail metrics are not in Prometheus (no ServiceMonitor). The numbers above were not measured |
 | `observability.slo-without-burn-rate.cluster` | warn | medium | SLO tools [], 0 sli/slo recording rules, slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'], 0 burn rate alerts |
@@ -378,6 +334,7 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `resources.krr-recommendation.prod-app-y/statefulset/app-y-backend-mysql:mysql` | warn | medium | CPU request over by 0.19 cores: CPU request 0.2 → 0.01 cores, CPU limit 1.0 → none, memory request 768 → 740 MB, memory limit 1536 → 740 MB. KRR severity CRITICAL (CPU req OK, CPU limit WARNING, memory req GOOD, memory limit CRITICAL) |
 | `resources.krr-recommendation.prod-app-z-backend/deployment/app-z-backend:backend` | warn | medium | memory request over by 410 MB: CPU HPA detected, memory request 1024 → 614 MB, memory limit 2048 → 614 MB. KRR severity CRITICAL (CPU req UNKNOWN, CPU limit UNKNOWN, memory req WARNING, memory limit CRITICAL). cpu: HPA detected |
 | `resources.krr-recommendation.prod-app-z-backend/deployment/app-z-pg-proxy:forwarder` | warn | medium | memory request under by 68 MB: CPU request 0.02 → 0.01 cores, CPU limit 0.2 → none, memory request 32 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD) |
+| `security.no-certificate-manager.cluster` | warn | medium | no component of family certificates in inventory.components |
 | `security.psa-not-enforced.cluster` | warn | medium | Namespaces with an enforce label [], prod without one ['app-ab-prod', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend']. Share of containers allowing root 0.61 (29 prod workloads) |
 | `security.rbac-wildcard.argocd-application-controller` | warn | medium | ClusterRole argocd-application-controller: * in verbs and resources, bound subjects [('ServiceAccount', 'argocd', 'argocd-application-controller')] |
 | `security.sa-token-mounted-without-rbac.cluster` | warn | medium | Workloads with token mounted 86/92, of which 30 prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: ['prod-app-w/deployment/app-w', 'prod-app-t/deployment/app-t-ai', 'prod-app-t/deployment/app-t-backend', 'prod-app-t/deployment/app-t-studio', 'prod-app-t/deployment/app-t-web' … |
@@ -396,9 +353,9 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `tenancy.prod-without-quota.prod-app-x` | warn | medium | prod-app-x (prod): no ResourceQuota. Pods 3, CPU requests total 1.1 cores, memory requests total 2.25GB, 7d CPU p95 None cores (cluster share None), memory p95 NoneGB, 7d max/median Nonex. Tenants in this cluster 14, shares nodes with prod True |
 | `tenancy.prod-without-quota.prod-app-y` | warn | medium | prod-app-y (prod): no ResourceQuota. Pods 8, CPU requests total 0.51 cores, memory requests total 8.0GB, 7d CPU p95 None cores (cluster share None), memory p95 NoneGB, 7d max/median Nonex. Tenants in this cluster 14, shares nodes with prod True |
 | `tenancy.prod-without-quota.prod-app-z-backend` | warn | medium | prod-app-z-backend (prod): no ResourceQuota. Pods 9, CPU requests total 2.72 cores, memory requests total 14.53GB, 7d CPU p95 None cores (cluster share None), memory p95 NoneGB, 7d max/median Nonex. Tenants in this cluster 14, shares nodes with prod True |
-| `tenancy.shared-node-limit-overcommit.ip-10-0-1-117.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-1-117.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): tenant kinds ['dev', 'prod'], namespaces ['kube-system', 'keda', 'monitoring', 'argocd', 'dev-app-y', 'dev-app-aa']. Memory limit total 11.6GB / allocatable 6.9GB = 1.68x, request total 4.7GB … |
-| `tenancy.shared-node-limit-overcommit.ip-10-0-1-139.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default): tenant kinds ['dev', 'prod'], namespaces ['prod-app-y', 'dev-app-y', 'prod-app-s', 'prod-app-z-backend', 'dev-app-s', 'prod-app-v']. Memory limit total 47.0GB / allocatable 29.8GB = 1.58x, request total 18.9GB, containers without a … |
-| `tenancy.shared-node-limit-overcommit.ip-10-0-2-218.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-2-218.ap-northeast-2.compute.internal (pool system-ondemand): tenant kinds ['dev', 'other', 'prod'], namespaces ['monitoring', 'argocd', 'dev-app-aa', 'keda', 'kube-system', 'middleware']. Memory limit total 5.7GB / allocatable 3.2GB = 1.79x, request total 2.0GB, containers without a … |
+| `tenancy.shared-node-limit-overcommit.ip-10-0-1-117.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-1-117.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): tenant kinds ['dev', 'prod'], namespaces ['kube-system', 'keda', 'monitoring', 'argocd', 'dev-app-y', 'dev-app-aa'] and 3 more. Memory limit total 11.6GB / allocatable 6.9GB = 1.68x, request total … |
+| `tenancy.shared-node-limit-overcommit.ip-10-0-1-139.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default): tenant kinds ['dev', 'prod'], namespaces ['prod-app-y', 'dev-app-y', 'prod-app-s', 'prod-app-z-backend', 'dev-app-s', 'prod-app-v'] and 6 more. Memory limit total 47.0GB / allocatable 29.8GB = 1.58x, request total 18.9GB, containers … |
+| `tenancy.shared-node-limit-overcommit.ip-10-0-2-218.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-2-218.ap-northeast-2.compute.internal (pool system-ondemand): tenant kinds ['dev', 'other', 'prod'], namespaces ['monitoring', 'argocd', 'dev-app-aa', 'keda', 'kube-system', 'middleware'] and 2 more. Memory limit total 5.7GB / allocatable 3.2GB = 1.79x, request total 2.0GB, containers … |
 | `tenancy.tenant-without-limitrange.prod-app-z-backend` | warn | medium | prod-app-z-backend (prod): no LimitRange, containers without requests 2 / without a memory limit 2 (pods 9). 7d CPU p95 None cores, memory p95 NoneGB |
 | `traffic.external-exposure.ingress/argocd/argocd-server` | warn | medium | ingress ['deploy.lab-k.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check |
 | `traffic.external-exposure.ingress/dev-app-s/app-s-admin` | warn | medium | ingress ['admin-dev.lab-l.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check |
@@ -422,7 +379,7 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `tenancy.dev-shares-prod-nodes.ip-10-0-1-117.ap-northeast-2.compute.internal` | fail | low | Node ip-10-0-1-117.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): prod pods 2 (['app-ab-prod', 'prod-app-y']) together with dev pods 2 (['dev-app-aa', 'dev-app-y']). Memory limit total/allocatable 1.68, CPU limit total/allocatable 3.37, containers without a memory … |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | low | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default): prod pods 23 (['app-ab-prod', 'prod-app-s', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend']) together with dev pods 10 (['dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y']). Memory limit … |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-218.ap-northeast-2.compute.internal` | fail | low | Node ip-10-0-2-218.ap-northeast-2.compute.internal (pool system-ondemand): prod pods 2 (['prod-app-t', 'prod-app-x']) together with dev pods 1 (['dev-app-aa']). Memory limit total/allocatable 1.79, CPU limit total/allocatable 1.81, containers without a memory limit 1 |
-| `albctl.aws-api-churn.cluster` | warn | low | AWS API calls since leader start 242614, top [['Elastic Load Balancing v2/DescribeTargetHealth', 76055], ['Elastic Load Balancing v2/DescribeTargetGroupAttributes', 43347], ['EC2/DescribeInstances', 38801], ['EC2/DescribeSecurityGroups', 24999], ['Elastic Load Balancing v2/RegisterTargets' … |
+| `albctl.aws-api-churn.cluster` | warn | low | AWS API calls since leader start 242614, top [['Elastic Load Balancing v2/DescribeTargetHealth', 76055], ['Elastic Load Balancing v2/DescribeTargetGroupAttributes', 43347], ['EC2/DescribeInstances', 38801], ['EC2/DescribeSecurityGroups', 24999], ['Elastic Load Balancing v2/RegisterTargets', 11793]] … |
 | `alertmanager.single-instance.monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager` | warn | low | replicas 1 (ready 1), cluster None (peers 0), data storage emptyDir (silence/notification state preserved 120h) |
 | `argocd.notifications-not-configured.cluster` | warn | low | service.* in argocd-notifications-cm False (triggers 0), prod apps 9, and no Argo CD metrics flow to Alertmanager either (no ServiceMonitor) |
 | `argocd.prod-tracks-moving-ref.cluster` | warn | low | prod apps 9, apps whose targetRevision is a branch or HEAD 9 ['argocd/application/app-w-prod', 'argocd/application/app-t-prod', 'argocd/application/app-x-prod', 'argocd/application/app-s-prod', 'argocd/application/app-y-prod', 'argocd/application/app-ab-prod' … |
@@ -444,9 +401,9 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `kubeproxy.metrics-not-scraped.cluster` | warn | low | metrics False (source None), targets up 0/down 0 [], metricsBindAddress 0.0.0.0:10249 (loopback only False), nodes 9 |
 | `kubeproxy.node-cmd-unavailable.cluster` | warn | low | 9 of 9 nodes could not read /proxyMode or /healthz. Mode from the config file: iptables |
 | `loki.version-old.monitoring/statefulset/loki-stack` | warn | low | Loki 2.6.1, storage emptyDir, retention applied False(compactor 1.0) |
-| `observability.alert-metric-without-dashboard.grafana` | warn | low | 28 dashboards (196 panel metrics) — 153 of 194 alert-rule metrics have no panel: Without, aggregator_unavailable_apiservice, aggregator_unavailable_apiservice_total, alerting, alertmanager_cluster_members, alertmanager_config_hash |
+| `observability.alert-metric-without-dashboard.grafana` | warn | low | 28 dashboards (196 panel metrics) — 153 of 194 alert-rule metrics have no panel: ['Without', 'aggregator_unavailable_apiservice', 'aggregator_unavailable_apiservice_total', 'alerting', 'alertmanager_cluster_members', 'alertmanager_config_hash'] and 147 more |
 | `observability.alerts-never-fired.cluster` | warn | low | 139 of 141 rules did not fire in 15 days (['AlertmanagerClusterCrashlooping', 'AlertmanagerClusterDown', 'AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerFailedReload', 'AlertmanagerFailedToSendAlerts', 'AlertmanagerMembersInconsistent', 'CPUThrottlingHigh' … |
-| `observability.saturation-signal-missing.cluster` | warn | low | 41 of 41 ingress backends have no saturation metric (e.g. [('argocd', 'argocd-server'), ('dev-app-s', 'app-s-admin'), ('dev-app-s', 'app-s-api'), ('dev-app-s', 'app-s-backend'), ('dev-app-s', 'app-s-frontend'), ('dev-app-y', 'app-y-admin')]), namespaces with saturation metrics [] |
+| `observability.saturation-signal-missing.cluster` | warn | low | 41 of 41 ingress backends have no saturation metric (e.g. [('argocd', 'argocd-server'), ('dev-app-s', 'app-s-admin'), ('dev-app-s', 'app-s-api'), ('dev-app-s', 'app-s-backend'), ('dev-app-s', 'app-s-frontend'), ('dev-app-y', 'app-y-admin')] and 35 more), namespaces with saturation metrics [] |
 | `observability.unclassified-errors.cluster` | warn | low | 24 unclassified error lines (23380 lines scanned, 23 files). Top: [('ebs-csi \| "Unexpected failure when attempting to remove node taint(s)" err="isAllocatableSet: driver', 8), ('ebs-csi \| "Volume deletion failed" err="persistentvolume pvc-<uuid> is still attached to node ip-10-', 4), ('ebs-csi \| … |
 | `observability.unstructured-logs.app-ab-prod` | warn | low | Of 947170 lines in 1h, 0 parse as JSON (0.0) |
 | `observability.unstructured-logs.argocd` | warn | low | Of 14865 lines in 1h, 0 parse as JSON (0.0) |
@@ -500,11 +457,11 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `resilience.no-prestop.prod-app-y/app-y-ai` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-y/app-y-backend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-y/app-y-frontend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
+| `resilience.no-prestop.prod-app-z-backend/app-ad` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-backend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-embedding-server` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-frontend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-pg-proxy` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
-| `resilience.no-prestop.prod-app-z-backend/tts-proxy` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `scaling.hpa-cpu-only-prod.prod-app-z-backend/deployment/app-z-backend` | warn | low | HPA prod-app-z-backend/app-z-backend: metrics ['cpu'], current CPU 0% / target 70% |
 | `scaling.hpa-cpu-only-prod.prod-app-z-backend/deployment/app-z-frontend` | warn | low | HPA prod-app-z-backend/app-z-frontend: metrics ['cpu'], current CPU 1% / target 70% |
 | `scaling.hpa-no-behavior-prod.prod-app-z-backend/deployment/app-z-backend` | warn | low | HPA prod-app-z-backend/app-z-backend: no behavior (defaults: scaleDown 300s, scaleUp immediate), None desired changes over 7 days |
@@ -529,84 +486,16 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-admin` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-backend` | warn | low | replicas 2, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-frontend` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.prod-app-z-backend/app-ad` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-z-backend/app-z-embedding-server` | warn | low | replicas 2, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.prod-app-z-backend/tts-proxy` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-1-245.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-1-245.ap-northeast-2.compute.internal (pool default): prod pods 2 (['prod-app-t', 'prod-app-z-backend']) together with dev pods 1 (['dev-app-s']). Memory limit total/allocatable 0.94, CPU limit total/allocatable 2.98, containers without a memory limit 0 |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-100.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-100.ap-northeast-2.compute.internal (pool default): prod pods 9 (['prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-z-backend']) together with dev pods 2 (['dev-app-aa', 'dev-app-v']). Memory limit total/allocatable 1.1, CPU limit total/allocatable 1.96, containers without a memory … |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-60.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-60.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): prod pods 2 (['prod-app-s', 'prod-app-v']) together with dev pods 2 (['dev-app-s', 'dev-app-v']). Memory limit total/allocatable 1.49, CPU limit total/allocatable 2.44, containers without a memory limit … |
 | `vpccni.metrics-unreadable.cluster` | warn | low | 9 of 9 nodes without readable ipamd metrics (localhost:61678): ['ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-1-137.ap-northeast-2.compute.internal', 'ip-10-0-1-139.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal' … |
 | `eks.audit-log-off.cluster` | fail | info | enabled logs ['api', 'authenticator', 'controllerManager', 'scheduler'], disabled logs ['audit'] |
-| `hygiene.no-progressive-delivery.cluster` | fail | info | No progressive-delivery component (Argo Rollouts, Flagger). All deployments are rolling updates (replace everything) -- ALB weighted target groups are not used either |
 
 The table cuts each evidence at 300 characters and a check may cut a list in its evidence; nothing is lost. Every finding below carries, folded, the material its rule judged, taken from `findings-draft.json` `details`.
 
-<details><summary><code>observability.no-symptom-alerts.cluster</code></summary>
-
-```json
-{
- "alerting": 157,
- "by_class": {
-  "app-cause": 5,
-  "app": 22,
-  "cause": 130
- },
- "symptom_ratio": 0.0,
- "symptom_rules": []
-}
-```
-
-</details>
-<details><summary><code>resilience.n-plus-one.cluster</code></summary>
-
-```json
-{
- "allocatable_cpu_without_largest": 15.45,
- "allocatable_memory_gb_without_largest": 46.3,
- "autoscaler": true,
- "autoscaler_name": "karpenter",
- "available": true,
- "cannot_fit_elsewhere": [],
- "cpu_ok": true,
- "karpenter": true,
- "largest_node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
- "largest_node_cpu": 3.92,
- "largest_node_memory_gb": 29.8,
- "memory_ok": true,
- "ok": false,
- "pods_on_largest_node": 34,
- "pools_short": [
-  {
-   "eligible_nodes": [
-    "ip-10-0-1-137.ap-northeast-2.compute.internal",
-    "ip-10-0-1-245.ap-northeast-2.compute.internal",
-    "ip-10-0-2-100.ap-northeast-2.compute.internal"
-   ],
-   "pods": 32,
-   "needed_cpu": 2.79,
-   "free_cpu": 2.62,
-   "needed_memory_gb": 14.81,
-   "free_memory_gb": 11.64
-  },
-  {
-   "eligible_nodes": [
-    "ip-10-0-1-137.ap-northeast-2.compute.internal",
-    "ip-10-0-1-245.ap-northeast-2.compute.internal"
-   ],
-   "pods": 1,
-   "needed_cpu": 0.5,
-   "free_cpu": 0.28,
-   "needed_memory_gb": 4.0,
-   "free_memory_gb": 8.39
-  }
- ],
- "prod_pods_on_largest_node": 23,
- "requests_cpu_total": 11.51,
- "requests_memory_gb_total": 45.7,
- "tight": false
-}
-```
-
-</details>
 <details><summary><code>karpenter.ec2nodeclass-al2.cluster</code></summary>
 
 ```json
@@ -856,7 +745,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy</code></summary>
+<details><summary><code>security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad</code></summary>
 
 ```json
 {
@@ -870,7 +759,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  ],
  "severe": true,
  "system": false,
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -957,6 +846,22 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>observability.no-symptom-alerts.cluster</code></summary>
+
+```json
+{
+ "alerting": 157,
+ "by_class": {
+  "app-cause": 5,
+  "app": 22,
+  "cause": 130
+ },
+ "symptom_ratio": 0.0,
+ "symptom_rules": []
+}
+```
+
+</details>
 <details><summary><code>prometheus.memory-pressure.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus</code></summary>
 
 ```json
@@ -971,6 +876,57 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "restarts": 2,
  "rss_vs_limit": null,
  "target": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+}
+```
+
+</details>
+<details><summary><code>resilience.n-plus-one.cluster</code></summary>
+
+```json
+{
+ "allocatable_cpu_without_largest": 15.45,
+ "allocatable_memory_gb_without_largest": 46.3,
+ "autoscaler": true,
+ "autoscaler_name": "karpenter",
+ "available": true,
+ "cannot_fit_elsewhere": [],
+ "cpu_ok": true,
+ "karpenter": true,
+ "largest_node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+ "largest_node_cpu": 3.92,
+ "largest_node_memory_gb": 29.8,
+ "memory_ok": true,
+ "ok": false,
+ "pods_on_largest_node": 34,
+ "pools_short": [
+  {
+   "eligible_nodes": [
+    "ip-10-0-1-137.ap-northeast-2.compute.internal",
+    "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "ip-10-0-2-100.ap-northeast-2.compute.internal"
+   ],
+   "pods": 32,
+   "needed_cpu": 2.79,
+   "free_cpu": 2.62,
+   "needed_memory_gb": 14.81,
+   "free_memory_gb": 11.64
+  },
+  {
+   "eligible_nodes": [
+    "ip-10-0-1-137.ap-northeast-2.compute.internal",
+    "ip-10-0-1-245.ap-northeast-2.compute.internal"
+   ],
+   "pods": 1,
+   "needed_cpu": 0.5,
+   "free_cpu": 0.28,
+   "needed_memory_gb": 4.0,
+   "free_memory_gb": 8.39
+  }
+ ],
+ "prod_pods_on_largest_node": 23,
+ "requests_cpu_total": 11.51,
+ "requests_memory_gb_total": 45.7,
+ "tight": false
 }
 ```
 
@@ -1129,7 +1085,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>hygiene.mutable-image-tag.prod-app-z-backend/deployment/tts-proxy:tailscale</code></summary>
+<details><summary><code>hygiene.mutable-image-tag.prod-app-z-backend/deployment/app-ad:tailscale</code></summary>
 
 ```json
 {
@@ -1141,12 +1097,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "pull_policy": "IfNotPresent",
  "registry": "docker.io",
  "tag_kind": "latest",
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
 </details>
-<details><summary><code>hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/tts-proxy</code></summary>
+<details><summary><code>hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/app-ad</code></summary>
 
 ```json
 {
@@ -1173,7 +1129,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "privilegeEscalationAllowed",
   "runAsRootAllowed"
  ],
- "target": "prod-app-z-backend/deployment/tts-proxy"
+ "target": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -1198,7 +1154,11 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "karpenter": 2,
   "prod-app-y": 2,
   "prod-app-r": 2,
-  "prod-app-v": 2
+  "prod-app-v": 2,
+  "app-ab-prod": 2,
+  "arc-system": 1,
+  "dev-app-aa": 1,
+  "prod-app-x": 1
  },
  "gap_ratio": 0.565,
  "nodes_all_missing": [],
@@ -1504,12 +1464,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resilience.no-readiness-probe.prod-app-z-backend/tts-proxy</code></summary>
+<details><summary><code>resilience.no-readiness-probe.prod-app-z-backend/app-ad</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
+ "name": "app-ad",
  "kind": "Deployment"
 }
 ```
@@ -1573,7 +1533,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resilience.single-node-dependency.prod-app-z-backend/deployment/tts-proxy</code></summary>
+<details><summary><code>resilience.single-node-dependency.prod-app-z-backend/deployment/app-ad</code></summary>
 
 ```json
 {
@@ -1582,7 +1542,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "hostPath volume ['dev-net-tun']"
  ],
  "replicas": 1,
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -1741,23 +1701,23 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/app-z-pg-proxy</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
  "name": "app-z-pg-proxy",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
  "kind": "Deployment"
 }
 ```
@@ -2119,12 +2079,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resources.no-memory-limit.prod-app-z-backend/tts-proxy</code></summary>
+<details><summary><code>resources.no-memory-limit.prod-app-z-backend/app-ad</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
+ "name": "app-ad",
  "kind": "Deployment"
 }
 ```
@@ -2184,7 +2144,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  },
  "danger_workloads": [
   "kube-system/daemonset/aws-node",
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "kube-system/daemonset/ebs-csi-node-windows",
   "kube-system/daemonset/ebs-csi-node",
   "middleware/deployment/redis-insight",
@@ -2259,7 +2219,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "/clusterrolebinding/keda-operator"
  ],
  "danger_workloads_prod": [
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "prod-app-v/deployment/app-v-admin-frontend",
   "prod-app-y/deployment/app-y-admin",
   "prod-app-y/deployment/app-y-frontend",
@@ -2537,7 +2497,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod"
  ],
  "lb": [
-  "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+  "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
  ],
  "mixed_prod_nonprod": true,
  "namespace_count": 16,
@@ -2705,7 +2665,33 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "argocd/deployment/argocd-repo-server",
   "argocd/deployment/argocd-server",
   "kube-system/deployment/external-dns",
-  "middleware/deployment/kafka-exporter"
+  "middleware/deployment/kafka-exporter",
+  "middleware/deployment/kafka-ui",
+  "middleware/deployment/redis-insight",
+  "monitoring/deployment/kube-prometheus-stack-grafana",
+  "monitoring/deployment/kube-prometheus-stack-operator",
+  "monitoring/deployment/vmalert",
+  "prod-app-z-backend/deployment/app-z-pg-proxy",
+  "argocd/statefulset/argocd-application-controller",
+  "dev-app-s/statefulset/app-s-backend-mysql",
+  "dev-app-y/statefulset/app-y-backend-mysql",
+  "dev-app-v/statefulset/app-v-backend-dev-mysql",
+  "dev-app-aa/statefulset/app-aa-mysql",
+  "dev-app-aa/statefulset/app-aa-postgres",
+  "middleware/statefulset/kafka-controller",
+  "middleware/statefulset/redis-master",
+  "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager",
+  "monitoring/statefulset/loki-stack",
+  "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus",
+  "monitoring/statefulset/vm-single",
+  "prod-app-t/statefulset/app-t-backend-postgresql",
+  "prod-app-x/statefulset/app-x-postgresql",
+  "prod-app-s/statefulset/app-s-backend-mysql",
+  "prod-app-y/statefulset/app-y-backend-mysql",
+  "prod-app-z-backend/statefulset/app-z-neo4j",
+  "prod-app-r/statefulset/app-r-postgresql",
+  "prod-app-v/statefulset/app-v-backend-prod-mysql",
+  "app-ab-prod/statefulset/app-ab-backend-postgresql"
  ]
 }
 ```
@@ -2729,7 +2715,38 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "dev-app-y/deployment/app-y-admin",
   "dev-app-y/deployment/app-y-ai",
   "dev-app-y/deployment/app-y-backend",
-  "dev-app-y/deployment/app-y-frontend"
+  "dev-app-y/deployment/app-y-frontend",
+  "dev-app-v/deployment/app-v-admin-frontend",
+  "dev-app-v/deployment/app-v-backend",
+  "dev-app-v/deployment/app-v-frontend",
+  "dev-app-aa/deployment/app-aa-backend",
+  "dev-app-aa/deployment/app-aa-frontend",
+  "prod-app-w/deployment/app-w",
+  "prod-app-t/deployment/app-t-ai",
+  "prod-app-t/deployment/app-t-backend",
+  "prod-app-t/deployment/app-t-studio",
+  "prod-app-t/deployment/app-t-web",
+  "prod-app-x/deployment/app-x-api",
+  "prod-app-s/deployment/app-s-admin",
+  "prod-app-s/deployment/app-s-api",
+  "prod-app-s/deployment/app-s-backend",
+  "prod-app-s/deployment/app-s-frontend",
+  "prod-app-y/deployment/app-y-admin",
+  "prod-app-y/deployment/app-y-ai",
+  "prod-app-y/deployment/app-y-backend",
+  "prod-app-y/deployment/app-y-frontend",
+  "prod-app-z-backend/deployment/app-z-backend",
+  "prod-app-z-backend/deployment/app-z-embedding-server",
+  "prod-app-z-backend/deployment/app-z-file-worker",
+  "prod-app-z-backend/deployment/app-z-frontend",
+  "prod-app-z-backend/deployment/app-z-graph-worker",
+  "prod-app-r/deployment/app-r-backend",
+  "prod-app-r/deployment/app-r-web",
+  "prod-app-v/deployment/app-v-admin-frontend",
+  "prod-app-v/deployment/app-v-backend",
+  "prod-app-v/deployment/app-v-frontend",
+  "app-ab-prod/deployment/app-ab-backend",
+  "app-ab-prod/deployment/app-ab-frontend"
  ]
 }
 ```
@@ -2941,710 +2958,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "requests_total": 6899928,
  "target": "monitoring/statefulset/loki-stack",
  "wal_disk_full_failures": 0
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.app-ab-prod/app-ab-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-ab-tp-api.lab-k.example"
- ],
- "ingress": "app-ab-backend",
- "namespace": "app-ab-prod",
- "services": [
-  "app-ab-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.app-ab-prod/app-ab-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-ab-tp-prod.lab-k.example"
- ],
- "ingress": "app-ab-frontend",
- "namespace": "app-ab-prod",
- "services": [
-  "app-ab-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.argocd/argocd-server</code></summary>
-
-```json
-{
- "hosts": [
-  "deploy.lab-k.example"
- ],
- "ingress": "argocd-server",
- "namespace": "argocd",
- "services": [
-  "argocd-server"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-aa/app-aa-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "demo-api.lab-m.example"
- ],
- "ingress": "app-aa-backend",
- "namespace": "dev-app-aa",
- "services": [
-  "app-aa-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-aa/app-aa-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "demo.lab-m.example"
- ],
- "ingress": "app-aa-frontend",
- "namespace": "dev-app-aa",
- "services": [
-  "app-aa-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-admin</code></summary>
-
-```json
-{
- "hosts": [
-  "admin-dev.lab-l.example"
- ],
- "ingress": "app-s-admin",
- "namespace": "dev-app-s",
- "services": [
-  "app-s-admin"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-api</code></summary>
-
-```json
-{
- "hosts": [
-  "api-dev.v1.lab-l.example"
- ],
- "ingress": "app-s-api",
- "namespace": "dev-app-s",
- "services": [
-  "app-s-api"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "api-dev.lab-l.example"
- ],
- "ingress": "app-s-backend",
- "namespace": "dev-app-s",
- "services": [
-  "app-s-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "dev.lab-l.example"
- ],
- "ingress": "app-s-frontend",
- "namespace": "dev-app-s",
- "services": [
-  "app-s-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-v/app-v-admin-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "admin-dev.lab-n.example"
- ],
- "ingress": "app-v-admin-frontend",
- "namespace": "dev-app-v",
- "services": [
-  "app-v-admin-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-v/app-v-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "api-dev.lab-n.example"
- ],
- "ingress": "app-v-backend",
- "namespace": "dev-app-v",
- "services": [
-  "app-v-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-v/app-v-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "dev.lab-n.example"
- ],
- "ingress": "app-v-frontend",
- "namespace": "dev-app-v",
- "services": [
-  "app-v-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-admin</code></summary>
-
-```json
-{
- "hosts": [
-  "admin-dev.lab-m.example"
- ],
- "ingress": "app-y-admin",
- "namespace": "dev-app-y",
- "services": [
-  "app-y-admin"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-ai</code></summary>
-
-```json
-{
- "hosts": [
-  "ai-dev.lab-m.example"
- ],
- "ingress": "app-y-ai",
- "namespace": "dev-app-y",
- "services": [
-  "app-y-ai"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-y-api-dev.lab-k.example"
- ],
- "ingress": "app-y-backend",
- "namespace": "dev-app-y",
- "services": [
-  "app-y-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-y-dev.lab-k.example"
- ],
- "ingress": "app-y-frontend",
- "namespace": "dev-app-y",
- "services": [
-  "app-y-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.middleware/kafka-ui</code></summary>
-
-```json
-{
- "hosts": [
-  "kafka.lab-k.example"
- ],
- "ingress": "kafka-ui",
- "namespace": "middleware",
- "services": [
-  "kafka-ui"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.middleware/redis-insight</code></summary>
-
-```json
-{
- "hosts": [
-  "redis.lab-k.example"
- ],
- "ingress": "redis-insight",
- "namespace": "middleware",
- "services": [
-  "redis-insight"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.monitoring/kube-prometheus-stack-grafana</code></summary>
-
-```json
-{
- "hosts": [
-  "monitor.lab-k.example"
- ],
- "ingress": "kube-prometheus-stack-grafana",
- "namespace": "monitoring",
- "services": [
-  "kube-prometheus-stack-grafana"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.monitoring/vmauth</code></summary>
-
-```json
-{
- "hosts": [
-  "metrics-write.lab-k.example"
- ],
- "ingress": "vmauth",
- "namespace": "monitoring",
- "services": [
-  "vmauth"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-r/app-r-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-r-api.lab-k.example"
- ],
- "ingress": "app-r-backend",
- "namespace": "prod-app-r",
- "services": [
-  "app-r-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-r/app-r-web</code></summary>
-
-```json
-{
- "hosts": [
-  "app-r.lab-k.example"
- ],
- "ingress": "app-r-web",
- "namespace": "prod-app-r",
- "services": [
-  "app-r-web"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-admin</code></summary>
-
-```json
-{
- "hosts": [
-  "canary-admin.lab-l.example",
-  "admin.lab-l.example"
- ],
- "ingress": "app-s-admin",
- "namespace": "prod-app-s",
- "services": [
-  "app-s-admin"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-api</code></summary>
-
-```json
-{
- "hosts": [
-  "canary-api-v1.lab-l.example",
-  "api.v1.lab-l.example"
- ],
- "ingress": "app-s-api",
- "namespace": "prod-app-s",
- "services": [
-  "app-s-api"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "canary-api.lab-l.example",
-  "api.lab-l.example"
- ],
- "ingress": "app-s-backend",
- "namespace": "prod-app-s",
- "services": [
-  "app-s-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "canary.lab-l.example",
-  "www.lab-l.example",
-  "lab-l.example"
- ],
- "ingress": "app-s-frontend",
- "namespace": "prod-app-s",
- "services": [
-  "app-s-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-ai</code></summary>
-
-```json
-{
- "hosts": [
-  "app-t-ai.lab-k.example"
- ],
- "ingress": "app-t-ai",
- "namespace": "prod-app-t",
- "services": [
-  "app-t-ai"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-t-api.lab-k.example"
- ],
- "ingress": "app-t-backend",
- "namespace": "prod-app-t",
- "services": [
-  "app-t-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-studio</code></summary>
-
-```json
-{
- "hosts": [
-  "app-t-studio.lab-k.example"
- ],
- "ingress": "app-t-studio",
- "namespace": "prod-app-t",
- "services": [
-  "app-t-studio"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-web</code></summary>
-
-```json
-{
- "hosts": [
-  "app-t.lab-k.example"
- ],
- "ingress": "app-t-web",
- "namespace": "prod-app-t",
- "services": [
-  "app-t-web"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-v/app-v-admin-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "admin.lab-n.example"
- ],
- "ingress": "app-v-admin-frontend",
- "namespace": "prod-app-v",
- "services": [
-  "app-v-admin-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-v/app-v-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "api.lab-n.example"
- ],
- "ingress": "app-v-backend",
- "namespace": "prod-app-v",
- "services": [
-  "app-v-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-v/app-v-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "lab-n.example",
-  "www.lab-n.example"
- ],
- "ingress": "app-v-frontend",
- "namespace": "prod-app-v",
- "services": [
-  "app-v-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-w/app-w</code></summary>
-
-```json
-{
- "hosts": [
-  "app-w.lab-k.example"
- ],
- "ingress": "app-w",
- "namespace": "prod-app-w",
- "services": [
-  "app-w"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-x/app-x-api</code></summary>
-
-```json
-{
- "hosts": [
-  "app-x-api.lab-k.example"
- ],
- "ingress": "app-x-api",
- "namespace": "prod-app-x",
- "services": [
-  "app-x-api"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-admin</code></summary>
-
-```json
-{
- "hosts": [
-  "admin.lab-m.example"
- ],
- "ingress": "app-y-admin",
- "namespace": "prod-app-y",
- "services": [
-  "app-y-admin"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-ai</code></summary>
-
-```json
-{
- "hosts": [
-  "ai.lab-m.example"
- ],
- "ingress": "app-y-ai",
- "namespace": "prod-app-y",
- "services": [
-  "app-y-ai"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "api.lab-m.example"
- ],
- "ingress": "app-y-backend",
- "namespace": "prod-app-y",
- "services": [
-  "app-y-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "lab-m.example",
-  "www.lab-m.example"
- ],
- "ingress": "app-y-frontend",
- "namespace": "prod-app-y",
- "services": [
-  "app-y-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-z-backend/app-z-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-z-api.lab-k.example"
- ],
- "ingress": "app-z-backend",
- "namespace": "prod-app-z-backend",
- "services": [
-  "app-z-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-z-backend/app-z-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-z.lab-k.example"
- ],
- "ingress": "app-z-frontend",
- "namespace": "prod-app-z-backend",
- "services": [
-  "app-z-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
 }
 ```
 
@@ -4560,7 +3873,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod-app-z-backend/deployment/app-z-frontend",
   "prod-app-z-backend/deployment/app-z-graph-worker",
   "prod-app-z-backend/deployment/app-z-pg-proxy",
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "prod-app-r/deployment/app-r-backend",
   "prod-app-r/deployment/app-r-web",
   "prod-app-v/deployment/app-v-admin-frontend",
@@ -4622,7 +3935,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod-app-z-backend/deployment/app-z-frontend",
   "prod-app-z-backend/statefulset/app-z-neo4j",
   "prod-app-z-backend/deployment/app-z-pg-proxy",
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "prod-app-r/deployment/app-r-backend",
   "prod-app-r/deployment/app-r-web",
   "prod-app-v/deployment/app-v-admin-frontend",
@@ -5687,8 +5000,8 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod-app-r/statefulset/app-r-postgresql",
   "prod-app-t/statefulset/app-t-backend-postgresql",
   "prod-app-x/statefulset/app-x-postgresql",
-  "prod-app-z-backend/deployment/app-z-embedding-server",
-  "prod-app-z-backend/deployment/tts-proxy"
+  "prod-app-z-backend/deployment/app-ad",
+  "prod-app-z-backend/deployment/app-z-embedding-server"
  ],
  "prod_without_request": 35,
  "request_ratio": 0.009,
@@ -5905,30 +5218,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```json
 {
  "aws_api_calls_total": 242614,
- "aws_api_retries_avg": 0.0,
- "aws_api_slow_ops_avg_s": [
-  [
-   "Shield/GetSubscriptionState",
-   0.759
-  ],
-  [
-   "EC2/RevokeSecurityGroupIngress",
-   0.317
-  ],
-  [
-   "EC2/AuthorizeSecurityGroupIngress",
-   0.295
-  ],
-  [
-   "Elastic Load Balancing v2/RegisterTargets",
-   0.283
-  ],
-  [
-   "Elastic Load Balancing v2/CreateTargetGroup",
-   0.265
-  ]
- ],
- "aws_api_top_ops": [
+ "aws_api_ops_by_calls": [
   [
    "Elastic Load Balancing v2/DescribeTargetHealth",
    76055
@@ -5960,6 +5250,201 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   [
    "Elastic Load Balancing v2/DescribeLoadBalancers",
    3732
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeRules",
+   3732
+  ],
+  [
+   "ACM/DescribeCertificate",
+   3509
+  ],
+  [
+   "EC2/DescribeVpcs",
+   2989
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroups",
+   1880
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListeners",
+   1866
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+   1866
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListenerCertificates",
+   1280
+  ],
+  [
+   "Shield/GetSubscriptionState",
+   1221
+  ],
+  [
+   "EC2/DescribeNetworkInterfaces",
+   1080
+  ],
+  [
+   "ACM/ListCertificates",
+   660
+  ],
+  [
+   "WAF Regional/GetWebACLForResource",
+   644
+  ],
+  [
+   "WAFV2/GetWebACLForResource",
+   644
+  ],
+  [
+   "EC2/DescribeSubnets",
+   586
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyRule",
+   557
+  ],
+  [
+   "EC2/AuthorizeSecurityGroupIngress",
+   195
+  ],
+  [
+   "EC2/RevokeSecurityGroupIngress",
+   194
+  ],
+  [
+   "Elastic Load Balancing v2/CreateRule",
+   30
+  ],
+  [
+   "Elastic Load Balancing v2/CreateTargetGroup",
+   30
+  ],
+  [
+   "Elastic Load Balancing v2/DeleteRule",
+   14
+  ],
+  [
+   "Elastic Load Balancing v2/DeleteTargetGroup",
+   14
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyTargetGroup",
+   13
+  ],
+  [
+   "EC2/DescribeAvailabilityZones",
+   2
+  ]
+ ],
+ "aws_api_retries_avg": 0.0,
+ "aws_api_slow_ops_avg_s": [
+  [
+   "Shield/GetSubscriptionState",
+   0.759
+  ],
+  [
+   "EC2/RevokeSecurityGroupIngress",
+   0.317
+  ],
+  [
+   "EC2/AuthorizeSecurityGroupIngress",
+   0.295
+  ],
+  [
+   "Elastic Load Balancing v2/RegisterTargets",
+   0.283
+  ],
+  [
+   "Elastic Load Balancing v2/CreateTargetGroup",
+   0.265
+  ],
+  [
+   "EC2/DescribeSubnets",
+   0.138
+  ],
+  [
+   "Elastic Load Balancing v2/CreateRule",
+   0.103
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyRule",
+   0.096
+  ],
+  [
+   "ACM/ListCertificates",
+   0.087
+  ],
+  [
+   "EC2/DescribeVpcs",
+   0.084
+  ],
+  [
+   "EC2/DescribeInstances",
+   0.082
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroups",
+   0.081
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeRules",
+   0.08
+  ],
+  [
+   "EC2/DescribeSecurityGroups",
+   0.076
+  ],
+  [
+   "WAFV2/GetWebACLForResource",
+   0.075
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTags",
+   0.071
+  ],
+  [
+   "ACM/DescribeCertificate",
+   0.07
+  ],
+  [
+   "EC2/DescribeNetworkInterfaces",
+   0.065
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancers",
+   0.064
+  ],
+  [
+   "WAF Regional/GetWebACLForResource",
+   0.059
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListeners",
+   0.057
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListenerCertificates",
+   0.052
+  ],
+  [
+   "Elastic Load Balancing v2/DeregisterTargets",
+   0.05
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+   0.047
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+   0.042
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetHealth",
+   0.036
   ]
  ],
  "metrics_available": true,
@@ -6398,7 +5883,80 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "kubelet_certificate_manager_server_ttl_seconds",
   "kubelet_server_expiration_renew_errors",
   "kubelet_volume_stats_inodes_free",
-  "kubelet_volume_stats_used_bytes"
+  "kubelet_volume_stats_used_bytes",
+  "kubernetes_build_info",
+  "namespace",
+  "negatives",
+  "node_bonding_active",
+  "node_bonding_slaves",
+  "node_disk_io_time_weighted_seconds_total",
+  "node_filefd_allocated",
+  "node_filefd_maximum",
+  "node_filesystem_files",
+  "node_filesystem_files_free",
+  "node_filesystem_readonly",
+  "node_md_disks",
+  "node_md_disks_required",
+  "node_network_receive_errs_total",
+  "node_network_receive_packets_total",
+  "node_network_transmit_errs_total",
+  "node_network_transmit_packets_total",
+  "node_network_up",
+  "node_nf_conntrack_entries",
+  "node_nf_conntrack_entries_limit",
+  "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile",
+  "node_systemd_unit_state",
+  "node_textfile_scrape_error",
+  "node_timex_maxerror_seconds",
+  "node_timex_offset_seconds",
+  "node_timex_sync_status",
+  "node_vmstat_pgmajfault",
+  "prometheus",
+  "prometheus_config_last_reload_successful",
+  "prometheus_engine_queries",
+  "prometheus_engine_queries_concurrent_max",
+  "prometheus_notifications_alertmanagers_discovered",
+  "prometheus_notifications_errors_total",
+  "prometheus_notifications_queue_capacity",
+  "prometheus_notifications_queue_length",
+  "prometheus_notifications_sent_total",
+  "prometheus_operator_list_operations_failed_total",
+  "prometheus_operator_list_operations_total",
+  "prometheus_operator_managed_resources",
+  "prometheus_operator_node_address_lookup_errors_total",
+  "prometheus_operator_ready",
+  "prometheus_operator_reconcile_errors_total",
+  "prometheus_operator_reconcile_operations_total",
+  "prometheus_operator_status_update_errors_total",
+  "prometheus_operator_status_update_operations_total",
+  "prometheus_operator_syncs",
+  "prometheus_operator_watch_operations_failed_total",
+  "prometheus_operator_watch_operations_total",
+  "prometheus_remote_storage_failed_samples_total",
+  "prometheus_remote_storage_highest_timestamp_in_seconds",
+  "prometheus_remote_storage_queue_highest_sent_timestamp_seconds",
+  "prometheus_remote_storage_samples_failed_total",
+  "prometheus_remote_storage_samples_total",
+  "prometheus_remote_storage_shards_desired",
+  "prometheus_remote_storage_shards_max",
+  "prometheus_remote_storage_succeeded_samples_total",
+  "prometheus_rule_evaluation_failures_total",
+  "prometheus_rule_group_iterations_missed_total",
+  "prometheus_rule_group_rules",
+  "prometheus_sd_refresh_failures_total",
+  "prometheus_target_metadata_cache_entries",
+  "prometheus_target_scrape_pool_exceeded_label_limits_total",
+  "prometheus_target_scrape_pool_exceeded_target_limit_total",
+  "prometheus_target_sync_failed_total",
+  "prometheus_tsdb_compactions_failed_total",
+  "prometheus_tsdb_reloads_failures_total",
+  "reloader_last_reload_successful",
+  "robustperception",
+  "s_failure_total",
+  "scrapes",
+  "see",
+  "service",
+  "www"
  ],
  "alert_metrics_without_panel_count": 153,
  "available": true,
@@ -6581,7 +6139,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6599,7 +6157,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6617,7 +6175,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6635,7 +6193,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6653,7 +6211,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6671,7 +6229,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6689,7 +6247,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6707,7 +6265,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6725,7 +6283,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6743,7 +6301,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6761,7 +6319,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6779,7 +6337,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6797,7 +6355,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6815,7 +6373,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6833,7 +6391,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6851,7 +6409,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6869,7 +6427,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6887,7 +6445,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6905,7 +6463,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6923,7 +6481,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6941,7 +6499,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6959,7 +6517,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6977,7 +6535,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6995,7 +6553,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7014,7 +6572,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7033,7 +6591,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7052,7 +6610,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7072,7 +6630,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7090,7 +6648,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7108,7 +6666,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7126,7 +6684,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7145,7 +6703,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7163,7 +6721,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7181,7 +6739,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7199,7 +6757,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7217,7 +6775,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7235,7 +6793,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7253,7 +6811,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7272,7 +6830,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7290,7 +6848,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7308,7 +6866,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   }
  ],
@@ -8746,6 +8304,17 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>resilience.no-prestop.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>resilience.no-prestop.prod-app-z-backend/app-z-backend</code></summary>
 
 ```json
@@ -8785,17 +8354,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 {
  "namespace": "prod-app-z-backend",
  "name": "app-z-pg-proxy",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>resilience.no-prestop.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
  "kind": "Deployment"
 }
 ```
@@ -9091,23 +8649,23 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/app-z-embedding-server</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
  "name": "app-z-embedding-server",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
  "kind": "Deployment"
 }
 ```

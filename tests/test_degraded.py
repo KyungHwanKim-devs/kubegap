@@ -19,9 +19,9 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def _ctx(tmp_path, summary: dict, inv: dict | None = None):
-    inv = inv or {"cluster": {"platform": "k3s"}, "namespaces": {"prod_like": []}, "profile": {"name": "lab"}}
+    inv = inv or {"cluster": {"platform": "k3s"}, "namespaces": {"prod_like": []}, "scale": {"name": "small", "source": "guessed"}}
     (tmp_path / "inventory.json").write_text(json.dumps(inv))
-    return evaluate.Context(tmp_path, inv, summary, rubric.load_profile("lab"))
+    return evaluate.Context(tmp_path, inv, summary, "small")
 
 
 def _check(**kw) -> dict:
@@ -34,7 +34,7 @@ def _check(**kw) -> dict:
         "rule": {"needs": "item.get('metrics_available')", "needs_reason": "metrics not read", "expr": "item['bad'] > 0"},
         "evidence": "f\"bad {item['bad']}\"",
         "severity_default": "low",
-        "profiles": ["lab"],
+        "platforms": ["k3s"],
     }
     base.update(kw)
     return base
@@ -68,7 +68,7 @@ def test_needs_reason_defaults_to_the_expression(tmp_path):
 
 
 def test_eks_inventory_checks_skip_when_describe_cluster_failed(tmp_path):
-    inv = {"cluster": {"platform": "eks", "eks": {"name": "c1", "region": "ap-northeast-2", "error": "AccessDeniedException: eks:DescribeCluster"}}, "namespaces": {"prod_like": []}, "profile": {"name": "lab"}}
+    inv = {"cluster": {"platform": "eks", "eks": {"name": "c1", "region": "ap-northeast-2", "error": "AccessDeniedException: eks:DescribeCluster"}}, "namespaces": {"prod_like": []}, "scale": {"name": "small", "source": "guessed"}}
     cx = _ctx(tmp_path, {}, inv)
     c = _check(id="eks.audit-log-off", type="inventory", each=None, rule={"expr": "'audit' not in ((inv['cluster'].get('eks') or {}).get('logging_enabled') or [])"}, evidence="'audit logging off'")
     del c["each"]
@@ -166,7 +166,7 @@ def test_summarize_echo_survives_missing_endpoints(tmp_path):
             {
                 "context": "c",
                 "cluster": {"platform": "k3s"},
-                "profile": {"name": "lab"},
+                "scale": {"name": "small", "source": "guessed"},
                 "nodes": {"count": 0, "nodes": []},
                 "namespaces": {"count": 0, "prod_like": []},
                 "crds": {"count": 0},
@@ -230,15 +230,20 @@ def test_node_rows_for_unread_nodes_make_the_node_checks_skip_by_name(tmp_path):
     (tmp_path / "collect-result.json").write_text(json.dumps({"core": {"steps": {"node-os": {"nodes": {"n1": {"ok": False, "error": "no node access"}}}}}}))
     out = nodeos.analyze(tmp_path, inv)
     assert [r["node"] for r in out["nodes"]] == ["n1", "n2"] and all(r["collected"] is False for r in out["nodes"])
-    cx = _ctx(tmp_path, {"nodeos": out}, {**inv, "namespaces": {"prod_like": []}, "profile": {"name": "lab"}})
+    cx = _ctx(tmp_path, {"nodeos": out}, {**inv, "namespaces": {"prod_like": []}, "scale": {"name": "small", "source": "guessed"}})
     c = next(c for c in _all_checks() if c["id"] == "node.kernel-lockup")
-    r = evaluate.evaluate_check(c, cx, rubric.resolve_thresholds(c, rubric.load_profile("lab"), {}))
+    r = evaluate.evaluate_check(c, cx, rubric.resolve_thresholds(c, "k3s", "small", {}))
     assert r["status"] == "skip" and r["reason"] == "nothing to judge: node not read (2)"
     assert out["pod_logs"] is None and out["pod_dirs"] is None, "nothing large is not the same as nothing read"
 
 
 def test_ssm_list_not_read_makes_ssm_unregistered_skip(tmp_path):
-    inv = {"cluster": {"platform": "eks", "eks": {"name": "c"}}, "node_access": {"method": "none", "ssm_error": "AccessDenied", "ssm_unregistered": None, "ssm_registered": []}, "namespaces": {"prod_like": []}, "profile": {"name": "prod"}}
+    inv = {
+        "cluster": {"platform": "eks", "eks": {"name": "c"}},
+        "node_access": {"method": "none", "ssm_error": "AccessDenied", "ssm_unregistered": None, "ssm_registered": []},
+        "namespaces": {"prod_like": []},
+        "scale": {"name": "large", "source": "guessed"},
+    }
     cx = _ctx(tmp_path, {}, inv)
     c = next(c for c in _all_checks() if c["id"] == "eks.ssm-unregistered")
     r = evaluate.evaluate_check(c, cx, {})

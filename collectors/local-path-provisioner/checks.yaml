@@ -2,10 +2,10 @@
 - id: storage.local-path-over-capacity
   name: local-path volume usage exceeds the PVC capacity (capacity is not enforced)
   area: storage
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.over_capacity
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     expr: "True"
   target: "item['namespace'] + '/' + item['pvc']"
@@ -17,7 +17,7 @@
   verify:
     - "sudo du -sm /var/lib/rancher/k3s/storage/*"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -33,15 +33,15 @@
 - id: storage.local-path-node-pinned
   name: Workloads pinned to a node by a local-path PV (cannot start if that node dies)
   area: storage
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.summary
   cluster_level: true
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     warn_expr: "(item.get('pv_count') or 0) > 0"
   target: "'cluster'"
-  evidence: "f\"{item.get('pv_count')} local-path PVs, by node {item.get('by_node')}, node disk used {item.get('node_total_mb')}MB. top: {[(p['namespace'], p['pvc'], p['node'], p['used_mb'], p['workloads'][:1]) for p in (item.get('pinned') or [])[:8]]}\""
+  evidence: "f\"{item.get('pv_count')} local-path PVs, by node {item.get('by_node')}, node disk used {item.get('node_total_mb')}MB. top: {shown([(p['namespace'], p['pvc'], p['node'], p['used_mb'], shown(p['workloads'], 1)) for p in (item.get('pinned') or [])], 8)}\""
   severity_default: low
   symptom_linked: false
   why: A local-path volume is a node directory and cannot move. If that node dies, the StatefulSet or DB using it cannot start on another node. This is the small k3s cluster's "N+1" list. The longer the list, the larger the blast radius of a single node.
@@ -49,7 +49,7 @@
   verify:
     - "kubectl get pv -o custom-columns=NAME:.metadata.name,CLAIM:.spec.claimRef.name,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "warn"
         item:
@@ -76,7 +76,7 @@
 - id: storage.local-path-fs-near-full
   name: Node filesystem hosting local-path volumes has little free space (volumes have no capacity limit)
   area: storage
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.summary
   cluster_level: true
@@ -97,7 +97,7 @@
   suggest: "On the tight node, clean up the largest directories first (du -sm /var/lib/rancher/k3s/storage/*) or shorten backup PVC retention. To actually enforce capacity, use Longhorn or NFS instead of local-path, or mount a separate disk via nodePathMap to keep volumes off the OS disk."
   verify:
     - "ssh <node> df -h / && sudo du -sm /var/lib/rancher/k3s/storage/* | sort -rn | head"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "fail"
@@ -743,14 +743,14 @@
 - id: storage.local-path-orphan-dirs
   name: local-path directories without a PV remain (leftover data from deleted PVCs)
   area: storage
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.summary
   cluster_level: true
   rule:
     warn_expr: "len(item['orphan_dirs']) > 0 or len(item['released']) > 0"
   target: "'cluster'"
-  evidence: "f\"directories without a PV {[(o['node'], o['dir'], o['mb']) for o in item['orphan_dirs']][:8]} (total {item['orphan_mb']}MB), Released/Failed PVs {item['released']}, directories per node {item['node_dirs']} vs PVs {item['by_node']}\""
+  evidence: "f\"directories without a PV {shown([(o['node'], o['dir'], o['mb']) for o in item['orphan_dirs']], 8)} (total {item['orphan_mb']}MB), Released/Failed PVs {item['released']}, directories per node {item['node_dirs']} vs PVs {item['by_node']}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -760,7 +760,7 @@
   suggest: "Confirm from the directory name (pvc-<uid>_<ns>_<pvc>) that the PVC really is gone, then delete it. Released PVs: kubectl delete pv."
   verify:
     - "ssh <node> sudo ls /var/lib/rancher/k3s/storage | sed 's/_.*//' | sort > /tmp/dirs; kubectl get pv -o name | sed 's#.*/##' | sort > /tmp/pvs; comm -23 /tmp/dirs /tmp/pvs"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "warn"
@@ -1156,14 +1156,14 @@
 - id: storage.local-path-prod-delete-reclaim
   name: prod local-path PVs have reclaimPolicy Delete (deleting the PVC deletes the data immediately, no snapshot)
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.summary
   cluster_level: true
   rule:
     warn_expr: "len(item['prod_pvs_delete_reclaim']) > 0"
   target: "'cluster'"
-  evidence: "f\"{len(item['prod_pvs_delete_reclaim'])} of {item['prod_pvs']} prod PVs are Delete {item['prod_pvs_delete_reclaim'][:10]}, StorageClass reclaim {item['reclaim_policies']}, default class {item['default_class']}\""
+  evidence: "f\"{len(item['prod_pvs_delete_reclaim'])} of {item['prod_pvs']} prod PVs are Delete {shown(item['prod_pvs_delete_reclaim'], 10)}, StorageClass reclaim {item['reclaim_policies']}, default class {item['default_class']}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -1173,7 +1173,7 @@
   suggest: "For DB and backup PVCs, create a second StorageClass with reclaimPolicy Retain (local-path-retain), or patch existing PVs with kubectl patch pv <pv> -p '{\"spec\":{\"persistentVolumeReclaimPolicy\":\"Retain\"}}'. Keep backups on another node or outside the cluster (S3, NAS)."
   verify:
     - "kubectl get pv -o custom-columns=PV:.metadata.name,NS:.spec.claimRef.namespace,PVC:.spec.claimRef.name,RECLAIM:.spec.persistentVolumeReclaimPolicy,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "warn"
@@ -1416,7 +1416,7 @@
 - id: storage.local-path-provisioner-unhealthy
   name: local-path-provisioner is not ready or its configuration is empty
   area: storage
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.summary
   cluster_level: true
@@ -1434,7 +1434,7 @@
   suggest: "kubectl -n kube-system logs deploy/local-path-provisioner. The default class is set by the storageclass.kubernetes.io/is-default-class annotation."
   verify:
     - "kubectl -n kube-system get deploy local-path-provisioner; kubectl get sc"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "fail"

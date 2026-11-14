@@ -9,6 +9,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
+from ...foundations import units
 from ...foundations.snapshot import objects
 from ...foundations.workload import image_repo, is_db_like
 from ...foundations.workload import key as wl_key
@@ -23,7 +24,12 @@ BACKUP_NAME_RE = re.compile(r"(backup|dump|snapshot|archive|bak)", re.IGNORECASE
 BACKUP_TARGET_RE = re.compile(r"(postgres|pgsql|mysql|mariadb|mongo|elastic|opensearch|clickhouse|qdrant|milvus|cassandra|neo4j|influx|timescale|solr|couch|cockroach|tidb|scylla|weaviate|meili|typesense)", re.IGNORECASE)
 
 
-OFFSITE_RE = re.compile(r"(s3://|s3\.|aws s3|rclone|restic|gs://|gsutil|b2 |backblaze|minio|mc cp|azcopy|rsync .*@|scp |sftp|wal-g|pgbackrest|borg|kopia)", re.IGNORECASE)
+OFFSITE_RE = re.compile(r"(s3://|s3\.|aws s3|rclone|restic|gs://|gsutil|b2 |backblaze|minio|mc cp|azcopy|rsync .*@|scp .*@|sftp|wal-g|pgbackrest|borg|kopia)", re.IGNORECASE)
+
+
+def _without_copies_to_nodes(text: str, node_addrs: set) -> str:
+    """`text` with every `user@host` whose host is a node of this cluster removed, so that an rsync or scp between two nodes is not read as a copy off the cluster."""
+    return re.sub(r"\S+@([A-Za-z0-9_.-]+)", lambda m: "" if m.group(1) in node_addrs else m.group(0), text)
 
 
 def pv_node(pv: dict) -> str | None:
@@ -91,6 +97,8 @@ def backup_locality(cx) -> dict:
                 "other_backup_cronjobs_in_namespace": [],
             }
         )
+    # a node of this cluster, by name or address: a dump sent there by rsync or scp has not left the cluster
+    node_addrs = {a.get("address") for n in objects(cx.snap, "nodes") for a in (n.get("status") or {}).get("addresses") or [] if a.get("address")} | {n["metadata"]["name"] for n in objects(cx.snap, "nodes")}
     rows = []
     for cj in objects(cx.snap, "cronjobs"):
         md, sp = cj["metadata"], cj.get("spec") or {}
@@ -103,10 +111,7 @@ def backup_locality(cx) -> dict:
         claims = [v["persistentVolumeClaim"]["claimName"] for v in pod.get("volumes") or [] if v.get("persistentVolumeClaim")]
         host_paths = [v["hostPath"].get("path") for v in pod.get("volumes") or [] if v.get("hostPath")]
         dest_nodes = {pvc_node.get((ns, c)) for c in claims}
-        offsite = bool(OFFSITE_RE.search(text))
-        src = db_pvcs.get(ns, [])
-        src_nodes = {n for _, _, n in src if n}
-        same_node = bool(dest_nodes & src_nodes) or (bool(host_paths) and bool(pod.get("nodeSelector") or pod.get("nodeName")))
+        offsite = bool(OFFSITE_RE.search(_without_copies_to_nodes(text, node_addrs)))
         # Which database this CronJob dumps: its command, args or env values name the database's Service (the host of pg_dump -h, mysqldump -h, a connection
         # string), the workload itself, or its first pod (<statefulset>-0), as a whole token. A name that is only the prefix of another (app-postgres of
         # app-postgres-mx) does not match (#169). The image is not part of the match (a CronJob running the postgres image would claim a database named
@@ -122,6 +127,12 @@ def backup_locality(cx) -> dict:
                 targets_db.append({"target": db["target"], "matched_by": hit})
                 if not sp.get("suspend"):
                     db["backup_cronjobs"].append({"name": md["name"], "matched_by": hit})
+        # The source of the dump is the database the CronJob names. Only when it names none is every store of the namespace taken as a possible source:
+        # a namespace with a MySQL on one node and a vector store on another would otherwise put the MySQL dump "on the node of its source" because of the other store.
+        named = {t["target"] for t in targets_db}
+        src = [x for x in db_pvcs.get(ns, []) if not named or x[0] in named]
+        src_nodes = {n for _, _, n in src if n}
+        same_node = bool(dest_nodes & src_nodes) or (bool(host_paths) and bool(pod.get("nodeSelector") or pod.get("nodeName")))
         rows.append(
             {
                 "namespace": ns,
@@ -135,7 +146,8 @@ def backup_locality(cx) -> dict:
                 "dest_nodes": sorted(n for n in dest_nodes if n),
                 "host_paths": host_paths,
                 "offsite_hint": offsite,
-                "source_db": [{"workload": w, "pvc": c, "node": n} for w, c, n in src][:6],
+                "source_db": [{"workload": w, "pvc": c, "node": n} for w, c, n in src],
+                "source_by": "named in the command" if named else "every store of the namespace (the command names none)",
                 "source_nodes": sorted(src_nodes),
                 "same_node_as_source": same_node,
                 "local_only": not offsite and (bool(claims) or bool(host_paths)),
@@ -145,11 +157,23 @@ def backup_locality(cx) -> dict:
     for db in databases:
         own = {b["name"] for b in db["backup_cronjobs"]}
         db["other_backup_cronjobs_in_namespace"] = [{"name": r["name"], "suspend": r["suspend"], "targets_db": [t["target"] for t in r["targets_db"]]} for r in rows if r["namespace"] == db["namespace"] and r["name"] not in own]
+    commands_kept = units.collected(cx.snap, "app-settings")
+    if not commands_kept:
+        # Which database a CronJob dumps and whether it sends a copy elsewhere are read from its command, args and env values, which this run did not
+        # keep. An empty command is not "sends nothing off the node": the fields say they are not known (None), so that neither a check nor a reader
+        # of the table takes them for an answer. A daily report once said eight backup jobs "show no copy going off the nodes" from these fields.
+        why = "not known: this run did not keep the CronJob's command, args and environment values (collection unit app-settings)"
+        for r in rows:
+            r.update(targets_db=None, offsite_hint=None, source_db=None, source_nodes=None, same_node_as_source=None, local_only=None, source_by=why, note=why)
+        for db in databases:
+            db["backup_cronjobs"] = None
+            db["other_backup_cronjobs_in_namespace"] = [{"name": r["name"], "suspend": r["suspend"], "targets_db": None} for r in rows if r["namespace"] == db["namespace"]]
     return {
+        "commands_kept": commands_kept,
         "rows": rows,
         "count": len(rows),
-        "local_only": [r["target"] for r in rows if r["local_only"]],
-        "same_node": [r["target"] for r in rows if r["same_node_as_source"]],
+        "local_only": [r["target"] for r in rows if r["local_only"]] if commands_kept else None,
+        "same_node": [r["target"] for r in rows if r["same_node_as_source"]] if commands_kept else None,
         "databases": databases,
         "excluded_stores": sorted(excluded),
         "note": "databases: every store that needs a dump (BACKUP_TARGET_RE) with a PVC, and the backup CronJobs whose command, args or env name its Service, its workload or its first pod; excluded_stores: caches, queues, monitoring stores and MinIO with a PVC, which this check does not ask a dump of",

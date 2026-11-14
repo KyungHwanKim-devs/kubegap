@@ -259,11 +259,11 @@ def _rules(alerting: list[dict], recording: list[dict], src: str | None) -> dict
         "by_class": dict(cls),
         "by_severity": dict(sev),
         "symptom_ratio": round(cls.get("symptom", 0) / len(alerting), 3) if alerting else None,
-        "symptom_rules": [r["name"] for r in alerting if r["class"] == "symptom"][:40],
-        "app_rules": [r["name"] for r in alerting if r["class"] == "app"][:60],
-        "app_cause_rules": [r["name"] for r in alerting if r["class"] == "app-cause"][:60],
+        "symptom_rules": [r["name"] for r in alerting if r["class"] == "symptom"],
+        "app_rules": [r["name"] for r in alerting if r["class"] == "app"],
+        "app_cause_rules": [r["name"] for r in alerting if r["class"] == "app-cause"],
         "unhealthy": unhealthy_rules,
-        "page_severity_cause": [r["name"] for r in alerting if r["class"] == "cause" and (r.get("severity") or "") == "critical"][:40],
+        "page_severity_cause": [r["name"] for r in alerting if r["class"] == "cause" and (r.get("severity") or "") == "critical"],
     }
 
 
@@ -291,7 +291,7 @@ def _alerts(snap: Path, alerting: list[dict]) -> dict:
         "rules_total": len(names),
         "firing_now": firing_now,
         "firing_now_by_name": dict(Counter(a["alertname"] for a in firing_now)),
-        "top_firing_7d": samples[:15],
+        "firing_7d_by_alert": samples,
         "always_firing_7d": always,
         "skip_reason": None if samples_read else "alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)",
         "watchdog_samples_7d": wd,
@@ -313,7 +313,7 @@ def _failure_modes(alerting: list[dict], comps: set, platform: str | None) -> di
         if mode == "Backup failure" and not ({"velero", "k8up"} & comps):
             applicable = applicable and True  # without a backup tool there is no alert either; that itself is handled by the absence check. Here it is "not applicable"
             applicable = bool({"velero", "k8up"} & comps)
-        matrix.append({"mode": mode, "symptom": symptom, "importance": importance, "applicable": applicable, "covered": bool(hits), "rules": hits[:6]})
+        matrix.append({"mode": mode, "symptom": symptom, "importance": importance, "applicable": applicable, "covered": bool(hits), "rules": hits})
     return {
         "matrix": matrix,
         "uncovered": [m for m in matrix if m["applicable"] and not m["covered"]],
@@ -330,9 +330,9 @@ def _slo(alerting: list[dict], recording: list[dict], comps: set) -> dict:
     ]  # kube-prometheus defaults (apiserver SLO) are not service SLO signals
     return {
         "tools": sorted({"sloth", "pyrra"} & comps),
-        "sli_recording_rules": sli_rules[:30],
-        "burn_rate_alerts": burn[:30],
-        "slo_labelled_rules": [r["name"] for r in alerting if (r.get("labels") or {}).get("slo")][:30],
+        "sli_recording_rules": sli_rules,
+        "burn_rate_alerts": burn,
+        "slo_labelled_rules": [r["name"] for r in alerting if (r.get("labels") or {}).get("slo")],
         "any_signal": bool(({"sloth", "pyrra"} & comps) or sli_rules or burn or [r for r in alerting if (r.get("labels") or {}).get("slo")]),
     }
 
@@ -382,7 +382,7 @@ def _alertmanager(snap: Path, now: _dt.datetime) -> dict:
                 "state": (s_.get("status") or {}).get("state"),
                 "comment": (s_.get("comment") or "")[:120],
                 "created_by": s_.get("createdBy"),
-                "matchers": [f"{m.get('name')}{'=~' if m.get('isRegex') else '='}{m.get('value')}" for m in (s_.get("matchers") or [])][:5],
+                "matchers": [f"{m.get('name')}{'=~' if m.get('isRegex') else '='}{m.get('value')}" for m in (s_.get("matchers") or [])],
                 "ends_at": s_.get("endsAt"),
                 "age_days": round((now - starts).days, 1) if starts else None,
                 "remaining_days": round((ends - now).total_seconds() / 86400, 1) if ends else None,
@@ -399,7 +399,7 @@ def _alertmanager(snap: Path, now: _dt.datetime) -> dict:
             {"alertname": (a.get("labels") or {}).get("alertname"), "by": ((a.get("status") or {}).get("inhibitedBy") or []) + ((a.get("status") or {}).get("silencedBy") or [])}
             for a in alerts
             if (a.get("status") or {}).get("state") == "suppressed"
-        ][:20]
+        ]
         am["alerts_active_by_receiver"] = dict(Counter(r.get("name") for a in alerts if (a.get("status") or {}).get("state") == "active" for r in (a.get("receivers") or [])))
     am["notifications_failed_1d"] = [{"integration": lab.get("integration"), "count": v} for lab, v in metric_rows(snap, "alertmanager_notifications_failed_1d")]
     return am
@@ -415,6 +415,9 @@ def _golden_signals(snap: Path, comps: set, platform: str | None, alb: dict | No
     covered = (alb or {}).get("covered_services")  # summary.traffic.alb, built before this section: (ns, service) pairs that have RequestCount in aws/alb-metrics.json
     alb_covered = {tuple(x) for x in covered} if covered else set()
     alb_error = (alb or {}).get("covered_services_error")
+    # On EKS with the AWS Load Balancer Controller the three signals are in CloudWatch. When that was not read (a daily run makes no AWS call), an
+    # ingress without app or controller metrics is unknown, not missing.
+    alb_unread = alb_cloudwatch and not (snap / "aws" / "alb-metrics.json").is_file()
     rows = []
     for ing in items(load_json(snap / "objects" / "ingresses.networking.k8s.io.json")):
         ns, name = ing["metadata"]["namespace"], ing["metadata"]["name"]
@@ -430,14 +433,14 @@ def _golden_signals(snap: Path, comps: set, platform: str | None, alb: dict | No
                 "namespace": ns,
                 "ingress": name,
                 "class": cls_,
-                "hosts": hosts[:3],
-                "services": services[:4],
+                "hosts": hosts,
+                "services": services,
                 "latency": lte,
                 "traffic": lte,
                 "errors": lte,
                 "saturation": ns in sat_ns,
                 "source": "app" if app_metrics else ("ingress-controller" if ic_metrics else ("alb-cloudwatch" if alb_metrics else ("alb-cloudwatch (not collected)" if alb_cloudwatch else None))),
-                "missing_all_lte": not lte,
+                "missing_all_lte": not lte and not alb_unread,
                 "cluster_ic_metrics": bool(ic_rows),  # whether the cluster has any ingress controller metrics at all (if none, the cause is a single one — ingress-controller-metrics-missing)
             }
         )
@@ -512,10 +515,10 @@ def _grafana(snap: Path, alerting: list[dict]) -> dict:
         out["dashboards_json"] = {
             "read": len(sources),
             "source": "api" if dfiles else "provisioned configmaps",
-            "rows": dash_rows[:200],
+            "rows": dash_rows,
             "panel_metrics": len(panel_metrics),
             "alert_metrics": len(alert_metrics),
-            "alert_metrics_without_panel": without[:80],
+            "alert_metrics_without_panel": without,
             "alert_metrics_without_panel_count": len(without),
             "empty_dashboards": [r["uid"] for r in dash_rows if r["panels_with_expr"] == 0],
             "available": True,

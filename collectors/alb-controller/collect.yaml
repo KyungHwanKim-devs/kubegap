@@ -2,6 +2,7 @@
 # ALB/target group CloudWatch metrics, unhealthy targets, idle timeout and group sharing are covered by the core traffic section (alb-metrics step). This collector looks at the controller itself: replicas, leader, IRSA, webhooks, TargetGroupBinding state, AWS API call latency/retries and reconcile errors.
 # The controller metrics (:8080/metrics) are not scraped by Prometheus (no ServiceMonitor, as observed). The pod-metrics step reads them through the apiserver pod proxy; if the proxy is blocked (timeout seen on EKS) it curls the pod IP from inside a reachable node.
 - id: controller-metrics
+  unit: metrics
   type: pod-metrics
   namespace: kube-system
   selector: app.kubernetes.io/name=aws-load-balancer-controller

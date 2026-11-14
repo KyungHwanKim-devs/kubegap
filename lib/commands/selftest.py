@@ -7,7 +7,8 @@ before they cause an outage.
 
 Shape of the `test:` section:
   test:
-    profile: prod           # defaults to the first value of profiles
+    platform: eks           # defaults to the first value of platforms, else eks
+    scale: large            # defaults to the first value of scales, else large
     cases:
       - expect: fail        # fail | warn | pass | none (zero findings)
         item: {…}           # type summary: one item to place at the `each` path (for cluster_level, the dict itself)
@@ -40,7 +41,6 @@ from ..judgement.evaluate.context import get_path
 BASE_INV = {
     "context": "selftest",
     "cluster": {"platform": "eks", "server_version": "v1.32.0", "eks": {}},
-    "profile": {"name": "prod"},
     "namespaces": {"count": 2, "names": ["prod-a", "dev-a"], "prod_like": ["prod-a"], "dev_like": ["dev-a"]},
     "nodes": {"count": 0, "nodes": []},
     "components": {},
@@ -60,12 +60,19 @@ def _set_path(d: dict, path: str, value):
     d[parts[-1]] = value
 
 
-def _build_snapshot(root: Path, check: dict, case: dict, profile_name: str):
+def _test_ground(check: dict) -> tuple[str, str]:
+    """(platform, scale) a check's test cases run on: `test.platform` and `test.scale`, else the first platform and scale the check names, else eks at large
+    (where every family is expected)."""
+    t = check.get("test") or {}
+    platform = t.get("platform") or (check.get("platforms") or ["eks"])[0]
+    return ("gke" if platform == "other" else platform), t.get("scale") or (check.get("scales") or ["large"])[0]
+
+
+def _build_snapshot(root: Path, check: dict, case: dict, platform: str):
     paths.ensure_private_dir(root / "objects")
     paths.ensure_private_dir(root / "metrics")
     inv = json.loads(json.dumps(BASE_INV))
-    inv["cluster"]["platform"] = "k3s" if profile_name == "lab" else "eks"
-    inv["profile"]["name"] = profile_name
+    inv["cluster"]["platform"] = platform
     for k, v in (case.get("inventory") or {}).items():
         inv[k] = v
     summary: dict = json.loads(json.dumps(case.get("summary") or {}))
@@ -96,13 +103,14 @@ def audit_against_snapshot(checks: list[dict], snap: Path) -> list[dict]:
     item['key'] fails when missing; item.get('key') fails only when no real item has it (optional keys may exist on only some items)."""
     summary = json.loads((snap / "summary.json").read_text(encoding="utf-8"))
     inv = json.loads((snap / "inventory.json").read_text(encoding="utf-8")) if (snap / "inventory.json").is_file() else {}
-    profile = ((inv.get("profile") or {}).get("name")) or "prod"
+    platform = (inv.get("cluster") or {}).get("platform")
+    scale = (inv.get("scale") or {}).get("name") or "large"
     out = []
     for c in checks:
         if c["type"] != "summary" or not c.get("each"):
             continue
-        if profile not in (c.get("profiles") or []):
-            continue  # check disabled for this snapshot's profile (e.g. Karpenter checks on a small k3s cluster)
+        if rubric.applies(c, platform, scale):
+            continue  # the check does not run on this snapshot's platform or scale (e.g. Karpenter checks on a small k3s cluster)
         seq = get_path(summary, c["each"])
         if seq is None:
             continue  # this snapshot has no such section; cannot judge
@@ -164,8 +172,7 @@ def audit_metric_boundaries(checks: list[dict]) -> list[dict]:
         if c["type"] != "metric":
             continue
         t = c.get("test") or {}
-        profile = rubric.load_profile(t.get("profile") or (c.get("profiles") or ["prod"])[0])
-        b = metric_boundary(c, rubric.resolve_thresholds(c, profile, {}))
+        b = metric_boundary(c, rubric.resolve_thresholds(c, *_test_ground(c), {}))
         if b is None:
             continue
         qid, threshold = b
@@ -184,12 +191,12 @@ def audit_each_paths(checks: list[dict], snaps: list[Path]) -> list[dict]:
             inv = json.loads((snap / "inventory.json").read_text(encoding="utf-8")) if (snap / "inventory.json").is_file() else {}
         except (OSError, json.JSONDecodeError):
             continue
-        loaded.append((snap, ((inv.get("profile") or {}).get("name")) or "prod", summary))
+        loaded.append((snap, ((inv.get("cluster") or {}).get("platform"), (inv.get("scale") or {}).get("name") or "large"), summary))
     out = []
     for c in checks:
         if c["type"] != "summary" or not c.get("each"):
             continue
-        applicable = [(sn, sm) for sn, prof, sm in loaded if prof in (c.get("profiles") or [])]
+        applicable = [(sn, sm) for sn, ground, sm in loaded if not rubric.applies(c, *ground)]
         if not applicable:
             continue
         if all(get_path(sm, c["each"]) is None for _, sm in applicable):
@@ -225,22 +232,22 @@ def run(check_ids: list[str] | None = None, echo=print, snapshots: list[Path] | 
         if not t or not t.get("cases"):
             results["untested"].append(c["id"])
             continue
-        profile_name = t.get("profile") or (c.get("profiles") or ["prod"])[0]
-        profile = rubric.load_profile(profile_name)
-        if profile.get("missing"):  # a case under a profile that does not exist would run with the check's defaults and say nothing
-            results["failed"].append(f"{c['id']}: test.profile {profile_name!r} is not a file of rubric/profiles/")
+        platform, scale = _test_ground(c)
+        if scale not in rubric.SCALES:  # a case under a scale that does not exist would run with the check's defaults and say nothing
+            results["failed"].append(f"{c['id']}: test.scale {scale!r} is not one of {rubric.SCALES}")
             if echo:
-                echo(f"  failed {c['id']}: test.profile {profile_name!r} is not a profile")
+                echo(f"  failed {c['id']}: test.scale {scale!r} is not a scale")
             continue
+        c = {**c, "severity_default": rubric.severity_for(c, scale)}
         for i, case in enumerate(t["cases"]):
             expect = case.get("expect", "fail")
             label = f"{c['id']} #{i + 1} expect={expect}"
             try:
                 with tempfile.TemporaryDirectory() as td:
                     root = Path(td)
-                    inv, summary = _build_snapshot(root, c, case, profile_name)
-                    cx = _ev.Context(root, inv, summary, profile)
-                    thresholds = rubric.resolve_thresholds(c, profile, {})
+                    inv, summary = _build_snapshot(root, c, case, platform)
+                    cx = _ev.Context(root, inv, summary, scale)
+                    thresholds = rubric.resolve_thresholds(c, platform, scale, {})
                     r = _ev.evaluate_check(c, cx, thresholds)
             except Exception as e:  # an exception inside the expression is exactly what this test is looking for
                 results["failed"].append({"case": label, "reason": f"exception {type(e).__name__}: {e}", "trace": traceback.format_exc(limit=3)})

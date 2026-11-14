@@ -13,6 +13,7 @@
   target: "'cluster'"
   evidence: "f\"provider API calls since controller start: success {item['api_success']} / errors {item['api_errors']} (ratio {item['api_error_ratio']}), sync failures {item['sync_calls_error']}/{item['sync_calls_total']}, reconcile errors {item['reconcile_errors_total']}, ExternalSecrets not Ready {item['not_ready']} (oldest refresh {item['not_ready_oldest_refresh_h']} hours ago)\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: >
     If the secret an ExternalSecret points to was deleted from the store or its permissions changed, the controller fails again every refreshInterval (default 1 hour) — API call cost and log/event noise accumulate, and that Secret is frozen at the last successful value.
@@ -21,7 +22,6 @@
   suggest: "Follow the message of the ExternalSecret that is not Ready (ResourceNotFound, AccessDenied): restore the secret in the store, or delete the ExternalSecret if it is unused. Group with security.externalsecret-not-ready as one item."
   verify:
     - "kubectl get externalsecret -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[0].status,REASON:.status.conditions[0].reason"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -221,7 +221,6 @@
   suggest: "EKS: IRSA/Pod Identity. Outside the cluster (small k3s cluster): minimize the IAM user policy to GetSecretValue + a resource ARN prefix with 90-day rotation, or consider OIDC federation (IAM Roles Anywhere, GitHub-style OIDC)."
   verify:
     - "kubectl get clustersecretstore -o jsonpath='{.items[*].spec.provider.aws.auth}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -378,7 +377,6 @@
   suggest: "webhook.replicaCount 2 or failurePolicy Ignore. One controller is enough (leader election)."
   verify:
     - "kubectl get deploy -n external-secrets ; kubectl get validatingwebhookconfiguration externalsecret-validate -o jsonpath='{.webhooks[*].failurePolicy}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -571,7 +569,6 @@
   suggest: "Raise --concurrent (default 1), and with many items lengthen refreshInterval to reduce calls."
   verify:
     - "kubectl get externalsecret -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,INTERVAL:.spec.refreshInterval,REFRESH:.status.refreshTime"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -685,7 +682,6 @@
   suggest: "Retain (default) for prod. Delete only where secret revocation must take effect immediately."
   verify:
     - "kubectl get externalsecret -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name} {.spec.target.deletionPolicy}{\"\\n\"}{end}' | grep Delete"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -796,7 +792,6 @@
   suggest: "Follow the conditions message of kubectl describe clustersecretstore <name> (auth, permissions, region)."
   verify:
     - "kubectl get clustersecretstore,secretstore -A"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -907,7 +902,6 @@
   suggest: "Upgrade the Helm chart (CRDs included). For 0.9 → 1.x follow the v1beta1 → v1 API migration guide."
   verify:
     - "helm list -n external-secrets"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -1059,7 +1053,6 @@
   suggest: "Helm values serviceMonitor.enabled true. Otherwise prepare node access (SSM or SSH)."
   verify:
     - "kubectl get --raw /api/v1/namespaces/external-secrets/pods/<pod>:8080/proxy/metrics | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

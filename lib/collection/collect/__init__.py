@@ -15,13 +15,13 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from ...foundations import paths, yamlite
+from ...foundations import paths, units, yamlite
 from ...foundations.config import Config
 from ...foundations.runlog import RunLog
 from ...foundations.snapshot import remove_stale_temp, write_private
 from ..prom import Prometheus
 from .cloud_steps import step_alb_metrics, step_aws, step_cw_metrics, step_cwlogs
-from .context import CollectState, NodeRunner, StepContext, Stores, step_in_mode
+from .context import CollectState, NodeRunner, StepContext, Stores
 from .http_steps import step_http, step_promql
 from .k8s_steps import step_component_logs, step_kubectl, step_kubectl_dump_all, step_pod_metrics
 from .node_steps import step_node
@@ -84,13 +84,14 @@ def run_collector(
         log.skip(id=f"collector.{name}", reason=result["skipped"], collector=name)
         return result
     steps = yamlite.load_file(spec_path) or []
-    ctx = StepContext(name, folder, context, cfg, inv, snap, log, kubeconfig, prom, stores, node_access, echo, state if state is not None else CollectState())
+    ctx = StepContext(name, folder, context, cfg, inv, snap, log, kubeconfig, prom, stores, node_access, echo, state if state is not None else CollectState(), mode)
     for st in steps:
         sid, typ = st["id"], st["type"]
         if echo:
             echo(f"  [{name}] {sid}")
-        if not step_in_mode(st, mode):
-            result["steps"][sid] = ctx.skip(sid, f"not collected in {mode} mode", {"ok": True, "skipped": f"not collected in {mode} mode", "mode_skipped": True, "out": st.get("out") or st.get("file")})
+        if not units.collected(mode, st["unit"]):
+            why = f"a {mode} run does not collect {st['unit']}"
+            result["steps"][sid] = ctx.skip(sid, why, {"ok": True, "skipped": why, "mode_skipped": True, "unit": st["unit"], "out": st.get("out") or st.get("file")})
             continue
         handler = STEP_HANDLERS.get(typ)
         if handler is None:
@@ -149,6 +150,9 @@ def step_summary(results: dict, mode: str, seconds_total: float) -> dict:
         "mode_skipped": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("mode_skipped")],
         "failed": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("ok") is False and not st.get("skipped")],
         "skipped": [f"{cn}.{sid}" for cn, sid, st in steps if isinstance(st, dict) and st.get("skipped") and not st.get("mode_skipped")],
+        # steps whose output stopped at a limit of the collection (a page of an AWS list, the last N lines of a node log, the tail of a component log):
+        # what was read is not all there is, and a count made from it is a lower bound
+        "at_limit": {f"{cn}.{sid}": lim for cn, sid, st in steps if isinstance(st, dict) and (lim := (st.get("at_limit") or st.get("capped")))},
         "seconds_total": seconds_total,
     }
 

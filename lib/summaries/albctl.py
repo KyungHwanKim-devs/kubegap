@@ -52,14 +52,14 @@ def _pod_metrics(snap: Path) -> dict:
             recon_err[labels.get("controller")] = recon_err.get(labels.get("controller"), 0) + int(v)
         wq = {labels.get("name"): v for labels, v in lb.get("workqueue_depth", [])}
         total_calls = sum(api_calls.values())
-        slow_ops = sorted(((k, round(api_dur[k] / api_calls[k], 3)) for k in api_calls if api_calls[k] >= 20 and k in api_dur), key=lambda kv: -kv[1])[:5]
-        top_ops = sorted(api_calls.items(), key=lambda kv: -kv[1])[:8]
+        slow_ops = sorted(((k, round(api_dur[k] / api_calls[k], 3)) for k in api_calls if api_calls[k] >= 20 and k in api_dur), key=lambda kv: -kv[1])
+        top_ops = sorted(api_calls.items(), key=lambda kv: -kv[1])
         start = sg.get("process_start_time_seconds")
         pods[f.stem] = {
             "leader": leader,
             "process_start": start,
             "aws_api_calls_total": total_calls,
-            "aws_api_top_ops": top_ops,
+            "aws_api_ops_by_calls": top_ops,
             "aws_api_slow_ops_avg_s": slow_ops,
             "aws_api_retries_avg": rounded(retries_sum / retries_cnt, 3) if retries_cnt else None,
             "aws_api_retries_total": int(retries_sum),
@@ -232,7 +232,7 @@ def analyze(snap: Path, inv: dict | None, traffic: dict | None = None) -> dict:
         "reconcile_errors_total": (ld or {}).get("reconcile_errors_total"),
         "reconcile_by_result": (ld or {}).get("reconcile_by_result"),
         "aws_api_calls_total": sum(d["aws_api_calls_total"] for d in pm.values()),
-        "aws_api_top_ops": (ld or {}).get("aws_api_top_ops"),
+        "aws_api_ops_by_calls": (ld or {}).get("aws_api_ops_by_calls"),
         "aws_api_slow_ops_avg_s": (ld or {}).get("aws_api_slow_ops_avg_s"),
         "aws_api_retries_avg": (ld or {}).get("aws_api_retries_avg"),
         "webhook_5xx": sum(d["webhook_5xx"] for d in pm.values()),
@@ -262,7 +262,7 @@ def analyze(snap: Path, inv: dict | None, traffic: dict | None = None) -> dict:
         "ingress_class_params": len(params),
         "alb_ingresses": len(alb_ings),
         "ingresses_without_lb": no_lb,
-        "ingress_annotations_top": dict(ann_counter.most_common(8)),
+        "ingress_annotations_by_count": dict(ann_counter.most_common()),
         "tgb_count": len(tgb_rows),
         "tgb_by_target_type": dict(Counter(t["target_type"] for t in tgb_rows)),
         "tgb_stale": [f"{t['namespace']}/{t['name']}" for t in tgb_rows if t["stale"]],
@@ -276,7 +276,7 @@ def analyze(snap: Path, inv: dict | None, traffic: dict | None = None) -> dict:
         "aws_api_calls_total": metrics["aws_api_calls_total"],
         "aws_api_retries_avg": metrics["aws_api_retries_avg"],
         "aws_api_slow_ops_avg_s": metrics["aws_api_slow_ops_avg_s"],
-        "aws_api_top_ops": metrics["aws_api_top_ops"],
+        "aws_api_ops_by_calls": metrics["aws_api_ops_by_calls"],
         "rest_client_429_503": metrics["rest_client_429_503"],
         "workqueue_depth_max": metrics["workqueue_depth_max"],
         "target_groups_read": bool(traffic_alb.get("available")),  # the ALB listing (elasticloadbalancing:Describe*) answered; without it the AWS-side counts below are 0 for the wrong reason (#141)
@@ -290,8 +290,8 @@ def analyze(snap: Path, inv: dict | None, traffic: dict | None = None) -> dict:
         "webhooks": webhooks,
         "ingress_classes": classes,
         "ingress_class_params": params,
-        "ingresses": {"alb": len(alb_ings), "without_lb": no_lb, "annotations_top": dict(ann_counter.most_common(12))},
-        "target_group_bindings": {"count": len(tgb_rows), "rows": tgb_rows[:60]},
+        "ingresses": {"alb": len(alb_ings), "without_lb": no_lb, "annotations_by_count": dict(ann_counter.most_common())},
+        "target_group_bindings": {"count": len(tgb_rows), "rows": tgb_rows},
         "lb_services": lb_svcs,
         "metrics": metrics,
         "summary": summary,

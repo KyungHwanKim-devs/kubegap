@@ -1,0 +1,95 @@
+# What a report teaches when the replicas of a workload, or most production pods, sit on one node. Every page below was opened and read (2026-11-14).
+topic: replica-placement-across-nodes
+checks: [resilience.replicas-same-node, resilience.single-eligible-node, resilience.prod-concentration]
+mechanism: >
+  Two replicas survive a node failure only when they are on two nodes, and nothing in a plain Deployment asks for that. The scheduler works per pod:
+  it filters the nodes where the pod is feasible, scores the rest and binds the pod to the highest score. For pods that declare no spreading and
+  belong to a Service or a ReplicaSet, kube-scheduler applies built-in defaults: maxSkew 3 across kubernetes.io/hostname and maxSkew 5 across zones,
+  both with whenUnsatisfiable ScheduleAnyway. ScheduleAnyway is a preference in scoring, not a rule, so both replicas on one node is an allowed
+  outcome.
+
+
+  A declared constraint is only as wide as the nodes the pod may use. If the pod has a nodeSelector or a required nodeAffinity, the scheduler skips
+  the non-matching nodes in the skew calculation. A required rule is hard: the pod cannot be scheduled unless it is met. When labels, affinity and
+  taints together leave one eligible node, every replica lands there and a topology spread declaration is satisfied on that single node; when it
+  fails, the pods have nowhere else to go. A preferred rule is scored with a weight between 1 and 100, and the pod is still scheduled when no node
+  matches.
+
+
+  Placement is also not kept. There is no guarantee that constraints remain satisfied when pods are removed; scaling down a Deployment may leave an
+  imbalanced distribution. A node autoscaler that consolidates removes underutilized nodes and moves their pods onto the rest, looking only at
+  resource requests. Over time pods collect on few nodes unless something says otherwise.
+
+
+  What the failure costs: when a node stops answering, it is tainted not-ready or unreachable, and Kubernetes adds to every pod a toleration for those
+  taints of 300 seconds. Pods remain bound to the lost node for 5 minutes after the problem is detected before they are evicted and recreated
+  elsewhere. A workload with all its replicas on that node is down for at least that time, and a node that holds most production pods takes that many
+  services with it at once.
+sources:
+  - { title: "Kubernetes: Pod Topology Spread Constraints", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/" }
+  - { title: "Kubernetes: Assigning Pods to Nodes", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/" }
+  - { title: "Kubernetes: Kubernetes Scheduler", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/" }
+  - { title: "Kubernetes: Taints and Tolerations", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/" }
+  - { title: "Kubernetes: Node Autoscaling", url: "https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/" }
+detect:
+  - kind: metric
+    what: >
+      kube-state-metrics exports one kube_pod_info series per pod with the node it runs on and the workload that created it. Counting distinct nodes
+      per workload shows which ones have every replica on a single node; counting pods per node shows the share one node holds.
+    example: 'count by (namespace, created_by_name) (count by (namespace, created_by_name, node) (kube_pod_info{created_by_kind="ReplicaSet"})) == 1'
+  - kind: dashboard
+    what: >
+      A table of pods per node for the production namespaces, sorted by count. One node holding half of them is visible at a glance and is not
+      something an alert expresses well.
+    example: 'sort_desc(count by (node) (kube_pod_info{namespace=~".*prod.*"}))'
+  - kind: command
+    what: Where the replicas of one workload are, as a look at one moment.
+    example: "kubectl get pods -n <namespace> -l app=<name> -o wide"
+solutions:
+  - scale: [small]
+    approach: >
+      On two or three nodes, declare a topology spread across kubernetes.io/hostname with maxSkew 1 and ScheduleAnyway on the workloads that matter,
+      and turn required node affinity that is only a preference ("keep apps off that node") into preferred with weight 100. Accept that with one node
+      left everything runs there.
+    tools: [topologySpreadConstraints]
+    tradeoff: >
+      Replicas are apart whenever two nodes are up and nothing ever stays Pending because of the rule. It is a preference: after a node comes back,
+      pods do not move back on their own.
+    example: |
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app: api }
+  - scale: [medium]
+    approach: >
+      Make the spread a rule for production workloads: whenUnsatisfiable DoNotSchedule across hostnames, together with a PodDisruptionBudget. Keep
+      genuine pins (a local volume, a GPU) and write down why.
+    tools: [topologySpreadConstraints, PodDisruptionBudget]
+    tradeoff: >
+      Two replicas are never on one node. A pod that cannot satisfy the rule is not scheduled, so a cluster short of nodes shows Pending pods
+      instead of a hidden single point of failure. Required pod anti-affinity gives the same guarantee but allows only one pod per node and is not
+      recommended in clusters larger than several hundred nodes.
+  - scale: [large]
+    approach: >
+      Spread across zones as well as hostnames, and run the Descheduler so that placement is corrected after scale-downs and consolidation: its
+      RemoveDuplicates strategy keeps one pod of a ReplicaSet per node and RemovePodsViolatingTopologySpreadConstraint evicts the minimum number of
+      pods to bring each constraint back within maxSkew. It evicts through the Eviction API and respects PodDisruptionBudgets.
+    tools: [topologySpreadConstraints, Descheduler]
+    tradeoff: >
+      Placement stays as declared instead of drifting. The Descheduler is one more component to run, and every correction is an eviction of a running
+      pod.
+cases:
+  - company: Moonlight
+    url: "https://updates.moonlightwork.com/outage-post-mortem-87370"
+    summary: >
+      Between January 18 and January 22 the nodes of a cluster on Google Cloud crashed repeatedly with kernel panics after sustained 100% CPU use. The
+      scheduler had at times placed all three website pods on the same node, together with CPU-intensive pods; when that node crashed its pods moved
+      to another node and the cycle repeated, until the website was fully down. Anti-affinity rules on all major deployments restored the service.
+    match: Three replicas gave no redundancy because nothing kept them on different nodes; one node failure removed all of them.
+reading:
+  - { title: "Kubernetes: Pod Topology Spread Constraints", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/", why: "maxSkew, the two whenUnsatisfiable modes, the built-in defaults and the known limitations." }
+  - { title: "Kubernetes: Assigning Pods to Nodes", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/", why: "Required against preferred affinity, and how nodeSelector and affinity combine to narrow the eligible nodes." }
+  - { title: "Descheduler README", url: "https://github.com/kubernetes-sigs/descheduler", why: "Why scheduling decisions go stale and which strategies correct them." }
+  - { title: "Moonlight: Outage Post-Mortem", url: "https://updates.moonlightwork.com/outage-post-mortem-87370", why: "A short account of three replicas on one node." }

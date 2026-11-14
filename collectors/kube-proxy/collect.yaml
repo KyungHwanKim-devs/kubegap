@@ -3,11 +3,12 @@
 # 2) Inside the node: /proxyMode (iptables|ipvs|nftables) and /healthz. On EKS the mode is also in the ConfigMap, but k3s has no config file so asking the node is the only way. Output logs/node/<node>/kube-proxy.txt
 # 3) Config (ConfigMap kube-proxy-config), DaemonSet and Service/EndpointSlice counts come from the core object dump; logs from core component-logs (logs/pods/kube-proxy/) and the k3s journal.
 - id: metrics
+  unit: metrics
   type: promql
   file: metrics.yaml
   timeout: 30
 - id: proxy-mode
-  modes: [full]   # skipped by the daily run
+  unit: node-os
   type: node
   nodes: all
   cmd: echo "mode=$(curl -s -m 3 http://127.0.0.1:10249/proxyMode)"; echo "healthz=$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:10256/healthz)"; echo "metrics_local=$(curl -s -m 3 -o /dev/null -w '%{http_code}' http://127.0.0.1:10249/metrics)"

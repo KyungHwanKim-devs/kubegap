@@ -1,5 +1,6 @@
 # EKS platform checks. Reads cluster.eks in inventory.json and the aws/ folder.
 - id: eks.audit-log-off
+  needs: [cloud-account]
   name: Control plane audit log disabled
   area: platform
   type: inventory
@@ -13,9 +14,9 @@
   suggest: Enable audit and keep the CloudWatch log group retention short (7-30 days) to cap the cost.
   verify:
     - "aws eks describe-cluster --name {cluster} --query cluster.logging"
-  profiles: [prod]
+  platforms: [eks]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         inventory:
@@ -55,6 +56,7 @@
               addons: {}
 
 - id: eks.public-endpoint-open
+  needs: [cloud-account]
   name: Cluster public endpoint open to the whole world
   area: security
   type: inventory
@@ -71,9 +73,9 @@
   suggest: Restrict publicAccessCidrs to office/VPN CIDRs, or switch to private-only and access through a VPN or bastion.
   verify:
     - "aws eks describe-cluster --name {cluster} --query cluster.resourcesVpcConfig"
-  profiles: [prod]
+  platforms: [eks]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         inventory:
@@ -132,7 +134,7 @@
 - id: eks.addon-outdated
   name: Managed add-on is not the latest version
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: inventory
   each: cluster.eks.addons
   rule:
@@ -148,9 +150,9 @@
   suggest: "aws eks update-addon --addon-name <name> --addon-version <version>, one step at a time. Read the changelog first."
   verify:
     - "aws eks describe-addon-versions --addon-name <name> --kubernetes-version {k8s_version} --query 'addons[].addonVersions[0].addonVersion'"
-  profiles: [prod]
+  platforms: [eks]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         inventory:
@@ -244,6 +246,7 @@
   name: Node OS, kernel and container runtime skew
   area: platform
   type: inventory
+  needs: [cloud-account]
   cluster_level: true
   rule:
     expr: "len(inv['nodes'].get('os_images', [])) > 1 and len(inv['nodes'].get('runtimes', [])) > 1"
@@ -256,9 +259,9 @@
   verify:
     - "kubectl get nodes -o custom-columns=NAME:.metadata.name,OS:.status.nodeInfo.osImage,KERNEL:.status.nodeInfo.kernelVersion,RUNTIME:.status.nodeInfo.containerRuntimeVersion"
     - "kubectl get ec2nodeclass -o jsonpath='{.items[*].spec.amiFamily}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         inventory:
@@ -347,6 +350,7 @@
               - "containerd://2.1"
 
 - id: eks.ssm-unregistered
+  needs: [cloud-account]
   name: Node not registered with SSM
   area: platform
   type: inventory
@@ -361,9 +365,9 @@
   suggest: Add AmazonSSMManagedInstanceCore to the node role (Karpenter EC2NodeClass role). Kernel log checks for nodes failing this check are marked as skipped.
   verify:
     - "aws ssm describe-instance-information --query 'InstanceInformationList[].{id:InstanceId,ping:PingStatus}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         inventory:
@@ -415,7 +419,7 @@
 - id: eks.extended-support
   name: Extended support billing in effect
   area: cost
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: inventory
   cluster_level: true
   rule:
@@ -428,9 +432,9 @@
   suggest: Plan the upgrade to the next minor (check removed APIs with Pluto/kubent → add-ons → control plane → nodes). If it cannot happen now, record that keeping upgradePolicy at EXTENDED is a deliberate decision.
   verify:
     - "aws eks describe-cluster-versions --cluster-versions {k8s_version}"
-  profiles: [prod]
+  platforms: [eks]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         inventory:
@@ -511,7 +515,7 @@
 - id: eks.no-backup-policy
   name: No EBS snapshot policy (DLM) or AWS Backup plan
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: inventory
   rule:
     needs: "aws_file('dlm-lifecycle-policies.json') is not None and aws_file('backup-plans.json') is not None"
@@ -527,9 +531,9 @@
   verify:
     - "aws dlm get-lifecycle-policies"
     - "aws backup list-backup-plans"
-  profiles: [prod]
+  platforms: [eks]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         inventory:
@@ -611,7 +615,7 @@
   type: summary
   each: scaling.karpenter
   cluster_level: true
-  profiles: [prod]
+  platforms: [eks]
   rule:
     needs: "item.get('present')"
     needs_reason: "karpenter not present"
@@ -671,6 +675,7 @@
           present: false
 
 - id: eks.acm-certificate-expiring
+  needs: [cloud-account]
   name: ACM certificate in use is expiring soon, expired, or cannot auto-renew
   area: security
   type: summary
@@ -692,7 +697,7 @@
   suggest: "If RenewalEligibility is INELIGIBLE, restore the validation CNAME in Route53. Re-import IMPORTED certificates 30 days before expiry or replace them with ACM-issued ones. Delete expired unused certificates."
   verify:
     - "aws acm list-certificates --query 'CertificateSummaryList[?InUse==`true`].[DomainName,NotAfter,RenewalEligibility,Status]' --output table"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -781,7 +786,7 @@
 - id: eks.service-quota-near-limit
   name: AWS service quota usage near the limit (at the limit, node, LB and IP creation fail silently)
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: eksplatform.quotas
   cluster_level: true
@@ -791,7 +796,7 @@
     expr: "len(item.get('near_limit') or []) > 0"
     warn_expr: "len(item.get('over_60') or []) > 0"
   target: "'aws-account'"
-  evidence: "f\"quotas with a usage metric {item.get('with_usage')}/{item.get('quotas')}, at 80% or more {item.get('near_limit')}, at 60% or more {item.get('over_60')}, top operational quotas {item.get('watched_top')[:6]}\""
+  evidence: "f\"quotas with a usage metric {item.get('with_usage')}/{item.get('quotas')}, at 80% or more {item.get('near_limit')}, at 60% or more {item.get('over_60')}, top operational quotas {shown(item.get('watched_quotas'), 6)}\""
   severity_default: high
   symptom_linked: false
   why: >
@@ -802,7 +807,7 @@
   verify:
     - "aws service-quotas list-service-quotas --service-code ec2 --query 'Quotas[?UsageMetric!=null].[QuotaName,Value]' --output table"
     - "aws cloudwatch get-metric-statistics --namespace AWS/Usage --metric-name ResourceCount --dimensions Name=Service,Value=EC2 Name=Type,Value=Resource Name=Resource,Value=vCPU Name=Class,Value=Standard/OnDemand --statistics Maximum --period 3600 --start-time <1h ago> --end-time <now>"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -814,7 +819,7 @@
             - "ALB listener rules per load balancer 85/100"
           over_60:
             - "ALB listener rules per load balancer 0.85"
-          watched_top:
+          watched_quotas:
             - "['VPC count', 3.0, 5.0, 0.6]"
           max_ratio: 0.6
           max_ratio_name: "VPC count"
@@ -826,7 +831,7 @@
           near_limit: []
           over_60:
             - "VPC count 0.6"
-          watched_top:
+          watched_quotas:
             - "['VPC count', 3.0, 5.0, 0.6]"
           max_ratio: 0.6
           max_ratio_name: "VPC count"
@@ -837,7 +842,7 @@
           with_usage: 20
           near_limit: []
           over_60: []
-          watched_top:
+          watched_quotas:
             - "['VPC count', 3.0, 5.0, 0.6]"
           max_ratio: 0.6
           max_ratio_name: "VPC count"
@@ -848,11 +853,12 @@
           with_usage: 20
           near_limit: []
           over_60: []
-          watched_top:
+          watched_quotas:
             - "['VPC count', 3.0, 5.0, 0.6]"
           max_ratio: 0.6
           max_ratio_name: "VPC count"
 - id: storage.ebs-volume-io-saturated
+  needs: [cloud-account]
   name: EBS volume I/O saturation (queue length, IOPS limit, burst balance) — root volumes included
   area: storage
   type: summary
@@ -877,7 +883,7 @@
   suggest: "For root volumes with a high queue, raise iops/throughput in the EC2NodeClass blockDeviceMappings (gp3 can be tuned independently of volume size) or reduce logs and emptyDir use. For PVCs, the StorageClass parameters iops/throughput."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/EBS --metric-name VolumeQueueLength --dimensions Name=VolumeId,Value=<vol> --statistics Average --period 300 --start-time <24h ago> --end-time <now>"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -934,6 +940,7 @@
           max_queue: 0.26
           max_iops_ratio: 0.05
 - id: eks.security-group-open-to-world
+  needs: [cloud-account]
   name: Cluster security group inbound open to 0.0.0.0/0 (other than 443)
   area: security
   type: summary
@@ -955,7 +962,7 @@
   suggest: "Keep only cluster SG and ALB SG references as node security group inbound and delete CIDR rules. Replace SSH with SSM."
   verify:
     - "aws ec2 describe-security-groups --group-ids <sg> --query 'SecurityGroups[].IpPermissions[?contains(IpRanges[].CidrIp, `0.0.0.0/0`)]'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1002,6 +1009,7 @@
           public_cidrs:
             - "0.0.0.0/0"
 - id: eks.nodegroup-ami-old
+  needs: [cloud-account]
   name: Managed node group AMI is old (kernel and containerd patches not applied)
   area: platform
   type: summary
@@ -1025,7 +1033,7 @@
   suggest: "aws eks update-nodegroup-version --cluster-name <c> --nodegroup-name <ng> (rolling replacement). Automate with the node group's 'auto update' or a periodic pipeline."
   verify:
     - "aws eks describe-nodegroup --cluster-name <c> --nodegroup-name <ng> --query 'nodegroup.{ami:releaseVersion,status:status,health:health}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"

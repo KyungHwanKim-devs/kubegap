@@ -1,0 +1,9 @@
+# What is true of an EKS cluster whatever its size. See rubric/platforms/k3s.yaml for what belongs in a platform file.
+name: eks
+families_not_expected: []
+exclude:
+  traffic.endpoint-zero:
+    - kube-system/kube-prometheus-stack-kube-controller-manager   # managed control plane: these Services have no endpoints by design
+    - kube-system/kube-prometheus-stack-kube-scheduler
+    - kube-system/kube-prometheus-stack-kube-etcd
+    - kube-system/kube-prometheus-stack-kube-proxy

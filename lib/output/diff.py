@@ -83,49 +83,61 @@ def _body_hash(o: dict) -> str:
     return hashlib.sha256(json.dumps(body, sort_keys=True, default=str).encode()).hexdigest()[:16]
 
 
+DIGEST_FILE = "objects-digest.json"
+
+
+def _field_hashes(o: dict) -> dict[str, str]:
+    """A short hash per changed-field path of one object: `spec.replicas`, `spec.template`, `data`, … The paths a reader is pointed to."""
+    out: dict[str, str] = {}
+    keys = [k for k in BODY_KEYS if k in o] or [k for k in o if k not in ("metadata", "status", "kind", "apiVersion")]
+    for k in keys:
+        v = o.get(k)
+        for path, val in [(f"{k}.{x}", v[x]) for x in sorted(v)] if isinstance(v, dict) else [(k, v)]:
+            out[path] = hashlib.sha256(json.dumps(val, sort_keys=True, default=str).encode()).hexdigest()[:8]
+    return out
+
+
+def object_digest(snap: Path) -> dict:
+    """What a later run needs of this run's objects to say what was added, removed and changed: per kind the number of items, and for the kinds
+    compared one by one a hash of the body, the generation and a hash per field path. No value is in it. A daily run keeps this file in place
+    of objects/ (lib/output/slim.py); for a snapshot that still has objects/ it is computed from them."""
+    if not (snap / "objects").is_dir():
+        return load_json(snap / DIGEST_FILE) or {}
+    out: dict = {}
+    for p in sorted((snap / "objects").glob("*.json")):
+        its = items(load_json(p))
+        if p.stem in COUNT_ONLY_KINDS:
+            out[p.stem] = {"count": len(its)}
+            continue
+        out[p.stem] = {
+            "count": len(its),
+            "items": {_key(o): {"h": _body_hash(o), "g": (o.get("metadata") or {}).get("generation"), "f": {"metadata.resourceVersion": _body_hash(o)} if o.get("kind") == "ConfigMap" else _field_hashes(o)} for o in its},
+        }
+    return out
+
+
 def diff_objects(a: Path, b: Path) -> dict:
     out: dict = {"kinds_compared": 0, "added": [], "removed": [], "changed": [], "count_only": {}, "kinds_only_in_a": [], "kinds_only_in_b": []}
-    fa = {p.stem: p for p in (a / "objects").glob("*.json")} if (a / "objects").is_dir() else {}
-    fb = {p.stem: p for p in (b / "objects").glob("*.json")} if (b / "objects").is_dir() else {}
+    fa, fb = object_digest(a), object_digest(b)
     out["kinds_only_in_a"] = sorted(set(fa) - set(fb))
     out["kinds_only_in_b"] = sorted(set(fb) - set(fa))
     for kind in sorted(set(fa) & set(fb)):
-        ia, ib = items(load_json(fa[kind])), items(load_json(fb[kind]))
-        if kind in COUNT_ONLY_KINDS:
-            if len(ia) != len(ib):
-                out["count_only"][kind] = {"before": len(ia), "after": len(ib), "delta": len(ib) - len(ia)}
+        if "items" not in fa[kind] or "items" not in fb[kind]:
+            if fa[kind]["count"] != fb[kind]["count"]:
+                out["count_only"][kind] = {"before": fa[kind]["count"], "after": fb[kind]["count"], "delta": fb[kind]["count"] - fa[kind]["count"]}
             continue
         out["kinds_compared"] += 1
-        ma = {_key(o): o for o in ia}
-        mb = {_key(o): o for o in ib}
+        ma, mb = fa[kind]["items"], fb[kind]["items"]
         for k in sorted(set(mb) - set(ma)):
             out["added"].append({"kind": kind, "name": k})
         for k in sorted(set(ma) - set(mb)):
             out["removed"].append({"kind": kind, "name": k})
         for k in sorted(set(ma) & set(mb)):
-            ha, hb = _body_hash(ma[k]), _body_hash(mb[k])
-            if ha != hb:
-                ga = (ma[k].get("metadata") or {}).get("generation")
-                gb = (mb[k].get("metadata") or {}).get("generation")
-                out["changed"].append({"kind": kind, "name": k, "generation": [ga, gb], "changed_fields": ["metadata.resourceVersion"] if ma[k].get("kind") == "ConfigMap" else _changed_fields(ma[k], mb[k])})
+            if ma[k]["h"] != mb[k]["h"]:
+                paths_ = [p for p in sorted(set(ma[k]["f"]) | set(mb[k]["f"])) if ma[k]["f"].get(p) != mb[k]["f"].get(p)]
+                out["changed"].append({"kind": kind, "name": k, "generation": [ma[k]["g"], mb[k]["g"]], "changed_fields": paths_[:12]})
     out["summary"] = {"added": len(out["added"]), "removed": len(out["removed"]), "changed": len(out["changed"])}
     return out
-
-
-def _changed_fields(a: dict, b: dict, prefix: str = "", depth: int = 0, limit: int = 12) -> list[str]:
-    """Record a few changed top-level and second-level field paths (so the LLM knows where to look)."""
-    out: list[str] = []
-    keys = [k for k in BODY_KEYS if k in a or k in b] or [k for k in set(a) | set(b) if k not in ("metadata", "status", "kind", "apiVersion")]
-    for k in keys:
-        va, vb = a.get(k), b.get(k)
-        if va == vb:
-            continue
-        if isinstance(va, dict) and isinstance(vb, dict) and depth < 2:
-            sub = [f"{k}.{x}" for x in sorted(set(va) | set(vb)) if va.get(x) != vb.get(x)]
-            out.extend(sub[:limit])
-        else:
-            out.append(k)
-    return out[:limit]
 
 
 def diff_findings(a: Path, b: Path) -> dict:
@@ -140,7 +152,7 @@ def diff_findings(a: Path, b: Path) -> dict:
     # whether the check existed and was allowed to run on each side (absent, disabled, not-collected, tool-missing, error), the rule_hash of its verdict-deciding
     # parts and the thresholds in force. A check that was `skip` on one side (its inputs were absent, as when Argo CD was installed between the runs) is a cluster
     # change, and the row carries both statuses and the skip reason so the report can say so.
-    crit: dict[str, list] = {"new_checks": [], "dropped_checks": [], "rule_changed": [], "thresholds_changed": []}
+    crit: dict[str, list] = {"new_checks": [], "dropped_checks": [], "rule_changed": [], "thresholds_changed": [], "severity_changed": []}
     GATED = ("disabled", "not-collected", "tool-missing", "error")
 
     def gate(c: dict | None) -> bool:
@@ -158,6 +170,8 @@ def diff_findings(a: Path, b: Path) -> dict:
             return "rule_changed"
         if (x.get("thresholds") or {}) != (y.get("thresholds") or {}):
             return "thresholds_changed"
+        if x.get("severity_default") != y.get("severity_default"):
+            return "severity_changed"  # the check's own level differs: the cluster's scale was answered or changed between the runs, or the check was re-levelled
         return None
 
     def crit_row(f: dict, kind: str, bucket: str) -> dict:
@@ -217,7 +231,7 @@ def diff_findings(a: Path, b: Path) -> dict:
 
     return {
         "rubric_version": [da.get("rubric_version"), db.get("rubric_version")],
-        "profile": [(da.get("profile") or {}).get("name"), (db.get("profile") or {}).get("name")],
+        "scale": [(da.get("scale") or {}).get("name"), (db.get("scale") or {}).get("name")],
         "counts_before": {"fail": sev(da, "fail"), "warn": sev(da, "warn")},
         "counts_after": {"fail": sev(db, "fail"), "warn": sev(db, "warn")},
         "new": new,
@@ -226,7 +240,7 @@ def diff_findings(a: Path, b: Path) -> dict:
         "rename_suspects": rename_suspects,
         "criteria_changes": {
             **crit,
-            "note": "Findings whose check did not exist or was gated off on one side (new_checks, dropped_checks), whose rule_hash differs (rule_changed) or whose thresholds in force differ (thresholds_changed) are criteria changes and are kept out of new, resolved and changed.",
+            "note": "Findings whose check did not exist or was gated off on one side (new_checks, dropped_checks), whose rule_hash differs (rule_changed) whose thresholds in force differ (thresholds_changed) or whose own severity differs, as when the scale of the cluster was answered between the runs (severity_changed), are criteria changes and are kept out of new, resolved and changed.",
         },
         "summary": {"new": len(new), "resolved": len(resolved), "changed": len(changed), "criteria_changes": sum(len(v) for v in crit.values())},
     }
@@ -250,7 +264,7 @@ def diff_inventory(a: Path, b: Path) -> dict:
     return {
         "taken_at": [ia.get("taken_at"), ib.get("taken_at")],
         "server_version": [(ia.get("cluster") or {}).get("server_version"), (ib.get("cluster") or {}).get("server_version")],
-        "profile": [(ia.get("profile") or {}).get("name"), (ib.get("profile") or {}).get("name")],
+        "platform": [(ia.get("cluster") or {}).get("platform"), (ib.get("cluster") or {}).get("platform")],
         "node_count": [(ia.get("nodes") or {}).get("count"), (ib.get("nodes") or {}).get("count")],
         "nodes_added": sorted(nodes_b - nodes_a),
         "nodes_removed": sorted(nodes_a - nodes_b),
@@ -277,7 +291,7 @@ def diff_events(a: Path, b: Path) -> dict:
         if oa != ob or (x is None) != (y is None):
             # A count that dropped to 0 after the retention window (default 1 hour) is expiry, not a cluster change (seen on a real cluster: SuccessfullyReconciled 38,473 -> 0)
             kind = "expired" if (oa > 0 and ob == 0) else ("new" if (oa == 0 and ob > 0) else "changed")
-            rows.append({"reason": reason, "type": typ, "occurrences": [oa, ob], "delta": ob - oa, "kind": kind, "objects_top_after": (y or {}).get("objects_top", [])[:3]})
+            rows.append({"reason": reason, "type": typ, "occurrences": [oa, ob], "delta": ob - oa, "kind": kind, "objects_top_after": (y or {}).get("objects_by_count", [])[:3]})
     rows.sort(key=lambda r: (r["type"] != "Warning", -abs(r["delta"])))
     return {
         "changed": rows[:40],
@@ -390,7 +404,7 @@ def persisted_findings(b: Path, lookback: int = 10) -> dict:
 
 # ---------- history.csv ----------
 
-HISTORY_COLUMNS = ["snapshot", "taken_at", "context", "profile", "rubric_version", "signatures_version", "critical", "high", "medium", "low", "info", "warn", "suppressed", "checks_evaluated", "nodes", "components"]
+HISTORY_COLUMNS = ["snapshot", "taken_at", "context", "scale", "rubric_version", "signatures_version", "critical", "high", "medium", "low", "info", "warn", "suppressed", "checks_evaluated", "nodes", "components"]
 
 
 def append_history(snap: Path) -> Path | None:
@@ -404,7 +418,7 @@ def append_history(snap: Path) -> Path | None:
         "snapshot": snap.name,
         "taken_at": inv.get("taken_at"),
         "context": inv.get("context"),
-        "profile": (fd.get("profile") or {}).get("name"),
+        "scale": (fd.get("scale") or {}).get("name"),
         "rubric_version": fd.get("rubric_version"),
         "signatures_version": inv.get("signatures_version"),
         **{k: fails.get(k, 0) for k in ("critical", "high", "medium", "low", "info")},

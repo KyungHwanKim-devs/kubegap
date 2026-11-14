@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ...foundations import paths, units
 from ...foundations.config import Config
 from ...foundations.runlog import RunLog
 from ..portfwd import PortForward
@@ -119,6 +120,11 @@ class StepContext:
     node_access: NodeRunner | None
     echo: Callable | None
     state: CollectState
+    mode: str = paths.DEFAULT_MODE
+
+    def collects(self, unit: str) -> bool:
+        """Whether this run's mode collects a unit (collectors/units.yaml). A step that writes more when a second unit is collected asks here."""
+        return units.collected(self.mode, unit)
 
     @property
     def eks(self) -> dict:
@@ -140,9 +146,3 @@ def parallel(fn, items, workers: int | None = None) -> list:
         return [fn(it) for it in items]
     with ThreadPoolExecutor(max_workers=min(workers or ITEM_WORKERS, len(items)), thread_name_prefix="step") as pool:
         return list(pool.map(fn, items))
-
-
-def step_in_mode(st: dict, mode: str) -> bool:
-    """A step runs in every mode unless its collect.yaml entry lists `modes:`; `modes: [full]` marks a step the daily run skips (slow tools, per-node scripts, CloudWatch queries, cost data)."""
-    modes = st.get("modes")
-    return not modes or mode in modes

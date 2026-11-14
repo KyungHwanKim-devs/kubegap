@@ -1,16 +1,18 @@
 # Sample reports
 
-Real reports written by `/kubegap` on an EKS cluster and a two-node k3s cluster. Four are in English and two in Korean. Account ids, private IPs, cluster and node names, namespaces, workload names and domains were replaced afterwards with placeholders such as `node-a`, `app-c` or `api.example-b.ai`; numbers and findings are untouched, and wording is unchanged apart from those names. The procedure is in [`docs/SAMPLES.md`](../docs/SAMPLES.md).
+Eight real reports: a daily and a full audit of an EKS cluster and of a two-node k3s cluster, each written once in English and once in Korean. They were made on 2026-11-15 by typing `/kubegap daily` or `/kubegap full` into an agent session that knew nothing about the clusters, and are published as the run wrote them, with names replaced.
 
-Every run writes two files. `report.md` is for people: a first screen (urgent or not, today's problems, since the last run), the cluster at a glance and what is coming up (both from code), the problems (3 in daily mode, 5 in full) each with what is happening, why, a suggested fix, rollback, why this happens (the principle, a public case, what to read next) and the evidence table, then the since-last-run table, every other critical or high item, one line per area in full mode, what the run could not see, a numbers table and the check ids behind each problem. `report-details.md` is for the next run and for digging: every table (counts, critical/high list, changes, absence, suppressed, collectors run, checks evaluated, signature matches, the full first-pass list) assembled by `scripts/kubegap render-details`, plus the analysis record from the facts: severity changes, recounted numbers, why things changed, per-area detail (full mode), files read and tool notes.
+| Cluster | Mode | English | Korean |
+|---|---|---|---|
+| k3s: 2 nodes, embedded etcd, MetalLB, local-path-provisioner, run at small scale | daily | [report](en/k3s/daily/report.md) | [리포트](ko/k3s/daily/report.md) |
+| k3s, the same | full | [report](en/k3s/full/report.md) · [details](en/k3s/full/report-details.md) | [리포트](ko/k3s/full/report.md) · [세부](ko/k3s/full/report-details.md) |
+| EKS: 9 nodes (Karpenter plus a managed node group), run at medium scale | daily | [report](en/eks/daily/report.md) | [리포트](ko/eks/daily/report.md) |
+| EKS, the same | full | [report](en/eks/full/report.md) · [details](en/eks/full/report-details.md) | [리포트](ko/eks/full/report.md) · [세부](ko/eks/full/report-details.md) |
 
-| Language | Cluster | Mode | Report | Details |
-|---|---|---|---|---|
-| English | k3s, 2 Ubuntu nodes, embedded etcd, MetalLB, flannel, local-path-provisioner; profile `lab` | daily | [en/k3s/daily/report.md](en/k3s/daily/report.md) | [en/k3s/daily/report-details.md](en/k3s/daily/report-details.md) |
-| English | k3s, same | full | [en/k3s/full/report.md](en/k3s/full/report.md) | [en/k3s/full/report-details.md](en/k3s/full/report-details.md) |
-| English | EKS, 8 nodes (Karpenter spot plus a managed node group), 23 components; profile `prod` | daily | [en/eks/daily/report.md](en/eks/daily/report.md) | [en/eks/daily/report-details.md](en/eks/daily/report-details.md) |
-| English | EKS, same | full | [en/eks/full/report.md](en/eks/full/report.md) | [en/eks/full/report-details.md](en/eks/full/report-details.md) |
-| Korean | EKS, same | full | [ko/eks/full/report.md](ko/eks/full/report.md) | [ko/eks/full/report-details.md](ko/eks/full/report-details.md) |
-| Korean | k3s, same | daily | [ko/k3s/daily/report.md](ko/k3s/daily/report.md) | [ko/k3s/daily/report-details.md](ko/k3s/daily/report-details.md) |
+What to know when reading them:
 
-Daily snapshots are compared with the previous daily snapshot, full with full, so a report's "since the previous run" section always talks about the same kind of run.
+- **A daily report is one or two screens.** What is broken now, what happened, the three things that matter most, and at the end what the run did not look at. A daily audit writes one file.
+- **A full report is long.** Up to five problems, each explained in six sections, around 500 lines. `report-details.md` next to it holds every verdict and every table and is assembled by code.
+- **The English and the Korean report of one cluster are two separate runs**, minutes apart, by two sessions. They agree on the facts and do not always choose the same five problems or order them alike: choosing is the agent's judgement, within what the assembly check requires (every critical finding and every high failure has to be placed).
+- **The k3s full reports did not read the nodes.** Node access was skipped in those runs, and the reports say so under the limits of the run. The EKS full reports read seven of nine nodes; two are not registered with SSM.
+- **Names are placeholders.** Account ids, private IPs, load balancer addresses, cluster and node names, namespaces, workload names, repositories and domains were replaced with names such as `node-a`, `app-c` or `lab-k`. Numbers and findings are untouched and the wording is unchanged apart from those names. How a sample is made is in [`docs/SAMPLES.md`](../docs/SAMPLES.md).

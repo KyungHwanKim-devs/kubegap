@@ -1,0 +1,67 @@
+# What a report teaches when the internal certificates of a k3s server are close to expiry. Every page below was opened and read (2026-11-14).
+topic: k3s-certificate-rotation
+checks: [platform.k3s-certificate-expiring]
+mechanism: >
+  k3s issues its own client and server certificates, the ones the API server, the kubelet and the other components use to talk to each other. They
+  are valid for 365 days from the day they were issued.
+
+
+  They are renewed in one place only: when k3s starts. Every time the service starts, any certificate that has expired or is within 120 days of
+  expiring is renewed; the renewal reuses the existing keys and extends the lifetime. Releases before May 2025 used 90 days for this window instead
+  of 120. Nothing renews a certificate while the process keeps running.
+
+
+  So the state that leads to an outage is a k3s process that has been up for a long time. A server that runs a full year without a restart lets
+  its certificates expire, and the cluster stops on a day when nothing else changed.
+
+
+  k3s warns before that. When a certificate is inside the window it creates a Kubernetes Warning event with the reason
+  CertificateExpirationWarning, related to the Node that uses the certificate. An event is not an alert: it is seen by someone who looks, or by
+  something that collects events.
+
+
+  The CA certificates are another matter. k3s generates self-signed CA certificates when the first server starts, they are valid for 10 years, and
+  they are not renewed automatically. Rotating a self-signed CA is disruptive and ends with a restart of k3s on all nodes, servers first.
+sources:
+  - { title: "k3s: certificate", url: "https://docs.k3s.io/cli/certificate" }
+  - { title: "x509-certificate-exporter", url: "https://github.com/enix/x509-certificate-exporter" }
+detect:
+  - kind: metric
+    what: >
+      The expiry date of the certificate files on the server, exported as a time series. x509-certificate-exporter has a node-local DaemonSet mode
+      for cluster PKI files and exports x509_cert_not_after per certificate; its Helm chart ships a PrometheusRule with renewal and expiration
+      alerts and a Grafana dashboard. The directory where k3s keeps its certificates has to be given to it.
+    example: '(x509_cert_not_after - time()) / 86400 < 30'
+  - kind: alert
+    what: >
+      A client certificate presented to the API server that is about to expire. The kubernetes-mixin alert KubeClientCertificateExpiration warns
+      below 7 days and is critical below 24 hours; it is a last line, later than the file-based alert above.
+    example: 'KubeClientCertificateExpiration'
+  - kind: command
+    what: The list k3s itself prints, with every certificate and its expiry, run on a server node.
+    example: 'k3s certificate check --output table'
+solutions:
+  - scale: [small]
+    approach: >
+      Restart the k3s service on every server at least once inside the renewal window, which in practice means not letting a server run a whole year
+      untouched: put the restart on the calendar. The restart is the renewal; nothing else has to be installed. Watch for the
+      CertificateExpirationWarning events in between.
+    tools: [k3s]
+    tradeoff: >
+      No component to run. It rests on a person remembering and on someone reading events, so a year can still go by unnoticed on a cluster nobody
+      touches.
+  - scale: [medium, large]
+    approach: >
+      Export the certificate expiry with x509-certificate-exporter and alert on days left, so that the restart is asked for by an alert. Rotate with
+      k3s certificate rotate on one server at a time (stop k3s, rotate, start k3s) in a maintenance window, and put the 10 year CA expiry in the
+      same dashboard.
+    tools: [x509-certificate-exporter, Prometheus, "k3s certificate rotate"]
+    tradeoff: >
+      The expiry is a number on a dashboard with an alert months ahead. The exporter is a DaemonSet that reads certificate files of the host, one
+      more workload with host access to justify and keep updated.
+cases: []
+reading:
+  - { title: "k3s: certificate", url: "https://docs.k3s.io/cli/certificate", why: "The lifetimes, the renewal at start, the check and rotate commands, and what rotating the CA involves." }
+  - { title: "x509-certificate-exporter", url: "https://github.com/enix/x509-certificate-exporter", why: "How certificate files on nodes and TLS Secrets become metrics, with the alerts the chart ships." }
+  - { title: "x509-certificate-exporter: metrics", url: "https://github.com/enix/x509-certificate-exporter/blob/main/docs/metrics.md", why: "The metric names, the labels and PromQL examples for days left." }
+  - { title: "Runbook: KubeClientCertificateExpiration", url: "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubeclientcertificateexpiration/", why: "What the stock alert means and what breaks when a client certificate runs out." }

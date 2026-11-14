@@ -106,7 +106,7 @@ def analyze(snap: Path, inv: dict | None, summary: dict | None) -> dict:
                 trend.append({"snapshot": r.get("snapshot"), "nodes": int(r.get("nodes") or 0)})
         except (OSError, ValueError):
             pass
-    out = {"platform": platform, "efficiency": efficiency, "node_count_trend": trend[-12:], "nodes": node_rows}
+    out = {"platform": platform, "efficiency": efficiency, "node_count_trend": trend, "nodes": node_rows}
     if platform != "eks":
         out["pricing"] = {"available": False, "note": "no bill (small k3s cluster). Core efficiency and N-1 only"}
         return out
@@ -202,7 +202,7 @@ def analyze(snap: Path, inv: dict | None, summary: dict | None) -> dict:
     tot_req = sum(ns_cpu.values())
     chargeback = [
         {"namespace": ns, "cpu_request": round(v, 2), "share": round(v / tot_req, 3) if tot_req else None, "monthly_usd_est": round(v / tot_req * compute, 2) if tot_req and compute else None, "prod": ns in prod}
-        for ns, v in ns_cpu.most_common(15)
+        for ns, v in ns_cpu.most_common()
     ]
     # ---- Cost Explorer ----
     ce = load_json(snap / "aws" / "ce-cost-30d.json")
@@ -213,7 +213,7 @@ def analyze(snap: Path, inv: dict | None, summary: dict | None) -> dict:
         bill = {
             "window": (ce.get("ResultsByTime") or [{}])[0].get("TimePeriod"),
             "total_usd": round(sum(v for _, v in rows), 2),
-            "by_service": [{"service": k, "usd": round(v, 2)} for k, v in rows[:12]],
+            "by_service": [{"service": k, "usd": round(v, 2)} for k, v in rows],
             "note": "Cost Explorer covers the whole account (including RDS, S3 etc. outside this cluster). 0.01 USD per request",
         }
     out.update(

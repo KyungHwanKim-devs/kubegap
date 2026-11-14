@@ -18,7 +18,6 @@
   suggest: "If there is no plan to use it, helm uninstall keda (including CRDs). If there is, move HPAs to ScaledObjects."
   verify:
     - "kubectl get scaledobjects,scaledjobs -A"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -137,7 +136,6 @@
   suggest: "metrics-apiserver replicas 2 (active-active is possible) + PDB; the operator uses leader election, so 2 gives a standby replica. With few nodes, at least a PDB."
   verify:
     - "kubectl get deploy -n keda ; kubectl get apiservice v1beta1.external.metrics.k8s.io"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -399,7 +397,6 @@
   suggest: "Add fallback: {failureThreshold: 3, replicas: <usual peak count>} to the ScaledObject. For metrics-api triggers, consumers then stay up even when the app endpoint dies."
   verify:
     - "kubectl get scaledobject -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name} {.spec.fallback}{\"\\n\"}{end}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -514,7 +511,6 @@
   suggest: "Query the trigger metric directly (the URL for metrics-api, the consumer group lag for kafka) and see whether values arrive. If the worker is unused, delete the ScaledObject and the Deployment."
   verify:
     - "kubectl get scaledobject -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ACTIVE:.status.conditions[1].status,LAST:.status.lastActiveTime"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -631,7 +627,6 @@
   suggest: "Compare kubectl get triggerauthentication -n <ns> with the referenced Secret names. If an ExternalSecret has not synced yet, see security.externalsecret-not-ready."
   verify:
     - "kubectl get scaledobject -A -o jsonpath='{range .items[*]}{.metadata.namespace} {.spec.triggers[*].authenticationRef.name}{\"\\n\"}{end}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -794,6 +789,7 @@
   target: "'cluster'"
   evidence: "f\"request codes since metrics-apiserver start {item['api_requests_by_code']}, non-2xx/3xx responses {item['api_requests_non_2xx']}, operator gRPC GetMetrics failures {item['api_grpc_non_ok']}, scaler errors in logs (24h) {item['scaler_errors_24h_logs']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     For every external metric request from the HPA controller, metrics-apiserver fetches the value from the operator over gRPC and answers. A 500 or gRPC Unknown means the HPA got no value at that moment. The counters are cumulative since process start, so they are judged as a ratio.
@@ -802,7 +798,6 @@
   suggest: "Match the times failures cluster with scaler errors in the operator log (logs/pods/keda/). Availability of the trigger target (broker, app URL) is the cause in most cases."
   verify:
     - "apiserver_request_total{component=\"external-metrics\"} from the pod /metrics (metrics/pod/keda-metrics-apiserver/)"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1016,7 +1011,6 @@
   suggest: "Helm values prometheus.operator.enabled true (+ serviceMonitor). Trigger value trends and scale loop latency then accumulate in Prometheus."
   verify:
     - "kubectl get deploy -n keda keda-operator -o jsonpath='{.spec.template.spec.containers[0].args}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -1182,7 +1176,6 @@
   suggest: "If you keep Fail, set webhooks replicas 2."
   verify:
     - "kubectl get validatingwebhookconfiguration keda-admission -o jsonpath='{.webhooks[*].failurePolicy}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

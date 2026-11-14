@@ -1,0 +1,67 @@
+# What a report teaches when the scheduled etcd snapshots of a k3s server are missing or old. Every page below was opened and read (2026-11-14).
+topic: k3s-etcd-snapshot-schedule
+checks: [platform.k3s-etcd-snapshot-stale]
+mechanism: >
+  On a k3s server with the embedded etcd, every object of the cluster lives in that one datastore: Deployments, Secrets, ConfigMaps, the custom
+  resources of every operator. k3s protects it with scheduled snapshots, and they are on by default: at 00:00 and 12:00 system time (the cron spec
+  0 */12 * * *), with 5 snapshots retained per server node on local disk, in the directory ${data-dir}/server/db/snapshots. A snapshot contains a
+  complete copy of the datastore together with the cluster CA certificates and private keys.
+
+
+  The schedule can be off or stretched while the cluster looks the same: --etcd-disable-snapshots turns it off and
+  --etcd-snapshot-schedule-cron can be set to a longer interval. What changes is only what a restore can return to: restoring means stopping k3s and starting the server with --cluster-reset and --cluster-reset-restore-path pointing at a
+  snapshot, and the cluster comes back as it was when that snapshot was taken. With the newest snapshot a week old, a restore loses a week of
+  changes; with none, there is nothing to restore from.
+
+
+  Three details decide whether a snapshot is of use on the day. Retention is applied per server node and the default location is the server's own
+  disk, so the snapshots are lost together with the disk they protect unless they are also uploaded (--etcd-s3). Snapshots taken by hand with
+  k3s etcd-snapshot save have no retention and are never removed automatically. And restoring on a new host needs the server token that was in use
+  when the snapshot was taken, because the bootstrap data inside the snapshot is encrypted with a key derived from it; the token file is
+  /var/lib/rancher/k3s/server/token and has to be kept somewhere else as well.
+sources:
+  - { title: "k3s: etcd-snapshot", url: "https://docs.k3s.io/cli/etcd-snapshot" }
+  - { title: "k3s: Backup and Restore", url: "https://docs.k3s.io/datastore/backup-restore" }
+detect:
+  - kind: dashboard
+    what: >
+      k3s records every snapshot as an ETCDSnapshotFile object, visible from any Kubernetes client and covering all servers and S3, with the node,
+      the location, the size and the creation time. A panel or a periodic check that reads the newest creation time shows a stopped schedule; the
+      pages read name no Prometheus metric for it.
+    example: "kubectl get etcdsnapshotfile"
+  - kind: alert
+    what: >
+      The documentation's example shows a Normal event with the reason ETCDSnapshotCreated when a snapshot is saved. Where events are shipped to a
+      log store, the absence of that reason for longer than the schedule is the alert. This was read from an example of an on-demand snapshot saved
+      to S3; whether every scheduled local snapshot emits it was not verified.
+    example: 'no event with the reason ETCDSnapshotCreated during the last 13 hours'
+  - kind: command
+    what: The snapshots one server knows about, on that server.
+    example: "sudo k3s etcd-snapshot ls"
+solutions:
+  - scale: [small]
+    approach: >
+      Keep the default schedule and make sure nothing has turned it off, then add the S3 options so that every snapshot is also uploaded to a bucket
+      outside the machine. Keep a copy of the server token outside the cluster.
+    tools: ["k3s etcd-snapshot", "k3s --etcd-s3"]
+    tradeoff: >
+      The cluster state survives the loss of the server's disk, for the price of a bucket and one credential. S3 retention is counted for the whole
+      bucket prefix and not per node, and a snapshot without the token cannot be restored on a new host.
+    example: |
+      k3s server \
+        --etcd-snapshot-schedule-cron "0 */12 * * *" \
+        --etcd-snapshot-retention 5 \
+        --etcd-s3 --etcd-s3-bucket <bucket>
+  - scale: [medium, large]
+    approach: >
+      Shorten the interval to what the cluster can afford to lose, raise the retention, take the S3 settings from a Secret
+      (--etcd-s3-config-secret) instead of flags, and rehearse the restore on a spare host with the token on a calendar. Alert on the age of the
+      newest ETCDSnapshotFile.
+    tools: ["k3s etcd-snapshot", "k3s --etcd-s3"]
+    tradeoff: >
+      The amount of state a restore loses is a chosen number and the restore is a practised procedure. The S3 Secret cannot be used during a
+      restore, because the API server is not available then, so the bucket settings must also be at hand outside the cluster.
+cases: []
+reading:
+  - { title: "k3s: etcd-snapshot", url: "https://docs.k3s.io/cli/etcd-snapshot", why: "Schedule, retention, S3 options, ETCDSnapshotFile objects and the restore steps for one and for several servers." }
+  - { title: "k3s: Backup and Restore", url: "https://docs.k3s.io/datastore/backup-restore", why: "What has to be backed up for each datastore, and why the token file belongs to the backup." }

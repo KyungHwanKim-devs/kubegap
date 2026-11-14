@@ -1,0 +1,82 @@
+# What a report teaches when the cluster cannot place its pods after losing its largest node. Every page below was opened and read (2026-11-14).
+topic: spare-capacity-node-loss
+checks: [resilience.n-plus-one]
+mechanism: >
+  The scheduler places a pod by its resource requests, not by what it uses. In the filtering step it keeps the nodes that have enough available
+  resources to meet the pod's requests; if that list is empty the pod is not schedulable and remains unscheduled until the scheduler is able to place
+  it. Nothing else in Kubernetes makes room.
+
+
+  When a node is lost, its pods are recreated and go through the same filter against the nodes that are left. If the requests of all pods add up to
+  more than the remaining nodes can allocate, some pods stay Pending. Without a PriorityClass every pod has priority zero, so nothing says which ones; with priorities the scheduler places the
+  higher ones first and tries to preempt lower-priority pods to make room. All of this is true
+  even on a cluster that is mostly idle: a pod that requests 2 CPU and uses 0.1 still takes 2 CPU of room, so over-requesting alone can remove the
+  spare node.
+
+
+  What happens next depends on whether anything adds nodes. Without a node autoscaler, the pods stay Pending until the lost node comes back or
+  someone adds capacity. With one, a node is provisioned for pods that cannot be scheduled, sized by their requests; the autoscaler also does not look
+  at real usage. The gap is then the time a node takes to become available, which the AWS guidance puts at multiple minutes, and longer when the
+  capacity asked for does not exist: Karpenter falls back from spot to on-demand only when the NodePool allows on-demand.
+
+
+  The standard way to remove that gap is to hold spare room on purpose: placeholder pods with a negative priority reserve capacity, and the control
+  plane picks them as the first candidates to preempt when there is a shortage. The preempted placeholders become unschedulable in turn, which is what
+  makes the autoscaler add the next node.
+sources:
+  - { title: "Kubernetes: Kubernetes Scheduler", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/" }
+  - { title: "Kubernetes: Node Autoscaling", url: "https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/" }
+  - { title: "Kubernetes: Overprovision Node Capacity For A Cluster", url: "https://kubernetes.io/docs/tasks/administer-cluster/node-overprovisioning/" }
+  - { title: "Amazon EKS best practices: Cluster Autoscaler", url: "https://docs.aws.amazon.com/eks/latest/best-practices/cas.html" }
+  - { title: "Karpenter: NodePools", url: "https://karpenter.sh/docs/concepts/nodepools/" }
+  - { title: "Kubernetes: Pod Priority and Preemption", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/pod-priority-preemption/" }
+  - { title: "Amazon EKS best practices: Karpenter", url: "https://docs.aws.amazon.com/eks/latest/best-practices/karpenter.html" }
+detect:
+  - kind: alert
+    what: >
+      Requests against what is left without the largest node. Both sides come from kube-state-metrics: allocatable per node and requests per
+      container. The rule fires before a node is lost, which is the point; do it per resource.
+    example: |
+      - alert: NoRoomForNodeLoss
+        expr: sum(kube_pod_container_resource_requests{resource="memory"}) > sum(kube_node_status_allocatable{resource="memory"}) - max(kube_node_status_allocatable{resource="memory"})
+        for: 1h
+  - kind: metric
+    what: >
+      Pods that are Pending now. After a node loss this is the symptom; the FailedScheduling event on the pod says which resource was short.
+    example: 'sum by (namespace) (kube_pod_status_phase{phase="Pending"})'
+solutions:
+  - scale: [small]
+    approach: >
+      Lower the requests that are far above usage until everything fits on the nodes that remain when the largest is gone. If it still does not fit,
+      accept it and decide which pods may stay Pending by giving the ones that must run a higher PriorityClass. Watch the one rule above.
+    tools: [PriorityClass]
+    tradeoff: >
+      No extra node is bought. Requests closer to usage leave less room for bursts, and when a node is lost the lower-priority pods are the ones that wait until
+      it is back.
+  - scale: [medium]
+    approach: >
+      Let a node autoscaler close the gap and make sure it can: the NodePool allows on-demand next to spot so that Karpenter can fall back, and its
+      limits leave room for one more node. Accept a few minutes of Pending pods after a node loss.
+    tools: [Karpenter, "Cluster Autoscaler"]
+    tradeoff: >
+      Capacity returns without a person. Pods wait for as long as a node takes to start, and the fallback capacity costs more than spot.
+  - scale: [large]
+    approach: >
+      Reserve the room in advance with placeholder pods: a Deployment of pause containers with a negative PriorityClass and requests that add up to
+      what one node loss displaces, spread across zones. Real pods preempt them at once and the autoscaler replaces the reserve in the background.
+    tools: [PriorityClass, Karpenter, "Cluster Autoscaler"]
+    tradeoff: >
+      A node loss is absorbed without Pending pods. The reserve is capacity paid for and not used, and with Karpenter the placeholder replica count
+      also sets a minimum node count when preferred anti-affinity spreads them.
+    example: |
+      apiVersion: scheduling.k8s.io/v1
+      kind: PriorityClass
+      metadata:
+        name: placeholder
+      value: -1000
+      globalDefault: false
+cases: []
+reading:
+  - { title: "Kubernetes: Overprovision Node Capacity For A Cluster", url: "https://kubernetes.io/docs/tasks/administer-cluster/node-overprovisioning/", why: "The placeholder pattern with its manifests and how the reserve is sized." }
+  - { title: "Kubernetes: Node Autoscaling", url: "https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/", why: "What autoscalers provision for and consolidate on: requests, not usage." }
+  - { title: "Amazon EKS best practices: Cluster Autoscaler", url: "https://docs.aws.amazon.com/eks/latest/best-practices/cas.html", why: "The overprovisioning section weighs scheduling latency against the price of idle nodes." }

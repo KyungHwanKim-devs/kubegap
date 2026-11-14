@@ -53,6 +53,7 @@ def plan(context_dir: Path, keep_daily: int | None, keep_full: int | None, now: 
         return p
     snaps = sorted(s for s in context_dir.iterdir() if s.is_dir() and paths.is_snapshot_name(s.name))
     seen = dict.fromkeys(paths.MODES, 0)
+    reported = dict.fromkeys(paths.MODES, False)  # the newest snapshot of a mode that has a report is the baseline of the next report (paths.previous_snapshot)
     for s in reversed(snaps):  # newest first
         mode = paths.snapshot_mode(s)
         if paths.is_incomplete(s):
@@ -64,13 +65,18 @@ def plan(context_dir: Path, keep_daily: int | None, keep_full: int | None, now: 
                 p.reasons[s] = "incomplete"
             continue
         seen[mode] += 1
+        newest_reported = not reported[mode] and (s / "report.md").is_file()
         n = keep_n[mode]
+        reported[mode] = reported[mode] or newest_reported
         if n is None:
             p.keep.append(s)
             p.reasons[s] = f"{mode}: no retention set"
         elif seen[mode] == 1:
             p.keep.append(s)
             p.reasons[s] = f"latest {mode} (comparison baseline)"
+        elif newest_reported:
+            p.keep.append(s)
+            p.reasons[s] = f"latest {mode} with a report (comparison baseline)"
         elif seen[mode] <= n:
             p.keep.append(s)
             p.reasons[s] = f"{mode} {seen[mode]}/{n}"

@@ -1,0 +1,108 @@
+# What a report teaches when one subject can change several tenants' namespaces. Every page below was opened and read (2026-11-14).
+topic: cross-tenant-rbac
+checks: [tenancy.cross-tenant-broad-rbac]
+mechanism: >
+  RBAC permissions are purely additive: there are no deny rules. A RoleBinding grants a role to its subjects (users, groups, service accounts)
+  inside one namespace, and it may reference a ClusterRole, which is how the built-in roles admin and edit are meant to be handed out. Nothing
+  limits how many namespaces bind the same subject. Each binding looks reasonable where it stands; what the subject can do is the sum of all of
+  them, and no single object shows that sum.
+
+
+  The built-in roles are broader than their names suggest. edit allows read and write access to most objects in a namespace. It does not allow
+  viewing or changing roles and role bindings, but it does allow reading Secrets and running pods as any ServiceAccount in the namespace, so it can
+  be used to gain the API access of any ServiceAccount there. admin adds the right to create roles and role bindings in the namespace.
+  cluster-admin in a RoleBinding gives full control of everything in that namespace. More generally, the permission to create workloads in a
+  namespace implicitly grants access to the Secrets, ConfigMaps and volumes that a pod can mount there, and the Kubernetes guidance on RBAC says that
+  boundaries within a namespace should be considered weak.
+
+
+  So the namespace is the boundary, and authorization is what holds it. The multi-tenancy guide calls authorization the most important isolation
+  of the control plane: if teams or their workloads can access or modify each other's API resources, they can change or disable every other policy
+  and undo the protection it gives. A subject with edit in the production namespaces of two tenants joins them. One leaked kubeconfig, one
+  compromised CI job or one mistaken command with that identity reaches both: the Secrets of both, the workloads of both, and through their
+  ServiceAccounts whatever those are allowed to do.
+
+
+  Operators are the legitimate exception. A GitOps controller or a platform team has to act in many namespaces. The difference to look for is
+  whether the breadth is intended, held by an identity built for it, and visible in one place.
+sources:
+  - { title: "Kubernetes: Using RBAC Authorization", url: "https://kubernetes.io/docs/reference/access-authn-authz/rbac/" }
+  - { title: "Kubernetes: Role Based Access Control Good Practices", url: "https://kubernetes.io/docs/concepts/security/rbac-good-practices/" }
+  - { title: "Kubernetes: Multi-tenancy", url: "https://kubernetes.io/docs/concepts/security/multi-tenancy/" }
+detect:
+  - kind: metric
+    what: >
+      The bindings themselves, as an inventory that can be graphed and compared over time. kube-state-metrics exports one series per RoleBinding
+      with the role it references (the metric is marked experimental). It carries no subject, so it shows where admin and edit are bound and when a
+      new binding appears, not to whom.
+    example: 'count by (namespace) (kube_rolebinding_info{roleref_name=~"admin|edit|cluster-admin"})'
+  - kind: alert
+    what: >
+      A change to a binding. The API server audit log records who did what to which resource; a policy rule at level Metadata for the
+      rbac.authorization.k8s.io group is enough to see every create and update of a RoleBinding, and the log pipeline can alert on those in
+      production namespaces. Without an audit policy file no events are logged at all.
+    example: |
+      apiVersion: audit.k8s.io/v1
+      kind: Policy
+      rules:
+        - level: Metadata
+          resources:
+            - group: "rbac.authorization.k8s.io"
+              resources: ["rolebindings", "clusterrolebindings"]
+  - kind: command
+    what: >
+      The sum per subject, which no metric gives: list every RoleBinding to admin or edit with its namespace and subjects and group by subject.
+      This is the review the RBAC good practices ask to repeat periodically.
+    example: |
+      kubectl get rolebindings -A -o json | jq -r '.items[] | select(.roleRef.name=="admin" or .roleRef.name=="edit") | "\(.metadata.namespace) \(.subjects[]?.name)"' | sort
+solutions:
+  - scale: [small]
+    approach: >
+      When one person runs the cluster and is the only human with access, that person holding rights in every namespace is the honest state, and
+      splitting it adds nothing. What is worth fixing at this size is machine identities: a CI deployer or an application ServiceAccount should be
+      bound in the one namespace it deploys to. Go through the list once and keep it short.
+    tools: [RoleBinding]
+    tradeoff: >
+      An afternoon of review and no new tooling. The operator's own credential remains a single key to everything, so where it is stored matters
+      more than how the bindings are cut.
+  - scale: [medium]
+    approach: >
+      One group per tenant, bound with a RoleBinding in that tenant's namespaces only, and people get access by joining a group in the identity
+      provider rather than by being named in a binding. On EKS an access entry maps an IAM role to a Kubernetes group that the RoleBindings name.
+      Each deployer ServiceAccount belongs to one tenant. Keep the bindings in Git next to the namespace so that a review of the repository is a
+      review of access.
+    tools: [RoleBinding, "OIDC groups", "EKS access entries"]
+    tradeoff: >
+      A leaked credential reaches one tenant, and leaving a team removes access in one place. Someone who works on two tenants now switches
+      identities, and every new tenant needs its group created before anyone can deploy.
+    example: |
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: tenant-a-edit
+        namespace: prod-a
+      subjects:
+        - kind: Group
+          name: tenant-a-developers
+          apiGroup: rbac.authorization.k8s.io
+      roleRef:
+        kind: ClusterRole
+        name: edit
+        apiGroup: rbac.authorization.k8s.io
+  - scale: [large]
+    approach: >
+      On top of per-tenant groups: no standing edit in production for people at all, changes arrive through the GitOps controller, and human access
+      is read-only by default with a low-privileged account that can impersonate a stronger one when needed, as the good practices suggest instead
+      of using cluster-admin directly. Audit logging of RBAC changes is on and reviewed, and roles narrower than the built-in edit are written where
+      a tenant must not read Secrets.
+    tools: [RoleBinding, "audit policy", "impersonation"]
+    tradeoff: >
+      The tenant boundary survives a stolen laptop and every change of access leaves a record. Incidents need a practised way to get elevated
+      rights quickly, and custom roles have to be maintained as new resource kinds appear.
+cases: []
+reading:
+  - { title: "Kubernetes: Role Based Access Control Good Practices", url: "https://kubernetes.io/docs/concepts/security/rbac-good-practices/", why: "Least privilege in concrete rules, and the list of permissions that are wider than they look (Secrets, workload creation)." }
+  - { title: "Kubernetes: Using RBAC Authorization", url: "https://kubernetes.io/docs/reference/access-authn-authz/rbac/", why: "The table of user-facing roles says exactly what admin, edit and view allow." }
+  - { title: "Kubernetes: Multi-tenancy", url: "https://kubernetes.io/docs/concepts/security/multi-tenancy/", why: "Where RBAC sits among namespaces, quotas, network policy and node isolation, for teams and for customers." }
+  - { title: "Kubernetes: Auditing", url: "https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/", why: "How an audit policy is written and what each level records." }
+  - { title: "Amazon EKS: Grant IAM users access to Kubernetes with EKS access entries", url: "https://docs.aws.amazon.com/eks/latest/userguide/access-entries.html", why: "How an IAM identity is tied to a Kubernetes group or an access policy on EKS." }

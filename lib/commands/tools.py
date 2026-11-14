@@ -39,7 +39,7 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..foundations import paths, shell
+from ..foundations import paths, shell, units
 from ..foundations.snapshot import write_private, write_private_bytes
 
 
@@ -126,7 +126,7 @@ TOOLS: list[Tool] = [
     Tool("python3", "Runs the collect, summarize and evaluate scripts", required=True, brew="python", checks=["*"], note="This script itself runs on Python, so it cannot be missing"),
     Tool(
         "aws",
-        "EKS, EC2, SSM and CloudWatch queries (needed only for the EKS profile)",
+        "EKS, EC2, SSM and CloudWatch queries (needed only on EKS)",
         brew="awscli",
         download={
             "version": "2.39.3",
@@ -160,7 +160,7 @@ TOOLS: list[Tool] = [
             "controlplane.etcd-slow",
             "node.*@full",
         ],
-        modes="daily and full; ECR, the control-plane logs, the nodes and the pricing and cost data in full only",
+        modes="full. A daily audit calls no AWS API; on EKS kubectl itself still runs `aws eks get-token` to log in",
         without="the EKS, ECR and cost checks are not collected; the control-plane log checks and the node checks say so in the report",
         note="On macOS without brew, install https://awscli.amazonaws.com/AWSCLIV2.pkg directly. The Linux zip is checked against its pinned sha256 and, when gpg is installed, against the AWS CLI Team's signature (#108)",
     ),
@@ -269,7 +269,7 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         "ssh",
-        "Small k3s cluster node access (small k3s cluster profile)",
+        "Node access on k3s and RKE2",
         brew=None,
         version_args=["-V"],
         checks=["node.*@full"],
@@ -817,14 +817,14 @@ def by_name(name: str) -> Tool | None:
 
 
 def check_ids(patterns: list[str], catalog: dict[str, dict]) -> list[str]:
-    """The check ids of the catalog (id -> check) that `patterns` name, sorted: an id, `<prefix>.*`, `<prefix>.*@full` (full-mode-only
-    checks of that prefix), or "*"."""
+    """The check ids of the catalog (id -> check) that `patterns` name, sorted: an id, `<prefix>.*`, `<prefix>.*@full` (the checks of that prefix
+    that need a collection unit the daily run leaves out), or "*"."""
     out: set[str] = set()
     for pat in patterns:
         if pat == "*":
             out |= set(catalog)
         elif pat.endswith(".*@full"):
-            out |= {c for c, chk in catalog.items() if c.startswith(pat[: -len("*@full")]) and chk.get("modes") == ["full"]}
+            out |= {c for c, chk in catalog.items() if c.startswith(pat[: -len("*@full")]) and units.missing(chk.get("needs"), "daily")}
         elif pat.endswith(".*"):
             out |= {c for c in catalog if c.startswith(pat[:-1])}
         elif pat in catalog:
@@ -907,18 +907,18 @@ def catalog() -> dict[str, dict]:
 
 
 _ROLE_KO = {
-    "aws": "EKS, EC2, SSM, CloudWatch 조회(EKS 프로필에서만)",
+    "aws": "EKS, EC2, SSM, CloudWatch 조회(EKS에서만)",
     "helm": "Helm 릴리스 상태와 나이(Helm이 Secret에 두는 릴리스 기록을 읽음)",
     "krr": "리소스 requests 추천(Robusta KRR, Prometheus 기반)",
     "polaris": "매니페스트 정적 점검과 가벼운 보안 점검",
     "pluto": "지원이 끝난 API 탐지",
     "kubent": "지원이 끝난 API 탐지(Pluto 보완)",
-    "ssh": "작은 k3s 클러스터의 노드 접근(k3s 프로필)",
+    "ssh": "k3s와 RKE2의 노드 접근",
 }
 _MODES_KO = {
     "full": "full",
     "daily and full": "daily, full",
-    "daily and full; ECR, the control-plane logs, the nodes and the pricing and cost data in full only": "daily, full(ECR·컨트롤플레인 로그·노드·가격과 비용 데이터는 full에서만)",
+    "full. A daily audit calls no AWS API; on EKS kubectl itself still runs `aws eks get-token` to log in": "full. daily 점검은 AWS API를 부르지 않습니다. EKS에서는 kubectl이 로그인하려고 `aws eks get-token`을 실행합니다",
 }
 _NOTE_KO = {
     "ssh": "kubegap이 설치하지 않습니다. macOS와 대부분의 Linux에 기본으로 있고, 슬림 컨테이너 이미지에는 없을 수 있습니다(배포판 패키지 openssh-client)",

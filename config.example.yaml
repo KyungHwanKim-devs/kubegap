@@ -18,9 +18,8 @@ ssm_document: ask            # EKS only. The SSM document kubegap-node-read (dep
 
 # ---- (2) Connection information (leave empty for auto-discovery) ----
 # context: my-cluster        # kube context to audit by default. /kubegap --context takes precedence
-# profile: prod              # override the detected set of expectations (prod | lab | small-prod | multi-az-prod | dev). Detected from platform and node count: EKS -> prod, 1-3 nodes -> lab, otherwise small-prod. --profile takes precedence
-# namespace_profiles:        # a different profile per namespace (glob -> profile). Checks listed in that profile's disabled_checks produce no findings in those namespaces
-#   "dev-*": dev
+# scale: small               # the scale every cluster of this config is run at (small | medium | large). Leave it out to be asked once per cluster; the answer is kept with that cluster's data
+# dev_namespaces: ["dev-*"]  # namespaces that are not production: availability, backup and cost checks say nothing about them (rubric/scales.yaml lists the checks)
 #   "staging": dev
 # aws_profile: my-aws        # AWS CLI profile for EKS. If empty, the AWS_PROFILE from the kubeconfig exec env is used, then the AWS CLI default
 # aws_region: us-east-1
@@ -57,7 +56,7 @@ suppress:
     reason: CI runners are ephemeral pods; replicas do not apply
     until: 2027-01-01
 
-# Per-check threshold overrides. Key = check id, value = threshold (fail) and warn_threshold (warn). Takes precedence over the profile files (rubric/profiles/*.yaml).
+# Per-check threshold overrides. Key = check id, value = threshold (fail) and warn_threshold (warn). Takes precedence over the value a check gives for the platform or the scale.
 overrides:
   resources.cpu-throttling:
     threshold: 0.35

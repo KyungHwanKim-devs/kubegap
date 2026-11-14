@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import json
 import re
+from collections import Counter
 from pathlib import Path
 
-from ...foundations import components, podmetrics, scrub
+from ...foundations import components, karpenterlog, logscan, paths, podmetrics, scrub, signatures
 from ...foundations.runlog import RunLog
-from ...foundations.snapshot import write_private
+from ...foundations.snapshot import COMPONENT_LOGS_AGGREGATE, COMPONENT_LOGS_DIR, taken_at, write_private
 from .. import kube, nodecommands
 from .context import StepContext
 
@@ -96,7 +97,7 @@ DISCOVERY_RESOURCES = {
 }  # discover.OBJECT_KINDS as `kubectl api-resources` names them
 
 
-def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: list[str], timeout: float, log: RunLog, collector: str, echo=None) -> dict:
+def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: list[str], timeout: float, log: RunLog, collector: str, echo=None, *, app_settings: bool = True) -> dict:
     resources, discovery_error = api_resources(context, kubeconfig, log)
     done = {p.stem for p in (snap / "objects").glob("*.json")}
     # `served` is every kind the API listed and `written` every file stem this step wrote; with `fetched_by_discovery` (the kinds lib/collection/discover.py had saved, by full
@@ -128,7 +129,7 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
             else:
                 summary["failed"][full] = r.error or r.stderr.strip()[-200:]
             continue
-        err = scrub.scrub_or_error(data)
+        err = scrub.scrub_or_error(data, app_settings=app_settings)
         if err:  # the kind is not written; run.log and the step record carry the failure so report section 7-1 shows it
             summary["failed"][full] = err
             summary["ok"] = False
@@ -148,9 +149,29 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
     return summary
 
 
-def run_component_logs_step(st: dict, sid: str, name: str, inv: dict, context: str | None, kubeconfig: str | None, snap: Path, log: RunLog, timeout: float, echo) -> dict:
-    """Fetch workload pod logs of detected components (components_present) with kubectl logs into logs/pods/<component>/<ns>_<workload>.log.
-    User application logs are not fetched (that is Loki's job). Capped tail lines per pod, 24 hours."""
+def component_logs_aggregate(texts: dict[str, str], inv: dict, *, keep_lines: bool, capped: list[str]) -> dict:
+    """What a snapshot keeps of the component logs: the counts per failure pattern (lib/foundations/logscan), what the Karpenter controller's log
+    says of the last 24 hours (lib/foundations/karpenterlog), how many lines each workload returned and which were cut at the tail limit. `texts`
+    maps the path a log would have as a file (logs/pods/<component>/<ns>_<workload>.log) to its text."""
+    sigs, _errors = signatures.load(inv.get("collectors_enabled") or ["core"])
+    scan = logscan.scan_texts(sorted(texts.items()), sigs, taken=taken_at(inv), keep_lines=keep_lines)
+    return {
+        "counted_at": "collection",
+        "log_scan": {**scan, "components_with_logs": sorted({rel.split("/")[2] for rel in texts}), "lines_by_file": {rel: t.count("\n") for rel, t in sorted(texts.items())}, "scan_signatures_version": paths.signatures_version()},
+        "karpenter_logs": karpenterlog.facts([t for rel, t in sorted(texts.items()) if rel.startswith("logs/pods/karpenter/")]),
+        "capped": capped,
+    }
+
+
+_STREAM_RE = re.compile(r"^\[pod/([^/\]]+)/([^\]]+)\] ")  # the prefix `kubectl logs --prefix` puts before each line: one stream per pod and container
+
+
+def run_component_logs_step(st: dict, sid: str, name: str, inv: dict, context: str | None, kubeconfig: str | None, snap: Path, log: RunLog, timeout: float, echo, *, keep_lines: bool) -> dict:
+    """Read the logs of the workloads of detected components (components_present) with kubectl logs, count them and write the counts to
+    logs/pods/AGGREGATED.json. No line is written as a file: the text stays in memory until it is counted (lib/foundations/logscan,
+    lib/foundations/karpenterlog). With `keep_lines` (the unit component-log-samples) up to five masked sample lines per failure pattern and the
+    unclassified error patterns are kept with the counts. User application logs are not read (that is Loki's job). The last 24 hours, and of each
+    container the last `tail` lines: a container that returned exactly that many was cut there, and the record says how many were (`capped_streams`)."""
     from ...foundations.components import COMPONENTS
 
     kinds = ("daemonsets", "deployments", "statefulsets")
@@ -187,6 +208,7 @@ def run_component_logs_step(st: dict, sid: str, name: str, inv: dict, context: s
                         seen.add((m["namespace"], m["name"]))
                         targets.append((comp, k, m["namespace"], m["name"], o))
     result: dict = {"ok": True, "components": {}, "targets": len(targets)}
+    texts: dict[str, str] = {}
     for comp, kind, ns, wl, o in targets:
         sel = (o.get("spec", {}).get("selector") or {}).get("matchLabels") or {}
         rec = result["components"].setdefault(comp, {})
@@ -194,13 +216,21 @@ def run_component_logs_step(st: dict, sid: str, name: str, inv: dict, context: s
             rec[f"{ns}/{wl}"] = {"ok": False, "error": "no selector.matchLabels"}
             continue
         selector = ",".join(f"{k}={v}" for k, v in sel.items())
-        out = snap / "logs" / "pods" / comp / f"{ns}_{wl}.log"
+        rel = f"logs/pods/{comp}/{ns}_{wl}.log"  # the path the text would have as a file: signatures choose their targets by it
+        cap = tail_ds if kind == "daemonsets" else tail
         args = ["logs", "-n", ns, "-l", selector, "--all-containers", "--prefix", "--timestamps", f"--since={since}", f"--tail={tail_ds if kind == 'daemonsets' else tail}", "--max-log-requests", "40", "--ignore-errors"]
-        r = kube.kubectl(args, context=context, timeout=timeout, id=f"{name}.{sid}.{comp}.{ns}/{wl}", log=log, out_path=out, kubeconfig=kubeconfig, collector=name)
+        r = kube.kubectl(args, context=context, timeout=timeout, id=f"{name}.{sid}.{comp}.{ns}/{wl}", log=log, kubeconfig=kubeconfig, collector=name)
         lines = r.stdout.count("\n") if r.ok else 0
-        if r.ok and lines == 0:
-            out.unlink(missing_ok=True)
-        rec[f"{ns}/{wl}"] = {"ok": r.ok, "kind": kind[:-1], "lines": lines, "out": str(out.relative_to(snap)) if (r.ok and lines) else None, "error": None if r.ok else (r.error or r.stderr.strip()[-200:])}
+        streams = Counter(m.group(0) for m in map(_STREAM_RE.match, r.stdout.splitlines()) if m) if r.ok else Counter()
+        capped = sum(1 for n in streams.values() if n >= cap)
+        if r.ok and lines:
+            texts[rel] = r.stdout
+        rec[f"{ns}/{wl}"] = {"ok": r.ok, "kind": kind[:-1], "lines": lines, "tail": cap, "capped_streams": capped, "error": None if r.ok else (r.error or r.stderr.strip()[-200:])}
+    aggregate = component_logs_aggregate(texts, inv, keep_lines=keep_lines, capped=sorted(f"{comp}: {w}" for comp, wls in result["components"].items() for w, x in wls.items() if x.get("capped_streams")))
+    write_private(snap / COMPONENT_LOGS_DIR / COMPONENT_LOGS_AGGREGATE, json.dumps(aggregate, ensure_ascii=False, indent=1, default=str))
+    result["out"] = str(COMPONENT_LOGS_DIR / COMPONENT_LOGS_AGGREGATE)
+    result["lines_kept"] = keep_lines
+    result["capped"] = aggregate["capped"]
     if echo:
         for comp, wls in result["components"].items():
             echo(f"    {comp:<28} workloads {len(wls)}, lines {sum(w.get('lines', 0) for w in wls.values())}" + ("" if all(w["ok"] for w in wls.values()) else " (some failed)"))
@@ -224,7 +254,7 @@ def metrics_filter(keep: str | None):
 
 
 def step_kubectl_dump_all(ctx: StepContext, st: dict) -> dict:
-    ctx.state.objects_dump = dump_all(ctx.context, ctx.kubeconfig, ctx.snap, st.get("exclude", []), float(st.get("timeout", 60)), ctx.log, ctx.name, ctx.echo)
+    ctx.state.objects_dump = dump_all(ctx.context, ctx.kubeconfig, ctx.snap, st.get("exclude", []), float(st.get("timeout", 60)), ctx.log, ctx.name, ctx.echo, app_settings=ctx.collects("app-settings"))
     return ctx.state.objects_dump
 
 
@@ -235,7 +265,7 @@ def step_kubectl(ctx: StepContext, st: dict) -> dict:
         runs = {}
         for node in [n["name"] for n in (ctx.inv.get("nodes") or {}).get("nodes", [])]:
             out = ctx.snap / str(st["out"]).format(item=node, node=node)
-            tf = scrub.json_scrubber()[0] if out.suffix == ".json" else None
+            tf = scrub.json_scrubber(app_settings=ctx.collects("app-settings"))[0] if out.suffix == ".json" else None
             r = kube.kubectl(
                 [str(a).format(item=node, node=node) for a in st["args"]], context=ctx.context, timeout=timeout, id=f"{ctx.name}.{sid}.{node}", log=ctx.log, out_path=out, kubeconfig=ctx.kubeconfig, collector=ctx.name, transform=tf
             )
@@ -245,7 +275,7 @@ def step_kubectl(ctx: StepContext, st: dict) -> dict:
         return {"ok": any(x["ok"] for x in runs.values()), "nodes": runs}
     out = ctx.snap / st["out"]
     # JSON output is scrubbed inside shell.run before the file exists (lib/foundations/scrub.py json_scrubber); if scrubbing raises, nothing is written and the step fails
-    tf, info = scrub.json_scrubber() if out.suffix == ".json" else (None, {"items": None})
+    tf, info = scrub.json_scrubber(app_settings=ctx.collects("app-settings")) if out.suffix == ".json" else (None, {"items": None})
     r = kube.kubectl(list(st["args"]), context=ctx.context, timeout=timeout, id=f"{ctx.name}.{sid}", log=ctx.log, out_path=out, kubeconfig=ctx.kubeconfig, collector=ctx.name, transform=tf)
     n = info["items"] if r.ok else None
     res = {"ok": r.ok, "items": n, "error": None if r.ok else (r.error or r.stderr.strip()[-200:])}
@@ -364,4 +394,4 @@ def step_pod_metrics(ctx: StepContext, st: dict) -> dict:
 
 
 def step_component_logs(ctx: StepContext, st: dict) -> dict:
-    return run_component_logs_step(st, st["id"], ctx.name, ctx.inv, ctx.context, ctx.kubeconfig, ctx.snap, ctx.log, float(st.get("timeout", 60)), ctx.echo)
+    return run_component_logs_step(st, st["id"], ctx.name, ctx.inv, ctx.context, ctx.kubeconfig, ctx.snap, ctx.log, float(st.get("timeout", 60)), ctx.echo, keep_lines=ctx.collects("component-log-samples"))

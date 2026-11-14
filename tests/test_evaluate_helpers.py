@@ -63,11 +63,11 @@ def test_excluded_uses_case_sensitive_globs():
 
 
 def _ctx(inv: dict) -> Context:
-    return Context(Path("/nonexistent"), inv, {}, {"name": "prod"})
+    return Context(Path("/nonexistent"), inv, {}, "large")
 
 
 def test_days_until():
-    today = dt.date.today()
+    today = dt.datetime.now(dt.UTC).date()  # the clock a snapshot without taken_at falls back to is UTC; the local date differs from it for part of every day
     c = _ctx({})
     assert c.today == today
     assert c.days_until((today + dt.timedelta(days=10)).isoformat()) == 10
@@ -162,7 +162,7 @@ def test_image_repo():
 def _cx_with_pods(tmp_path, pods):
     (tmp_path / "objects").mkdir()
     (tmp_path / "objects" / "pods.json").write_text(json.dumps({"items": pods}), encoding="utf-8")
-    return Context(tmp_path, {}, {}, {"name": "prod"})
+    return Context(tmp_path, {}, {}, "large")
 
 
 def test_db_like_labels_look_up_the_pod_container(tmp_path):
@@ -196,3 +196,12 @@ def test_db_like_guesses_a_gone_pod_from_its_name(tmp_path):
     cx = _cx_with_pods(tmp_path, [])
     assert cx.db_like({"namespace": "prod-a", "pod": "shop-postgresql-0", "container": "postgresql"})
     assert not cx.db_like({"namespace": "prod-a", "pod": "web-6d7ff4dcdb-abcde", "container": "app"})
+
+
+def test_a_name_of_the_environment_is_visible_inside_a_comprehension_on_every_python():
+    """Python 3.11 failed a check whose evidence called a helper inside a list comprehension; CI runs 3.11 to 3.14."""
+    from lib.judgement.evaluate.rules import eval_expr
+
+    env = {"rows": [{"x": [1, 2, 3]}, {"x": [4]}], "first": lambda xs, n: xs[:n], "n": 1}
+    assert eval_expr("[first(p['x'], n) for p in rows]", env) == [[1], [4]]
+    assert eval_expr("any(len(p['x']) > n for p in rows)", env) is True

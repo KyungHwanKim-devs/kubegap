@@ -172,9 +172,9 @@ def test_the_check_target_is_one_per_object(tmp_path):
     from lib.judgement import evaluate
 
     snap = _snap(tmp_path, pluto={"items": [PLUTO_WEB], "target-versions": {"k8s": "v1.33.0"}}, kubent=[KUBENT_WEB])
-    inv = {"cluster": {"platform": "eks", "server_version": "v1.32.0"}, "namespaces": {"prod_like": []}, "profile": {"name": "prod"}}
+    inv = {"cluster": {"platform": "eks", "server_version": "v1.32.0"}, "namespaces": {"prod_like": []}, "scale": {"name": "large", "source": "guessed"}}
     (snap / "inventory.json").write_text(json.dumps(inv))
     summary = {"hygiene": {"deprecated": hygiene.deprecated(hygiene.Ctx(snap, inv))}}
     check = next(c for c in rubric.load_checks(["core"])[0] if c["id"] == "hygiene.deprecated-api")
-    r = evaluate.evaluate_check(check, evaluate.Context(snap, inv, summary, rubric.load_profile("prod")), rubric.resolve_thresholds(check, rubric.load_profile("prod"), {}))
+    r = evaluate.evaluate_check(check, evaluate.Context(snap, inv, summary, "large"), rubric.resolve_thresholds(check, "eks", "large", {}))
     assert [f["target"] for f in r["findings"]] == ["default/deployment/web"] and "[kubent+pluto]" in r["findings"][0]["evidence"]

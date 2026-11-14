@@ -3,6 +3,7 @@
 # replicas/version/PDB of operator, metrics-apiserver and webhooks; existence of Secrets referenced by trigger authentication; ScaledObject fallback, pollingInterval and last active time; external metrics API request errors; the operator Prometheus metrics flag.
 # The operator exposes no Prometheus metrics when --enable-prometheus-metrics=false. The metrics-apiserver (:8080) always exposes apiserver_request_total and gRPC client metrics.
 - id: metrics-apiserver-metrics
+  unit: metrics
   type: pod-metrics
   namespace: keda
   selector: app.kubernetes.io/name=keda-operator-metrics-apiserver
@@ -14,6 +15,7 @@
   keep: '^(apiserver_request_total|keda_internal_metricsservice_grpc_client_(handled|started)_total|registered_metrics_total|apiserver_current_inflight_requests|process_(start_time|resident_memory_bytes))'
   timeout: 30
 - id: operator-metrics
+  unit: metrics
   type: pod-metrics
   namespace: keda
   selector: app.kubernetes.io/name=keda-operator

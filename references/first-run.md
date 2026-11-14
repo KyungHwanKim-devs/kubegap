@@ -43,7 +43,7 @@ Both add a free-text entry to every question by themselves, and the user types i
 | `option <id>: <label> — <description>` | one option: label and description as printed |
 | `config:`, `run:`, `show:`, `then:` under an option | what to do after the user picked that option (section 3). They are not shown in the window |
 | `typed answer` | what the free-text entry means for this question. Mention it in the question text in a few words ("or type the addresses") |
-| `note …` (after the questions) | something decided without a question, with its reason: "loki: not asked. logs go to elasticsearch (…)", "grafana: no token needed; 25 dashboards and 1 datasources are read from ConfigMaps (…)". Not a question; it goes into the report under what this run could not see, as printed |
+| `note …` (after the questions) | something decided without a question, with its reason: "loki: not asked. logs go to elasticsearch (…)", "grafana: no token needed; 25 dashboards and 1 datasources are read from ConfigMaps (…)". Not a question and not a limit of the run: what it names was read another way or is not installed. It is not written into the report |
 
 Every explanation, count and option comes from the block. Do not invent a question, an option or a number of checks; if something you would like to ask is not in the block, it is not asked. The only questions outside the block are the two this file names: Write / Don't write before a config value is written (section 3) and Install / Stop for a missing required tool (section 5).
 
@@ -76,6 +76,7 @@ A question the user closes without choosing (escape, an empty answer) counts as 
 
 | id | Asked when | Choices | Skipping costs |
 |---|---|---|---|
+| `scale` | config.yaml has no `scale` and this cluster's answers hold none | Small · Medium · Large (each remembered for this cluster; none runs anything) | closed without choosing: the scale is guessed from the node count (3 or fewer small, 20 or fewer medium, else large) and the report's first screen says it was guessed |
 | `home-mode` | a folder under `~/.kubegap` is readable by other users (setup.json `machine.open_dirs`) | Fix now (`protect-home`, chmod 700 on those folders, not remembered because the gap is gone) · Leave it | nothing in the report; the snapshots stay readable by other users of the machine |
 | `tools` | optional tools are not on this machine and `install_tools` is `ask` | Install all (`setup --install-only` with the names listed) · Skip · typed: names to install only those (`setup --install-only a,b`, then `answer tools skip` for the rest) | the checks of those tools are reported as "tool missing" or skip because their input is not read |
 | `ssm-document` | EKS, and the SSM document `kubegap-node-read` is missing or older than the local file | Upload or Update (`setup --install-ssm-document`) · Skip | the node checks are "no node access" |
@@ -108,4 +109,4 @@ In a headless run (`claude -p`, `codex exec`, a schedule) there is no window and
 
 ## 8. In the report
 
-`setup` and `questions` end with `skipped earlier [...]` lines for the questions the user skipped while the gap is still there. Name each of them in "What this run could not see" with what it would add, and end that sentence with: `/kubegap setup` asks again.
+`setup` and `questions` end with `skipped earlier [...]` lines for the questions the user skipped while the gap is still there. `assemble` puts each of them into the report section "Limits of this run" under "Left out by choice", with what answering would add; you do not write them into the facts.

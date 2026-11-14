@@ -9,7 +9,7 @@
   "taken_at": "2026-11-07T10:22:59+09:00",
   "platform": "k3s",
   "server_version": "v1.33.5+k3s1",
-  "profile": "lab",
+  "scale": "small",
   "node_access": "none",
   "nodes": 2,
   "namespaces": 26,
@@ -40,8 +40,7 @@
    "reloader"
   ],
   "missing_families": [
-   "backup",
-   "slo"
+   "backup"
   ],
   "stores": {
    "loki": {
@@ -63,23 +62,21 @@
   "count": 0,
   "by_type": {},
   "reasons": [],
-  "top_objects": [],
+  "objects_by_events": [],
   "warning_samples": {},
   "missing": "events.json missing. Either collect did not run on this snapshot (discover-only folder) or event collection failed"
  },
  "metrics": {
   "top-nodes": {
    "source": "metrics/top-nodes.txt",
-   "lines": 2,
-   "head": [
+   "lines": [
     "node-a    383m    6%    10803Mi   33%   ",
     "node-b   1259m   10%   16913Mi   53%   "
    ]
   },
   "top-pods": {
    "source": "metrics/top-pods.txt",
-   "lines": 123,
-   "head": [
+   "lines": [
     "app-a-prod       app-a-backend-79c97cbbd6-kkc2d                        backend                            3m     632Mi    ",
     "app-a-prod       app-a-backend-79c97cbbd6-ztv7h                        backend                            2m     222Mi    ",
     "app-a-prod       app-a-frontend-574ff75654-6sqcp                       frontend                           2m     226Mi    ",
@@ -109,7 +106,100 @@
     "app-a-prod       app-a-sandbox-prepull-mxchs                           hold-network                       0m     2Mi      ",
     "app-a-prod       app-a-sandbox-prepull-mxchs                           hold-nextjs                        0m     0Mi      ",
     "app-a-prod       app-a-sandbox-prepull-mxchs                           hold-python                        0m     0Mi      ",
-    "app-a-prod       app-a-sandbox-prepull-mxchs                           hold-python-ml                     0m     0Mi      "
+    "app-a-prod       app-a-sandbox-prepull-mxchs                           hold-python-ml                     0m     0Mi      ",
+    "app-a-prod       app-a-sandbox-prepull-mxchs                           hold-spring                        0m     0Mi      ",
+    "app-a-prod       app-a-sandbox-prepull-mxchs                           hold-sql                           0m     1Mi      ",
+    "app-a-prod       app-a-sandbox-prepull-mxchs                           hold-todo                          0m     0Mi      ",
+    "app-a-prod       app-a-umami-67b7d6cd46-nwlqx                          umami                              1m     394Mi    ",
+    "arc-systems           arc-actions-runner-controller-5c9d9ffd65-766b6             kube-rbac-proxy                    1m     8Mi      ",
+    "arc-systems           arc-actions-runner-controller-5c9d9ffd65-766b6             manager                            2m     25Mi     ",
+    "arc-systems           lab-a-runner-8tt2w-cpndm                                docker                             1m     26Mi     ",
+    "arc-systems           lab-a-runner-8tt2w-cpndm                                runner                             1m     113Mi    ",
+    "arc-systems           lab-a-runner-8tt2w-d2pwq                                docker                             1m     27Mi     ",
+    "arc-systems           lab-a-runner-8tt2w-d2pwq                                runner                             1m     132Mi    ",
+    "argocd                argocd-application-controller-0                            argocd-application-controller      41m    445Mi    ",
+    "argocd                argocd-applicationset-controller-cdc6ffd77-sq64x           argocd-applicationset-controller   2m     41Mi     ",
+    "argocd                argocd-dex-server-7b868d86fb-hrb9f                         dex                                1m     27Mi     ",
+    "argocd                argocd-notifications-controller-59f6949d7-rkdp8            argocd-notifications-controller    1m     33Mi     ",
+    "argocd                argocd-redis-859b7784f4-685mj                              redis                              5m     7Mi      ",
+    "argocd                argocd-repo-server-848dcbb4db-jz8xs                        argocd-repo-server                 1m     108Mi    ",
+    "argocd                argocd-server-d5888bf9-zkltn                               argocd-server                      1m     58Mi     ",
+    "cert-manager          cert-manager-7c4b5b58df-4v7td                              cert-manager-controller            1m     43Mi     ",
+    "cert-manager          cert-manager-cainjector-7bf5c557bb-kbtv7                   cert-manager-cainjector            1m     70Mi     ",
+    "cert-manager          cert-manager-webhook-596c6cdc7b-lz6vt                      cert-manager-webhook               1m     18Mi     ",
+    "app-b-prod   app-b-backend-578495c5bf-zs7lj                    backend                            2m     70Mi     ",
+    "app-b-prod   app-b-frontend-8544fb6d67-v47q2                   frontend                           2m     57Mi     ",
+    "app-c-prod              app-c-postgres-0                                             postgres                           4m     51Mi     ",
+    "app-c-prod              app-c-signaling-69c8794869-p9brb                             app                                4m     75Mi     ",
+    "app-c-prod              app-c-web-64587d56b7-w8rjk                                   app                                2m     105Mi    ",
+    "app-d          app-d-b6cc95769-4w9mf                               nginx                              0m     7Mi      ",
+    "app-f-prod             app-f-5fc9656f46-dr4nw                                      app                                2m     204Mi    ",
+    "app-f-prod             app-f-5fc9656f46-r5stq                                      app                                2m     210Mi    ",
+    "app-f-prod             app-f-admin-6b64d57556-mknxv                                app                                1m     73Mi     ",
+    "app-f-prod             app-f-mx-7f466df4fb-dsdpw                                   app                                2m     197Mi    ",
+    "app-f-prod             app-f-mx-worker-76547bbd84-mzxhn                            worker                             1m     280Mi    ",
+    "app-f-prod             app-f-postgres-0                                            postgres                           4m     29Mi     ",
+    "app-f-prod             app-f-postgres-mx-0                                         postgres                           4m     36Mi     ",
+    "app-f-prod             app-f-postgres-vn-0                                         postgres                           6m     25Mi     ",
+    "app-f-prod             app-f-redis-0                                               redis                              8m     5Mi      ",
+    "app-f-prod             app-f-vn-766644b56d-dhklj                                   app                                2m     207Mi    ",
+    "app-f-prod             app-f-vn-worker-76bdf4cc86-cj7bp                            worker                             1m     222Mi    ",
+    "app-f-prod             app-f-worker-59f5df65db-9lxvr                               worker                             1m     211Mi    ",
+    "external-secrets      external-secrets-74b997bf86-96bd5                          external-secrets                   1m     41Mi     ",
+    "external-secrets      external-secrets-cert-controller-7d7cc86594-8bdst          cert-controller                    1m     53Mi     ",
+    "external-secrets      external-secrets-webhook-76d5b49f6-62nfg                   webhook                            1m     32Mi     ",
+    "app-g-api           app-g-api-7cb685d8cf-zxqt7                               api                                1m     116Mi    ",
+    "app-g-api           app-g-minio-0                                            minio                              1m     497Mi    ",
+    "app-g-api           app-g-postgres-0                                         postgres                           17m    126Mi    ",
+    "app-h-prod               app-h-admin-7fd8789559-dgvt5                                  app                                1m     70Mi     ",
+    "app-h-prod               app-h-admin-7fd8789559-k5mhl                                  app                                1m     102Mi    ",
+    "app-h-prod               app-h-admin-7fd8789559-wct54                                  app                                1m     78Mi     ",
+    "app-h-prod               app-h-api-server-5d6b56f78b-fd59m                             app                                2m     719Mi    ",
+    "app-h-prod               app-h-api-server-5d6b56f78b-srwnk                             app                                26m    779Mi    ",
+    "app-h-prod               app-h-api-server-5d6b56f78b-xxzbl                             app                                2m     617Mi    ",
+    "app-h-prod               app-h-app-q-client-7599c7f5f-79njd                             app                                1m     125Mi    ",
+    "app-h-prod               app-h-app-q-client-7599c7f5f-s2b62                             app                                1m     77Mi     ",
+    "app-h-prod               app-h-embed-67f6f74f6c-lb7lj                                  app                                2m     634Mi    ",
+    "app-h-prod               app-h-excel-agent-fd75f7986-8v9zq                             app                                2m     399Mi    ",
+    "app-h-prod               app-h-mysql-0                                                 mysql                              33m    1194Mi   ",
+    "app-h-prod               app-h-app-p-7b944d986b-9v85l                                app                                1m     68Mi     ",
+    "app-h-prod               app-h-qdrant-0                                                qdrant                             1m     51Mi     ",
+    "ingress-nginx         nginx-ingress-ingress-nginx-controller-86f8b99dfd-6kgsq    controller                         3m     254Mi    ",
+    "ingress-nginx         nginx-ingress-ingress-nginx-controller-86f8b99dfd-lkdwm    controller                         10m    251Mi    ",
+    "keda                  keda-admission-webhooks-5d67c9bcfb-8fcdl                   keda-admission-webhooks            1m     11Mi     ",
+    "keda                  keda-operator-85ff5bb446-lwkl6                             keda-operator                      2m     25Mi     ",
+    "keda                  keda-operator-metrics-apiserver-7ff5758fd7-gq7g7           keda-operator-metrics-apiserver    4m     36Mi     ",
+    "kube-system           coredns-59d4d457d-qjng8                                    coredns                            8m     30Mi     ",
+    "kube-system           local-path-provisioner-774c6665dc-lrslx                    local-path-provisioner             1m     13Mi     ",
+    "kube-system           metrics-server-7bfffcd44-fkpfm                             metrics-server                     7m     52Mi     ",
+    "kube-system           nvidia-device-plugin-rhjfx                                 nvidia-device-plugin               1m     23Mi     ",
+    "logging               elasticsearch-0                                            elasticsearch                      145m   1620Mi   ",
+    "logging               fluent-bit-c7fr8                                           fluent-bit                         68m    107Mi    ",
+    "logging               fluent-bit-nnsb5                                           fluent-bit                         39m    52Mi     ",
+    "logging               kibana-59c97cdf75-ht2zf                                    kibana                             2m     302Mi    ",
+    "metallb-system        controller-654858564f-cpj5c                                controller                         1m     59Mi     ",
+    "metallb-system        speaker-lqmcg                                              speaker                            4m     30Mi     ",
+    "metallb-system        speaker-xfxlv                                              speaker                            3m     20Mi     ",
+    "app-i-prod        app-i-84cc888b48-xwcpb                                 app                                2m     98Mi     ",
+    "app-i-prod        app-i-postgres-0                                       postgres                           4m     43Mi     ",
+    "monitoring            alertmanager-kube-prometheus-stack-alertmanager-0          alertmanager                       1m     29Mi     ",
+    "monitoring            alertmanager-kube-prometheus-stack-alertmanager-0          config-reloader                    0m     17Mi     ",
+    "monitoring            kube-prometheus-stack-grafana-74c84c99-g4grd               grafana                            6m     204Mi    ",
+    "monitoring            kube-prometheus-stack-grafana-74c84c99-g4grd               grafana-sc-dashboard               3m     102Mi    ",
+    "monitoring            kube-prometheus-stack-grafana-74c84c99-g4grd               grafana-sc-datasources             1m     98Mi     ",
+    "monitoring            kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2   kube-state-metrics                 6m     36Mi     ",
+    "monitoring            kube-prometheus-stack-operator-74656dd4f5-5fmv5            kube-prometheus-stack              3m     34Mi     ",
+    "monitoring            kube-prometheus-stack-prometheus-node-exporter-5wh9f       node-exporter                      6m     13Mi     ",
+    "monitoring            kube-prometheus-stack-prometheus-node-exporter-rsgt8       node-exporter                      1m     19Mi     ",
+    "monitoring            prometheus-kube-prometheus-stack-prometheus-0              config-reloader                    1m     19Mi     ",
+    "monitoring            prometheus-kube-prometheus-stack-prometheus-0              prometheus                         112m   890Mi    ",
+    "app-k        app-k-54c94979b5-b65b5                            web                                1m     141Mi    ",
+    "app-k        app-k-postgres-557c6964d6-c7hzd                   postgres                           2m     28Mi     ",
+    "registry              registry-0                                                 registry                           1m     186Mi    ",
+    "reloader              reloader-reloader-787b597f5c-d6nsn                         reloader-reloader                  1m     31Mi     ",
+    "app-l-prod         app-l-api-7867899bb6-5xzqb                              api                                1m     4Mi      ",
+    "app-l-prod         app-l-postgres-76b69b654d-lzf4d                         postgres                           2m     64Mi     ",
+    "app-l-prod         app-l-web-7545d66987-mzgxd                              web                                6m     162Mi    "
    ]
   }
  },
@@ -329,7 +419,7 @@
     "Failed": 4,
     "Pending": 1
    },
-   "restarts_top": [
+   "restarts_by_pod": [
     {
      "namespace": "app-c-prod",
      "pod": "app-c-coturn-549854dfcb-jgp4h",
@@ -449,6 +539,342 @@
      "pod": "app-f-mx-worker-76547bbd84-mzxhn",
      "restarts": 5,
      "node": "node-a"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-vn-766644b56d-dhklj",
+     "restarts": 5,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-excel-agent-fd75f7986-8v9zq",
+     "restarts": 5,
+     "node": "node-a"
+    },
+    {
+     "namespace": "logging",
+     "pod": "fluent-bit-nnsb5",
+     "restarts": 5,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-k",
+     "pod": "app-k-postgres-557c6964d6-c7hzd",
+     "restarts": 5,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-l-prod",
+     "pod": "app-l-postgres-76b69b654d-lzf4d",
+     "restarts": 5,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-a-prod",
+     "pod": "app-a-gateway-6d898d5f68-5sd56",
+     "restarts": 4,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-d",
+     "pod": "app-d-b6cc95769-4w9mf",
+     "restarts": 4,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-mx-7f466df4fb-dsdpw",
+     "restarts": 4,
+     "node": "node-a"
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "prometheus-kube-prometheus-stack-prometheus-0",
+     "restarts": 4,
+     "node": "node-b"
+    },
+    {
+     "namespace": "argocd",
+     "pod": "argocd-application-controller-0",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "cert-manager",
+     "pod": "cert-manager-webhook-596c6cdc7b-lz6vt",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-app-q-client-7599c7f5f-79njd",
+     "restarts": 3,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-qdrant-0",
+     "restarts": 3,
+     "node": "node-a"
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "local-path-provisioner-774c6665dc-lrslx",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "metrics-server-7bfffcd44-fkpfm",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "metallb-system",
+     "pod": "controller-654858564f-cpj5c",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "metallb-system",
+     "pod": "speaker-lqmcg",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-i-prod",
+     "pod": "app-i-84cc888b48-xwcpb",
+     "restarts": 3,
+     "node": "node-a"
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "kube-prometheus-stack-operator-74656dd4f5-5fmv5",
+     "restarts": 3,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-a-prod",
+     "pod": "app-a-frontend-574ff75654-rjbzg",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "argocd",
+     "pod": "argocd-applicationset-controller-cdc6ffd77-sq64x",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "argocd",
+     "pod": "argocd-dex-server-7b868d86fb-hrb9f",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "argocd",
+     "pod": "argocd-notifications-controller-59f6949d7-rkdp8",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "argocd",
+     "pod": "argocd-repo-server-848dcbb4db-jz8xs",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-postgres-0",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-postgres-vn-0",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "external-secrets",
+     "pod": "external-secrets-74b997bf86-96bd5",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "external-secrets",
+     "pod": "external-secrets-cert-controller-7d7cc86594-8bdst",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-g-api",
+     "pod": "app-g-api-7cb685d8cf-zxqt7",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-admin-7fd8789559-k5mhl",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-api-server-5d6b56f78b-fd59m",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-api-server-5d6b56f78b-srwnk",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-app-p-7b944d986b-9v85l",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "ingress-nginx",
+     "pod": "nginx-ingress-ingress-nginx-controller-86f8b99dfd-6kgsq",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "ingress-nginx",
+     "pod": "nginx-ingress-ingress-nginx-controller-86f8b99dfd-lkdwm",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "keda",
+     "pod": "keda-admission-webhooks-5d67c9bcfb-8fcdl",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "keda",
+     "pod": "keda-operator-metrics-apiserver-7ff5758fd7-gq7g7",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "nvidia-device-plugin-rhjfx",
+     "restarts": 2,
+     "node": "node-a"
+    },
+    {
+     "namespace": "logging",
+     "pod": "kibana-59c97cdf75-ht2zf",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "alertmanager-kube-prometheus-stack-alertmanager-0",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "kube-prometheus-stack-prometheus-node-exporter-rsgt8",
+     "restarts": 2,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-a-prod",
+     "pod": "app-a-phoenix-56ddc584cf-znjvs",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-a-prod",
+     "pod": "app-a-postgres-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-a-prod",
+     "pod": "app-a-redis-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-b-prod",
+     "pod": "app-b-frontend-8544fb6d67-v47q2",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-c-prod",
+     "pod": "app-c-postgres-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-postgres-mx-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-f-prod",
+     "pod": "app-f-redis-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "external-secrets",
+     "pod": "external-secrets-webhook-76d5b49f6-62nfg",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-g-api",
+     "pod": "app-g-minio-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-g-api",
+     "pod": "app-g-postgres-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "coredns-59d4d457d-qjng8",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "app-i-prod",
+     "pod": "app-i-postgres-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "registry",
+     "pod": "registry-0",
+     "restarts": 1,
+     "node": "node-b"
+    },
+    {
+     "namespace": "reloader",
+     "pod": "reloader-reloader-787b597f5c-d6nsn",
+     "restarts": 1,
+     "node": "node-b"
     }
    ],
    "pending": [
@@ -1270,7 +1696,7 @@
    "rules_total": 145,
    "firing_now": [],
    "firing_now_by_name": {},
-   "top_firing_7d": [],
+   "firing_7d_by_alert": [],
    "always_firing_7d": null,
    "skip_reason": "alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)",
    "watchdog_samples_7d": null,
@@ -1325,7 +1751,11 @@
       "KubePersistentVolumeInodesFillingUp",
       "KubePersistentVolumeInodesFillingUp",
       "KubePersistentVolumeErrors",
-      "KubeNodePressure"
+      "KubeNodePressure",
+      "NodeFilesystemSpaceFillingUp",
+      "NodeFilesystemSpaceFillingUp",
+      "NodeFilesystemAlmostOutOfSpace",
+      "NodeFilesystemAlmostOutOfSpace"
      ]
     },
     {
@@ -3425,7 +3855,94 @@
      "kube_statefulset_replicas",
      "kube_statefulset_status_current_revision",
      "kube_statefulset_status_observed_generation",
-     "kube_statefulset_status_replicas_ready"
+     "kube_statefulset_status_replicas_ready",
+     "kube_statefulset_status_replicas_updated",
+     "kube_statefulset_status_update_revision",
+     "kubelet_certificate_manager_client_expiration_renew_errors",
+     "kubelet_certificate_manager_client_ttl_seconds",
+     "kubelet_certificate_manager_server_ttl_seconds",
+     "kubelet_evictions",
+     "kubelet_server_expiration_renew_errors",
+     "kubelet_volume_stats_inodes_free",
+     "kubelet_volume_stats_used_bytes",
+     "kubernetes_build_info",
+     "namespace",
+     "negatives",
+     "node",
+     "node_bonding_active",
+     "node_bonding_slaves",
+     "node_disk_io_time_weighted_seconds_total",
+     "node_filefd_allocated",
+     "node_filefd_maximum",
+     "node_filesystem_files",
+     "node_filesystem_files_free",
+     "node_filesystem_readonly",
+     "node_md_disks",
+     "node_md_disks_required",
+     "node_network_receive_errs_total",
+     "node_network_receive_packets_total",
+     "node_network_transmit_errs_total",
+     "node_network_transmit_packets_total",
+     "node_network_up",
+     "node_nf_conntrack_entries",
+     "node_nf_conntrack_entries_limit",
+     "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile",
+     "node_systemd_service_restart_total",
+     "node_systemd_unit_state",
+     "node_textfile_scrape_error",
+     "node_timex_maxerror_seconds",
+     "node_timex_offset_seconds",
+     "node_timex_sync_status",
+     "node_vmstat_pgmajfault",
+     "one",
+     "only",
+     "prometheus",
+     "prometheus_config_last_reload_successful",
+     "prometheus_engine_queries",
+     "prometheus_engine_queries_concurrent_max",
+     "prometheus_notifications_alertmanagers_discovered",
+     "prometheus_notifications_errors_total",
+     "prometheus_notifications_queue_capacity",
+     "prometheus_notifications_queue_length",
+     "prometheus_notifications_sent_total",
+     "prometheus_operator_list_operations_failed_total",
+     "prometheus_operator_list_operations_total",
+     "prometheus_operator_managed_resources",
+     "prometheus_operator_node_address_lookup_errors_total",
+     "prometheus_operator_ready",
+     "prometheus_operator_reconcile_errors_total",
+     "prometheus_operator_reconcile_operations_total",
+     "prometheus_operator_status_update_errors_total",
+     "prometheus_operator_status_update_operations_total",
+     "prometheus_operator_syncs",
+     "prometheus_operator_watch_operations_failed_total",
+     "prometheus_operator_watch_operations_total",
+     "prometheus_remote_storage_failed_samples_total",
+     "prometheus_remote_storage_queue_highest_sent_timestamp_seconds",
+     "prometheus_remote_storage_queue_highest_timestamp_seconds",
+     "prometheus_remote_storage_samples_failed_total",
+     "prometheus_remote_storage_samples_total",
+     "prometheus_remote_storage_shards_desired",
+     "prometheus_remote_storage_shards_max",
+     "prometheus_remote_storage_succeeded_samples_total",
+     "prometheus_rule_evaluation_failures_total",
+     "prometheus_rule_group_iterations_missed_total",
+     "prometheus_rule_group_rules",
+     "prometheus_sd_kubernetes_failures_total",
+     "prometheus_sd_refresh_failures_total",
+     "prometheus_target_metadata_cache_entries",
+     "prometheus_target_scrape_pool_exceeded_label_limits_total",
+     "prometheus_target_scrape_pool_exceeded_target_limit_total",
+     "prometheus_target_sync_failed_total",
+     "prometheus_tsdb_compactions_failed_total",
+     "prometheus_tsdb_reloads_failures_total",
+     "reloader_last_reload_successful",
+     "robustperception",
+     "scrapes",
+     "see",
+     "service",
+     "with",
+     "www"
     ],
     "alert_metrics_without_panel_count": 167,
     "empty_dashboards": [],
@@ -3464,7 +3981,7 @@
   "webhook_failures_total": 0,
   "etcd": null,
   "controller_manager": {
-   "note": "k3s runs as one process, so controller-manager errors are mixed into nodes[<server>].top_errors"
+   "note": "k3s runs as one process, so controller-manager errors are mixed into nodes[<server>].errors_by_count"
   }
  },
  "nodeos": {
@@ -3816,7 +4333,7 @@
      {
       "pv": "pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c",
       "namespace": "default",
-      "pvc": "data-k-quiz-db-0",
+      "pvc": "data-app-ah-db-0",
       "node": "node-b",
       "storage_class": "local-path",
       "capacity_mb": 10240,
@@ -4103,9 +4620,10 @@
  },
  "logs": {
   "source": "logs/ (signature matches) + loki/ + metrics/ + objects/pods.json",
-  "signatures_version": "1.1.0",
+  "signatures_version": "1.1.1",
   "catalog_size": 80,
   "catalog_errors": [],
+  "component_logs": "counted while they were collected; no line is stored",
   "components_with_logs": [
    "argocd",
    "cert-manager",
@@ -4119,27 +4637,30 @@
    "metallb",
    "prometheus"
   ],
-  "files": [
-   "logs/pods/argocd/argocd_argocd-application-controller.log",
-   "logs/pods/argocd/argocd_argocd-applicationset-controller.log",
-   "logs/pods/argocd/argocd_argocd-notifications-controller.log",
-   "logs/pods/argocd/argocd_argocd-repo-server.log",
-   "logs/pods/argocd/argocd_argocd-server.log",
-   "logs/pods/cert-manager/cert-manager_cert-manager-cainjector.log",
-   "logs/pods/cert-manager/cert-manager_cert-manager.log",
-   "logs/pods/coredns/kube-system_coredns.log",
-   "logs/pods/elasticsearch-opensearch/logging_elasticsearch.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log",
-   "logs/pods/external-secrets/external-secrets_external-secrets.log",
-   "logs/pods/fluent-bit/logging_fluent-bit.log",
-   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log",
-   "logs/pods/ingress-nginx/ingress-nginx_nginx-ingress-ingress-nginx-controller.log",
-   "logs/pods/keda/keda_keda-operator.log",
-   "logs/pods/metallb/metallb-system_controller.log",
-   "logs/pods/metallb/metallb-system_speaker.log",
-   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log"
-  ],
+  "component_log_lines": {
+   "logs/pods/argocd/argocd_argocd-application-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-applicationset-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-notifications-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-repo-server.log": 1500,
+   "logs/pods/argocd/argocd_argocd-server.log": 1104,
+   "logs/pods/cert-manager/cert-manager_cert-manager-cainjector.log": 120,
+   "logs/pods/cert-manager/cert-manager_cert-manager.log": 66,
+   "logs/pods/coredns/kube-system_coredns.log": 1500,
+   "logs/pods/elasticsearch-opensearch/logging_elasticsearch.log": 29,
+   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log": 1160,
+   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log": 576,
+   "logs/pods/external-secrets/external-secrets_external-secrets.log": 1500,
+   "logs/pods/fluent-bit/logging_fluent-bit.log": 1200,
+   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 879,
+   "logs/pods/ingress-nginx/ingress-nginx_nginx-ingress-ingress-nginx-controller.log": 3000,
+   "logs/pods/keda/keda_keda-operator.log": 26,
+   "logs/pods/metallb/metallb-system_controller.log": 522,
+   "logs/pods/metallb/metallb-system_speaker.log": 1200,
+   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log": 1059
+  },
+  "component_logs_capped": [],
+  "files": [],
+  "lines_kept": true,
   "files_scanned": [
    "logs/pods/argocd/argocd_argocd-application-controller.log",
    "logs/pods/argocd/argocd_argocd-applicationset-controller.log",
@@ -4514,7 +5035,7 @@
   ],
   "boot_window_skipped": {},
   "boot_window_seconds": 300,
-  "scan_signatures_version": "1.1.0",
+  "scan_signatures_version": "1.1.1",
   "loki": {
    "present": false,
    "ok": false,
@@ -4529,8 +5050,7 @@
     "metrics_scraped": false,
     "note": "fluent-bit metrics are not in Prometheus (no ServiceMonitor/PodMonitor). Output errors and drops 0 mean not measured"
    }
-  },
-  "component_logs_removed": true
+  }
  },
  "tools": {
   "source": "tools/",
@@ -7421,10 +7941,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-autopost-en:autopost",
+     "target": "app-a-prod/cronjob/app-ae-en:autopost",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-en",
+     "name": "app-ae-en",
      "container": "autopost",
      "severity": "UNKNOWN",
      "cpu_request": 0.05,
@@ -7454,10 +7974,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-autopost-ja:autopost",
+     "target": "app-a-prod/cronjob/app-ae-ja:autopost",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-ja",
+     "name": "app-ae-ja",
      "container": "autopost",
      "severity": "UNKNOWN",
      "cpu_request": 0.05,
@@ -7487,10 +8007,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-day:digest",
+     "target": "app-a-prod/cronjob/app-af-day:digest",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-digest-day",
+     "name": "app-af-day",
      "container": "digest",
      "severity": "UNKNOWN",
      "cpu_request": 0.05,
@@ -7520,10 +8040,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-month:digest",
+     "target": "app-a-prod/cronjob/app-af-month:digest",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-digest-month",
+     "name": "app-af-month",
      "container": "digest",
      "severity": "UNKNOWN",
      "cpu_request": 0.05,
@@ -7553,10 +8073,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-week:digest",
+     "target": "app-a-prod/cronjob/app-af-week:digest",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-digest-week",
+     "name": "app-af-week",
      "container": "digest",
      "severity": "UNKNOWN",
      "cpu_request": 0.05,
@@ -7586,10 +8106,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-global:radar",
+     "target": "app-a-prod/cronjob/app-ag-global:radar",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global",
+     "name": "app-ag-global",
      "container": "radar",
      "severity": "UNKNOWN",
      "cpu_request": 0.25,
@@ -7619,10 +8139,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-global-eu:radar",
+     "target": "app-a-prod/cronjob/app-ag-global-eu:radar",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global-eu",
+     "name": "app-ag-global-eu",
      "container": "radar",
      "severity": "UNKNOWN",
      "cpu_request": 0.25,
@@ -7652,10 +8172,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-japan:radar",
+     "target": "app-a-prod/cronjob/app-ag-japan:radar",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan",
+     "name": "app-ag-japan",
      "container": "radar",
      "severity": "UNKNOWN",
      "cpu_request": 0.25,
@@ -7685,10 +8205,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-japan-noon:radar",
+     "target": "app-a-prod/cronjob/app-ag-japan-noon:radar",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan-noon",
+     "name": "app-ag-japan-noon",
      "container": "radar",
      "severity": "UNKNOWN",
      "cpu_request": 0.25,
@@ -8246,7 +8766,7 @@
      "kubegap_reason": ""
     }
    ],
-   "top_over_cpu": [
+   "over_cpu": [
     {
      "target": "app-h-prod/deployment/app-h-embed:app",
      "kind": "Deployment",
@@ -8654,7 +9174,7 @@
      "kubegap_reason": "memory request under by 520 MB"
     }
    ],
-   "top_over_memory": [
+   "over_memory": [
     {
      "target": "app-h-prod/deployment/app-h-embed:app",
      "kind": "Deployment",
@@ -8685,7 +9205,7 @@
      "kubegap_reason": "CPU request over by 0.49 cores, memory request over by 1301 MB"
     }
    ],
-   "top_under_memory": [
+   "under_memory": [
     {
      "target": "app-a-prod/statefulset/app-a-postgres:postgres",
      "kind": "StatefulSet",
@@ -9267,6 +9787,209 @@
      "summary": "CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB",
      "kubegap_level": "warn",
      "kubegap_reason": "memory request under by 84 MB"
+    },
+    {
+     "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-todo",
+     "kind": "DaemonSet",
+     "namespace": "app-a-prod",
+     "name": "app-a-sandbox-prepull",
+     "container": "hold-todo",
+     "severity": "WARNING",
+     "cpu_request": 0.01,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.05,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 16,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 64,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 2,
+     "cpu_request_delta": 0.0,
+     "memory_request_delta_mb": -84,
+     "summary": "CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 84 MB"
+    },
+    {
+     "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-network",
+     "kind": "DaemonSet",
+     "namespace": "app-a-prod",
+     "name": "app-a-sandbox-prepull",
+     "container": "hold-network",
+     "severity": "WARNING",
+     "cpu_request": 0.01,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.05,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 16,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 64,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 2,
+     "cpu_request_delta": 0.0,
+     "memory_request_delta_mb": -84,
+     "summary": "CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 84 MB"
+    },
+    {
+     "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-sql",
+     "kind": "DaemonSet",
+     "namespace": "app-a-prod",
+     "name": "app-a-sandbox-prepull",
+     "container": "hold-sql",
+     "severity": "WARNING",
+     "cpu_request": 0.01,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.05,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 16,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 64,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 2,
+     "cpu_request_delta": 0.0,
+     "memory_request_delta_mb": -84,
+     "summary": "CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 84 MB"
+    },
+    {
+     "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-go",
+     "kind": "DaemonSet",
+     "namespace": "app-a-prod",
+     "name": "app-a-sandbox-prepull",
+     "container": "hold-go",
+     "severity": "WARNING",
+     "cpu_request": 0.01,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.05,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 16,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 64,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 2,
+     "cpu_request_delta": 0.0,
+     "memory_request_delta_mb": -84,
+     "summary": "CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 84 MB"
+    },
+    {
+     "target": "app-l-prod/deployment/app-l-web:web",
+     "kind": "Deployment",
+     "namespace": "app-l-prod",
+     "name": "app-l-web",
+     "container": "web",
+     "severity": "WARNING",
+     "cpu_request": 0.05,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.3,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 128,
+     "memory_request_rec_mb": 204,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 512,
+     "memory_limit_rec_mb": 204,
+     "memory_limit_sev": "WARNING",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.04,
+     "memory_request_delta_mb": -76,
+     "summary": "CPU request 0.05 → 0.01 cores, CPU limit 0.3 → none, memory request 128 → 204 MB, memory limit 512 → 204 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 76 MB"
+    },
+    {
+     "target": "app-a-prod/statefulset/app-a-redis:redis",
+     "kind": "StatefulSet",
+     "namespace": "app-a-prod",
+     "name": "app-a-redis",
+     "container": "redis",
+     "severity": "WARNING",
+     "cpu_request": 0.02,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.1,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 32,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 192,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.01,
+     "memory_request_delta_mb": -68,
+     "summary": "CPU request 0.02 → 0.01 cores, CPU limit 0.1 → none, memory request 32 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 68 MB"
+    },
+    {
+     "target": "app-f-prod/statefulset/app-f-redis:redis",
+     "kind": "StatefulSet",
+     "namespace": "app-f-prod",
+     "name": "app-f-redis",
+     "container": "redis",
+     "severity": "WARNING",
+     "cpu_request": 0.02,
+     "cpu_request_rec": 0.01,
+     "cpu_request_sev": "GOOD",
+     "cpu_limit": 0.1,
+     "cpu_limit_rec": null,
+     "cpu_limit_sev": "WARNING",
+     "memory_request_mb": 32,
+     "memory_request_rec_mb": 100,
+     "memory_request_sev": "GOOD",
+     "memory_limit_mb": 64,
+     "memory_limit_rec_mb": 100,
+     "memory_limit_sev": "GOOD",
+     "info": {},
+     "warnings": [],
+     "hpa": false,
+     "pods_live": 1,
+     "cpu_request_delta": 0.01,
+     "memory_request_delta_mb": -68,
+     "summary": "CPU request 0.02 → 0.01 cores, CPU limit 0.1 → none, memory request 32 → 100 MB",
+     "kubegap_level": "warn",
+     "kubegap_reason": "memory request under by 68 MB"
     }
    ],
    "cpu_limit_remove_recommended": [
@@ -20296,6 +21019,159 @@
      "node_rebooted_at": null,
      "rebooted": false,
      "crashloop": false
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-app-q-client-7599c7f5f-79njd",
+     "container": "app",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Unknown",
+     "exit_code": 255,
+     "last_finished": "2026-10-28T22:06:17Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "Unknown",
+     "prod": true,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "app-h-prod",
+     "pod": "app-h-qdrant-0",
+     "container": "qdrant",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Unknown",
+     "exit_code": 255,
+     "last_finished": "2026-10-28T22:06:17Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "Unknown",
+     "prod": true,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "local-path-provisioner-774c6665dc-lrslx",
+     "container": "local-path-provisioner",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 1,
+     "last_finished": "2026-07-11T00:27:14Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 1)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "kube-system",
+     "pod": "metrics-server-7bfffcd44-fkpfm",
+     "container": "metrics-server",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 2,
+     "last_finished": "2026-07-11T00:27:15Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 2)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "metallb-system",
+     "pod": "controller-654858564f-cpj5c",
+     "container": "controller",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 1,
+     "last_finished": "2026-07-11T00:27:13Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 1)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "metallb-system",
+     "pod": "speaker-lqmcg",
+     "container": "speaker",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 1,
+     "last_finished": "2026-07-11T00:27:11Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 1)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "app-i-prod",
+     "pod": "app-i-84cc888b48-xwcpb",
+     "container": "app",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Unknown",
+     "exit_code": 255,
+     "last_finished": "2026-10-28T22:06:17Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "Unknown",
+     "prod": true,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2",
+     "container": "kube-state-metrics",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 2,
+     "last_finished": "2026-07-11T00:27:15Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 2)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
+    },
+    {
+     "namespace": "monitoring",
+     "pod": "kube-prometheus-stack-operator-74656dd4f5-5fmv5",
+     "container": "kube-prometheus-stack",
+     "restarts": 3,
+     "waiting": null,
+     "last_reason": "Error",
+     "exit_code": 2,
+     "last_finished": "2026-07-11T00:27:12Z",
+     "unhealthy_events": 0,
+     "unhealthy_by_probe": {},
+     "cause": "crash (exit 2)",
+     "prod": false,
+     "node_rebooted_at": null,
+     "rebooted": false,
+     "crashloop": false
     }
    ],
    "by_cause": {
@@ -20391,8 +21267,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-en",
-     "target": "app-a-prod/marketing-autopost-en",
+     "name": "app-ae-en",
+     "target": "app-a-prod/app-ae-en",
      "schedule": "*/15 7-15 * * *",
      "interval_h": 0.25,
      "suspend": true,
@@ -20422,8 +21298,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-ja",
-     "target": "app-a-prod/marketing-autopost-ja",
+     "name": "app-ae-ja",
+     "target": "app-a-prod/app-ae-ja",
      "schedule": "*/15 3-12 * * *",
      "interval_h": 0.25,
      "suspend": true,
@@ -20453,8 +21329,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-day",
-     "target": "app-a-prod/marketing-digest-day",
+     "name": "app-af-day",
+     "target": "app-a-prod/app-af-day",
      "schedule": "0 0 * * *",
      "interval_h": 24.0,
      "suspend": true,
@@ -20484,8 +21360,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-month",
-     "target": "app-a-prod/marketing-digest-month",
+     "name": "app-af-month",
+     "target": "app-a-prod/app-af-month",
      "schedule": "0 0 1 * *",
      "interval_h": 720.0,
      "suspend": true,
@@ -20515,8 +21391,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-week",
-     "target": "app-a-prod/marketing-digest-week",
+     "name": "app-af-week",
+     "target": "app-a-prod/app-af-week",
      "schedule": "0 0 * * 1",
      "interval_h": 168.0,
      "suspend": true,
@@ -20546,8 +21422,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global",
-     "target": "app-a-prod/marketing-radar-global",
+     "name": "app-ag-global",
+     "target": "app-a-prod/app-ag-global",
      "schedule": "27 12 * * *",
      "interval_h": 24.0,
      "suspend": true,
@@ -20577,8 +21453,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global-eu",
-     "target": "app-a-prod/marketing-radar-global-eu",
+     "name": "app-ag-global-eu",
+     "target": "app-a-prod/app-ag-global-eu",
      "schedule": "57 6 * * *",
      "interval_h": 24.0,
      "suspend": true,
@@ -20608,8 +21484,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan",
-     "target": "app-a-prod/marketing-radar-japan",
+     "name": "app-ag-japan",
+     "target": "app-a-prod/app-ag-japan",
      "schedule": "27 10 * * *",
      "interval_h": 24.0,
      "suspend": true,
@@ -20639,8 +21515,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan-noon",
-     "target": "app-a-prod/marketing-radar-japan-noon",
+     "name": "app-ag-japan-noon",
+     "target": "app-a-prod/app-ag-japan-noon",
      "schedule": "57 2 * * *",
      "interval_h": 24.0,
      "suspend": true,
@@ -21325,6 +22201,7 @@
    "no_user_classes_with_prod": true
   },
   "backup": {
+   "commands_kept": true,
    "rows": [
     {
      "namespace": "app-a-prod",
@@ -21352,13 +22229,9 @@
        "workload": "app-a-prod/statefulset/app-a-postgres",
        "pvc": "data-app-a-postgres-0",
        "node": "node-b"
-      },
-      {
-       "workload": "app-a-prod/statefulset/app-a-redis",
-       "pvc": "data-app-a-redis-0",
-       "node": "node-b"
       }
      ],
+     "source_by": "named in the command",
      "source_nodes": [
       "node-b"
      ],
@@ -21392,23 +22265,9 @@
        "workload": "app-f-prod/statefulset/app-f-postgres",
        "pvc": "app-f-postgres-data-app-f-postgres-0",
        "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres-mx",
-       "pvc": "app-f-postgres-mx-data-app-f-postgres-mx-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres-vn",
-       "pvc": "app-f-postgres-vn-data-app-f-postgres-vn-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-redis",
-       "pvc": "app-f-redis-data-app-f-redis-0",
-       "node": "node-b"
       }
      ],
+     "source_by": "named in the command",
      "source_nodes": [
       "node-b"
      ],
@@ -21439,26 +22298,12 @@
      "offsite_hint": false,
      "source_db": [
       {
-       "workload": "app-f-prod/statefulset/app-f-postgres",
-       "pvc": "app-f-postgres-data-app-f-postgres-0",
-       "node": "node-b"
-      },
-      {
        "workload": "app-f-prod/statefulset/app-f-postgres-mx",
        "pvc": "app-f-postgres-mx-data-app-f-postgres-mx-0",
        "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres-vn",
-       "pvc": "app-f-postgres-vn-data-app-f-postgres-vn-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-redis",
-       "pvc": "app-f-redis-data-app-f-redis-0",
-       "node": "node-b"
       }
      ],
+     "source_by": "named in the command",
      "source_nodes": [
       "node-b"
      ],
@@ -21489,26 +22334,12 @@
      "offsite_hint": false,
      "source_db": [
       {
-       "workload": "app-f-prod/statefulset/app-f-postgres",
-       "pvc": "app-f-postgres-data-app-f-postgres-0",
-       "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-postgres-mx",
-       "pvc": "app-f-postgres-mx-data-app-f-postgres-mx-0",
-       "node": "node-b"
-      },
-      {
        "workload": "app-f-prod/statefulset/app-f-postgres-vn",
        "pvc": "app-f-postgres-vn-data-app-f-postgres-vn-0",
        "node": "node-b"
-      },
-      {
-       "workload": "app-f-prod/statefulset/app-f-redis",
-       "pvc": "app-f-redis-data-app-f-redis-0",
-       "node": "node-b"
       }
      ],
+     "source_by": "named in the command",
      "source_nodes": [
       "node-b"
      ],
@@ -21539,16 +22370,12 @@
      "offsite_hint": false,
      "source_db": [
       {
-       "workload": "app-g-api/statefulset/app-g-minio",
-       "pvc": "app-g-minio-data-app-g-minio-0",
-       "node": "node-b"
-      },
-      {
        "workload": "app-g-api/statefulset/app-g-postgres",
        "pvc": "app-g-postgres-data-app-g-postgres-0",
        "node": "node-b"
       }
      ],
+     "source_by": "named in the command",
      "source_nodes": [
       "node-b"
      ],
@@ -21587,15 +22414,10 @@
        "workload": "app-h-prod/statefulset/app-h-mysql",
        "pvc": "mysql-data-app-h-mysql-0",
        "node": "node-b"
-      },
-      {
-       "workload": "app-h-prod/statefulset/app-h-qdrant",
-       "pvc": "app-h-qdrant-data-app-h-qdrant-0",
-       "node": "node-a"
       }
      ],
+     "source_by": "named in the command",
      "source_nodes": [
-      "node-a",
       "node-b"
      ],
      "same_node_as_source": true,
@@ -21630,6 +22452,7 @@
        "node": "node-b"
       }
      ],
+     "source_by": "named in the command",
      "source_nodes": [
       "node-b"
      ],
@@ -22119,8 +22942,8 @@
     },
     {
      "namespace": "default",
-     "name": "data-k-quiz-db-0",
-     "target": "default/data-k-quiz-db-0",
+     "name": "data-app-ah-db-0",
+     "target": "default/data-app-ah-db-0",
      "prod": false,
      "phase": "Bound",
      "storage_class": "local-path",
@@ -22862,6 +23685,7 @@
    "local-path-provisioner.metrics.local-path",
    "prometheus.metrics.observability"
   ],
+  "at_limit": {},
   "seconds_total": 262.7,
   "object_files": {
    "acraccesstokens.generators.external-secrets.io": "ok",
@@ -31738,9 +32562,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan-noon",
+     "name": "app-ag-japan-noon",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-radar-japan-noon",
+     "target": "app-a-prod/cronjob/app-ag-japan-noon",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -32044,9 +32868,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-month",
+     "name": "app-af-month",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-digest-month",
+     "target": "app-a-prod/cronjob/app-af-month",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -32146,9 +32970,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global-eu",
+     "name": "app-ag-global-eu",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-radar-global-eu",
+     "target": "app-a-prod/cronjob/app-ag-global-eu",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -32350,9 +33174,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan",
+     "name": "app-ag-japan",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-radar-japan",
+     "target": "app-a-prod/cronjob/app-ag-japan",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -32860,9 +33684,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-en",
+     "name": "app-ae-en",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-autopost-en",
+     "target": "app-a-prod/cronjob/app-ae-en",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -32962,9 +33786,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global",
+     "name": "app-ag-global",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-radar-global",
+     "target": "app-a-prod/cronjob/app-ag-global",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -33064,9 +33888,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-day",
+     "name": "app-af-day",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-digest-day",
+     "target": "app-a-prod/cronjob/app-af-day",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -33268,9 +34092,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-ja",
+     "name": "app-ae-ja",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-autopost-ja",
+     "target": "app-a-prod/cronjob/app-ae-ja",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -33472,9 +34296,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-week",
+     "name": "app-af-week",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-digest-week",
+     "target": "app-a-prod/cronjob/app-af-week",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -35020,9 +35844,9 @@
     },
     {
      "namespace": "default",
-     "name": "poca-finder-backend-config",
+     "name": "app-ak-finder-backend-config",
      "kind": "ConfigMap",
-     "target": "default/configmap/poca-finder-backend-config",
+     "target": "default/configmap/app-ak-finder-backend-config",
      "prod": false,
      "danger": 1,
      "warning": 0,
@@ -37682,24 +38506,24 @@
     "registry/statefulset/registry",
     "app-a-prod/statefulset/app-a-postgres",
     "app-a-prod/cronjob/app-a-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan-noon",
+    "app-a-prod/cronjob/app-ag-japan-noon",
     "app-f-prod/cronjob/app-f-postgres-mx-backup",
     "app-h-prod/cronjob/app-h-mysql-backup",
-    "app-a-prod/cronjob/marketing-digest-month",
-    "app-a-prod/cronjob/marketing-radar-global-eu",
+    "app-a-prod/cronjob/app-af-month",
+    "app-a-prod/cronjob/app-ag-global-eu",
     "app-f-prod/cronjob/app-f-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan",
+    "app-a-prod/cronjob/app-ag-japan",
     "app-f-prod/cronjob/app-f-ga4-digest-month",
     "app-a-prod/cronjob/umami-report-week",
     "app-f-prod/cronjob/app-f-ga4-digest-week",
     "app-f-prod/cronjob/app-f-postgres-vn-backup",
-    "app-a-prod/cronjob/marketing-autopost-en",
-    "app-a-prod/cronjob/marketing-radar-global",
-    "app-a-prod/cronjob/marketing-digest-day",
+    "app-a-prod/cronjob/app-ae-en",
+    "app-a-prod/cronjob/app-ag-global",
+    "app-a-prod/cronjob/app-af-day",
     "app-f-prod/cronjob/app-f-ga4-digest-day",
-    "app-a-prod/cronjob/marketing-autopost-ja",
+    "app-a-prod/cronjob/app-ae-ja",
     "app-a-prod/cronjob/app-a-sandbox-watchdog",
-    "app-a-prod/cronjob/marketing-digest-week",
+    "app-a-prod/cronjob/app-af-week",
     "app-i-prod/cronjob/app-i-postgres-backup",
     "app-f-prod/cronjob/app-f-policy-radar",
     "app-a-prod/cronjob/umami-report-day",
@@ -37716,7 +38540,7 @@
     "kube-system/deployment/coredns",
     "/clusterrolebinding/argocd-server",
     "/clusterrolebinding/keda-operator",
-    "default/configmap/poca-finder-backend-config",
+    "default/configmap/app-ak-finder-backend-config",
     "app-a-prod/rolebinding/app-a-sandbox-manager",
     "app-a-prod/role/app-a-sandbox-manager",
     "monitoring/role/kube-prometheus-stack-grafana",
@@ -38636,55 +39460,55 @@
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-autopost-en",
+     "workload": "app-a-prod/cronjob/app-ae-en",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-autopost-ja",
+     "workload": "app-a-prod/cronjob/app-ae-ja",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-day",
+     "workload": "app-a-prod/cronjob/app-af-day",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-month",
+     "workload": "app-a-prod/cronjob/app-af-month",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-week",
+     "workload": "app-a-prod/cronjob/app-af-week",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-global",
+     "workload": "app-a-prod/cronjob/app-ag-global",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-global-eu",
+     "workload": "app-a-prod/cronjob/app-ag-global-eu",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-japan",
+     "workload": "app-a-prod/cronjob/app-ag-japan",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-japan-noon",
+     "workload": "app-a-prod/cronjob/app-ag-japan-noon",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
@@ -38831,7 +39655,9 @@
       "app-f-prod/statefulset/app-f-postgres-vn",
       "app-f-prod/statefulset/app-f-redis",
       "app-g-api/statefulset/app-g-minio",
-      "app-g-api/statefulset/app-g-postgres"
+      "app-g-api/statefulset/app-g-postgres",
+      "app-i-prod/statefulset/app-i-postgres",
+      "app-g-api/cronjob/app-g-postgres-backup"
      ],
      "prod_workloads": 7,
      "nodes_with_label": 1,
@@ -38866,7 +39692,21 @@
       "app-f-prod/deployment/app-f-vn",
       "app-h-prod/deployment/app-h-admin",
       "app-h-prod/deployment/app-h-api-server",
-      "app-h-prod/deployment/app-h-app-q-client"
+      "app-h-prod/deployment/app-h-app-q-client",
+      "app-h-prod/deployment/app-h-embed",
+      "app-h-prod/deployment/app-h-app-p",
+      "kube-system/deployment/coredns",
+      "app-i-prod/deployment/app-i",
+      "app-c-prod/statefulset/app-c-postgres",
+      "app-h-prod/statefulset/app-h-mysql",
+      "app-h-prod/statefulset/app-h-qdrant",
+      "registry/statefulset/registry",
+      "kube-system/daemonset/nvidia-device-plugin",
+      "app-a-prod/cronjob/app-a-postgres-backup",
+      "app-h-prod/cronjob/app-h-mysql-backup",
+      "kube-system/cronjob/containerd-cleanup-node-a",
+      "kube-system/cronjob/containerd-cleanup-node-b",
+      "registry/cronjob/registry-gc"
      ],
      "prod_workloads": 16,
      "nodes_with_label": 2,
@@ -38884,7 +39724,19 @@
       "argocd/deployment/argocd-repo-server",
       "argocd/deployment/argocd-server",
       "cert-manager/deployment/cert-manager",
-      "cert-manager/deployment/cert-manager-cainjector"
+      "cert-manager/deployment/cert-manager-cainjector",
+      "cert-manager/deployment/cert-manager-webhook",
+      "ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller",
+      "keda/deployment/keda-admission-webhooks",
+      "keda/deployment/keda-operator",
+      "keda/deployment/keda-operator-metrics-apiserver",
+      "kube-system/deployment/coredns",
+      "kube-system/deployment/local-path-provisioner",
+      "kube-system/deployment/metrics-server",
+      "metallb-system/deployment/controller",
+      "argocd/statefulset/argocd-application-controller",
+      "metallb-system/daemonset/speaker",
+      "monitoring/daemonset/kube-prometheus-stack-prometheus-node-exporter"
      ],
      "prod_workloads": 0,
      "nodes_with_label": 2,
@@ -38933,14 +39785,48 @@
     },
     {
      "namespace": "default",
-     "name": "poca-finder-backend-config",
+     "name": "app-ak-finder-backend-config",
      "prod": false,
      "keys": [
       "AWS_REGION",
       "CORS_ALLOWED_ORIGINS",
       "DATABASE_URL",
       "DETECTION_FALLBACK_TO_FULL",
-      "DETECTION_IOU"
+      "DETECTION_IOU",
+      "DETECTION_MAX_DETECTIONS",
+      "DETECTION_MIN_CONFIDENCE",
+      "DETECTION_MIN_SIZE",
+      "DETECTION_SERVICE_URL",
+      "DETECTION_TIMEOUT_MS",
+      "EMBEDDING_MODE",
+      "JINA_EMBEDDING_DIMENSION",
+      "JINA_EMBEDDING_MODELS",
+      "JINA_IMAGE_EMBEDDING_MODEL",
+      "JWT_EXPIRES_IN",
+      "JWT_RELAY_EXPIRES_IN",
+      "JWT_RELAY_SECRET",
+      "JWT_SECRET",
+      "NODE_ENV",
+      "PORT",
+      "PUBLIC_ASSET_BASE_URL",
+      "QDRANT_API_KEY",
+      "QDRANT_COLLECTION",
+      "QDRANT_DEFAULT_LIMIT",
+      "QDRANT_SCORE_THRESHOLD",
+      "QDRANT_URL",
+      "QDRANT_VECTOR_SIZE",
+      "RUN_SCHEMA_SYNC",
+      "S3_BUCKET",
+      "S3_UPLOAD_PREFIX",
+      "TWITTER_CLIENT_ID",
+      "TWITTER_CLIENT_ID_RELAY",
+      "TWITTER_CLIENT_SECRET",
+      "TWITTER_CLIENT_SECRET_RELAY",
+      "TWITTER_REDIRECT_URI",
+      "TWITTER_REDIRECT_URI_RELAY",
+      "TWITTER_SCOPES",
+      "TWITTER_SCOPES_RELAY",
+      "UPLOAD_URL_TTL"
      ],
      "age_days": 311
     }
@@ -38953,7 +39839,7 @@
    "pvc_unused": [
     {
      "namespace": "default",
-     "name": "data-k-quiz-db-0",
+     "name": "data-app-ah-db-0",
      "prod": false
     }
    ],
@@ -39181,6 +40067,459 @@
      "prod": false,
      "managed_by": null,
      "last_applied": true
+    }
+   ],
+   "owners": [
+    {
+     "workload": "app-a-prod/deployment/app-a-backend",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/deployment/app-a-frontend",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/deployment/app-a-gateway",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/deployment/app-a-phoenix",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/deployment/app-a-umami",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/deployment/app-m",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "arc-systems/deployment/arc-actions-runner-controller",
+     "managed_by": "helm",
+     "helm_release": "arc"
+    },
+    {
+     "workload": "cert-manager/deployment/cert-manager",
+     "managed_by": "helm",
+     "helm_release": "cert-manager"
+    },
+    {
+     "workload": "cert-manager/deployment/cert-manager-cainjector",
+     "managed_by": "helm",
+     "helm_release": "cert-manager"
+    },
+    {
+     "workload": "cert-manager/deployment/cert-manager-webhook",
+     "managed_by": "helm",
+     "helm_release": "cert-manager"
+    },
+    {
+     "workload": "app-b-prod/deployment/app-b-backend",
+     "managed_by": "argocd",
+     "argocd_app": "app-b-prod"
+    },
+    {
+     "workload": "app-b-prod/deployment/app-b-frontend",
+     "managed_by": "argocd",
+     "argocd_app": "app-b-prod"
+    },
+    {
+     "workload": "app-c-prod/deployment/app-c-coturn",
+     "managed_by": "argocd",
+     "argocd_app": "app-c"
+    },
+    {
+     "workload": "app-c-prod/deployment/app-c-signaling",
+     "managed_by": "argocd",
+     "argocd_app": "app-c"
+    },
+    {
+     "workload": "app-c-prod/deployment/app-c-web",
+     "managed_by": "argocd",
+     "argocd_app": "app-c"
+    },
+    {
+     "workload": "app-d/deployment/app-d",
+     "managed_by": "argocd",
+     "argocd_app": "app-d"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-admin",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-shared"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-mx",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-mx"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-mx-worker",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-mx"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-sales-bot",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-vn",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-vn"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-vn-worker",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-vn"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-worker",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "external-secrets/deployment/external-secrets",
+     "managed_by": "helm",
+     "helm_release": "external-secrets"
+    },
+    {
+     "workload": "external-secrets/deployment/external-secrets-cert-controller",
+     "managed_by": "helm",
+     "helm_release": "external-secrets"
+    },
+    {
+     "workload": "external-secrets/deployment/external-secrets-webhook",
+     "managed_by": "helm",
+     "helm_release": "external-secrets"
+    },
+    {
+     "workload": "app-g-api/deployment/app-g-api",
+     "managed_by": "argocd",
+     "argocd_app": "app-g-api"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-admin",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-api-server",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-app-q-client",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-embed",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-excel-agent",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-app-p",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller",
+     "managed_by": "helm",
+     "helm_release": "nginx-ingress"
+    },
+    {
+     "workload": "keda/deployment/keda-admission-webhooks",
+     "managed_by": "helm",
+     "helm_release": "keda"
+    },
+    {
+     "workload": "keda/deployment/keda-operator",
+     "managed_by": "helm",
+     "helm_release": "keda"
+    },
+    {
+     "workload": "keda/deployment/keda-operator-metrics-apiserver",
+     "managed_by": "helm",
+     "helm_release": "keda"
+    },
+    {
+     "workload": "app-i-prod/deployment/app-i",
+     "managed_by": "argocd",
+     "argocd_app": "app-i"
+    },
+    {
+     "workload": "monitoring/deployment/kube-prometheus-stack-grafana",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "monitoring/deployment/kube-prometheus-stack-kube-state-metrics",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "monitoring/deployment/kube-prometheus-stack-operator",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "app-k/deployment/app-k",
+     "managed_by": "argocd",
+     "argocd_app": "app-k"
+    },
+    {
+     "workload": "app-k/deployment/app-k-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-k"
+    },
+    {
+     "workload": "reloader/deployment/reloader-reloader",
+     "managed_by": "helm",
+     "helm_release": "reloader"
+    },
+    {
+     "workload": "app-l-prod/deployment/app-l-api",
+     "managed_by": "argocd",
+     "argocd_app": "app-l-prod"
+    },
+    {
+     "workload": "app-l-prod/deployment/app-l-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-l-prod"
+    },
+    {
+     "workload": "app-l-prod/deployment/app-l-web",
+     "managed_by": "argocd",
+     "argocd_app": "app-l-prod"
+    },
+    {
+     "workload": "app-a-prod/statefulset/app-a-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/statefulset/app-a-redis",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-c-prod/statefulset/app-c-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-c"
+    },
+    {
+     "workload": "app-f-prod/statefulset/app-f-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/statefulset/app-f-postgres-mx",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-mx"
+    },
+    {
+     "workload": "app-f-prod/statefulset/app-f-postgres-vn",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-vn"
+    },
+    {
+     "workload": "app-f-prod/statefulset/app-f-redis",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-shared"
+    },
+    {
+     "workload": "app-g-api/statefulset/app-g-minio",
+     "managed_by": "argocd",
+     "argocd_app": "app-g-api"
+    },
+    {
+     "workload": "app-g-api/statefulset/app-g-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-g-api"
+    },
+    {
+     "workload": "app-h-prod/statefulset/app-h-mysql",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/statefulset/app-h-qdrant",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-i-prod/statefulset/app-i-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-i"
+    },
+    {
+     "workload": "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "app-a-prod/daemonset/app-a-sandbox-prepull",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "kube-system/daemonset/nvidia-device-plugin",
+     "managed_by": "argocd",
+     "argocd_app": "nvidia"
+    },
+    {
+     "workload": "monitoring/daemonset/kube-prometheus-stack-prometheus-node-exporter",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-a-postgres-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-a-sandbox-watchdog",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-ae-en",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-ae-ja",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-af-day",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-af-month",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-af-week",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-ag-global",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-ag-global-eu",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-ag-japan",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-ag-japan-noon",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/umami-report-day",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/umami-report-month",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/umami-report-week",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-ga4-digest-day",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-ga4-digest-month",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-ga4-digest-week",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-policy-radar",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-postgres-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-postgres-mx-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-mx"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-postgres-vn-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-vn"
+    },
+    {
+     "workload": "app-g-api/cronjob/app-g-postgres-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-g-api"
+    },
+    {
+     "workload": "app-h-prod/cronjob/app-h-mysql-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-i-prod/cronjob/app-i-postgres-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-i"
     }
    ],
    "unmanaged_prod": [],
@@ -39413,15 +40752,15 @@
    "prod_without_request": [
     "app-a-prod/cronjob/app-a-postgres-backup",
     "app-a-prod/cronjob/app-a-sandbox-watchdog",
-    "app-a-prod/cronjob/marketing-autopost-en",
-    "app-a-prod/cronjob/marketing-autopost-ja",
-    "app-a-prod/cronjob/marketing-digest-day",
-    "app-a-prod/cronjob/marketing-digest-month",
-    "app-a-prod/cronjob/marketing-digest-week",
-    "app-a-prod/cronjob/marketing-radar-global",
-    "app-a-prod/cronjob/marketing-radar-global-eu",
-    "app-a-prod/cronjob/marketing-radar-japan",
-    "app-a-prod/cronjob/marketing-radar-japan-noon",
+    "app-a-prod/cronjob/app-ae-en",
+    "app-a-prod/cronjob/app-ae-ja",
+    "app-a-prod/cronjob/app-af-day",
+    "app-a-prod/cronjob/app-af-month",
+    "app-a-prod/cronjob/app-af-week",
+    "app-a-prod/cronjob/app-ag-global",
+    "app-a-prod/cronjob/app-ag-global-eu",
+    "app-a-prod/cronjob/app-ag-japan",
+    "app-a-prod/cronjob/app-ag-japan-noon",
     "app-a-prod/cronjob/umami-report-day",
     "app-a-prod/cronjob/umami-report-month",
     "app-a-prod/cronjob/umami-report-week",
@@ -40872,7 +42211,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-autopost-en",
+     "workload": "app-a-prod/cronjob/app-ae-en",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -40885,7 +42224,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-autopost-ja",
+     "workload": "app-a-prod/cronjob/app-ae-ja",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -40898,7 +42237,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-day",
+     "workload": "app-a-prod/cronjob/app-af-day",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -40911,7 +42250,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-month",
+     "workload": "app-a-prod/cronjob/app-af-month",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -40924,7 +42263,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-week",
+     "workload": "app-a-prod/cronjob/app-af-week",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -40937,7 +42276,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-global",
+     "workload": "app-a-prod/cronjob/app-ag-global",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -40950,7 +42289,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-global-eu",
+     "workload": "app-a-prod/cronjob/app-ag-global-eu",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -40963,7 +42302,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-japan",
+     "workload": "app-a-prod/cronjob/app-ag-japan",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -40976,7 +42315,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-japan-noon",
+     "workload": "app-a-prod/cronjob/app-ag-japan-noon",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -41277,15 +42616,15 @@
     "app-a-prod/daemonset/app-a-sandbox-prepull",
     "app-a-prod/cronjob/app-a-postgres-backup",
     "app-a-prod/cronjob/app-a-sandbox-watchdog",
-    "app-a-prod/cronjob/marketing-autopost-en",
-    "app-a-prod/cronjob/marketing-autopost-ja",
-    "app-a-prod/cronjob/marketing-digest-day",
-    "app-a-prod/cronjob/marketing-digest-month",
-    "app-a-prod/cronjob/marketing-digest-week",
-    "app-a-prod/cronjob/marketing-radar-global",
-    "app-a-prod/cronjob/marketing-radar-global-eu",
-    "app-a-prod/cronjob/marketing-radar-japan",
-    "app-a-prod/cronjob/marketing-radar-japan-noon",
+    "app-a-prod/cronjob/app-ae-en",
+    "app-a-prod/cronjob/app-ae-ja",
+    "app-a-prod/cronjob/app-af-day",
+    "app-a-prod/cronjob/app-af-month",
+    "app-a-prod/cronjob/app-af-week",
+    "app-a-prod/cronjob/app-ag-global",
+    "app-a-prod/cronjob/app-ag-global-eu",
+    "app-a-prod/cronjob/app-ag-japan",
+    "app-a-prod/cronjob/app-ag-japan-noon",
     "app-a-prod/cronjob/umami-report-day",
     "app-a-prod/cronjob/umami-report-month",
     "app-a-prod/cronjob/umami-report-week",
@@ -41489,18 +42828,22 @@
       "marketing_autopost.py:resource_owner_secret"
      ],
      "mounted_by": [
-      "app-a-prod/cronjob/marketing-autopost-en",
-      "app-a-prod/cronjob/marketing-autopost-ja",
-      "app-a-prod/cronjob/marketing-digest-day",
-      "app-a-prod/cronjob/marketing-digest-month",
-      "app-a-prod/cronjob/marketing-digest-week",
-      "app-a-prod/cronjob/marketing-radar-global"
+      "app-a-prod/cronjob/app-ae-en",
+      "app-a-prod/cronjob/app-ae-ja",
+      "app-a-prod/cronjob/app-af-day",
+      "app-a-prod/cronjob/app-af-month",
+      "app-a-prod/cronjob/app-af-week",
+      "app-a-prod/cronjob/app-ag-global",
+      "app-a-prod/cronjob/app-ag-global-eu",
+      "app-a-prod/cronjob/app-ag-japan",
+      "app-a-prod/cronjob/app-ag-japan-noon",
+      "app-a-prod/deployment/app-m"
      ]
     },
     {
      "namespace": "default",
-     "name": "poca-finder-backend-config",
-     "target": "default/configmap/poca-finder-backend-config",
+     "name": "app-ak-finder-backend-config",
+     "target": "default/configmap/app-ak-finder-backend-config",
      "prod": false,
      "keys": [
       "JWT_RELAY_SECRET",
@@ -42679,7 +44022,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-japan-noon",
+     "target": "app-a-prod/cronjob/app-ag-japan-noon",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -42727,7 +44070,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-month",
+     "target": "app-a-prod/cronjob/app-af-month",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -42743,7 +44086,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-global-eu",
+     "target": "app-a-prod/cronjob/app-ag-global-eu",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -42775,7 +44118,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-japan",
+     "target": "app-a-prod/cronjob/app-ag-japan",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -42855,7 +44198,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-autopost-en",
+     "target": "app-a-prod/cronjob/app-ae-en",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -42871,7 +44214,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-global",
+     "target": "app-a-prod/cronjob/app-ag-global",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -42887,7 +44230,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-day",
+     "target": "app-a-prod/cronjob/app-af-day",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -42919,7 +44262,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-autopost-ja",
+     "target": "app-a-prod/cronjob/app-ae-ja",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -42951,7 +44294,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-week",
+     "target": "app-a-prod/cronjob/app-af-week",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -43179,7 +44522,7 @@
      "security_warning": []
     },
     {
-     "target": "default/configmap/poca-finder-backend-config",
+     "target": "default/configmap/app-ak-finder-backend-config",
      "namespace": "default",
      "prod": false,
      "security_danger": [
@@ -43473,24 +44816,24 @@
     "app-f-prod/statefulset/app-f-postgres",
     "app-a-prod/statefulset/app-a-postgres",
     "app-a-prod/cronjob/app-a-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan-noon",
+    "app-a-prod/cronjob/app-ag-japan-noon",
     "app-f-prod/cronjob/app-f-postgres-mx-backup",
     "app-h-prod/cronjob/app-h-mysql-backup",
-    "app-a-prod/cronjob/marketing-digest-month",
-    "app-a-prod/cronjob/marketing-radar-global-eu",
+    "app-a-prod/cronjob/app-af-month",
+    "app-a-prod/cronjob/app-ag-global-eu",
     "app-f-prod/cronjob/app-f-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan",
+    "app-a-prod/cronjob/app-ag-japan",
     "app-f-prod/cronjob/app-f-ga4-digest-month",
     "app-a-prod/cronjob/umami-report-week",
     "app-f-prod/cronjob/app-f-ga4-digest-week",
     "app-f-prod/cronjob/app-f-postgres-vn-backup",
-    "app-a-prod/cronjob/marketing-autopost-en",
-    "app-a-prod/cronjob/marketing-radar-global",
-    "app-a-prod/cronjob/marketing-digest-day",
+    "app-a-prod/cronjob/app-ae-en",
+    "app-a-prod/cronjob/app-ag-global",
+    "app-a-prod/cronjob/app-af-day",
     "app-f-prod/cronjob/app-f-ga4-digest-day",
-    "app-a-prod/cronjob/marketing-autopost-ja",
+    "app-a-prod/cronjob/app-ae-ja",
     "app-a-prod/cronjob/app-a-sandbox-watchdog",
-    "app-a-prod/cronjob/marketing-digest-week",
+    "app-a-prod/cronjob/app-af-week",
     "app-i-prod/cronjob/app-i-postgres-backup",
     "app-f-prod/cronjob/app-f-policy-radar",
     "app-a-prod/cronjob/umami-report-day",
@@ -43564,24 +44907,24 @@
     "registry/statefulset/registry",
     "app-a-prod/statefulset/app-a-postgres",
     "app-a-prod/cronjob/app-a-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan-noon",
+    "app-a-prod/cronjob/app-ag-japan-noon",
     "app-f-prod/cronjob/app-f-postgres-mx-backup",
     "app-h-prod/cronjob/app-h-mysql-backup",
-    "app-a-prod/cronjob/marketing-digest-month",
-    "app-a-prod/cronjob/marketing-radar-global-eu",
+    "app-a-prod/cronjob/app-af-month",
+    "app-a-prod/cronjob/app-ag-global-eu",
     "app-f-prod/cronjob/app-f-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan",
+    "app-a-prod/cronjob/app-ag-japan",
     "app-f-prod/cronjob/app-f-ga4-digest-month",
     "app-a-prod/cronjob/umami-report-week",
     "app-f-prod/cronjob/app-f-ga4-digest-week",
     "app-f-prod/cronjob/app-f-postgres-vn-backup",
-    "app-a-prod/cronjob/marketing-autopost-en",
-    "app-a-prod/cronjob/marketing-radar-global",
-    "app-a-prod/cronjob/marketing-digest-day",
+    "app-a-prod/cronjob/app-ae-en",
+    "app-a-prod/cronjob/app-ag-global",
+    "app-a-prod/cronjob/app-af-day",
     "app-f-prod/cronjob/app-f-ga4-digest-day",
-    "app-a-prod/cronjob/marketing-autopost-ja",
+    "app-a-prod/cronjob/app-ae-ja",
     "app-a-prod/cronjob/app-a-sandbox-watchdog",
-    "app-a-prod/cronjob/marketing-digest-week",
+    "app-a-prod/cronjob/app-af-week",
     "app-i-prod/cronjob/app-i-postgres-backup",
     "app-f-prod/cronjob/app-f-policy-radar",
     "app-a-prod/cronjob/umami-report-day",
@@ -43598,7 +44941,7 @@
     "kube-system/deployment/coredns",
     "/clusterrolebinding/argocd-server",
     "/clusterrolebinding/keda-operator",
-    "default/configmap/poca-finder-backend-config",
+    "default/configmap/app-ak-finder-backend-config",
     "app-a-prod/rolebinding/app-a-sandbox-manager",
     "app-a-prod/role/app-a-sandbox-manager",
     "monitoring/role/kube-prometheus-stack-grafana",
@@ -45476,7 +46819,7 @@
    "nodes_saturated_7d": [],
    "burst_tenants": [],
    "throttled_prod": [],
-   "top_cpu_share": [
+   "cpu_share": [
     {
      "namespace": "app-a-prod",
      "kind": "prod",
@@ -45522,6 +46865,114 @@
     {
      "namespace": "app-i-prod",
      "kind": "prod",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "app-k",
+     "kind": "other",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "app-l-prod",
+     "kind": "prod",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "app-n",
+     "kind": "other",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "arc-systems",
+     "kind": "ci",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "argocd",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "cert-manager",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "default",
+     "kind": "other",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "external-secrets",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "ingress-nginx",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "keda",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "kube-node-lease",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "kube-public",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "kube-system",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "logging",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "metallb-system",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "monitoring",
+     "kind": "system",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "registry",
+     "kind": "other",
+     "cpu_p95_7d": null,
+     "share": null
+    },
+    {
+     "namespace": "reloader",
+     "kind": "system",
      "cpu_p95_7d": null,
      "share": null
     }
@@ -46175,8 +47626,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "app-a-marketing-radar-git",
-     "target": "app-a-prod/externalsecret/app-a-marketing-radar-git",
+     "name": "app-a-app-ag-git",
+     "target": "app-a-prod/externalsecret/app-a-app-ag-git",
      "prod": true,
      "store": "aws-secret-store",
      "store_kind": "ClusterSecretStore",
@@ -47146,6 +48597,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-a-prod",
      "chart": null,
      "target_revision": "HEAD",
@@ -47178,6 +48630,7 @@
      "dest_namespace": "arc-systems",
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "infra/arc-runners",
      "chart": null,
      "target_revision": "main",
@@ -47208,6 +48661,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-b-prod",
      "chart": null,
      "target_revision": "HEAD",
@@ -47240,6 +48694,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-c",
      "chart": null,
      "target_revision": "HEAD",
@@ -47272,6 +48727,7 @@
      "dest_namespace": null,
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-d",
      "chart": null,
      "target_revision": "HEAD",
@@ -47304,6 +48760,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-f-kr",
      "chart": null,
      "target_revision": "HEAD",
@@ -47336,6 +48793,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-f-mx",
      "chart": null,
      "target_revision": "HEAD",
@@ -47368,6 +48826,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-f-shared",
      "chart": null,
      "target_revision": "HEAD",
@@ -47400,6 +48859,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-f-vn",
      "chart": null,
      "target_revision": "HEAD",
@@ -47432,6 +48892,7 @@
      "dest_namespace": null,
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-g-api",
      "chart": null,
      "target_revision": "HEAD",
@@ -47464,6 +48925,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-h",
      "chart": null,
      "target_revision": "HEAD",
@@ -47496,6 +48958,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-i",
      "chart": null,
      "target_revision": "HEAD",
@@ -47528,6 +48991,7 @@
      "dest_namespace": "monitoring",
      "prod": false,
      "repo": "https://prometheus-community.github.io/helm-charts",
+     "repo_url": "https://prometheus-community.github.io/helm-charts",
      "path": null,
      "chart": "kube-prometheus-stack",
      "target_revision": "79.5.0",
@@ -47561,6 +49025,7 @@
      "dest_namespace": "kube-system",
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "infra/nvidia",
      "chart": null,
      "target_revision": "main",
@@ -47591,6 +49056,7 @@
      "dest_namespace": null,
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-k",
      "chart": null,
      "target_revision": "HEAD",
@@ -47623,6 +49089,7 @@
      "dest_namespace": "argocd",
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "argocd-apps",
      "chart": null,
      "target_revision": "HEAD",
@@ -47653,6 +49120,7 @@
      "dest_namespace": null,
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-n",
      "chart": null,
      "target_revision": "HEAD",
@@ -47687,6 +49155,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-l-prod",
      "chart": null,
      "target_revision": "HEAD",
@@ -48162,9 +49631,9 @@
    {
     "pv": "pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c",
     "namespace": "default",
-    "pvc": "data-k-quiz-db-0",
+    "pvc": "data-app-ah-db-0",
     "node": "node-b",
-    "path": "/var/lib/rancher/k3s/storage/pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c_default_data-k-quiz-db-0",
+    "path": "/var/lib/rancher/k3s/storage/pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c_default_data-app-ah-db-0",
     "reclaim": "Delete",
     "phase": "Bound",
     "capacity": "10Gi",
@@ -48529,7 +49998,7 @@
     {
      "pv": "pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c",
      "namespace": "default",
-     "pvc": "data-k-quiz-db-0",
+     "pvc": "data-app-ah-db-0",
      "node": "node-b",
      "storage_class": "local-path",
      "capacity_mb": 10240,

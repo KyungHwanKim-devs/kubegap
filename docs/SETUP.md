@@ -26,12 +26,15 @@ Without a connection, only the checks that need it are left out, and the report 
 
 | Question | Asked when | Choices |
 |---|---|---|
+| `scale` | the config has no `scale` and the question was never answered for this cluster | Small · Medium · Large |
 | `home-mode` | a folder under `~/.kubegap` is readable by other users of the machine (created by an older kubegap or widened by hand) | Fix now (`kubegap protect-home`, chmod 700) · Leave it |
 | `tools` | optional tools are not installed | Install all · Skip · or type the names to install only those |
 | `ssm-document` | EKS, and the SSM document is missing or older than the one shipped with kubegap | Upload · Skip |
 | `node-ssh` | k3s, RKE2 or an unrecognized platform, and the config names no node access (`ssh:` block or `node_access`) | Check SSH now · Skip. If nodes do not answer: Accept host keys or Check again · Use the rest · Skip · or type an address per node |
 | `grafana-token` | Grafana was found, no token is set, and either no dashboard or datasource ConfigMap exists for the sidecars or Grafana counts more dashboards than those ConfigMaps hold | Show how · Skip |
 | `stores` | Prometheus, Alertmanager, Loki or Grafana has no Service in the cluster. Loki is left out when the log shipper's configuration (fluent-bit, fluentd, promtail) says the logs go elsewhere; the report then says where | Not installed · Ask next time · or type the address |
+
+A daily audit asks the first two only (`scale` and `home-mode`): it reads no node, calls no AWS API and runs no extra tool, so the other questions wait for the first full audit.
 
 An answer is remembered per cluster in `~/.kubegap/snapshots/<context>/answers.json`. A skipped question is not asked again, and the report names what was skipped. `/kubegap setup` asks everything again.
 
@@ -46,7 +49,7 @@ scripts/kubegap answer --context <name> --forget     # forget every answer of th
 
 ## Inside the nodes
 
-Disk, inodes, the kernel log, the kubelet configuration and the container runtime are not visible through the Kubernetes API. kubegap reads them on the node with a fixed list of read commands, [`deploy/node-access/COMMANDS.md`](../deploy/node-access/COMMANDS.md). This is the only part that may need something prepared outside your machine. A full run uses it for the node checks. A daily run uses it only to read the `/metrics` of a component that Prometheus does not scrape and the API server proxy cannot reach.
+Disk, inodes, the kernel log, the kubelet configuration and the container runtime are not visible through the Kubernetes API. kubegap reads them on the node with a fixed list of read commands, [`deploy/node-access/COMMANDS.md`](../deploy/node-access/COMMANDS.md). This is the only part that may need something prepared outside your machine. Only a full run uses it. A daily run contacts no node, even when access is set up.
 
 **EKS.** Nodes are read through SSM. The commands are fixed in one SSM document, [`deploy/permissions/ssm-document.yaml`](../deploy/permissions/ssm-document.yaml), which has to exist in the account. The first run offers to upload it. That one call uses your current credentials and needs `ssm:CreateDocument`, `ssm:UpdateDocument`, `ssm:UpdateDocumentDefaultVersion` and `ssm:ListDocumentVersions`; the audit itself does not need them. The node IAM role must include `AmazonSSMManagedInstanceCore`. The EKS-optimized AMI already runs the SSM agent.
 
@@ -75,13 +78,13 @@ helm, krr, polaris, pluto and kubent are looked up on your `PATH`. On EKS so is 
 <!-- tools-table:begin -->
 | Tool | What it does | Checks that need it | Mode | Install method and location | Without it |
 |---|---|---|---|---|---|
-| aws | EKS, EC2, SSM and CloudWatch queries (needed only for the EKS profile) | eks.* (11), ecr.* (8), cost.idle-compute-high, cost.request-waste, cost.on-demand-in-spot-pool, cost.unused-eip, cost.idle-load-balancer, cost.idle-node, controlplane.scheduler-unschedulable, controlplane.webhook-call-failures, controlplane.controller-error-repeat, controlplane.apiserver-slow-traces, controlplane.authenticator-failures, controlplane.etcd-slow, node.* (26, full mode) | daily and full; ECR, the control-plane logs, the nodes and the pricing and cost data in full only | Homebrew `awscli` → on failure: the pinned release 2.39.3 from awscli.amazonaws.com, sha256 + OpenPGP signature checked, into `.tools/bin/`, linux only | the EKS, ECR and cost checks are not collected; the control-plane log checks and the node checks say so in the report |
+| aws | EKS, EC2, SSM and CloudWatch queries (needed only on EKS) | eks.* (11), ecr.* (8), cost.idle-compute-high, cost.request-waste, cost.on-demand-in-spot-pool, cost.unused-eip, cost.idle-load-balancer, cost.idle-node, controlplane.scheduler-unschedulable, controlplane.webhook-call-failures, controlplane.controller-error-repeat, controlplane.apiserver-slow-traces, controlplane.authenticator-failures, controlplane.etcd-slow, node.* (26, full mode) | full. A daily audit calls no AWS API; on EKS kubectl itself still runs `aws eks get-token` to log in | Homebrew `awscli` → on failure: the pinned release 2.39.3 from awscli.amazonaws.com, sha256 + OpenPGP signature checked, into `.tools/bin/`, linux only | the EKS, ECR and cost checks are not collected; the control-plane log checks and the node checks say so in the report |
 | helm | Helm release status and age (reads release records, which Helm stores in Secrets) | hygiene.helm-release-not-deployed, hygiene.helm-release-stale | full | Homebrew `helm` → on failure: the pinned release v4.3.1 from get.helm.sh, sha256 checked, into `.tools/bin/` | those checks are reported as tool missing |
 | krr | Resource request recommendations (Robusta KRR, Prometheus-based) | resources.krr-recommendation | full | a Python virtualenv of its own, `.tools/krr-venv/`, from `deploy/krr-requirements.txt` (a sha256 per file) → on failure: Homebrew `robusta-dev/krr/krr` (third-party tap) | those checks are reported as tool missing |
 | polaris | Static manifest audit and lightweight security checks | hygiene.polaris-reliability-danger, security.polaris-security-danger | full | the pinned release v10.2.6 from FairwindsOps/polaris, sha256 checked, into `.tools/bin/` → on failure: Homebrew `FairwindsOps/tap/polaris` (third-party tap) | those checks are reported as tool missing |
 | pluto | Deprecated API detection | hygiene.deprecated-api | full | the pinned release v5.24.5 from FairwindsOps/pluto, sha256 checked, into `.tools/bin/` → on failure: Homebrew `FairwindsOps/tap/pluto` (third-party tap) | those checks skip because their input is not read (never a pass) |
 | kubent | Deprecated API detection (complements Pluto) | hygiene.deprecated-api | full | Homebrew `kubent` → on failure: the pinned release 0.7.3 from doitintl/kube-no-trouble, sha256 checked, into `.tools/bin/` | those checks skip because their input is not read (never a pass) |
-| ssh | Small k3s cluster node access (small k3s cluster profile) | node.* (26, full mode) | full | Included by default on macOS and most Linux. Minimal images (slim containers) may lack it: distro package openssh-client | the node checks are reported as not collected (no node access) |
+| ssh | Node access on k3s and RKE2 | node.* (26, full mode) | full | Included by default on macOS and most Linux. Minimal images (slim containers) may lack it: distro package openssh-client | the node checks are reported as not collected (no node access) |
 <!-- tools-table:end -->
 
 An install goes through Homebrew when it is there. Otherwise kubegap downloads the release binary of a version pinned in `lib/commands/tools.py`, compares it with the sha256 pinned next to it, and puts it in `.tools/bin/` inside the kubegap folder only when the digest matches. polaris and pluto come from a third-party tap, so for those two the pinned download goes first. krr is installed into its own Python virtualenv from `deploy/krr-requirements.txt`, which pins every package it needs with a sha256 per file (`pip install --require-hashes`); that virtualenv goes before the third-party tap formula. On Linux the aws CLI zip is also checked against the AWS CLI Team's OpenPGP signature when `gpg` is installed (the key is `deploy/aws-cli-public-key.asc`); without gpg the sha256 pin alone decides and the install says so. Nothing asks a publisher what is newest during an install; `scripts/kubegap setup --check-tool-updates` does that and prints the material of the next pin.
@@ -115,11 +118,11 @@ The keys that answer a first-run question for good:
 
 **What is read without a token.** The Grafana chart's sidecars load dashboards and datasources from ConfigMaps labelled `grafana_dashboard` and `grafana_datasource`; kube-prometheus-stack ships its dashboards that way. kubegap keeps those ConfigMaps in the snapshot (the dashboard JSON as is; of a datasource file only name, type, url and isDefault per entry, never a password or a header) and takes the two lists and the alert-metric-without-dashboard comparison from them. Grafana's own metric `grafana_stat_totals_dashboard`, read from its `/metrics` endpoint through the same port-forward (no login needed) or from a Prometheus that scrapes Grafana, says how many dashboards exist in all; when that is more than the ConfigMaps hold, the difference was made in Grafana itself and the first-run question asks for a token with those numbers. kubegap never reads the Grafana admin password.
 
-Other things the file holds: `mode: full` to make full the default, `profile` and `namespace_profiles` to change what kubegap expects of a cluster or a namespace, `suppress` and `overrides` to silence a check or change a threshold, `retention` and `snapshots_root` for the collected data, `keep_component_logs`, `apiserver_job`.
+Other things the file holds: `mode: full` to make full the default, `scale` (small, medium or large) to fix the scale without the question and `dev_namespaces` to name namespaces that are not production, `suppress` and `overrides` to silence a check or change a threshold, `retention` and `snapshots_root` for the collected data, `apiserver_job`.
 
 ## Collected data
 
-Every run writes one folder, `~/.kubegap/snapshots/<context>/<timestamp>/`, with the collected files and the two report files, and compares itself with the previous run of the same mode. Folders and files are created readable by your user only. A full snapshot is about 40 MB.
+Every run writes one folder, `~/.kubegap/snapshots/<context>/<timestamp>/`, with the collected files and the report (`report.md`, and after a full audit `report-details.md` too), and compares itself with the previous run of the same mode. Folders and files are created readable by your user only. A full snapshot is about 40 MB and a daily one about 20 MB.
 
 ```bash
 scripts/kubegap prune --context <name> --keep-daily 14 --keep-full 4 --dry-run
@@ -133,10 +136,10 @@ For a first run before security approval, or on a cluster where you may read onl
 
 ```yaml
 # ~/.kubegap/config.yaml
-mode: daily          # no node scripts, no CloudWatch logs, no cost data, no external tools
+mode: daily          # no node, no AWS API call, no extra tool; no command, args, environment value or ConfigMap key of an application is kept
 node_access: none    # no SSM send-command, no SSH
 install_tools: never # nothing is installed on this machine
-# no grafana_api_token: the Grafana datasource and dashboard lists are not read
+# no grafana_api_token: dashboards made in Grafana itself are not listed (those loaded from ConfigMaps are)
 ```
 
 Give the kubeconfig a dedicated user bound to the shipped ClusterRole, [`deploy/permissions/clusterrole.yaml`](../deploy/permissions/clusterrole.yaml), which is `get` and `list` plus `create` on `pods/portforward`, and excludes Secrets. On EKS attach the IAM policy without its two `ssm:SendCommand` statements. kubegap prints it with your account and cluster filled in:
@@ -155,7 +158,8 @@ What that run cannot see, each reported as "not collected" or "skipped" and neve
 - the 26 `node.*` checks that read the node scripts and the kubelet configuration. The 10 that read Prometheus node metrics keep running;
 - the two Helm checks, `hygiene.helm-release-not-deployed` and `hygiene.helm-release-stale`;
 - the six control-plane log checks on EKS: `controlplane.scheduler-unschedulable`, `webhook-call-failures`, `controller-error-repeat`, `apiserver-slow-traces`, `authenticator-failures`, `etcd-slow`;
-- the checks that read cost data, ECR, service quotas and EBS metrics;
+- every check that reads the AWS account: cost, ECR, service quotas, EBS, load balancer settings and metrics, backup policies. A daily audit calls no AWS API, so it needs no IAM policy at all;
+- the checks that read how applications are configured: whether a database has a backup job, a credential written into a ConfigMap, a JVM heap larger than its limit;
 - the krr, polaris, pluto and kubent results;
 - the node-side read of `/metrics` for components Prometheus does not scrape. Their `*.metrics-unreadable` check warns when the API server proxy is blocked as well.
 

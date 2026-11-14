@@ -5,7 +5,6 @@
   type: summary
   each: metallb.pools
   cluster_level: true
-  profiles: [prod, lab]
   rule:
     needs: "item.get('present')"
     needs_reason: "pools not present"
@@ -20,7 +19,7 @@
   verify:
     - "kubectl get ipaddresspools -A -o yaml; kubectl get svc -A --field-selector spec.type=LoadBalancer"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -81,7 +80,6 @@
   type: summary
   each: metallb.l2
   cluster_level: true
-  profiles: [prod, lab]
   rule:
     needs: "'available' in item and not item.get('partial') and ((item['available'] and (item.get('announced_total') or 0) > 0) or (not item['available'] and not item.get('metrics_tls_only')))"
     needs_reason: "no L2 announcement to judge, or L2 leaders not read or read from only some speakers (metrics over TLS with authentication and no status resources)"
@@ -299,7 +297,6 @@
   suggest: "kubectl -n metallb-system get ds speaker; check node taints (the speaker needs tolerations) and nodeSelector."
   verify:
     - "kubectl -n metallb-system get pods -o wide"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "skip"
@@ -922,7 +919,6 @@
   verify:
     - "Up to 0.15: kubectl get --raw /api/v1/namespaces/metallb-system/pods/<speaker-pod>:7472/proxy/metrics | grep metallb_k8s_client"
     - "From 0.15.3: kubectl get configurationstates.metallb.io -n metallb-system"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1334,7 +1330,6 @@
   suggest: "BGP mode (if the router supports it), or externalTrafficPolicy Local plus one service IP per node. For a small k3s cluster, record 'leader node = X, about 10 s outage if it dies' in the report."
   verify:
     - "kubectl get svc -A --field-selector spec.type=LoadBalancer; kubectl -n metallb-system get servicel2statuses.metallb.io -o wide"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -1597,7 +1592,6 @@
   suggest: "Upgrade the metallb Helm chart. CRD changes are in the release notes."
   verify:
     - "kubectl -n metallb-system get ds speaker -o jsonpath='{.spec.template.spec.containers[?(@.name==\"speaker\")].image}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -1750,7 +1744,6 @@
   area: traffic
   type: summary
   each: metallb.pools.services
-  profiles: [prod, lab]
   rule:
     needs: "item.get('pending') or item.get('announcers_read') or item.get('pool_advertised') == []"
     needs_reason: "the announcing nodes were not read (speaker metrics from only some speakers, status objects not written before 0.14.6, ServiceBGPStatus not before 0.15.0) and the pool has an advertisement or the IP is in no IPAddressPool, so the config alone does not decide"
@@ -1775,7 +1768,7 @@
     - "kubectl get servicel2statuses,servicebgpstatuses -A   # 0.14.6 and later: one object per announcing node and Service"
     - "arping -c 3 <EXTERNAL-IP>   # L2 mode, from a host on the same network"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"   # announcers read, nobody announces
         item:
@@ -1836,7 +1829,6 @@
   type: summary
   each: metallb.summary
   cluster_level: true
-  profiles: [prod, lab]
   rule:
     needs: "not item.get('bgp_peers') or item.get('bgp_sessions_read')"
     needs_reason: "BGP peers are configured but no session state was read: the speaker metrics answer in native mode through 0.15 when every speaker was read, BGPSessionState objects in frr-k8s mode from 0.15.2 (group frrk8s.metallb.io), Prometheus when it scrapes metallb_bgp_session_up or frrk8s_bgp_session_up"
@@ -1860,7 +1852,7 @@
     - "kubectl logs -n metallb-system -l component=speaker --since=1h | grep -i 'bgp'"
     - "metallb_bgp_session_up == 0 or frrk8s_bgp_session_up == 0   # in Prometheus, when it scrapes MetalLB"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:

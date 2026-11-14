@@ -45,7 +45,7 @@ def _controller(snap: Path, ctrl: dict | None) -> dict:
             "sidecar_timeouts": timeouts,
             "batching": any(a == "--batching=true" for a in plugin_args),
             "metrics_flag": any("metrics" in a for a in plugin_args),
-            "plugin_args": plugin_args[:12],
+            "plugin_args": plugin_args,
             "priority_class": tpl.get("priorityClassName"),
             "anti_affinity": bool((tpl.get("affinity") or {}).get("podAntiAffinity")),
             "pods_by_node": {},
@@ -150,7 +150,7 @@ def _volume_attachments(snap: Path, inv: dict, now: _dt.datetime) -> dict:
         )
     stuck = [r for r in va_rows if (not r["attached"] and (r["age_min"] or 0) >= 10) or r["error"]]
     orphan = [r for r in va_rows if r["pv_missing"] or r["node_missing"]]
-    return {"count": len(va_rows), "rows": va_rows[:40], "stuck": stuck, "orphan": orphan}
+    return {"count": len(va_rows), "rows": va_rows, "stuck": stuck, "orphan": orphan}
 
 
 def _storage_classes(snap: Path) -> list[dict]:
@@ -254,7 +254,7 @@ def _summary(controller: dict, node: dict, windows: dict | None, credentials: di
         "sidecar_timeouts": controller.get("sidecar_timeouts"),
         "volume_attachments": va["count"],
         "va_stuck": [r["name"] for r in va["stuck"]],
-        "va_stuck_detail": va["stuck"][:6],
+        "va_stuck_detail": va["stuck"],
         "va_orphan": [r["name"] for r in va["orphan"]],
         "classes": len(classes),
         "classes_unencrypted": [c["name"] for c in classes if not c["encrypted"] and not c["intree"]],

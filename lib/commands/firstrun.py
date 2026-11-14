@@ -32,7 +32,7 @@ import json
 from pathlib import Path
 
 from ..collection.discover import SSH_PLATFORMS
-from ..foundations import paths, rubric
+from ..foundations import paths, rubric, units
 from ..foundations.config import Config
 from ..foundations.snapshot import load_json, write_private
 from . import tools
@@ -43,6 +43,7 @@ NODE_ACCESS_FILE = "node-access.json"
 STORES = ("prometheus", "alertmanager", "loki", "grafana")
 SKIP = "skip"
 PARTIAL = "partial"  # node-ssh: go on with the nodes that answer
+DAILY_QUESTIONS = ("scale", "home-mode")  # what a daily run asks: the scale the severities are for, and who can read the folder the snapshots go to
 
 
 # ---------- counts taken from the check catalog ----------
@@ -54,9 +55,9 @@ def _checks() -> tuple[dict, ...]:
 
 def node_script_checks() -> int:
     """Checks that read the node scripts or the kubelet configuration: the `node.*` checks a daily run does not collect. The `node.*` metric
-    checks read Prometheus and run without node access. This is the catalog's count; a profile can switch a few of them off (two are for
-    the lab profile only), so the texts say "up to"."""
-    return sum(1 for c in _checks() if c["id"].startswith("node.") and c.get("modes") == ["full"])
+    checks read Prometheus and run without node access. This is the catalog's count; a few of them run on one platform only (two are for
+    k3s), so the texts say "up to"."""
+    return sum(1 for c in _checks() if c["id"].startswith("node.") and units.missing(c.get("needs"), "daily"))
 
 
 # ---------- remembered answers ----------
@@ -107,6 +108,12 @@ def ssh_decision(ctx_dir: Path | None, cfg: Config) -> str:
 # ---------- the questions ----------
 
 
+def scale_decision(ctx_dir: Path | None) -> str | None:
+    """The scale the user chose for this cluster ("small", "medium", "large"), None when the question was never answered. Passed to discovery
+    and evaluation by the command; config.yaml `scale` wins over it there (lib/foundations/rubric.resolve_scale)."""
+    return (load_answers(ctx_dir).get("scale") or {}).get("choice")
+
+
 def _opt(id: str, label: str, description: str, run: list[str] | None = None, *, remember: bool = True, show: list[str] | None = None, config: list[str] | None = None) -> dict:
     """`run`: kubegap arguments the agent runs after this choice (it adds --context). `show`: lines the agent prints for the user, who acts on
     them. `config`: a [key, value] the choice puts into config.yaml, which the agent writes only after showing the dry run and a second
@@ -116,7 +123,7 @@ def _opt(id: str, label: str, description: str, run: list[str] | None = None, *,
 
 
 LANGUAGES = ("en", "ko")
-_AGAIN = {"en": " Not asked again; `/kubegap setup` brings the question back.", "ko": " 다시 묻지 않아요. `/kubegap setup`으로 다시 불러올 수 있어요."}
+_AGAIN = {"en": " Not asked again; `/kubegap setup` brings the question back.", "ko": " 다시 묻지 않습니다. `/kubegap setup`으로 다시 불러올 수 있습니다."}
 
 
 def _skip(L: str, lost: str) -> dict:
@@ -133,6 +140,42 @@ def _n(L: str, n: int, en_one: str, en_many: str, ko: str) -> str:
 # (#173). tests/test_firstrun.py checks the Korean against the translation-pattern list the writing guides use.
 
 
+def _q_scale(setup: dict, cfg: Config, L: str) -> dict | None:
+    """How the cluster is run. One question, asked first, because the answer decides how serious each finding is and how far the suggested
+    fixes go. Closing the window without choosing leaves it open: the run guesses from the node count and the report says it guessed."""
+    if str(cfg.get("scale") or "").lower() in ("small", "medium", "large"):
+        return None
+    if L == "ko":
+        q = {
+            "header": "운영 규모",
+            "question": "이 클러스터는 어떤 규모로 운영하나요?",
+            "explain": "같은 문제라도 규모에 따라 무게가 다릅니다. 답에 맞춰 심각도와 권하는 해결 수준을 정합니다. 애매하면 장애가 났을 때 감당할 수 있는 수준으로 고르세요.",
+            "gain": ["작은 클러스터에 큰 조직 기준을 들이대지 않습니다. 고르지 않으면 노드 수로 짐작하고 리포트에 그렇게 적습니다"],
+            "small": ("소형", "전담 SRE/DevOps 엔지니어 없이 운영하는 작은 클러스터입니다. 개인, 사이드 프로젝트, 소규모 팀."),
+            "medium": ("중형", "운영 담당자가 있고, 실제 사용자가 쓰는 서비스가 올라가 있습니다."),
+            "large": ("대형", "전담 팀이 있고, 장애가 매출이나 계약(SLA)에 바로 영향을 줍니다."),
+        }
+    else:
+        q = {
+            "header": "Scale",
+            "question": "At what scale do you run this cluster?",
+            "explain": "The same finding weighs differently at different scales. The answer sets the severity of each finding and how far the suggested fixes go. If unsure, pick by how much of an outage you could absorb.",
+            "gain": ["a small cluster is not held to a large organization's standard; without an answer the scale is guessed from the node count and the report says so"],
+            "small": ("Small", "A small cluster run without a dedicated SRE or DevOps engineer: personal, side project, small team."),
+            "medium": ("Medium", "Someone is responsible for operations and real users depend on the services."),
+            "large": ("Large", "A dedicated team runs it and an outage hits revenue or a contract (SLA) directly."),
+        }
+    return {
+        "id": "scale",
+        "header": q["header"],
+        "question": q["question"],
+        "explain": q["explain"],
+        "gain": q["gain"],
+        "options": [_opt(k, *q[k]) for k in ("small", "medium", "large")],
+        "typed": None,
+    }
+
+
 def _q_home_mode(setup: dict, cfg: Config, L: str) -> dict | None:
     dirs = (setup.get("machine") or {}).get("open_dirs") or []
     if not dirs:
@@ -142,11 +185,11 @@ def _q_home_mode(setup: dict, cfg: Config, L: str) -> dict | None:
     if L == "ko":
         q = {
             "header": "폴더 권한",
-            "question": f"{top['path']} 폴더를 나만 읽을 수 있게 바꿀까요? 지금은 이 컴퓨터의 다른 사용자도 읽을 수 있어요(권한 {top['mode']}).",
-            "explain": "이 폴더에 점검 결과가 쌓여요. 클러스터에서 읽어 온 오브젝트, 이벤트, 로그 줄이 전부 여기 있어요. kubegap은 이 폴더를 0700으로 만드는데, 이 폴더는 옛 버전이 만들었거나 나중에 권한이 넓어졌어요.",
-            "gain": ["리포트는 달라지지 않아요. 점검 결과를 내 계정만 읽을 수 있게 돼요"],
-            "fix": ("지금 고치기", f"{top['path']} 아래 폴더 {n}개에 chmod 700을 해요. 다른 건 건드리지 않아요."),
-            "leave": ("그대로 두기", "폴더는 지금 그대로예요." + _AGAIN["ko"]),
+            "question": f"{top['path']} 폴더를 나만 읽을 수 있게 바꿀까요? 지금은 이 컴퓨터의 다른 사용자도 읽을 수 있습니다(권한 {top['mode']}).",
+            "explain": "이 폴더에 점검 결과가 쌓입니다. 클러스터에서 읽어 온 오브젝트, 이벤트, 로그 줄이 전부 여기 있습니다. kubegap은 이 폴더를 0700으로 만드는데, 이 폴더는 옛 버전이 만들었거나 나중에 권한이 넓어졌습니다.",
+            "gain": ["리포트는 달라지지 않습니다. 점검 결과를 내 계정만 읽을 수 있게 됩니다"],
+            "fix": ("지금 고치기", f"{top['path']} 아래 폴더 {n}개에 chmod 700을 합니다. 다른 건 건드리지 않습니다."),
+            "leave": ("그대로 두기", "폴더는 지금 그대로입니다." + _AGAIN["ko"]),
         }
     else:
         q = {
@@ -178,14 +221,14 @@ def _q_tools(setup: dict, cfg: Config, L: str) -> dict | None:
         return None
     names = [t["name"] for t in missing]
     if L == "ko":
-        lines = [f"{t['name']}: {t['role']} — {t.get('checks_text') or ', '.join(t['checks'])} 항목에 쓰여요. 설치 방법: {tools.install_plan(tools.by_name(t['name']))}" for t in missing]
+        lines = [f"{t['name']}: {t['role']} — {t.get('checks_text') or ', '.join(t['checks'])} 항목에 쓰입니다. 설치 방법: {tools.install_plan(tools.by_name(t['name']))}" for t in missing]
         q = {
             "header": "도구",
-            "question": f"이 컴퓨터에 없는 선택 도구가 {len(names)}개 있어요: {', '.join(names)}. 설치할까요?",
-            "explain": "도구마다 kubegap이 직접 계산하지 않는 걸 대신 계산해요. 설치는 이 컴퓨터에만 하고, 클러스터에는 아무것도 설치하지 않아요.",
-            "install": ("전부 설치", f"{', '.join(names)}를 설치해요. Homebrew가 있으면 그걸로, 없으면 sha256을 확인한 고정 버전으로요."),
-            "skip": "이 도구들이 맡은 항목은 '도구 없음'으로 적히거나 입력이 없어 건너뛰어요. 나머지는 전부 돌아가요.",
-            "typed": "일부만 설치하려면 도구 이름을 쉼표로 적어 주세요. 그 이름으로 `setup --install-only <이름>`을 돌리고, 나머지는 `skip`으로 기록해요",
+            "question": f"이 컴퓨터에 없는 선택 도구가 {len(names)}개 있습니다: {', '.join(names)}. 설치할까요?",
+            "explain": "도구마다 kubegap이 직접 계산하지 않는 걸 대신 계산합니다. 설치는 이 컴퓨터에만 하고, 클러스터에는 아무것도 설치하지 않습니다.",
+            "install": ("전부 설치", f"{', '.join(names)}를 설치합니다. Homebrew가 있으면 그걸로, 없으면 sha256을 확인한 고정 버전으로요."),
+            "skip": "이 도구들이 맡은 항목은 '도구 없음'으로 적히거나 입력이 없어 건너뜁니다. 나머지는 전부 돌아갑니다.",
+            "typed": "일부만 설치하려면 도구 이름을 쉼표로 적어 주세요. 그 이름으로 `setup --install-only <이름>`을 돌리고, 나머지는 `skip`으로 기록합니다",
         }
     else:
         lines = [f"{t['name']}: {t['role']} — feeds {t.get('checks_text') or ', '.join(t['checks'])}; install: {tools.install_plan(tools.by_name(t['name']))}" for t in missing]
@@ -221,11 +264,11 @@ def _q_ssm_document(setup: dict, cfg: Config, L: str) -> dict | None:
     if L == "ko":
         q = {
             "header": "노드 점검",
-            "question": f"노드 안쪽(디스크, 커널 로그, kubelet 설정)을 읽을까요? AWS 계정 {e.get('account')}, 리전 {e.get('region')}에 문서 하나를 {'올려야' if new else '새 버전으로 바꿔야'} 해요.",
-            "explain": "EKS 노드는 SSM으로 읽어요. 노드에서 돌릴 명령은 SSM 문서 kubegap-node-read(deploy/permissions/ssm-document.yaml) 하나에 고정돼 있어요. 그래서 점검용 키로는 그 읽기 명령만 돌릴 수 있고 다른 건 못 해요. 올리는 건 지금 자격 증명으로 호출 한 번이고 ssm:CreateDocument 권한이 필요해요.",
-            "gain": [f"full 점검에서 노드 점검 항목이 최대 {n}개 늘어요. Prometheus가 긁지 않는 컴포넌트 메트릭도 노드 쪽에서 읽어요"],
-            "upload": ("올리기" if new else "새 버전으로 바꾸기", f"문서 kubegap-node-read를 {'올려요' if new else '새 버전으로 바꿔요'}. 노드에서는 아무것도 바뀌지 않아요."),
-            "skip": "노드 점검 항목은 '노드 접근 없음'으로 적혀요.",
+            "question": f"노드 안쪽(디스크, 커널 로그, kubelet 설정)을 읽을까요? AWS 계정 {e.get('account')}, 리전 {e.get('region')}에 문서 하나를 {'올려야' if new else '새 버전으로 바꿔야'} 합니다.",
+            "explain": "EKS 노드는 SSM으로 읽습니다. 노드에서 돌릴 명령은 SSM 문서 kubegap-node-read(deploy/permissions/ssm-document.yaml) 하나에 고정돼 있습니다. 그래서 점검용 키로는 그 읽기 명령만 돌릴 수 있고 다른 건 못 합니다. 올리는 건 지금 자격 증명으로 호출 한 번이고 ssm:CreateDocument 권한이 필요합니다.",
+            "gain": [f"full 점검에서 노드 점검 항목이 최대 {n}개 늘어납니다. Prometheus가 긁지 않는 컴포넌트 메트릭도 노드 쪽에서 읽습니다"],
+            "upload": ("올리기" if new else "새 버전으로 바꾸기", f"문서 kubegap-node-read를 {'올립니다' if new else '새 버전으로 바꿉니다'}. 노드에서는 아무것도 바뀌지 않습니다."),
+            "skip": "노드 점검 항목은 '노드 접근 없음'으로 적힙니다.",
         }
     else:
         verb = "upload" if new else "update"
@@ -258,7 +301,7 @@ def _q_node_ssh(setup: dict, cfg: Config, node_access: dict, L: str, *, again: b
     nodes = c.get("node_count")
     ko = L == "ko"
     gain = (
-        [f"full 점검에서 노드 점검 항목이 최대 {n_checks}개 늘어요. Prometheus가 긁지 않는 컴포넌트 메트릭도 노드 쪽에서 읽어요"]
+        [f"full 점검에서 노드 점검 항목이 최대 {n_checks}개 늘어납니다. Prometheus가 긁지 않는 컴포넌트 메트릭도 노드 쪽에서 읽습니다"]
         if ko
         else [f"up to {n_checks} node checks in a full run, and the node-side read of component metrics that Prometheus does not scrape"]
     )
@@ -268,9 +311,9 @@ def _q_node_ssh(setup: dict, cfg: Config, node_access: dict, L: str, *, again: b
     if not probed or (again and not failed):  # asking again when every node answers: the first form, so the user can still turn it off
         if ko:
             question = f"노드 {nodes}대 안쪽(디스크, 커널 로그, kubelet 설정)을 SSH로 읽을까요?"
-            explain = "이 클러스터의 노드는 SSH로 읽어요. 내가 `ssh`를 칠 때 쓰는 사용자와 키를 그대로 써요. '지금 SSH 확인'을 고르면 노드마다 한 번 접속해서 `uname`과 `hostname`만 돌려요. 노드에 아무것도 쓰지 않아요. 고르기 전에는 SSH 접속을 하지 않아요."
-            check = ("지금 SSH 확인", "노드마다 한 번 접속해서 어느 노드가 답하는지 알려 줘요. 그다음 점검부터 노드를 SSH로 읽어요.")
-            skip = "SSH 접속을 하지 않아요. 노드 점검 항목은 '노드 접근 없음'으로 적혀요."
+            explain = "이 클러스터의 노드는 SSH로 읽습니다. 내가 `ssh`를 칠 때 쓰는 사용자와 키를 그대로 씁니다. '지금 SSH 확인'을 고르면 노드마다 한 번 접속해서 `uname`과 `hostname`만 돌립니다. 노드에 아무것도 쓰지 않습니다. 고르기 전에는 SSH 접속을 하지 않습니다."
+            check = ("지금 SSH 확인", "노드마다 한 번 접속해서 어느 노드가 답하는지 알려 줍니다. 그다음 점검부터 노드를 SSH로 읽습니다.")
+            skip = "SSH 접속을 하지 않습니다. 노드 점검 항목은 '노드 접근 없음'으로 적힙니다."
         else:
             question = f"Read inside the {nodes} node{'s' if nodes != 1 else ''} over SSH (disk, kernel log, kubelet settings)?"
             explain = "On this cluster nodes are read over SSH, with the user and key your own `ssh` would use. Choosing the check connects to each node once and runs `uname` and `hostname`; nothing is written on a node. Until you choose, kubegap makes no SSH connection."
@@ -287,7 +330,7 @@ def _q_node_ssh(setup: dict, cfg: Config, node_access: dict, L: str, *, again: b
                 _opt(
                     "accept-keys",
                     "호스트 키 받아들이기",
-                    "설정 파일에 `ssh.accept_new_hosts: true`를 더해요. 그러면 ssh가 처음 보는 노드의 키를 저장해요. 저장한 키가 나중에 바뀌면 그때는 거부해요.",
+                    "설정 파일에 `ssh.accept_new_hosts: true`를 더합니다. 그러면 ssh가 처음 보는 노드의 키를 저장합니다. 저장한 키가 나중에 바뀌면 그때는 거부합니다.",
                     ["nodes"],
                     remember=False,
                     config=["ssh.accept_new_hosts", "true"],
@@ -305,21 +348,21 @@ def _q_node_ssh(setup: dict, cfg: Config, node_access: dict, L: str, *, again: b
                 )
             )
     elif ko:
-        opts.append(_opt("check", "다시 확인", "직접 뭔가 고친 뒤에 골라요. 한 번 손으로 로그인했거나 키를 더했을 때요.", ["nodes"], remember=False))
+        opts.append(_opt("check", "다시 확인", "직접 뭔가 고친 뒤에 고릅니다. 한 번 손으로 로그인했거나 키를 더했을 때요.", ["nodes"], remember=False))
     else:
         opts.append(_opt("check", "Check again", "For after you fixed something yourself (logged in once by hand, added a key).", ["nodes"], remember=False))
     rest = len(probed) - len(failed)
     if rest:
         if ko:
-            opts.append(_opt(PARTIAL, "답한 노드만 쓰기", f"답한 노드 {rest}대로 계속해요. {', '.join(sorted(failed))}의 노드 점검 항목은 '노드 접근 없음'으로 적혀요."))
+            opts.append(_opt(PARTIAL, "답한 노드만 쓰기", f"답한 노드 {rest}대로 계속합니다. {', '.join(sorted(failed))}의 노드 점검 항목은 '노드 접근 없음'으로 적힙니다."))
         else:
             opts.append(_opt(PARTIAL, "Use the rest", f"Goes on with the {rest} node{'s' if rest != 1 else ''} that answered. The node checks are 'no node access' for {', '.join(sorted(failed))}."))
-    opts.append(_skip(L, "어느 노드에도 SSH 접속을 하지 않아요. 노드 점검 항목은 '노드 접근 없음'으로 적혀요." if ko else "No SSH connection is made to any node. The node checks are reported as 'no node access'."))
+    opts.append(_skip(L, "어느 노드에도 SSH 접속을 하지 않습니다. 노드 점검 항목은 '노드 접근 없음'으로 적힙니다." if ko else "No SSH connection is made to any node. The node checks are reported as 'no node access'."))
     what = "; ".join(f"{n} ({r.get('host')}): {r.get('why')}" for n, r in sorted(failed.items()))
     if ko:
-        question = f"노드 {len(probed)}대 중 {len(failed)}대에 SSH가 닿지 않았어요. 어떻게 할까요?"
-        explain = "노드별로 안 된 이유예요: " + what
-        typed = "나만 아는 값을 항목마다 하나씩 적어 주세요. `<노드>=<주소>`(이 컴퓨터에서 닿는 주소, 예를 들어 Tailscale IP. 로그인 이름이 다르면 `사용자@주소`), `user=<로그인 이름>`, `key=<개인 키 파일 경로>`. 각각 설정 값 `ssh.hosts.<노드>`, `ssh.user`, `ssh.key`로 들어가요. 적고 나면 `nodes`를 다시 돌려요"
+        question = f"노드 {len(probed)}대 중 {len(failed)}대에 SSH가 닿지 않았습니다. 어떻게 할까요?"
+        explain = "노드별로 안 된 이유입니다: " + what
+        typed = "나만 아는 값을 항목마다 하나씩 적어 주세요. `<노드>=<주소>`(이 컴퓨터에서 닿는 주소, 예를 들어 Tailscale IP. 로그인 이름이 다르면 `사용자@주소`), `user=<로그인 이름>`, `key=<개인 키 파일 경로>`. 각각 설정 값 `ssh.hosts.<노드>`, `ssh.user`, `ssh.key`로 들어갑니다. 적고 나면 `nodes`를 다시 돌립니다"
     else:
         question = f"SSH did not reach {len(failed)} of {len(probed)} nodes. How do you want to go on?"
         explain = "What failed, per node: " + what
@@ -352,22 +395,24 @@ def _q_grafana_token(setup: dict, cfg: Config, L: str) -> dict | None:
         q = {
             "header": "Grafana",
             "question": (
-                f"Grafana에 대시보드가 {prov['total']}개 있는데 ConfigMap에서 읽을 수 있는 건 {prov['dashboards']}개예요. 나머지 {prov['unlisted']}개는 Grafana 화면에서 만든 거라 토큰이 있어야 목록에 나와요. 토큰을 넣을까요?"
+                f"Grafana에 대시보드가 {prov['total']}개 있는데 ConfigMap에서 읽을 수 있는 건 {prov['dashboards']}개입니다. 나머지 {prov['unlisted']}개는 Grafana 화면에서 만든 거라 토큰이 있어야 목록에 나옵니다. 토큰을 넣을까요?"
                 if prov
-                else "Grafana의 데이터소스 목록과 대시보드 목록도 읽을까요? 읽기 전용 토큰이 하나 필요해요."
+                else "Grafana의 데이터소스 목록과 대시보드 목록도 읽을까요? 읽기 전용 토큰이 하나 필요합니다."
             ),
-            "explain": "Grafana는 로그인한 쪽에만 이 목록을 보여 줘요. kubegap은 관리자 비밀번호를 읽지 않으니(Secret이에요) 토큰은 직접 만들어 설정 파일에 넣어 주세요. 이 대화에 토큰을 붙여 넣지는 마세요."
-            + (" Helm이 ConfigMap으로 넣은 대시보드와 데이터소스는 토큰 없이도 읽어요." if prov else ""),
+            "explain": "Grafana는 로그인한 쪽에만 이 목록을 보여 줍니다. kubegap은 관리자 비밀번호를 읽지 않으니(Secret입니다) 토큰은 직접 만들어 설정 파일에 넣어 주세요. 이 대화에 토큰을 붙여 넣지는 마세요."
+            + (" Helm이 ConfigMap으로 넣은 대시보드와 데이터소스는 토큰 없이도 읽습니다." if prov else ""),
             "gain": [
-                f"Grafana 화면에서 만든 대시보드 {prov['unlisted']}개가 목록과 알림 대조에 들어가요" if prov else "리포트에 데이터소스 목록과 대시보드 목록이 들어가요. grafana.* 점검 항목은 토큰이 없어도 Grafana 자체 메트릭으로 돌아가요"
+                f"Grafana 화면에서 만든 대시보드 {prov['unlisted']}개가 목록과 알림 대조에 들어갑니다"
+                if prov
+                else "리포트에 데이터소스 목록과 대시보드 목록이 들어갑니다. grafana.* 점검 항목은 토큰이 없어도 Grafana 자체 메트릭으로 돌아갑니다"
             ],
-            "show": ("방법 보기", "세 단계를 보여 줘요. Grafana와 내 편집기에서 직접 해요."),
+            "show": ("방법 보기", "세 단계를 보여 줍니다. Grafana와 내 편집기에서 직접 합니다."),
             "show_lines": [
-                "1. Grafana에 관리자로 들어가서 Viewer 역할의 서비스 계정을 만들고 토큰을 하나 더해요",
-                f"2. 내 편집기로 {cfg_path}에 이 줄을 더해요:  grafana_api_token: <토큰>",
+                "1. Grafana에 관리자로 들어가서 Viewer 역할의 서비스 계정을 만들고 토큰을 하나 더합니다",
+                f"2. 내 편집기로 {cfg_path}에 이 줄을 더합니다:  grafana_api_token: <토큰>",
                 f"3. chmod 600 {cfg_path}",
             ],
-            "skip": f"화면에서 만든 대시보드 {prov['unlisted']}개는 목록에 없고, 리포트에 그렇게 적혀요." if prov else "두 목록은 리포트에 '인증 없음'으로 적혀요.",
+            "skip": f"화면에서 만든 대시보드 {prov['unlisted']}개는 목록에 없고, 리포트에 그렇게 적힙니다." if prov else "두 목록은 리포트에 '인증 없음'으로 적힙니다.",
         }
     else:
         q = {
@@ -403,7 +448,7 @@ _STORE_GAIN = {
         "grafana": "the Grafana health checks",
     },
     "ko": {
-        "prometheus": "PromQL로 보는 점검 항목과 숫자 전부예요. 7일 사용량과 requests 비교, 재시작, 스로틀링, 컨트롤플레인과 컴포넌트 메트릭",
+        "prometheus": "PromQL로 보는 점검 항목과 숫자 전부입니다. 7일 사용량과 requests 비교, 재시작, 스로틀링, 컨트롤플레인과 컴포넌트 메트릭",
         "alertmanager": "알림 라우팅과 silence 점검 항목",
         "loki": "Loki를 검색하는 로그 점검 항목",
         "grafana": "Grafana 상태 점검 항목",
@@ -435,13 +480,13 @@ def _q_stores(setup: dict, cfg: Config, L: str) -> dict | None:
     if L == "ko":
         q = {
             "header": "모니터링 도구",
-            "question": f"클러스터 안에서 {', '.join(missing)}{'을' if len(missing) == 1 else '를'} 찾지 못했어요. 다른 곳에 설치돼 있나요?",
-            "explain": "kubegap은 이 도구들을 클러스터 안의 Service로 찾아서 포트포워딩으로 읽어요. 다른 클러스터, 관리형 서비스, VM처럼 밖에서 돌고 있으면 주소를 적어 주면 그 주소로 읽어요."
-            + (f" 로그 수집기 설정에 Loki 주소가 적혀 있어요: {outside}. 그 주소가 맞으면 아래에 `loki={outside}`라고 적어 주세요." if outside else ""),
+            "question": f"클러스터 안에서 {', '.join(missing)}{'을' if len(missing) == 1 else '를'} 찾지 못했습니다. 다른 곳에 설치돼 있나요?",
+            "explain": "kubegap은 이 도구들을 클러스터 안의 Service로 찾아서 포트포워딩으로 읽습니다. 다른 클러스터, 관리형 서비스, VM처럼 밖에서 돌고 있으면 주소를 적어 주면 그 주소로 읽습니다."
+            + (f" 로그 수집기 설정에 Loki 주소가 적혀 있습니다: {outside}. 그 주소가 맞으면 아래에 `loki={outside}`라고 적어 주세요." if outside else ""),
             "gain": [f"{k}: {_STORE_GAIN['ko'][k]}" for k in missing],
-            "absent": ("설치 안 함", "그 도구가 필요한 점검 항목은 건너뛰고, 리포트에 그렇게 적어요."),
-            "later": ("다음에 다시 묻기", "아무것도 기억하지 않아요."),
-            "typed": f"주소를 도구마다 한 줄씩 적어 주세요. `<도구>=<http 주소>` 형식이에요. 예: `{'loki=' + outside if outside else 'prometheus=http://prometheus.example.internal:9090'}`. 각각 설정 값 `<도구>_url`로 들어가요. 적고 나면 `setup`을 다시 돌려요",
+            "absent": ("설치 안 함", "그 도구가 필요한 점검 항목은 건너뛰고, 리포트에 그렇게 적습니다."),
+            "later": ("다음에 다시 묻기", "아무것도 기억하지 않습니다."),
+            "typed": f"주소를 도구마다 한 줄씩 적어 주세요. `<도구>=<http 주소>` 형식입니다. 예: `{'loki=' + outside if outside else 'prometheus=http://prometheus.example.internal:9090'}`. 각각 설정 값 `<도구>_url`로 들어갑니다. 적고 나면 `setup`을 다시 돌립니다",
         }
     else:
         q = {
@@ -466,9 +511,10 @@ def _q_stores(setup: dict, cfg: Config, L: str) -> dict | None:
     }
 
 
-def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = False, language: str = "en") -> list[dict]:
+def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = False, language: str = "en", mode: str = "full") -> list[dict]:
     """The open questions for this context, in the order they are asked, with their texts in `language`. `setup` is the dict `run_setup`
-    wrote to setup.json."""
+    wrote to setup.json. A daily run asks only what it needs (DAILY_QUESTIONS): it reads no node, calls no AWS API and runs no extra tool, so
+    the questions about those wait for the first full run."""
     if not (setup.get("cluster") or {}).get("reachable"):
         return []
     L = language if language in LANGUAGES else "en"
@@ -476,6 +522,7 @@ def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = Fa
     node_access = _load(ctx_dir, NODE_ACCESS_FILE)
     out = []
     builders = (
+        _q_scale(setup, cfg, L),
         _q_home_mode(setup, cfg, L),
         _q_tools(setup, cfg, L),
         _q_ssm_document(setup, cfg, L),
@@ -484,7 +531,7 @@ def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = Fa
         _q_stores(setup, cfg, L),
     )
     for q in builders:
-        if q is None:
+        if q is None or (mode == "daily" and q["id"] not in DAILY_QUESTIONS):
             continue
         a = answers.get(q["id"])
         if a:
@@ -498,22 +545,22 @@ def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = Fa
 
 
 def skipped(setup: dict, cfg: Config, ctx_dir: Path | None, *, language: str = "en") -> list[dict]:
-    """Questions answered with "skip" whose gap is still there: the report names them in "what this run could not see"."""
+    """Questions answered with "skip" whose gap is still there: `assemble` lists them in the report's limits section, under "left out by choice"."""
     answers = load_answers(ctx_dir)
     return [{"id": q["id"], "header": q["header"], "gain": q["gain"], "at": answers[q["id"]].get("at")} for q in questions(setup, cfg, ctx_dir, all_=True, language=language) if (answers.get(q["id"]) or {}).get("choice") == SKIP]
 
 
 def noted(setup: dict, cfg: Config, ctx_dir: Path | None, *, language: str = "en") -> list[str]:
-    """Things decided without a question, for the report's "what this run could not see": today, Loki left out because the logs go elsewhere."""
+    """Things decided without a question, printed for the user and not written into the report (what they name was read another way or is not installed): today, Loki left out because the logs go elsewhere."""
     out = []
     why = loki_not_asked(setup, language)
     if why and not cfg.url("loki") and not ((setup.get("monitoring") or {}).get("loki") or {}).get("ok"):
-        out.append(f"loki: 묻지 않았어요. {why}. Loki는 읽지 않아요" if language == "ko" else f"loki: not asked. {why}; Loki is not read")
+        out.append(f"loki: 묻지 않았습니다. {why}. Loki는 읽지 않습니다" if language == "ko" else f"loki: not asked. {why}; Loki is not read")
     prov = grafana_without_token(setup)
     if prov and not prov["unlisted"] and not cfg.get("grafana_api_token") and ((setup.get("monitoring") or {}).get("grafana") or {}).get("ok"):
         if language == "ko":
-            tail = f"Grafana가 세는 대시보드도 {prov['total']}개라 빠진 게 없어요" if isinstance(prov["total"], int) else "Grafana 전체 개수는 메트릭을 못 읽어 모르고, 화면에서 만든 대시보드가 있으면 목록에 없어요"
-            out.append(f"grafana: 토큰 없이 ConfigMap에서 대시보드 {prov['dashboards']}개와 데이터소스 {prov['datasources']}개를 읽어요. {tail}")
+            tail = f"Grafana가 세는 대시보드도 {prov['total']}개라 빠진 게 없습니다" if isinstance(prov["total"], int) else "Grafana 전체 개수는 메트릭을 못 읽어 모르고, 화면에서 만든 대시보드가 있으면 목록에 없습니다"
+            out.append(f"grafana: 토큰 없이 ConfigMap에서 대시보드 {prov['dashboards']}개와 데이터소스 {prov['datasources']}개를 읽습니다. {tail}")
         else:
             tail = f"Grafana counts {prov['total']} dashboards too, so none is missing" if isinstance(prov["total"], int) else "the total in Grafana could not be read from its metric, so a dashboard made in Grafana itself would be unlisted"
             out.append(f"grafana: no token needed; {prov['dashboards']} dashboards and {prov['datasources']} datasources are read from ConfigMaps. {tail}")
@@ -527,19 +574,19 @@ _RENDER = {
         "config": "   (dry run, show the lines, write only after the user picks Write)",
         "typed": "  typed answer: ",
         "skipped": "skipped earlier",
-        "tail": "  -> name these in the report under what this run could not see, with: `/kubegap setup` asks again",
+        "tail": '  -> `assemble` lists these in the report under "Limits of this run"; do not write them yourself',
         "note": "note",
-        "note_tail": "  -> name these in the report under what this run could not see",
+        "note_tail": "  -> not a limit of the run: do not write these into the report",
     },
     "ko": {
         "title": "== questions for the user ({n})",
-        "none": "  none: 빠진 게 없거나, 질문마다 답이 이미 있어요",
-        "config": "   (dry run으로 바뀔 줄을 먼저 보여 주고, 사용자가 '쓰기'를 고른 뒤에만 써요)",
+        "none": "  none: 빠진 게 없거나, 질문마다 답이 이미 있습니다",
+        "config": "   (dry run으로 바뀔 줄을 먼저 보여 주고, 사용자가 '쓰기'를 고른 뒤에만 씁니다)",
         "typed": "  typed answer: ",
         "skipped": "skipped earlier",
-        "tail": "  -> 리포트의 '이번에 못 본 것'에 이 항목을 적고, `/kubegap setup`으로 다시 물을 수 있다고 써요",
+        "tail": "  -> assemble이 리포트의 '이번 점검의 한계'에 넣는다. 직접 적지 않는다",
         "note": "note",
-        "note_tail": "  -> 리포트의 '이번에 못 본 것'에 이 항목을 적어요",
+        "note_tail": "  -> 점검의 한계가 아니다. 리포트에 적지 않는다",
     },
 }
 

@@ -2,7 +2,7 @@
 - id: vpccni.node-ip-exhaustion
   name: Node pod IPs near the limit of its instance type
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.nodes
   rule:
@@ -27,7 +27,7 @@
   verify:
     - "on the node: curl -s localhost:61678/metrics | grep -E 'awscni_(assigned_ip_addresses|total_ip_addresses|eni_max|no_available_ip_addresses)'"
     - "kubectl get events -A --field-selector reason=FailedCreatePodSandBox | grep -i 'assign'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "skip"
@@ -215,7 +215,7 @@
 - id: vpccni.no-available-ip
   name: ipamd has already answered "no available IP" on a node
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.nodes
   rule:
@@ -237,7 +237,7 @@
   verify:
     - "on the node: curl -s localhost:61678/metrics | grep awscni_no_available_ip_addresses"
     - "kubectl get events -A --field-selector reason=FailedCreatePodSandBox | grep -i 'assign'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "skip"
@@ -277,7 +277,7 @@
 - id: vpccni.max-pods-exceeds-ip-capacity
   name: Node max-pods is larger than the number of IPs the CNI can hand out
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.nodes
   rule:
@@ -295,7 +295,7 @@
   suggest: "Set kubelet.maxPods in the Karpenter EC2NodeClass to the IP limit (x16 with prefix delegation), or enable prefix delegation to raise the IP limit."
   verify:
     - "kubectl get node <node> -o jsonpath='{.status.allocatable.pods}' ; aws ec2 describe-instance-types --instance-types <type> --query 'InstanceTypes[].NetworkInfo.[MaximumNetworkInterfaces,Ipv4AddressesPerInterface]'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -376,7 +376,7 @@
 - id: vpccni.prefix-delegation-off
   name: nitro nodes but prefix delegation is off (IP limit is 16x smaller)
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.warm.summary
   cluster_level: true
@@ -397,7 +397,7 @@
   suggest: "Set ENABLE_PREFIX_DELEGATION=true and WARM_PREFIX_TARGET=1 on aws-node (via add-on configurationValues). It applies to new nodes only, so it takes effect as Karpenter replaces nodes. Raise max-pods as well."
   verify:
     - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 PREFIX"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "skip"
@@ -501,6 +501,7 @@
             - "ip-10-0-2-60.us-east-1.compute.internal"
             - "ip-10-0-2-83.us-east-1.compute.internal"
 - id: vpccni.subnet-ips-low
+  needs: [cloud-account]
   name: Node subnet has few free IPs
   area: traffic
   type: summary
@@ -523,7 +524,7 @@
   suggest: "A subnet cannot be widened; instead attach a secondary CIDR to the VPC and use custom networking (ENIConfig) to place only pods there. Or tidy per-node reservations with prefix delegation."
   verify:
     - "aws ec2 describe-subnets --subnet-ids <id> --query 'Subnets[].AvailableIpAddressCount'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -580,7 +581,7 @@
   suggest: "Only when the subnet is tight: WARM_IP_TARGET=5, MINIMUM_IP_TARGET=10 or so. With prefix delegation, WARM_PREFIX_TARGET=1 is the default and these settings are ignored."
   verify:
     - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 -E 'WARM|MINIMUM'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -651,7 +652,7 @@
 - id: vpccni.ec2-api-errors
   name: aws-node accumulating EC2 API call failures (IAM, throttling, subnet)
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.nodes
   rule:
@@ -662,13 +663,14 @@
   target: "item['node']"
   evidence: "f\"node {item['node']}: EC2 API failures {item['ec2_api_errors']} (by API {item['metrics'].get('ec2_api_errors_by_api')}), force-removed ENIs {item['metrics'].get('force_removed_enis')} / IPs {item['metrics'].get('force_removed_ips')} (cumulative since ipamd start, IMDS 404 excluded)\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: >
     ipamd creates and attaches ENIs and allocates IPs through the EC2 API. As failures pile up, the warm pool cannot be refilled, so pods start slowly or get no IP. Causes are a missing AmazonEKS_CNI_Policy on the node role, API throttling (RequestLimitExceeded), and subnet or security group configuration. Read together with the log signatures vpc-cni.ec2-throttled and ipamd-error.
   suggest: "Find the failing API name in the aws-node logs (logs/pods/vpc-cni/); for IAM fix the node role policy, for throttling reduce the concurrent scale-out burst."
   verify:
     - "kubectl logs -n kube-system -l k8s-app=aws-node --since=24h | grep -iE 'error|throttl' | head"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -815,14 +817,14 @@
 - id: vpccni.metrics-unreadable
   name: Nodes whose ipamd metrics could not be read (IP usage is an estimate only)
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.warm.summary
   cluster_level: true
   rule:
     warn_expr: "len(item['metrics_unavailable_nodes']) > 0"
   target: "'cluster'"
-  evidence: "f\"{len(item['metrics_unavailable_nodes'])} of {item['nodes']} nodes without readable ipamd metrics (localhost:61678): {item['metrics_unavailable_nodes'][:6]}\""
+  evidence: "f\"{len(item['metrics_unavailable_nodes'])} of {item['nodes']} nodes without readable ipamd metrics (localhost:61678): {shown(item['metrics_unavailable_nodes'], 6)}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -832,7 +834,7 @@
   suggest: "Register with SSM (eks.ssm-unregistered) or install cni-metrics-helper (awscni_* to CloudWatch or Prometheus)."
   verify:
     - "kubectl get pods -n kube-system -l k8s-app=aws-node -o wide"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -887,7 +889,7 @@
   verify:
     - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{\"\\n\"}{end}' | grep -E 'amazon-k8s-cni|SNAT'"
     - "on a node: sudo iptables -t nat -S | grep -- '-j SNAT'   # expect --random-fully on the SNAT rule"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -947,7 +949,7 @@
 - id: vpccni.external-snat-off-with-private-routes
   name: Pod traffic to peered networks is SNATed to the node IP (external SNAT off while the VPC has peering, transit gateway or VPN routes)
   area: traffic
-  modes: [full]   # the VPC route tables are collected in the full run only
+  needs: [cloud-account]
   type: summary
   each: vpccni.snat
   cluster_level: true
@@ -966,7 +968,7 @@
   verify:
     - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 SNAT"
     - "aws ec2 describe-route-tables --filters Name=vpc-id,Values=<vpc id> --query 'RouteTables[].Routes[?VpcPeeringConnectionId != null || TransitGatewayId != null || CoreNetworkArn != null || LocalGatewayId != null || (GatewayId && starts_with(GatewayId, `vgw-`))]'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"

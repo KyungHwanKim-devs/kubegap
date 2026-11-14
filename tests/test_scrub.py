@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 
 from lib.foundations import scrub
 
@@ -239,3 +240,22 @@ def test_gzip_applied_copy_under_the_cap_is_inspected():
     doc = json.dumps({"kind": "ConfigMap", "data": {"API_TOKEN": "tok-0123456789abcdef"}}).encode()
     packed = base64.b64encode(gzip.compress(doc)).decode()
     assert scrub._secret_like_in_applied(packed) == ["API_TOKEN"]
+
+
+def test_a_sample_never_carries_a_load_balancer_address_or_the_snapshot_folder(tmp_path):
+    """scripts/scrub-sample.py replaces these whatever the map holds: a report about an open port names the address it is open on."""
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location("scrub_sample", Path(__file__).resolve().parent.parent / "scripts" / "scrub-sample.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    text = "open on k8s-mw-kafka-0a1b2c3d4e-0011223344556677.elb.ap-northeast-2.amazonaws.com, snapshot `/Users/me/.kubegap-x/snapshots/prod/2026-11-15T01-51-00`"
+    out = mod.scrub(text, mod.build({}))
+    assert "0a1b2c3d4e" not in out and "amazonaws.com" not in out and re.search(r"lb-[0-9a-f]{10}\.elb\.example\.com", out)
+    other = mod.scrub("a-1.elb.us-east-1.amazonaws.com b-2.elb.us-east-1.amazonaws.com a-1.elb.us-east-1.amazonaws.com", mod.build({})).split()
+    assert other[0] == other[2] != other[1]  # the same address gets the same name, another address another
+    assert "/Users/me" not in out and "`~/.kubegap/snapshots/<context>/2026-11-15T01-51-00`" in out
+    out = mod.scrub("target group k8s-prodshop-checkout-1234567890 and ALB k8s-acmeprodlb-abcdef0123 x", mod.build({}))
+    assert "prodshop" not in out and "checkout" not in out and "k8s-lb-1234567890" in out
+    assert "acmeprodlb" not in out and "k8s-lb-abcdef0123" in out

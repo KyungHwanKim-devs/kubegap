@@ -42,14 +42,14 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 - 요약 데이터나 자원 목록으로 판정하는 점검 항목은 규칙의 `rule.needs`에 적힌 입력이 없으면 `skip`이 됩니다. `done`으로 끝날 때는 판정하지 못한 대상을 7-5절에 적습니다.
 - 입력이 비어 있다는 이유로 통과시키지 않습니다. 배경은 [#114](https://github.com/KyungHwanKim-devs/kubegap/issues/114)에 있습니다.
 
-영어 원본의 표는 `tests/test_permissions.py`가 검사합니다. Kubernetes 표는 ClusterRole의 그룹, 리소스, verb와 정확히 같아야 하고, AWS 표는 정책의 액션과 정확히 같아야 합니다. 표에 적은 수집 단계는 `collectors/*/collect.yaml`에 있어야 하고, 모드 칸은 그 단계의 `modes:`와 맞아야 합니다. 점검 항목 칸은 각 종류가 어느 요약 섹션에 들어가는지 보고 사람이 썼습니다. 같은 테스트는 코드가 역할에 없는 것을 읽지 않는지와, 역할에 코드가 읽지 않는 것이 없는지도 확인합니다.
+영어 원본의 표는 `tests/test_permissions.py`가 검사합니다. Kubernetes 표는 ClusterRole의 그룹, 리소스, verb와 정확히 같아야 하고, AWS 표는 정책의 액션과 정확히 같아야 합니다. 표에 적은 수집 단계는 `collectors/*/collect.yaml`에 있어야 하고, 모드 칸은 그 단계가 속한 수집 단위(`collectors/units.yaml`)의 모드와 맞아야 합니다. 점검 항목 칸은 각 종류가 어느 요약 섹션에 들어가는지 보고 사람이 썼습니다. 같은 테스트는 코드가 역할에 없는 것을 읽지 않는지와, 역할에 코드가 읽지 않는 것이 없는지도 확인합니다.
 
 이 문서에서 자주 나오는 이름은 이런 뜻입니다.
 
 | 이름 | 뜻 |
 |---|---|
 | `core/objects.dump-all` | `collectors/core/collect.yaml`의 수집 단계 `objects.dump-all`입니다. ClusterRole이 허용하는 리소스 종류를 한 번씩 나열해 `objects/<kind>.json`에 저장합니다. Kubernetes 권한 대부분이 이 단계에서 쓰입니다 |
-| `lib/collection/discover.py` | 수집 전에 몇 가지 종류를 읽어 클러스터의 플랫폼, 컴포넌트, 프로파일을 판단합니다. 프로파일은 kubegap이 클러스터에 적용할 기준입니다 |
+| `lib/collection/discover.py` | 수집 전에 몇 가지 종류를 읽어 클러스터의 플랫폼과 컴포넌트를 판단합니다 |
 | daily, full | daily 점검과 full 점검입니다. 따로 적지 않은 권한은 둘 다 씁니다. full이라고 적은 것은 full 점검에서만 씁니다 |
 
 ## 점검 종류별로 쓰는 권한
@@ -60,12 +60,13 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 - 컴포넌트 로그를 읽는 `pods/log`
 - Prometheus, Alertmanager, Loki, Grafana 포트포워드
 - `grafana_api_token`이 설정되어 있을 때 Grafana API
-- EKS에서 탐지와 setup에 쓰는 AWS Describe, List 호출: `eks`, `ecr:DescribeRepositories`, `ssm:DescribeInstanceInformation`, `ssm:DescribeDocument`, `sts`, `logs:DescribeLogGroups`
-- EKS의 daily AWS 수집 단계 11개: `nodegroup`, `subnets`, `ssm-instances`, `cluster-security-groups`, `alb-metrics`, `ec2-volumes`, `ec2-volumes-available`, `ec2-addresses`, `ec2-nat-gateways`, `acm-certificates`, `instance-type-network`. 이 가운데 `alb-metrics`는 `elasticloadbalancing:Describe*`, `ec2:DescribeSecurityGroups`, `cloudwatch:GetMetricData`를 씁니다.
-- 노드 접속 방법이 있을 때, 파드 메트릭을 노드 안에서 curl로 대신 읽는 동작. EKS에서는 고정된 문서의 SSM `send-command`와, 그 출력을 읽는 `ssm:GetCommandInvocation`을 씁니다.
+- AWS API는 부르지 않고 노드에도 접속하지 않습니다. 남는 AWS 호출은 EKS 클러스터의 kubeconfig가 스스로 하는 `aws eks get-token` 하나입니다.
 
 **full 점검.** daily 점검이 쓰는 것 전부에 아래를 더합니다.
 
+- EKS에서 탐지와 setup에 쓰는 AWS Describe, List 호출: `eks`, `ecr:DescribeRepositories`, `ssm:DescribeInstanceInformation`, `ssm:DescribeDocument`, `sts`, `logs:DescribeLogGroups`
+- EKS의 AWS 수집 단계 전부. 이 가운데 `alb-metrics`는 `elasticloadbalancing:Describe*`, `ec2:DescribeSecurityGroups`, `cloudwatch:GetMetricData`를 씁니다.
+- 파드 메트릭을 노드 안에서 curl로 대신 읽는 동작. EKS에서는 고정된 문서의 SSM `send-command`와, 그 출력을 읽는 `ssm:GetCommandInvocation`을 씁니다.
 - 노드 스크립트: SSM 또는 SSH로 실행합니다.
 - kubelet 설정을 읽는 `nodes/proxy`
 - CloudWatch Logs Insights: `logs:StartQuery`, `GetQueryResults`, `StopQuery`
@@ -94,7 +95,7 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 
 ### 로그와 메트릭을 읽는 권한
 
-**`pods/log`.** 수집 단계 `core/component-logs`가 컴포넌트 파드의 최근 24시간 로그를 `kubectl logs`로 읽습니다. 요약 단계인 `summarize`가 끝나면 원본을 지우고, `keep_component_logs`를 설정하면 남깁니다. `logs.signatures`, `observability.unclassified-errors`, 그리고 `lib/summaries/scaling.py`가 `logs/pods/karpenter/`에서 읽는 Karpenter 로그 정보가 이 로그를 씁니다.
+**`pods/log`.** 수집 단계 `core/component-logs`가 컴포넌트 파드의 최근 24시간 로그를 `kubectl logs`로 읽습니다. 로그는 읽으면서 메모리에서 세고, 원문은 스냅샷에 쓰지 않습니다. `logs.signatures`, `observability.unclassified-errors`, 그리고 Karpenter 컨트롤러 로그에서 세는 정보(`lib/foundations/karpenterlog.py`)가 이 로그를 씁니다.
 
 없으면 `logs.signatures`는 일치하는 로그가 없다고 보고, `observability.unclassified-errors`는 분류할 로그가 없습니다. 이 둘은 로그 파일이 없는 경우와 로그가 빈 경우를 구분하지 못해서, `skip` 없이 조용히 넘어갑니다. `observability.*`의 Loki와 로그 에이전트 점검 항목 9개는 Loki와 Prometheus를 읽으므로 영향이 없습니다.
 
@@ -124,7 +125,7 @@ PromQL로 판정하는 모든 항목이 이 연결에 기댑니다. `type: metri
 |---|---|---|
 | `services` | `lib/collection/monitoring.py`가 `get svc -A`로 네 모니터링 도구를 찾습니다. 트래픽, 복원력, 플랫폼, albctl, kubeproxy, 오퍼레이터의 80개 항목이 씁니다 | 설정에 URL이 없으면 모니터링 도구를 찾지 못합니다. `traffic.*`의 서비스 항목은 `skip`이 됩니다 |
 | `endpoints` | `traffic.endpoint-zero`, `operators.webhook-no-endpoints` | 둘 다 `skip`이 됩니다. 이때 `summary.webhooks.no_endpoints`는 `None`입니다 |
-| `namespaces` | 네임스페이스 수, prod로 보이는 네임스페이스, 프로파일을 판단합니다. 복원력의 네임스페이스별 항목, `security.psa-not-enforced`, 멀티테넌시의 25개 항목이 씁니다 | 프로파일 탐지가 설정값을 쓰고, prod와 lab 분류가 비어 있습니다 |
+| `namespaces` | 네임스페이스 수와 prod로 보이는 네임스페이스를 판단합니다. 복원력의 네임스페이스별 항목, `security.psa-not-enforced`, 멀티테넌시의 25개 항목이 씁니다 | 네임스페이스를 운영과 개발로 나눈 분류가 비어 있습니다 |
 | `persistentvolumes` | 스토리지 18개, 복원력, ebscsi, k3s local-path 플랫폼 항목까지 64개 항목이 씁니다 | 스토리지 항목 `skip` |
 | `persistentvolumeclaims` | 스토리지, 복원력의 36개 항목이 씁니다 | 스토리지 항목 `skip` |
 | `resourcequotas`, `limitranges` | `tenancy.*` 12개 | 멀티테넌시 항목 `skip` |
@@ -240,15 +241,15 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 
 **`ssm:DescribeDocument`.** `lib/commands/setup.py`와 `lib/collection/nodecommands.py`가 `kubegap-node-read`가 계정에 있고 최신인지 확인합니다. 쓰는 항목은 `ssm:SendCommand`와 같습니다. 없으면 kubegap이 SSM 문서가 저장소의 것과 같은지 확인할 수 없어서 노드 명령을 보내지 않습니다.
 
-**`ssm:SendCommand`.** `lib/collection/node.py`가 `type: node` 수집 단계와, API 서버 프록시가 막혔을 때 파드 메트릭을 대신 읽는 동작에 씁니다. 수집 단계는 full 전용이고, 메트릭을 대신 읽는 curl은 daily와 full 모두에서 돌아갑니다.
+**`ssm:SendCommand`.** `lib/collection/node.py`가 `type: node` 수집 단계와, API 서버 프록시가 막혔을 때 파드 메트릭을 대신 읽는 동작에 씁니다. 둘 다 full 점검에서만 돌아갑니다. daily 점검은 노드에 접속하지 않습니다.
 
-노드 스크립트와 kubelet configz를 읽는 `node.*` 항목 26개, `vpccni.*`의 ipamd 행, `vpc-cni.*` 로그 시그니처 셋(ipamd.log), `kubeproxy.*`의 모드 행, `*.metrics-unreadable`의 대체 경로가 씁니다. `node.*`의 나머지 10개는 Prometheus를 읽습니다. 없으면 이 노드 항목들은 daily에서 수집되지 않고, full에서는 읽지 못한 노드마다 `skip`이 됩니다. 파드 메트릭을 대신 읽을 수도 없어서 `metrics-unreadable`이 warn을 냅니다.
+노드 스크립트와 kubelet configz를 읽는 `node.*` 항목 26개, `vpccni.*`의 ipamd 행, `vpc-cni.*` 로그 시그니처 셋(ipamd.log), `kubeproxy.*`의 모드 행, `*.metrics-unreadable`의 대체 경로가 씁니다. `node.*`의 나머지 10개는 Prometheus를 읽습니다. daily에서는 이 노드 항목들을 수집하지 않습니다. 권한이 없으면 full에서는 읽지 못한 노드마다 `skip`이 됩니다. 파드 메트릭을 대신 읽을 수도 없어서 `metrics-unreadable`이 warn을 냅니다.
 
 **`ssm:GetCommandInvocation`.** `lib/collection/node.py`가 모든 SSM 명령의 결과를 읽습니다. 쓰는 항목은 `ssm:SendCommand`와 같습니다. 없으면 명령은 가지만 출력을 읽지 못해서 노드 단계가 실패합니다.
 
 ### 수집 단계 하나만 쓰는 권한
 
-아래 권한은 수집 단계 하나만 쓰고, 없으면 표의 항목이 `skip`이 됩니다. `acm:ListCertificates`는 daily와 full 모두에서 쓰고, 나머지는 full 전용입니다.
+아래 권한은 수집 단계 하나만 쓰고, 없으면 표의 항목이 `skip`이 됩니다. 전부 full 전용입니다. daily 점검은 AWS API를 부르지 않습니다.
 
 | 권한 | 수집 단계 | 쓰는 점검 항목 |
 |---|---|---|
@@ -264,7 +265,7 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 | `ce:GetCostAndUsage` | `eks-platform/ce-cost-30d` | `cost.*` 7개 |
 | `pricing:GetProducts` | `eks-platform/pricing-ondemand` | `cost.idle-compute-high`, `cost.request-waste`, `cost.on-demand-in-spot-pool`, `cost.idle-node` |
 
-**`ecr:DescribeRepositories`.** daily와 full 모두에서 `lib/collection/discover.py`가 저장소 이름을 읽고, ECR 수집기는 이 목록의 저장소마다 돌아갑니다. `ecr.*` 8개가 기대는 권한입니다. 없으면 ECR 수집기가 살펴볼 저장소가 없어서 ECR 항목이 `skip`이 됩니다.
+**`ecr:DescribeRepositories`.** full 점검에서 `lib/collection/discover.py`가 저장소 이름을 읽고, ECR 수집기는 이 목록의 저장소마다 돌아갑니다. `ecr.*` 8개가 기대는 권한입니다. 없으면 ECR 수집기가 살펴볼 저장소가 없어서 ECR 항목이 `skip`이 됩니다.
 
 ## IAM 권한이 하나도 없을 때 (#22)
 
@@ -272,10 +273,12 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 
 | 모드 | 점검 항목 | 판정함 | IAM 권한이 없어서 건너뜀 | 다른 이유로 건너뜀 | 이 모드에서 수집하지 않음 |
 |---|---|---|---|---|---|
-| daily | 365 | 280 | 20 | 5 (그중 4개는 권한이 다 있어도 건너뜁니다. ingress-nginx 점검 항목 2개, `observability.fluentbit-output-errors`, `observability.alert-metric-without-dashboard`는 이 클러스터에 설치되거나 설정된 것이 없어서입니다. `hygiene.deprecated-api`는 pluto와 kubent가 full 전용 단계라서 건너뜁니다) | 56 (full 전용 입력) |
+| daily | — | — | 0 | — | — |
 | full | 365 | 295 | 57 | 6 (같은 4개에 Helm 점검 항목 2개가 더해집니다. 기본 ClusterRole이 Secret을 막아서 `helm list`가 돌지 못합니다) | 0 |
 
-각 줄에서 남는 4개는 `prod` 프로파일에서 끈 2개와 LLM 점검 항목 2개입니다. 시험한 컴퓨터에 없던 도구(krr, polaris)의 항목은 뺐습니다.
+daily 줄은 daily 점검이 AWS를 부르던 때에 잰 값이었습니다. 지금 daily 점검은 Kubernetes API와 저장소만 읽고 AWS를 부르지 않으므로, IAM 정책이 없어도 달라지는 것이 없습니다. AWS가 필요한 점검 항목은 "이 모드에서 수집하지 않음"으로 적힙니다.
+
+각 줄에서 남는 4개는 이 플랫폼에서 돌지 않는 2개와 LLM 점검 항목 2개입니다. 시험한 컴퓨터에 없던 도구(krr, polaris)의 항목은 뺐습니다.
 
 없는 권한 때문에 못 보는 것은 아래와 같습니다. 하나하나 이유를 붙여 건너뜀으로 적히고, 통과로 세지 않습니다.
 
@@ -299,7 +302,7 @@ EKS에서는 `ssm:SendCommand`로 노드에 들어갑니다. k3s와 베어메탈
 | EKS | `eks-platform/kubelet-journal`, `eks-platform/containerd-journal`, `vpc-cni/ipamd-metrics`, `vpc-cni/ipamd-log` |
 | k3s | `k3s-platform/k3s-journal-errors`, `k3s-platform/k3s-journal-stats`, `k3s-platform/k3s-scheduler-unschedulable`, `k3s-platform/k3s-webhook-failures`, `k3s-platform/k3s-etcd-slow`, `k3s-platform/kubelet-pleg`, `k3s-platform/k3s-node`, `k3s-platform/containerd-log` |
 
-파드 메트릭을 대신 읽는 curl은 daily와 full 모두에서 돌아갑니다. 접속 방식별 명령 전문은 [`deploy/node-access/COMMANDS.md`](../../deploy/node-access/COMMANDS.md)에 있습니다.
+파드 메트릭을 대신 읽는 curl도 full 점검에서만 돌아갑니다. 접속 방식별 명령 전문은 [`deploy/node-access/COMMANDS.md`](../../deploy/node-access/COMMANDS.md)에 있습니다.
 
 ## `ssm:SendCommand`를 제한하는 방법
 

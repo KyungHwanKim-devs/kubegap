@@ -1,0 +1,86 @@
+# What a report teaches when NetworkPolicy objects exist but nothing in the cluster applies them. Every page below was opened and read (2026-11-14).
+topic: networkpolicy-not-enforced
+checks: [security.networkpolicy-not-enforced]
+mechanism: >
+  A NetworkPolicy is a request, not a firewall. The API server stores it; the network plugin of the cluster is what turns it into packet filtering.
+  The Kubernetes documentation states the consequence in one sentence: creating a NetworkPolicy resource without a controller that implements it
+  will have no effect. By default a pod is non-isolated for ingress and for egress, all connections are allowed, and that stays the case for
+  every pod the unimplemented policy selects. The person who wrote a default-deny policy believes traffic is blocked.
+
+
+  On EKS with the Amazon VPC CNI this is the starting state. Network policy support is a parameter of the add-on, enableNetworkPolicy, that has to
+  be set to true. When it is on, a controller in the EKS control plane translates each NetworkPolicy into PolicyEndpoint objects
+  (policyendpoints.networking.k8s.aws) and a node agent, a second container in the aws-node pods, enforces them with eBPF. With the feature
+  disabled the aws-node pods have a single container, and no PolicyEndpoint objects exist.
+
+
+  Even when it is on, a few limits apply. A new pod starts with a default allow policy until its policies are configured (standard mode); strict
+  mode starts pods with default deny instead and then requires a policy for everything they need, CoreDNS included. Policies apply to EC2 Linux
+  nodes only, not to Fargate or Windows nodes. Enforcement is reliable for pods owned by a controller such as a Deployment, not for standalone
+  pods. The nodes need Linux kernel 5.10 or later.
+
+
+  k3s is the opposite case: it includes an embedded network policy controller (the kube-router netpol library) that is on unless every server is
+  started with --disable-network-policy. If it is disabled later, the iptables rules it had written are not removed until they are cleaned up by
+  hand on every node.
+sources:
+  - { title: "Kubernetes: Network Policies", url: "https://kubernetes.io/docs/concepts/services-networking/network-policies/" }
+  - { title: "EKS: Limit Pod traffic with Kubernetes network policies", url: "https://docs.aws.amazon.com/eks/latest/userguide/cni-network-policy.html" }
+  - { title: "EKS: Restrict Pod network traffic with Kubernetes network policies", url: "https://docs.aws.amazon.com/eks/latest/userguide/cni-network-policy-configure.html" }
+  - { title: "EKS: Troubleshooting Kubernetes network policies", url: "https://docs.aws.amazon.com/eks/latest/userguide/network-policies-troubleshooting.html" }
+  - { title: "k3s: Networking Services", url: "https://docs.k3s.io/networking/networking-services" }
+  - { title: "blackbox_exporter", url: "https://github.com/prometheus/blackbox_exporter" }
+detect:
+  - kind: alert
+    what: >
+      A connection that a policy forbids and that succeeds anyway. The pages read name no metric that says whether policies are enforced (the VPC
+      CNI node agent serves metrics on port 8162; their names were not read), so the signal proposed here is a probe that is expected to fail:
+      blackbox_exporter probes a target that a policy closes to it, and probe_success turning 1 means the policy is not applied.
+    example: |
+      - alert: NetworkPolicyNotEnforced
+        expr: probe_success{job="netpol-canary"} == 1
+        for: 10m
+  - kind: metric
+    what: >
+      That policies exist at all, per namespace. kube-state-metrics exports kube_networkpolicy_spec_ingress_rules and
+      kube_networkpolicy_spec_egress_rules (experimental). They count what was written, not what is enforced, which is the gap this topic is about.
+    example: 'count by (namespace) (kube_networkpolicy_spec_ingress_rules)'
+  - kind: dashboard
+    what: >
+      The allow and deny decisions of the VPC CNI node agent. With enablePolicyEventLogs it writes a flow log line with a Verdict for each
+      connection of a pod that has a policy, and with enableCloudWatchLogs sends them to CloudWatch Logs. The logs need an additional vCPU for the
+      agent container.
+    example: '"Verdict":"DENY"'
+  - kind: command
+    what: Whether the agent is told to enforce and whether the control plane produced PolicyEndpoints.
+    example: 'kubectl get policyendpoints -A'
+solutions:
+  - scale: [small]
+    approach: >
+      On k3s do nothing but confirm the server was not started with --disable-network-policy. On EKS set enableNetworkPolicy to true in the VPC CNI
+      add-on configuration, check that the aws-node pods now have two containers and that PolicyEndpoint objects appear for the existing
+      policies, and test one policy by trying a connection it forbids.
+    tools: ["Amazon VPC CNI", k3s]
+    tradeoff: >
+      The policies already written start to work, with one configuration value. They start to work all at once: a policy that was wrong while it
+      had no effect now blocks traffic, so switch it on at a quiet time and watch the applications.
+    example: |
+      {
+        "enableNetworkPolicy": "true"
+      }
+  - scale: [medium, large]
+    approach: >
+      Enable enforcement as above and keep a canary probe that must fail, so that a later add-on change that switches enforcement off raises an
+      alert. Send the policy decision logs to CloudWatch Logs for the namespaces that matter, consider strict mode so that new pods start closed,
+      and set a cluster-wide baseline with ClusterNetworkPolicy instead of repeating a default-deny in every namespace.
+    tools: ["Amazon VPC CNI", blackbox_exporter, "CloudWatch Logs", ClusterNetworkPolicy]
+    tradeoff: >
+      Enforcement is verified continuously and denials can be investigated from logs. Strict mode needs a policy for every dependency of every
+      pod, and the decision logs cost a vCPU per node agent plus log ingestion.
+cases: []
+reading:
+  - { title: "Kubernetes: Network Policies", url: "https://kubernetes.io/docs/concepts/services-networking/network-policies/", why: "How isolation is defined, that policies are additive, and the sentence about plugins that do not implement them." }
+  - { title: "EKS: Restrict Pod network traffic with Kubernetes network policies", url: "https://docs.aws.amazon.com/eks/latest/userguide/cni-network-policy-configure.html", why: "The prerequisites and the steps to turn enforcement on in the VPC CNI, including strict mode." }
+  - { title: "EKS: Troubleshooting Kubernetes network policies", url: "https://docs.aws.amazon.com/eks/latest/userguide/network-policies-troubleshooting.html", why: "Where the decision logs are and what to check when a policy has no effect." }
+  - { title: "k3s: Networking Services", url: "https://docs.k3s.io/networking/networking-services", why: "The embedded controller of k3s and what is left behind when it is disabled." }
+  - { title: "kube-state-metrics: NetworkPolicy metrics", url: "https://github.com/kubernetes/kube-state-metrics/blob/main/docs/metrics/policy/networkpolicy-metrics.md", why: "The series that show which policies exist, and that they are marked experimental." }

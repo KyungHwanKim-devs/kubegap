@@ -117,7 +117,7 @@ def _prometheus(snap: Path, inv: dict) -> dict:
     build = (load_json(snap / "prometheus" / "buildinfo.json") or {}).get("data") or {}
     rt = (load_json(snap / "prometheus" / "runtimeinfo.json") or {}).get("data") or {}
     head = tsdb.get("headStats") or {}
-    top_metrics = [{"name": x["name"], "series": x["value"]} for x in (tsdb.get("seriesCountByMetricName") or [])[:10]]
+    top_metrics = [{"name": x["name"], "series": x["value"]} for x in (tsdb.get("seriesCountByMetricName") or [])]
     num_series = head.get("numSeries") or metric_scalar(snap, "prom_head_series") or store.get("head_series")
     top_share = round(top_metrics[0]["series"] / num_series, 3) if top_metrics and num_series else None
     bucket_series = sum(x["series"] for x in top_metrics if x["name"].endswith("_bucket"))
@@ -165,7 +165,7 @@ def _prometheus(snap: Path, inv: dict) -> dict:
         "top_metrics": top_metrics,
         "top_metric_share": top_share,
         "top10_bucket_series": bucket_series,
-        "top_labels_by_values": [{"label": x["name"], "values": x["value"]} for x in (tsdb.get("labelValueCountByLabelName") or [])[:5]],
+        "top_labels_by_values": [{"label": x["name"], "values": x["value"]} for x in (tsdb.get("labelValueCountByLabelName") or [])],
         "rss_vs_limit": round(rss_ratio, 3) if rss_ratio is not None else None,
         "memory_limit": wl.get("memory_limit"),
         "oomkilled_last": oom_obj["oomkilled"] or any(x.startswith("prometheus-") and x.endswith("/prometheus") for x in oom_rows),
@@ -177,7 +177,7 @@ def _prometheus(snap: Path, inv: dict) -> dict:
         "tsdb_bytes": metric_scalar(snap, "prometheus_storage_bytes"),
         "scrape_interval_s": interval,
         "slow_scrape_jobs": slow_jobs,
-        "scrape_top": slow[:5],
+        "scrape_top": slow,
         "sample_limit_exceeded_1h": limit_exceeded,
         "sample_limit_targets": targets["sample_limit_targets"],
         "notifications_dropped_1d": round(metric_scalar(snap, "prom_notifications_dropped_1d") or 0),

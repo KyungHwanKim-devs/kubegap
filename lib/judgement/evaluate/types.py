@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from ...foundations import rubric
 from ...foundations.snapshot import metric_sample
 from .context import Context, get_path
 from .rules import ItemRecorder, Run, eval_expr, excluded, finding
@@ -19,7 +20,7 @@ def eval_signature(cx: Context, check: dict, run: Run) -> dict:
         if st not in ("fail", "warn"):
             run.counts["pass"] += 1
             continue
-        if excluded(check["id"], sig["id"], cx.profile):
+        if excluded(check["id"], sig["id"], cx.platform):
             run.counts["excluded"] += 1
             continue
         run.counts[st] += 1
@@ -62,9 +63,9 @@ def eval_absence(cx: Context, check: dict, run: Run) -> dict:
     fam, comp = check.get("family"), check.get("component")
     present = set(cx.inv.get("families_present") or [])
     comps = set(cx.inv.get("components_present") or [])
-    expected = cx.profile.get("expected_families")
-    if fam and expected is not None and fam not in expected:
-        return run.skip(f"profile {cx.profile.get('name')} does not require family {fam}")
+    expected = rubric.expected_families(cx.scale, cx.platform)
+    if fam and fam not in expected:
+        return run.skip(f"family {fam} is not expected at scale {cx.scale} on platform {cx.platform['name']}")
     missing = (fam and fam not in present) or (comp and comp not in comps)
     if not missing:
         run.counts["pass"] += 1

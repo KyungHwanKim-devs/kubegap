@@ -29,6 +29,7 @@ the `type: kubectl` steps through `json_scrubber`, which lib/foundations/shell a
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 
@@ -70,6 +71,11 @@ ENV_SKIP_RE = re.compile(r"(_FILE|_PATH|_DIR|_NAME|_KEY_ID|_REF|_ENABLED|_URL|_H
 # A line inside a config file such as `HTTP_Passwd xxx`, `password: xxx`, `DB_PASSWORD=xxx`. The key may start with the secret word itself (the earlier form required one leading character and missed a bare `password = ...`).
 _LINE_RE = re.compile(r"(?im)^\s*([A-Za-z0-9_.-]*(?:passw(?:or)?d|secret|token|api[_-]?key)[A-Za-z0-9_.-]*)\s*[:= ]\s*(\S{8,})\s*$")
 _URL_RE = re.compile(r"^[a-z][a-z0-9+.-]*://", re.IGNORECASE)
+# The right-hand side of a line of code that reads the value from somewhere else: a name, optionally dotted, called or indexed
+# (`os.environ["DISCORD_BOT_TOKEN"]`, `os.getenv("X")`, `env("x_secret"),`, `load_token()`). A credential written into the file is a literal,
+# and a literal does not start with a name that is then called or indexed and closed.
+_CODE_READ_RE = re.compile(r"^[A-Za-z_][\w.]*[(\[].*[)\]][,;]?$")
+_ENV_REF_RE = re.compile(r"\$\([A-Za-z_][A-Za-z0-9_]*\)")  # dependent environment variable syntax: the value is another variable's
 
 
 def _keys_for(table: list[tuple[str, str, tuple[str, ...]]], ns: str, name: str) -> set[str]:
@@ -80,8 +86,8 @@ def _keys_for(table: list[tuple[str, str, tuple[str, ...]]], ns: str, name: str)
     return out
 
 
-def secret_like_keys(data: dict, limit: int = 8) -> list[str]:
-    """Key names (or `key:line-key` inside config files) whose value looks like a credential. Values are inspected but never returned."""
+def secret_like_keys(data: dict) -> list[str]:
+    """Key names (or `key:line-key` inside config files) whose value looks like a credential, all of them. Values are inspected but never returned."""
     keys: list[str] = []
     for k, v in (data or {}).items():
         v = str(v)
@@ -89,15 +95,20 @@ def secret_like_keys(data: dict, limit: int = 8) -> list[str]:
             keys.append(k)
         elif "\n" in v and len(v) <= 1_048_576:  # etcd caps an object at 1 MiB, so this scans every value; the old 20,000-character cap left large config files unchecked
             for m in _LINE_RE.finditer(v):
+                if _CODE_READ_RE.match(m.group(2)):
+                    continue
                 val = m.group(2).strip("\"'")
                 if val.startswith(("${", "$(", "/", "<", "{{")) or val.lower() in ("changeme", "password", "null", "none") or "secretkeyref" in val.lower():
                     continue
+                if ENV_SKIP_RE.search(m.group(1)) or m.group(1).lower().endswith(("name", "ref", "path", "file")):  # secretName, tokenPath: where a secret is, not the secret (istio-sidecar-injector's template)
+                    continue
                 keys.append(f"{k}:{m.group(1)}")
-                if len(keys) >= limit:
-                    break
-        if len(keys) >= limit:
-            break
-    return list(dict.fromkeys(keys))[:limit]  # dedupe (the same password line can appear in several blocks) while keeping order
+    return list(dict.fromkeys(keys))  # dedupe (the same password line can appear in several blocks) while keeping order
+
+
+# Variables whose value is the name of a Secret object, not a credential, although their own name says SECRET.
+# TS_KUBE_SECRET: "the name of the Kubernetes secret in which to store tailscaled state" (tailscale/tailscale cmd/containerboot/main.go:38@v1.90.6).
+SECRET_NAME_VARS = frozenset({"TS_KUBE_SECRET"})
 
 
 def env_name_secret_like(name: str) -> bool:
@@ -107,19 +118,52 @@ def env_name_secret_like(name: str) -> bool:
 
 def env_secret_like(name: str, value) -> bool:
     """Whether an env entry's literal value looks like a credential. Numeric limits (TOKEN_CAP), flags (ALLOW_EMPTY_PASSWORD=yes), paths and
-    short values are not; neither is Reloader's STAKATER_* variable, which names a Secret to watch."""
+    short values are not; neither is a variable that names a Secret object (Reloader's STAKATER_*, SECRET_NAME_VARS)."""
     v = str(value)
     if not v or v == "None" or v.startswith("/") or v.isdigit() or v.lower() in ("true", "false", "yes", "no", "on", "off") or len(v) < 8:
         return False
-    if name.startswith("STAKATER_"):
+    if name.startswith("STAKATER_") or name in SECRET_NAME_VARS:
+        return False
+    if _ENV_REF_RE.fullmatch(v):  # `$(REDIS_PASSWORD)`: Kubernetes expands it from another variable of the container, which may come from a Secret
         return False
     return env_name_secret_like(name)
 
 
-def scrub_env(env: list) -> None:
-    """Drop the value of each credential-like variable of one `env` list, keeping its length, shape and verdict under MARK."""
+# Namespaces of the platform and its add-ons. A run that does not collect the unit app-settings (collectors/units.yaml; the daily run) keeps command,
+# args, literal environment values and ConfigMap keys only here: the checks that read one read it from a component (Karpenter feature gates, VPC CNI
+# warm targets, MetalLB speaker settings, the flags of a controller), and an application's configuration is the user's own.
+SYSTEM_NS_PREFIX = ("kube-", "karpenter", "monitoring", "cert-manager", "external-secrets", "ingress-nginx", "metallb-system", "keda", "argocd", "arc-system", "arc-systems", "logging", "reloader")
+
+
+def system_namespace(ns) -> bool:
+    return isinstance(ns, str) and ns.startswith(SYSTEM_NS_PREFIX)
+
+
+# What a check asks of a command without reading it: whether it is a shell running a script (`sh -c …`: the shell is PID 1 and does not pass SIGTERM on)
+# and whether it only holds the container open (a prepull DaemonSet that sleeps). Worked out before a command is dropped and kept under MARK, as the
+# verdict of a credential-like variable is, so the checks give the same answer when the command itself is not written.
+SHELLS = ("sh", "/bin/sh", "bash", "/bin/bash", "/usr/bin/bash", "ash", "/bin/ash")
+_HOLDER_RE = re.compile(r"\b(sleep|pause|tail -f)\b")
+
+
+def command_shape(c: dict) -> dict:
+    """`{"shell": bool, "holder": bool, "digest": str | None}` of a container's (or an exec probe's) command and args: from the lists when they are
+    there, from what the scrub recorded when it dropped them. The digest tells two commands apart, and the same command in two runs, without the text."""
+    mark = c.get(MARK)
+    if isinstance(mark, dict) and isinstance(mark.get("command_shape"), dict):
+        return dict(mark["command_shape"])
+    command, args = [str(a) for a in c.get("command") or []], [str(a) for a in c.get("args") or []]
+    if not command and not args:
+        return {"shell": False, "holder": False, "digest": None}
+    digest = hashlib.sha256(json.dumps([command, args], ensure_ascii=False).encode()).hexdigest()[:16]
+    return {"shell": bool(command) and command[0] in SHELLS and "-c" in command + args, "holder": bool(_HOLDER_RE.search(" ".join(command + args))), "digest": digest}
+
+
+def scrub_env(env: list, *, every: bool = False) -> None:
+    """Drop the value of each credential-like variable of one `env` list, keeping its length, shape and verdict under MARK. With `every` (a daily
+    run, outside the system namespaces) every literal value is dropped, whatever the name."""
     for e in env:
-        if isinstance(e, dict) and "value" in e and isinstance(e.get("name"), str) and env_name_secret_like(e["name"]):
+        if isinstance(e, dict) and "value" in e and isinstance(e.get("name"), str) and (every or env_name_secret_like(e["name"])):
             v = e.pop("value")
             e[MARK] = {"len": len(str(v)), "shape": shape(v), "secret_like": env_secret_like(e["name"], v)}
 
@@ -165,14 +209,30 @@ def shape(v) -> str:
     return "word"
 
 
-def scrub_configmap(cm: dict) -> dict:
-    """Replace the values of one ConfigMap in place (see module docstring) and record what was there under `kubegap_scrub`."""
+def scrub_configmap(cm: dict, *, app_settings: bool = True) -> dict:
+    """Replace the values of one ConfigMap in place (see module docstring) and record what was there under `kubegap_scrub`. Without `app_settings`
+    a ConfigMap outside the system namespaces keeps no key either: its name, labels and size are what a daily run knows of it."""
     if MARK in cm:
         return cm
     meta = cm.get("metadata") or {}
     ns, name = meta.get("namespace") or "", meta.get("name") or ""
     data = cm.get("data") or {}
     binary = cm.get("binaryData") or {}
+    if not app_settings and not system_namespace(ns):
+        ann = meta.get("annotations") or {}
+        dropped_ann = [k for k in COPY_ANNOTATIONS if k in ann]
+        for k in dropped_ann:
+            ann[k] = {"len": len(str(ann[k])), "shape": shape(ann[k])}
+        chars = sum(len(str(v)) for v in data.values()) + sum(len(str(v)) for v in binary.values())
+        cm.pop("data", None)
+        cm.pop("binaryData", None)
+        # managedFields name every key a manager wrote (`fieldsV1.f:data.f:<key>`). What lib/summaries/hygiene/configchanges reads of an entry is who
+        # wrote `data` and when, so each entry keeps its top-level field names and nothing below them.
+        for e in meta.get("managedFields") or []:
+            if isinstance(e, dict) and isinstance(e.get("fieldsV1"), dict):
+                e["fieldsV1"] = {k: {} for k in e["fieldsV1"]}
+        cm[MARK] = {"values_dropped": True, "keys_dropped": len(data) + len(binary), "data_chars": chars, "annotations_dropped": dropped_ann}
+        return cm
     keep = _keys_for(KEEP_VALUES, ns, name)
     presence = _keys_for(PRESENCE_ONLY, ns, name)
     lines = _keys_for(LINE_COUNT_ONLY, ns, name)
@@ -182,7 +242,7 @@ def scrub_configmap(cm: dict) -> dict:
     dropped_ann = []
     for k in COPY_ANNOTATIONS:
         if k in ann:
-            found = list(dict.fromkeys(found + _secret_like_in_applied(ann[k])))[:8]
+            found = list(dict.fromkeys(found + _secret_like_in_applied(ann[k])))
             ann[k] = {"len": len(str(ann[k])), "shape": shape(ann[k])}
             dropped_ann.append(k)
     labels = meta.get("labels") or {}
@@ -254,16 +314,16 @@ class ScrubFailed(shell._NamedError):
     """Scrubbing raised, so the text must not be written. The message starts with "scrub failed:"."""
 
 
-def scrub_or_error(obj) -> str | None:
+def scrub_or_error(obj, *, app_settings: bool = True) -> str | None:
     """Scrub `obj` in place. None on success; on any exception the message "scrub failed: <type>: <text>" and the caller writes nothing."""
     try:
-        scrub_objects(obj)
+        scrub_objects(obj, app_settings=app_settings)
     except Exception as e:
         return f"scrub failed: {type(e).__name__}: {e}"
     return None
 
 
-def json_scrubber():
+def json_scrubber(*, app_settings: bool = True):
     """A `shell.run` transform for kubectl JSON output plus the item count it saw.
 
     Returns (fn, info). `fn(text)` parses the JSON, scrubs it and returns the scrubbed JSON text; text that is not JSON is returned unchanged,
@@ -279,7 +339,7 @@ def json_scrubber():
             return text
         except Exception as e:
             raise ScrubFailed(f"scrub failed: {type(e).__name__}: {e}") from e
-        err = scrub_or_error(data)
+        err = scrub_or_error(data, app_settings=app_settings)
         if err:
             raise ScrubFailed(err)
         try:
@@ -291,10 +351,16 @@ def json_scrubber():
     return fn, info
 
 
-def scrub_objects(obj):
-    """Walk kubectl JSON (a single object or a List) and apply the Secret and ConfigMap rules in place. Returns the same object."""
+def scrub_objects(obj, *, app_settings: bool = True, _ns=None):
+    """Walk kubectl JSON (a single object or a List) and apply the Secret and ConfigMap rules in place. Returns the same object. With
+    `app_settings` false (the run does not collect that unit) nothing an application is configured with is kept outside the system namespaces:
+    every literal environment value goes, not only the credential-like ones, and so does every `command` and `args` list, of a container, a
+    probe or a hook; the number of items and `command_shape` stay under `kubegap_scrub`, so "has a command", "is a shell script", "only sleeps"
+    and "the same command as before" remain readable."""
     if isinstance(obj, dict):
         kind = obj.get("kind")
+        if isinstance(kind, str) and isinstance(obj.get("metadata"), dict):
+            _ns = obj["metadata"].get("namespace") or _ns
         if isinstance(kind, str) and kind in SECRET_KINDS:
             obj.pop("data", None)
             obj.pop("stringData", None)
@@ -303,19 +369,24 @@ def scrub_objects(obj):
                 if k in ann:
                     ann[k] = {"len": len(str(ann[k])), "shape": shape(ann[k])}
         elif isinstance(kind, str) and kind in CONFIGMAP_KINDS:
-            scrub_configmap(obj)
+            scrub_configmap(obj, app_settings=app_settings)
             return obj
         meta = obj.get("metadata")
         if isinstance(kind, str) and isinstance(meta, dict) and isinstance(meta.get("annotations"), dict):
             _reduce_applied(meta["annotations"])
+        bare = not app_settings and not system_namespace(_ns)
         env = obj.get("env")
         if isinstance(env, list):
-            scrub_env(env)
+            scrub_env(env, every=bare)
+        if bare and (isinstance(obj.get("command"), list) or isinstance(obj.get("args"), list)):
+            shape_ = command_shape(obj)
+            gone = {k: len(obj.pop(k)) for k in ("command", "args") if isinstance(obj.get(k), list)}
+            obj[MARK] = {**(obj.get(MARK) if isinstance(obj.get(MARK), dict) else {}), "items_dropped": gone, "command_shape": shape_}
         for v in obj.values():
-            scrub_objects(v)
+            scrub_objects(v, app_settings=app_settings, _ns=_ns)
     elif isinstance(obj, list):
         for v in obj:
-            scrub_objects(v)
+            scrub_objects(v, app_settings=app_settings, _ns=_ns)
     return obj
 
 

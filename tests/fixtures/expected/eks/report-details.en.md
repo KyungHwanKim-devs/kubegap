@@ -1,13 +1,13 @@
-# kubegap report details — arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (`app-u-cluster`), full mode
+# kubegap report details — app-u-cluster-eks (`app-u-cluster`), full mode
 
-Reference half of the report, assembled by `scripts/kubegap render-details` from the snapshot files plus the analysis block of `llm/facts.json`. The human report is `report.md` next to this file. Headings follow the report language; data inside tables is English.
+Reference half of the report, assembled by `scripts/kubegap render-details` from the snapshot files plus the analysis block of `report/outline.json`. The human report is `report.md` next to this file. Headings follow the report language; data inside tables is English.
 
 | Item | Value |
 |---|---|
 | kube context / cluster | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
 | Run time / mode | 2026-11-07T10:33:37+09:00 / full (collection 300.7 s, 0 steps skipped by mode, 6 failed) |
-| Profile | `prod` (detected) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.87 / 1.1.0 |
+| Scale | `medium` (guessed) |
+| kubegap / rubric / signatures | <kubegap> / 0.1.94 / 1.1.0 |
 | Verified against | Kubernetes v1.32.13-eks-577a51e (verified 1.30 to 1.37) · Prometheus 2.49.1 (verified 2.49 to 3.15) · Alertmanager 0.26.0 (verified 0.26 to 0.34) · Loki 2.6.1 (verified 2.6 to 3.7) · Grafana 10.2.3 (verified 10.2 to 13.3) |
 | Nodes / namespaces / pods / CRDs | 9 (Ready 9) / 26 / 154 / 47 |
 | Components (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
@@ -20,13 +20,13 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 
 | Severity (default) | fail | warn | vs. previous run of this mode |
 |---|---|---|---|
-| critical | 1 | 3 | no previous run of this mode |
-| high | 36 | 29 | no previous run of this mode |
-| medium | 117 | 172 | no previous run of this mode |
+| critical | 1 | 0 | no previous run of this mode |
+| high | 35 | 32 | no previous run of this mode |
+| medium | 118 | 172 | no previous run of this mode |
 | low | 17 | 145 | no previous run of this mode |
-| info | 2 | 0 | no previous run of this mode |
+| info | 1 | 0 | no previous run of this mode |
 
-Checks 367: evaluated 360, disabled by profile 2, skipped 3, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
+Checks 367: evaluated 359, not run on this platform or at this scale 3, skipped 3, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
 
 ### 1-1. Final judgment vs. first pass (adjustments)
 
@@ -50,32 +50,31 @@ Checks 367: evaluated 360, disabled by profile 2, skipped 3, not collected in th
 | `karpenter.ec2nodeclass-al2.cluster` | high |  | EC2NodeClass 1 total, amiFamily AL2 ['default'], AMI families ['AL2'], AMI not pinned (auto-tracks latest) ['default'] |
 | `observability.failure-mode-uncovered.OOMKill` | high |  | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
 | `observability.loki-oomkilled.cluster` | high |  | Loki pods [('loki-stack-0', 1, 'OOMKilled', '2026-10-25T00:15:41Z')]. Storage {'tmp': 'emptyDir', 'config': 'secret', 'storage': 'emptyDir'}, memory RSS 289MB |
-| `observability.no-event-retention.cluster` | high |  | no component of family event-retention in inventory.components |
 | `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | high |  | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
 | `observability.stack-storage-emptydir.monitoring/loki-stack` | high |  | emptyDir volumes: tmp, storage, replicas 1 |
 | `platform.k8s-version-eol.cluster` | high |  | server v1.32.13-eks-577a51e: EKS end of standard support 2026-03-23, 229 days past; upstream end of life 2026-02-28 |
 | `platform.karpenter-version-compat.cluster` | high |  | Karpenter 0.37.0 supports Kubernetes 1.23 to 1.30 (table row 0.37), the cluster runs 1.32.  |
 | `resilience.prod-concentration.ip-10-0-1-139.ap-northeast-2.compute.internal` | high |  | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default, spot) holds prod pods 23/45 (0.51), 18 workloads: ['app-ab-prod/app-ab-backend', 'app-ab-prod/app-ab-frontend', 'prod-app-s/app-s-admin' … |
-| `resilience.replicas-same-node.prod-app-w/deployment/app-w` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
-| `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | high |  | replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
-| `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling … |
-| `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | high |  | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling … |
+| `resilience.replicas-same-node.prod-app-w/deployment/app-w` | high |  | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes … |
+| `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | high |  | every replica is on one node now. replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes … |
+| `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | high |  | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes … |
+| `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | high |  | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred … |
 | `resources.cpu-throttling.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | high |  | pod prometheus-kube-prometheus-stack-prometheus-0: throttling ratio now 0.28, 24 h or the pod's life 0.28: throttled through the day |
 | `resources.cpu-throttling.prod-app-s/deploy/app-s-frontend:frontend` | high |  | ["pod app-s-frontend-6d7ff4dcdb-wjjxj: throttling ratio now 0.00, 24 h or the pod's life 0.46: throttled through the day; no 5-minute value, under 0.01 now", "pod app-s-frontend-6d7ff4dcdb-h7hpl: throttling ratio now … |
 | `resources.memory-limit-near-p95.prod-app-z-backend/deploy/app-z-embedding-server:embedding` | high |  | pod app-z-embedding-server-8445d87f5-dwqrx: 7d memory working set p95 / limit = 0.94 |
-| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | high |  | kernel log: 0 kills in 24 h on 1 of 2 nodes read. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods. cAdvisor counter 0 |
-| `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | high |  | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago), 2 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
+| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | high |  | kernel log: 0 kills in 24 h on 1 of 2 nodes read. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (none of those pods is running now). cAdvisor counter 0. Running now … |
+| `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | high |  | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago). The container has restarted 2 times since the pod was created, for any reason and … |
 | `security.networkpolicy-not-enforced.cluster` | high |  | 4 NetworkPolicies (['app-ab-prod', 'prod-app-r', 'prod-app-t', 'prod-app-x']), enforced False: aws-eks-nodeagent --enable-network-policy=false, 0 PolicyEndpoints |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | high |  | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
-| `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
+| `security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 | `storage.pvc-usage-high.dev-app-aa/data-app-aa-mysql-0` | high |  | Usage 0.902 (capacity 9.7GB, inodes 0.0), growth 0.0GB/day, None days to full, workloads ['statefulset/app-aa-mysql'], StorageClass gp3 |
-| `traffic.alb-unhealthy-targets.dev-app-aa/app-aa-backend` | high |  | Target group k8s-devvxtch-vxtchatb-b347218b4f (application, port 8000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0 … |
-| `traffic.alb-unhealthy-targets.dev-app-v/app-v-frontend` | high |  | Target group k8s-devtooto-appkf-133751726c (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 3.0 … |
-| `traffic.alb-unhealthy-targets.prod-app-t/app-t-backend` | high |  | Target group k8s-prodcurt-curtainc-bb495c72c8 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0 … |
-| `traffic.alb-unhealthy-targets.prod-app-v/app-v-frontend` | high |  | Target group k8s-prodtoot-appkf-36f816b829 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0 … |
-| `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | high |  | Target group k8s-prodinse-insertoo-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0 … |
-| `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | high |  | Target group k8s-prodrhem-appnbac-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0 … |
-| `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | high |  | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com'], sourceRanges None … |
+| `traffic.alb-unhealthy-targets.dev-app-aa/app-aa-backend` | high |  | Target group k8s-lb-b347218b4f (application, port 8000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / … |
+| `traffic.alb-unhealthy-targets.dev-app-v/app-v-frontend` | high |  | Target group k8s-lb-133751726c (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 3.0, health check / … |
+| `traffic.alb-unhealthy-targets.prod-app-t/app-t-backend` | high |  | Target group k8s-lb-bb495c72c8 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / … |
+| `traffic.alb-unhealthy-targets.prod-app-v/app-v-frontend` | high |  | Target group k8s-lb-36f816b829 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / … |
+| `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | high |  | Target group k8s-lb-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / … |
+| `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | high |  | Target group k8s-lb-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0, health check / … |
+| `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | high |  | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['lb-151c379572.elb.example.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to … |
 | `vpccni.no-available-ip.ip-10-0-1-139.ap-northeast-2.compute.internal` | high |  | node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): ipamd answered 'no available IP' 4 times since it started; pod IPs 36/56 (0.643), ENI 4/4, max-pods 58 |
 
 (consecutive-run counts need diff.json; none for this snapshot)
@@ -97,12 +96,11 @@ No earlier full snapshot to compare with.
 | Finding | Status | Severity | Why it should exist | Proposal |
 |---|---|---|---|---|
 | `resilience.no-backup.cluster` | fail | critical | There is no way to recover cluster state (objects) and PV data. Deleting a namespace by mistake or a broken etcd or PV is the end. A CronJob dump without a tool is often "a backup kept on the same … | Velero (plus EBS snapshots or PV backup). On EKS at least a DLM snapshot policy. In a small k3s cluster, k3s etcd-snapshot or a state.db copy plus PV directory backup. Test a restore; a dump that was … |
-| `observability.no-slo.cluster` | warn | critical | Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first. | Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress. |
-| `observability.no-event-retention.cluster` | fail | high | Kubernetes events are kept for only one hour by default. FailedScheduling, OOMKilling and Unhealthy from the night are gone by morning. The most undervalued material is lost. | Ship events to Loki or Elasticsearch with kubernetes-event-exporter. Alternatively, the promtail/alloy event source if Loki exists, or `[INPUT] kubernetes_events` with fluent-bit (detection … |
+| `observability.no-slo.cluster` | warn | high | Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first. | Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress. |
+| `observability.no-event-retention.cluster` | fail | medium | Kubernetes events are kept for only one hour by default. FailedScheduling, OOMKilling and Unhealthy from the night are gone by morning. The most undervalued material is lost. | Ship events to Loki or Elasticsearch with kubernetes-event-exporter. Alternatively, the promtail/alloy event source if Loki exists, or `[INPUT] kubernetes_events` with fluent-bit (detection … |
 | `security.no-certificate-manager.cluster` | warn | medium | When TLS certificate renewal is manual, services keep going down from expiry. cert-manager (or ACM plus ALB on EKS) automates renewal. On EKS, ALBs using ACM certificates work without cert-manager … | Install cert-manager, or if ACM is in use, suppress this check in config.yaml with a reason. |
-| `hygiene.no-progressive-delivery.cluster` | fail | info | A rolling update is "replace everything", so a defect in the new version reaches all traffic immediately. Without a canary tool (some traffic -> check metrics -> expand), deployment verification … | As services grow, automate canary judgment with Argo Rollouts (same ecosystem as Argo CD) + AnalysisTemplate (ALB 5xx, p95 Prometheus queries). |
 
-Expected families missing (inventory): backup, event-retention, slo, certificates, progressive-delivery.
+Expected families missing (inventory): backup, certificates, event-retention, slo.
 
 ## 6. Suppressed, tool missing, not collected
 
@@ -112,7 +110,7 @@ Expected families missing (inventory): backup, event-retention, slo, certificate
 - Not collected in full mode 0: none
 - Skipped or errored 3: `observability.fluentbit-output-errors` (skip: summary.logs.agents.fluent-bit missing), `traffic.ingress-nginx-vulnerable-version` (skip: summary.traffic.nginx missing), `traffic.ingress-nginx-retired` (skip: summary.traffic.nginx missing)
 - Judged in part 23 (some targets lacked what the rule needs; those are not judged, not passed): `node.kernel-oom-node-level` (2 not judged: node not read (2)), `node.kernel-lockup` (2 not judged: node not read (2)), `node.kernel-io-fs-errors` (2 not judged: node not read (2)), `node.kernel-nic-events` (2 not judged: node not read (2)), `node.conntrack-table-full` (2 not judged: node not read (2)), `node.kernel-net-mem-pressure` (2 not judged: node not read (2)), `node.cgroup-v1` (2 not judged: node not read (2)), `node.sysctl-tuning` (2 not judged: node not read (2)), `node.cri-not-ready` (2 not judged: node not read, or cri not read (2)), `node.cri-exited-containers` (2 not judged: node not read (2)), `node.service-restarts` (2 not judged: node not read (2)), `node.reboot-required` (2 not judged: node not read (2)), `node.os-updates-pending` (2 not judged: node not read (2)), `node.kubelet-reserved-missing` (2 not judged: node not read, or kubelet not read (2)), `node.kubelet-eviction-memory-missing` (2 not judged: node not read, or kubelet not read (2)), `node.clock-unsynced-os` (2 not judged: node not read (2)), `node.zombie-processes` (2 not judged: node not read (2)), `node.kubelet-api-qps-low` (2 not judged: node not read, or kubelet not read (2)), `node.docker-and-containerd` (2 not judged: node not read (2)), `node.container-writable-layer-large` (2 not judged: node not read (2)), `node.large-images` (2 not judged: node not read (2)), `vpccni.no-available-ip` (2 not judged: VPC CNI metrics not read (awscni_no_available_ip_addresses) (2)), `vpccni.ec2-api-errors` (2 not judged: metrics not read (2))
-- Query returned no series 4 (every metric name the query reads has series, so nothing happened; a name with no series would be a skip): `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `controlplane.apiserver-401-rate`, `scaling.pod-pending-long`
+- Query returned no series 3 (every metric name the query reads has series, so nothing happened; a name with no series would be a skip): `observability.scrape-targets-down`, `controlplane.apiserver-401-rate`, `scaling.pod-pending-long`
 
 ## 7. Appendix
 
@@ -155,11 +153,11 @@ Deprecated-API tools: kubent 28 of 41 Lists answered (13 refused or not served);
 
 ### 7-2. Checks evaluated
 
-367 checks: disabled 2, done 360, llm 2, skip 3. Load errors: none.
+367 checks: disabled 3, done 359, llm 2, skip 3. Load errors: none.
 
 ### 7-3. Signature matches and unclassified errors
 
-Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runner-controller, alb-controller, argocd, ebs-csi, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, loki, metrics-server, prometheus, promtail, vpc-cni). Unclassified error lines: 145.
+Signature catalog 1.1.1, 40 files, 23879 lines scanned (components: actions-runner-controller, alb-controller, argocd, ebs-csi, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, loki, metrics-server, prometheus, promtail, vpc-cni). Unclassified error lines: 145.
 
 | Signature | Component | Area | Severity | Status | Count | First, last | Sample |
 |---|---|---|---|---|---|---|---|
@@ -180,9 +178,10 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | node:ip-10-0-1-139.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="get state for bb8345cc36bb26c57461ca9eb5c37ef0819a9de1a4cfe72eece946c75b3c5599" error="context deadline … | 6 | logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log |
 | ebs-csi \| "Volume deletion failed" err="persistentvolume pvc-<uuid> is still attached to node ip-10-0-1-98.ap-northeast-2.compute.internal" … | 4 | logs/pods/ebs-csi/kube-system_ebs-csi-controller.log |
 | ebs-csi \| "Unhandled Error" err="error syncing volume \"pvc-<uuid>\": persistentvolume pvc-<uuid> is still attached to node … | 4 | logs/pods/ebs-csi/kube-system_ebs-csi-controller.log |
-| node:ip-10-0-2-100.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62" error="context deadline … | 3 | logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log |
 | ebs-csi \| "Event occurred" object="prod-app-x/app-x-api-usage" fieldPath="" kind="PersistentVolumeClaim" apiVersion="v1" type="Warning" … | 3 | logs/pods/ebs-csi/kube-system_ebs-csi-controller.log |
 | ebs-csi \| "Unhandled Error" err="error syncing claim \"<uuid>\": failed to provision volume with StorageClass \"gp3\": error generating accessibility … | 3 | logs/pods/ebs-csi/kube-system_ebs-csi-controller.log |
+| node:ip-10-0-2-100.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62" error="context deadline … | 3 | logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log |
+| kube-proxy \| "Kube-proxy configuration may be incomplete or incorrect" err="nodePortAddresses is unset; NodePort connections will be accepted on all … | 2 | logs/pods/kube-proxy/kube-system_kube-proxy.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="failed to load cni during init, please check CRI plugin status before setting up network for pods" error="cni … | 2 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| "Eviction manager: failed to get summary stats" err="failed to get node info: node \"ip-10-0-1-<n>.ap-northeast-2.compute.internal\" not … | 2 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| "ContainerStatus from runtime service failed" err="rpc error: code = NotFound desc = an error occurred when try to find container … | 2 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log |
@@ -196,7 +195,6 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | node:ip-10-0-2-100.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="get state for 1a8fce1368e23a54372baa095d5b19d99ed81102dc9e7b3beb9ba13ff476c798" error="context deadline … | 2 | logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log |
 | node:ip-10-0-2-100.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="ttrpc: received message on inactive stream" stream=3 | 2 | logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log |
 | node:ip-10-0-2-100.ap-northeast-2.compute.internal \| "Eviction manager: failed to get summary stats" err="failed to get node info: node \"ip-10-0-2-<n>.ap-northeast-2.compute.internal\" not … | 2 | logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log |
-| kube-proxy \| "Kube-proxy configuration may be incomplete or incorrect" err="nodePortAddresses is unset; NodePort connections will be accepted on all … | 2 | logs/pods/kube-proxy/kube-system_kube-proxy.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="collecting metrics for a8a9d8b268ec10d5dc42145447580db16a5b3152ee3f97d810ded9029e1106f2" error="cgroups: … | 1 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="failed to reload cni configuration after receiving fs change event(WRITE         … | 1 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log |
 | node:ip-10-0-1-137.ap-northeast-2.compute.internal \| time="<ts>" level=error msg="ContainerStatus for \"e8426e2dc7f50ebd0fc6522f7e55f5ecb85cf46287b7077842a160630158833e\" failed" error="rpc … | 1 | logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log |
@@ -214,49 +212,45 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | id | Status | Default severity | Evidence |
 |---|---|---|---|
 | `resilience.no-backup.cluster` | fail | critical | no backup tool (family backup). Alternative signals: etcd snapshots 0, backup-like CronJobs that ran in the last 7 days [], VolumeSnapshots 0. If signals exist, the LLM checks whether copies leave the node |
-| `observability.no-slo.cluster` | warn | critical | no SLO tool. Signals: sli/slo recording rules [], burn rate alerts [], slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'] known issue #15 |
-| `observability.no-symptom-alerts.cluster` | warn | critical | 157 alert rules: symptom 0, cause 138, app metrics (assumed symptom) 14. Symptom ratio 0.0. Symptom rules: [] |
-| `resilience.n-plus-one.cluster` | warn | critical | Allocatable without the largest node ip-10-0-1-139.ap-northeast-2.compute.internal (3.92 cores, 29.8GB): CPU 15.45 cores vs total requests 11.51 (OK), memory 46.3GB vs 45.7GB (OK). Pods on that node 34 (prod 23). Pods that fit on no other node []. Pools short of room: 32 pods limited to … |
-| `controlplane.scheduler-unschedulable.prod-app-x/app-x-api` | fail | high | 24h 'Unable to schedule pod; no fit' 7 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
-| `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-file-worker` | fail | high | 24h 'Unable to schedule pod; no fit' 51 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
-| `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-graph-worker` | fail | high | 24h 'Unable to schedule pod; no fit' 11 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
+| `controlplane.scheduler-unschedulable.prod-app-x/app-x-api` | fail | high | 24h 'Unable to schedule pod; no fit' 7 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(… |
+| `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-file-worker` | fail | high | 24h 'Unable to schedule pod; no fit' 51 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(… |
+| `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-graph-worker` | fail | high | 24h 'Unable to schedule pod; no fit' 11 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(… |
 | `eks.no-backup-policy.cluster` | fail | high | dlm get-lifecycle-policies Policies 0, backup list-backup-plans 0. In-cluster backup tools: {'etcd_snapshots': 0, 'backup_cronjobs': [], 'stale_backup_cronjobs': [], 'volume_snapshots': 0, 'any': False} |
 | `eks.public-endpoint-open.cluster` | fail | high | public True, private True, allowed CIDRs ['0.0.0.0/0'] |
 | `events.tracked-warning-reasons.FreeDiskSpaceFailed` | fail | high | kubelet image GC could not free space. Disk is full of in-use images and logs. 1338 occurrences total (1 events, trend over 1 snapshots [1338], flat), first 2026-10-23T01:20:23Z last 2026-11-07T01:32:11Z. Top objects: ['Node/ip-10-0-1-139.ap-northeast-2.compute.internal'] |
 | `karpenter.ec2nodeclass-al2.cluster` | fail | high | EC2NodeClass 1 total, amiFamily AL2 ['default'], AMI families ['AL2'], AMI not pinned (auto-tracks latest) ['default'] |
 | `observability.failure-mode-uncovered.OOMKill` | fail | high | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
 | `observability.loki-oomkilled.cluster` | fail | high | Loki pods [('loki-stack-0', 1, 'OOMKilled', '2026-10-25T00:15:41Z')]. Storage {'tmp': 'emptyDir', 'config': 'secret', 'storage': 'emptyDir'}, memory RSS 289MB |
-| `observability.no-event-retention.cluster` | fail | high | no component of family event-retention in inventory.components |
 | `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | fail | high | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
 | `observability.stack-storage-emptydir.monitoring/loki-stack` | fail | high | emptyDir volumes: tmp, storage, replicas 1 |
 | `platform.k8s-version-eol.cluster` | fail | high | server v1.32.13-eks-577a51e: EKS end of standard support 2026-03-23, 229 days past; upstream end of life 2026-02-28 |
 | `platform.karpenter-version-compat.cluster` | fail | high | Karpenter 0.37.0 supports Kubernetes 1.23 to 1.30 (table row 0.37), the cluster runs 1.32.  |
 | `resilience.prod-concentration.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | high | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default, spot) holds prod pods 23/45 (0.51), 18 workloads: ['app-ab-prod/app-ab-backend', 'app-ab-prod/app-ab-frontend', 'prod-app-s/app-s-admin', 'prod-app-s/app-s-api', 'prod-app-s/app-s-backend', 'prod-app-s/app-s-frontend' … |
-| `resilience.replicas-same-node.prod-app-w/deployment/app-w` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
-| `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | fail | high | replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
-| `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
-| `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | fail | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling constraints 4 |
+| `resilience.replicas-same-node.prod-app-w/deployment/app-w` | fail | high | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
+| `resilience.replicas-same-node.prod-app-y/deployment/app-y-ai` | fail | high | every replica is on one node now. replicas 3 (Running 3), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 3}, AZ distribution {'ap-northeast-2a': 3}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
+| `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | fail | high | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
+| `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | fail | high | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling constraints 4 |
 | `resources.cpu-throttling.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | fail | high | pod prometheus-kube-prometheus-stack-prometheus-0: throttling ratio now 0.28, 24 h or the pod's life 0.28: throttled through the day |
 | `resources.cpu-throttling.prod-app-s/deploy/app-s-frontend:frontend` | fail | high | ["pod app-s-frontend-6d7ff4dcdb-wjjxj: throttling ratio now 0.00, 24 h or the pod's life 0.46: throttled through the day; no 5-minute value, under 0.01 now", "pod app-s-frontend-6d7ff4dcdb-h7hpl: throttling ratio now 0.38, 24 h or the pod's life 0.42: throttled through the day", "pod … |
 | `resources.memory-limit-near-p95.prod-app-z-backend/deploy/app-z-embedding-server:embedding` | fail | high | pod app-z-embedding-server-8445d87f5-dwqrx: 7d memory working set p95 / limit = 0.94 |
-| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | fail | high | kernel log: 0 kills in 24 h on 1 of 2 nodes read. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods. cAdvisor counter 0 |
-| `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | fail | high | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago), 2 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
+| `resources.oomkilled-repeated.prod-app-t/deploy/app-t-ai:ai` | fail | high | kernel log: 0 kills in 24 h on 1 of 2 nodes read. Prometheus: 3 pods ended by OOM in 7 days, 3 already replaced, 13 restarts in those pods (none of those pods is running now). cAdvisor counter 0. Running now: app-t-ai-5469577cf8-7nwnb (created 2026-11-06T08:26:51Z, 0 restarts of this container … |
+| `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | fail | high | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago). The container has restarted 2 times since the pod was created, for any reason and not only in the last 7 days. An OOM older than 7 days is warn, older than 30 days … |
 | `security.networkpolicy-not-enforced.cluster` | fail | high | 4 NetworkPolicies (['app-ab-prod', 'prod-app-r', 'prod-app-t', 'prod-app-x']), enforced False: aws-eks-nodeagent --enable-network-policy=false, 0 PolicyEndpoints |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | high | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
-| `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
+| `security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 | `storage.pvc-usage-high.dev-app-aa/data-app-aa-mysql-0` | fail | high | Usage 0.902 (capacity 9.7GB, inodes 0.0), growth 0.0GB/day, None days to full, workloads ['statefulset/app-aa-mysql'], StorageClass gp3 |
-| `traffic.alb-unhealthy-targets.dev-app-aa/app-aa-backend` | fail | high | Target group k8s-devvxtch-vxtchatb-b347218b4f (application, port 8000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-aa-backend'] |
-| `traffic.alb-unhealthy-targets.dev-app-v/app-v-frontend` | fail | high | Target group k8s-devtooto-appkf-133751726c (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 3.0, health check / expected codes 200, backends ['deployment/app-v-frontend'] |
-| `traffic.alb-unhealthy-targets.prod-app-t/app-t-backend` | fail | high | Target group k8s-prodcurt-curtainc-bb495c72c8 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-t-backend'] |
-| `traffic.alb-unhealthy-targets.prod-app-v/app-v-frontend` | fail | high | Target group k8s-prodtoot-appkf-36f816b829 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-v-frontend'] |
-| `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | fail | high | Target group k8s-prodinse-insertoo-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-y-frontend'] |
-| `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | fail | high | Target group k8s-prodrhem-appnbac-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0, health check / expected codes 200, backends ['deployment/app-z-backend'] |
-| `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | fail | high | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to the internet by the … |
+| `traffic.alb-unhealthy-targets.dev-app-aa/app-aa-backend` | fail | high | Target group k8s-lb-b347218b4f (application, port 8000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-aa-backend'] |
+| `traffic.alb-unhealthy-targets.dev-app-v/app-v-frontend` | fail | high | Target group k8s-lb-133751726c (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 3.0, health check / expected codes 200, backends ['deployment/app-v-frontend'] |
+| `traffic.alb-unhealthy-targets.prod-app-t/app-t-backend` | fail | high | Target group k8s-lb-bb495c72c8 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-t-backend'] |
+| `traffic.alb-unhealthy-targets.prod-app-v/app-v-frontend` | fail | high | Target group k8s-lb-36f816b829 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-v-frontend'] |
+| `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | fail | high | Target group k8s-lb-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-y-frontend'] |
+| `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | fail | high | Target group k8s-lb-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0, health check / expected codes 200, backends ['deployment/app-z-backend'] |
+| `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | fail | high | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['lb-151c379572.elb.example.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to the internet by the security group |
 | `vpccni.no-available-ip.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | high | node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): ipamd answered 'no available IP' 4 times since it started; pod IPs 36/56 (0.643), ENI 4/4, max-pods 58 |
 | `controlplane.apiserver-5xx.cluster` | warn | high | 5xx per second 0.004 (code 503) |
-| `controlplane.scheduler-unschedulable.arc-runners/self-hosted-arm64-8msc5-runner` | warn | high | 24h 'Unable to schedule pod; no fit' 36 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
-| `controlplane.scheduler-unschedulable.prod-app-r/app-r-backend` | warn | high | 24h 'Unable to schedule pod; no fit' 4 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
-| `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-embedding-server` | warn | high | 24h 'Unable to schedule pod; no fit' 4 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
+| `controlplane.scheduler-unschedulable.arc-runners/self-hosted-arm64-8msc5-runner` | warn | high | 24h 'Unable to schedule pod; no fit' 36 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(… |
+| `controlplane.scheduler-unschedulable.prod-app-r/app-r-backend` | warn | high | 24h 'Unable to schedule pod; no fit' 4 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(… |
+| `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-embedding-server` | warn | high | 24h 'Unable to schedule pod; no fit' 4 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(… |
 | `eks.service-quota-near-limit.aws-account` | warn | high | quotas with a usage metric 25/65, at 80% or more [], at 60% or more ['VPCs 0.6'], top operational quotas [['VPCs', 3.0, 5.0, 0.6], ['listener rules per ALB', 48.0, 100.0, 0.48], ['target groups per ALB', 41.0, 100.0, 0.41], ['certificates per ALB', 9.0, 25.0, 0.36], ['NLBs', 2.0, 50.0, 0.04] … |
 | `events.tracked-warning-reasons.Unhealthy` | warn | high | Probe failure. Readiness removes it from traffic, liveness restarts it. 1 occurrences total (1 events, trend over 1 snapshots [1], flat), first 2026-11-07T00:48:24Z last 2026-11-07T00:48:24Z. Top objects: ['Pod/prod-app-s/app-s-backend-7c46f75bf6-ljlnl'] |
 | `events.tracked-warning-reasons.UpdateFailed` | warn | high | Operator reconcile failure (ExternalSecret etc.). 2711 occurrences total (1 events, trend over 1 snapshots [2711], flat), first 2026-10-08T12:31:38Z last 2026-11-07T01:18:03Z. Top objects: ['ExternalSecret/database/mysql-app-v-secret'] |
@@ -266,18 +260,21 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `node.disk-usage.10.0.1.139:9100:/` | warn | high | usage 0.85 |
 | `observability.failure-mode-uncovered.Scheduling failure` | warn | high | user symptom: new pods do not start. No alert rule covers this failure mode |
 | `observability.failure-mode-uncovered.VPC CNI IP exhaustion` | warn | high | user symptom: pods Pending without network. No alert rule covers this failure mode |
+| `observability.no-slo.cluster` | warn | high | no SLO tool. Signals: sli/slo recording rules [], burn rate alerts [], slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'] known issue #15 |
+| `observability.no-symptom-alerts.cluster` | warn | high | 157 alert rules: symptom 0, cause 138, app metrics (assumed symptom) 14. Symptom ratio 0.0. Symptom rules: [] |
 | `prometheus.memory-pressure.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus` | warn | high | working set / limit 0.655 (limit 1536Mi), active series 165690, Prometheus container last terminated OOMKilled True (2026-11-05T08:21:29Z), restarts 2, OOMKilled containers in the monitoring namespace ['loki-stack-0/loki', 'prometheus-kube-prometheus-stack-prometheus-0/prometheus'], restarts over 7 … |
-| `resilience.replicas-same-node.prod-app-x/deployment/app-x-api` | warn | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-137.ap-northeast-2.compute.internal': 1}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
+| `resilience.n-plus-one.cluster` | warn | high | Allocatable without the largest node ip-10-0-1-139.ap-northeast-2.compute.internal (3.92 cores, 29.8GB): CPU 15.45 cores vs total requests 11.51 (OK), memory 46.3GB vs 45.7GB (OK). Pods on that node 34 (prod 23). Pods that fit on no other node []. Pools short of room: 32 pods limited to … |
+| `resilience.replicas-same-node.prod-app-x/deployment/app-x-api` | warn | high | the replicas are on different nodes now, but nothing declares that they must be (no topologySpread, no podAntiAffinity), so a reschedule may put them on one. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1 … |
 | `resilience.restarts-crashloop.argocd/argocd-application-controller-0:application-controller` | warn | high | 42 restarts, state Running, last termination OOMKilled (exit 137) 2026-10-30T09:00:04Z, cause class OOM (memory limit), Unhealthy events 0, node reboot time None |
 | `resources.cpu-throttling.dev-app-s/deploy/app-s-frontend:frontend` | warn | high | ["pod app-s-frontend-6578574c-qx5nj: throttling ratio now 0.00, 24 h or the pod's life 0.23: throttled through the day, below the fail line; no 5-minute value, under 0.01 now", "pod app-s-frontend-999976975-nf4rv: throttling ratio now 0.12, 24 h or the pod's life 0.11: throttled through the day … |
 | `resources.cpu-throttling.dev-app-v/deploy/app-v-frontend:frontend` | warn | high | ["pod app-v-frontend-f7b9d96d4-dn7qv: throttling ratio now 0.00, 24 h or the pod's life 0.23: throttled through the day, below the fail line; no 5-minute value, under 0.01 now", "pod app-v-frontend-f7b9d96d4-jl226: throttling ratio now 0.00, 24 h or the pod's life 0.21: throttled through the day … |
 | `resources.cpu-throttling.dev-app-y/deploy/app-y-frontend:frontend` | warn | high | pod app-y-frontend-7f6d6dc65b-lnmq4: throttling ratio now 0.16, 24 h or the pod's life 0.12: throttled through the day, below the fail line |
-| `resources.oomkilled-repeated.monitoring/sts/loki-stack:loki` | warn | high | kernel log: 1 kill in 24 h on 1 of 1 node read. Prometheus: 0 pods ended by OOM in 7 days, 0 restarts in those pods. cAdvisor counter 0 |
-| `resources.oomkilled-repeated.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | warn | high | kernel log not read on its node, no node access there. Prometheus: 1 pod ended by OOM in 7 days, 1 restarts in those pods. cAdvisor counter 1 |
-| `resources.oomkilled.argocd/sts/argocd-application-controller:application-controller` | warn | high | pod argocd-application-controller-0: last termination reason OOMKilled, finished at 2026-10-30T09:00:04Z (7.7 days ago), 42 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
-| `resources.oomkilled.monitoring/sts/loki-stack:loki` | warn | high | pod loki-stack-0: last termination reason OOMKilled, finished at 2026-10-25T00:15:41Z (13.1 days ago), 1 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
-| `security.imds-hop-limit.cluster` | warn | high | Of 9 instances, 9 with IMDS hop limit > 1 or tokens optional: {'hop=2 tokens=required': 9}. Examples [('system_core', 'm5.large', 2, 'required'), ('system_core', 'm5.large', 2, 'required'), ('karpenter-node', 't8i.medium', 2, 'required'), ('karpenter-node', 'm7i-flex.large', 2, 'required')]. … |
-| `traffic.db-exposed.nlb/app-u-db-shared` | warn | high | nlb (defined outside the cluster) /app-u-db-shared: ports [3306, 3307, 3308, 3309, 3310, 3311, 5432, 5433, 6379, 7687], exposure internet-facing, addresses ['app-u-db-shared-d7d643f6896a3b2b.elb.ap-northeast-2.amazonaws.com'], sourceRanges None, security group allow-list, at most 4 sources per … |
+| `resources.oomkilled-repeated.monitoring/sts/loki-stack:loki` | warn | high | kernel log: 1 kill in 24 h on 1 of 1 node read. Prometheus: 0 pods ended by OOM in 7 days, 0 restarts in those pods. cAdvisor counter 0. Running now: loki-stack-0 (created 2026-10-08T12:33:26Z, 1 restart of this container since, its previous run ended 2026-10-25T00:15:41Z with reason OOMKilled … |
+| `resources.oomkilled-repeated.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | warn | high | kernel log not read on its node, no node access there. Prometheus: 1 pod ended by OOM in 7 days, 1 restarts in those pods. cAdvisor counter 1. Running now: prometheus-kube-prometheus-stack-prometheus-0 (created 2026-09-08T12:47:49Z, 2 restarts of this container since, its previous run ended … |
+| `resources.oomkilled.argocd/sts/argocd-application-controller:application-controller` | warn | high | pod argocd-application-controller-0: last termination reason OOMKilled, finished at 2026-10-30T09:00:04Z (7.7 days ago). The container has restarted 42 times since the pod was created, for any reason and not only in the last 7 days. An OOM older than 7 days is warn, older than 30 days is excluded |
+| `resources.oomkilled.monitoring/sts/loki-stack:loki` | warn | high | pod loki-stack-0: last termination reason OOMKilled, finished at 2026-10-25T00:15:41Z (13.1 days ago). The container has restarted 1 times since the pod was created, for any reason and not only in the last 7 days. An OOM older than 7 days is warn, older than 30 days is excluded |
+| `security.imds-hop-limit.cluster` | warn | high | Of 9 instances, 9 with IMDS hop limit > 1 or tokens optional: {'hop=2 tokens=required': 9}. Examples [('system_core', 'm5.large', 2, 'required'), ('system_core', 'm5.large', 2, 'required'), ('karpenter-node', 't8i.medium', 2, 'required'), ('karpenter-node', 'm7i-flex.large', 2, 'required')] and 5 … |
+| `traffic.db-exposed.nlb/app-u-db-shared` | warn | high | nlb (defined outside the cluster) /app-u-db-shared: ports [3306, 3307, 3308, 3309, 3310, 3311, 5432, 5433, 6379, 7687], exposure internet-facing, addresses ['lb-fd242d81b4.elb.example.com'], sourceRanges None, security group allow-list, at most 4 sources per port, widest /32. NLB created outside … |
 | `vpccni.node-ip-exhaustion.ip-10-0-1-137.ap-northeast-2.compute.internal` | warn | high | node ip-10-0-1-137.ap-northeast-2.compute.internal (r8gd.medium, pool default): pod IPs 3/6 (0.5), ENI 2/2 (at limit True), 'no available IP' events 0, max-pods 8, prod pods 1. prefix delegation False |
 | `vpccni.node-ip-exhaustion.ip-10-0-1-241.ap-northeast-2.compute.internal` | warn | high | node ip-10-0-1-241.ap-northeast-2.compute.internal (t8i.small, pool system-ondemand): pod IPs 6/9 (0.667), ENI 3/3 (at limit True), 'no available IP' events 0, max-pods 11, prod pods 1. prefix delegation False |
 | `vpccni.node-ip-exhaustion.ip-10-0-1-245.ap-northeast-2.compute.internal` | warn | high | node ip-10-0-1-245.ap-northeast-2.compute.internal (r8gd.medium, pool default): pod IPs 5/6 (0.833), ENI 2/2 (at limit True), 'no available IP' events 0, max-pods 8, prod pods 2. prefix delegation False |
@@ -286,7 +283,7 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `cost.idle-compute-high.cluster` | fail | medium | Node compute monthly estimate 459.83 USD (on-demand list price, current spot price), of which idle 431.52 USD (0.94), by pool {'nodegroup:system_core-20251217040546303900000001': 172.28, 'default': 133.3, 'system-ondemand': 154.26}, 23.74 USD per core-month. Spot node share 0.44, spot savings … |
 | `cost.request-waste.cluster` | fail | medium | CPU request total 9.28 cores -> KRR recommendation 2.21 cores, reducible 7.07 cores ~ 167.84 USD/month |
 | `ebscsi.storageclass-unencrypted.cluster` | fail | medium | ebs.csi.aws.com StorageClasses 4, without encrypted ['gp3', 'gp3-2a', 'gp3-2c'] (default class gp3), in-tree leftovers ['gp2'], without allowVolumeExpansion ['gp2', 'gp3', 'gp3-2a', 'gp3-2c'] |
-| `ecr.scan-disabled.ecr/registry/<account>` | fail | medium | registry scanning BASIC (rules 0), repositories with scanOnPush off 41/45 (used by prod 27: ['ecr-app-ab-frontend-eks-prod', 'ecr-app-w-eks-prod', 'ecr-app-t-backend-eks-prod', 'ecr-app-t-web-eks-prod', 'ecr-app-r-postgresql-prod', 'ecr-app-s-admin-eks-prod']…), scanned images 0/908, CRITICAL+HIGH 0 |
+| `ecr.scan-disabled.ecr/registry/<account>` | fail | medium | registry scanning BASIC (rules 0), repositories with scanOnPush off 41/45 (used by prod 27: ['ecr-app-ab-frontend-eks-prod', 'ecr-app-w-eks-prod', 'ecr-app-t-backend-eks-prod', 'ecr-app-t-web-eks-prod', 'ecr-app-r-postgresql-prod', 'ecr-app-s-admin-eks-prod'] and 21 more), scanned images 0/908 … |
 | `eks.addon-outdated.aws-ebs-csi-driver` | fail | medium | installed v1.37.0-eksbuild.1, latest available v1.67.2-eksbuild.1, default v1.67.2-eksbuild.1 |
 | `eks.addon-outdated.vpc-cni` | fail | medium | installed v1.19.0-eksbuild.1, latest available v1.23.2-eksbuild.12, default v1.22.4-eksbuild.14 |
 | `eks.extended-support.cluster` | fail | medium | version 1.32, supportType EXTENDED, status EXTENDED_SUPPORT, end of standard support 2026-03-23T09:00:00+09:00, end of extended support 2027-03-23T09:00:00+09:00 |
@@ -297,14 +294,15 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `eso.provider-api-errors.cluster` | fail | medium | provider API calls since controller start: success 31963 / errors 2711 (ratio 0.0782), sync failures 2711/73134, reconcile errors 2711, ExternalSecrets not Ready ['database/externalsecret/mysql-app-v-secret'] (oldest refresh 7796.6 hours ago) |
 | `grafana.datasource-errors.monitoring/deployment/kube-prometheus-stack-grafana` | fail | medium | responses per datasource (cumulative since start) [('Loki(loki)', 2614, {'101': 4, '200': 2275, '400': 6, '429': 329}), ('Prometheus(prometheus)', 1535, {'200': 1349, '301': 186}), ('VictoriaMetrics_onprem(prometheus)', 142, {'200': 142})], error rate 1% or more ['Loki(loki)'] (max 0.1259), Grafana … |
 | `hygiene.eks-upgrade-insight.Amazon Linux 2 compatibility` | fail | medium | Amazon Linux 2 compatibility (UPGRADE_READINESS, k8s 1.33): ERROR — Amazon EKS stopped publishing EKS-optimized Amazon Linux 2 (AL2) AMIs on November 26, 2025. AL2023 and Bottlerocket based AMIs for Amazon EKS are available for all supported Kubernetes versions includ |
-| `hygiene.mutable-image-tag.prod-app-z-backend/deployment/tts-proxy:tailscale` | fail | medium | image tailscale/tailscale:latest (tag latest, imagePullPolicy IfNotPresent, registry docker.io) |
-| `hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/tts-proxy` | fail | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'memoryLimitsMissing', 'memoryRequestsMissing']. Security-category danger ['dangerousCapabilities', 'privilegeEscalationAllowed' … |
+| `hygiene.mutable-image-tag.prod-app-z-backend/deployment/app-ad:tailscale` | fail | medium | image tailscale/tailscale:latest (tag latest, imagePullPolicy IfNotPresent, registry docker.io) |
+| `hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/app-ad` | fail | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'memoryLimitsMissing', 'memoryRequestsMissing'] and 6 more. Security-category danger ['dangerousCapabilities' … |
 | `observability.alert-firing-stale.KubeControllerManagerDown` | fail | medium | Firing for 59.5 days (ALERTS_FOR_STATE). Labels {'severity': 'critical'} |
 | `observability.alert-firing-stale.KubeSchedulerDown` | fail | medium | Firing for 59.5 days (ALERTS_FOR_STATE). Labels {'severity': 'critical'} |
 | `observability.alerts-always-firing.KubeControllerManagerDown` | fail | medium | 7d firing samples 20157 (same level as Watchdog = never stops firing) |
 | `observability.alerts-always-firing.KubeSchedulerDown` | fail | medium | 7d firing samples 20157 (same level as Watchdog = never stops firing) |
 | `observability.log-coverage-gap.cluster` | fail | medium | Of 147 pods Running for over 1h, 83 are absent from Loki pod labels (ratio 0.565). Nodes with every pod missing: []. By namespace: {'kube-system': 23, 'monitoring': 22, 'prod-app-z-backend': 5, 'keda': 3, 'middleware': 3, 'prod-app-t': 3, 'prod-app-s': 3, 'argocd': 2, 'dev-app-s': 2, 'dev-app-y' … |
 | `observability.loki-retention-unbounded.cluster` | fail | medium | Loki 2.6.1, retention_period 31d, retention_enabled false |
+| `observability.no-event-retention.cluster` | fail | medium | no component of family event-retention in inventory.components |
 | `operators.unhealthy-condition.externalsecrets/database/mysql-app-v-secret` | fail | medium | Ready=False (SecretSyncedError) for 7795.6 hours: could not get secret data from provider |
 | `resilience.db-probe-timeout.prod-app-s/statefulset/app-s-backend-mysql:mysql` | fail | medium | prod-app-s/statefulset/app-s-backend-mysql container mysql: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe present |
 | `resilience.db-probe-timeout.prod-app-v/statefulset/app-v-backend-prod-mysql:mysql` | fail | medium | prod-app-v/statefulset/app-v-backend-prod-mysql container mysql: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe present |
@@ -322,11 +320,11 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `resilience.no-readiness-probe.prod-app-y/app-y-ai` | fail | medium | containers without a readinessProbe: ai |
 | `resilience.no-readiness-probe.prod-app-y/app-y-backend` | fail | medium | containers without a readinessProbe: backend |
 | `resilience.no-readiness-probe.prod-app-y/app-y-frontend` | fail | medium | containers without a readinessProbe: frontend |
-| `resilience.no-readiness-probe.prod-app-z-backend/tts-proxy` | fail | medium | containers without a readinessProbe: tailscale, forwarder |
+| `resilience.no-readiness-probe.prod-app-z-backend/app-ad` | fail | medium | containers without a readinessProbe: tailscale, forwarder |
 | `resilience.recreate-strategy-serving.prod-app-r/deployment/app-r-backend` | fail | medium | strategy Recreate (justification none), replicas 1, preStop False, grace 30s |
 | `resilience.replicas-same-zone.prod-app-x/deployment/app-x-api` | fail | medium | replicas 2, AZ distribution {'ap-northeast-2a': 2}, node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-137.ap-northeast-2.compute.internal': 1}, topologySpread [] |
 | `resilience.replicas-same-zone.prod-app-z-backend/deployment/app-z-embedding-server` | fail | medium | replicas 2, AZ distribution {'ap-northeast-2a': 2}, node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-245.ap-northeast-2.compute.internal': 1}, topologySpread [] |
-| `resilience.single-node-dependency.prod-app-z-backend/deployment/tts-proxy` | fail | medium | ["hostPath volume ['dev-net-tun']"], replicas 1 |
+| `resilience.single-node-dependency.prod-app-z-backend/deployment/app-ad` | fail | medium | ["hostPath volume ['dev-net-tun']"], replicas 1 |
 | `resilience.single-replica-in-prod.app-ab-prod/app-ab-backend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.app-ab-prod/app-ab-frontend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-r/app-r-backend` | fail | medium | replicas 1, no HPA |
@@ -341,9 +339,9 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `resilience.single-replica-in-prod.prod-app-v/app-v-frontend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-y/app-y-admin` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-y/app-y-frontend` | fail | medium | replicas 1, no HPA |
+| `resilience.single-replica-in-prod.prod-app-z-backend/app-ad` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-z-backend/app-z-pg-proxy` | fail | medium | replicas 1, no HPA |
-| `resilience.single-replica-in-prod.prod-app-z-backend/tts-proxy` | fail | medium | replicas 1, no HPA |
-| `resources.besteffort-in-prod.prod-app-z-backend/deploy/tts-proxy` | fail | medium | pod tts-proxy-7b6db97b69-4bbjf: QoS BestEffort (neither request nor limit) |
+| `resources.besteffort-in-prod.prod-app-z-backend/deploy/app-ad` | fail | medium | pod app-ad-7b6db97b69-4bbjf: QoS BestEffort (neither request nor limit) |
 | `resources.cpu-request-overprovisioned.prod-app-z-backend/deploy/app-z-backend:backend` | fail | medium | pod app-z-backend-78679bf4b-lhhg4: 7d CPU p95 0.003 cores / request 0.50 cores = 0.01 |
 | `resources.jvm-heap-vs-limit.middleware/statefulset/kafka-controller:jmx-exporter` | fail | medium | middleware/statefulset/kafka-controller container jmx-exporter (jmx-exporter:0.20.0-debian-11-r4): -Xmx NoneMiB, MaxRAMPercentage 100.0, memory limit 128.0MiB -> heap/limit 1.0 (heap unset False) |
 | `resources.krr-recommendation.argocd/statefulset/argocd-application-controller:application-controller` | fail | medium | memory request under by 373 MB, CPU request over by 0.143 cores: CPU request 0.2 → 0.057 cores, CPU limit 0.5 → none, memory request 384 → 757 MB. KRR severity WARNING (CPU req OK, CPU limit WARNING, memory req WARNING, memory limit GOOD) |
@@ -365,7 +363,7 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `resources.krr-recommendation.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | medium | CPU request over by 0.49 cores, memory request over by 2417 MB: CPU request 0.5 → 0.01 cores, CPU limit 2.0 → none, memory request 4096 → 1679 MB, memory limit 5120 → 1679 MB. KRR severity CRITICAL (CPU req WARNING, CPU limit WARNING, memory req CRITICAL, memory limit CRITICAL) |
 | `resources.large-request-binpacking.prod-app-z-backend/deploy/app-z-embedding-server:embedding` | fail | medium | ['pod app-z-embedding-server-8445d87f5-dwqrx: request is 58% of the median node allocatable', 'pod app-z-embedding-server-8445d87f5-sbzpj: request is 58% of the median node allocatable'] |
 | `resources.large-request-binpacking.prod-app-z-backend/sts/app-z-neo4j:neo4j` | fail | medium | pod app-z-neo4j-0: request is 58% of the median node allocatable |
-| `resources.no-memory-limit.prod-app-z-backend/tts-proxy` | fail | medium | containers without a limit: tailscale, forwarder |
+| `resources.no-memory-limit.prod-app-z-backend/app-ad` | fail | medium | containers without a limit: tailscale, forwarder |
 | `resources.node-request-usage-gap.ip-10-0-1-117.ap-northeast-2.compute.internal` | fail | medium | CPU requests/allocatable 0.96, usage/allocatable 7d p95 0.09 (5m instant 0.09) |
 | `resources.node-request-usage-gap.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | medium | CPU requests/allocatable 0.92, usage/allocatable 7d p95 0.09 (5m instant 0.05) |
 | `resources.node-request-usage-gap.ip-10-0-1-245.ap-northeast-2.compute.internal` | fail | medium | CPU requests/allocatable 0.90, usage/allocatable 7d p95 0.08 (5m instant 0.01) |
@@ -395,7 +393,7 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `tenancy.prod-without-quota.prod-app-y` | fail | medium | prod-app-y (prod): no ResourceQuota. Pods 8, CPU requests total 0.51 cores, memory requests total 8.0GB, 7d CPU p95 0.037 cores (cluster share 0.017), memory p95 3.43GB, 7d max/median 1.2x. Tenants in this cluster 14, shares nodes with prod True |
 | `tenancy.prod-without-quota.prod-app-z-backend` | fail | medium | prod-app-z-backend (prod): no ResourceQuota. Pods 9, CPU requests total 2.72 cores, memory requests total 14.53GB, 7d CPU p95 0.904 cores (cluster share 0.41), memory p95 11.89GB, 7d max/median 344.0x. Tenants in this cluster 14, shares nodes with prod True |
 | `tenancy.tenant-without-limitrange.prod-app-z-backend` | fail | medium | prod-app-z-backend (prod): no LimitRange, containers without requests 2 / without a memory limit 2 (pods 9). 7d CPU p95 0.904 cores, memory p95 11.89GB |
-| `traffic.alb-elb-5xx.k8s-lab-kprodlb-b18a4555d7` | fail | medium | ALB k8s-lab-kprodlb-b18a4555d7 (internet-facing): 24h requests 162172.0, ELB 5xx 145.0, target 5xx 152.0, rejected connections 0, idle timeout 300s, target groups 41 |
+| `traffic.alb-elb-5xx.k8s-lb-b18a4555d7` | fail | medium | ALB k8s-lb-b18a4555d7 (internet-facing): 24h requests 162172.0, ELB 5xx 145.0, target 5xx 152.0, rejected connections 0, idle timeout 300s, target groups 41 |
 | `traffic.ingress-p95-latency.prod-app-s/app-s-api` | fail | medium | ['canary-api-v1.lab-l.example', 'api.v1.lab-l.example']: p95 request-weighted 10.381s, hourly average 15.821s, 1h max 50.6329s, latest hour with requests 16.7603s on 3.0 requests at 2026-11-07T00:35, 287.0 requests/24h (source alb-cloudwatch) |
 | `traffic.shared-alb-group.alb-group/app-u-prod-lb` | fail | medium | ALB group app-u-prod-lb: 41 ingresses, 48 hosts, 16 namespaces ['app-ab-prod', 'argocd', 'dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y', 'middleware', 'monitoring', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend'], kinds … |
 | `vpccni.prefix-delegation-off.cluster` | fail | medium | ENABLE_PREFIX_DELEGATION false, nitro nodes 9/9. nodes above 50% IP usage ['ip-10-0-2-218.ap-northeast-2.compute.internal', 'ip-10-0-1-245.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal' … |
@@ -403,9 +401,9 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `argocd.admin-account-no-sso.cluster` | warn | medium | admin.enabled True, SSO (dex/oidc) False, anonymous False, RBAC policy.default '' / policy.csv 0 lines, exec.enabled False, URL https://deploy.lab-k.example |
 | `argocd.components-not-ha.cluster` | warn | medium | components (ready/replicas) {'applicationset-controller': '1/1', 'dex-server': '1/1', 'notifications-controller': '1/1', 'redis': '1/1', 'repo-server': '1/1', 'server': '1/1', 'application-controller': '1/1'}, not ready [], single replica (server, repo-server) ['repo-server', 'server'], version … |
 | `controlplane.authenticator-failures.cluster` | warn | medium | 24h authentication failures 8: [{'message': 'access denied', 'count': 8}] |
-| `controlplane.controller-error-repeat.gc_controller.go` | warn | medium | 24h E lines 6 times (gc_controller.go). Samples: summary.controlplane.controller_manager.top_errors |
-| `controlplane.controller-error-repeat.horizontal.go` | warn | medium | 24h E lines 11 times (horizontal.go). Samples: summary.controlplane.controller_manager.top_errors |
-| `controlplane.controller-error-repeat.type.go` | warn | medium | 24h W lines 80479 times (type.go). Samples: summary.controlplane.controller_manager.top_errors |
+| `controlplane.controller-error-repeat.gc_controller.go` | warn | medium | 24h E lines 6 times (gc_controller.go). Samples: summary.controlplane.controller_manager.errors_by_count |
+| `controlplane.controller-error-repeat.horizontal.go` | warn | medium | 24h E lines 11 times (horizontal.go). Samples: summary.controlplane.controller_manager.errors_by_count |
+| `controlplane.controller-error-repeat.type.go` | warn | medium | 24h W lines 80479 times (type.go). Samples: summary.controlplane.controller_manager.errors_by_count |
 | `coredns.nxdomain-ratio-high.cluster` | warn | medium | NXDOMAIN share of responses in 1h 0.503, queries per second 75.8, NXDOMAIN share of queries forwarded upstream 0.442 (upstreams ['10.0.0.2:53']), pods with default ndots (5) 154, autopath False, cache hit ratio 0.9237 |
 | `ecr.dockerhub-dependency.ecr/registry/<account>` | warn | medium | registry distribution of container images {'602401143452.dkr.ecr.ap-northeast-2.amazonaws.com': 77, '<account>.dkr.ecr.ap-northeast-2.amazonaws.com': 59, 'docker.io': 34, 'quay.io': 25, 'ghcr.io': 9, 'public.ecr.aws': 8, 'registry.k8s.io': 3}, docker.io images 19 (e.g. ['alpine/socat:1.8.0.0' … |
 | `eks.addon-outdated.coredns` | warn | medium | installed v1.11.3-eksbuild.1, latest available v1.11.4-eksbuild.104, default v1.11.4-eksbuild.104 |
@@ -414,11 +412,11 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `hygiene.mutable-image-tag.arc-runners/cronjob/arc-cool-down:kubectl` | warn | medium | image bitnami/kubectl:latest (tag latest, imagePullPolicy Always, registry docker.io) |
 | `hygiene.mutable-image-tag.arc-runners/cronjob/arc-warm-up:kubectl` | warn | medium | image bitnami/kubectl:latest (tag latest, imagePullPolicy Always, registry docker.io) |
 | `hygiene.mutable-image-tag.middleware/deployment/redis-insight:redis-insight` | warn | medium | image redis/redisinsight:latest (tag latest, imagePullPolicy Always, registry docker.io) |
-| `hygiene.node-label-dependency.app-u.ai/role` | warn | medium | Label app-u.ai/role: 34 workloads (production 9) depend on it via nodeSelector/affinity, present on 5/9 nodes — e.g. argocd/deployment/argocd-applicationset-controller, argocd/deployment/argocd-dex-server, argocd/deployment/argocd-notifications-controller |
-| `hygiene.node-label-dependency.workload-type` | warn | medium | Label workload-type: 39 workloads (production 26) depend on it via nodeSelector/affinity, present on 4/9 nodes — e.g. dev-app-s/deployment/app-s-admin, dev-app-s/deployment/app-s-api, dev-app-s/deployment/app-s-backend |
+| `hygiene.node-label-dependency.app-u.ai/role` | warn | medium | Label app-u.ai/role: 34 workloads (production 9) depend on it via nodeSelector/affinity, present on 5/9 nodes — e.g. ['argocd/deployment/argocd-applicationset-controller', 'argocd/deployment/argocd-dex-server', 'argocd/deployment/argocd-notifications-controller'] and 31 more |
+| `hygiene.node-label-dependency.workload-type` | warn | medium | Label workload-type: 39 workloads (production 26) depend on it via nodeSelector/affinity, present on 4/9 nodes — e.g. ['dev-app-s/deployment/app-s-admin', 'dev-app-s/deployment/app-s-api', 'dev-app-s/deployment/app-s-backend'] and 36 more |
 | `hygiene.polaris-reliability-danger.arc-runners/cronjob/arc-cool-down` | warn | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'memoryLimitsMissing', 'memoryRequestsMissing', 'metadataAndInstanceMismatched', 'priorityClassNotSet']. Security-category danger ['privilegeEscalationAllowed', 'runAsRootAllowed'] is in … |
 | `hygiene.polaris-reliability-danger.arc-runners/cronjob/arc-warm-up` | warn | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'memoryLimitsMissing', 'memoryRequestsMissing', 'metadataAndInstanceMismatched', 'priorityClassNotSet']. Security-category danger ['privilegeEscalationAllowed', 'runAsRootAllowed'] is in … |
-| `hygiene.polaris-reliability-danger.middleware/deployment/redis-insight` | warn | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'metadataAndInstanceMismatched', 'missingPodDisruptionBudget', 'priorityClassNotSet']. Security-category danger ['privilegeEscalationAllowed' … |
+| `hygiene.polaris-reliability-danger.middleware/deployment/redis-insight` | warn | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'metadataAndInstanceMismatched', 'missingPodDisruptionBudget', 'priorityClassNotSet'] and 2 more. Security-category danger ['privilegeEscalationAllowed' … |
 | `karpenter.consistency-errors.cluster` | warn | medium | cluster state synced True, consistency errors 3, reconcile errors {}, pod startup average 30.9s (8787 pods), node termination average 14.7s |
 | `keda.components-single-replica.cluster` | warn | medium | operator 1/1, metrics-apiserver 1/1, APIService v1beta1.external.metrics Available True, PDB False, prod ScaledObject 3 |
 | `keda.prod-external-trigger-no-fallback.cluster` | warn | medium | prod external-trigger ScaledObjects without fallback ['prod-app-y/scaledobject/app-y-ai-kafka-lag', 'prod-app-z-backend/scaledobject/app-z-file-worker', 'prod-app-z-backend/scaledobject/app-z-graph-worker'], trigger types {'kafka': 4, 'metrics-api': 2}, minimum pollingInterval 15s |
@@ -516,7 +514,7 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `security.psa-not-enforced.cluster` | warn | medium | Namespaces with an enforce label [], prod without one ['app-ab-prod', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend']. Share of containers allowing root 0.61 (29 prod workloads) |
 | `security.rbac-wildcard.argocd-application-controller` | warn | medium | ClusterRole argocd-application-controller: * in verbs and resources, bound subjects [('ServiceAccount', 'argocd', 'argocd-application-controller')] |
 | `security.sa-token-mounted-without-rbac.cluster` | warn | medium | Workloads with token mounted 86/92, of which 30 prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: ['prod-app-w/deployment/app-w', 'prod-app-t/deployment/app-t-ai', 'prod-app-t/deployment/app-t-backend', 'prod-app-t/deployment/app-t-studio', 'prod-app-t/deployment/app-t-web' … |
-| `storage.ebs-unencrypted.cluster` | warn | medium | 18 of 18 volumes unencrypted: ['vol-078adb8df155474d5', 'vol-014ddb2ea18fb9f56', 'vol-04d6da165847ff0c2', 'vol-0a599f6260d09b6a1', 'vol-00f082f394c11e743', 'vol-09dd14b8fe1120fe8', 'vol-0d059a329425ff008', 'vol-0cd5d589fe93566d4'] |
+| `storage.ebs-unencrypted.cluster` | warn | medium | 18 of 18 volumes unencrypted: ['vol-078adb8df155474d5', 'vol-014ddb2ea18fb9f56', 'vol-04d6da165847ff0c2', 'vol-0a599f6260d09b6a1', 'vol-00f082f394c11e743', 'vol-09dd14b8fe1120fe8', 'vol-0d059a329425ff008', 'vol-0cd5d589fe93566d4'] and 10 more |
 | `storage.prod-db-reclaim-delete.cluster` | warn | medium | DB-like prod PVCs whose PV reclaimPolicy is Delete: ['prod-app-v/data-app-v-backend-prod-mysql-0', 'prod-app-s/data-app-s-backend-mysql-0', 'prod-app-z-backend/data-app-z-neo4j-0', 'app-ab-prod/data-app-ab-backend-postgresql-0', 'prod-app-r/data-app-r-postgresql-0' … |
 | `tenancy.prod-boundary-missing.app-ab-prod` | warn | medium | app-ab-prod: ResourceQuota False, NetworkPolicies 1 (enforced by the cluster False), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 14 |
 | `tenancy.prod-boundary-missing.prod-app-r` | warn | medium | prod-app-r: ResourceQuota False, NetworkPolicies 1 (enforced by the cluster False), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 14 |
@@ -527,38 +525,38 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `tenancy.prod-without-quota.dev-app-s` | warn | medium | dev-app-s (dev): no ResourceQuota. Pods 5, CPU requests total 0.4 cores, memory requests total 1.25GB, 7d CPU p95 0.052 cores (cluster share 0.024), memory p95 0.86GB, 7d max/median 1.4x. Tenants in this cluster 14, shares nodes with prod True |
 | `tenancy.prod-without-quota.dev-app-v` | warn | medium | dev-app-v (dev): no ResourceQuota. Pods 4, CPU requests total 0.3 cores, memory requests total 1.0GB, 7d CPU p95 0.024 cores (cluster share 0.011), memory p95 0.95GB, 7d max/median 1.7x. Tenants in this cluster 14, shares nodes with prod True |
 | `tenancy.prod-without-quota.dev-app-y` | warn | medium | dev-app-y (dev): no ResourceQuota. Pods 5, CPU requests total 0.4 cores, memory requests total 2.25GB, 7d CPU p95 0.035 cores (cluster share 0.016), memory p95 1.4GB, 7d max/median 1.1x. Tenants in this cluster 14, shares nodes with prod True |
-| `tenancy.shared-node-limit-overcommit.ip-10-0-1-117.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-1-117.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): tenant kinds ['dev', 'prod'], namespaces ['kube-system', 'keda', 'monitoring', 'argocd', 'dev-app-y', 'dev-app-aa']. Memory limit total 11.6GB / allocatable 6.9GB = 1.68x, request total 4.7GB … |
-| `tenancy.shared-node-limit-overcommit.ip-10-0-1-139.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default): tenant kinds ['dev', 'prod'], namespaces ['prod-app-y', 'dev-app-y', 'prod-app-s', 'prod-app-z-backend', 'dev-app-s', 'prod-app-v']. Memory limit total 47.0GB / allocatable 29.8GB = 1.58x, request total 18.9GB, containers without a … |
-| `tenancy.shared-node-limit-overcommit.ip-10-0-2-218.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-2-218.ap-northeast-2.compute.internal (pool system-ondemand): tenant kinds ['dev', 'other', 'prod'], namespaces ['monitoring', 'argocd', 'dev-app-aa', 'keda', 'kube-system', 'middleware']. Memory limit total 5.7GB / allocatable 3.2GB = 1.79x, request total 2.0GB, containers without a … |
-| `traffic.alb-deregistration-vs-grace.app-ab-prod/app-ab-backend` | warn | medium | Target group k8s-pwcprod-pwcbacke-bea446d347: deregistration_delay 300s, backends ['deployment/app-ab-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.app-ab-prod/app-ab-frontend` | warn | medium | Target group k8s-pwcprod-pwcfront-e72ef00971: deregistration_delay 300s, backends ['deployment/app-ab-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.argocd/argocd-server` | warn | medium | Target group k8s-argocd-argocdse-74c4dcbda2: deregistration_delay 300s, backends ['deployment/argocd-server'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.dev-app-aa/app-aa-backend` | warn | medium | Target group k8s-devvxtch-vxtchatb-b347218b4f: deregistration_delay 300s, backends ['deployment/app-aa-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.dev-app-aa/app-aa-frontend` | warn | medium | Target group k8s-devvxtch-vxtchatb-e9834ca5fe: deregistration_delay 300s, backends ['deployment/app-aa-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.dev-app-v/app-v-admin-frontend` | warn | medium | Target group k8s-devtooto-appka-ae7a7a06ff: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.dev-app-v/app-v-backend` | warn | medium | Target group k8s-devtooto-appkb-0987e78003: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.dev-app-v/app-v-frontend` | warn | medium | Target group k8s-devtooto-appkf-133751726c: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.middleware/kafka-ui` | warn | medium | Target group k8s-middlewa-kafkaui-0a6256c8b2: deregistration_delay 300s, backends ['deployment/kafka-ui'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.middleware/redis-insight` | warn | medium | Target group k8s-middlewa-redisins-e7e7fd218a: deregistration_delay 300s, backends ['deployment/redis-insight'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.monitoring/kube-prometheus-stack-grafana` | warn | medium | Target group k8s-monitori-kubeprom-af0f3aa6c7: deregistration_delay 300s, backends ['deployment/kube-prometheus-stack-grafana'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.monitoring/vmauth` | warn | medium | Target group k8s-monitori-vmauth-e07e5153ee: deregistration_delay 300s, backends ['deployment/vmauth'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-r/app-r-backend` | warn | medium | Target group k8s-prodsoro-appmba-f68effe430: deregistration_delay 300s, backends ['deployment/app-r-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-r/app-r-web` | warn | medium | Target group k8s-prodsoro-appmwe-194ae69849: deregistration_delay 300s, backends ['deployment/app-r-web'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-ai` | warn | medium | Target group k8s-prodcurt-curtainc-fc2d368787: deregistration_delay 300s, backends ['deployment/app-t-ai'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-backend` | warn | medium | Target group k8s-prodcurt-curtainc-bb495c72c8: deregistration_delay 300s, backends ['deployment/app-t-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-studio` | warn | medium | Target group k8s-prodcurt-curtainc-57e5adf3bf: deregistration_delay 300s, backends ['deployment/app-t-studio'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-web` | warn | medium | Target group k8s-prodcurt-curtainc-022a51fc31: deregistration_delay 300s, backends ['deployment/app-t-web'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-v/app-v-admin-frontend` | warn | medium | Target group k8s-prodtoot-appka-d0c066d282: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-v/app-v-backend` | warn | medium | Target group k8s-prodtoot-appkb-7df87a92cc: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-v/app-v-frontend` | warn | medium | Target group k8s-prodtoot-appkf-36f816b829: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-w/app-w` | warn | medium | Target group k8s-prodcarp-carpenst-e238817282: deregistration_delay 300s, backends ['deployment/app-w'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-x/app-x-api` | warn | medium | Target group k8s-prodfand-apppa-754a9b50b2: deregistration_delay 300s, backends ['deployment/app-x-api'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-admin` | warn | medium | Target group k8s-prodinse-insertoo-37417ab44f: deregistration_delay 300s, backends ['deployment/app-y-admin'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-ai` | warn | medium | Target group k8s-prodinse-insertoo-b22674073c: deregistration_delay 300s, backends ['deployment/app-y-ai'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-backend` | warn | medium | Target group k8s-prodinse-insertoo-89a3732998: deregistration_delay 300s, backends ['deployment/app-y-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-frontend` | warn | medium | Target group k8s-prodinse-insertoo-032c25d752: deregistration_delay 300s, backends ['deployment/app-y-frontend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-z-backend/app-z-backend` | warn | medium | Target group k8s-prodrhem-appnbac-8c88bb317a: deregistration_delay 300s, backends ['deployment/app-z-backend'] terminationGracePeriod 30s, no preStop |
-| `traffic.alb-deregistration-vs-grace.prod-app-z-backend/app-z-frontend` | warn | medium | Target group k8s-prodrhem-appnfro-9726e5b1d3: deregistration_delay 300s, backends ['deployment/app-z-frontend'] terminationGracePeriod 30s, no preStop |
+| `tenancy.shared-node-limit-overcommit.ip-10-0-1-117.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-1-117.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): tenant kinds ['dev', 'prod'], namespaces ['kube-system', 'keda', 'monitoring', 'argocd', 'dev-app-y', 'dev-app-aa'] and 3 more. Memory limit total 11.6GB / allocatable 6.9GB = 1.68x, request total … |
+| `tenancy.shared-node-limit-overcommit.ip-10-0-1-139.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default): tenant kinds ['dev', 'prod'], namespaces ['prod-app-y', 'dev-app-y', 'prod-app-s', 'prod-app-z-backend', 'dev-app-s', 'prod-app-v'] and 6 more. Memory limit total 47.0GB / allocatable 29.8GB = 1.58x, request total 18.9GB, containers … |
+| `tenancy.shared-node-limit-overcommit.ip-10-0-2-218.ap-northeast-2.compute.internal` | warn | medium | Node ip-10-0-2-218.ap-northeast-2.compute.internal (pool system-ondemand): tenant kinds ['dev', 'other', 'prod'], namespaces ['monitoring', 'argocd', 'dev-app-aa', 'keda', 'kube-system', 'middleware'] and 2 more. Memory limit total 5.7GB / allocatable 3.2GB = 1.79x, request total 2.0GB, containers … |
+| `traffic.alb-deregistration-vs-grace.app-ab-prod/app-ab-backend` | warn | medium | Target group k8s-lb-bea446d347: deregistration_delay 300s, backends ['deployment/app-ab-backend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.app-ab-prod/app-ab-frontend` | warn | medium | Target group k8s-lb-e72ef00971: deregistration_delay 300s, backends ['deployment/app-ab-frontend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.argocd/argocd-server` | warn | medium | Target group k8s-lb-74c4dcbda2: deregistration_delay 300s, backends ['deployment/argocd-server'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.dev-app-aa/app-aa-backend` | warn | medium | Target group k8s-lb-b347218b4f: deregistration_delay 300s, backends ['deployment/app-aa-backend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.dev-app-aa/app-aa-frontend` | warn | medium | Target group k8s-lb-e9834ca5fe: deregistration_delay 300s, backends ['deployment/app-aa-frontend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.dev-app-v/app-v-admin-frontend` | warn | medium | Target group k8s-lb-ae7a7a06ff: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.dev-app-v/app-v-backend` | warn | medium | Target group k8s-lb-0987e78003: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.dev-app-v/app-v-frontend` | warn | medium | Target group k8s-lb-133751726c: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.middleware/kafka-ui` | warn | medium | Target group k8s-lb-0a6256c8b2: deregistration_delay 300s, backends ['deployment/kafka-ui'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.middleware/redis-insight` | warn | medium | Target group k8s-lb-e7e7fd218a: deregistration_delay 300s, backends ['deployment/redis-insight'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.monitoring/kube-prometheus-stack-grafana` | warn | medium | Target group k8s-lb-af0f3aa6c7: deregistration_delay 300s, backends ['deployment/kube-prometheus-stack-grafana'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.monitoring/vmauth` | warn | medium | Target group k8s-lb-e07e5153ee: deregistration_delay 300s, backends ['deployment/vmauth'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-r/app-r-backend` | warn | medium | Target group k8s-lb-f68effe430: deregistration_delay 300s, backends ['deployment/app-r-backend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-r/app-r-web` | warn | medium | Target group k8s-lb-194ae69849: deregistration_delay 300s, backends ['deployment/app-r-web'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-ai` | warn | medium | Target group k8s-lb-fc2d368787: deregistration_delay 300s, backends ['deployment/app-t-ai'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-backend` | warn | medium | Target group k8s-lb-bb495c72c8: deregistration_delay 300s, backends ['deployment/app-t-backend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-studio` | warn | medium | Target group k8s-lb-57e5adf3bf: deregistration_delay 300s, backends ['deployment/app-t-studio'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-t/app-t-web` | warn | medium | Target group k8s-lb-022a51fc31: deregistration_delay 300s, backends ['deployment/app-t-web'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-v/app-v-admin-frontend` | warn | medium | Target group k8s-lb-d0c066d282: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-v/app-v-backend` | warn | medium | Target group k8s-lb-7df87a92cc: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-v/app-v-frontend` | warn | medium | Target group k8s-lb-36f816b829: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-w/app-w` | warn | medium | Target group k8s-lb-e238817282: deregistration_delay 300s, backends ['deployment/app-w'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-x/app-x-api` | warn | medium | Target group k8s-lb-754a9b50b2: deregistration_delay 300s, backends ['deployment/app-x-api'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-admin` | warn | medium | Target group k8s-lb-37417ab44f: deregistration_delay 300s, backends ['deployment/app-y-admin'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-ai` | warn | medium | Target group k8s-lb-b22674073c: deregistration_delay 300s, backends ['deployment/app-y-ai'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-backend` | warn | medium | Target group k8s-lb-89a3732998: deregistration_delay 300s, backends ['deployment/app-y-backend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-y/app-y-frontend` | warn | medium | Target group k8s-lb-032c25d752: deregistration_delay 300s, backends ['deployment/app-y-frontend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-z-backend/app-z-backend` | warn | medium | Target group k8s-lb-8c88bb317a: deregistration_delay 300s, backends ['deployment/app-z-backend'] terminationGracePeriod 30s, no preStop |
+| `traffic.alb-deregistration-vs-grace.prod-app-z-backend/app-z-frontend` | warn | medium | Target group k8s-lb-9726e5b1d3: deregistration_delay 300s, backends ['deployment/app-z-frontend'] terminationGracePeriod 30s, no preStop |
 | `traffic.external-exposure.ingress/argocd/argocd-server` | warn | medium | ingress ['deploy.lab-k.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check |
 | `traffic.external-exposure.ingress/dev-app-s/app-s-admin` | warn | medium | ingress ['admin-dev.lab-l.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check |
 | `traffic.external-exposure.ingress/dev-app-v/app-v-admin-frontend` | warn | medium | ingress ['admin-dev.lab-n.example']: exposure internet-facing, TLS True, no auth annotation. Whether the app has its own login (Argo CD, Grafana etc.) needs a manual check |
@@ -588,7 +586,7 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `tenancy.dev-shares-prod-nodes.ip-10-0-1-117.ap-northeast-2.compute.internal` | fail | low | Node ip-10-0-1-117.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): prod pods 2 (['app-ab-prod', 'prod-app-y']) together with dev pods 2 (['dev-app-aa', 'dev-app-y']). Memory limit total/allocatable 1.68, CPU limit total/allocatable 3.37, containers without a memory … |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | low | Node ip-10-0-1-139.ap-northeast-2.compute.internal (pool default): prod pods 23 (['app-ab-prod', 'prod-app-s', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend']) together with dev pods 10 (['dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y']). Memory limit … |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-218.ap-northeast-2.compute.internal` | fail | low | Node ip-10-0-2-218.ap-northeast-2.compute.internal (pool system-ondemand): prod pods 2 (['prod-app-t', 'prod-app-x']) together with dev pods 1 (['dev-app-aa']). Memory limit total/allocatable 1.79, CPU limit total/allocatable 1.81, containers without a memory limit 1 |
-| `albctl.aws-api-churn.cluster` | warn | low | AWS API calls since leader start 242614, top [['Elastic Load Balancing v2/DescribeTargetHealth', 76055], ['Elastic Load Balancing v2/DescribeTargetGroupAttributes', 43347], ['EC2/DescribeInstances', 38801], ['EC2/DescribeSecurityGroups', 24999], ['Elastic Load Balancing v2/RegisterTargets' … |
+| `albctl.aws-api-churn.cluster` | warn | low | AWS API calls since leader start 242614, top [['Elastic Load Balancing v2/DescribeTargetHealth', 76055], ['Elastic Load Balancing v2/DescribeTargetGroupAttributes', 43347], ['EC2/DescribeInstances', 38801], ['EC2/DescribeSecurityGroups', 24999], ['Elastic Load Balancing v2/RegisterTargets', 11793]] … |
 | `albctl.target-group-without-tgb.cluster` | warn | low | target groups the controller does not own 1 (TargetGroupBindings 52, hand-made 9) |
 | `alertmanager.single-instance.monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager` | warn | low | replicas 1 (ready 1), cluster disabled (peers 0), data storage emptyDir (silence/notification state preserved 120h) |
 | `argocd.notifications-not-configured.cluster` | warn | low | service.* in argocd-notifications-cm False (triggers 0), prod apps 9, and no Argo CD metrics flow to Alertmanager either (no ServiceMonitor) |
@@ -600,7 +598,7 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `ebscsi.controller-metrics-disabled.cluster` | warn | low | controller EC2 API request series 0, driver 1.37.0 (add-on v1.37.0-eksbuild.1). When enabled, shows EC2 API errors {} / throttles None |
 | `ecr.no-lifecycle-policy.ecr/registry/<account>` | warn | low | repositories without a lifecycle policy ['app-v', 'bitnami/kafka', 'ecr-app-ab-postgresql-pgvector', 'bitnami/mysql'] (total 10.9GiB), overall 45 repositories, 908 images, 473.1GiB ≈ 50.8 USD/month, untagged images 257 (excluding 182 attestations) |
 | `ecr.no-replication.ecr/registry/<account>` | warn | low | replication rules 0, repositories used by prod 29, total 473.1GiB |
-| `ecr.tag-mutable-prod.ecr/registry/<account>` | warn | low | MUTABLE repositories 44/45, used by prod 28: ['ecr-app-ab-frontend-eks-prod', 'ecr-app-w-eks-prod', 'ecr-app-t-backend-eks-prod', 'ecr-app-t-web-eks-prod', 'ecr-app-r-postgresql-prod', 'ecr-app-s-admin-eks-prod', 'ecr-app-ab-postgresql-pgvector', 'ecr-app-t-postgresql-prod']…, digest-pinned … |
+| `ecr.tag-mutable-prod.ecr/registry/<account>` | warn | low | MUTABLE repositories 44/45, used by prod 28: ['ecr-app-ab-frontend-eks-prod', 'ecr-app-w-eks-prod', 'ecr-app-t-backend-eks-prod', 'ecr-app-t-web-eks-prod', 'ecr-app-r-postgresql-prod', 'ecr-app-s-admin-eks-prod', 'ecr-app-ab-postgresql-pgvector', 'ecr-app-t-postgresql-prod'] and 20 more … |
 | `ecr.untagged-images.ecr/registry/<account>` | warn | low | untagged images 257/908 (excluding 182 BuildKit attestation manifests), repositories 45 |
 | `eso.version-old.cluster` | warn | low | external-secrets 0.9.13 (ExternalSecrets 49, PushSecrets 0) |
 | `grafana.version-old.monitoring/deployment/kube-prometheus-stack-grafana` | warn | low | Grafana 10.2.3 (database ok), ingress ['monitor.lab-k.example'], dashboards 28 |
@@ -616,9 +614,9 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `keda.scaledobject-never-active.cluster` | warn | low | inactive for more than 14 days ['dev-app-y/scaledobject/app-y-ai-kafka-lag'], not Ready [], fallback active [], scale-to-zero targets ['prod-app-z-backend/scaledobject/app-z-file-worker', 'prod-app-z-backend/scaledobject/app-z-graph-worker'] |
 | `kubeproxy.conntrack-invalid-drops.cluster` | warn | low | conntrack INVALID drops over 1 hour 822 packets (sum over nodes), services with externalTrafficPolicy Local 0, Services with a Local traffic policy and no endpoint on the node (max over nodes) 0 |
 | `loki.version-old.monitoring/statefulset/loki-stack` | warn | low | Loki 2.6.1, storage emptyDir, retention applied False(compactor 1.0) |
-| `observability.alert-metric-without-dashboard.grafana` | warn | low | 28 dashboards (196 panel metrics) — 132 of 173 alert-rule metrics have no panel: aggregator_unavailable_apiservice, aggregator_unavailable_apiservice_total, alertmanager_cluster_members, alertmanager_config_hash, alertmanager_config_last_reload_successful … |
+| `observability.alert-metric-without-dashboard.grafana` | warn | low | 28 dashboards (196 panel metrics) — 132 of 173 alert-rule metrics have no panel: ['aggregator_unavailable_apiservice', 'aggregator_unavailable_apiservice_total', 'alertmanager_cluster_members', 'alertmanager_config_hash', 'alertmanager_config_last_reload_successful' … |
 | `observability.alerts-never-fired.cluster` | warn | low | 127 of 141 rules did not fire in 15 days (['AlertmanagerClusterCrashlooping', 'AlertmanagerClusterDown', 'AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerFailedReload', 'AlertmanagerFailedToSendAlerts', 'AlertmanagerMembersInconsistent' … |
-| `observability.saturation-signal-missing.cluster` | warn | low | 37 of 41 ingress backends have no saturation metric (e.g. [('argocd', 'argocd-server'), ('dev-app-s', 'app-s-admin'), ('dev-app-s', 'app-s-api'), ('dev-app-s', 'app-s-backend'), ('dev-app-s', 'app-s-frontend'), ('dev-app-y', 'app-y-admin')]), namespaces with saturation metrics ['default' … |
+| `observability.saturation-signal-missing.cluster` | warn | low | 37 of 41 ingress backends have no saturation metric (e.g. [('argocd', 'argocd-server'), ('dev-app-s', 'app-s-admin'), ('dev-app-s', 'app-s-api'), ('dev-app-s', 'app-s-backend'), ('dev-app-s', 'app-s-frontend'), ('dev-app-y', 'app-y-admin')] and 31 more), namespaces with saturation metrics … |
 | `observability.severity-channels-not-separated.cluster` | warn | low | routes [('slack-system', None), ('null', ['alertname="Watchdog"']), ('slack-sre', ['env="prod"', 'service="image-inference"', 'slo="img-inference"']), ('slack-sre', ['env="prod"', 'service="lora-training"', 'slo="lora-training"'])], receivers ['null', 'slack-sre', 'slack-system'], default receiver … |
 | `observability.unclassified-errors.cluster` | warn | low | 145 unclassified error lines (23879 lines scanned, 40 files). Top: [('node:ip-10-0-2-100.ap-northeast-2.compute.internal \| "ContainerStatus from runtime service failed" e', 12), ('node:ip-10-0-1-139.ap-northeast-2.compute.internal \| "ContainerStatus from runtime service failed" e', 11), ('ebs-csi \| … |
 | `observability.unstructured-logs.app-ab-prod` | warn | low | Of 947170 lines in 1h, 0 parse as JSON (0.0) |
@@ -673,11 +671,11 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `resilience.no-prestop.prod-app-y/app-y-ai` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-y/app-y-backend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-y/app-y-frontend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
+| `resilience.no-prestop.prod-app-z-backend/app-ad` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-backend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-embedding-server` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-frontend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-pg-proxy` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
-| `resilience.no-prestop.prod-app-z-backend/tts-proxy` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resources.memory-request-overprovisioned.app-ab-prod/sts/app-ab-backend-postgresql:postgresql` | warn | low | pod app-ab-backend-postgresql-0: 7d memory working set p95 55 MB / request 256 MB = 0.22; database-like: keep the request |
 | `resources.memory-request-overprovisioned.argocd/deploy/argocd-repo-server:repo-server` | warn | low | pod argocd-repo-server-d487895cc-bth22: 7d memory working set p95 93 MB / request 512 MB = 0.18 |
 | `resources.memory-request-overprovisioned.dev-app-aa/sts/app-aa-postgres:postgres` | warn | low | pod app-aa-postgres-0: 7d memory working set p95 28 MB / request 256 MB = 0.11; database-like: keep the request |
@@ -726,85 +724,17 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-admin` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-backend` | warn | low | replicas 2, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-frontend` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.prod-app-z-backend/app-ad` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-z-backend/app-z-embedding-server` | warn | low | replicas 2, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.prod-app-z-backend/tts-proxy` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-1-245.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-1-245.ap-northeast-2.compute.internal (pool default): prod pods 2 (['prod-app-t', 'prod-app-z-backend']) together with dev pods 1 (['dev-app-s']). Memory limit total/allocatable 0.94, CPU limit total/allocatable 2.98, containers without a memory limit 0 |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-100.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-100.ap-northeast-2.compute.internal (pool default): prod pods 9 (['prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-z-backend']) together with dev pods 2 (['dev-app-aa', 'dev-app-v']). Memory limit total/allocatable 1.1, CPU limit total/allocatable 1.96, containers without a memory … |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-60.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-60.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): prod pods 2 (['prod-app-s', 'prod-app-v']) together with dev pods 2 (['dev-app-s', 'dev-app-v']). Memory limit total/allocatable 1.49, CPU limit total/allocatable 2.44, containers without a memory limit … |
-| `traffic.alb-protection-off.k8s-lab-kprodlb-b18a4555d7` | warn | low | ALB k8s-lab-kprodlb-b18a4555d7: deletion_protection False, access_logs False, target groups in the ingress group 41 |
+| `traffic.alb-protection-off.k8s-lb-b18a4555d7` | warn | low | ALB k8s-lb-b18a4555d7: deletion_protection False, access_logs False, target groups in the ingress group 41 |
 | `vpccni.metrics-unreadable.cluster` | warn | low | 2 of 9 nodes without readable ipamd metrics (localhost:61678): ['ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal'] |
 | `eks.audit-log-off.cluster` | fail | info | enabled logs ['api', 'authenticator', 'controllerManager', 'scheduler'], disabled logs ['audit'] |
-| `hygiene.no-progressive-delivery.cluster` | fail | info | No progressive-delivery component (Argo Rollouts, Flagger). All deployments are rolling updates (replace everything) -- ALB weighted target groups are not used either |
 
 The table cuts each evidence at 300 characters and a check may cut a list in its evidence; nothing is lost. Every finding below carries, folded, the material its rule judged, taken from `findings-draft.json` `details`.
 
-<details><summary><code>observability.no-symptom-alerts.cluster</code></summary>
-
-```json
-{
- "alerting": 157,
- "by_class": {
-  "app-cause": 5,
-  "app": 14,
-  "cause": 138
- },
- "symptom_ratio": 0.0,
- "symptom_rules": []
-}
-```
-
-</details>
-<details><summary><code>resilience.n-plus-one.cluster</code></summary>
-
-```json
-{
- "allocatable_cpu_without_largest": 15.45,
- "allocatable_memory_gb_without_largest": 46.3,
- "autoscaler": true,
- "autoscaler_name": "karpenter",
- "available": true,
- "cannot_fit_elsewhere": [],
- "cpu_ok": true,
- "karpenter": true,
- "largest_node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
- "largest_node_cpu": 3.92,
- "largest_node_memory_gb": 29.8,
- "memory_ok": true,
- "ok": false,
- "pods_on_largest_node": 34,
- "pools_short": [
-  {
-   "eligible_nodes": [
-    "ip-10-0-1-137.ap-northeast-2.compute.internal",
-    "ip-10-0-1-245.ap-northeast-2.compute.internal",
-    "ip-10-0-2-100.ap-northeast-2.compute.internal"
-   ],
-   "pods": 32,
-   "needed_cpu": 2.79,
-   "free_cpu": 2.62,
-   "needed_memory_gb": 14.81,
-   "free_memory_gb": 11.64
-  },
-  {
-   "eligible_nodes": [
-    "ip-10-0-1-137.ap-northeast-2.compute.internal",
-    "ip-10-0-1-245.ap-northeast-2.compute.internal"
-   ],
-   "pods": 1,
-   "needed_cpu": 0.5,
-   "free_cpu": 0.28,
-   "needed_memory_gb": 4.0,
-   "free_memory_gb": 8.39
-  }
- ],
- "prod_pods_on_largest_node": 23,
- "requests_cpu_total": 11.51,
- "requests_memory_gb_total": 45.7,
- "tight": false
-}
-```
-
-</details>
 <details><summary><code>controlplane.scheduler-unschedulable.prod-app-x/app-x-api</code></summary>
 
 ```json
@@ -843,7 +773,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "first": "2026-10-23T01:20:23Z",
  "last": "2026-11-07T01:32:11Z",
  "meaning": "kubelet image GC could not free space. Disk is full of in-use images and logs",
- "objects_top": [
+ "objects_by_count": [
   {
    "object": "Node/ip-10-0-1-139.ap-northeast-2.compute.internal",
    "occurrences": 1338
@@ -1188,6 +1118,16 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "kernel_nodes_read": 1,
  "kernel_nodes_total": 2,
  "last_kill": null,
+ "pods_now": [
+  {
+   "pod": "app-t-ai-5469577cf8-7nwnb",
+   "created": "2026-11-06T08:26:51Z",
+   "restarts": 0,
+   "last_ended": null,
+   "last_reason": null,
+   "last_exit_code": null
+  }
+ ],
  "pods_oomkilled": 3,
  "pods_replaced": 3,
  "restarts_of_those_pods": 13,
@@ -1249,7 +1189,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy</code></summary>
+<details><summary><code>security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad</code></summary>
 
 ```json
 {
@@ -1263,7 +1203,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  ],
  "severe": true,
  "system": false,
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -1303,7 +1243,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "matcher": "200"
  },
  "lb_type": "application",
- "name": "k8s-devvxtch-vxtchatb-b347218b4f",
+ "name": "k8s-lb-b347218b4f",
  "port": 8000,
  "target": "dev-app-aa/app-aa-backend",
  "targets_healthy": 0,
@@ -1343,7 +1283,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "matcher": "200"
  },
  "lb_type": "application",
- "name": "k8s-devtooto-appkf-133751726c",
+ "name": "k8s-lb-133751726c",
  "port": 3000,
  "target": "dev-app-v/app-v-frontend",
  "targets_healthy": 0,
@@ -1383,7 +1323,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "matcher": "200"
  },
  "lb_type": "application",
- "name": "k8s-prodcurt-curtainc-bb495c72c8",
+ "name": "k8s-lb-bb495c72c8",
  "port": 3000,
  "target": "prod-app-t/app-t-backend",
  "targets_healthy": 0,
@@ -1423,7 +1363,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "matcher": "200"
  },
  "lb_type": "application",
- "name": "k8s-prodtoot-appkf-36f816b829",
+ "name": "k8s-lb-36f816b829",
  "port": 3000,
  "target": "prod-app-v/app-v-frontend",
  "targets_healthy": 0,
@@ -1463,7 +1403,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "matcher": "200"
  },
  "lb_type": "application",
- "name": "k8s-prodinse-insertoo-032c25d752",
+ "name": "k8s-lb-032c25d752",
  "port": 3003,
  "target": "prod-app-y/app-y-frontend",
  "targets_healthy": 0,
@@ -1503,7 +1443,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "matcher": "200"
  },
  "lb_type": "application",
- "name": "k8s-prodrhem-appnbac-8c88bb317a",
+ "name": "k8s-lb-8c88bb317a",
  "port": 8000,
  "target": "prod-app-z-backend/app-z-backend",
  "targets_healthy": 0,
@@ -1543,7 +1483,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "9094": 1
  },
  "hosts": [
-  "k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com"
+  "lb-151c379572.elb.example.com"
  ],
  "name": "kafka-controller-0-external",
  "namespace": "middleware",
@@ -1653,7 +1593,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "VPCs 0.6"
  ],
  "quotas": 65,
- "watched_top": [
+ "watched_quotas": [
   [
    "VPCs",
    3.0,
@@ -1722,7 +1662,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "first": "2026-11-07T00:48:24Z",
  "last": "2026-11-07T00:48:24Z",
  "meaning": "Probe failure. Readiness removes it from traffic, liveness restarts it",
- "objects_top": [
+ "objects_by_count": [
   {
    "object": "Pod/prod-app-s/app-s-backend-7c46f75bf6-ljlnl",
    "occurrences": 1
@@ -1748,7 +1688,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "first": "2026-10-08T12:31:38Z",
  "last": "2026-11-07T01:18:03Z",
  "meaning": "Operator reconcile failure (ExternalSecret etc.)",
- "objects_top": [
+ "objects_by_count": [
   {
    "object": "ExternalSecret/database/mysql-app-v-secret",
    "occurrences": 2711
@@ -1861,6 +1801,22 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>observability.no-symptom-alerts.cluster</code></summary>
+
+```json
+{
+ "alerting": 157,
+ "by_class": {
+  "app-cause": 5,
+  "app": 14,
+  "cause": 138
+ },
+ "symptom_ratio": 0.0,
+ "symptom_rules": []
+}
+```
+
+</details>
 <details><summary><code>prometheus.memory-pressure.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus</code></summary>
 
 ```json
@@ -1880,6 +1836,57 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "restarts": 2,
  "rss_vs_limit": 0.655,
  "target": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+}
+```
+
+</details>
+<details><summary><code>resilience.n-plus-one.cluster</code></summary>
+
+```json
+{
+ "allocatable_cpu_without_largest": 15.45,
+ "allocatable_memory_gb_without_largest": 46.3,
+ "autoscaler": true,
+ "autoscaler_name": "karpenter",
+ "available": true,
+ "cannot_fit_elsewhere": [],
+ "cpu_ok": true,
+ "karpenter": true,
+ "largest_node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+ "largest_node_cpu": 3.92,
+ "largest_node_memory_gb": 29.8,
+ "memory_ok": true,
+ "ok": false,
+ "pods_on_largest_node": 34,
+ "pools_short": [
+  {
+   "eligible_nodes": [
+    "ip-10-0-1-137.ap-northeast-2.compute.internal",
+    "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "ip-10-0-2-100.ap-northeast-2.compute.internal"
+   ],
+   "pods": 32,
+   "needed_cpu": 2.79,
+   "free_cpu": 2.62,
+   "needed_memory_gb": 14.81,
+   "free_memory_gb": 11.64
+  },
+  {
+   "eligible_nodes": [
+    "ip-10-0-1-137.ap-northeast-2.compute.internal",
+    "ip-10-0-1-245.ap-northeast-2.compute.internal"
+   ],
+   "pods": 1,
+   "needed_cpu": 0.5,
+   "free_cpu": 0.28,
+   "needed_memory_gb": 4.0,
+   "free_memory_gb": 8.39
+  }
+ ],
+ "prod_pods_on_largest_node": 23,
+ "requests_cpu_total": 11.51,
+ "requests_memory_gb_total": 45.7,
+ "tight": false
 }
 ```
 
@@ -2025,6 +2032,16 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "kernel_nodes_read": 1,
  "kernel_nodes_total": 1,
  "last_kill": null,
+ "pods_now": [
+  {
+   "pod": "loki-stack-0",
+   "created": "2026-10-08T12:33:26Z",
+   "restarts": 1,
+   "last_ended": "2026-10-25T00:15:41Z",
+   "last_reason": "OOMKilled",
+   "last_exit_code": 137
+  }
+ ],
  "pods_oomkilled": 0,
  "pods_replaced": 0,
  "restarts_of_those_pods": 0,
@@ -2043,6 +2060,16 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "kernel_log_read": false,
  "kernel_nodes_old_script": 0,
  "kernel_nodes_total": 1,
+ "pods_now": [
+  {
+   "pod": "prometheus-kube-prometheus-stack-prometheus-0",
+   "created": "2026-09-08T12:47:49Z",
+   "restarts": 2,
+   "last_ended": "2026-11-05T08:21:29Z",
+   "last_reason": "OOMKilled",
+   "last_exit_code": 137
+  }
+ ],
  "pods_oomkilled": 1,
  "pods_replaced": 0,
  "restarts_of_those_pods": 1,
@@ -2209,7 +2236,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "7687": 4
  },
  "hosts": [
-  "app-u-db-shared-d7d643f6896a3b2b.elb.ap-northeast-2.amazonaws.com"
+  "lb-fd242d81b4.elb.example.com"
  ],
  "name": "app-u-db-shared",
  "namespace": null,
@@ -2708,7 +2735,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>hygiene.mutable-image-tag.prod-app-z-backend/deployment/tts-proxy:tailscale</code></summary>
+<details><summary><code>hygiene.mutable-image-tag.prod-app-z-backend/deployment/app-ad:tailscale</code></summary>
 
 ```json
 {
@@ -2720,12 +2747,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "pull_policy": "IfNotPresent",
  "registry": "docker.io",
  "tag_kind": "latest",
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
 </details>
-<details><summary><code>hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/tts-proxy</code></summary>
+<details><summary><code>hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/app-ad</code></summary>
 
 ```json
 {
@@ -2752,7 +2779,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "privilegeEscalationAllowed",
   "runAsRootAllowed"
  ],
- "target": "prod-app-z-backend/deployment/tts-proxy"
+ "target": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -2823,7 +2850,11 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "karpenter": 2,
   "prod-app-y": 2,
   "prod-app-r": 2,
-  "prod-app-v": 2
+  "prod-app-v": 2,
+  "app-ab-prod": 2,
+  "arc-system": 1,
+  "dev-app-aa": 1,
+  "prod-app-x": 1
  },
  "gap_ratio": 0.565,
  "nodes_all_missing": [],
@@ -3129,12 +3160,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resilience.no-readiness-probe.prod-app-z-backend/tts-proxy</code></summary>
+<details><summary><code>resilience.no-readiness-probe.prod-app-z-backend/app-ad</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
+ "name": "app-ad",
  "kind": "Deployment"
 }
 ```
@@ -3198,7 +3229,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resilience.single-node-dependency.prod-app-z-backend/deployment/tts-proxy</code></summary>
+<details><summary><code>resilience.single-node-dependency.prod-app-z-backend/deployment/app-ad</code></summary>
 
 ```json
 {
@@ -3207,7 +3238,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "hostPath volume ['dev-net-tun']"
  ],
  "replicas": 1,
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -3366,6 +3397,17 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/app-z-pg-proxy</code></summary>
 
 ```json
@@ -3377,18 +3419,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>resources.besteffort-in-prod.prod-app-z-backend/deploy/tts-proxy</code></summary>
+<details><summary><code>resources.besteffort-in-prod.prod-app-z-backend/deploy/app-ad</code></summary>
 
 ```json
 {
@@ -3399,7 +3430,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "instance": "10.0.2.210:8080",
   "job": "kube-state-metrics",
   "namespace": "prod-app-z-backend",
-  "pod": "tts-proxy-7b6db97b69-4bbjf",
+  "pod": "app-ad-7b6db97b69-4bbjf",
   "qos_class": "BestEffort",
   "service": "kube-prometheus-stack-kube-state-metrics",
   "uid": "99b58936-3d63-43b5-8ffe-c9ceb4353c71"
@@ -3821,12 +3852,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resources.no-memory-limit.prod-app-z-backend/tts-proxy</code></summary>
+<details><summary><code>resources.no-memory-limit.prod-app-z-backend/app-ad</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
+ "name": "app-ad",
  "kind": "Deployment"
 }
 ```
@@ -3971,7 +4002,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  },
  "danger_workloads": [
   "kube-system/daemonset/aws-node",
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "kube-system/daemonset/ebs-csi-node-windows",
   "kube-system/daemonset/ebs-csi-node",
   "middleware/deployment/redis-insight",
@@ -4046,7 +4077,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "/clusterrolebinding/keda-operator"
  ],
  "danger_workloads_prod": [
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "prod-app-v/deployment/app-v-admin-frontend",
   "prod-app-y/deployment/app-y-admin",
   "prod-app-y/deployment/app-y-frontend",
@@ -4486,13 +4517,13 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>traffic.alb-elb-5xx.k8s-lab-kprodlb-b18a4555d7</code></summary>
+<details><summary><code>traffic.alb-elb-5xx.k8s-lb-b18a4555d7</code></summary>
 
 ```json
 {
  "elb_5xx_24h": 145.0,
  "idle_timeout_s": 300,
- "name": "k8s-lab-kprodlb-b18a4555d7",
+ "name": "k8s-lb-b18a4555d7",
  "rejected_connections_24h": 0,
  "requests_24h": 162172.0,
  "scheme": "internet-facing",
@@ -4529,7 +4560,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "unhealthy_max_24h": 0,
   "unhealthy_now": 0,
   "target_groups": [
-   "k8s-prodillu-appi-c50edbe2df"
+   "k8s-lb-c50edbe2df"
   ]
  },
  "metrics_read": true,
@@ -4551,7 +4582,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod"
  ],
  "lb": [
-  "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+  "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
  ],
  "mixed_prod_nonprod": true,
  "namespace_count": 16,
@@ -4736,7 +4767,20 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "docker.io/bitnamilegacy/jmx-exporter:0.20.0-debian-11-r4",
   "docker.io/bitnamilegacy/kafka:3.6.1-debian-11-r3",
   "docker.io/bitnamilegacy/kubectl:1.32.4",
-  "docker.io/bitnamilegacy/os-shell:11-debian-11-r95"
+  "docker.io/bitnamilegacy/os-shell:11-debian-11-r95",
+  "docker.io/danielqsj/kafka-exporter:v1.7.0",
+  "docker.io/grafana/grafana:10.2.3",
+  "docker.io/grafana/promtail:2.9.2",
+  "docker.io/library/busybox:1.31.1",
+  "docker.io/provectuslabs/kafka-ui:v0.7.1",
+  "grafana/loki:2.6.1",
+  "neo4j:2026.05.0-community",
+  "pgvector/pgvector:pg16",
+  "redis/redisinsight:latest",
+  "tailscale/tailscale:latest",
+  "victoriametrics/victoria-metrics:v1.132.0",
+  "victoriametrics/vmalert:v1.97.0",
+  "victoriametrics/vmauth:v1.132.0"
  ],
  "images_by_registry": {
   "602401143452.dkr.ecr.ap-northeast-2.amazonaws.com": 77,
@@ -4863,7 +4907,33 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "argocd/deployment/argocd-repo-server",
   "argocd/deployment/argocd-server",
   "kube-system/deployment/external-dns",
-  "middleware/deployment/kafka-exporter"
+  "middleware/deployment/kafka-exporter",
+  "middleware/deployment/kafka-ui",
+  "middleware/deployment/redis-insight",
+  "monitoring/deployment/kube-prometheus-stack-grafana",
+  "monitoring/deployment/kube-prometheus-stack-operator",
+  "monitoring/deployment/vmalert",
+  "prod-app-z-backend/deployment/app-z-pg-proxy",
+  "argocd/statefulset/argocd-application-controller",
+  "dev-app-s/statefulset/app-s-backend-mysql",
+  "dev-app-y/statefulset/app-y-backend-mysql",
+  "dev-app-v/statefulset/app-v-backend-dev-mysql",
+  "dev-app-aa/statefulset/app-aa-mysql",
+  "dev-app-aa/statefulset/app-aa-postgres",
+  "middleware/statefulset/kafka-controller",
+  "middleware/statefulset/redis-master",
+  "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager",
+  "monitoring/statefulset/loki-stack",
+  "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus",
+  "monitoring/statefulset/vm-single",
+  "prod-app-t/statefulset/app-t-backend-postgresql",
+  "prod-app-x/statefulset/app-x-postgresql",
+  "prod-app-s/statefulset/app-s-backend-mysql",
+  "prod-app-y/statefulset/app-y-backend-mysql",
+  "prod-app-z-backend/statefulset/app-z-neo4j",
+  "prod-app-r/statefulset/app-r-postgresql",
+  "prod-app-v/statefulset/app-v-backend-prod-mysql",
+  "app-ab-prod/statefulset/app-ab-backend-postgresql"
  ]
 }
 ```
@@ -4887,7 +4957,38 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "dev-app-y/deployment/app-y-admin",
   "dev-app-y/deployment/app-y-ai",
   "dev-app-y/deployment/app-y-backend",
-  "dev-app-y/deployment/app-y-frontend"
+  "dev-app-y/deployment/app-y-frontend",
+  "dev-app-v/deployment/app-v-admin-frontend",
+  "dev-app-v/deployment/app-v-backend",
+  "dev-app-v/deployment/app-v-frontend",
+  "dev-app-aa/deployment/app-aa-backend",
+  "dev-app-aa/deployment/app-aa-frontend",
+  "prod-app-w/deployment/app-w",
+  "prod-app-t/deployment/app-t-ai",
+  "prod-app-t/deployment/app-t-backend",
+  "prod-app-t/deployment/app-t-studio",
+  "prod-app-t/deployment/app-t-web",
+  "prod-app-x/deployment/app-x-api",
+  "prod-app-s/deployment/app-s-admin",
+  "prod-app-s/deployment/app-s-api",
+  "prod-app-s/deployment/app-s-backend",
+  "prod-app-s/deployment/app-s-frontend",
+  "prod-app-y/deployment/app-y-admin",
+  "prod-app-y/deployment/app-y-ai",
+  "prod-app-y/deployment/app-y-backend",
+  "prod-app-y/deployment/app-y-frontend",
+  "prod-app-z-backend/deployment/app-z-backend",
+  "prod-app-z-backend/deployment/app-z-embedding-server",
+  "prod-app-z-backend/deployment/app-z-file-worker",
+  "prod-app-z-backend/deployment/app-z-frontend",
+  "prod-app-z-backend/deployment/app-z-graph-worker",
+  "prod-app-r/deployment/app-r-backend",
+  "prod-app-r/deployment/app-r-web",
+  "prod-app-v/deployment/app-v-admin-frontend",
+  "prod-app-v/deployment/app-v-backend",
+  "prod-app-v/deployment/app-v-frontend",
+  "app-ab-prod/deployment/app-ab-backend",
+  "app-ab-prod/deployment/app-ab-frontend"
  ]
 }
 ```
@@ -7052,7 +7153,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod-app-z-backend/deployment/app-z-frontend",
   "prod-app-z-backend/deployment/app-z-graph-worker",
   "prod-app-z-backend/deployment/app-z-pg-proxy",
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "prod-app-r/deployment/app-r-backend",
   "prod-app-r/deployment/app-r-web",
   "prod-app-v/deployment/app-v-admin-frontend",
@@ -7114,7 +7215,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod-app-z-backend/deployment/app-z-frontend",
   "prod-app-z-backend/statefulset/app-z-neo4j",
   "prod-app-z-backend/deployment/app-z-pg-proxy",
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "prod-app-r/deployment/app-r-backend",
   "prod-app-r/deployment/app-r-web",
   "prod-app-v/deployment/app-v-admin-frontend",
@@ -7935,7 +8036,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-pwcprod-pwcbacke-bea446d347",
+ "name": "k8s-lb-bea446d347",
  "target": "app-ab-prod/app-ab-backend",
  "workloads": [
   "deployment/app-ab-backend"
@@ -7952,7 +8053,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-pwcprod-pwcfront-e72ef00971",
+ "name": "k8s-lb-e72ef00971",
  "target": "app-ab-prod/app-ab-frontend",
  "workloads": [
   "deployment/app-ab-frontend"
@@ -7969,7 +8070,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-argocd-argocdse-74c4dcbda2",
+ "name": "k8s-lb-74c4dcbda2",
  "target": "argocd/argocd-server",
  "workloads": [
   "deployment/argocd-server"
@@ -7986,7 +8087,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-devvxtch-vxtchatb-b347218b4f",
+ "name": "k8s-lb-b347218b4f",
  "target": "dev-app-aa/app-aa-backend",
  "workloads": [
   "deployment/app-aa-backend"
@@ -8003,7 +8104,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-devvxtch-vxtchatb-e9834ca5fe",
+ "name": "k8s-lb-e9834ca5fe",
  "target": "dev-app-aa/app-aa-frontend",
  "workloads": [
   "deployment/app-aa-frontend"
@@ -8020,7 +8121,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-devtooto-appka-ae7a7a06ff",
+ "name": "k8s-lb-ae7a7a06ff",
  "target": "dev-app-v/app-v-admin-frontend",
  "workloads": [
   "deployment/app-v-admin-frontend"
@@ -8037,7 +8138,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-devtooto-appkb-0987e78003",
+ "name": "k8s-lb-0987e78003",
  "target": "dev-app-v/app-v-backend",
  "workloads": [
   "deployment/app-v-backend"
@@ -8054,7 +8155,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-devtooto-appkf-133751726c",
+ "name": "k8s-lb-133751726c",
  "target": "dev-app-v/app-v-frontend",
  "workloads": [
   "deployment/app-v-frontend"
@@ -8071,7 +8172,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-middlewa-kafkaui-0a6256c8b2",
+ "name": "k8s-lb-0a6256c8b2",
  "target": "middleware/kafka-ui",
  "workloads": [
   "deployment/kafka-ui"
@@ -8088,7 +8189,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-middlewa-redisins-e7e7fd218a",
+ "name": "k8s-lb-e7e7fd218a",
  "target": "middleware/redis-insight",
  "workloads": [
   "deployment/redis-insight"
@@ -8105,7 +8206,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-monitori-kubeprom-af0f3aa6c7",
+ "name": "k8s-lb-af0f3aa6c7",
  "target": "monitoring/kube-prometheus-stack-grafana",
  "workloads": [
   "deployment/kube-prometheus-stack-grafana"
@@ -8122,7 +8223,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-monitori-vmauth-e07e5153ee",
+ "name": "k8s-lb-e07e5153ee",
  "target": "monitoring/vmauth",
  "workloads": [
   "deployment/vmauth"
@@ -8139,7 +8240,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodsoro-appmba-f68effe430",
+ "name": "k8s-lb-f68effe430",
  "target": "prod-app-r/app-r-backend",
  "workloads": [
   "deployment/app-r-backend"
@@ -8156,7 +8257,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodsoro-appmwe-194ae69849",
+ "name": "k8s-lb-194ae69849",
  "target": "prod-app-r/app-r-web",
  "workloads": [
   "deployment/app-r-web"
@@ -8173,7 +8274,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodcurt-curtainc-fc2d368787",
+ "name": "k8s-lb-fc2d368787",
  "target": "prod-app-t/app-t-ai",
  "workloads": [
   "deployment/app-t-ai"
@@ -8190,7 +8291,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodcurt-curtainc-bb495c72c8",
+ "name": "k8s-lb-bb495c72c8",
  "target": "prod-app-t/app-t-backend",
  "workloads": [
   "deployment/app-t-backend"
@@ -8207,7 +8308,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodcurt-curtainc-57e5adf3bf",
+ "name": "k8s-lb-57e5adf3bf",
  "target": "prod-app-t/app-t-studio",
  "workloads": [
   "deployment/app-t-studio"
@@ -8224,7 +8325,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodcurt-curtainc-022a51fc31",
+ "name": "k8s-lb-022a51fc31",
  "target": "prod-app-t/app-t-web",
  "workloads": [
   "deployment/app-t-web"
@@ -8241,7 +8342,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodtoot-appka-d0c066d282",
+ "name": "k8s-lb-d0c066d282",
  "target": "prod-app-v/app-v-admin-frontend",
  "workloads": [
   "deployment/app-v-admin-frontend"
@@ -8258,7 +8359,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodtoot-appkb-7df87a92cc",
+ "name": "k8s-lb-7df87a92cc",
  "target": "prod-app-v/app-v-backend",
  "workloads": [
   "deployment/app-v-backend"
@@ -8275,7 +8376,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodtoot-appkf-36f816b829",
+ "name": "k8s-lb-36f816b829",
  "target": "prod-app-v/app-v-frontend",
  "workloads": [
   "deployment/app-v-frontend"
@@ -8292,7 +8393,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodcarp-carpenst-e238817282",
+ "name": "k8s-lb-e238817282",
  "target": "prod-app-w/app-w",
  "workloads": [
   "deployment/app-w"
@@ -8309,7 +8410,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodfand-apppa-754a9b50b2",
+ "name": "k8s-lb-754a9b50b2",
  "target": "prod-app-x/app-x-api",
  "workloads": [
   "deployment/app-x-api"
@@ -8326,7 +8427,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodinse-insertoo-37417ab44f",
+ "name": "k8s-lb-37417ab44f",
  "target": "prod-app-y/app-y-admin",
  "workloads": [
   "deployment/app-y-admin"
@@ -8343,7 +8444,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodinse-insertoo-b22674073c",
+ "name": "k8s-lb-b22674073c",
  "target": "prod-app-y/app-y-ai",
  "workloads": [
   "deployment/app-y-ai"
@@ -8360,7 +8461,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodinse-insertoo-89a3732998",
+ "name": "k8s-lb-89a3732998",
  "target": "prod-app-y/app-y-backend",
  "workloads": [
   "deployment/app-y-backend"
@@ -8377,7 +8478,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodinse-insertoo-032c25d752",
+ "name": "k8s-lb-032c25d752",
  "target": "prod-app-y/app-y-frontend",
  "workloads": [
   "deployment/app-y-frontend"
@@ -8394,7 +8495,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodrhem-appnbac-8c88bb317a",
+ "name": "k8s-lb-8c88bb317a",
  "target": "prod-app-z-backend/app-z-backend",
  "workloads": [
   "deployment/app-z-backend"
@@ -8411,7 +8512,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "backend_prestop": false,
  "deregistration_delay_s": 300,
  "lb_type": "application",
- "name": "k8s-prodrhem-appnfro-9726e5b1d3",
+ "name": "k8s-lb-9726e5b1d3",
  "target": "prod-app-z-backend/app-z-frontend",
  "workloads": [
   "deployment/app-z-frontend"
@@ -8566,7 +8667,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "unhealthy_max_24h": 0,
   "unhealthy_now": 0,
   "target_groups": [
-   "k8s-prodillu-appi-d65740e6d5"
+   "k8s-lb-d65740e6d5"
   ]
  },
  "metrics_read": true,
@@ -8601,7 +8702,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "unhealthy_max_24h": 1.0,
   "unhealthy_now": 1,
   "target_groups": [
-   "k8s-prodtoot-appkf-36f816b829"
+   "k8s-lb-36f816b829"
   ]
  },
  "metrics_read": true,
@@ -8635,7 +8736,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "unhealthy_max_24h": 0,
   "unhealthy_now": 0,
   "target_groups": [
-   "k8s-prodsoro-appmba-f68effe430"
+   "k8s-lb-f68effe430"
   ]
  },
  "metrics_read": true,
@@ -8669,7 +8770,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "unhealthy_max_24h": 0,
   "unhealthy_now": 0,
   "target_groups": [
-   "k8s-prodcurt-curtainc-fc2d368787"
+   "k8s-lb-fc2d368787"
   ]
  },
  "metrics_read": true,
@@ -8721,8 +8822,8 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod-app-r/statefulset/app-r-postgresql",
   "prod-app-t/statefulset/app-t-backend-postgresql",
   "prod-app-x/statefulset/app-x-postgresql",
-  "prod-app-z-backend/deployment/app-z-embedding-server",
-  "prod-app-z-backend/deployment/tts-proxy"
+  "prod-app-z-backend/deployment/app-ad",
+  "prod-app-z-backend/deployment/app-z-embedding-server"
  ],
  "prod_without_request": 35,
  "request_ratio": 0.009,
@@ -9132,30 +9233,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```json
 {
  "aws_api_calls_total": 242614,
- "aws_api_retries_avg": 0.0,
- "aws_api_slow_ops_avg_s": [
-  [
-   "Shield/GetSubscriptionState",
-   0.759
-  ],
-  [
-   "EC2/RevokeSecurityGroupIngress",
-   0.317
-  ],
-  [
-   "EC2/AuthorizeSecurityGroupIngress",
-   0.295
-  ],
-  [
-   "Elastic Load Balancing v2/RegisterTargets",
-   0.283
-  ],
-  [
-   "Elastic Load Balancing v2/CreateTargetGroup",
-   0.265
-  ]
- ],
- "aws_api_top_ops": [
+ "aws_api_ops_by_calls": [
   [
    "Elastic Load Balancing v2/DescribeTargetHealth",
    76055
@@ -9187,6 +9265,201 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   [
    "Elastic Load Balancing v2/DescribeLoadBalancers",
    3732
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeRules",
+   3732
+  ],
+  [
+   "ACM/DescribeCertificate",
+   3509
+  ],
+  [
+   "EC2/DescribeVpcs",
+   2989
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroups",
+   1880
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListeners",
+   1866
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+   1866
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListenerCertificates",
+   1280
+  ],
+  [
+   "Shield/GetSubscriptionState",
+   1221
+  ],
+  [
+   "EC2/DescribeNetworkInterfaces",
+   1080
+  ],
+  [
+   "ACM/ListCertificates",
+   660
+  ],
+  [
+   "WAF Regional/GetWebACLForResource",
+   644
+  ],
+  [
+   "WAFV2/GetWebACLForResource",
+   644
+  ],
+  [
+   "EC2/DescribeSubnets",
+   586
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyRule",
+   557
+  ],
+  [
+   "EC2/AuthorizeSecurityGroupIngress",
+   195
+  ],
+  [
+   "EC2/RevokeSecurityGroupIngress",
+   194
+  ],
+  [
+   "Elastic Load Balancing v2/CreateRule",
+   30
+  ],
+  [
+   "Elastic Load Balancing v2/CreateTargetGroup",
+   30
+  ],
+  [
+   "Elastic Load Balancing v2/DeleteRule",
+   14
+  ],
+  [
+   "Elastic Load Balancing v2/DeleteTargetGroup",
+   14
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyTargetGroup",
+   13
+  ],
+  [
+   "EC2/DescribeAvailabilityZones",
+   2
+  ]
+ ],
+ "aws_api_retries_avg": 0.0,
+ "aws_api_slow_ops_avg_s": [
+  [
+   "Shield/GetSubscriptionState",
+   0.759
+  ],
+  [
+   "EC2/RevokeSecurityGroupIngress",
+   0.317
+  ],
+  [
+   "EC2/AuthorizeSecurityGroupIngress",
+   0.295
+  ],
+  [
+   "Elastic Load Balancing v2/RegisterTargets",
+   0.283
+  ],
+  [
+   "Elastic Load Balancing v2/CreateTargetGroup",
+   0.265
+  ],
+  [
+   "EC2/DescribeSubnets",
+   0.138
+  ],
+  [
+   "Elastic Load Balancing v2/CreateRule",
+   0.103
+  ],
+  [
+   "Elastic Load Balancing v2/ModifyRule",
+   0.096
+  ],
+  [
+   "ACM/ListCertificates",
+   0.087
+  ],
+  [
+   "EC2/DescribeVpcs",
+   0.084
+  ],
+  [
+   "EC2/DescribeInstances",
+   0.082
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroups",
+   0.081
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeRules",
+   0.08
+  ],
+  [
+   "EC2/DescribeSecurityGroups",
+   0.076
+  ],
+  [
+   "WAFV2/GetWebACLForResource",
+   0.075
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTags",
+   0.071
+  ],
+  [
+   "ACM/DescribeCertificate",
+   0.07
+  ],
+  [
+   "EC2/DescribeNetworkInterfaces",
+   0.065
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancers",
+   0.064
+  ],
+  [
+   "WAF Regional/GetWebACLForResource",
+   0.059
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListeners",
+   0.057
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeListenerCertificates",
+   0.052
+  ],
+  [
+   "Elastic Load Balancing v2/DeregisterTargets",
+   0.05
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeLoadBalancerAttributes",
+   0.047
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetGroupAttributes",
+   0.042
+  ],
+  [
+   "Elastic Load Balancing v2/DescribeTargetHealth",
+   0.036
   ]
  ],
  "metrics_available": true,
@@ -9850,7 +10123,59 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "node_md_disks",
   "node_md_disks_required",
   "node_network_receive_errs_total",
-  "node_network_receive_packets_total"
+  "node_network_receive_packets_total",
+  "node_network_transmit_errs_total",
+  "node_network_transmit_packets_total",
+  "node_network_up",
+  "node_nf_conntrack_entries",
+  "node_nf_conntrack_entries_limit",
+  "node_quantile:kubelet_pleg_relist_duration_seconds:histogram_quantile",
+  "node_systemd_unit_state",
+  "node_textfile_scrape_error",
+  "node_timex_maxerror_seconds",
+  "node_timex_offset_seconds",
+  "node_timex_sync_status",
+  "node_vmstat_pgmajfault",
+  "prometheus_config_last_reload_successful",
+  "prometheus_engine_queries",
+  "prometheus_engine_queries_concurrent_max",
+  "prometheus_notifications_alertmanagers_discovered",
+  "prometheus_notifications_errors_total",
+  "prometheus_notifications_queue_capacity",
+  "prometheus_notifications_queue_length",
+  "prometheus_notifications_sent_total",
+  "prometheus_operator_list_operations_failed_total",
+  "prometheus_operator_list_operations_total",
+  "prometheus_operator_managed_resources",
+  "prometheus_operator_node_address_lookup_errors_total",
+  "prometheus_operator_ready",
+  "prometheus_operator_reconcile_errors_total",
+  "prometheus_operator_reconcile_operations_total",
+  "prometheus_operator_status_update_errors_total",
+  "prometheus_operator_status_update_operations_total",
+  "prometheus_operator_syncs",
+  "prometheus_operator_watch_operations_failed_total",
+  "prometheus_operator_watch_operations_total",
+  "prometheus_remote_storage_failed_samples_total",
+  "prometheus_remote_storage_highest_timestamp_in_seconds",
+  "prometheus_remote_storage_queue_highest_sent_timestamp_seconds",
+  "prometheus_remote_storage_samples_failed_total",
+  "prometheus_remote_storage_samples_total",
+  "prometheus_remote_storage_shards_desired",
+  "prometheus_remote_storage_shards_max",
+  "prometheus_remote_storage_succeeded_samples_total",
+  "prometheus_rule_evaluation_failures_total",
+  "prometheus_rule_group_iterations_missed_total",
+  "prometheus_rule_group_rules",
+  "prometheus_sd_refresh_failures_total",
+  "prometheus_target_metadata_cache_entries",
+  "prometheus_target_scrape_pool_exceeded_label_limits_total",
+  "prometheus_target_scrape_pool_exceeded_target_limit_total",
+  "prometheus_target_sync_failed_total",
+  "prometheus_tsdb_compactions_failed_total",
+  "prometheus_tsdb_reloads_failures_total",
+  "reloader_last_reload_successful",
+  "s_failure_total"
  ],
  "alert_metrics_without_panel_count": 132,
  "available": true,
@@ -10775,23 +11100,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 {
  "error_lines_unclassified": 145,
  "files_scanned": [
-  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log",
-  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log",
-  "logs/node/ip-10-0-1-241.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-1-241.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log",
-  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log",
-  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/containerd-24h.log",
-  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/ipamd-24h.log",
-  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/kubelet-24h.log",
   "logs/pods/actions-runner-controller/arc-system_arc-gha-rs-controller.log",
   "logs/pods/alb-controller/kube-system_aws-load-balancer-controller.log",
   "logs/pods/argocd/argocd_argocd-application-controller.log",
@@ -10814,7 +11122,24 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "logs/pods/metrics-server/kube-system_metrics-server.log",
   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log",
   "logs/pods/promtail/monitoring_loki-stack-promtail.log",
-  "logs/pods/vpc-cni/kube-system_aws-node.log"
+  "logs/pods/vpc-cni/kube-system_aws-node.log",
+  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log",
+  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log",
+  "logs/node/ip-10-0-1-241.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-1-241.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log",
+  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log",
+  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/containerd-24h.log",
+  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/ipamd-24h.log",
+  "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/kubelet-24h.log"
  ],
  "lines_scanned": 23879,
  "unclassified_errors": [
@@ -10868,14 +11193,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "sample": "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-provisioner] 2026-11-06T08:58:33.262494744Z E1106 08:58:33.262448       1 controller.go:1025] \"Unhandled Error\" err=\"error syncing volume \\\"pvc-014f87e5-611a-4e1b-a8ca-7392e8b26757\\\": persistentv"
   },
   {
-   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context deadline …",
-   "count": 3,
-   "files": {
-    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 3
-   },
-   "sample": "2026-11-06T09:01:56+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:01:56.321732901Z\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context d"
-  },
-  {
    "pattern": "ebs-csi | \"Event occurred\" object=\"prod-app-x/app-x-api-usage\" fieldPath=\"\" kind=\"PersistentVolumeClaim\" apiVersion=\"v1\" type=\"Warning\" …",
    "count": 3,
    "files": {
@@ -10890,6 +11207,22 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
     "logs/pods/ebs-csi/kube-system_ebs-csi-controller.log": 3
    },
    "sample": "[pod/ebs-csi-controller-85dcc64955-m7jp8/csi-provisioner] 2026-11-06T07:44:20.455164108Z E1106 07:44:20.455119       1 controller.go:974] \"Unhandled Error\" err=\"error syncing claim \\\"014f87e5-611a-4e1b-a8ca-7392e8b26757\\\": failed to provisi"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context deadline …",
+   "count": 3,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 3
+   },
+   "sample": "2026-11-06T09:01:56+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:01:56.321732901Z\" level=error msg=\"get state for da1c4f57e08314a3a87663a8b50da684670269c24fa10dc709c77e12d6c2fb62\" error=\"context d"
+  },
+  {
+   "pattern": "kube-proxy | \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted on all …",
+   "count": 2,
+   "files": {
+    "logs/pods/kube-proxy/kube-system_kube-proxy.log": 2
+   },
+   "sample": "[pod/kube-proxy-46cc5/kube-proxy] 2026-11-06T08:59:05.940716243Z E1106 08:59:05.939170       1 server.go:234] \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted o"
   },
   {
    "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"failed to load cni during init, please check CRI plugin status before setting up network for pods\" error=\"cni …",
@@ -10996,14 +11329,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.259774    1556 eviction_manager.go:292] \"Eviction manager: failed to get summary stats\" err=\"failed to get node info: node \\\"ip-10-0-2-100."
   },
   {
-   "pattern": "kube-proxy | \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted on all …",
-   "count": 2,
-   "files": {
-    "logs/pods/kube-proxy/kube-system_kube-proxy.log": 2
-   },
-   "sample": "[pod/kube-proxy-46cc5/kube-proxy] 2026-11-06T08:59:05.940716243Z E1106 08:59:05.939170       1 server.go:234] \"Kube-proxy configuration may be incomplete or incorrect\" err=\"nodePortAddresses is unset; NodePort connections will be accepted o"
-  },
-  {
    "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"collecting metrics for a8a9d8b268ec10d5dc42145447580db16a5b3152ee3f97d810ded9029e1106f2\" error=\"cgroups: …",
    "count": 1,
    "files": {
@@ -11058,6 +11383,454 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
     "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
    },
    "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:40.046841    1516 kubelet_node_status.go:466] \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-1-137.ap-northeast-2.compute.in"
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 == IN_CREATE|IN_ISDIR): …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: W1106 09:44:40.113696    1516 watcher.go:93] Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 ="
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no imagefs label for configured runtime\"",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:40.119869    1516 eviction_manager.go:267] \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no ima"
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-<n>.ap-northeast-2.compute.internal\\\": node …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:40+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:40.504397    1516 kubelet_node_status.go:554] \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-137.ap-northeast-2."
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | object-\"prod-app-x\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is forbidden: User …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: W1106 09:44:54.753733    1516 reflector.go:569] object-\"prod-app-x\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is for"
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed to list *v1.ConfigMap: configmaps …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:54.754115    1516 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed t"
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | object-\"prod-app-x\"/\"app-x-api-secret\": failed to list *v1.Secret: <masked> \"app-x-api-secret\" is forbidden: User …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: W1106 09:44:54.755274    1516 reflector.go:569] object-\"prod-app-x\"/\"app-x-api-secret\": failed to list *v1.Secret: <masked> \"app-x-api-secret\" is forbidde"
+  },
+  {
+   "pattern": "node:ip-10-0-1-137.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"app-x-api-secret\\\": Failed to watch *v1.Secret: <masked> to list *v1.Secret: <masked> …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T09:44:54+0000 ip-10-0-1-137.ap-northeast-2.compute.internal kubelet[1516]: E1106 09:44:54.755506    1516 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-x\\\"/\\\"app-x-api-secret\\\": Failed to watch *v1.Secret: <masked> to"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"abc5268c5ac596430d283957517cc0207cc7f278e8884875dfc0b98c7549acfb\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T02:44:53+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T02:44:53.275389812Z\" level=error msg=\"ContainerStatus for \\\"abc5268c5ac596430d283957517cc0207cc7f278e8884875dfc0b98c7549acfb\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"4e304ff10e36ad4aeb0e57d765bb833d72e80e8d80bffb57f0a9ccfbf999c672\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T03:38:51+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T03:38:51.751608465Z\" level=error msg=\"ContainerStatus for \\\"4e304ff10e36ad4aeb0e57d765bb833d72e80e8d80bffb57f0a9ccfbf999c672\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"e43b801de41fa6648a82bb085f7f0e99e732943205567f534ee48c0fed379257\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T05:35:52+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T05:35:52.259128796Z\" level=error msg=\"ContainerStatus for \\\"e43b801de41fa6648a82bb085f7f0e99e732943205567f534ee48c0fed379257\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"8dad2fea42b4343ede88bf973fb15b28e182373f790dde7c51586e7a668cc21d\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T06:08:53+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T06:08:53.088785825Z\" level=error msg=\"ContainerStatus for \\\"8dad2fea42b4343ede88bf973fb15b28e182373f790dde7c51586e7a668cc21d\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"e8d53d577bcb44ac16cb7a18c3dc22c1bd721b33df9837b1b11575edd02c5fdc\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T06:56:54+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T06:56:54.672356630Z\" level=error msg=\"ContainerStatus for \\\"e8d53d577bcb44ac16cb7a18c3dc22c1bd721b33df9837b1b11575edd02c5fdc\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"fc17dddfb93ac007ddd787b67a63aacfb13050a318379ccf784a32128ef88aa5\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T07:35:52+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T07:35:52.103369442Z\" level=error msg=\"ContainerStatus for \\\"fc17dddfb93ac007ddd787b67a63aacfb13050a318379ccf784a32128ef88aa5\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"b7a42a9dbe0a983a99b214b3e16f7a9c42bb307095e26ffbfce33a9bb36ab2b4\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T07:49:04+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T07:49:04.608734122Z\" level=error msg=\"ContainerStatus for \\\"b7a42a9dbe0a983a99b214b3e16f7a9c42bb307095e26ffbfce33a9bb36ab2b4\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=35",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170195308Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=35"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=39",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170249646Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=39"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=41",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170256090Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=41"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=43",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.170261943Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=43"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=3",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229252943Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=3"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229296400Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=7",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229305511Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=7"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=9",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229313655Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=9"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=11",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229321043Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=11"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=17",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.229328307Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=17"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"c8415f5426a522cb9bee5c935ff2230ac490b988d775b9cb963ab71527c6d7ce\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:50+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:50.824526503Z\" level=error msg=\"ContainerStatus for \\\"c8415f5426a522cb9bee5c935ff2230ac490b988d775b9cb963ab71527c6d7ce\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"459b6a4dc7daaeefdc0907db37479094ae0e3e43df5c859dbf00e3da5818ae94\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:54+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T08:59:54.833959892Z\" level=error msg=\"ContainerStatus for \\\"459b6a4dc7daaeefdc0907db37479094ae0e3e43df5c859dbf00e3da5818ae94\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"d5529bd0e89f949ab998b9c017fd992eb12f4ed4cc1e04ae26135c6a115462d3\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T09:00:58+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T09:00:58.951499999Z\" level=error msg=\"ContainerStatus for \\\"d5529bd0e89f949ab998b9c017fd992eb12f4ed4cc1e04ae26135c6a115462d3\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"852ec3e1ee4c664f330cfa008d437d795f7d193953dd1b0e4f9514cabb250f54\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T09:45:38+0000 ip-10-0-1-139.ap-northeast-2.compute.internal containerd[1461]: time=\"2026-11-06T09:45:38.203672949Z\" level=error msg=\"ContainerStatus for \\\"852ec3e1ee4c664f330cfa008d437d795f7d193953dd1b0e4f9514cabb250f54\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | object-\"app-ab-prod\"/\"app-ab-frontend-secret\": failed to list *v1.Secret: <masked> \"app-ab-frontend-secret\" is forbidden: User …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: W1106 08:58:58.339227    1593 reflector.go:569] object-\"app-ab-prod\"/\"app-ab-frontend-secret\": failed to list *v1.Secret: <masked> \"app-ab-frontend-secret"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"app-ab-prod\\\"/\\\"app-ab-frontend-secret\\\": Failed to watch *v1.Secret: <masked> to list *v1.Secret: <masked> …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: E1106 08:58:58.339256    1593 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"app-ab-prod\\\"/\\\"app-ab-frontend-secret\\\": Failed to watch *v1.Secret: <masked>"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | Failed to process watch event {EventType:0 …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:45+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: W1106 08:59:45.050377    1593 manager.go:1169] Failed to process watch event {EventType:0 Name:/kubepods.slice/kubepods-burstable.slice/kubepods-burstable"
+  },
+  {
+   "pattern": "node:ip-10-0-1-139.ap-northeast-2.compute.internal | E1106 13:52:11.<n>    <n> k--output truncated--",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-139.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T13:52:11+0000 ip-10-0-1-139.ap-northeast-2.compute.internal kubelet[1593]: E1106 13:52:11.348616    1593 k--output truncated--"
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"failed to reload cni configuration after receiving fs change event(WRITE         …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:59:12+0000 ip-10-0-1-245.ap-northeast-2.compute.internal containerd[1412]: time=\"2026-11-06T08:59:12.117442953Z\" level=error msg=\"failed to reload cni configuration after receiving fs change event(WRITE         \\\"/etc/cni/net."
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | {\"level\":\"error\",\"ts\":\"<ts>\",\"caller\":\"awsutils/awsutils.go:<n>\",\"msg\":\"r8gd.medium: instance type does not exist\"}",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/ipamd-24h.log": 1
+   },
+   "sample": "{\"level\":\"error\",\"ts\":\"2026-11-06T08:59:10.241Z\",\"caller\":\"awsutils/awsutils.go:1618\",\"msg\":\"r8gd.medium: instance type does not exist\"}"
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeConfig for service …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.243281    1530 log.go:32] \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeCon"
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-1-<n>.ap-northeast-2.compute.internal\\\" not found\"",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.334735    1530 kubelet_node_status.go:466] \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-1-245.ap-northeast-2.compute.in"
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 == IN_CREATE|IN_ISDIR): …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: W1106 08:58:59.417259    1530 watcher.go:93] Error while processing event (\"/sys/fs/cgroup/devices/kubepods.slice/kubepods-besteffort.slice\": 0x40000100 ="
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no imagefs label for configured runtime\"",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.421858    1530 eviction_manager.go:267] \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no ima"
+  },
+  {
+   "pattern": "node:ip-10-0-1-245.ap-northeast-2.compute.internal | \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-<n>.ap-northeast-2.compute.internal\\\": node …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-1-245.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:59+0000 ip-10-0-1-245.ap-northeast-2.compute.internal kubelet[1530]: E1106 08:58:59.822990    1530 kubelet_node_status.go:554] \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-1-245.ap-northeast-2."
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:08:25+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:08:25.977046136Z\" level=error msg=\"ttrpc: received message on inactive stream\" stream=5"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"721c86c2ddbbd259576a3a8177dff00ae3aa79d43d5f628bbcff16fe78222132\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:20:21+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:20:21.504893358Z\" level=error msg=\"ContainerStatus for \\\"721c86c2ddbbd259576a3a8177dff00ae3aa79d43d5f628bbcff16fe78222132\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"8ddd23774d613913174fa77e1e3bd8e9567b6632ceb85f2f12e7338a7cb87a2d\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:26:50+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:26:50.137843966Z\" level=error msg=\"ContainerStatus for \\\"8ddd23774d613913174fa77e1e3bd8e9567b6632ceb85f2f12e7338a7cb87a2d\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"219c9fc551ba1c733e3d07dcaee99d0b3811671d94fb3124fec511822ab0140d\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:49:40+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:49:40.394713697Z\" level=error msg=\"ContainerStatus for \\\"219c9fc551ba1c733e3d07dcaee99d0b3811671d94fb3124fec511822ab0140d\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"f1ba92141f3eba4d5d473111043ca30f667cfc27de7df02897e22e2c46ee27c6\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T08:51:49+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T08:51:49.609971021Z\" level=error msg=\"ContainerStatus for \\\"f1ba92141f3eba4d5d473111043ca30f667cfc27de7df02897e22e2c46ee27c6\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"9b73872e00d5d10bc91e7baa651281abb1ffda16703f690ae41a2b3bbc9108f1\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T09:00:56+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:00:56.605922288Z\" level=error msg=\"ContainerStatus for \\\"9b73872e00d5d10bc91e7baa651281abb1ffda16703f690ae41a2b3bbc9108f1\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"collecting metrics for e944d40b8100456ffa7df69e3ad60466efd7dd536a10f463b4dacefb9c21b7ef\" error=\"cgroups: …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T09:01:51+0000 ip-10-0-2-100.ap-northeast-2.compute.internal containerd[1414]: time=\"2026-11-06T09:01:51.831406365Z\" level=error msg=\"collecting metrics for e944d40b8100456ffa7df69e3ad60466efd7dd536a10f463b4dacefb9c21b7ef\" error=\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeConfig for service …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.186466    1556 log.go:32] \"RuntimeConfig from runtime service failed\" err=\"rpc error: code = Unimplemented desc = unknown method RuntimeCon"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-2-<n>.ap-northeast-2.compute.internal\\\" not found\"",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.229753    1556 kubelet_node_status.go:466] \"Error getting the current node from lister\" err=\"node \\\"ip-10-0-2-100.ap-northeast-2.compute.in"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no imagefs label for configured runtime\"",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.259727    1556 eviction_manager.go:267] \"eviction manager: failed to check if we have separate container filesystem. Ignoring.\" err=\"no ima"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-2-<n>.ap-northeast-2.compute.internal\\\": node …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:08:13+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:08:13.648702    1556 kubelet_node_status.go:554] \"Error updating node status, will retry\" err=\"error getting node \\\"ip-10-0-2-100.ap-northeast-2."
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | object-\"prod-app-r\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is forbidden: User …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: W1106 08:58:58.062271    1556 reflector.go:569] object-\"prod-app-r\"/\"kube-root-ca.crt\": failed to list *v1.ConfigMap: configmaps \"kube-root-ca.crt\" is for"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-r\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed to list *v1.ConfigMap: configmaps …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:58:58.062308    1556 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-r\\\"/\\\"kube-root-ca.crt\\\": Failed to watch *v1.ConfigMap: failed t"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | object-\"prod-app-z-backend\"/\"app-z-backend-secret\": failed to list *v1.Secret: <masked> \"app-z-backend-secret\" is forbidden: User …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: W1106 08:58:58.191724    1556 reflector.go:569] object-\"prod-app-z-backend\"/\"app-z-backend-secret\": failed to list *v1.Secret: <masked> \"app-z-backend-sec"
+  },
+  {
+   "pattern": "node:ip-10-0-2-100.ap-northeast-2.compute.internal | \"Unhandled Error\" err=\"object-\\\"prod-app-z-backend\\\"/\\\"app-z-backend-secret\\\": Failed to watch *v1.Secret: <masked> to list *v1.Secret: …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-100.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T08:58:58+0000 ip-10-0-2-100.ap-northeast-2.compute.internal kubelet[1556]: E1106 08:58:58.191765    1556 reflector.go:166] \"Unhandled Error\" err=\"object-\\\"prod-app-z-backend\\\"/\\\"app-z-backend-secret\\\": Failed to watch *v1.Secret:"
+  },
+  {
+   "pattern": "node:ip-10-0-2-218.ap-northeast-2.compute.internal | time=\"<ts>\" level=error msg=\"ContainerStatus for \\\"9f3b8870257f34f53f016fd834a86f3d978f55b40048ebc36f5451b848914f55\\\" failed\" error=\"rpc …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/containerd-24h.log": 1
+   },
+   "sample": "2026-11-06T11:00:11+0000 ip-10-0-2-218.ap-northeast-2.compute.internal containerd[3613]: time=\"2026-11-06T11:00:11.286783531Z\" level=error msg=\"ContainerStatus for \\\"9f3b8870257f34f53f016fd834a86f3d978f55b40048ebc36f5451b848914f55\\\" failed\""
+  },
+  {
+   "pattern": "node:ip-10-0-2-218.ap-northeast-2.compute.internal | \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = an error occurred when try to find container …",
+   "count": 1,
+   "files": {
+    "logs/node/ip-10-0-2-218.ap-northeast-2.compute.internal/kubelet-24h.log": 1
+   },
+   "sample": "2026-11-06T11:00:11+0000 ip-10-0-2-218.ap-northeast-2.compute.internal kubelet[3748]: E1106 11:00:11.287025    3748 log.go:32] \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = an error occurred when try t"
   }
  ]
 }
@@ -12407,6 +13180,17 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>resilience.no-prestop.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>resilience.no-prestop.prod-app-z-backend/app-z-backend</code></summary>
 
 ```json
@@ -12446,17 +13230,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 {
  "namespace": "prod-app-z-backend",
  "name": "app-z-pg-proxy",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>resilience.no-prestop.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
  "kind": "Deployment"
 }
 ```
@@ -13267,23 +14040,23 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/app-z-embedding-server</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
  "name": "app-z-embedding-server",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
  "kind": "Deployment"
 }
 ```
@@ -13365,13 +14138,13 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>traffic.alb-protection-off.k8s-lab-kprodlb-b18a4555d7</code></summary>
+<details><summary><code>traffic.alb-protection-off.k8s-lb-b18a4555d7</code></summary>
 
 ```json
 {
  "access_logs": false,
  "deletion_protection": false,
- "name": "k8s-lab-kprodlb-b18a4555d7",
+ "name": "k8s-lb-b18a4555d7",
  "target_groups": 41,
  "type": "application"
 }

@@ -19,7 +19,6 @@
   suggest: "Walk down from the Conditions/Events of kubectl describe certificate <name> → certificaterequest → order → challenge (cmctl status certificate <name>)."
   verify:
     - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[?(@.type==\"Ready\")].status,NOTAFTER:.status.notAfter"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -367,7 +366,6 @@
   suggest: "Try a manual renewal with cmctl renew <name> and watch the Challenge state. For HTTP-01, check that http://<host>/.well-known/acme-challenge/ is reachable from outside."
   verify:
     - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,RENEW:.status.renewalTime,NOTAFTER:.status.notAfter | sort -k3"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -650,7 +648,6 @@
   suggest: "Read the Reason in kubectl describe challenge -A. For HTTP-01, run curl -v http://<host>/.well-known/acme-challenge/x from outside."
   verify:
     - "kubectl get orders,challenges -A"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1004,7 +1001,6 @@
   suggest: "Check Status in kubectl describe clusterissuer <name>. Confirm the ACME account key Secret (privateKeySecretRef) exists."
   verify:
     - "kubectl get clusterissuers,issuers -A -o wide"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1150,13 +1146,12 @@
   severity_default: high
   symptom_linked: true
   why: >
-    Certificates from the staging ACME server chain to the "(STAGING) Let's Encrypt" root, so every browser warns. A common incident is an ingress whose issuerRef was never switched to production after testing. cert-manager may not reissue the Secret after the change, so the Secret may need deleting.
+    Certificates from the staging ACME server chain to the "(STAGING) Let's Encrypt" root, so every browser warns. A common incident is an ingress whose issuerRef was never switched to production after testing. After the issuerRef is changed cert-manager reissues, because the issuer annotations on the Secret no longer match the Certificate (https://cert-manager.io/docs/faq/).
   measured: >
     Measured on a real k3s cluster: 0 → pass.
-  suggest: "Change the Certificate's issuerRef to production and trigger reissuance with kubectl delete secret <tls>."
+  suggest: "Change the Certificate's issuerRef to production; cert-manager reissues on its own. If it does not, `cmctl renew <certificate>`."
   verify:
     - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ISSUER:.spec.issuerRef.name | grep -i staging"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1374,7 +1369,6 @@
   suggest: "Add the cert-manager.io/cluster-issuer annotation to the Ingress so ingress-shim creates the Certificate. For external CA certificates that are not a Certificate, at least monitor expiry (blackbox exporter probe_ssl_earliest_cert_expiry)."
   verify:
     - "kubectl get ingress -A -o json | jq -r '.items[] | .metadata.namespace+\"/\"+.metadata.name+\" \"+((.spec.tls//[])|map(.secretName)|join(\",\"))'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1586,6 +1580,7 @@
   target: "'cluster'"
   evidence: "f\"sync calls since controller start {item['sync_calls']} / errors {item['sync_errors']}, ACME requests {item['acme_requests']} by status {item['acme_by_status']} (4xx/5xx {item['acme_errors']}, ratio {item['acme_error_ratio']}), Ready False metric {item['not_ready_metric']}\""
   severity_default: low
+  nature: occurrence
   symptom_linked: false
   why: >
     Sync errors count how often the controller failed while reconciling some object (permissions, webhook, transient errors included), so a high number is not an outage by itself, but a steady climb means some Certificate is not progressing. ACME 4xx is rate limiting (429), bad requests (400) or account problems (403); 5xx is on the Let's Encrypt side.
@@ -1594,7 +1589,6 @@
   suggest: "kubectl -n cert-manager logs deploy/cert-manager --since=24h | grep -iE 'error|failed' | sort | uniq -c | sort -rn | head"
   verify:
     - "kubectl get --raw /api/v1/namespaces/cert-manager/pods/<controller-pod>:9402/proxy/metrics | grep -E 'certmanager_controller_sync_error_count|certmanager_http_acme_client_request_count'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1872,7 +1866,6 @@
   suggest: "Upgrade the cert-manager Helm chart one minor at a time (including the CRD upgrade: --set crds.enabled=true or kubectl apply cert-manager.crds.yaml)."
   verify:
     - "kubectl -n cert-manager get deploy -o jsonpath='{range .items[*]}{.metadata.name}{\" \"}{.spec.template.spec.containers[0].image}{\"\\n\"}{end}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -2084,7 +2077,6 @@
   suggest: "Helm values prometheus.servicemonitor.enabled true. Otherwise node access (SSM or SSH)."
   verify:
     - "kubectl get --raw /api/v1/namespaces/cert-manager/pods/<controller-pod>:9402/proxy/metrics | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

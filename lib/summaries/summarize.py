@@ -18,10 +18,6 @@ from .. import __version__
 from ..foundations import paths
 from ..foundations.runlog import RunLog, read_runlog
 from ..foundations.snapshot import (
-    COMPONENT_LOGS_AGGREGATE,
-    COMPONENT_LOGS_DIR,
-    COMPONENT_LOGS_MARKER,
-    component_logs_removed,
     event_count,
     forget_reads,
     items,
@@ -36,7 +32,6 @@ from ..foundations.snapshot import (
 )
 
 WAITING_REASONS = ("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "CreateContainerConfigError", "CreateContainerError", "InvalidImageName", "RunContainerError")
-LABEL_KEEP = ("__name__", "namespace", "pod", "container", "node", "instance", "mountpoint", "qos_class", "reason", "job", "horizontalpodautoscaler", "endpoint", "kind", "phase", "poddisruptionbudget", "service", "deployment")
 
 
 def _rel(snap: Path, p: Path) -> str:
@@ -48,7 +43,7 @@ def _rel(snap: Path, p: Path) -> str:
 
 def summarize_events(snap: Path) -> dict:
     path = snap / "events.json"
-    out: dict = {"source": _rel(snap, path), "count": 0, "by_type": {}, "reasons": [], "top_objects": [], "warning_samples": {}}
+    out: dict = {"source": _rel(snap, path), "count": 0, "by_type": {}, "reasons": [], "objects_by_events": [], "warning_samples": {}}
     if not path.is_file():
         out["missing"] = "events.json missing. Either collect did not run on this snapshot (discover-only folder) or event collection failed"
         return out
@@ -80,10 +75,10 @@ def summarize_events(snap: Path) -> dict:
         objects[obj] += 1
         if typ == "Warning" and len(samples[reason]) < 3:
             samples[reason].append({"object": obj, "message": (e.get("message") or "")[:300], "last": last})
-    out["reasons"] = sorted([{**r, "objects_top": [o for o, _ in r["objects"].most_common(5)]} for r in reasons.values()], key=lambda r: (-r["occurrences"], r["reason"]))
+    out["reasons"] = sorted([{**r, "objects_by_count": [o for o, _ in r["objects"].most_common()]} for r in reasons.values()], key=lambda r: (-r["occurrences"], r["reason"]))
     for r in out["reasons"]:
         r.pop("objects", None)
-    out["top_objects"] = [{"object": o, "events": n} for o, n in objects.most_common(10)]
+    out["objects_by_events"] = [{"object": o, "events": n} for o, n in objects.most_common()]
     out["warning_samples"] = dict(samples)
     # per-Reason trend across every snapshot in the context folder (lib/summaries/events.py)
     try:
@@ -94,9 +89,9 @@ def summarize_events(snap: Path) -> dict:
             "source": "../events-history.json",
             "snapshots": h["snapshot_count"],
             "unique_events": h["unique_events"],
-            "tracked_hits": [{k: r[k] for k in ("reason", "type", "severity_hint", "meaning", "occurrences", "events", "first", "last", "trend", "per_snapshot", "objects_top")} for r in h["tracked_hits"]],
+            "tracked_hits": [{k: r[k] for k in ("reason", "type", "severity_hint", "meaning", "occurrences", "events", "first", "last", "trend", "per_snapshot", "objects_by_count")} for r in h["tracked_hits"]],
             "tracked_silent": h["tracked_silent"],
-            "top_warning_reasons": [{k: r[k] for k in ("reason", "occurrences", "trend", "per_snapshot")} for r in h["reasons"] if r["type"] == "Warning"][:15],
+            "warning_reasons": [{k: r[k] for k in ("reason", "occurrences", "trend", "per_snapshot")} for r in h["reasons"] if r["type"] == "Warning"],
         }
     except Exception as e:  # a failure in the trend analysis must not block the whole summary
         out["history"] = {"error": f"{type(e).__name__}: {e}"}
@@ -104,10 +99,6 @@ def summarize_events(snap: Path) -> dict:
 
 
 # ---------- metrics ----------
-
-
-def _labels(m: dict) -> dict:
-    return {k: v for k, v in m.items() if k in LABEL_KEEP}
 
 
 def summarize_metrics(snap: Path) -> dict:
@@ -123,20 +114,19 @@ def summarize_metrics(snap: Path) -> dict:
         rows = []
         for r in d.get("result", []):
             # Prometheus answers "NaN" for a quantile over no samples; metric_value makes that None, which json.dumps can write (a NaN token is not JSON)
-            rows.append({"labels": _labels(r.get("metric", {})), "value": metric_value(r)})
+            rows.append({"labels": dict(r.get("metric") or {}), "value": metric_value(r)})
         nums = [r["value"] for r in rows if r["value"] is not None]
         if nums:
             rec["stats"] = {"min": min(nums), "max": max(nums), "mean": math.fsum(nums) / len(nums), "n": len(nums)}  # fsum: the same digits on every Python (3.12 changed how sum() adds floats)
         rows.sort(key=lambda r: -(r["value"] if r["value"] is not None else float("-inf")))
-        rec["top"] = rows[:30]
-        rec["truncated"] = max(0, len(rows) - 30)
+        rec["rows"] = rows  # every series, largest first
         out[f.stem] = rec
     # kubectl top
     for name in ("top-nodes.txt", "top-pods.txt"):
         p = mdir / name
         if p.is_file():
             lines = [ln for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
-            out[name.replace(".txt", "")] = {"source": _rel(snap, p), "lines": len(lines), "head": lines[:30]}
+            out[name.replace(".txt", "")] = {"source": _rel(snap, p), "lines": lines}
     return out
 
 
@@ -170,7 +160,7 @@ def summarize_objects(snap: Path, inv: dict | None) -> dict:
         "source": "objects/pods.json",
         "count": len(pods),
         "by_phase": dict(Counter((p.get("status") or {}).get("phase") or "Unknown" for p in pods)),
-        "restarts_top": [r for r in restarts[:20] if r["restarts"] > 0],
+        "restarts_by_pod": [r for r in restarts if r["restarts"] > 0],
         "pending": [
             {
                 "namespace": p["metadata"]["namespace"],
@@ -366,7 +356,7 @@ def summarize_webhooks(snap: Path) -> dict:
                         "timeout_seconds": w.get("timeoutSeconds"),
                         "service": f"{sns}/{sname}" if sns else (cc.get("url") or "?"),
                         "ready_endpoints": ready,
-                        "resources": resources[:8],
+                        "resources": resources,
                         "namespace_selector": ns_sel or None,
                         "object_selector": obj_sel or None,
                         "self_lock_risk": self_lock_risk,
@@ -438,7 +428,7 @@ def summarize_recent_changes(snap: Path, now: _dt.datetime, hours: int = 24) -> 
         "hours": hours,
         "workloads": changed,
         "namespaces": sorted({c["namespace"] for c in changed}),
-        "event_targets": sorted(set(ev_targets))[:50],
+        "event_targets": sorted(set(ev_targets)),
         "count": len(changed),
     }
 
@@ -447,7 +437,7 @@ def _collection_meta(snap: Path) -> dict:
     """Mode of this snapshot and the steps the mode skipped, so the report can say "not collected in daily mode" instead of treating the gaps as defects."""
     cr = load_json(snap / "collect-result.json") or {}
     s = cr.get("_summary") or {}
-    return {"mode": paths.snapshot_mode(snap), "mode_skipped_steps": s.get("mode_skipped") or [], "failed_steps": s.get("failed") or [], "seconds_total": s.get("seconds_total")}
+    return {"mode": paths.snapshot_mode(snap), "mode_skipped_steps": s.get("mode_skipped") or [], "failed_steps": s.get("failed") or [], "at_limit": s.get("at_limit") or {}, "seconds_total": s.get("seconds_total")}
 
 
 def summarize_tools(snap: Path) -> dict:
@@ -523,43 +513,8 @@ def _component_enabled(key: str, enabled_by: tuple[str, ...], snap: Path, collec
     return key == "ecr" and (snap / "aws" / "ecr-repositories.json").exists()
 
 
-COMPONENT_LOGS_MARKER_TEXT = (
-    "Component pod logs were collected here, aggregated into summary.json (logs section: signature counts, masked sample lines, unclassified error patterns; "
-    "scaling section: Karpenter timings) and then deleted, so that raw log lines cannot be read by the agent and sent to its model API. "
-    "AGGREGATED.json next to this file holds what was computed from them; a rerun of summarize reads it. "
-    "To keep the raw logs, set keep_component_logs: true in ~/.kubegap/config.yaml.\n"
-)
-
-
-def remove_component_logs(snap: Path, summary: dict | None = None) -> int:
-    """Delete logs/pods/*.log after the summary is written. Leaves the marker and AGGREGATED.json (the log-derived parts of `summary`, so a rerun does not need the raw files). Returns the number of files removed."""
-    import shutil
-
-    d = snap / COMPONENT_LOGS_DIR
-    if not d.is_dir():
-        return 0
-    files = [p for p in d.rglob("*") if p.is_file() and p.name not in (COMPONENT_LOGS_MARKER, COMPONENT_LOGS_AGGREGATE)]
-    if not files:
-        return 0
-    from .logs import LOG_SCAN_KEYS
-    from .scaling import KARPENTER_LOG_KEYS
-
-    logs_sec = (summary or {}).get("logs") if isinstance((summary or {}).get("logs"), dict) else {}
-    karp = ((summary or {}).get("scaling") or {}).get("karpenter") if isinstance((summary or {}).get("scaling"), dict) else {}
-    agg = {
-        "removed_at": _dt.datetime.now().astimezone().isoformat(timespec="seconds"),
-        "files_removed": sorted(str(p.relative_to(snap)) for p in files),
-        "log_scan": {k: logs_sec.get(k) for k in LOG_SCAN_KEYS if k in logs_sec},
-        "karpenter_logs": {k: karp.get(k) for k in KARPENTER_LOG_KEYS if isinstance(karp, dict) and k in karp},
-    }
-    shutil.rmtree(d)
-    write_private(d / COMPONENT_LOGS_AGGREGATE, json.dumps(agg, ensure_ascii=False, indent=1, default=str))
-    write_private(d / COMPONENT_LOGS_MARKER, COMPONENT_LOGS_MARKER_TEXT)
-    return len(files)
-
-
-def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> dict:
-    """Build summary.json. Unless keep_component_logs is true the component pod logs are deleted afterwards, with their log-derived aggregates saved to logs/pods/AGGREGATED.json; lib/summaries/logs.py and lib/summaries/scaling.py read that file on a rerun, so the result does not change."""
+def summarize(snap: Path, echo=print) -> dict:
+    """Build summary.json from what the snapshot holds. Nothing of the snapshot is changed or removed: a summary can be built again from the same files."""
     remove_stale_temp(snap)
     forget_reads(snap)
     inv = load_json(snap / "inventory.json")
@@ -619,7 +574,7 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
             "taken_at": inv.get("taken_at"),
             "platform": inv["cluster"]["platform"],
             "server_version": inv["cluster"].get("server_version"),
-            "profile": inv["profile"]["name"],
+            "scale": (inv.get("scale") or {}).get("name"),
             "node_access": inv["node_access"]["method"],
             "nodes": inv["nodes"]["count"],
             "namespaces": inv["namespaces"]["count"],
@@ -636,26 +591,15 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
     unlisted = sorted(stem for stem, st in s["collection"]["object_files"].items() if st == "unlisted")
     if unlisted:
         RunLog(snap / "run.log").note("object files a reader asked for that the cluster serves but the snapshot does not have (the reader's stem and the file name disagree)", stems=unlisted)
-    removed = 0 if keep_component_logs else remove_component_logs(snap, s)
-    if isinstance(s.get("logs"), dict):
-        s["logs"]["component_logs_removed"] = component_logs_removed(snap)  # from the marker, so a later keep_component_logs: true does not claim the logs are there
     write_private(snap / "summary.json", json.dumps(s, ensure_ascii=False, indent=1, default=str))
     if echo:
-        if removed:
-            echo(f"component logs: {removed} files aggregated into {COMPONENT_LOGS_DIR}/{COMPONENT_LOGS_AGGREGATE} and deleted ({COMPONENT_LOGS_MARKER} left in place)")
-        elif component_logs_removed(snap):
-            echo(f"component logs: deleted by an earlier summarize; log results read from {COMPONENT_LOGS_DIR}/{COMPONENT_LOGS_AGGREGATE}" + (" (keep_component_logs: true has no effect on this snapshot)" if keep_component_logs else ""))
-        elif keep_component_logs and (snap / COMPONENT_LOGS_DIR).is_dir():
-            echo("component logs: kept (keep_component_logs: true). Raw log lines can be read by the agent")
-        if isinstance(s.get("logs"), dict) and s["logs"].get("scan_incomplete"):
-            echo("warning: component logs are gone and no AGGREGATED.json was found; log signature results cover node logs only")
         e, o, m, r = s["events"], s["objects"], s["metrics"], s["run"]
         if e.get("missing"):
             echo(f"events: {e['missing']}")
         else:
             echo(f"events {e['count']} (Warning {e['by_type'].get('Warning', 0)}), {len(e['reasons'])} distinct Reasons. top: " + ", ".join(f"{x['reason']}x{x['occurrences']}" for x in e["reasons"][:5]))
         echo(
-            f"objects {o['kind_count']} kinds, pods {o['pods']['count']}: top restarts {len(o['pods']['restarts_top'])}, Pending {len(o['pods']['pending'])}, "
+            f"objects {o['kind_count']} kinds, pods {o['pods']['count']}: top restarts {len(o['pods']['restarts_by_pod'])}, Pending {len(o['pods']['pending'])}, "
             f"waiting reasons {len(o['pods']['waiting'])}, Failed {len(o['pods']['failed'])}; Deployment unavailable {len(o['deployments']['unavailable'])}, "
             f"replicas=1 {o['deployments']['replicas_1']}; Services without ready endpoints {len(o['services']['no_ready_endpoints']) if o['services']['no_ready_endpoints'] is not None else '(no endpoints)'}"
         )

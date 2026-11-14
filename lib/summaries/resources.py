@@ -138,9 +138,9 @@ def analyze_krr(snap: Path) -> dict:
             unknown_reasons[w] += 1
         rows.append(row)
     rows.sort(key=lambda r: (SEV_ORDER.get(r["severity"], 9), -abs(r.get("cpu_request_delta") or 0) - abs(r.get("memory_request_delta_mb") or 0) / 1024))
-    over_cpu = sorted([r for r in rows if (r.get("cpu_request_delta") or 0) > 0.05], key=lambda r: -r["cpu_request_delta"])[:20]
-    under_mem = sorted([r for r in rows if (r.get("memory_request_delta_mb") or 0) < -64], key=lambda r: r["memory_request_delta_mb"])[:20]
-    over_mem = sorted([r for r in rows if (r.get("memory_request_delta_mb") or 0) > 256], key=lambda r: -r["memory_request_delta_mb"])[:20]
+    over_cpu = sorted([r for r in rows if (r.get("cpu_request_delta") or 0) > 0.05], key=lambda r: -r["cpu_request_delta"])
+    under_mem = sorted([r for r in rows if (r.get("memory_request_delta_mb") or 0) < -64], key=lambda r: r["memory_request_delta_mb"])
+    over_mem = sorted([r for r in rows if (r.get("memory_request_delta_mb") or 0) > 256], key=lambda r: -r["memory_request_delta_mb"])
     limit_remove = [r["target"] for r in rows if r["cpu_limit"] is not None and r["cpu_limit_rec"] is None and r["cpu_limit_sev"] in ("WARNING", "CRITICAL")]
     totals = {k: (round(v, 2) if isinstance(v, float) else v) for k, v in totals.items()}
     totals["cpu_request_saving_cores"] = round(totals["cpu_request_current"] - totals["cpu_request_recommended"], 2)
@@ -162,9 +162,9 @@ def analyze_krr(snap: Path) -> dict:
         "cluster_summary": j.get("clusterSummary"),
         "totals": totals,
         "workloads": rows,
-        "top_over_cpu": over_cpu,
-        "top_over_memory": over_mem,
-        "top_under_memory": under_mem,
+        "over_cpu": over_cpu,
+        "over_memory": over_mem,
+        "under_memory": under_mem,
         "cpu_limit_remove_recommended": limit_remove,
     }
 
@@ -184,18 +184,19 @@ def analyze_p95(snap: Path, inv: dict | None) -> dict:
     if not available:
         return {"available": False, "note": "metrics/*_p95_*_7d.json missing (no Prometheus or not collected yet)"}
 
-    def top(d, reverse, n=20):
-        return [{"workload": k, "ratio": v} for k, v in sorted(d.items(), key=lambda kv: kv[1], reverse=reverse)[:n]]
+    def top(d, reverse):
+        """Every workload of `d`, the most extreme first. All of them: a reader counts the list."""
+        return [{"workload": k, "ratio": v} for k, v in sorted(d.items(), key=lambda kv: kv[1], reverse=reverse)]
 
     large = [{"workload": f"{workload_of(lab.get('namespace', '') + '/' + lab.get('pod', ''))}:{lab.get('container', '')}", "ratio_of_median_node": round(v, 2)} for lab, v in metric_rows(snap, "large_request_containers")]
     return {
         "available": True,
         "window": "7d, 15m step, p95",
         "containers_measured": {"cpu_vs_request": len(cpu_req), "cpu_vs_limit": len(cpu_lim), "memory_vs_request": len(mem_req), "memory_vs_limit": len(mem_lim)},
-        "cpu_overprovisioned_top": top({k: v for k, v in cpu_req.items() if v < 0.35}, False),
-        "cpu_near_limit_top": top({k: v for k, v in cpu_lim.items() if v >= 0.75}, True),
-        "memory_overprovisioned_top": top({k: v for k, v in mem_req.items() if v < 0.35}, False),
-        "memory_near_limit_top": top({k: v for k, v in mem_lim.items() if v >= 0.8}, True),
+        "cpu_overprovisioned": top({k: v for k, v in cpu_req.items() if v < 0.35}, False),
+        "cpu_near_limit": top({k: v for k, v in cpu_lim.items() if v >= 0.75}, True),
+        "memory_overprovisioned": top({k: v for k, v in mem_req.items() if v < 0.35}, False),
+        "memory_near_limit": top({k: v for k, v in mem_lim.items() if v >= 0.8}, True),
         "large_requests": sorted(large, key=lambda r: -r["ratio_of_median_node"]),
         "node_cpu_p95": {lab.get("node"): round(v, 3) for lab, v in metric_rows(snap, "node_cpu_usage_ratio_p95_7d")},
         "node_memory_p95": {lab.get("node"): round(v, 3) for lab, v in metric_rows(snap, "node_memory_usage_ratio_p95_7d")},

@@ -1,0 +1,136 @@
+# What a report teaches when a whole node is short of memory or the kernel's OOM killer ran at node level. Every page below was opened and read (2026-11-14).
+topic: node-memory-exhaustion
+checks: [node.memory-available-low, node.kernel-oom-node-level]
+mechanism: >
+  By default pods can consume all the capacity of a node. The kubelet, the container runtime, the kernel and the daemons of the operating system
+  need memory too, and unless some is set aside for them (kubeReserved for the Kubernetes daemons, systemReserved for the operating system; both
+  are empty by default) they compete with the pods. The scheduler only counts requests, so containers without a request or limit are not in its
+  sum at all.
+
+
+  The kubelet has one defence: when memory.available falls below 100Mi (the default hard eviction threshold) it sets the MemoryPressure condition
+  and evicts pods. It first takes pods whose usage exceeds their requests, ordered by priority and then by how far they exceed the request; pods
+  that stay within their requests go last. A hard eviction has a grace period of 0 seconds and ignores PodDisruptionBudgets.
+
+
+  That defence is slow in two ways. The kubelet computes memory.available from the cgroup hierarchy (capacity minus working set, with inactive
+  file pages left out), not from what a tool like free shows, and it evaluates the thresholds on an interval of 10 seconds. If memory grows faster
+  than that, or the growth is outside the pods, the kernel runs out first and its OOM killer acts on the whole node. The kernel scores every
+  process by the share of node memory it uses plus an adjustment that the kubelet sets per QoS class: -997 for Guaranteed, 1000 for BestEffort,
+  and for Burstable a value that shrinks as the memory request grows. The highest score dies. Usually that is a container with no request that uses
+  a lot of memory, and the kubelet restarts it; but a system OOM affects the entire node and all pods on it, and the node can go offline until
+  memory is reclaimed.
+
+
+  So a node-level OOM line in the kernel log means the eviction threshold did not act in time, and a low MemAvailable is the state just before it.
+sources:
+  - { title: "Kubernetes: Node-pressure Eviction", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/" }
+  - { title: "Kubernetes: Reserve Compute Resources for System Daemons", url: "https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/" }
+  - { title: "Kubernetes: Kubelet Configuration (v1beta1)", url: "https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/" }
+  - { title: "Kubernetes: Pod Quality of Service Classes", url: "https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/" }
+detect:
+  - kind: alert
+    what: >
+      The node_exporter mixin ships a rule on the share of memory in use, from MemAvailable, held for 15 minutes; the threshold is a setting of the
+      mixin. MemAvailable includes what runs outside containers, which the kubelet's own figure does not show.
+    example: |
+      - alert: NodeMemoryHighUtilization
+        expr: 100 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100) > 90
+        for: 15m
+  - kind: metric
+    what: >
+      Whether the kernel killed anything. node_exporter exports the kernel's oom_kill counter from /proc/vmstat by default; it does not say which
+      process died, so read it next to the MemoryPressure condition and the kubelet's evictions by signal.
+    example: |
+      increase(node_vmstat_oom_kill[1h])
+      kube_node_status_condition{condition="MemoryPressure",status="true"} == 1
+      sum by (instance, eviction_signal) (rate(kubelet_evictions[15m]))
+  - kind: metric
+    what: >
+      The real headroom per node over time, to see whether it follows load or only ever falls.
+    example: 'node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes'
+  - kind: command
+    what: >
+      Which process the kernel chose, on the node itself.
+    example: "journalctl -k --since -24h | grep -E 'Out of memory|oom-kill'"
+solutions:
+  - scale: [small]
+    approach: >
+      Give every workload a memory request and limit, third-party charts first (their defaults are often empty), and let a LimitRange put a default
+      on whatever is deployed without one. Add the alert on MemAvailable. With that, a runaway container dies at its own limit instead of taking
+      the node.
+    tools: [LimitRange, "node_exporter mixin alerts"]
+    tradeoff: >
+      One manifest per namespace and no node configuration. The defaults are applied only when a pod is admitted, so running pods keep what they
+      have until they are recreated, and a default limit that is too small turns into container OOM kills.
+    example: |
+      apiVersion: v1
+      kind: LimitRange
+      metadata:
+        name: memory-defaults
+      spec:
+        limits:
+          - type: Container
+            defaultRequest:
+              memory: 128Mi
+            default:
+              memory: 512Mi
+  - scale: [medium]
+    approach: >
+      Set memory aside on every node in the kubelet configuration: kubeReserved and systemReserved, and an eviction threshold larger than 100Mi.
+      Allocatable shrinks by the sum, the scheduler stops placing requests into that space, and the kubelet evicts before the kernel has to kill.
+      Keep enforcement on pods only, which is the default.
+    tools: [KubeletConfiguration, LimitRange, "node_exporter mixin alerts"]
+    tradeoff: >
+      The node's own daemons have room and eviction comes before a system OOM. Each node offers less to pods: in the documentation's example a
+      32Gi node with 2Gi and 1Gi reserved and a 500Mi threshold has 28.5Gi allocatable.
+    example: |
+      apiVersion: kubelet.config.k8s.io/v1beta1
+      kind: KubeletConfiguration
+      kubeReserved:
+        memory: 1Gi
+      systemReserved:
+        memory: 500Mi
+      evictionHard:
+        memory.available: "500Mi"
+  - scale: [large]
+    approach: >
+      In addition, turn on the kubelet's memcg notification (kernelMemcgNotification) so that it learns of a crossed threshold at once instead of
+      at the next poll, add soft eviction thresholds so pods are evicted with a grace period first, and keep monitoring and other memory-heavy
+      platform workloads on their own node group so that they cannot take customer workloads with them. Enforce the reservations on the system
+      cgroups only after the daemons have been profiled.
+    tools: [KubeletConfiguration, "dedicated node groups", "node_exporter mixin alerts"]
+    tradeoff: >
+      Eviction reacts faster and more gently, and one workload's growth stays in its node group. More kubelet settings to keep the same across node
+      groups; and enforcing systemReserved can get critical system services OOM killed, which is why the documentation recommends it only with
+      exhaustive profiling.
+cases:
+  - company: Blue Matador
+    year: 2019
+    url: "https://www.bluematador.com/blog/post-mortem-kubernetes-node-oom"
+    summary: >
+      SystemOOM events fired on two production nodes on two consecutive days. The fluentd-sumologic pods had grown in memory; they had no resource
+      requests or limits. Those pods were killed and restarted and other workloads were not affected. The author set requests and limits on them
+      and tuned the Ruby garbage collector.
+    match: A container without a limit grew until the whole node was out of memory and the kernel chose the victim.
+  - company: NU.nl
+    year: 2019
+    url: "https://www.tibobeijen.nl/2019/02/01/learning-from-kubernetes-cluster-failure/"
+    summary: >
+      Internal services became slow and returned errors, several nodes were NotReady and node events showed SystemOOM. A new ElastAlert rule queried
+      very large Elasticsearch indexes and its memory use ramped up; the pod had no limits because the chart defaults were empty. Replacement nodes
+      became unstable as well, and Prometheus and Grafana ran in the same cluster and were affected.
+    match: The operating system killed processes before the kubelet could reclaim memory, and the nodes themselves went NotReady.
+  - company: UK Ministry of Justice
+    year: 2023
+    url: "https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-25-prometheus-on-live-cluster-down.html"
+    summary: >
+      Prometheus exited with code 137 and the node it ran on went NotReady. After it moved to another monitoring node it kept restarting; node
+      memory was at 89%. More namespaces and rules had made Prometheus need more memory than the instance type had. The team doubled the instance
+      size, raised the container limits and opened a follow-up for an alert on node memory and on a pod that uses most of a node's memory.
+    match: One pod's memory grew to the size of its node; there was no alert on node memory before the node failed.
+reading:
+  - { title: "Kubernetes: Node-pressure Eviction", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/", why: "How memory.available is computed, the eviction order, and the section on node out-of-memory behaviour with the score per QoS class." }
+  - { title: "Kubernetes: Reserve Compute Resources for System Daemons", url: "https://kubernetes.io/docs/tasks/administer-cluster/reserve-compute-resources/", why: "What kubeReserved and systemReserved are for, a worked example, and the order in which to start enforcing them." }
+  - { title: "Kubernetes: Limit Ranges", url: "https://kubernetes.io/docs/concepts/policy/limit-range/", why: "How namespace defaults are applied at admission and the one inconsistency they do not check." }
+  - { title: "Learning from Kubernetes cluster failure (Tibo Beijen)", url: "https://www.tibobeijen.nl/2019/02/01/learning-from-kubernetes-cluster-failure/", why: "A node memory failure told as a chain of contributing causes, including monitoring that lived in the failing cluster." }

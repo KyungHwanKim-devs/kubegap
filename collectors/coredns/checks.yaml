@@ -32,7 +32,6 @@
   verify:
     - "sum by (rcode) (increase(coredns_dns_responses_total[1h]))"
     - "kubectl exec -n <ns> <pod> -- cat /etc/resolv.conf  (the user checks ndots and search)"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -284,7 +283,7 @@
     warn_expr: "item['nodes_total'] >= 2 and (not item['has_pdb'] or not item['spread_declared'])"
   target: "'cluster'"
   evidence: "f\"replicas {item['replicas']}, nodes with pods {item['nodes_with_pods']} of {item['nodes_total']} ({item['pods_by_node']}), PDB {item['pdb']}, spread declared (antiAffinity/topologySpread) {item['spread_declared']}, restarts total {item['restarts_total']}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: true
   why: >
     When CoreDNS stops, service names stop resolving and every app fails at once — the user symptom is "everything is slow, everything errors". With 1 replica, DNS is gone for seconds to tens of seconds whenever that pod's node dies or the pod restarts or redeploys. Two replicas on the same node give no protection.
@@ -294,10 +293,9 @@
     - { who: Freshworks 2025, url: https://medium.com/freshworks-engineering-blog/decoding-coredns-failures-75ebdc89ac0b }
     - { who: Backpackr 2025, url: https://aws.amazon.com/ko/blogs/tech/optimizing-amazon-eks-journey-of-backpackr-part1 }
     - { who: Oath 2018, url: https://www.youtube.com/watch?v=likHm-KHGWQ }
-  suggest: "replicas 2 or more + podAntiAffinity (hostname) or topologySpread + PDB (minAvailable 1). On k3s, override the coredns Deployment with HelmChartConfig/kustomize."
+  suggest: "replicas 2 or more + podAntiAffinity (hostname) or topologySpread + PDB (minAvailable 1). On k3s the packaged coredns manifest is rewritten at every start, so an edit does not last (https://docs.k3s.io/installation/packaged-components): start k3s with --disable=coredns and deploy your own CoreDNS."
   verify:
     - "kubectl get pods -n kube-system -l k8s-app=kube-dns -o wide ; kubectl get pdb -n kube-system"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -558,7 +556,6 @@
   suggest: "EKS: autoScaling in the coredns add-on configurationValues (enabled true, minReplicas 2, maxReplicas 10). Elsewhere: deploy cluster-proportional-autoscaler."
   verify:
     - "kubectl get deploy -n kube-system | grep -i dns ; aws eks describe-addon --addon-name coredns --query addon.configurationValues"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -775,7 +772,6 @@
   suggest: "Raise the success and denial TTLs in the Corefile cache block (e.g. cache 300 { success 9984 300 / denial 9984 60 }) and reduce ndots noise (coredns.nxdomain-ratio-high)."
   verify:
     - "sum(rate(coredns_cache_hits_total[1h])) / (sum(rate(coredns_cache_hits_total[1h])) + sum(rate(coredns_cache_misses_total[1h])))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -947,7 +943,6 @@
   suggest: "Answer AAAA immediately with an empty NOERROR via the CoreDNS template plugin (template IN AAAA . { rcode NOERROR }), or do IPv4-only lookups on the app side (single-request-reopen option). NodeLocal DNSCache also mitigates it."
   verify:
     - "sum by (type) (increase(coredns_dns_requests_total[1h]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -1108,6 +1103,7 @@
   target: "'cluster'"
   evidence: "f\"upstreams {item['upstreams']}: SERVFAIL in 1h {item['forward_servfail_1h']} ({item['forward_servfail_ratio']}), health check failures {item['forward_healthcheck_failures_1h']}, max_concurrent rejections {item['max_concurrent_rejects_1h']}, overall SERVFAIL ratio {item['servfail_ratio']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     If the forward target (the VPC resolver on EKS, public resolvers such as 1.1.1.1 or 8.8.8.8 on a small k3s cluster) fails, external name resolution returns SERVFAIL and apps see "connection failed". Health check failures are intermittent disconnects; max_concurrent rejections are CoreDNS itself being overloaded. Core traffic.coredns-servfail looks at the overall ratio; this check isolates the upstream side.
@@ -1118,7 +1114,6 @@
   suggest: "Use two or more upstreams (policy sequential/random). With the VPC resolver, check the Route 53 Resolver query limit (1,024 per second per ENI). With external resolvers, pick trustworthy ones."
   verify:
     - "sum by (to, rcode) (increase(coredns_proxy_request_duration_seconds_count{proxy_name=\"forward\"}[1h]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1374,13 +1369,13 @@
   target: "'cluster'"
   evidence: "f\"panics in 1h {item['panics_1h']}, reload failures {item['reload_failed_1h']}, restarts total {item['restarts_total']}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     A panic is a plugin defect that failed a request; a reload failure means the ConfigMap was edited incorrectly and CoreDNS keeps running on the old Corefile (you think it is fixed, but it is not applied). Read together with the log signature coredns.reload-failed.
   suggest: "Find the cause line with kubectl logs -n kube-system -l k8s-app=kube-dns | grep -iE 'panic|reload' and fix the Corefile syntax."
   verify:
     - "sum(increase(coredns_panics_total[1h])) ; sum(increase(coredns_reload_failed_total[1h]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1550,7 +1545,6 @@
   suggest: "NodeLocal DNSCache (node-local cache, TCP upstream) is the real fix. As a stopgap, restarting the CoreDNS pods reshuffles the mapping."
   verify:
     - "sum by (pod) (rate(coredns_dns_requests_total[5m]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -1721,7 +1715,6 @@
   suggest: "With 5 or more nodes and p99 over 50ms or more than 200 queries per second, deploy the node-local-dns DaemonSet (point kubelet --cluster-dns at the link-local IP)."
   verify:
     - "kubectl get ds -n kube-system node-local-dns"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -1981,7 +1974,6 @@
   suggest: "Set coreDns.enabled true in the kube-prometheus-stack values, or attach a ServiceMonitor to the kube-dns Service in kube-system (port metrics 9153)."
   verify:
     - "count({__name__=~\"coredns_.*\"})"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

@@ -1,0 +1,92 @@
+# What a report teaches when the AWS account is close to a service quota the cluster consumes. Every page below was opened and read (2026-11-14).
+topic: aws-service-quotas
+checks: [eks.service-quota-near-limit]
+mechanism: >
+  An AWS account has a maximum for almost every resource it can hold: quotas are set per service, most of them per Region, and each has a default
+  that applies until an increase is granted. Some are adjustable and some are not. An EKS cluster draws on the quotas of other services every time
+  it grows, without anyone calling those services by hand: a new node uses the vCPU quota for running On-Demand or Spot instances and the quota of
+  network interfaces per Region; an Ingress uses load balancers, target groups and listener rules; a PersistentVolume uses EBS storage; a NAT
+  gateway uses an Elastic IP. Several defaults are small (5 VPCs per Region, 5 Elastic IPs, 50 Application Load Balancers per Region, 5 security
+  groups per network interface).
+
+
+  When a quota is reached, the AWS API call that would create the resource is refused. Kubernetes has no notion of the quota, so nothing in the
+  cluster says "quota": the node autoscaler reports that it could not get capacity (Karpenter treats EC2's VcpuLimitExceeded like any other
+  capacity shortage), pods stay Pending, an Ingress is not reconciled into a load balancer, and the reason is in an event or a controller log. The limit is
+  shared by everything in the account and Region, so another team's instances or load balancers count against it too.
+
+
+  The remedy is slow in exactly the moment it is needed. An increase is a request: smaller ones are usually approved automatically, larger ones go
+  to AWS Support, take time to review, process and deploy, get no priority handling, and can be denied or approved in part. That is why the
+  threshold to act is well below 100%.
+
+
+  Usage is visible for only some quotas. A subset of services, EC2 and Elastic Load Balancing among them, publish usage metrics to CloudWatch, and
+  only for those can usage be drawn against the quota or alarmed on; the rest have to be counted. Request-rate throttling of AWS APIs is a separate
+  limit from resource quotas.
+sources:
+  - { title: "Service Quotas: What is Service Quotas?", url: "https://docs.aws.amazon.com/servicequotas/latest/userguide/intro.html" }
+  - { title: "Service Quotas: Requesting a quota increase", url: "https://docs.aws.amazon.com/servicequotas/latest/userguide/request-quota-increase.html" }
+  - { title: "Amazon EKS best practices: Known Limits and Service Quotas", url: "https://docs.aws.amazon.com/eks/latest/best-practices/known_limits_and_service_quotas.html" }
+  - { title: "CloudWatch: Visualizing your service quotas and setting alarms", url: "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Quotas-Visualize-Alarms.html" }
+  - { title: "Service Quotas: Automatic Management", url: "https://docs.aws.amazon.com/servicequotas/latest/userguide/automatic-management.html" }
+detect:
+  - kind: alert
+    what: >
+      A CloudWatch alarm on usage as a percentage of the quota. For a usage metric m1, the metric math function SERVICE_QUOTA(m1) returns the quota
+      of that resource, so the expression below is the utilisation; the documented example alarms above 80.
+    example: 'm1/SERVICE_QUOTA(m1)*100'
+  - kind: dashboard
+    what: >
+      The Service Quotas console shows the applied value and, for quotas in active use, the utilisation under each quota; the CloudWatch console
+      lists the usage metrics under Usage, By AWS Resource. Service Quotas Automatic Management sends a notification at 80% and at 95% utilisation
+      to the AWS Health dashboard, and to email or Slack when configured.
+    example: 'CloudWatch > Metrics > Usage > By AWS Resource'
+  - kind: command
+    what: The quotas of one service that have a usage metric, with their current values.
+    example: "aws service-quotas list-service-quotas --service-code ec2 --query 'Quotas[?UsageMetric!=null].[QuotaName,Value]' --output table"
+solutions:
+  - scale: [small]
+    approach: >
+      Turn on Service Quotas Automatic Management in Notify Only mode and send its notifications to an address that is read. Request an increase
+      for the few quotas the cluster actually grows into (instance vCPUs, Elastic IPs, VPCs) when the first notice arrives, not when a node fails
+      to launch.
+    tools: ["Service Quotas Automatic Management", "AWS Health"]
+    tradeoff: >
+      One setting replaces a set of alarms, and the warning comes at 80%. It covers only the quotas the feature supports, and 80% of a small quota
+      can be one scale-out away from the limit.
+  - scale: [medium]
+    approach: >
+      Create CloudWatch alarms on the quotas this cluster consumes, with the threshold low enough to leave time for a Support case, and keep the
+      requested values in the same infrastructure code as the cluster. Where the limit is per load balancer (listener rules, target groups), split
+      the Ingresses over more than one load balancer instead of asking for more.
+    tools: [CloudWatch, "Service Quotas", "AWS Load Balancer Controller"]
+    tradeoff: >
+      The threshold and the list of quotas are chosen for this cluster. Only quotas with a usage metric can be alarmed on; the others need a
+      periodic count, and a second load balancer is billed.
+    example: |
+      Metrics:
+        - Id: usage
+          MetricStat:
+            Metric: { Namespace: AWS/Usage, MetricName: ResourceCount }
+            Period: 3600
+            Stat: Maximum
+        - Id: pct
+          Expression: usage/SERVICE_QUOTA(usage)*100
+      Threshold: 60
+      ComparisonOperator: GreaterThanThreshold
+  - scale: [large]
+    approach: >
+      Treat quotas as capacity planning across accounts: alarms for every production account collected in one monitoring account through CloudWatch
+      cross-account observability, Automatic Management in Notify and Auto-Adjust mode for the quotas that support automated approval, and a
+      review of the quota table whenever a design adds nodes, load balancers or clusters by the dozen.
+    tools: ["CloudWatch cross-account observability", "Service Quotas Automatic Management"]
+    tradeoff: >
+      Increases are requested before anyone has to think of them. An automatic request is not guaranteed to be approved and gives no reason when it
+      is not, so a manual request through Support remains the fallback.
+cases: []
+reading:
+  - { title: "Amazon EKS best practices: Known Limits and Service Quotas", url: "https://docs.aws.amazon.com/eks/latest/best-practices/known_limits_and_service_quotas.html", why: "The table of quotas EKS clusters have run into, with their codes, defaults and what each one limits." }
+  - { title: "CloudWatch: Visualizing your service quotas and setting alarms", url: "https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Quotas-Visualize-Alarms.html", why: "Which services publish usage metrics and how SERVICE_QUOTA turns one into an alarm." }
+  - { title: "Service Quotas: Requesting a quota increase", url: "https://docs.aws.amazon.com/servicequotas/latest/userguide/request-quota-increase.html", why: "How a request is handled and why a large one is not quick." }
+  - { title: "Service Quotas: Automatic Management", url: "https://docs.aws.amazon.com/servicequotas/latest/userguide/automatic-management.html", why: "The two modes, the thresholds and the limits of automatic adjustment." }

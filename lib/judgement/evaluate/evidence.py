@@ -37,6 +37,30 @@ def sg_text(item: dict) -> str:
     return "not applicable"
 
 
+def shown(xs, n: int) -> str:
+    """The first `n` of a list for an evidence sentence, always with how many were left out: `['a', 'b'] and 8 more`. An evidence sentence is
+    something to read; the finding's `details` and the summary keep the whole list. A cut list without its remainder reads as the whole
+    (a report once said 11 workloads where there were 15). A text is cut to `n` characters with an ellipsis."""
+    if isinstance(xs, str):
+        return xs if len(xs) <= n else xs[:n].rstrip() + "…"
+    xs = list(xs or [])
+    return str(xs) if len(xs) <= n else f"{xs[:n]} and {len(xs) - n} more"
+
+
+def placement_text(item: dict) -> str:
+    """Evidence of resilience.replicas-same-node. The check fires in two cases that read very differently, so the sentence says which one first: every
+    replica is on one node now, or they are apart now and nothing declares that they must be. A report once said four Deployments had every
+    replica on one node where each had its replicas on two nodes of one zone."""
+    case = (
+        "every replica is on one node now. " if item.get("all_same_node") else "the replicas are on different nodes now, but nothing declares that they must be (no topologySpread, no podAntiAffinity), so a reschedule may put them on one. "
+    )
+    tail = " — only one eligible node, so a spread declaration still lands on the same node" if item.get("single_eligible_node") else ""
+    return (
+        f"{case}replicas {item['replicas']} (Running {item['running']}), node distribution {item['nodes']}, AZ distribution {item['zones']}, "
+        f"topologySpread {item['topology_spread']}, podAntiAffinity {item['anti_affinity']}, nodes eligible under scheduling constraints {item['eligible_nodes']}{tail}"
+    )
+
+
 def oom_text(item: dict) -> str:
     """The evidence of resources.oomkilled-repeated from a `resilience.oom_7d` row: both sources with their windows, never one number standing for the other."""
     total = item.get("kernel_nodes_total") or 0
@@ -57,8 +81,25 @@ def oom_text(item: dict) -> str:
         kern = "kernel log not read on its node, no node access there"
     pods = item.get("pods_oomkilled") or 0
     rep = item.get("pods_replaced") or 0
-    prom = f"Prometheus: {pods} pod{'s' if pods != 1 else ''} ended by OOM in 7 days" + (f", {rep} already replaced" if rep else "") + f", {item.get('restarts_of_those_pods') or 0} restarts in those pods"
-    return f"{kern}. {prom}. cAdvisor counter {item.get('cadvisor_oom_events_7d') or 0}"
+    prom = (
+        f"Prometheus: {pods} pod{'s' if pods != 1 else ''} ended by OOM in 7 days"
+        + (f", {rep} already replaced" if rep else "")
+        + f", {item.get('restarts_of_those_pods') or 0} restarts in those pods"
+        # of the pods that were ended by OOM, not of the workload's current pod: a replacement pod's own restarts are not counted here
+        + ((" (none of those pods is running now)" if rep >= pods else f" (those of them still running: {item.get('live_pod_restarts_max') or 0} at most)") if rep else "")
+    )
+    now = item.get("pods_now")
+    running = ""
+    if now:
+
+        def one(p: dict) -> str:
+            if p.get("restarts") is None:
+                return f"{p['pod']} (created {p.get('created')})"
+            last = f", its previous run ended {p['last_ended']} with reason {p.get('last_reason')}, exit code {p.get('last_exit_code')}" if p.get("last_ended") else ""
+            return f"{p['pod']} (created {p.get('created')}, {p['restarts']} restart{'s' if p['restarts'] != 1 else ''} of this container since{last})"
+
+        running = ". Running now: " + ", ".join(one(p) for p in now)
+    return f"{kern}. {prom}. cAdvisor counter {item.get('cadvisor_oom_events_7d') or 0}{running}"
 
 
 def argocd_backend_text(item) -> str:
@@ -90,7 +131,7 @@ def oom_last_text(summary, labels) -> str:
     """resources.oomkilled: when the container was last OOMKilled, from summary.resilience.restarts.oom_last keyed namespace/pod/container."""
     key = f"{labels['namespace']}/{labels['pod']}/{labels['container']}"
     last = ((summary.get("resilience") or {}).get("restarts") or {}).get("oom_last", {}).get(key, {})
-    return f"pod {labels['pod']}: last termination reason OOMKilled, finished at {last.get('finished')} ({last.get('age_days')} days ago), {last.get('restarts')} restarts. An OOM older than 7 days is warn, older than 30 days is excluded"
+    return f"pod {labels['pod']}: last termination reason OOMKilled, finished at {last.get('finished')} ({last.get('age_days')} days ago). The container has restarted {last.get('restarts')} times since the pod was created, for any reason and not only in the last 7 days. An OOM older than 7 days is warn, older than 30 days is excluded"
 
 
 def no_backup_text(signals: dict) -> str:

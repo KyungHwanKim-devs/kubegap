@@ -21,7 +21,7 @@ INV = {
     "context": "default",
     "taken_at": TAKEN,
     "cluster": {"platform": "k3s"},
-    "profile": {"name": "lab"},
+    "scale": {"name": "small", "source": "guessed"},
     "nodes": {"count": 1, "nodes": [{"name": "kkh2", "roles": ["control-plane", "etcd", "master"]}]},
     "namespaces": {"count": 0, "prod_like": []},
     "crds": {"count": 0},
@@ -173,10 +173,10 @@ def test_configmap_age_is_measured_from_the_snapshot_time(tmp_path):
 
 
 def test_evaluate_today_is_the_snapshot_date():
-    cx = Context(Path("/nonexistent"), {"taken_at": TAKEN}, {}, {"name": "prod"})
+    cx = Context(Path("/nonexistent"), {"taken_at": TAKEN}, {}, "large")
     assert cx.today == dt.date(2026, 11, 5), "the operator's calendar date of the snapshot (+09:00), not UTC"
     assert cx.days_until("2026-11-15") == 10
-    assert Context(Path("/nonexistent"), {"taken_at": TAKEN, "today": "2026-10-25"}, {}, {"name": "prod"}).today == dt.date(2026, 10, 25), "the embedded test cases pin `today` and win"
+    assert Context(Path("/nonexistent"), {"taken_at": TAKEN, "today": "2026-10-25"}, {}, "large").today == dt.date(2026, 10, 25), "the embedded test cases pin `today` and win"
 
 
 def test_suppressions_expire_against_the_snapshot_date():

@@ -32,6 +32,21 @@ def node_boot_times(cx) -> dict[str, _dt.datetime]:
 _KIND_SHORT = {"Deployment": "deploy", "StatefulSet": "sts", "DaemonSet": "ds", "Job": "job", "CronJob": "cronjob", "ReplicaSet": "rs", "ReplicationController": "rc"}
 
 
+def _pod_now(p: dict, container: str | None) -> dict:
+    """What a running pod's own status says of one container: how often it restarted and how its previous run ended (when, why, with what exit
+    code). The reason tells an OOM kill from a container that ended with the node, which is what decides whether the restarts go on."""
+    st = next((c for c in (p.get("status") or {}).get("containerStatuses") or [] if c.get("name") == container), None) or {}
+    last = (st.get("lastState") or {}).get("terminated") or {}
+    return {
+        "pod": p["metadata"]["name"],
+        "created": p["metadata"].get("creationTimestamp"),
+        "restarts": int(st["restartCount"]) if "restartCount" in st else None,
+        "last_ended": last.get("finishedAt"),
+        "last_reason": last.get("reason"),
+        "last_exit_code": last.get("exitCode"),
+    }
+
+
 def owner_of_pod(cx, ns: str, pod: str, created_by: tuple[str | None, str | None] | None) -> str:
     """`deploy/<name>`, `sts/<name>`, `cronjob/<name>` … for a pod, the same shape lib.judgement.evaluate.Context.workload gives a metric series. A live pod is read from its ownerReferences;
     a pod that is already gone is read from kube_pod_info's created_by, and a ReplicaSet is resolved to its Deployment through the ReplicaSets still in the snapshot, else by stripping the hash with a `?` mark."""
@@ -128,10 +143,13 @@ def oom_7d(cx) -> dict:
         if rc < 1:
             continue  # the OOMKilled reason label outlives the window; a kill inside 7 days always leaves a restart in it
         r = row_for(ns, pod, c)
-        r["pods"].append({"pod": pod, "restarts_7d": rc, "live": (ns, pod) in live, "node": pod_nodes.get((ns, pod))})
+        # a StatefulSet pod keeps its name when it is recreated: the series of the earlier pod differs in `uid`, and its restarts are history, not what the pod there now does
+        now = cx.pod_by_name.get((ns, pod))
+        is_live = (ns, pod) in live and (not lab.get("uid") or not now or lab["uid"] == (now.get("metadata") or {}).get("uid"))
+        r["pods"].append({"pod": pod, "restarts_7d": rc, "live": is_live, "node": pod_nodes.get((ns, pod))})
         r["pods_oomkilled"] += 1
         r["restarts_of_those_pods"] += rc
-        if (ns, pod) in live:
+        if is_live:
             r["live_pod_restarts_max"] = max(r["live_pod_restarts_max"], rc)
         else:
             r["pods_replaced"] += 1
@@ -178,9 +196,19 @@ def oom_7d(cx) -> dict:
         r["kernel_cgroup_ooms_on_nodes"] = sum(kernel[n]["oom_cgroup_count"] for n in read if not kernel[n]["oom_section"])
         r["kernel_log_read"] = r["kernel_nodes_read"] > 0
         r["kernel_any_node_read"] = any(rec["source"] in ("journalctl", "dmesg") for rec in kernel.values())  # False in daily mode, where no node log is collected at all
-        r["kernel_kill_times"] = sorted(r["kernel_kill_times"])[-10:]
+        r["kernel_kill_times"] = sorted(r["kernel_kill_times"])
         r["last_kill"] = r["kernel_kill_times"][-1] if r["kernel_kill_times"] else None
         r["pods"].sort(key=lambda p: (-p["restarts_7d"], p["pod"]))
+        # The pods the workload runs now, with the restart count of this container as the pod object carries it. A report that says "the pods that were
+        # ended are gone" goes on to say how the present pod is doing; without the number it was guessed ("no restarts") twice, for a pod that had one.
+        r["pods_now"] = sorted(
+            (
+                _pod_now(p, r["container"])
+                for p in cx.pods
+                if p["metadata"]["namespace"] == r["namespace"] and (p.get("status") or {}).get("phase") == "Running" and owner_of_pod(cx, r["namespace"], p["metadata"]["name"], None) == r["workload"]
+            ),
+            key=lambda x: x["pod"],
+        )
     out_rows = sorted(rows.values(), key=lambda r: (-r["kernel_kills_24h"], -r["pods_oomkilled"], -r["restarts_of_those_pods"], r["target"]))
     prometheus_read = bool((metric_doc(cx.snap, "oom_pods_7d") or {}).get("ok"))
     return {

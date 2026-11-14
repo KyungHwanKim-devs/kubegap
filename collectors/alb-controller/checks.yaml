@@ -10,7 +10,7 @@
     warn_expr: "not item['has_pdb'] or not item['anti_affinity']"
   target: "'cluster'"
   evidence: "f\"aws-load-balancer-controller v{item['version']}: replicas {item['replicas']} / ready {item['ready']}, all on one node {item['all_same_node']}, PDB {item['has_pdb']}, podAntiAffinity {item['anti_affinity']}, leader pod found {item['leader_found']}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: false
   why: >
     Even when the controller stops, the ALBs and target groups it already created keep serving traffic. But targets are no longer registered or deregistered as pods change (RegisterTargets/DeregisterTargets), so after a rolling deploy traffic goes to dead pod IPs or new pods never receive traffic, and new Ingress or certificate changes are not applied.
@@ -19,7 +19,7 @@
   suggest: "Keep replicas 2 + podAntiAffinity + PDB (minAvailable 1). Check that both replicas do not land on the same node during node replacement (Karpenter)."
   verify:
     - "kubectl get deploy -n kube-system aws-load-balancer-controller -o wide ; kubectl get pdb -n kube-system"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -46,7 +46,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -83,7 +83,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -121,7 +121,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -158,7 +158,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -196,7 +196,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -233,7 +233,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -271,7 +271,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -308,7 +308,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -346,7 +346,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -383,7 +383,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -416,7 +416,7 @@
   suggest: "Attach a dedicated role with AWSLoadBalancerControllerIAMPolicy via IRSA or Pod Identity and remove ELB permissions from the node role."
   verify:
     - "kubectl get sa -n kube-system aws-load-balancer-controller -o jsonpath='{.metadata.annotations}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -443,7 +443,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -480,7 +480,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -518,7 +518,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -555,7 +555,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -591,7 +591,7 @@
   suggest: "Keep the namespaceSelector on the mpod webhook and use a controller PDB so both replicas do not go down at once. Keep a runbook step for switching failurePolicy to Ignore in an emergency."
   verify:
     - "kubectl get mutatingwebhookconfiguration aws-load-balancer-webhook -o jsonpath='{.webhooks[*].namespaceSelector}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -618,7 +618,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -655,7 +655,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -694,7 +694,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -731,7 +731,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -769,7 +769,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -806,7 +806,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -844,7 +844,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -881,7 +881,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -909,6 +909,7 @@
   target: "'cluster'"
   evidence: "f\"reconcile errors since leader start {item['reconcile_errors_total']}, apiserver 429/503 responses {item['rest_client_429_503']}, max workqueue depth {item['workqueue_depth_max']}, Ingresses without an LB address {item['ingresses_without_lb']}, stale TargetGroupBindings {item['tgb_stale']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: >
     A reconcile error means the controller failed to make one Ingress, Service or TargetGroupBinding match AWS (permissions, bad annotation, missing certificate, limits). The counter accumulates since the leader process started, so a small number may be a past event — read it together with the log signature alb-controller.reconcile-error (24 hours).
@@ -917,7 +918,7 @@
   suggest: "Run kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller | grep -i 'reconciler error' to find which Ingress it is, then fix the annotation, certificate or security group."
   verify:
     - "kubectl describe ingress -A | grep -A3 Events | grep -i fail"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -944,7 +945,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -981,7 +982,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1019,7 +1020,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -1056,7 +1057,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1094,7 +1095,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -1131,7 +1132,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1169,7 +1170,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -1206,7 +1207,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1231,7 +1232,7 @@
     needs_reason: "metrics not read"
     warn_expr: "((item['aws_api_retries_avg'] or 0) >= 0.1 or (item['rest_client_429_503'] or 0) >= 100)"
   target: "'cluster'"
-  evidence: "f\"AWS API calls since leader start {item['aws_api_calls_total']}, top {item['aws_api_top_ops'][:5] if item['aws_api_top_ops'] else None}, average retries per call {item['aws_api_retries_avg']}, slowest by average latency {item['aws_api_slow_ops_avg_s'][:3] if item['aws_api_slow_ops_avg_s'] else None}, apiserver 429/503 {item['rest_client_429_503']}\""
+  evidence: "f\"AWS API calls since leader start {item['aws_api_calls_total']}, top {shown(item['aws_api_ops_by_calls'], 5) if item['aws_api_ops_by_calls'] else None}, average retries per call {item['aws_api_retries_avg']}, slowest by average latency {shown(item['aws_api_slow_ops_avg_s'], 3) if item['aws_api_slow_ops_avg_s'] else None}, apiserver 429/503 {item['rest_client_429_503']}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -1241,7 +1242,7 @@
   suggest: "Reduce the number of target groups (ALB group sharing may already be in place) or the pod churn rate (HPA flapping, CronJob pods). If retries rise, tune the --aws-api-throttle argument and look for Throttling in the controller logs."
   verify:
     - "aws_api_call_duration_seconds_count and aws_api_call_retries_sum from the pod /metrics (metrics/pod/alb-controller/)"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -1268,7 +1269,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -1305,7 +1306,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1343,7 +1344,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -1380,7 +1381,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1418,7 +1419,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -1455,7 +1456,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1488,7 +1489,7 @@
   suggest: "If stale, look for that TGB's reconcile error in the controller logs. Delete TGBs whose Service is missing and clean up the target group on the AWS side too."
   verify:
     - "kubectl get targetgroupbindings -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,SVC:.spec.serviceRef.name,GEN:.metadata.generation,OBS:.status.observedGeneration"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1515,7 +1516,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -1553,7 +1554,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1591,7 +1592,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -1629,7 +1630,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1667,7 +1668,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -1704,7 +1705,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1719,6 +1720,7 @@
           traffic_unhealthy_target_groups: 6
           cluster_name_arg: "my-cluster-eks"
 - id: albctl.target-group-without-tgb
+  needs: [cloud-account]
   name: Target group in AWS that no TargetGroupBinding owns
   area: traffic
   type: summary
@@ -1737,7 +1739,7 @@
   verify:
     - "aws elbv2 describe-target-groups --query 'TargetGroups[].TargetGroupName'"
     - "kubectl get targetgroupbindings -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ARN:.spec.targetGroupARN"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "skip"
@@ -1768,7 +1770,7 @@
   rule:
     expr: "len(item['ingresses_without_lb']) > 0"
   target: "'cluster'"
-  evidence: "f\"ALB Ingresses {item['alb_ingresses']}, with empty status.loadBalancer {item['ingresses_without_lb']}. IngressClass {item['ingress_classes']} (default class {item['ingress_class_default']}), most used annotations {item['ingress_annotations_top']}\""
+  evidence: "f\"ALB Ingresses {item['alb_ingresses']}, with empty status.loadBalancer {item['ingresses_without_lb']}. IngressClass {item['ingress_classes']} (default class {item['ingress_class_default']}), most used annotations {item['ingress_annotations_by_count']}\""
   severity_default: high
   symptom_linked: true
   why: >
@@ -1776,7 +1778,7 @@
   suggest: "Read the Events in kubectl describe ingress and the controller logs. Subnet tags, ACM certificates and group name conflicts are the common causes."
   verify:
     - "kubectl get ingress -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ADDR:.status.loadBalancer.ingress[0].hostname"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1804,7 +1806,7 @@
           alb_ingresses: 40
           ingresses_without_lb:
             - "prod-a/web"
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -1841,7 +1843,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1879,7 +1881,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -1916,7 +1918,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -1949,7 +1951,7 @@
   suggest: "Set loadBalancerClass service.k8s.aws/nlb on the Service (a new LB is created and the DNS name changes, so plan the cutover)."
   verify:
     - "kubectl get svc -A -o json | jq -r '.items[] | select(.spec.type==\"LoadBalancer\") | \"\\(.metadata.namespace)/\\(.metadata.name) \\(.spec.loadBalancerClass) \\(.metadata.annotations[\"service.beta.kubernetes.io/aws-load-balancer-type\"])\"'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -1976,7 +1978,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -2014,7 +2016,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -2052,7 +2054,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -2089,7 +2091,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -2122,7 +2124,7 @@
   suggest: "Enable the ServiceMonitor (serviceMonitor.enabled true) so Prometheus scrapes it and kubegap uses that. Otherwise prepare node access (SSM registration)."
   verify:
     - "kubectl get --raw /api/v1/namespaces/kube-system/pods/<pod>:8080/proxy/metrics | head"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -2149,7 +2151,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -2186,7 +2188,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -2224,7 +2226,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -2261,7 +2263,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"
@@ -2299,7 +2301,7 @@
           ingress_class_params: 1
           alb_ingresses: 40
           ingresses_without_lb: []
-          ingress_annotations_top:
+          ingress_annotations_by_count:
             group.name: 40
             listen-ports: 40
             scheme: 40
@@ -2336,7 +2338,7 @@
             - "('EC2/AuthorizeSecurityGroupIngress', 0.295)"
             - "('Elastic Load Balancing v2/RegisterTargets', 0.283)"
             - "('Elastic Load Balancing v2/CreateTargetGroup', 0.266)"
-          aws_api_top_ops:
+          aws_api_ops_by_calls:
             - "('Elastic Load Balancing v2/DescribeTargetHealth', 73740)"
             - "('Elastic Load Balancing v2/DescribeTargetGroupAttributes', 40600)"
             - "('EC2/DescribeInstances', 36913)"

@@ -1,0 +1,16 @@
+# The scale the cluster is run at. Asked once per cluster (first-run question `scale`), stored with that cluster's answers; config.yaml
+# `scale:` overrides it; with neither, it is guessed from the node count and the report says so.
+# Scale is an expectation, not a fact: the same finding is a different size of problem for one person running two nodes and for a team
+# with an SLA. A check states its severity per scale (`severity_default: {small: …, medium: …, large: …}`) and may leave a scale out
+# (`scales: [medium, large]`); this file holds what is not per check.
+scales: [small, medium, large]
+# Guess when nobody answered: the largest node count that still reads as that scale.
+guess_by_nodes: { small: 3, medium: 20 }
+# Component families whose absence is a finding at that scale. A platform can take a family out (rubric/platforms/<name>.yaml).
+expected_families:
+  small: [metrics-store, logs-store, alert-router, backup, certificates, kube-state-metrics, node-exporter, event-retention]
+  medium: [metrics-store, logs-store, alert-router, backup, certificates, kube-state-metrics, node-exporter, event-retention, slo, secrets-manager, node-autoscaler]
+  large: [metrics-store, logs-store, alert-router, backup, certificates, kube-state-metrics, node-exporter, event-retention, slo, secrets-manager, node-autoscaler, progressive-delivery]
+# config.yaml `dev_namespaces: [<glob>, …]` names namespaces that are not production. These checks say nothing about them:
+# availability, backup and cost expectations do not hold for a development namespace.
+dev_namespace_disabled_checks: [resilience.single-replica-in-prod, resilience.no-pdb, resilience.replicas-same-node, resilience.prod-concentration, resilience.prod-db-without-backup-cronjob, resilience.backup-same-node, scaling.no-hpa-serving-prod, cost.request-waste, tenancy.prod-boundary-missing, tenancy.prod-without-quota]

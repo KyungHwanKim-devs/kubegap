@@ -1,0 +1,99 @@
+# What a report teaches when EBS volumes cannot be attached: the node is at its attachment limit, an attachment is stuck, or the controller that
+# attaches is a single point of failure. Every page below was opened and read (2026-11-14).
+topic: ebs-volume-attachment
+checks: [storage.node-attach-limit, storage.volume-attach-errors, ebscsi.volumeattachment-stuck, ebscsi.controller-availability]
+mechanism: >
+  A pod with an EBS-backed claim can start only after its volume is attached to the instance the pod was scheduled to. Kubernetes records that
+  request as a VolumeAttachment object ("this volume on this node"), and the EBS CSI controller carries it out with EC2 API calls. Three things
+  stand in the way.
+
+
+  The instance has a limit. On most Nitro instance types up to 28 devices can be attached, and that number is shared between EBS volumes, network
+  interfaces and NVMe instance store volumes: an m5.xlarge with three network interfaces has room for 25 volumes. Newer families (M7i, C7i, R7i
+  and later) have a dedicated EBS limit instead. Beyond the limit EC2 refuses with AttachmentLimitExceeded. The scheduler respects the limit the
+  CSI driver reports for the node, but the driver has traditionally reported it once, at startup; network interfaces attached later
+  take slots the scheduler still believes are free, and volumes then stay stuck in attaching until a slot frees up.
+
+
+  The volume is still attached elsewhere. An EBS volume is attached to one instance at a time. When a node disappears without a clean shutdown,
+  its pods cannot be deleted by the kubelet, a StatefulSet cannot create the replacement under the same name, and the VolumeAttachments of the
+  dead node are not removed. Kubernetes force-detaches only after a pod deletion has failed for 6 minutes on an unhealthy node. Until then the new
+  pod waits in ContainerCreating with a Multi-Attach error. The same delay follows a spot interruption if the driver's node pod is killed before
+  the workloads have unmounted.
+
+
+  The controller is not there. The driver's controller is a Deployment (two replicas in the Helm chart, with a preferred, not required, spread
+  over nodes). While no replica runs, no volume is created, attached, detached or resized; running pods keep their volumes, but nothing stateful
+  can move.
+sources:
+  - { title: "Amazon EBS: volume limits for Amazon EC2 instances", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html" }
+  - { title: "Kubernetes: Node-specific Volume Limits", url: "https://kubernetes.io/docs/concepts/storage/storage-limits/" }
+  - { title: "aws-ebs-csi-driver: Frequently Asked Questions", url: "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/faq.md" }
+  - { title: "Kubernetes: Node Shutdowns", url: "https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/" }
+  - { title: "aws-ebs-csi-driver: Helm chart values", url: "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/charts/aws-ebs-csi-driver/values.yaml" }
+  - { title: "Amazon EKS: Use Kubernetes volume storage with Amazon EBS", url: "https://docs.aws.amazon.com/eks/latest/userguide/ebs-csi.html" }
+detect:
+  - kind: metric
+    what: >
+      The driver's own view of EC2. With metrics enabled on the controller (off by default in the chart), aws_ebs_csi_api_request_errors_total
+      counts failed EC2 calls by request type and error code, aws_ebs_csi_api_request_throttles_total the throttled ones, and
+      aws_ebs_csi_ec2_detach_pending_seconds_total the time spent waiting for a volume to detach from its instance. On the node side the kubelet's
+      storage_operation_duration_seconds carries a status label per volume operation.
+    example: 'sum by (request, code) (increase(aws_ebs_csi_api_request_errors_total[1h]))'
+  - kind: alert
+    what: >
+      The controller has fewer ready pods than it should. This is the precondition of everything else, and it is visible before any volume
+      operation fails.
+    example: |
+      - alert: EbsCsiControllerNotReady
+        expr: sum(kube_pod_status_ready{namespace="kube-system", pod=~"ebs-csi-controller.*", condition="true"}) < 2
+        for: 10m
+  - kind: command
+    what: >
+      The attachments that are not attached, with the error EC2 gave. Next to it, the limit each node reports is in the CSINode objects.
+    example: "kubectl get volumeattachments -o custom-columns=PV:.spec.source.persistentVolumeName,NODE:.spec.nodeName,ATTACHED:.status.attached,ERR:.status.attachError.message"
+solutions:
+  - scale: [small]
+    approach: >
+      Keep the chart's two controller replicas and its disruption budget, and reserve attachment slots for what the driver cannot see, so the
+      scheduler stops short of the real limit. Accept the six-minute wait after a hard node failure; it protects the data.
+    tools: ["aws-ebs-csi-driver Helm chart"]
+    tradeoff: >
+      Pods are no longer scheduled to a node that cannot take their volume. Each reserved slot is one volume fewer per node, and reserved slots
+      and an explicit volume limit cannot be set together.
+    example: |
+      node:
+        reservedVolumeAttachments: 3
+  - scale: [medium]
+    approach: >
+      Spread the pods that carry volumes over nodes with topology spread constraints so that no node collects them, and give the controller a
+      spread constraint of its own so both replicas cannot share a node. Make node removal graceful: the driver's preStop hook (on by default)
+      waits until the node's attachments are gone, and Karpenter waits for volumes to detach before it terminates a node. Enable the driver's
+      metrics and alert on its API errors.
+    tools: [topologySpreadConstraints, Karpenter, Prometheus]
+    tradeoff: >
+      Node replacement stops producing six-minute gaps for stateful pods, and one node failure cannot take the whole controller. Spreading
+      stateful pods wider means more nodes carry state, which slows consolidation and draining.
+    example: |
+      controller:
+        topologySpreadConstraints:
+          - maxSkew: 1
+            topologyKey: kubernetes.io/hostname
+            whenUnsatisfiable: DoNotSchedule
+            labelSelector:
+              matchLabels: { app: ebs-csi-controller }
+  - scale: [large]
+    approach: >
+      Choose instance families with a dedicated EBS attachment limit for the node pools that run stateful workloads, so network interfaces no
+      longer compete with volumes. For hard node failures, put the out-of-service taint in the runbook: once a node is confirmed powered off, the
+      taint makes Kubernetes delete its pods and detach their volumes at once instead of after the timeout.
+    tools: ["EC2 instance families with a dedicated EBS volume limit", "node.kubernetes.io/out-of-service taint"]
+    tradeoff: >
+      Recovery of a stateful pod takes seconds instead of minutes. The taint is safe only on a node that is really off; on a node that is still
+      running it detaches volumes under a live workload and can corrupt data, and it has to be removed by hand afterwards.
+cases: []
+reading:
+  - { title: "aws-ebs-csi-driver: Frequently Asked Questions", url: "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/faq.md", why: "The six-minute delay after a node is preempted and the attachment limit, each with its cause and the options against it." }
+  - { title: "Amazon EBS: volume limits for Amazon EC2 instances", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/volume_limits.html", why: "How the shared limit is calculated and which instance families have a dedicated one." }
+  - { title: "Kubernetes: Node Shutdowns", url: "https://kubernetes.io/docs/concepts/cluster-administration/node-shutdown/", why: "What happens to StatefulSet pods and their volumes when a node dies, and how the out-of-service taint shortens it." }
+  - { title: "aws-ebs-csi-driver: Metrics", url: "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/metrics.md", why: "The metrics the driver exposes and the chart values that turn them on." }

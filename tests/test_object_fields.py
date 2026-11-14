@@ -186,6 +186,28 @@ def test_templating_recognises_the_default_argocd_label_and_the_eks_component_la
     out = hygiene._templating(hygiene.Ctx(tmp_path, INV))
     assert out["by_manager"] == {"argocd": 1, "platform": 1, "none": 1}
     assert [r["workload"] for r in out["unmanaged"]] == ["prod/deployment/loose"]
+    assert out["owners"] == [{"workload": "prod/deployment/shop-api", "managed_by": "argocd", "argocd_app": "shop"}]  # the platform's own workloads are not something the reader declares
+
+
+def test_templating_names_the_application_and_the_release_that_declare_a_workload(tmp_path):
+    _write(tmp_path, "applications.argoproj.io", [])
+    tracked = {"argocd.argoproj.io/tracking-id": "monitoring:apps/Deployment:monitoring/grafana", "meta.helm.sh/release-name": "kube-prometheus-stack", "meta.helm.sh/release-namespace": "monitoring"}
+    _write(
+        tmp_path,
+        "deployments",
+        [
+            {"metadata": {"namespace": "monitoring", "name": "grafana", "labels": {"app.kubernetes.io/managed-by": "Helm"}, "annotations": tracked}, "spec": {"template": {"spec": {"containers": []}}}},
+            {
+                "metadata": {"namespace": "cert-manager", "name": "cert-manager", "labels": {"app.kubernetes.io/managed-by": "Helm"}, "annotations": {"meta.helm.sh/release-name": "cert-manager"}},
+                "spec": {"template": {"spec": {"containers": []}}},
+            },
+        ],
+    )
+    for stem in ("statefulsets", "daemonsets", "cronjobs", "pods"):
+        _write(tmp_path, stem, [])
+    owners = {r["workload"]: r for r in hygiene._templating(hygiene.Ctx(tmp_path, INV))["owners"]}
+    assert owners["monitoring/deployment/grafana"] == {"workload": "monitoring/deployment/grafana", "managed_by": "argocd+helm", "argocd_app": "monitoring", "helm_release": "kube-prometheus-stack"}
+    assert owners["cert-manager/deployment/cert-manager"] == {"workload": "cert-manager/deployment/cert-manager", "managed_by": "helm", "helm_release": "cert-manager"}
 
 
 def test_diff_hashes_every_configuration_key_of_the_spec_less_kinds():

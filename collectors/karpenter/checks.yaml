@@ -6,20 +6,20 @@
   each: karpenterctl.summary
   cluster_level: true
   rule:
-    expr: "(item['ready'] or 0) < (item['replicas'] or 0) or (item['replicas'] or 0) < 2 or item['all_same_node'] or len(item['on_karpenter_node']) > 0"
-    warn_expr: "not item['has_pdb']"
+    expr: "(item['ready'] or 0) < (item['replicas'] or 0) or ((item['replicas'] or 0) >= 2 and item['all_same_node']) or len(item['on_karpenter_node']) > 0"
+    warn_expr: "not item['has_pdb'] or (item['replicas'] or 0) < 2"
   target: "'cluster'"
   evidence: "f\"karpenter v{item['version']}: replicas {item['replicas']} / ready {item['ready']}, all on one node {item['all_same_node']}, running on a Karpenter-made node {item['on_karpenter_node']}, PDB {item['has_pdb']}, leader identified {item['leader_found']}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: true
   why: >
     Without the controller, no nodes come up for Pending pods and nobody handles the 2-minute spot interruption warning (interruption queue), so pods are cut off without a drain. If the controller runs on a node it created, consolidating that node removes its own footing — the Karpenter docs say to put it on a managed node group or Fargate.
   measured: >
     Measured on a real EKS cluster: 2/2 on two managed node group nodes with a PDB — pass.
-  suggest: "Keep replicas 2 + PDB and pin it to a managed node group with a nodeSelector."
+  suggest: "Keep replicas 2 + PDB and pin it to a managed node group with a nodeSelector. One replica is a warn, not a failure: the chart default is 2 since 0.16.0, and the Karpenter troubleshooting page gives 1 as the answer when the managed node group has a single node (https://karpenter.sh/docs/troubleshooting/)."
   verify:
     - "kubectl get pods -n karpenter -o wide ; kubectl get pdb -n karpenter"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -359,6 +359,90 @@
             consolidation: 229
           nodepools: 4
           nodepools_without_limits: []
+      - expect: "warn"  # one replica on a one-node managed group is what the Karpenter docs offer; a restart is a short gap, not an outage
+        item:
+          present: true
+          version: "0.37.0"
+          k8s_supported: false
+          replicas: 1
+          ready: 1
+          all_same_node: false
+          on_karpenter_node: []
+          has_pdb: true
+          has_dedicated_role: true
+          irsa_role: "arn:aws:iam::<account>:role/KarpenterControllerRole-my-cluster-eks"
+          interruption_queue: "my-cluster-eks-karpenter"
+          drift_enabled: true
+          spot_to_spot_consolidation: false
+          feature_gates:
+            Drift: "true"
+            SpotToSpotConsolidation: "false"
+          ec2nodeclasses: 1
+          ami_families:
+            - "AL2"
+          classes_al2:
+            - "default"
+          classes_ami_unpinned:
+            - "default"
+          classes_imds_hop_gt1:
+            - "default"
+          classes_imds_tokens_optional: []
+          classes_root_small: []
+          classes_root_unencrypted:
+            - "default"
+          classes_not_ready: []
+          root_volume_gb:
+            default: 50.0
+          metrics_available: true
+          leader_found: true
+          nodepool_usage_ratio:
+            default/cpu: 0.006
+            default/memory: 0.046
+            system-ondemand/cpu: 0.03
+            system-ondemand/memory: 0.033
+          nodepool_usage_max: 0.046
+          nodeclaims_created_by_reason:
+            provisioning: 726
+            expiration/replace: 4
+          nodeclaims_terminated_by_reason:
+            expiration: 6
+            emptiness: 247
+            interruption: 251
+            consolidation: 229
+          nodeclaims_disrupted_by_reason:
+            "-": 507
+          interruption_messages_by_type:
+            NoOpKind: 1479
+            RebalanceRecommendationKind: 313
+            ScheduledChangeKind: 101
+            SpotInterruptionKind: 252
+            StateChangeKind: 1469
+          interruption_actions:
+            CordonAndDrain: 1005
+            NoAction: 313
+          interruption_messages_total: 3614
+          cloudprovider_errors_total: 33
+          cloudprovider_errors:
+            "Get(node.termination)": 32
+            "IsDrifted(nodeclaim.disruption)": 1
+          reconcile_errors_total: 0
+          reconcile_errors: {}
+          cluster_state_synced: true
+          consistency_errors: 3
+          pods_startup_avg_s: 32.7
+          pods_startup_count: 7388
+          node_termination_avg_s: 17.2
+          disruption_budgets_allowed:
+            app-amd64-fallback/-: 0
+            build-arm64/-: 0
+            default/-: 1
+            system-ondemand/-: 1
+          nodes_disrupted_total:
+            emptiness: 247
+            expiration: 6
+            consolidation: 229
+          nodepools: 4
+          nodepools_without_limits: []
 - id: karpenter.ec2nodeclass-al2
   name: EC2NodeClass uses the AL2 AMI family (end of support — no AMI from 1.33 on)
   area: platform
@@ -379,7 +463,7 @@
   suggest: "Switch amiFamily to AL2023 and set amiSelectorTerms alias al2023@v2026… (pinned version). Drift is on (Drift=true), so nodes are replaced in sequence — set budgets first. Karpenter 0.37 should be upgraded to 1.x first (platform.karpenter-version-compat)."
   verify:
     - "kubectl get ec2nodeclass -o jsonpath='{.items[*].spec.amiFamily}' ; kubectl get ec2nodeclass -o jsonpath='{.items[*].spec.amiSelectorTerms}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -563,13 +647,13 @@
   severity_default: high
   symptom_linked: false
   why: >
-    security.imds-hop-limit looks at the value on instances running now. This check looks at the **cause** — EC2NodeClass metadataOptions.httpPutResponseHopLimit is 2, so every new node also comes up with hop 2. With hop 1, pods (one hop behind the bridge) cannot obtain the node role credentials. httpTokens required enforces IMDSv2. Without root volume encrypted, the node disk (container images, logs, emptyDir) is plaintext.
+    security.imds-hop-limit looks at the value on instances running now. This check looks at the **cause** — EC2NodeClass metadataOptions.httpPutResponseHopLimit is 2, so every new node also comes up with hop 2. With hop 1, pods (one hop behind the bridge) cannot obtain the node role credentials. httpTokens required enforces IMDSv2. A class that leaves blockDeviceMappings out gets Karpenter's default mapping, which is encrypted for AL2, AL2023, Bottlerocket and Windows; a class that writes its own mapping without encrypted: true, or uses the Custom family without one, leaves the node disk (container images, logs, emptyDir) in plain text (https://karpenter.sh/docs/concepts/nodeclasses/).
   measured: >
     Measured on a real EKS cluster: hop 2 (fail), tokens required, 50Gi gp3 root volume without encryption (warn).
-  suggest: "EC2NodeClass metadataOptions.httpPutResponseHopLimit 1 (pods using IRSA or Pod Identity are unaffected), blockDeviceMappings.ebs.encrypted true. Nodes are replaced through drift."
+  suggest: "EC2NodeClass metadataOptions.httpPutResponseHopLimit 1 (pods using IRSA or Pod Identity are unaffected; give the AWS Load Balancer Controller `--aws-region` and `--aws-vpc-id` first, since it reads them from IMDS otherwise), blockDeviceMappings.ebs.encrypted true. Nodes are replaced through drift."
   verify:
     - "kubectl get ec2nodeclass default -o jsonpath='{.spec.metadataOptions}{\"\\n\"}{.spec.blockDeviceMappings}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -925,7 +1009,7 @@
   suggest: "A dedicated role with KarpenterControllerPolicy via IRSA or Pod Identity."
   verify:
     - "kubectl get sa -n karpenter karpenter -o jsonpath='{.metadata.annotations}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1097,7 +1181,7 @@
           nodepools: 4
           nodepools_without_limits: []
 - id: karpenter.interruption-handling
-  name: Spot interruption and rebalance message handling (interruption queue and actual handling counts)
+  name: Spot interruption message handling (interruption queue and actual handling counts)
   area: resilience
   type: summary
   each: karpenterctl.summary
@@ -1110,13 +1194,13 @@
   severity_default: high
   symptom_linked: true
   why: >
-    Without an interruption queue (SQS + EventBridge) the 2-minute spot reclaim warning is never received and pods are cut off without a drain (same premise as scaling.karpenter-no-interruption-queue — this check adds "how many were received and actually handled"). SpotInterruptionKind in the hundreds means a pool with frequent spot reclaims, so prod must not sit on a single spot type (resilience.prod-concentration).
+    Without an interruption queue (SQS + EventBridge) the 2-minute spot reclaim warning is never received and pods are cut off without a drain (same premise as scaling.karpenter-no-interruption-queue — this check adds "how many were received and actually handled"). A rebalance recommendation is only published as an event; Karpenter does not drain on it. SpotInterruptionKind in the hundreds means a pool with frequent spot reclaims, so prod must not sit on a single spot type (resilience.prod-concentration).
   measured: >
     Measured on a real EKS cluster: queue present; since leader start 252 spot interruptions, 313 rebalance recommendations, 1,005 CordonAndDrain actions, 251 NodeClaims terminated for interruption — warn. 33 cloud API errors (NodeClaimNotFound — re-reading an already deleted node, harmless).
   suggest: "Mix on-demand into the prod NodePool (capacity-type spot,on-demand + weights) or widen the instance types to lower the reclaim probability. If CordonAndDrain is low compared to interruption messages, check the queue permissions."
   verify:
-    - "karpenter_interruption_received_messages from the pod /metrics (metrics/pod/karpenter/)"
-  profiles: [prod]
+    - "karpenter_interruption_received_messages_total (karpenter_interruption_received_messages on older releases) from the pod /metrics (metrics/pod/karpenter/)"
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1465,7 +1549,7 @@
   suggest: "Raise the limits (see the cost section for a cost ceiling) or split the pool."
   verify:
     - "kubectl get nodepools -o custom-columns=NAME:.metadata.name,LIMITS:.spec.limits,USAGE:.status.resources"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1728,6 +1812,7 @@
   target: "'cluster'"
   evidence: "f\"cluster state synced {item['cluster_state_synced']}, consistency errors {item['consistency_errors']}, reconcile errors {item['reconcile_errors']}, pod startup average {item['pods_startup_avg_s']}s ({item['pods_startup_count']} pods), node termination average {item['node_termination_avg_s']}s\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: >
     With cluster_state_synced 0 Karpenter has not read the full node and pod state and stops making scheduling decisions (normal briefly after startup). Consistency errors (check=Termination etc.) mean a NodeClaim and the real instance disagree — a node whose termination never finished may be left behind.
@@ -1736,7 +1821,7 @@
   suggest: "Compare non-Ready entries in kubectl get nodeclaims with instances shutting down in the EC2 console."
   verify:
     - "kubectl get nodeclaims ; karpenter_consistency_errors from the pod /metrics"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -2010,7 +2095,7 @@
   suggest: "FEATURE_GATES=SpotToSpotConsolidation=true plus a wide instance type list in the NodePool. Turn it off again if churn appears."
   verify:
     - "kubectl get deploy -n karpenter karpenter -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 FEATURE"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -2276,7 +2361,7 @@
   suggest: "Helm values serviceMonitor.enabled true. Then it accumulates in Prometheus and trends become visible."
   verify:
     - "kubectl get servicemonitor -A | grep -i karpenter"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"

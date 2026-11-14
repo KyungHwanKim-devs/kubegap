@@ -15,90 +15,36 @@ from __future__ import annotations
 
 import contextlib
 import datetime as _dt
-import re
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 
-from ..foundations import paths
+from ..foundations import paths, units
 from ..foundations import podmetrics as _pm
-from ..foundations.logtext import normalize_message
-from ..foundations.mask import mask_text, strip_control
+from ..foundations.logscan import (  # noqa: F401  (the names the tests and the Loki half below use)
+    BOOT_WINDOW_S,
+    ERROR_RE,
+    ISO_RE,
+    ISO_TZ_RE,
+    KLOG_TS_RE,
+    MAX_FILE_BYTES,
+    NOT_ERROR_RE,
+    PREFIX_RE,
+    TS_ANY_RE,
+    _parse_iso,
+    _strip_prefix,
+    _ts_of,
+    _utc_str,
+    any_regex,
+    match_line,
+    merge,
+    normalize_unclassified,
+    scan_texts,
+)
 from ..foundations.promtext import parse as _parse_prom
 from ..foundations.signatures import Signature
 from ..foundations.signatures import load as load_signatures
-from ..foundations.snapshot import COMPONENT_LOGS_DIR, component_logs_aggregate, component_logs_removed, load_json, metric_result, metric_rows, metric_sum, parse_ts, taken_at
+from ..foundations.snapshot import COMPONENT_LOGS_DIR, component_logs_aggregate, load_json, metric_result, metric_rows, metric_sum, parse_ts, taken_at
 from ..foundations.workload import workload_of
-
-ISO_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})")
-KLOG_TS_RE = re.compile(r"\b[IWEF](\d{2})(\d{2}) (\d{2}:\d{2}:\d{2})")
-PREFIX_RE = re.compile(r"^\[pod/([^/\]]+)/([^\]]+)\] ")
-# The line formats these two regexes know, with the source of each format in references/sources.md (#129): klog text (`E1104 … file.go:12] "msg" err="…"`,
-# also behind the journal prefix `<host> kubelet[<pid>]: `), logfmt `level=` (go-kit: Prometheus 2.x, Loki, promtail, Alertmanager ≤0.27; slog: Prometheus 3.x,
-# Alertmanager ≥0.28, spelled `INFO`/`ERROR`; logrus text, spelled `warning`), JSON `"level":` (zap, logrus JSON, go-kit JSON, zerolog; Karpenter spells
-# `INFO`/`ERROR`), Elasticsearch 7 `"level": "INFO"` with a space and ECS `"log.level"`, actions-runner-controller `"severity"`, zap console (KEDA,
-# actions-runner-controller text: tab-separated `\tINFO\t`), fluent-bit `[ warn]`/`[error]` (width-5 label), nginx error log `[crit] 31#31: ` (emerg,
-# alert and crit are above error), zerolog console ` ERR ` (Traefik 3 default). klog JSON (`--logging-format=json`) has no level key and is not told apart.
-ERROR_RE = re.compile(
-    r'(?i)\b(error|fatal|panic|exception|failed|failure)\b|"(level|log\.level)":\s*"(error|fatal|critical)"|level=(error|fatal)|^\[?[^\]]*\]? ?\S* ?E\d{4} '
-    r"|(?-i: ERR |\[(emerg|alert|crit)\] \d+#\d+: )"
-)
-NOT_ERROR_RE = re.compile(
-    r'level=(info|debug|warn|warning)|"(level|log\.level)":\s*"(info|debug|warn|warning)"|"severity":"(info|debug|notice)"|\[ ?(info|debug|warn)\]|\t(INFO|DEBUG|WARN)\t'
-    r'|errors=0|error=nil|error=<nil>|"error":""|error: null|RegistrationStatus',
-    re.IGNORECASE,
-)
-# Lines whose level is info, debug or warn in any of the formats above are not errors even when the body contains "failed" (seen: actions-runner-controller
-# "severity":"info" lines and ebs-csi NotifyRegistrationStatus were caught as unclassified errors; before #129 only the JSON spelling was excluded, so a
-# KEDA `\tINFO\t`, Elasticsearch `"level": "INFO"`, logfmt `level=warn` or fluent-bit `[ warn]` line with a "failed" word counted as an error).
-BOOT_WINDOW_S = 300  # 300 seconds after node creation or reboot. Was 120, but after a small k3s cluster node reboot the first kubelet line came 140 seconds later, so it was raised. kubelet/containerd lines within this window after node creation are boot ordering (PLEG, network not ready before CNI init) and are excluded from signatures.
-ISO_TZ_RE = re.compile(r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:[.,]\d+)?(Z|[+-]\d{2}:?\d{2})?")
-# Any timestamp a component writes into its own line: ISO 8601 (logfmt `ts=`/`time=`, logrus `time="…"`, zap `"ts"`/`"time"`, Grafana `t=`, ECS `"@timestamp"`,
-# Elasticsearch 7 `"timestamp": "…,123Z"`) or the `2026/11/05 00:05:48` form of nginx and fluent-bit (milliseconds from fluent-bit 4.1.0).
-TS_ANY_RE = re.compile(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?|\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}(?:\.\d{1,9})?")
-MAX_FILE_BYTES = 30 * 1024 * 1024
-
-
-def _ts_of(line: str, today: _dt.date) -> str | None:
-    """The first timestamp in the line as written (ISO 8601 with its fraction and offset when present, so `_parse_iso` keeps a `+09:00` line 9 hours apart
-    from a `Z` one), else a klog header `E1104 15:10:15` completed with the year of `today`, the snapshot date (no offset: read as UTC, and by `scan` once more as node-local time)."""
-    m = ISO_TZ_RE.search(line)
-    if m:
-        return m.group(0)
-    m = KLOG_TS_RE.search(line)
-    if m:
-        y = today.year - 1 if (int(m.group(1)), int(m.group(2))) > (today.month, today.day) else today.year  # a January scan reads December lines as last year's
-        return f"{y}-{m.group(1)}-{m.group(2)}T{m.group(3)}"
-    return None
-
-
-def _utc_str(ts: str | None, assume_tz: _dt.tzinfo | None = None) -> str | None:
-    """`ts` from `_ts_of` as `YYYY-MM-DDTHH:MM:SSZ` in UTC, so first/last compare across pods whose containerd wrote local-time offsets. A timestamp without an
-    offset (a klog header in the k3s journal) is read in `assume_tz` (the node-local zone `scan` takes from the snapshot's `taken_at`), else as UTC. None when unreadable."""
-    t = _parse_iso(ts)
-    if t is None:
-        return None
-    m = ISO_TZ_RE.search(ts or "")
-    if assume_tz is not None and not (m and m.group(2)):
-        t = t.replace(tzinfo=assume_tz)
-    return t.astimezone(_dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def _parse_iso(s: str | None) -> _dt.datetime | None:
-    if not s:
-        return None
-    m = ISO_TZ_RE.search(s)
-    if not m:
-        return None
-    try:
-        base = _dt.datetime.strptime(m.group(1), "%Y-%m-%dT%H:%M:%S")
-    except ValueError:
-        return None
-    tz = m.group(2)
-    if not tz or tz == "Z":
-        return base.replace(tzinfo=_dt.UTC)
-    sign = 1 if tz[0] == "+" else -1
-    hh, mm = int(tz[1:3]), int(tz[-2:])
-    return base.replace(tzinfo=_dt.timezone(sign * _dt.timedelta(hours=hh, minutes=mm)))
 
 
 def _node_boot_windows(snap: Path) -> dict[str, _dt.datetime]:
@@ -123,148 +69,19 @@ def _node_boot_windows(snap: Path) -> dict[str, _dt.datetime]:
     return out
 
 
-def _strip_prefix(line: str) -> tuple[str, str | None]:
-    """'[pod/x/y] 2026-..Z body' → (body, 'x'). Also strips the timestamp."""
-    pod = None
-    m = PREFIX_RE.match(line)
-    if m:
-        pod = m.group(1)
-        line = line[m.end() :]
-    line = re.sub(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:?\d{2})?\s*", "", line, count=1)
-    line = re.sub(r"^\S+ \S+\[\d+\]: ", "", line)  # journalctl short-iso: '<host> <unit>[<pid>]: ' (the time was stripped above)
-    return line.strip(), pod
-
-
-def any_regex(sigs: list[Signature]) -> re.Pattern:
-    """One regex that matches a line when any of `sigs` would: the pre-filter of `scan`. A pattern that starts with the global `(?i)` becomes a scoped
-    `(?i:…)` group, since Python refuses a global flag anywhere but at the start of the whole expression (the first case-insensitive patterns came with #129)."""
-    parts = [f"(?i:{s.pattern[4:]})" if s.pattern.startswith("(?i)") else f"(?:{s.pattern})" for s in sigs]
-    return re.compile("|".join(parts))
-
-
-def match_line(line: str, sigs: list[Signature]) -> set[str]:
-    """The ids of `sigs` that count `line`: every signature whose pattern matches, except that a `component: any` signature yields to a component signature
-    on the same line (seen: metallb.speaker-error and common.context-deadline double-counted 533 times). `scan` and tests/test_signature_lines.py use it."""
-    hit = {s.id for s in sigs if s.regex.search(line)}
-    by_id = {s.id: s for s in sigs}
-    if any(by_id[h].component != "any" for h in hit):
-        hit = {h for h in hit if by_id[h].component != "any"}
-    return hit
-
-
-def normalize_unclassified(line: str) -> str:
-    """The key under which an error line that matched no signature is counted: the kubectl and journal prefixes off, every timestamp the component wrote
-    replaced by `<ts>` (otherwise identical errors one second apart never collapse), then `lib/foundations/logtext.normalize_message` (klog header off, numbers, ids and addresses blanked)."""
-    body, _pod = _strip_prefix(line)
-    body = TS_ANY_RE.sub("<ts>", body)
-    body = re.sub(r'"(@?timestamp|ts|time|start time|end time)":\s*"[^"]*"', r'"\1":"<ts>"', body)  # time fields in JSON logs that TS_ANY_RE does not spell
-    body = re.sub(r'"(ts|time)":\s*\d+(\.\d+)?', r'"\1":<ts>', body)  # zap EpochTimeEncoder (external-secrets `--zap-time-encoding=epoch`): seconds as a float
-    msg = normalize_message(body)
-    return msg if len(msg) <= 140 else msg[:140].rsplit(" ", 1)[0] + " …"  # the table shows this, so a cut is visible and ends at a word
-
-
-def scan(snap: Path, sigs: list[Signature]) -> dict:
-    """Scan the text logs under logs/ once and produce signature matches and unclassified errors."""
+def scan(snap: Path, sigs: list[Signature], *, keep_lines: bool = True) -> dict:
+    """Count the node log files under logs/ (everything but logs/pods/, whose lines were counted at collection and never written)."""
     ldir = snap / "logs"
     files = sorted(p for p in ldir.rglob("*") if p.is_file() and p.suffix in (".log", ".txt") and p.stat().st_size > 0 and p.name != "os.txt") if ldir.is_dir() else []
-    hits: dict[str, dict] = {s.id: {"count": 0, "first": None, "last": None, "files": Counter(), "samples": []} for s in sigs}
-    unclassified: Counter = Counter()
-    uncl_sample: dict[str, str] = {}
-    uncl_files: dict[str, Counter] = defaultdict(Counter)
-    lines_total = 0
-    error_lines = 0
-    scanned: list[str] = []
-    boot_until = _node_boot_windows(snap)
-    boot_skipped: Counter = Counter()
-    # klog lines in the k3s journal ("E1025 13:23:38") are node-local time without a tz. Interpret them once more with the snapshot's taken_at offset (operator local = small k3s cluster node local) to compare against the boot window
-    taken = taken_at(load_json(snap / "inventory.json"))
-    local_tz = taken.tzinfo
-    today = taken.date()  # completes the year of a klog header
-    for f in files:
-        rel = str(f.relative_to(snap))
-        applicable = [s for s in sigs if s.applies_to(rel)]
-        if not applicable:
-            continue
-        scanned.append(rel)
-        any_re = any_regex(applicable)
-        parts = rel.split("/")
-        component = parts[2] if rel.startswith("logs/pods/") and len(parts) > 3 else ("node:" + parts[2] if rel.startswith("logs/node/") and len(parts) > 3 else rel)
-        node_boot_until = boot_until.get(parts[2]) if rel.startswith("logs/node/") and len(parts) > 3 else None
-        try:
-            data = f.read_bytes()[-MAX_FILE_BYTES:].decode("utf-8", "replace")
-        except OSError:
-            continue
-        for line in data.splitlines():
-            if not line.strip():
+
+    def sources():
+        for f in files:
+            try:
+                yield str(f.relative_to(snap)), f.read_bytes()[-MAX_FILE_BYTES:].decode("utf-8", "replace")
+            except OSError:
                 continue
-            line = strip_control(line)[0]  # Traefik's default console format colours the level and message (zerolog console.go:374-384@v1.33.0); the patterns read the text
-            lines_total += 1
-            matched = False
-            if any_re.search(line):
-                matched_ids = match_line(line, applicable)
-                if node_boot_until is not None:
-                    ts_txt = _ts_of(line, today)
-                    lt = _parse_iso(ts_txt)
-                    if lt is not None and local_tz is not None and not (ISO_RE.search(line)) and KLOG_TS_RE.search(line):
-                        lt_local = lt.replace(tzinfo=local_tz)
-                        lt = min(lt, lt_local, key=lambda t: abs((t - node_boot_until).total_seconds()))  # whichever interpretation is closer to the boot time
-                    if lt is not None and lt <= node_boot_until:
-                        # node log inside the boot window. Not counted, but marked "matched" so it does not become an unclassified error either.
-                        for s in applicable:
-                            if s.regex.search(line):
-                                boot_skipped[s.id] += 1
-                                matched = True
-                        if matched:
-                            continue
-                for s in applicable:
-                    if s.id in matched_ids:
-                        matched = True
-                        h = hits[s.id]
-                        h["count"] += 1
-                        h["files"][rel] += 1
-                        ts = _utc_str(_ts_of(line, today), local_tz)
-                        if ts:
-                            h["first"] = min(h["first"], ts) if h["first"] else ts
-                            h["last"] = max(h["last"], ts) if h["last"] else ts
-                        if len(h["samples"]) < 5:
-                            h["samples"].append(mask_text(line[:240]).text)  # the raw log is deleted after summarize; these samples are what survives, so they are masked
-            if not matched and ERROR_RE.search(line) and not NOT_ERROR_RE.search(line):
-                error_lines += 1
-                key = f"{component} | {normalize_unclassified(line)}"
-                unclassified[key] += 1
-                uncl_files[key][rel] += 1
-                uncl_sample.setdefault(key, mask_text(line[:240]).text)
-    by_id = {s.id: s for s in sigs}
-    sig_rows = []
-    for sid, h in hits.items():
-        if h["count"] == 0:
-            continue
-        s = by_id[sid]
-        targets = len(h["files"])  # number of distinct pod/node files. Repetition from a single target is warn, not fail (seen: one ExternalSecret repeating produced fail/high)
-        sig_rows.append(
-            {
-                **s.public(),
-                "count": h["count"],
-                "first": h["first"],
-                "last": h["last"],
-                "files": dict(h["files"].most_common(6)),
-                "targets": targets,
-                "samples": h["samples"],
-                "status": "fail" if (h["count"] >= s.fail_at and targets >= 2) else ("warn" if h["count"] >= s.warn_at else "info"),
-            }
-        )
-    order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
-    sig_rows.sort(key=lambda r: (order.get(r["severity"], 9), -r["count"]))
-    uncl_rows = [{"pattern": k, "count": c, "files": dict(uncl_files[k].most_common(3)), "sample": uncl_sample.get(k)} for k, c in unclassified.most_common(30)]
-    return {
-        "files_scanned": scanned,
-        "lines_scanned": lines_total,
-        "error_lines_unclassified": error_lines,
-        "signatures": sig_rows,
-        "unclassified_errors": uncl_rows,
-        "boot_window_skipped": dict(boot_skipped),
-        "boot_window_seconds": BOOT_WINDOW_S,
-    }
+
+    return scan_texts(sources(), sigs, taken=taken_at(load_json(snap / "inventory.json")), boot_until=_node_boot_windows(snap), keep_lines=keep_lines)
 
 
 # ---------- Loki ----------
@@ -369,8 +186,8 @@ def analyze_loki(snap: Path, inv: dict) -> dict:
         "pods_without_logs_1h": len(missing),
         "gap_ratio": round(len(missing) / running_old, 3) if running_old else None,
         "nodes_all_missing": nodes_all_missing,
-        "by_namespace_missing": dict(by_ns_missing.most_common(15)),
-        "pods_without_logs": sorted(missing, key=lambda m: (m["namespace"], m["pod"]))[:60],
+        "by_namespace_missing": dict(by_ns_missing.most_common()),
+        "pods_without_logs": sorted(missing, key=lambda m: (m["namespace"], m["pod"])),
         "note": "A pod that wrote no log lines in an hour may be fine (idle). If a whole node is missing (nodes_all_missing), that node's promtail is dead; if a whole namespace is missing, promtail's exclusion config is the cause",
         "available": bool(pods_lbl),
     }
@@ -445,33 +262,31 @@ def analyze_agents(snap: Path, inv: dict) -> dict:
     return out
 
 
-# The keys of the logs section that come from scanning the raw log files. summarize saves exactly these to logs/pods/AGGREGATED.json before deleting the component logs, and analyze() reads them back on a rerun.
-LOG_SCAN_KEYS = ("files_scanned", "lines_scanned", "error_lines_unclassified", "signatures", "unclassified_errors", "boot_window_skipped", "boot_window_seconds", "components_with_logs", "files", "scan_signatures_version")
-
-
 def scan_section(snap: Path, sigs: list[Signature]) -> dict:
-    """Everything in the logs section that needs the raw files: the signature scan plus the file and component lists."""
-    res = scan(snap, sigs)
+    """The part of the logs section that comes from log lines: the component logs, counted while they were collected (logs/pods/AGGREGATED.json; no
+    line of them is a file), joined with the node logs of a full run, counted here from their files. With no aggregate (the step did not run) only
+    the node logs are counted and `component_logs` says so."""
+    node = scan(snap, sigs, keep_lines=units.collected(snap, "component-log-samples"))
+    agg = component_logs_aggregate(snap) or {}
+    pods = agg.get("log_scan") if isinstance(agg.get("log_scan"), dict) else None
+    res = merge([pods, node], sigs) if pods else node
     ldir = snap / "logs"
-    files = [str(f.relative_to(snap)) for f in sorted(ldir.rglob("*")) if f.is_file()] if ldir.is_dir() else []
-    pods_dir = snap / COMPONENT_LOGS_DIR
-    components = sorted(p.name for p in pods_dir.iterdir() if p.is_dir()) if pods_dir.is_dir() else []
-    return {"components_with_logs": components, "files": files, **res, "scan_signatures_version": paths.signatures_version()}
+    node_files = [str(f.relative_to(snap)) for f in sorted(ldir.rglob("*")) if f.is_file() and COMPONENT_LOGS_DIR not in f.relative_to(snap).parents] if ldir.is_dir() else []
+    return {
+        "component_logs": "counted while they were collected; no line is stored" if pods else "not counted: the component-logs step left no logs/pods/AGGREGATED.json",
+        "components_with_logs": (pods or {}).get("components_with_logs") or [],
+        "component_log_lines": (pods or {}).get("lines_by_file") or {},
+        "component_logs_capped": agg.get("capped") or [],
+        "files": node_files,
+        **res,
+        "scan_signatures_version": (pods or {}).get("scan_signatures_version") or paths.signatures_version(),
+    }
 
 
 def analyze(snap: Path, inv: dict | None) -> dict:
     inv = inv or {}
     sigs, errors = load_signatures(inv.get("collectors_enabled") or ["core"])
-    agg = component_logs_aggregate(snap) if component_logs_removed(snap) else None
-    if agg and isinstance(agg.get("log_scan"), dict):
-        # The raw component logs were deleted by an earlier summarize; scanning again would find only the node logs. Use what that run saved.
-        res = {k: agg["log_scan"].get(k) for k in LOG_SCAN_KEYS}
-        res["source_note"] = "component logs deleted after the first summarize; scan results read from logs/pods/AGGREGATED.json"
-    elif component_logs_removed(snap):
-        res = {**scan_section(snap, sigs), "source_note": "component logs deleted and no AGGREGATED.json found: only node logs were scanned; log signature checks are incomplete"}
-        res["scan_incomplete"] = True
-    else:
-        res = scan_section(snap, sigs)
+    res = scan_section(snap, sigs)
     return {
         "source": "logs/ (signature matches) + loki/ + metrics/ + objects/pods.json",
         "signatures_version": paths.signatures_version(),

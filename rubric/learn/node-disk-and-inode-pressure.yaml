@@ -1,0 +1,123 @@
+# What a report teaches when a node's filesystem is running out of bytes or of inodes. Every page below was opened and read (2026-11-14).
+topic: node-disk-and-inode-pressure
+checks: [node.disk-usage, node.inode-usage]
+mechanism: >
+  The kubelet watches two filesystems. nodefs is the node's main filesystem: local volumes, emptyDir volumes that are not backed by memory, logs
+  and what lives under /var/lib/kubelet. imagefs is an optional separate filesystem for container images; without one, images and the writable
+  layers of containers are on nodefs too. A pod writes to the node through its writable layer, its emptyDir volumes and its own logs under
+  /var/log/pods.
+
+
+  Three things happen as the disk fills, in this order. The kubelet rotates a container log at 10Mi and keeps 5 files per container. At 85% disk
+  usage image garbage collection starts and deletes unused images, oldest first, until usage is back at 80%; it runs every five minutes. If that is
+  not enough, the hard eviction thresholds are reached: nodefs.available below 10%, imagefs.available below 15%, nodefs.inodesFree below 5%. The
+  node gets the DiskPressure condition, the kubelet garbage collects dead pods and containers and deletes all unused images, and then evicts pods,
+  ranked by how much disk they use. A hard eviction has a grace period of 0 seconds and does not respect a PodDisruptionBudget. The condition stays
+  for 5 minutes by default after the pressure is gone.
+
+
+  Inodes are a second, separate limit. An ext4 filesystem fixes its number of inodes when it is created, every file takes one, and a workload with
+  many small files (a node_modules directory unpacked once per image layer) can use them up while most of the bytes are free. The image garbage
+  collection thresholds measure bytes only, so nothing reacts to inodes before the 5% eviction floor, and there pods are ranked by priority alone
+  because inodes have no requests.
+
+
+  The harm on the way there is not only eviction: image pulls fail with "no space left on device" and new pods do not start.
+sources:
+  - { title: "Kubernetes: Node-pressure Eviction", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/" }
+  - { title: "Kubernetes: Garbage Collection", url: "https://kubernetes.io/docs/concepts/architecture/garbage-collection/" }
+  - { title: "Kubernetes: Kubelet Configuration (v1beta1)", url: "https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/" }
+  - { title: "Kubernetes: Resource Management for Pods and Containers", url: "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/" }
+  - { title: "CNCF blog: Kubelet watches inodes. Just not until it's an emergency", url: "https://www.cncf.io/blog/2026/10/05/kubelet-watches-inodes-just-not-until-its-an-emergency/" }
+detect:
+  - kind: alert
+    what: >
+      The node_exporter mixin ships two kinds of rule for bytes and the same two for inodes. One fires on the trend: free space is below a threshold
+      and predict_linear says it reaches zero within the window. The other fires on the level alone. A rule on the trend goes quiet when growth
+      pauses, so the level rule is the one that cannot be missed.
+    example: |
+      - alert: NodeFilesystemFilesFillingUp
+        expr: |
+          node_filesystem_files_free / node_filesystem_files * 100 < 40
+          and predict_linear(node_filesystem_files_free[6h], 24*60*60) < 0
+          and node_filesystem_readonly == 0
+        for: 1h
+      - alert: NodeInodesAbove80Percent
+        expr: 1 - node_filesystem_files_free{mountpoint="/"} / node_filesystem_files{mountpoint="/"} > 0.80
+        for: 30m
+  - kind: metric
+    what: >
+      Bytes and inodes side by side per node. A node whose inode usage runs ahead of its byte usage is the one that image garbage collection will
+      not help.
+    example: |
+      1 - node_filesystem_avail_bytes / node_filesystem_size_bytes
+      1 - node_filesystem_files_free / node_filesystem_files
+  - kind: metric
+    what: >
+      What the kubelet already did about it: the DiskPressure node condition from kube-state-metrics and the kubelet's count of evictions per
+      eviction signal.
+    example: |
+      kube_node_status_condition{condition="DiskPressure",status="true"} == 1
+      sum by (instance, eviction_signal) (rate(kubelet_evictions[15m]))
+  - kind: command
+    what: >
+      Which directory holds the files, once a node is known to be filling up.
+    example: 'du --inodes -xS /var/lib/containerd | sort -rh | head -n 20'
+solutions:
+  - scale: [small]
+    approach: >
+      Keep the kubelet defaults and watch both ratios: the level alert on bytes and the level alert on inodes, on the filesystem that holds the
+      container data. On a single-disk node that also holds the volumes of the workloads, give the alert an earlier threshold, because the same
+      disk filling up stops the databases as well as the kubelet.
+    tools: ["node_exporter mixin alerts"]
+    tradeoff: >
+      No configuration to maintain. You are told early enough to delete or to grow the disk; the cluster does nothing about it by itself until
+      the kubelet starts to delete images and evict pods.
+  - scale: [medium]
+    approach: >
+      Tune the kubelet so that cleaning starts earlier and unused images do not stay for ever: a lower image garbage collection threshold, a
+      maximum age for unused images, and the log rotation size that fits the disk. Fix the images that carry tens of thousands of small files
+      at the build (multi-stage build, a .dockerignore).
+    tools: [KubeletConfiguration, "node_exporter mixin alerts"]
+    tradeoff: >
+      The disk is cleaned long before the eviction thresholds. An image that was removed has to be pulled again when a pod needs it, and smaller
+      or fewer log files mean less history on the node.
+    example: |
+      apiVersion: kubelet.config.k8s.io/v1beta1
+      kind: KubeletConfiguration
+      imageGCHighThresholdPercent: 75
+      imageGCLowThresholdPercent: 65
+      imageMaximumGCAge: 168h
+      containerLogMaxSize: 10Mi
+      containerLogMaxFiles: 5
+  - scale: [large]
+    approach: >
+      Give images their own filesystem so that image growth and pod data are handled separately, add soft eviction thresholds so that pods are
+      evicted with a grace period before the hard threshold removes them with none, and check the disk size of a node group whenever its launch
+      template changes.
+    tools: [KubeletConfiguration, "node_exporter mixin alerts"]
+    tradeoff: >
+      Image growth and pod data are measured and reclaimed separately, and evictions become orderly. It costs a second volume per node, eviction
+      settings to keep consistent across node groups, and a check in the pipeline that builds the nodes.
+cases:
+  - company: UK Ministry of Justice
+    year: 2023
+    url: "https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-09-18-lack-of-diskspace.html"
+    summary: >
+      A root volume utilisation alert fired and a user reported image pull errors with "no space left on device". While nodes were drained during
+      an upgrade of the EKS module, many pods were in Evicted and ContainerStateUnknown states. The new nodes had 20 GB disks instead of 100 GB
+      because the launch template had changed with the module version. Workloads were moved back to the old node group and the template was fixed.
+    match: The node filesystem filled, image pulls failed and the kubelet evicted pods; the disk size was a property of the node nobody had looked at.
+  - company: "CNCF blog (Onkar Shelke)"
+    year: 2026
+    url: "https://www.cncf.io/blog/2026/10/05/kubelet-watches-inodes-just-not-until-its-an-emergency/"
+    summary: >
+      A worker node paged with NodeFilesystemFilesFillingUp while its disk was at 83% of bytes and 67% of inodes. A single-stage image build shipped
+      node_modules with development dependencies and added another copy with every commit; the overlayfs snapshotter unpacks each layer into its
+      own directory, so one image held more than 40,000 files.
+    match: Inodes ran ahead of bytes, and the byte-based image garbage collection had no reason to act.
+reading:
+  - { title: "Kubernetes: Node-pressure Eviction", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/", why: "The signals, the default thresholds, what is reclaimed first and how pods are ranked." }
+  - { title: "CNCF blog: Kubelet watches inodes. Just not until it's an emergency", url: "https://www.cncf.io/blog/2026/10/05/kubelet-watches-inodes-just-not-until-its-an-emergency/", why: "Why inodes run out before bytes, with the alert rule and the dashboard query to add." }
+  - { title: "Kubernetes: Kubelet Configuration (v1beta1)", url: "https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/", why: "The image garbage collection, log rotation and eviction fields with their defaults." }
+  - { title: "node_exporter mixin alerts", url: "https://raw.githubusercontent.com/prometheus/node_exporter/master/docs/node-mixin/alerts/alerts.libsonnet", why: "The filesystem rules most clusters already have, to see what they fire on and what they miss." }

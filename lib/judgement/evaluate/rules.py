@@ -40,7 +40,10 @@ SAFE_BUILTINS = {
 
 
 def eval_expr(expr: str, env: dict):
-    return eval(expr, {"__builtins__": SAFE_BUILTINS}, env)
+    """Evaluate a check's expression with `env` as its names. The names are given as globals, not locals: up to Python 3.11 a comprehension is a
+    scope of its own and does not see the locals of `eval`, so `[shown(p["x"], 1) for p in rows]` raised NameError there while 3.12 and later
+    (PEP 709) evaluated it. As globals every name is visible in every nested scope on every version."""
+    return eval(expr, {"__builtins__": SAFE_BUILTINS, **env})
 
 
 def status(rule: dict, env: dict) -> str:
@@ -52,8 +55,8 @@ def status(rule: dict, env: dict) -> str:
     return "pass"
 
 
-def ns_profile_disables(check_id: str, target: str, env: dict, ns_profiles: dict[str, dict]) -> bool:
-    """config.yaml namespace_profiles (glob -> profile name). If the finding's namespace maps to a profile whose disabled_checks lists this check, the finding is not emitted."""
+def dev_namespace(target: str, env: dict, globs: list[str]) -> bool:
+    """Whether the target lives in a namespace config.yaml `dev_namespaces` names. The checks of rubric/scales.yaml `dev_namespace_disabled_checks` emit nothing there."""
     ns = None
     for key in ("ns",):
         if isinstance(env.get(key), str) and env[key]:
@@ -70,11 +73,11 @@ def ns_profile_disables(check_id: str, target: str, env: dict, ns_profiles: dict
         ns = target.split("/", 1)[0]
     if not ns:
         return False
-    return any(fnmatch.fnmatch(ns, pat) and check_id in (prof.get("disabled_checks") or []) for pat, prof in ns_profiles.items())
+    return any(fnmatch.fnmatch(ns, pat) for pat in globs)
 
 
-def excluded(check_id: str, target: str, profile: dict) -> bool:
-    pats = (profile.get("exclude") or {}).get(check_id) or []
+def excluded(check_id: str, target: str, platform: dict) -> bool:
+    pats = (platform.get("exclude") or {}).get(check_id) or []
     return any(fnmatch.fnmatchcase(target, p) for p in pats)
 
 
@@ -88,6 +91,8 @@ def finding(check: dict, target: str, status: str, evidence, source: str, extra:
         "status": status,
         "severity_default": check["severity_default"],
         "symptom_linked": bool(check.get("symptom_linked")),
+        "nature": check.get("nature", "state"),
+        **({"overdue": True} if check.get("overdue") else {}),
         "target": target,
         "evidence": evidence,
         "source": source,
@@ -201,7 +206,7 @@ def details(check: dict, env: dict) -> dict | None:
 class Run:
     """Mutable state of one check evaluation shared by the type handlers: the check, its thresholds, the collected findings and status counts.
 
-    `emit()` is the single place where a rule is applied to one target, so exclusions (profile `exclude`, namespace profiles) and the merging of
+    `emit()` is the single place where a rule is applied to one target, so exclusions (platform `exclude`, dev namespaces) and the merging of
     several instances of one target (Job pods of a CronJob, replicas) behave the same for every check type."""
 
     _ORDER: ClassVar[dict[str, int]] = {"fail": 0, "warn": 1}
@@ -219,7 +224,7 @@ class Run:
     def emit(self, env: dict, default_target: str, source: str) -> None:
         check, cx = self.check, self.cx
         target = str(eval_expr(check["target"], env)) if check.get("target") else default_target
-        if excluded(check["id"], target, cx.profile) or (cx.ns_profiles and ns_profile_disables(check["id"], target, env, cx.ns_profiles)):
+        if excluded(check["id"], target, cx.platform) or (cx.dev_namespaces and check["id"] in cx.dev_disabled and dev_namespace(target, env, cx.dev_namespaces)):
             self.counts["excluded"] += 1
             return
         if self.rule.get("needs") and not eval_expr(self.rule["needs"], env):

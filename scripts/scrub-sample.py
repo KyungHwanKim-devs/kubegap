@@ -18,10 +18,15 @@ This script then applies the name map, which is yours and stays out of the repos
     rules_after:                             # applied last, same form as rules
       - [ '\\bsome-leftover\\b', 'placeholder' ]
 
+Three things are replaced whatever the map says (ALWAYS below): load balancer DNS names (`*.elb.<region>.amazonaws.com`), the names the AWS Load
+Balancer Controller gives load balancers and target groups (`k8s-<namespace>-<name>-<hash>`, which carry cut real names), and the path of the
+snapshot folder, which holds the home directory.
+
 Numbers, findings and wording are left as they are. See docs/SAMPLES.md.
 """
 
 import argparse
+import hashlib
 import pathlib
 import re
 import sys
@@ -37,8 +42,20 @@ def app_placeholder(i: int) -> str:
     return f"app-{name}"
 
 
-def build(spec: dict) -> list[tuple[str, str]]:
-    rules: list[tuple[str, str]] = [(p, r) for p, r in spec.get("rules") or []]
+# Applied to every sample before the map, because no map should have to remember them: the public DNS name of a load balancer (a report about an
+# open port names the very address it is open on) and the folder of the snapshot the report came from, which carries the user's home directory.
+# The load balancer name becomes a name made from its hash, so two load balancers stay two and a summary that joins on the address still joins.
+ALWAYS: list = [
+    (r"[A-Za-z0-9-]+\.elb\.[a-z0-9-]+\.amazonaws\.com", lambda m: "lb-" + hashlib.sha256(m.group(0).lower().encode()).hexdigest()[:10] + ".elb.example.com"),
+    # what the AWS Load Balancer Controller names a load balancer or a target group: k8s-<first 8 of the namespace>-<first 8 of the name>-<10 hex>.
+    # The two cut names are real ones a word rule of the map cannot match (`prodshop`, `checkout`); the hash stays, so two resources stay apart.
+    (r"\bk8s-(?:[a-z0-9]+-){1,3}([0-9a-f]{10})\b", r"k8s-lb-\1"),  # one part when the load balancer was given a name, more when a namespace carries a hyphen
+    (r"(?:/Users|/home)/[^/\s`]+/\.kubegap[A-Za-z0-9._-]*/snapshots/[^/\s`]+/", "~/.kubegap/snapshots/<context>/"),
+]
+
+
+def build(spec: dict) -> list:
+    rules: list = ALWAYS + [(p, r) for p, r in spec.get("rules") or []]
     domains = spec.get("domains") or {}
     for d in sorted(domains, key=len, reverse=True):
         rules.append((rf"(?<![A-Za-z0-9-]){re.escape(d)}(?![A-Za-z0-9-])", domains[d]))

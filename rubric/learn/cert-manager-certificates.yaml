@@ -1,0 +1,93 @@
+# What a report teaches when a cert-manager Certificate or its issuer is not Ready, close to expiry, or issued by a staging CA. Every page below was
+# opened and read (2026-11-14).
+topic: cert-manager-certificates
+checks: [certmanager.certificate-not-ready, certmanager.certificate-expiring, certmanager.issuer-not-ready, certmanager.staging-issuer-in-prod]
+mechanism: >
+  A Certificate is a request that cert-manager keeps fulfilled. It generates a private key and a CertificateRequest, has the referenced Issuer or
+  ClusterIssuer sign it, and stores the signed certificate and the key in the Secret the Certificate names. The default duration is 90 days, and
+  unless renewBefore is set the renewal is attempted two thirds of the way through the actual duration, which for a 90 day certificate is 30 days
+  before it expires. The time is written to status.renewalTime. A certificate inside its last 30 days is therefore at the end of a normal cycle; a
+  renewalTime that has passed with no new certificate means renewal is failing.
+
+
+  With an ACME issuer such as Let's Encrypt, cert-manager creates an Order and one Challenge per domain. Before it presents a challenge to the ACME
+  server it runs a self-check of its own, so that DNS or load balancer propagation does not produce failed validations at the CA. A failed issuance
+  is retried: ephemeral failures within minutes, terminal ones after an exponentially increasing delay of 1 to 32 hours by default. Let's Encrypt
+  limits how often this can go on: 5 authorization failures per identifier per account every hour, 5 certificates for the exact same set of names
+  every 7 days, 50 certificates per registered domain every 7 days.
+
+
+  Every Certificate needs a referenced issuer that is in a ready condition before cert-manager attempts the request. An Issuer serves one namespace,
+  a ClusterIssuer all of them, so a ClusterIssuer that is not ready stops issuance and renewal for every Certificate that points at it, and nothing
+  is visible to users until the certificates already issued run out.
+
+
+  The Let's Encrypt staging environment exists for testing. Its root certificates are not present in browser or client trust stores, so a
+  certificate issued by a staging issuer is valid and Ready for cert-manager and rejected by every browser. Changing issuerRef on the Certificate
+  is one of the spec changes that makes cert-manager issue again.
+
+
+  While a Certificate is not Ready, what clients get depends on the Secret: if a previous certificate is still valid the ingress controller may
+  keep serving it; if there never was one, the ingress answers with its default certificate.
+sources:
+  - { title: "cert-manager: Certificate resource", url: "https://cert-manager.io/docs/usage/certificate/" }
+  - { title: "cert-manager: Certificate concept", url: "https://cert-manager.io/docs/concepts/certificate/" }
+  - { title: "cert-manager: Issuer concept", url: "https://cert-manager.io/docs/concepts/issuer/" }
+  - { title: "cert-manager: FAQ", url: "https://cert-manager.io/docs/faq/" }
+  - { title: "cert-manager: Troubleshooting ACME certificates", url: "https://cert-manager.io/docs/troubleshooting/acme/" }
+  - { title: "Let's Encrypt: Rate Limits", url: "https://letsencrypt.org/docs/rate-limits/" }
+  - { title: "Let's Encrypt: Staging Environment", url: "https://letsencrypt.org/docs/staging-environment/" }
+  - { title: "cert-manager-mixin: certificate alerts", url: "https://raw.githubusercontent.com/imusmanmalik/cert-manager-mixin/main/alerts/certificates.libsonnet" }
+detect:
+  - kind: alert
+    what: >
+      A Certificate that has not been Ready for ten minutes. cert-manager serves its metrics on port 9402; the community cert-manager-mixin ships
+      this rule as CertManagerCertNotReady with severity critical.
+    example: |
+      - alert: CertManagerCertNotReady
+        expr: certmanager_certificate_ready_status{condition!="True"} == 1
+        for: 10m
+  - kind: alert
+    what: >
+      A certificate that should already have been renewed. The mixin rule CertManagerCertExpirySoon compares
+      certmanager_certificate_expiration_timestamp_seconds with certmanager_certificate_renewal_timestamp_seconds and fires once a fraction (0.3 by
+      default) of the window between renewal time and expiry has passed without a renewal.
+    example: 'certmanager_certificate_expiration_timestamp_seconds - time() < 14 * 86400'
+  - kind: alert
+    what: >
+      cert-manager being refused by the CA for asking too often. The mixin rule CertManagerHittingRateLimits fires on ACME requests answered with
+      HTTP 429; depending on the limit, no certificate can be issued for up to a week.
+    example: 'sum by (host) (rate(certmanager_http_acme_client_request_count{status="429"}[5m])) > 0'
+  - kind: command
+    what: >
+      Why one Certificate is stuck. The reason is on the chain Certificate, CertificateRequest, Order, Challenge; cmctl prints the chain in one go.
+    example: 'cmctl status certificate <name> -n <namespace>'
+solutions:
+  - scale: [small]
+    approach: >
+      Let Prometheus scrape cert-manager through the PodMonitor of the Helm chart and keep one rule, the not-Ready alert. Keep one production
+      ClusterIssuer and use the staging issuer only on a host made for testing, so that a staging certificate on a real host cannot be left behind.
+    tools: [cert-manager, Prometheus]
+    tradeoff: >
+      One alert covers failed first issuance and failed renewal alike, at the price of two Helm values. It says that something is stuck, not why;
+      the reason still has to be read from the Order and the Challenge.
+    example: |
+      prometheus:
+        enabled: true
+        podmonitor:
+          enabled: true
+  - scale: [medium, large]
+    approach: >
+      Install the cert-manager-mixin: the three alerts above and its Grafana dashboard. Add a probe from outside for the hosts that matter, so that
+      the certificate a client actually receives is watched as well as the object in the cluster.
+    tools: [cert-manager-mixin, Grafana, blackbox_exporter]
+    tradeoff: >
+      Failing renewal, an exhausted rate limit and a wrong certificate on the wire each raise their own alert with weeks to spare. The mixin is
+      Jsonnet that has to be rendered and kept up to date, and the probe needs a target list that follows the ingresses.
+cases: []
+reading:
+  - { title: "cert-manager: Troubleshooting ACME certificates", url: "https://cert-manager.io/docs/troubleshooting/acme/", why: "How to walk from a stuck Certificate down to the Order and the Challenge, with the messages each failure leaves." }
+  - { title: "cert-manager: FAQ", url: "https://cert-manager.io/docs/faq/", why: "What triggers a new issuance, when a failed one is retried and how renewal time is computed." }
+  - { title: "Let's Encrypt: Rate Limits", url: "https://letsencrypt.org/docs/rate-limits/", why: "The limits a retry loop runs into, and which of them cannot be raised." }
+  - { title: "cert-manager-mixin", url: "https://github.com/imusmanmalik/cert-manager-mixin", why: "Ready-made alert rules and a dashboard for the metrics cert-manager exports." }
+  - { title: "cert-manager: Prometheus metrics", url: "https://cert-manager.io/docs/devops-tips/prometheus-metrics/", why: "How the metrics endpoint is scraped, with the PodMonitor values of the Helm chart." }

@@ -1,0 +1,115 @@
+# What a report teaches when MetalLB has assigned a Service address that the network outside the cluster cannot reach. Every page below was opened and read (2026-11-14).
+topic: metallb-announcement
+checks: [traffic.metallb-speaker-not-ready, traffic.metallb-config-stale, traffic.metallb-service-ip-not-announced, traffic.metallb-bgp-session-down]
+mechanism: >
+  MetalLB does two separate jobs, and a Service can have the first without the second. The controller assigns an address from an IPAddressPool and
+  writes it into the Service. The speakers then have to make the network beyond the cluster aware that the address lives in the
+  cluster, with ARP or NDP in layer 2 mode or with BGP. The Service shows an external IP as soon as the first job is done.
+
+
+  Announcing needs its own object. An L2Advertisement or a BGPAdvertisement must be associated with the pool; one without a pool selector applies to
+  every pool, one that names other pools leaves this pool unannounced. A speaker also does not announce a Service with externalTrafficPolicy Local
+  when no endpoint runs on its node.
+
+
+  In layer 2 mode a single node answers ARP for the address and kube-proxy spreads the traffic from there, so the ingress bandwidth of a Service is
+  that of one node. It is a failover mechanism, not load balancing: the speakers detect a failed node through memberlist and another node takes the
+  address over, which most clients follow within a few seconds. A node without a speaker cannot take over.
+
+
+  In BGP mode every node holds a session with the routers and advertises the Service addresses; the router learns them only through that session.
+  When a session drops, the router removes that node and rehashes the flows, and connections that land on another node break with a reset. With one
+  peer, a down session means no route at all, while the Services still hold their addresses.
+
+
+  MetalLB validates its configuration as a whole. When a change is invalid it marks the configuration as stale and keeps working with the last valid
+  one, so a widened pool or a new advertisement silently does not apply. The speaker reports this in metallb_k8s_client_config_stale_bool.
+sources:
+  - { title: "MetalLB: Concepts", url: "https://metallb.io/concepts/" }
+  - { title: "MetalLB in layer 2 mode", url: "https://metallb.io/concepts/layer2/" }
+  - { title: "MetalLB in BGP mode", url: "https://metallb.io/concepts/bgp/" }
+  - { title: "MetalLB: Configuration", url: "https://metallb.io/configuration/" }
+  - { title: "MetalLB: Troubleshooting", url: "https://metallb.io/troubleshooting/" }
+  - { title: "MetalLB: Prometheus metrics", url: "https://metallb.io/prometheus-metrics/" }
+detect:
+  - kind: alert
+    what: >
+      A configuration that was rejected and is not in effect. The gauge is 1 while MetalLB runs on a stale configuration because the latest one
+      failed to load.
+    example: |
+      - alert: MetalLBConfigStale
+        expr: metallb_k8s_client_config_stale_bool == 1
+        for: 5m
+  - kind: alert
+    what: >
+      A BGP session that is not up, per speaker and peer. Native mode exports metallb_bgp_session_up, FRR-K8s mode exports frrk8s_bgp_session_up;
+      1 is up, 0 is down.
+    example: 'metallb_bgp_session_up == 0 or frrk8s_bgp_session_up == 0'
+  - kind: metric
+    what: >
+      How full each pool is, and how many prefixes each session advertises (metallb_bgp_announced_prefixes_total,
+      frrk8s_bgp_announced_prefixes_total).
+    example: 'metallb_allocator_addresses_in_use_total / metallb_allocator_addresses_total'
+  - kind: metric
+    what: Whether a speaker pod is Ready on every node that should announce, from kube-state-metrics.
+    example: 'sum(kube_pod_status_ready{namespace="metallb-system", pod=~"speaker.*", condition="true"})'
+  - kind: command
+    what: >
+      Which node answers for an address in layer 2 mode, from a host on the same subnet. Pinging the Service address does not work as a test; the
+      Events of the Service show "announcing from node".
+    example: 'arping <loadbalancer ip>'
+solutions:
+  - scale: [small]
+    approach: >
+      Layer 2 mode with one pool and one L2Advertisement that selects no pool, so it applies to every pool and a pool added later is announced too.
+      Let the speaker run on every node that may carry traffic, and alert on the stale-configuration gauge.
+    tools: [MetalLB, Prometheus]
+    tradeoff: >
+      Nothing is needed from the router and any Ethernet network works. All traffic of a Service enters through one node, and when that node fails
+      the address is unreachable for the seconds the takeover and the clients' neighbour caches need.
+    example: |
+      apiVersion: metallb.io/v1beta1
+      kind: IPAddressPool
+      metadata:
+        name: first-pool
+        namespace: metallb-system
+      spec:
+        addresses:
+          - 192.168.1.240-192.168.1.250
+      # a second object, in its own document
+      apiVersion: metallb.io/v1beta1
+      kind: L2Advertisement
+      metadata:
+        name: example
+        namespace: metallb-system
+  - scale: [medium, large]
+    approach: >
+      BGP mode with the FRR-K8s backend, a BGPPeer for each of two routers so that one session down leaves a route, a BFDProfile on the peers for
+      faster failure detection, and an alert on every session. Scrape MetalLB with the ServiceMonitor of its manifests or Helm values.
+    tools: [MetalLB, FRR-K8s, BFD, Prometheus]
+    tradeoff: >
+      Routers spread connections over the nodes and a dead node is withdrawn by the routing protocol. It needs routers that speak BGP and someone
+      who configures them, and every change in the set of nodes rehashes flows, so existing connections can be reset once; resilient ECMP on the
+      router, pinning Services to nodes or client retries soften that. BFD exists only in the FRR-based modes.
+    example: |
+      apiVersion: metallb.io/v1beta2
+      kind: BGPPeer
+      metadata:
+        name: sample
+        namespace: metallb-system
+      spec:
+        myASN: 64500
+        peerASN: 64501
+        peerAddress: 10.0.0.1
+      # a second object, in its own document
+      apiVersion: metallb.io/v1beta1
+      kind: BGPAdvertisement
+      metadata:
+        name: example
+        namespace: metallb-system
+cases: []
+reading:
+  - { title: "MetalLB: Troubleshooting", url: "https://metallb.io/troubleshooting/", why: "The order to look in: assignment in the controller, announcement in the speakers, then the session or the ARP answer." }
+  - { title: "MetalLB in layer 2 mode", url: "https://metallb.io/concepts/layer2/", why: "Why layer 2 mode is failover and not load balancing, and what a client sees during a takeover." }
+  - { title: "MetalLB in BGP mode", url: "https://metallb.io/concepts/bgp/", why: "What a router does with the sessions and why a backend change resets connections." }
+  - { title: "MetalLB: Prometheus metrics", url: "https://metallb.io/prometheus-metrics/", why: "The metric names of each BGP backend and the manifests that expose them to Prometheus." }

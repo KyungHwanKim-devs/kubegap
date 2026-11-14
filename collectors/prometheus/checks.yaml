@@ -21,11 +21,10 @@
   cases:
     - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-25-prometheus-on-live-cluster-down.html }
     - { who: Saifeddine Rajhi 2024, url: https://seifrajhi.github.io/blog/prometheus-manage-memory-overload/ }
-  suggest: "Raise the limit (head series × about 8KB + compaction headroom) or reduce cardinality (prometheus.cardinality). Precompute long-range Grafana panels with recording rules."
+  suggest: "Raise the limit (about 2GiB per million head series for cardinality plus about 2.5GiB per million for ingestion at a 15s scrape interval, https://www.robustperception.io/how-much-ram-does-prometheus-2-x-need-for-cardinality-and-ingestion/, with headroom for compaction and queries) or reduce cardinality (prometheus.cardinality). Precompute long-range Grafana panels with recording rules."
   verify:
     - "kubectl -n monitoring top pod -l app.kubernetes.io/name=prometheus --containers"
     - "kubectl -n monitoring get pod -l app.kubernetes.io/name=prometheus -o jsonpath='{.items[*].status.containerStatuses[?(@.name==\"prometheus\")].lastState}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -474,7 +473,6 @@
   verify:
     - "kubectl -n monitoring exec prometheus-kube-prometheus-stack-prometheus-0 -c prometheus -- df -h /prometheus"
     - "kubectl -n monitoring get pvc"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1019,7 +1017,7 @@
     expr: "(item['head_series'] or 0) >= 2000000"
     warn_expr: "((item['head_series'] or 0) >= 1000000 or (item['top_metric_share'] or 0) >= 0.25)"
   target: "item['target']"
-  evidence: "f\"active series {item['head_series']} (label pairs {item['label_pairs']}), top metrics {[(x['name'], x['series']) for x in (item['top_metrics'] or [])[:5]]}, share of the top metric {item['top_metric_share']}, histogram bucket series among the top 10 {item['top10_bucket_series']}, labels with many values {item['top_labels_by_values']}\""
+  evidence: "f\"active series {item['head_series']} (label pairs {item['label_pairs']}), top metrics {shown([(x['name'], x['series']) for x in (item['top_metrics'] or [])], 5)}, share of the top metric {item['top_metric_share']}, histogram bucket series among the top 10 {item['top10_bucket_series']}, labels with many values {item['top_labels_by_values']}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -1031,7 +1029,6 @@
   suggest: "Drop unused _bucket series with metricRelabelings on the ServiceMonitors (kube-apiserver, kube-etcd). If an app metric is at the top, remove IDs and URLs from its labels. Check the top metrics each time via /api/v1/status/tsdb."
   verify:
     - "kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090 & curl -s localhost:9090/api/v1/status/tsdb | jq '.data.seriesCountByMetricName[:10]'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1472,6 +1469,7 @@
   target: "item['target']"
   evidence: "f\"jobs exceeding half their own scrape interval {item['slow_scrape_jobs']} (most common interval {round(item['scrape_interval_s'] or 0)}s), slowest {item['scrape_top']}, scrapes dropped for exceeding sampleLimit in the last hour {item['sample_limit_exceeded_1h']}, targets failing on it now {item['sample_limit_targets']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: >
     A scrape that exceeds sampleLimit drops all metrics of that target (not a partial store) — alerts for that job go silent. A scrape that takes more than half the interval means the target is overloaded or the response is too large, and it will soon hit the timeout (10s by default).
@@ -1481,7 +1479,6 @@
   suggest: "For slow targets, check the response size (curl -w %{size_download}) and trim with metricRelabelings or raise scrapeTimeout. For sampleLimit exceeded, raise sampleLimit on that ServiceMonitor or reduce the metrics."
   verify:
     - "curl -s localhost:9090/api/v1/query --data-urlencode 'query=topk(10, scrape_duration_seconds)'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1829,7 +1826,6 @@
   suggest: "For heavy groups, raise the interval (1m) or split the query into recording rules. If the CPU limit is tight (500m), raise it."
   verify:
     - "curl -s localhost:9090/api/v1/rules | jq '[.data.groups[] | {name, interval, lastEvaluation, evaluationTime}] | sort_by(-.evaluationTime)[:5]'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2270,6 +2266,7 @@
   target: "item['target']"
   evidence: "f\"notifications dropped over 24 hours {item['notifications_dropped_1d']}, send errors per Alertmanager address {item['notifications_errors_1d']}, last config reload successful {item['reload_success']} (config time {item['last_config_time']})\""
   severity_default: high
+  nature: occurrence
   symptom_linked: false
   why: >
     If a firing rule cannot reach Alertmanager, nobody finds out. dropped means the send queue overflowed (Alertmanager was down for a long time); errors means failures to a specific Alertmanager address (an Alertmanager restart, the network, or one of the configured addresses is dead). A reload failure means a new PrometheusRule has a syntax error and the old rules keep running.
@@ -2278,7 +2275,6 @@
   suggest: "Check the Alertmanager pod status and the 'Error sending alert' lines in the Prometheus log. For reload failures, check the rule validation errors in the prometheus-operator log."
   verify:
     - "curl -s localhost:9090/api/v1/alertmanagers | jq '.data'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2732,7 +2728,7 @@
   suggest: "prometheus.prometheusSpec.replicas: 2 + podAntiAffinity. For long-term retention, a Thanos sidecar."
   verify:
     - "kubectl -n monitoring get prometheus -o jsonpath='{.items[*].spec.replicas}'"
-  profiles: [prod]
+  scales: [medium, large]
   test:
     cases:
       - expect: "warn"
@@ -2968,7 +2964,6 @@
   suggest: "Upgrade the kube-prometheus-stack chart (Prometheus 3.x needs chart 66+). If staying on 2.x, at least 2.53 LTS."
   verify:
     - "curl -s localhost:9090/api/v1/status/buildinfo | jq .data.version"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

@@ -1,0 +1,112 @@
+# What a report teaches when the cluster DNS has no spare replica, answers SERVFAIL, panics or runs on an old Corefile. Every page below was opened and read (2026-11-14).
+topic: coredns-cluster-dns
+checks: [coredns.availability, traffic.coredns-servfail, coredns.panic-or-reload-failed]
+mechanism: >
+  The kubelet writes a resolv.conf into every pod that names one nameserver, the cluster DNS Service, with a search list and ndots:5. Pods reach that
+  one ClusterIP, kube-proxy translates it to a CoreDNS pod, and every name a workload resolves, internal or external, goes through those pods. The
+  search list multiplies the work: a name is tried with the search suffixes, so one external lookup becomes several queries.
+
+
+  That makes CoreDNS a dependency of everything at once. With one replica, or with all replicas on one node, the loss of that node or a restart of
+  that pod takes name resolution away from the whole cluster. Clients do not fail fast: a dropped UDP query is retried, and DNS timeouts usually
+  last up to 30 seconds (three retries with a 10 second timeout).
+
+
+  The default Corefile shows where failures come from. `forward . /etc/resolv.conf` sends every name outside the cluster domain to the resolvers of
+  the node. forward health-checks an upstream every 0.5 seconds once it has failed twice, and when all upstreams are down it assumes the health check
+  itself is broken and tries a random upstream, which may or may not answer. `loop` halts CoreDNS at startup when its own probe comes back: a node
+  whose resolv.conf lists 127.0.0.53 (systemd-resolved) makes CoreDNS forward to itself, and the pod goes into CrashLoopBackOff.
+
+
+  `reload` reads the Corefile every 30 seconds and compares its checksum; Kubernetes says to allow two minutes after an edit of the ConfigMap. When
+  the new Corefile has an error, CoreDNS keeps running the old configuration, logs the error and counts it in coredns_reload_failed_total. Nothing
+  else changes, so an edit that looks applied is not. A reload that moves a listener to a port it cannot bind leaves the old process without that
+  listener, which can break the health endpoint. Panics in a plugin are counted in coredns_panics_total.
+sources:
+  - { title: "Kubernetes: DNS for Services and Pods", url: "https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/" }
+  - { title: "Kubernetes: Customizing DNS Service", url: "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/" }
+  - { title: "Kubernetes: Using NodeLocal DNSCache in Kubernetes Clusters", url: "https://kubernetes.io/docs/tasks/administer-cluster/nodelocaldns/" }
+  - { title: "CoreDNS: forward plugin", url: "https://coredns.io/plugins/forward/" }
+  - { title: "CoreDNS: loop plugin", url: "https://coredns.io/plugins/loop/" }
+  - { title: "CoreDNS: reload plugin", url: "https://coredns.io/plugins/reload/" }
+  - { title: "CoreDNS: prometheus (metrics) plugin", url: "https://coredns.io/plugins/metrics/" }
+detect:
+  - kind: alert
+    what: >
+      The share of SERVFAIL among all responses. coredns_dns_responses_total carries the response code and the plugin that answered, so the same
+      series shows whether the failures come from forward (upstream) or from inside.
+    example: |
+      - alert: CoreDNSServfailRatioHigh
+        expr: sum(rate(coredns_dns_responses_total{rcode="SERVFAIL"}[5m])) / sum(rate(coredns_dns_responses_total[5m])) > 0.01
+        for: 10m
+  - kind: alert
+    what: >
+      A Corefile that was edited and not applied, or a plugin that panicked. Both counters are zero in a healthy cluster, so any increase is the
+      signal.
+    example: 'increase(coredns_reload_failed_total[1h]) > 0 or increase(coredns_panics_total[1h]) > 0'
+  - kind: metric
+    what: >
+      Upstream health and latency: forward exports coredns_forward_healthcheck_broken_total and coredns_proxy_healthcheck_failures_total, and the
+      request duration histogram shows the tail that applications feel.
+    example: 'histogram_quantile(0.99, sum by (le) (rate(coredns_dns_request_duration_seconds_bucket[5m])))'
+  - kind: metric
+    what: >
+      How many CoreDNS pods are Ready and how many disruptions the PodDisruptionBudget allows, from kube-state-metrics. One Ready pod, or zero
+      allowed disruptions with two pods on one node, is the state before the outage.
+    example: 'sum(kube_pod_status_ready{namespace="kube-system", pod=~"coredns.*", condition="true"})'
+  - kind: command
+    what: Which node each replica runs on, the one thing the metrics above do not show directly.
+    example: 'kubectl get pods -n kube-system -l k8s-app=kube-dns -o wide'
+solutions:
+  - scale: [small]
+    approach: >
+      On a cluster with two or more nodes, run two replicas that may not share a node and give them a PodDisruptionBudget. On k3s the packaged
+      CoreDNS manifest is managed by k3s and rewritten at every start, so the supported way to change the Deployment is to start the servers with
+      --disable=coredns and install CoreDNS yourself. On a single-node cluster a second replica protects nothing; accept it and alert on the
+      SERVFAIL ratio and the reload counter.
+    tools: [CoreDNS, "k3s --disable=coredns", PodDisruptionBudget]
+    tradeoff: >
+      A node can be lost or drained without a cluster-wide DNS gap, for one more small pod. Replacing the packaged k3s component means its upgrades
+      become yours.
+    example: |
+      # Deployment coredns
+      spec:
+        replicas: 2
+        template:
+          spec:
+            affinity:
+              podAntiAffinity:
+                requiredDuringSchedulingIgnoredDuringExecution:
+                  - topologyKey: kubernetes.io/hostname
+                    labelSelector:
+                      matchLabels: { k8s-app: kube-dns }
+  - scale: [medium, large]
+    approach: >
+      Size the replicas from the cluster with cluster-proportional-autoscaler (replicas = the larger of cores / coresPerReplica and nodes /
+      nodesPerReplica, with preventSinglePointFailure), and put NodeLocal DNSCache on every node so pods ask a cache on their own node, which skips
+      the DNAT and conntrack entry of the Service and can talk to CoreDNS over TCP. Alert on SERVFAIL, reload failures and panics from a place that does
+      not need the cluster's own DNS to deliver the page.
+    tools: [cluster-proportional-autoscaler, "NodeLocal DNSCache", Prometheus]
+    tradeoff: >
+      Query load is spread and one application can no longer starve everyone else's lookups as easily. NodeLocal DNSCache is one more DaemonSet on
+      every node to run and upgrade, and the autoscaler follows cluster size, not query rate.
+    example: |
+      linear: '{"coresPerReplica":256,"nodesPerReplica":16,"min":2,"preventSinglePointFailure":true}'
+cases:
+  - company: Zalando
+    year: 2019
+    url: "https://github.com/zalando-incubator/kubernetes-on-aws/blob/dev/docs/postmortems/jan-2019-dns-outage.md"
+    summary: >
+      A retry storm in one application raised the DNS query rate. The CoreDNS pods reached their memory limit of 100Mi, were OOM killed and kept
+      being killed under the load, which was a total DNS outage for the cluster. Fashion store pages returned errors for over an hour, and the
+      in-cluster monitoring failed with DNS, which delayed the page to the on-call engineer. ndots 5 and a client without DNS caching multiplied the
+      queries.
+    match: >
+      Every workload resolves through the same few CoreDNS pods, so when they are all down at once the whole cluster fails together, including the
+      alerting that depended on it.
+reading:
+  - { title: "Kubernetes: Customizing DNS Service", url: "https://kubernetes.io/docs/tasks/administer-cluster/dns-custom-nameservers/", why: "The default Corefile line by line, and how upstream resolvers and stub domains are set." }
+  - { title: "CoreDNS: reload plugin", url: "https://coredns.io/plugins/reload/", why: "What a failed reload leaves running and the metric that records it." }
+  - { title: "Kubernetes: Using NodeLocal DNSCache in Kubernetes Clusters", url: "https://kubernetes.io/docs/tasks/administer-cluster/nodelocaldns/", why: "Why a per-node cache removes the conntrack races and long UDP timeouts of cluster DNS." }
+  - { title: "Kubernetes: Autoscale the DNS Service in a Cluster", url: "https://kubernetes.io/docs/tasks/administer-cluster/dns-horizontal-autoscaling/", why: "The formula and parameters of the proportional autoscaler for the DNS Deployment." }
+  - { title: "Zalando: January 2019 DNS outage postmortem", url: "https://github.com/zalando-incubator/kubernetes-on-aws/blob/dev/docs/postmortems/jan-2019-dns-outage.md", why: "How one application's lookups took cluster DNS down and what the team changed afterwards." }

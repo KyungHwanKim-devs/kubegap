@@ -2,7 +2,7 @@
 - id: ecr.scan-disabled
   name: ECR image vulnerability scanning disabled (no scanOnPush, no registry scan rules)
   area: security
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -10,7 +10,7 @@
     expr: "len(item['repos_scan_off_prod']) > 0 and not item['registry_scan_on_push']"
     warn_expr: "len(item['repos_scan_off']) > 0 and not item['registry_scan_on_push']"
   target: "'ecr/registry/' + str(item['account'])"
-  evidence: "f\"registry scanning {item['scan_type']} (rules {item['scan_rules']}), repositories with scanOnPush off {len(item['repos_scan_off'])}/{item['repositories']} (used by prod {len(item['repos_scan_off_prod'])}: {item['repos_scan_off_prod'][:6]}…), scanned images {item['images_scanned']}/{item['images']}, CRITICAL+HIGH {item['critical_high_findings']}\""
+  evidence: "f\"registry scanning {item['scan_type']} (rules {item['scan_rules']}), repositories with scanOnPush off {len(item['repos_scan_off'])}/{item['repositories']} (used by prod {len(item['repos_scan_off_prod'])}: {shown(item['repos_scan_off_prod'], 6)}), scanned images {item['images_scanned']}/{item['images']}, CRITICAL+HIGH {item['critical_high_findings']}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -21,7 +21,7 @@
   verify:
     - "aws ecr get-registry-scanning-configuration"
     - "aws ecr describe-repositories --query 'repositories[?imageScanningConfiguration.scanOnPush==`false`].repositoryName'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -746,14 +746,14 @@
 - id: ecr.tag-mutable-prod
   name: ECR repositories used by prod have mutable tags (a different image can be pushed under the same tag)
   area: security
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
   rule:
     warn_expr: "len(item['repos_mutable_prod']) > 0"
   target: "'ecr/registry/' + str(item['account'])"
-  evidence: "f\"MUTABLE repositories {len(item['repos_mutable'])}/{item['repositories']}, used by prod {len(item['repos_mutable_prod'])}: {item['repos_mutable_prod'][:8]}…, digest-pinned containers {item['digest_pinned']}/{item['images_in_use']}, repositories with a latest tag {item['repos_with_latest_tag']}\""
+  evidence: "f\"MUTABLE repositories {len(item['repos_mutable'])}/{item['repositories']}, used by prod {len(item['repos_mutable_prod'])}: {shown(item['repos_mutable_prod'], 8)}, digest-pinned containers {item['digest_pinned']}/{item['images_in_use']}, repositories with a latest tag {item['repos_with_latest_tag']}\""
   severity_default: low
   symptom_linked: false
   why: >
@@ -763,7 +763,7 @@
   suggest: "aws ecr put-image-tag-mutability --repository-name <r> --image-tag-mutability IMMUTABLE (CI re-pushing the same tag will fail, so put the git sha in the tag). In Terraform, image_tag_mutability."
   verify:
     - "aws ecr describe-repositories --query 'repositories[?imageTagMutability==`MUTABLE`].repositoryName'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -1147,7 +1147,7 @@
 - id: ecr.no-lifecycle-policy
   name: ECR repositories without a lifecycle policy (images accumulate forever)
   area: cost
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -1165,7 +1165,7 @@
   suggest: "Attach the same policy to those repositories (aws ecr put-lifecycle-policy). With a Terraform module, make lifecycle_policy the default."
   verify:
     - "for r in $(aws ecr describe-repositories --query 'repositories[].repositoryName' --output text); do aws ecr get-lifecycle-policy --repository-name $r >/dev/null 2>&1 || echo no-policy $r; done"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1773,7 +1773,7 @@
 - id: ecr.stale-storage
   name: Images accumulating in repositories not pulled for more than 90 days (storage that only costs money)
   area: cost
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -1791,7 +1791,7 @@
   suggest: "Confirm with the owner and delete repositories with no pull history, or cut their lifecycle to 'latest 5 only'. For large repositories such as ML images, reduce the retained count from 30 to 10."
   verify:
     - "aws ecr describe-images --repository-name <r> --query 'max_by(imageDetails, &lastRecordedPullTime).lastRecordedPullTime'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -2605,14 +2605,14 @@
 - id: ecr.dockerhub-dependency
   name: Cluster pulls Docker Hub images directly with no pull-through cache (rate limits, outage propagation)
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
   rule:
     warn_expr: "(item['dockerhub_images'] or 0) >= 5 and len(item['pull_through_cache_rules']) == 0"
   target: "'ecr/registry/' + str(item['account'])"
-  evidence: "f\"registry distribution of container images {item['images_by_registry']}, docker.io images {item['dockerhub_images']} (e.g. {item['dockerhub_sample'][:4]}), pull-through cache rules {item['pull_through_cache_rules']}, replication rules {item['replication_rules']}\""
+  evidence: "f\"registry distribution of container images {item['images_by_registry']}, docker.io images {item['dockerhub_images']} (e.g. {shown(item['dockerhub_sample'], 4)}), pull-through cache rules {item['pull_through_cache_rules']}, replication rules {item['replication_rules']}\""
   severity_default: medium
   symptom_linked: false
   why: >
@@ -2627,7 +2627,7 @@
   verify:
     - "aws ecr describe-pull-through-cache-rules"
     - "kubectl get pods -A -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{\"\\n\"}{end}{end}' | grep -vE '^[0-9]+\\.dkr\\.ecr|^public\\.ecr|^registry\\.k8s|^quay|^ghcr' | sort -u"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -3240,7 +3240,7 @@
 - id: ecr.pull-failures
   name: Image pull failure events (ErrImagePull, BackOff)
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -3252,6 +3252,7 @@
   target: "'cluster'"
   evidence: "f\"image pull failure events within the event retention window {item['pull_failure_events']}, targets {item['pull_failure_targets']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     A pull failure is one of four things: registry authentication (ECR token expiring after 12 hours, IRSA permissions), missing tag (CI has not pushed yet), rate limit (Docker Hub) or network (NAT, no VPC endpoint). kubelet's PullImage metrics are dropped by the default kube-prometheus-stack configuration, so only events (1-hour retention) are used — 0 does not mean "none happened".
@@ -3265,7 +3266,7 @@
   suggest: "Classify by the message in the Events of kubectl describe pod <pod> (401 Unauthorized, manifest unknown, toomanyrequests, i/o timeout)."
   verify:
     - "kubectl get events -A --field-selector reason=Failed | grep -i pull"
-  profiles: [prod]  # ECR is an EKS-only collector (the selftest caught this during clone validation)
+  platforms: [eks]  # ECR is an EKS-only collector (the selftest caught this during clone validation)
   test:
     cases:
       - expect: "fail"
@@ -3879,7 +3880,7 @@
 - id: ecr.no-replication
   name: No ECR replication rules (a region outage takes the images with it)
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -3896,7 +3897,7 @@
   suggest: "If a DR region is defined, replicate only the prod repositories with aws ecr put-replication-configuration (repositoryFilters). Otherwise write 'single-region dependency' in the report."
   verify:
     - "aws ecr describe-registry"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -4457,7 +4458,7 @@
 - id: ecr.untagged-images
   name: Untagged images accumulating (no lifecycle untagged rule, or too loose)
   area: cost
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -4474,7 +4475,7 @@
   suggest: "Confirm the lifecycle untagged rule, and note in the report that multi-arch child manifests are normal. Judge actual space by GiB per repository."
   verify:
     - "aws ecr list-images --repository-name <r> --filter tagStatus=UNTAGGED --query 'length(imageIds)'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"

@@ -1,0 +1,106 @@
+# What a report teaches when an Argo CD Application with automatic pruning manages a Namespace or a CRD. Every page below was opened and read (2026-11-14).
+topic: argocd-prune-namespace-crd
+checks: [argocd.prune-manages-namespace-or-crd]
+mechanism: >
+  Automated sync in Argo CD does not delete anything by default: when a resource is no longer defined in Git, it stays in the cluster. Setting
+  prune: true in the automated sync policy changes that. From then on a resource that disappears from what Argo CD renders from Git is deleted from
+  the cluster during the next sync, and extraneous resources are pruned with the foreground deletion policy.
+
+
+  "Disappears from Git" covers more than a deliberate removal. A directory that is moved, a resource that is renamed, a generator or a template that
+  renders a different name all look the same to Argo CD: the old object is no longer among the target resources. The one built-in protection is
+  narrow: automated sync with prune refuses to sync when there are no target resources at all (unless allowEmpty is set). An application that still
+  renders some resources, only not the Namespace, passes it.
+
+
+  For most kinds the damage of a wrong prune is one object. Two kinds are containers. Deleting a Namespace deletes everything under it, asynchronously,
+  while the Namespace sits in Terminating and accepts no new objects. Deleting a CustomResourceDefinition makes the API server uninstall the endpoint
+  and delete all custom objects stored in it; recreating the definition starts out empty. So when a Namespace or a CRD is one of the resources an
+  Application tracks, one missing manifest removes every workload, Secret and PersistentVolumeClaim in that Namespace, or every object of that kind in
+  the cluster.
+
+
+  A Namespace that Argo CD creates through the sync option CreateNamespace=true is different: it is normally not tracked, so it is not pruned.
+  Deleting the Application itself is a second path with the same end. With the finalizer resources-finalizer.argocd.argoproj.io the controller
+  performs a cascading delete of the Application's resources, and in the App of Apps pattern that finalizer is what makes deleting a parent delete
+  the children's resources.
+sources:
+  - { title: "Argo CD: Automated Sync Policy", url: "https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/" }
+  - { title: "Argo CD: Sync Options", url: "https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/" }
+  - { title: "Argo CD: App Deletion", url: "https://argo-cd.readthedocs.io/en/stable/user-guide/app_deletion/" }
+  - { title: "Kubernetes: Share a Cluster with Namespaces", url: "https://kubernetes.io/docs/tasks/administer-cluster/namespaces/" }
+  - { title: "Kubernetes: Extend the Kubernetes API with CustomResourceDefinitions", url: "https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/" }
+detect:
+  - kind: metric
+    what: >
+      The application controller exports argocd_app_info with the labels sync_status and health_status, and argocd_app_sync_total with a phase label.
+      There is no metric for pruned resources. What the metrics show is the after-effect of the protection: a resource annotated Prune=false that
+      Argo CD wants to prune leaves the application out of sync, so an application that stays OutOfSync is the signal to look at.
+    example: 'argocd_app_info{sync_status="OutOfSync"}'
+  - kind: alert
+    what: >
+      An application that stays out of sync longer than a normal rollout takes. With Prune=false or Prune=confirm on Namespaces this is how a skipped
+      or waiting deletion becomes visible to a person.
+    example: |
+      - alert: ArgoAppOutOfSync
+        expr: argocd_app_info{sync_status="OutOfSync"} == 1
+        for: 30m
+  - kind: command
+    what: Which applications with automatic pruning track a Namespace or a CustomResourceDefinition as one of their resources.
+    example: >-
+      kubectl get applications.argoproj.io -A -o json | jq -r '.items[] | select(.spec.syncPolicy.automated.prune==true) | .metadata.name as $n |
+      .status.resources[]? | select(.kind=="Namespace" or .kind=="CustomResourceDefinition") | $n+" "+.kind+"/"+.name'
+solutions:
+  - scale: [small]
+    approach: >
+      Take the Namespace out of the manifests and let Argo CD create it with the sync option CreateNamespace=true, or keep the manifest and annotate
+      the Namespace with Prune=false. Do the same for CRDs that hold data you cannot recreate.
+    tools: ["Argo CD"]
+    tradeoff: >
+      A manifest that goes missing no longer deletes the Namespace. The price is that a Namespace you really want gone has to be deleted by hand, and
+      with Prune=false the application shows OutOfSync until someone does it. A Namespace created by CreateNamespace=true is not tracked at all.
+    example: |
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: shop
+        annotations:
+          argocd.argoproj.io/sync-options: Prune=false
+  - scale: [medium, large]
+    approach: >
+      Require a person to confirm the deletion of containers: annotate Namespaces and CRDs with Prune=confirm and Delete=confirm, so that a sync that
+      wants to prune them stays in Syncing until someone approves it. Keep volumes on a StorageClass with reclaimPolicy Retain so that data outlives a
+      deleted claim, and turn on FailOnSharedResource=true so that an application fails before it changes objects that belong to another one.
+    tools: ["Argo CD"]
+    tradeoff: >
+      A wrong render stops at an approval instead of at an outage, and data survives the deletion of its claim. Every intended removal of a Namespace
+      now waits for a person, and retained volumes have to be cleaned up by hand.
+    example: |
+      metadata:
+        annotations:
+          argocd.argoproj.io/sync-options: Prune=confirm,Delete=confirm
+cases:
+  - company: InfluxData
+    url: "https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/"
+    summary: >
+      A pull request added an Argo CD Application and AppProject under a name that already existed. Argo CD applied the file, the new object replaced
+      the existing application, and an entire production environment was deleted; all API endpoints returned 404. Volumes had the reclaim policy
+      Retain, so the data stayed, and service was back just under six hours after the merge. Afterwards the team added Prune=false to stateful
+      resources and to the Namespaces Argo CD manages, and enabled FailOnSharedResource=true.
+    match: A change in what Git renders made Argo CD delete everything an application owned, Namespaces included; what was outside its reach survived.
+  - company: Argo CD issue 28630
+    year: 2026
+    url: "https://github.com/argoproj/argo-cd/issues/28630"
+    summary: >
+      A user reported that shared Namespaces managed by Argo CD were deleted and about 97 applications were left Missing or OutOfSync while the
+      Namespaces terminated. The discussion concluded that the path was a manual sync with force, which replaced (deleted and recreated) a Namespace
+      whose tracking label pointed to another application; Prune=false on the Namespace did not prevent it. The issue was closed as a duplicate of
+      issue 29739.
+    match: >
+      A Namespace tracked as an application resource was deleted with everything in it. The path here was force replace, not prune, which is why
+      Prune=false alone is not the whole protection.
+reading:
+  - { title: "Argo CD: Sync Options", url: "https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/", why: "Prune=false, Prune=confirm, Delete=confirm and CreateNamespace, with what each one leaves in the sync status." }
+  - { title: "Argo CD: Automated Sync Policy", url: "https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/", why: "What automated sync deletes by default, what prune adds and what the empty-application protection covers." }
+  - { title: "InfluxData: Deleting Production in a Few Easy Steps", url: "https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/", why: "A full account of an Argo CD deletion and the list of changes a team made afterwards." }
+  - { title: "Argo CD: App Deletion", url: "https://argo-cd.readthedocs.io/en/stable/user-guide/app_deletion/", why: "When deleting an Application also deletes its resources, and how the finalizer decides it." }

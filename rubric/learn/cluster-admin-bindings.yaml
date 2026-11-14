@@ -1,0 +1,117 @@
+# What a report teaches when cluster-admin is bound to users, groups or ServiceAccounts beyond the system defaults. Every page below was opened and
+# read (2026-11-14).
+topic: cluster-admin-bindings
+checks: [security.cluster-admin-bindings]
+mechanism: >
+  cluster-admin is the super-user ClusterRole: any action on any resource. Bound with a ClusterRoleBinding it gives full control over every resource
+  in the cluster and in all namespaces; bound with a RoleBinding it gives full control over everything in that one namespace, the namespace itself
+  included. By default it is bound to the group system:masters. RBAC permissions are purely additive, there are no deny rules, so nothing granted
+  elsewhere can take a part of cluster-admin away again.
+
+
+  The harm comes from who holds the binding. A pod receives the credentials of its ServiceAccount automatically. If that ServiceAccount is bound to
+  cluster-admin, any code that runs in the container, the application or whoever broke into it, can perform any action against the API, including
+  reading Secrets and changing permissions. The Kubernetes documentation adds a second path: such a binding also gives full access to any user who
+  can read Secrets or create a pod in that namespace, because both lead to the ServiceAccount's token. By default, ServiceAccounts outside
+  kube-system have no permissions at all, so every such binding was added by someone.
+
+
+  Read access is wider than it looks. list and watch on Secrets reveal their contents just as get does. The right to create workloads in a namespace
+  implicitly grants the API access of every ServiceAccount in that namespace, since a pod can run as any of them.
+
+
+  The group system:masters is a special case: its members bypass all RBAC checks, and the access cannot be revoked by removing RoleBindings or
+  ClusterRoleBindings. On EKS the IAM principal that created the cluster received cluster-admin permissions automatically; access entries let an
+  administrator revoke or refine that, and attach an access policy scoped to the cluster or to named namespaces per IAM principal.
+
+
+  A binding outlives its reason. If an attacker is able to create an account with the same name as a deleted user, it inherits the rights still
+  bound to that name, which is why bindings are reviewed periodically.
+sources:
+  - { title: "Kubernetes: Using RBAC Authorization", url: "https://kubernetes.io/docs/reference/access-authn-authz/rbac/" }
+  - { title: "Kubernetes: RBAC Good Practices", url: "https://kubernetes.io/docs/concepts/security/rbac-good-practices/" }
+  - { title: "EKS Best Practices: Identity and Access Management", url: "https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html" }
+  - { title: "EKS: Associate access policies with access entries", url: "https://docs.aws.amazon.com/eks/latest/userguide/access-policies.html" }
+  - { title: "Kubernetes: Auditing", url: "https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/" }
+  - { title: "EKS: Send control plane logs to CloudWatch Logs", url: "https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html" }
+  - { title: "Kyverno: Policy Reports", url: "https://kyverno.io/docs/policy-reports/" }
+  - { title: "kube-linter: checks", url: "https://raw.githubusercontent.com/stackrox/kube-linter/main/docs/generated/checks.md" }
+detect:
+  - kind: alert
+    what: >
+      A new or changed ClusterRoleBinding or RoleBinding, taken from the API server audit log. An audit policy rule at the Metadata level records
+      who changed which binding and when; on EKS the audit log type has to be switched on (it is off by default) and arrives in CloudWatch Logs,
+      where a subscription filter on the rbac.authorization.k8s.io resources turns it into a notification.
+    example: |
+      - level: Metadata
+        resources:
+          - group: "rbac.authorization.k8s.io"
+            resources: ["clusterrolebindings", "rolebindings"]
+  - kind: dashboard
+    what: >
+      The standing list of who holds cluster-admin, kept as a policy report. A Kyverno policy in Audit mode records each resource that fails it in a
+      report without blocking anything, and its background scan covers bindings created before the policy existed.
+    example: 'validationActions: [Audit]'
+  - kind: command
+    what: >
+      The same question asked of manifests before they are applied. kube-linter has the check cluster-admin-role-binding (CIS Benchmark 5.1.1); it
+      is not enabled by default and has to be switched on in the linter's configuration.
+    example: 'cluster-admin-role-binding'
+solutions:
+  - scale: [small]
+    approach: >
+      Keep cluster-admin for the one person who operates the cluster and take it away from ServiceAccounts: a tool that works in one namespace gets
+      a RoleBinding to the built-in admin or edit role there instead of a ClusterRoleBinding to cluster-admin. Write the reason next to each binding
+      that stays. A pod that never calls the API gets automountServiceAccountToken false.
+    tools: [RBAC]
+    tradeoff: >
+      A compromised tool is limited to its namespace, and the change is a few lines of manifest. An operator or CI tool that really manages cluster
+      wide resources will fail with a narrow role until its ClusterRole lists what it needs.
+    example: |
+      apiVersion: rbac.authorization.k8s.io/v1
+      kind: RoleBinding
+      metadata:
+        name: deployer
+        namespace: app
+      roleRef:
+        apiGroup: rbac.authorization.k8s.io
+        kind: ClusterRole
+        name: edit
+      subjects:
+        - kind: ServiceAccount
+          name: deployer
+          namespace: app
+  - scale: [medium, large]
+    approach: >
+      Give people access through their identity provider, on EKS through access entries with an access policy per IAM principal scoped to
+      namespaces (view, edit, admin), and keep cluster-admin for a break-glass role. Create clusters without the creator's automatic admin
+      permission. Derive the role of a tool from what it actually calls (audit2rbac builds roles from the audit log), turn on the audit log, and
+      review the bindings on a calendar.
+    tools: ["EKS access entries", audit2rbac, Kyverno]
+    tradeoff: >
+      Who can do what is readable per principal and a leaked credential reaches less. It costs the audit log volume, a review routine, and friction
+      each time someone needs one more permission.
+cases:
+  - company: Aqua Nautilus (RBAC Buster)
+    year: 2023
+    url: "https://www.aquasec.com/blog/leveraging-kubernetes-rbac-to-backdoor-clusters/"
+    summary: >
+      Attackers reached API servers that accepted unauthenticated requests from anonymous users with privileges. They created a ClusterRole with
+      near admin-level privileges, a ServiceAccount kube-controller in kube-system and a ClusterRoleBinding named system:controller:kube-controller,
+      then a DaemonSet that mined Monero on every node. The researchers found at least 60 clusters targeted.
+    match: >
+      A ServiceAccount bound to an admin-level ClusterRole is full control of the cluster for whoever holds its token, and a binding with a
+      system-looking name stays unnoticed unless bindings are reviewed.
+  - company: Unit 42 (cryptocurrency exchange intrusion)
+    year: 2025
+    url: "https://unit42.paloaltonetworks.com/modern-kubernetes-threats/"
+    summary: >
+      After a developer workstation was compromised, the attacker used the developer's privileged cloud session to deploy a pod that exposed its
+      mounted service account token. The token belonged to a high-privileged management service account with broad RBAC permissions, and was used to
+      enumerate secrets, reach workloads across namespaces and move into the cloud backend.
+    match: One over-privileged ServiceAccount turned a single pod into access to the whole cluster.
+reading:
+  - { title: "Kubernetes: RBAC Good Practices", url: "https://kubernetes.io/docs/concepts/security/rbac-good-practices/", why: "The permissions that amount to more than they say: listing Secrets, creating workloads, creating PersistentVolumes." }
+  - { title: "Kubernetes: Using RBAC Authorization", url: "https://kubernetes.io/docs/reference/access-authn-authz/rbac/", why: "The built-in roles, what cluster-admin means in each kind of binding, and how escalation through bindings is prevented." }
+  - { title: "Aqua Nautilus: First-Ever Attack Leveraging Kubernetes RBAC to Backdoor Clusters", url: "https://www.aquasec.com/blog/leveraging-kubernetes-rbac-to-backdoor-clusters/", why: "How a binding is used as a back door that survives after the first hole is closed." }
+  - { title: "Kubernetes: Auditing", url: "https://kubernetes.io/docs/tasks/debug/debug-cluster/audit/", why: "The audit levels and policy rules behind any alert on changed bindings." }

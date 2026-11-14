@@ -76,7 +76,9 @@ def _pvc_rows(snap: Path, pvcs: list[dict], pvs: list[dict], pvc_users: dict[tup
                         zone = e["values"][0]
         g = growth.get(k)
         av = avail.get(k)
-        days = round(av / g) if (g and g > 0 and av is not None) else None
+        host_fs = str(sc_prov.get(sp.get("storageClassName")) or "").endswith("local-path")
+        # a local-path volume reports the node filesystem, so growth and room are the node's and shared by every such volume: the node disk says when it fills (local_path.summary.fs)
+        days = round(av / g) if (g and g > 0 and av is not None and not host_fs) else None
         users = sorted(pvc_users.get(k, set()))
         rows.append(
             {
@@ -205,7 +207,7 @@ def _ebs(snap: Path, now: _dt.datetime) -> dict:
         "unattached_monthly_usd_est": round(sum(v.get("size") or 0 for v in unattached) * 0.0912, 2),
         "snapshots_30d": len(snaps),
         "snapshots_30d_gb": sum(s.get("size") or 0 for s in snaps),
-        "snapshot_descriptions": dict(Counter((s.get("description") or "")[:40] for s in snaps).most_common(5)),
+        "snapshot_descriptions": dict(Counter((s.get("description") or "")[:40] for s in snaps).most_common()),
         "snapshot_latest": max((s.get("start") or "" for s in snaps), default=None),
         "snapshotted_volumes": len({s.get("volume") for s in snaps}),
     }

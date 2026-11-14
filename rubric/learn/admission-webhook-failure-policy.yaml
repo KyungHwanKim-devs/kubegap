@@ -1,0 +1,75 @@
+# What a report teaches when an admission webhook with failurePolicy Fail has no backend, or stands in front of every pod creation. Every page below was opened and read (2026-11-14).
+topic: admission-webhook-failure-policy
+checks: [operators.webhook-no-endpoints, albctl.webhook-fail-policy-pods]
+mechanism: >
+  An admission webhook is a call the API server makes to a service before it stores a matching request. What happens when that call cannot be made is
+  decided by failurePolicy, and the default is Fail: an error calling the webhook causes the admission to fail and the API request to be rejected.
+  Errors here are network errors, connection failures, timeouts, a non-2xx answer or a malformed one. The API server waits 10 seconds by default
+  (timeoutSeconds, between 1 and 30) before it treats the call as failed. With Ignore the error is ignored and the request continues.
+
+
+  So a webhook with Fail turns its own availability into the availability of every request it matches. When the Service behind it has no ready
+  endpoints, each matching create or update is rejected once the call fails or times out. The requests a webhook matches are set by its rules and
+  narrowed by namespaceSelector and objectSelector. A webhook that matches pods with neither selector matches every pod in the cluster, including the
+  pods of the webhook server itself: the Kubernetes documentation warns that a webhook running inside the cluster might cause deadlocks for its own
+  deployment if it intercepts resources required to start its own Pods. Two webhooks that check each other's Pods cannot start once both are down.
+
+
+  The AWS Load Balancer Controller is a common instance. It injects pod readiness gates through a mutating webhook at pod creation, in namespaces
+  labelled elbv2.k8s.aws/pod-readiness-gate-inject: enabled. Its documentation describes the choice plainly: with Fail, pod launches in labelled
+  namespaces are blocked while the controller pods are unavailable; with Ignore, pods are created without the gate, which risks application pods being
+  terminated before their replacements are healthy in the target groups. The default is Ignore in versions above v2.11.0 and Fail in v2.11.0 and
+  earlier, and the recommendation is Fail together with an explicit object selector.
+sources:
+  - { title: "Kubernetes: Dynamic Admission Control", url: "https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/" }
+  - { title: "Kubernetes: Admission Webhook Good Practices", url: "https://kubernetes.io/docs/concepts/cluster-administration/admission-webhooks-good-practices/" }
+  - { title: "AWS Load Balancer Controller: Pod readiness gate", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/pod_readiness_gate/" }
+detect:
+  - kind: alert
+    what: >
+      The API server counts admission webhook rejections in apiserver_admission_webhook_rejection_count, with the labels name, operation, type,
+      error_type and rejection_code. error_type calling_webhook_error means the call itself failed or timed out and the policy was Fail, which is
+      exactly this state; no_error means the webhook answered and said no.
+    example: |
+      - alert: AdmissionWebhookCallFailing
+        expr: sum by (name) (rate(apiserver_admission_webhook_rejection_count{error_type="calling_webhook_error"}[5m])) > 0
+        for: 5m
+  - kind: metric
+    what: >
+      How long webhook calls take, per webhook. A webhook that approaches its timeout is the stage before it starts failing.
+    example: 'histogram_quantile(0.99, sum by (le, name) (rate(apiserver_admission_webhook_admission_duration_seconds_bucket[5m])))'
+  - kind: command
+    what: Which webhooks have the policy Fail and how they are scoped, next to the endpoints of the Service they call.
+    example: "kubectl get validatingwebhookconfiguration,mutatingwebhookconfiguration -o yaml | grep -B2 -A2 failurePolicy"
+solutions:
+  - scale: [small]
+    approach: >
+      Scope first. Give every webhook that matches pods a namespaceSelector that leaves out kube-system and the namespace the webhook server runs in,
+      so that the cluster's own components and the webhook itself can always start. For a mutating webhook that only adds a convenience, set
+      failurePolicy to Ignore and accept that the mutation is skipped while the server is down.
+    tools: []
+    tradeoff: >
+      The webhook can no longer block its own recovery, with nothing extra to run. Ignore means requests pass unmutated during an outage of the
+      server; for the AWS Load Balancer Controller that is pods without readiness gates.
+    example: |
+      webhooks:
+        - name: mpod.elbv2.k8s.aws
+          failurePolicy: Fail
+          namespaceSelector:
+            matchExpressions:
+              - { key: elbv2.k8s.aws/pod-readiness-gate-inject, operator: In, values: [enabled] }
+  - scale: [medium, large]
+    approach: >
+      Keep Fail where the webhook enforces something, and make the server hard to lose: several replicas behind a ClusterIP Service, a
+      PodDisruptionBudget so that a drain does not take all of them, a small timeoutSeconds, and an objectSelector that keeps the add-ons the webhook
+      depends on out of its reach. Where the rule is simple, replace the validating webhook with a ValidatingAdmissionPolicy, which is evaluated
+      inside the API server and has no backend to lose.
+    tools: [PodDisruptionBudget, ValidatingAdmissionPolicy]
+    tradeoff: >
+      The policy stays enforced during a node failure or a drain. It costs more replicas for every webhook server, and the objectSelector is a label
+      a user can set to skip the webhook, so it fits opt-in webhooks only.
+cases: []
+reading:
+  - { title: "Kubernetes: Admission Webhook Good Practices", url: "https://kubernetes.io/docs/concepts/cluster-administration/admission-webhooks-good-practices/", why: "Scope limits, self-mutation deadlocks, dependency loops and when to fail open." }
+  - { title: "Kubernetes: Dynamic Admission Control", url: "https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/", why: "The reference for failurePolicy, timeoutSeconds, the selectors and the rejection metric." }
+  - { title: "AWS Load Balancer Controller: Pod readiness gate", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/pod_readiness_gate/", why: "What Fail and Ignore each cost for one concrete webhook, and how to narrow it with an object selector." }

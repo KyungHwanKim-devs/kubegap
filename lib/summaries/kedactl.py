@@ -177,7 +177,7 @@ def analyze(snap: Path, inv: dict | None, scaling: dict | None = None) -> dict:
             errs[k] = errs.get(k, 0) + int(v)
         so_errs = {f"{labels.get('namespace')}/{labels.get('scaledObject')}": int(v) for labels, v in _pm.labeled(pm, "keda", "scaled_object_errors")}
         op_pods[f.stem] = {
-            "keda_metric_names": keda_names[:20],
+            "keda_metric_names": keda_names,
             "keda_metrics_present": bool(keda_names),
             "names": _pm.found(pm, "keda"),
             "scaler_errors": errs,

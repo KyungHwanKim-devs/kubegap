@@ -21,7 +21,6 @@
   suggest: "Raise the limit to 1GiB or more, lower querier.max_concurrent, and set limits_config.max_query_series and max_entries_limit. Narrow query ranges and move long ranges to recording rules (ruler)."
   verify:
     - "kubectl -n monitoring top pod loki-stack-0 --containers"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -131,6 +130,7 @@
   target: "item['target']"
   evidence: "f\"{item['requests_5xx']} 5xx out of {item['requests_total']} requests since start (by route {item['requests_5xx_by_route']}, excluding /ready 503 during startup), panics {item['panics']}, WAL disk full {item['wal_disk_full_failures']}, error log lines {item['log_error_messages']}, rejected {item['discarded_by_reason']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     5xx means a query (series, query_range) died from memory pressure or a timeout, a panic means a bug or corruption, and WAL disk full means ingestion has stopped. Read together with Grafana 429s (grafana.datasource-errors) it separates "too many queries" from "Loki is too small".
@@ -139,7 +139,6 @@
   suggest: "Break loki_request_duration_seconds_count{status_code=~\"5..\"} down by route. 5xx on series/query_range points to memory (loki.memory-pressure) and limits_config."
   verify:
     - "kubectl -n monitoring port-forward svc/loki-stack 3100 & curl -s localhost:3100/metrics | grep -E 'loki_request_duration_seconds_count.*status_code=\"5|loki_panic_total'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -317,7 +316,6 @@
   suggest: "Migrate to the grafana/loki chart (SingleBinary mode) and set up 3.x, the tsdb index and retention in one go. Keep the existing boltdb-shipper data as a separate period in schema_config."
   verify:
     - "curl -s localhost:3100/loki/api/v1/status/buildinfo"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -401,7 +399,6 @@
   suggest: "Check the loki pod status and collect again. Enable a ServiceMonitor so Prometheus scrapes Loki."
   verify:
     - "kubectl -n monitoring port-forward svc/loki-stack 3100 & curl -s localhost:3100/metrics | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

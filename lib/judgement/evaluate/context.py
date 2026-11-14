@@ -27,7 +27,9 @@ from .evidence import (
     no_backup_text,
     oom_last_text,
     oom_text,
+    placement_text,
     sg_text,
+    shown,
     snat_private_routes_text,
     throttling_text,
 )
@@ -48,9 +50,11 @@ def get_path(d, dotted: str):
 class Context:
     """Snapshot data and helper functions shared during evaluation."""
 
-    def __init__(self, snap: Path, inv: dict, summary: dict, profile: dict, ns_profiles: dict[str, dict] | None = None):
-        self.snap, self.inv, self.summary, self.profile = snap, inv, summary, profile
-        self.ns_profiles: dict[str, dict] = ns_profiles or {}  # config.yaml namespace_profiles: namespace glob -> loaded profile dict
+    def __init__(self, snap: Path, inv: dict, summary: dict, scale: str, dev_namespaces: list[str] | None = None):
+        self.snap, self.inv, self.summary, self.scale = snap, inv, summary, scale
+        self.platform = rubric.load_platform((inv.get("cluster") or {}).get("platform"))  # rubric/platforms/<family>.yaml: excluded targets, families the platform makes pointless
+        self.dev_namespaces: list[str] = list(dev_namespaces or [])  # config.yaml dev_namespaces: namespace globs that are not production
+        self.dev_disabled: set[str] = set(rubric.load_scales().get("dev_namespace_disabled_checks") or [])
         self.prod_like = set((inv.get("namespaces") or {}).get("prod_like") or [])
         self._objects: dict[str, list] = {}
         self._k8s_versions = rubric.load_k8s_versions()
@@ -449,7 +453,9 @@ class Context:
             "serves_traffic": self.serves_traffic,
             "db_like": self.db_like,
             "_sg_text": sg_text,
+            "shown": shown,
             "_oom_text": oom_text,
+            "_placement_text": placement_text,
             # the twelve long evidence sentences of #24, one helper each (lib/judgement/evaluate/evidence.py)
             "_argocd_backend_text": argocd_backend_text,
             "_throttling_text": throttling_text,
@@ -465,5 +471,5 @@ class Context:
             "_snat_private_routes_text": snat_private_routes_text,
             "inv": self.inv,
             "summary": self.summary,
-            "ctx": {"profile": self.profile.get("name"), "platform": (self.inv.get("cluster") or {}).get("platform"), "prod_like": sorted(self.prod_like)},
+            "ctx": {"scale": self.scale, "platform": (self.inv.get("cluster") or {}).get("platform"), "prod_like": sorted(self.prod_like)},
         }

@@ -82,8 +82,91 @@ def test_a_degraded_run_never_turns_a_fail_or_warn_into_a_pass(runs, variant):
     assert lost_without_a_word == [], lost_without_a_word
 
 
+# Checks that keep judging in a daily run on part of what a full run gives them, and so find less. Each is named with the part it loses.
+PARTIAL_IN_DAILY = {
+    "logs.signatures": "the failure patterns of node logs (kubelet, containerd, kernel) are counted from node-os; the patterns of component logs are counted in every run",
+    "resources.oomkilled-repeated": "kernel out-of-memory kills are read from the node's kernel log (node-os); kills the kubelet reported on the pod are read in every run",
+    "resilience.liveness-dependency-path": "an exec probe's command is not kept without app-settings, so only HTTP probe paths are read for a dependency",
+}
+
+
+@pytest.mark.parametrize("variant", [v for v, _, _ in VARIANTS if v.endswith("-daily")])
+def test_a_daily_run_judges_as_a_full_run_does_or_says_it_did_not_judge(runs, variant):
+    """The daily run reads less (collectors/units.yaml). A check either gives the verdicts the full run gives on the same cluster, or it does not judge:
+    `not-collected`, because it names under `needs` a unit the daily run leaves out, or `skip` with the reason, when only this cluster's data was
+    missing (an ingress latency read from ALB metrics on EKS and from the controller's metrics elsewhere). A check that judged and found something
+    else has read data that was not there: it needs the unit. The first run of this test found seven such checks, two of which reported
+    databases as having no backup because the CronJob commands that name them are not kept by a daily run."""
+    full = json.loads(runs[variant.removesuffix("-daily")]["findings.json"])
+    daily = json.loads(runs[variant]["findings.json"])
+    before = {r["id"]: r for r in full["check_results"]}
+    after = {r["id"]: r for r in daily["check_results"]}
+
+    def verdicts(doc, cid):
+        return sorted((f["target"], f["status"]) for f in doc["findings"] if f["check"] == cid)
+
+    wrong = []
+    for cid, was in before.items():
+        now = after[cid]
+        if now["status"] == "not-collected" or cid in PARTIAL_IN_DAILY:
+            continue
+        if now["status"] == "skip" and was["status"] != "skip":
+            assert now.get("reason"), f"{cid}: a skip names what was missing"
+            continue
+        if now["status"] != was["status"] or verdicts(daily, cid) != verdicts(full, cid):
+            wrong.append((cid, was["status"], now["status"], len(verdicts(full, cid)), len(verdicts(daily, cid))))
+    assert wrong == [], wrong
+    assert any(r["status"] == "not-collected" for r in after.values())
+    for cid in PARTIAL_IN_DAILY:
+        assert len(verdicts(daily, cid)) <= len(verdicts(full, cid)), f"{cid} finds more in a daily run than in a full one"
+
+
+@pytest.mark.parametrize("variant", [v for v, _, _ in VARIANTS if v.endswith("-daily")])
+def test_a_daily_snapshot_holds_nothing_an_application_is_configured_with(tmp_path, variant):
+    """After the daily mutation no object outside the system namespaces carries a command, args, a literal environment value or a ConfigMap key, and
+    the files of the units the daily run leaves out are not there."""
+    from lib.foundations import scrub
+
+    _, fixture, mutate = next(v for v in VARIANTS if v[0] == variant)
+    snap = regress.stage(fixture, tmp_path, mutate)
+    assert not (snap / "aws").exists() and not (snap / "logs" / "node").exists() and not (snap / "logs" / "cloudwatch").exists() and not list((snap / "tools").glob("*.json"))
+
+    def walk(o, ns):
+        if isinstance(o, dict):
+            if isinstance(o.get("kind"), str) and isinstance(o.get("metadata"), dict):
+                ns = o["metadata"].get("namespace") or ns
+            if not scrub.system_namespace(ns) and ns:
+                assert not isinstance(o.get("command"), list) and not isinstance(o.get("args"), list), (ns, o.get("name"))
+                assert not any(isinstance(e, dict) and "value" in e for e in o.get("env") or [] if isinstance(o.get("env"), list)), (ns, o.get("name"))
+                if o.get("kind") == "ConfigMap":
+                    assert "data" not in o and "binaryData" not in o, (ns, o["metadata"].get("name"))
+            for v in o.values():
+                walk(v, ns)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v, ns)
+
+    seen = 0
+    for f in sorted((snap / "objects").glob("*.json")):
+        walk(json.loads(f.read_text(encoding="utf-8")), None)
+        seen += 1
+    assert seen > 10
+    # A key name must not survive anywhere in its own ConfigMap: on a live cluster the keys were found in metadata.managedFields
+    # (`fieldsV1.f:data.f:<key>`), which the walk above does not read (2026-11-14).
+    keys = {(o["metadata"]["namespace"], o["metadata"]["name"]): set(o.get("data") or {}) for o in json.loads((fixture / "objects" / "configmaps.json").read_text(encoding="utf-8"))["items"]}
+    checked = 0
+    for o in json.loads((snap / "objects" / "configmaps.json").read_text(encoding="utf-8"))["items"]:
+        ns, name = o["metadata"]["namespace"], o["metadata"]["name"]
+        if scrub.system_namespace(ns):
+            continue
+        text = json.dumps(o)
+        assert not [k for k in keys[(ns, name)] if f'"f:{k}"' in text or f'"{k}"' in text], (ns, name)
+        checked += len(keys[(ns, name)])
+    assert checked > 20
+
+
 def test_summary_shape_doc_matches_the_summaries(runs):
-    summaries = [json.loads(runs[v]["summary.json"]) for v, _, _ in VARIANTS if not v.endswith("-degraded")]
+    summaries = [json.loads(runs[v]["summary.json"]) for v, _, _ in VARIANTS if not v.endswith(("-degraded", "-daily"))]
     assert regress.shape_mismatches(summaries) == []
 
 
@@ -121,8 +204,8 @@ def test_a_nan_sample_is_null_not_a_nan_token(tmp_path):
     (tmp_path / "metrics").mkdir()
     (tmp_path / "metrics" / "q.json").write_text(json.dumps({"ok": True, "result": [{"metric": {"verb": "GET"}, "value": [0, "NaN"]}, {"metric": {"verb": "LIST"}, "value": [0, "0.5"]}]}))
     out = summarize.summarize_metrics(tmp_path)["q"]
-    assert [r["value"] for r in out["top"]] == [0.5, None] and out["stats"] == {"min": 0.5, "max": 0.5, "mean": 0.5, "n": 1}
-    assert not any(isinstance(r["value"], float) and math.isnan(r["value"]) for r in out["top"])
+    assert [r["value"] for r in out["rows"]] == [0.5, None] and out["stats"] == {"min": 0.5, "max": 0.5, "mean": 0.5, "n": 1}
+    assert not any(isinstance(r["value"], float) and math.isnan(r["value"]) for r in out["rows"])
     json.loads(json.dumps(out), parse_constant=lambda c: pytest.fail(f"non-JSON token {c}"))
 
 

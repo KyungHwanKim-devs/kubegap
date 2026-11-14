@@ -1,0 +1,125 @@
+# What a report teaches when the alert rules watch the parts of the cluster and nothing watches what users experience: no symptom alerts, no SLO, failure
+# modes without a rule. Every page below was opened and read (2026-11-14).
+topic: symptom-alerts-and-slo
+checks: [observability.no-symptom-alerts, observability.no-slo, observability.failure-mode-uncovered]
+mechanism: >
+  A monitoring system answers two questions: what is broken, and why. The "what's broken" is the symptom, the "why" is a cause, possibly an intermediate
+  one. Rules on container_*, node_* and kube_* series are cause rules: a pod restarts, a disk fills, a node is NotReady. They say that a part is
+  unhealthy. They do not say whether requests are being answered, and an outage whose cause has no rule produces no alert at all; it is learned from the
+  people who use the service.
+
+
+  Symptom rules look at the service from the user's side. The four golden signals name what to measure: latency (the time it takes to service a
+  request), traffic (how much demand is placed on the system), errors (the rate of requests that fail) and saturation (how full the service is). A
+  rule on the share of 5xx answers fires for any cause, including the ones nobody predicted. The rule sets that come with a monitoring stack are about
+  cluster components (pods crash looping, nodes not ready, volumes filling up, certificates expiring, an HPA maxed out), because a generic rule set
+  cannot know an application's request metrics. The symptom rules are the part that has to be written per service, from the application's own metrics
+  or from the ingress controller's.
+
+
+  An SLO turns a symptom into a number to alert on. Burn rate is how fast, relative to the SLO, the service consumes its error budget. The SRE Workbook
+  compares alerting approaches on precision, recall, detection time and reset time, and recommends several burn rates over several windows: page when
+  2% of the budget is burned in 1 hour (burn rate 14.4) or 5% in 6 hours (burn rate 6), open a ticket when 10% is burned in 3 days (burn rate 1), each
+  long window paired with a short one so the alert stops soon after the problem does. Writing those recording and alert rules by hand is long and
+  repetitive; Sloth and Pyrra generate them from a short description of the objective. The Workbook also notes that a service with few users or quiet
+  nights needs a different approach, because a handful of failed requests is a large share of very little traffic.
+sources:
+  - { title: "Google SRE Book: Monitoring Distributed Systems", url: "https://sre.google/sre-book/monitoring-distributed-systems/" }
+  - { title: "Google SRE Workbook: Alerting on SLOs", url: "https://sre.google/workbook/alerting-on-slos/" }
+  - { title: "Prometheus Operator runbooks", url: "https://runbooks.prometheus-operator.dev/" }
+  - { title: "Sloth README", url: "https://github.com/slok/sloth" }
+  - { title: "Sloth: getting-started example", url: "https://raw.githubusercontent.com/slok/sloth/main/examples/getting-started.yml" }
+  - { title: "Pyrra README", url: "https://github.com/pyrra-dev/pyrra" }
+detect:
+  - kind: metric
+    what: >
+      The error ratio per Ingress, from the ingress controller, for services that export no request metrics of their own. ingress-nginx counts every
+      request with its status.
+    example: |
+      sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests{status=~"5.."}[5m]))
+        / sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests[5m]))
+  - kind: alert
+    what: >
+      A burn-rate page as the SRE Workbook writes it for a 99.9% objective: the 1-hour and the 5-minute error ratio both above 14.4 times the budget.
+      The ratios are recording rules; Sloth and Pyrra generate them.
+    example: |
+      expr: |
+        job:slo_errors_per_request:ratio_rate1h{job="myjob"} > (14.4*0.001)
+          and job:slo_errors_per_request:ratio_rate5m{job="myjob"} > (14.4*0.001)
+  - kind: dashboard
+    what: >
+      The Pyrra interface, which displays each SLO with its error budget and burn rates. It shows how much budget is left, which a threshold alert never
+      does.
+  - kind: command
+    what: >
+      Which alert rules exist, to hold against the list of failure modes: for each mode, is there a rule, and for each service that receives traffic, is
+      there an error and a latency rule.
+    example: "kubectl get prometheusrules -A"
+solutions:
+  - scale: [small]
+    approach: >
+      No SLO tool. Keep the default rule set for the cause side, and add two symptom rules that cover everything behind the ingress controller at once:
+      the share of 5xx answers and a latency percentile per Ingress, with a fixed threshold. For the failure modes the report lists as uncovered, enable
+      the stock rule where one exists (most cluster-side modes have one).
+    tools: [PrometheusRule, ingress-nginx, kube-prometheus-stack]
+    tradeoff: >
+      An outage is noticed whatever its cause, with two rules and no new component. A fixed threshold is crude: at low traffic a few failed requests
+      trip it, and it says nothing about how much unreliability has added up over the month.
+    example: |
+      - alert: IngressHigh5xxRatio
+        expr: |
+          sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests{status=~"5.."}[5m]))
+            / sum by (exported_namespace, ingress) (rate(nginx_ingress_controller_requests[5m])) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+  - scale: [medium]
+    approach: >
+      Define an availability and a latency objective for the few services users depend on, starting with one that has an Ingress, and let Sloth or Pyrra
+      generate the recording rules and the multi-window burn-rate alerts. Pyrra runs as an operator that watches ServiceLevelObjective objects and adds
+      an interface; Sloth is a single binary that generates rule files and also has a controller mode with its own resources.
+    tools: [Sloth, Pyrra]
+    tradeoff: >
+      Pages follow the error budget instead of a guessed threshold, and a slow leak is caught by the long window. Each service needs a request metric
+      that can tell good from bad, somebody has to choose the objective, and every SLO adds a set of recording rules to Prometheus.
+    example: |
+      version: "prometheus/v1"
+      service: "myservice"
+      slos:
+        - name: "requests-availability"
+          objective: 99.9
+          sli:
+            events:
+              error_query: sum(rate(http_request_duration_seconds_count{job="myservice",code=~"(5..|429)"}[{{.window}}]))
+              total_query: sum(rate(http_request_duration_seconds_count{job="myservice"}[{{.window}}]))
+  - scale: [large]
+    approach: >
+      An SLO for every user-facing service, pages only from burn-rate alerts, and cause alerts demoted to tickets or dashboards. Review the failure-mode
+      list after each incident: the mode that hurt and had no rule gets one.
+    tools: [Sloth, Pyrra, Alertmanager]
+    tradeoff: >
+      Every page is about users and is actionable, which is what keeps people answering the pager. It needs agreement on objectives across teams and the
+      discipline to stop paging on causes, and both take longer than writing the rules.
+cases:
+  - company: NU.nl
+    year: 2019
+    url: "https://www.tibobeijen.nl/2019/02/01/learning-from-kubernetes-cluster-failure/"
+    summary: >
+      A newly added ElastAlert rule made the ElastAlert pods use memory without limit and nodes went NotReady one after another. The team first saw
+      occasional error pages, slow responses and timeouts in internal tools. No alerts fired: there were none for CPU, memory or disk, and cluster logs
+      and metrics that sat in Elasticsearch were either not visualized or missed.
+    match: The failure mode (node memory exhausted) had no rule and no symptom rule existed either, so the first signal was the error pages themselves.
+  - company: UK Ministry of Justice
+    year: 2023
+    url: "https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-08-04-dropped-logging-in-kibana.html"
+    summary: >
+      Application logs were missing from Kibana for long periods after a newer fluent-bit version changed how it drops chunks. Users reported it in a
+      support channel. The fix wrote buffer overflow to the file system and flushed in smaller chunks; the follow-up actions were notifications from
+      the logging clusters and an integration test that checks logs are being sent.
+    match: A failure mode without an alert, learned from the people affected; the action items add the missing signal.
+reading:
+  - { title: "Google SRE Book: Monitoring Distributed Systems", url: "https://sre.google/sre-book/monitoring-distributed-systems/", why: "Symptoms against causes, the four golden signals, and what makes a page worth sending." }
+  - { title: "Google SRE Workbook: Alerting on SLOs", url: "https://sre.google/workbook/alerting-on-slos/", why: "Six ways to alert on an SLO compared, ending with the multi-window burn-rate table, and a section on low-traffic services." }
+  - { title: "Pyrra README", url: "https://github.com/pyrra-dev/pyrra", why: "A ServiceLevelObjective object and the rules and burn-rate alerts generated from it." }
+  - { title: "Sloth README", url: "https://github.com/slok/sloth", why: "A short SLO description and the command that turns it into recording and alert rules." }
+  - { title: "Prometheus Operator runbooks", url: "https://runbooks.prometheus-operator.dev/", why: "The stock alerts by component, to see which failure modes already have a rule and what each one means." }

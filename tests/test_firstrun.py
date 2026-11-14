@@ -14,10 +14,17 @@ import pytest
 
 from lib.collection import discover, kube
 from lib.commands import firstrun
-from lib.foundations.config import Config
+from lib.foundations import units
+from lib.foundations.config import Config as _Config
 from lib.foundations.runlog import RunLog
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def Config(data=None):
+    """A config with the scale already decided: every test below is about one of the other questions, and the scale question would head
+    each list. The scale question has its own test, which uses the bare config."""
+    return _Config({"scale": "medium", **(data or {})})
 
 
 def _tool(name, present=True, required=False, checks=None):
@@ -217,7 +224,7 @@ def _all_questions(tmp_path, language="en"):
     out = []
     eks = _setup("eks", doc={"present": False, "current": False}, stores_ok=False, tools=tools)
     eks["machine"] = {"open_dirs": [{"path": "/home/u/.kubegap", "mode": "0755"}]}
-    out += firstrun.questions(eks, Config(), None, language=language)
+    out += firstrun.questions(eks, _Config(), None, language=language)
     out += firstrun.questions(_setup("k3s"), Config(), None, language=language)
     out += firstrun.questions(_setup("k3s"), Config(), tmp_path, language=language)
     out += firstrun.questions(_setup("aks"), Config(), None, language=language)
@@ -230,7 +237,7 @@ def _all_questions(tmp_path, language="en"):
 
 def test_every_question_fits_both_choice_windows_and_can_be_skipped(tmp_path):
     qs = _all_questions(tmp_path)
-    assert {q["id"] for q in qs} == {"home-mode", "tools", "ssm-document", "node-ssh", "grafana-token", "stores"}
+    assert {q["id"] for q in qs} == {"scale", "home-mode", "tools", "ssm-document", "node-ssh", "grafana-token", "stores"}
     assert {q["id"] for q in _all_questions(tmp_path, "ko")} == {q["id"] for q in qs}, "the Korean block asks the same questions"
     for q in qs:
         assert 2 <= len(q["options"]) <= 3, q["id"]  # Codex request_user_input: 2-3 options
@@ -260,14 +267,14 @@ def test_render_names_every_option_with_its_command(tmp_path):
     assert text.count("      then: ") == sum(len(q["options"]) for q in qs)
     assert "none" in firstrun.render([], "ctx")
     tail = firstrun.render([], "ctx", [{"id": "node-ssh", "header": "Node checks", "gain": ["g"]}]).splitlines()[-2:]
-    assert tail[0] == "skipped earlier [node-ssh] Node checks: g" and "/kubegap setup" in tail[1]
+    assert tail[0] == "skipped earlier [node-ssh] Node checks: g" and "Limits of this run" in tail[1]
 
 
 def test_node_check_count_is_the_catalog_s_and_is_worded_as_an_upper_bound():
-    full_only_node = [c for c in firstrun._checks() if c["id"].startswith("node.") and c.get("modes") == ["full"]]
+    full_only_node = [c for c in firstrun._checks() if c["id"].startswith("node.") and units.missing(c.get("needs"), "daily")]
     assert firstrun.node_script_checks() == len(full_only_node) > 0
-    # some of them are for one profile only, which is why every text says "up to"
-    assert any(c.get("profiles") for c in full_only_node)
+    # some of them run on one platform only, which is why every text says "up to"
+    assert any(c.get("platforms") for c in full_only_node)
     q = firstrun.questions(_setup("k3s"), Config({"grafana_api_token": "x"}), None)[0]
     assert q["gain"][0].startswith(f"up to {len(full_only_node)} node checks in a full run")
 
@@ -288,6 +295,7 @@ def test_answer_and_questions_commands(tmp_path, capsys):
     ctx_dir = tmp_path / "c"
     ctx_dir.mkdir()
     (ctx_dir / "setup.json").write_text(json.dumps(_setup("k3s")))
+    (tmp_path / "config.yaml").write_text("scale: medium\n")  # decided, so the list starts at the node question
     base = ["--context", "c", "--snapshots-root", str(tmp_path), "--config", str(tmp_path / "config.yaml")]
     assert cli.main(["questions", *base]) == 0
     assert "[node-ssh]" in capsys.readouterr().out
@@ -384,7 +392,10 @@ def test_readme_numbers_and_question_names_match_the_code():
     n = firstrun.node_script_checks()
     en, ko = (ROOT / "README.md").read_text(encoding="utf-8"), (ROOT / "README.ko.md").read_text(encoding="utf-8")
     node_area = sum(1 for c in firstrun._checks() if c["area"] == "node")
-    assert f"That is up to {n} more checks in a full audit" in en and "409 of the 411" in en and f"Of the {node_area} Node OS checks, {n} can be seen only by reaching the nodes" in en
+    assert f"That is up to {n} more checks in a full audit" in en and f"Of the {node_area} Node OS checks, {n} can be seen only by reaching the nodes" in en
+    total, not_daily = len(firstrun._checks()), sum(1 for c in firstrun._checks() if units.missing(c.get("needs"), "daily"))
+    assert f"There are {total} checks in 12 areas" in en and f"A daily audit covers at most {total - not_daily}, leaving out the {not_daily}" in en
+    assert f"점검 항목 {total}개" in ko and f"필요한 {not_daily}개를 뺀 최대 {total - not_daily}개" in ko
     assert f"full 점검의 항목이 최대 {n}개 늘고" in ko and f"노드 OS {node_area}개 중 {n}개는 노드에 들어가야 볼 수 있습니다" in ko
     # the names the README gives for `focus` are the catalog's area names, and the counts next to them are the catalog's
     import collections
@@ -394,7 +405,7 @@ def test_readme_numbers_and_question_names_match_the_code():
     setup_doc = (ROOT / "docs" / "SETUP.md").read_text(encoding="utf-8")
     assert f"the {n} `node.*` checks" in setup_doc
     first_run = (ROOT / "references" / "first-run.md").read_text(encoding="utf-8")
-    for qid in ("tools", "ssm-document", "node-ssh", "grafana-token", "stores"):
+    for qid in ("scale", "tools", "ssm-document", "node-ssh", "grafana-token", "stores"):
         assert f"| `{qid}` |" in setup_doc and f"| `{qid}` |" in first_run, qid
 
 
@@ -406,6 +417,23 @@ def test_setup_doc_names_every_key_config_set_writes():
     for key in configedit.SETTABLE:
         assert f"`{key}`" in line or (key.endswith("_url") and "the four `<store>_url` keys" in line), key
     assert "`ssh.hosts.<node>`" in line
+
+
+def test_scale_is_asked_first_once_per_cluster_and_config_overrides_the_answer(tmp_path):
+    from lib.foundations import rubric
+
+    s = _setup("k3s", nodes=2)
+    q = firstrun.questions(s, _Config({"grafana_api_token": "x", "node_access": "none"}), tmp_path)[0]
+    assert q["id"] == "scale" and [o["id"] for o in q["options"]] == ["small", "medium", "large"]
+    assert all(o["remember"] and not o["run"] and not o["config"] for o in q["options"])
+    assert firstrun.scale_decision(tmp_path) is None
+    assert rubric.resolve_scale({}, firstrun.scale_decision(tmp_path), 2) == {"name": "small", "source": "guessed", "nodes": 2}
+    assert rubric.resolve_scale({}, None, 9)["name"] == "medium" and rubric.resolve_scale({}, None, 21)["name"] == "large"
+    firstrun.record_answer(tmp_path, "scale", "large")
+    assert firstrun.scale_decision(tmp_path) == "large"
+    assert rubric.resolve_scale({}, firstrun.scale_decision(tmp_path), 2) == {"name": "large", "source": "answered"}
+    assert rubric.resolve_scale({"scale": "medium"}, "large", 2) == {"name": "medium", "source": "config.yaml"}
+    assert "scale" not in _ids(s, _Config({"scale": "small"}), tmp_path / "other") and "scale" not in _ids(s, _Config(), tmp_path)
 
 
 def test_home_mode_question_comes_first_and_fix_runs_protect_home():
@@ -439,9 +467,9 @@ def test_every_question_is_written_in_korean_not_translated(tmp_path):
         assert [o["id"] for o in q["options"]] == [o["id"] for o in en[qid]["options"]]
         assert [o["run"] for o in q["options"]] == [o["run"] for o in en[qid]["options"]]
         assert len(q["header"]) <= 12 and all(len(o["label"]) <= 12 for o in q["options"]), qid
-    text = firstrun.render(list(ko.values()), "ctx", [{"id": "node-ssh", "header": "노드 점검", "gain": ["g"]}], ["loki: 묻지 않았어요"], language="ko")
+    text = firstrun.render(list(ko.values()), "ctx", [{"id": "node-ssh", "header": "노드 점검", "gain": ["g"]}], ["loki: 묻지 않았습니다"], language="ko")
     assert "  question: " in text and "  option skip: 건너뛰기 — " in text and "answer --context ctx node-ssh skip" in text
-    assert "skipped earlier [node-ssh] 노드 점검: g" in text and "note loki: 묻지 않았어요" in text and "이번에 못 본 것" in text
+    assert "skipped earlier [node-ssh] 노드 점검: g" in text and "note loki: 묻지 않았습니다" in text and "이번 점검의 한계" in text
     assert "none:" in firstrun.render([], "ctx", language="ko")
 
 
@@ -453,7 +481,7 @@ def test_grafana_token_is_asked_only_for_dashboards_that_are_not_in_configmaps()
     s["monitoring"]["grafana"]["provisioned"] = {"dashboards": 25, "datasources": 1, "total_dashboards": 25, "error": None}
     assert "grafana-token" not in [q["id"] for q in firstrun.questions(s, Config(), None)]
     assert firstrun.noted(s, Config(), None) == ["grafana: no token needed; 25 dashboards and 1 datasources are read from ConfigMaps. Grafana counts 25 dashboards too, so none is missing"]
-    assert firstrun.noted(s, Config(), None, language="ko") == ["grafana: 토큰 없이 ConfigMap에서 대시보드 25개와 데이터소스 1개를 읽어요. Grafana가 세는 대시보드도 25개라 빠진 게 없어요"]
+    assert firstrun.noted(s, Config(), None, language="ko") == ["grafana: 토큰 없이 ConfigMap에서 대시보드 25개와 데이터소스 1개를 읽습니다. Grafana가 세는 대시보드도 25개라 빠진 게 없습니다"]
     s["monitoring"]["grafana"]["provisioned"]["total_dashboards"] = None
     assert "grafana-token" not in [q["id"] for q in firstrun.questions(s, Config(), None)]
     assert "could not be read" in firstrun.noted(s, Config(), None)[0]

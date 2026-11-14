@@ -1,0 +1,93 @@
+# What a report teaches when the apiserver answers with 5xx or logs failed webhook calls. Every page below was opened and read (2026-11-14).
+topic: apiserver-errors-and-admission-webhooks
+checks: [controlplane.apiserver-5xx, controlplane.webhook-call-failures]
+mechanism: >
+  Every create and update passes through the API server, and before the API server accepts an object it calls the admission webhooks registered for
+  that kind of object: mutating webhooks may change it, validating webhooks may reject it. A webhook is an HTTPS call to a server that usually runs as
+  pods in the same cluster, so the write path of the cluster now depends on those pods.
+
+
+  What happens when the call fails is set per webhook. The timeout is 10 seconds by default and must be between 1 and 30 seconds; a call that times
+  out or errors is handled by failurePolicy, which is Ignore (the request continues as if the webhook did not exist) or Fail (the request is
+  rejected). The default is Fail. So a webhook whose pods are down, slow or unreachable rejects every request it matches, including compliant ones,
+  and a slow one makes each request wait for the timeout first. A webhook that matches everything ("*" for groups, resources and operations) blocks
+  cluster-critical operations too, and two components can lock each other out: a webhook that intercepts the add-on it depends on (a network or
+  storage plugin), or two webhooks that check each other's pods, cannot start again once both are down.
+
+
+  The API server counts every response by HTTP code. A 5xx is the server failing to do what was asked, which is different from a 429: a 429 is the
+  server protecting itself on purpose when more requests are in flight than its limit (400 read plus 200 mutating by default), and clients are
+  expected to retry. A failed webhook call under Fail is one of the things that surfaces as an error on the request; controllers, operators and
+  kubectl all see it, because all of them write through the same path.
+
+
+  On EKS the control plane is managed and its logs are not delivered anywhere unless a log type is turned on per cluster; the line that names the
+  failing webhook is in the API server log, which is why the webhook check needs that log.
+sources:
+  - { title: "Kubernetes: Dynamic Admission Control", url: "https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/" }
+  - { title: "Kubernetes: Admission Webhook Good Practices", url: "https://kubernetes.io/docs/concepts/cluster-administration/admission-webhooks-good-practices/" }
+  - { title: "Amazon EKS best practices: EKS Control Plane", url: "https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html" }
+  - { title: "Amazon EKS best practices: Kubernetes Control Plane (API Priority and Fairness)", url: "https://docs.aws.amazon.com/eks/latest/best-practices/scale-control-plane.html" }
+  - { title: "Kubernetes: kube-apiserver flags", url: "https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/" }
+  - { title: "Amazon EKS: Send control plane logs to CloudWatch Logs", url: "https://docs.aws.amazon.com/eks/latest/userguide/control-plane-logs.html" }
+detect:
+  - kind: alert
+    what: >
+      The share of API requests answered with a 5xx. apiserver_request_total carries the HTTP code, verb and resource of every request, so the rule
+      can say which resource is failing. The kubernetes-mixin goes one step further with KubeAPIErrorBudgetBurn, which fires when errors burn the
+      error budget of an availability target over a long and a short window at once.
+    example: |
+      - alert: ApiserverErrorsHigh
+        expr: |
+          sum(rate(apiserver_request_total{code=~"5.."}[5m]))
+            / sum(rate(apiserver_request_total[5m])) > 0.01
+        for: 10m
+  - kind: metric
+    what: >
+      Which webhook is failing. apiserver_admission_webhook_rejection_count is labelled with the webhook name and an error_type; calling_webhook_error
+      means the call itself failed or timed out under failurePolicy Fail, as opposed to the webhook answering "not allowed". For webhooks set to
+      Ignore, apiserver_admission_webhook_fail_open_count counts the calls that failed and were let through. The latency histogram
+      apiserver_admission_webhook_admission_duration_seconds shows a webhook creeping towards its timeout before it starts to fail.
+    example: 'sum by (name) (rate(apiserver_admission_webhook_rejection_count{error_type="calling_webhook_error"}[5m]))'
+  - kind: command
+    what: >
+      On EKS without a Prometheus that scrapes the API server, the same fact is in the API server log once the api log type is enabled. The log group
+      is /aws/eks/<cluster>/cluster and the streams are named kube-apiserver-<id>.
+    example: 'filter @logStream like /kube-apiserver/ and @message like /failed calling webhook/ | stats count() by bin(1h)'
+solutions:
+  - scale: [small]
+    approach: >
+      Go through the webhook configurations once and narrow each one. Keep Fail only where an unchecked object would be a real problem; set a short
+      timeout; exclude kube-system and the webhook's own namespace with a namespaceSelector (the example skips every namespace that carries a label
+      of your choosing). For a mutating webhook that only adds convenience, set
+      failurePolicy to Ignore. On EKS, turn on the api log type so that a failing webhook is named somewhere.
+    tools: [ValidatingWebhookConfiguration, MutatingWebhookConfiguration, "EKS control plane logging"]
+    tradeoff: >
+      Deployments no longer stall because one operator's webhook pod is down. With Ignore, objects created during that time are admitted unmutated
+      and unvalidated, so it fits defaults and conveniences, not policy. The control plane log is billed as CloudWatch Logs ingestion and storage.
+    example: |
+      webhooks:
+        - name: defaults.example.com
+          failurePolicy: Ignore
+          timeoutSeconds: 3
+          namespaceSelector:
+            matchExpressions:
+              - { key: admission.example.com/skip, operator: DoesNotExist }
+  - scale: [medium, large]
+    approach: >
+      Treat webhook servers as part of the control plane. Run several replicas of each behind its Service, keep them out of each other's and their
+      add-ons' admission path with namespaceSelector and objectSelector, let mutating webhooks fail open and enforce the result with a validating
+      step. Move simple validations to ValidatingAdmissionPolicy, which the API server evaluates itself from CEL expressions with no webhook server
+      to call. Alert on the rejection counter by webhook name and on the request error ratio; at the large scale, on the error budget of an API
+      availability target.
+    tools: [ValidatingAdmissionPolicy, kubernetes-mixin, Prometheus]
+    tradeoff: >
+      A webhook outage becomes an alert with a name on it instead of a mystery of stalled rollouts, and policy that moved into the API server has no
+      dependency left to fail. Each policy has to be rewritten in CEL, and what cannot be expressed there stays a webhook that needs replicas, a
+      disruption budget and its own alert.
+cases: []
+reading:
+  - { title: "Kubernetes: Admission Webhook Good Practices", url: "https://kubernetes.io/docs/concepts/cluster-administration/admission-webhooks-good-practices/", why: "The checklist a webhook should meet, with the dependency loops and the namespaces to leave alone." }
+  - { title: "Kubernetes: Dynamic Admission Control", url: "https://kubernetes.io/docs/reference/access-authn-authz/extensible-admission-controllers/", why: "failurePolicy, timeouts, selectors and the metrics that show which webhook rejects." }
+  - { title: "Amazon EKS best practices: EKS Control Plane", url: "https://docs.aws.amazon.com/eks/latest/best-practices/control-plane.html", why: "The control plane metrics worth watching on a managed cluster and the warning about catch-all webhooks." }
+  - { title: "Amazon EKS best practices: Kubernetes Control Plane", url: "https://docs.aws.amazon.com/eks/latest/best-practices/scale-control-plane.html", why: "How the API server limits in-flight requests and answers 429, which is not the same signal as a 5xx." }

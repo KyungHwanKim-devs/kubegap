@@ -1,589 +1,501 @@
-# default — full audit, 2026-11-05 17:25
+# default — full audit, 2026-11-15 01:02
 
-Urgent now: yes. app-c-coturn, the TURN relay of app-c-prod, has been down for at least 38 days and crash-loops on every start.
+Broken now: none
 
-Today's problems: ① app-c-coturn crash-looping for 38 days ② No backup copy leaves the nodes ③ Stale alerts, no user-symptom alerts ④ Kubernetes 1.33 past end of life ⑤ Four Postgres DBs open on NodePorts
+The 5 largest problems: ① Database backups never leave the node they are written on ② Prometheus keeps 30 days of metrics on an emptyDir volume ③ Nine Argo CD applications would delete a whole Namespace if its manifest went missing ④ Kubernetes 1.33 is past its end of support ⑤ Some alert notifications fail to reach Discord
 
-Since the last run:
+What already happened: Tempo was killed for memory and its pod restarted up to 163 times · Prometheus restarted and repaired a corrupted write-ahead log
 
-- The previous run listed no problems, so there is no earlier work to mark done or not done.
-- Appeared: 3.
-  - apiserver 503s at 0.004 per second, measured while collection ran.
-  - One failed CoreDNS health check of 1.1.1.1 and 8.8.8.8 in the last hour, with no SERVFAIL answers.
-  - An info-level CPUThrottlingHigh on logging/elasticsearch-0, firing for 3.1 days.
-  - 4 log findings are also new, but only because the log rules changed. The cluster did not cause them.
-- Went away: none.
+Scale: small
 
 ## The cluster at a glance
 
 | What | Value |
 |---|---|
 | Nodes | 2 of 2 Ready |
-| Pods | 96 running, 0 pending, 4 failed |
-| Namespaces | 26, 7 production |
-| Components | 23: actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
-| Metrics and log stores | prometheus 3.7.3 / none |
+| Pods | 107 running, 0 pending, 3 failed |
+| Namespaces | 28, 8 production |
+| Components | 26: actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, istio, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, opentelemetry-collector, prometheus, prometheus-operator, reloader, tempo-jaeger |
+| Metrics and log stores | prometheus 3.7.3 / no Loki |
 | Kubernetes | v1.33.5+k3s1 (k3s) |
 
-## Coming up
+## What already happened
 
-| When | What | Source |
-|---|---|---|
-| 2026-06-28, already 130 days past | Upstream end of life of Kubernetes 1.33, the version both nodes run | findings-draft.json |
-| 2026-11-06 | cert-manager is due to renew app-g-prod-tls, which expires on 2026-12-06 | summary.json |
-| 2026-11-07 | cert-manager is due to renew app-e-api-tls, which expires on 2026-12-07 | summary.json |
-| every day at 03:00 UTC | containerd-cleanup-node-b prunes unused images and deletes all but the 5 newest etcd snapshots on node-b | objects/cronjobs.json |
-| every day at 03:30 UTC | app-d-postgres-backup deletes dumps older than 3 days; the app-f-mysql and app-g dumps do the same, the app-a dumps after 5 days and the app-e dumps after 7 | objects/cronjobs.json |
-| every day at 04:20 UTC | es-index-retention deletes Elasticsearch k3s-* indices older than 14 days | objects/cronjobs.json |
-| every day at 04:30 UTC | registry-tag-cleanup deletes all but the last 5 commit-hash tags per repository in the in-cluster registry | objects/cronjobs.json |
-| now | app-i-prod uses 2 of the 2 PVCs its quota allows; a third PVC is refused | summary.json |
+There is no earlier run to compare with, so this covers only what this run collected.
 
-## 1. app-c-coturn crash-looping for 38 days
+### Tempo was killed for memory and its pod restarted up to 163 times
 
-**What is happening.** The only app-c-coturn pod exits with code 255 right after each start. It has been in CrashLoopBackOff for at least 38 days, and the Deployment has 0 of 1 replicas available. WebRTC clients of app-c.acme.com and example-h.space that need a TURN relay get none.
+During the last seven days the tracing store `monitoring/tempo` was ended by the kernel for exceeding its memory limit, and the pod that ended that way counted 163 restarts before it was replaced. The pod running now, `tempo-0`, was created on 2026-11-12 at 16:12 UTC and has restarted once since, so the repeated restarts appear to be over. Whether traces were lost while it restarted cannot be told from this audit. In the same week one pod of `app-ac-prod/app-ac-ai` was also ended by an OOM kill once and has been replaced; its new pod has not restarted.
 
-- Affected: app-c-prod/app-c-coturn, in CrashLoopBackOff with 10,715 restarts. The last exit was code 255 at 2026-11-05 08:24 UTC, and the Deployment shows Available=False.
-- Checked and healthy: app-c-signaling and app-c-web are Running and Ready on node-a. app-c-postgres-0 is Running and Ready on node-b.
-- Changed for another reason: node-a rebooted around 2026-10-28 22:06 UTC. The BackOff events on record start then.
-- Not checked: whether any call actually failed, because there are no TURN, WebRTC or ingress request metrics. Also not checked: which clients need the relay and how many there are.
+Why Tempo needed more memory than its limit is not known. The count comes from kube-state-metrics in Prometheus, which records how the old pods ended; the Tempo log, which would say what it was doing, lives in Elasticsearch and was not read. The restart count is an upper bound, because a failing probe restarts a container too.
 
-**Why.** The container runs coturn/coturn:latest with imagePullPolicy Always. The image it now pulls rejects the argument --no-dtls. Confirmed. The previous container log begins with `turnserver: unrecognized option '--no-dtls'`. When the tag moved is not known.
+This did not expose one of the five problems below.
 
-**Suggested fix.**
+### Prometheus restarted and repaired a corrupted write-ahead log
 
-① See the rejected option for yourself.
+Prometheus started again on 2026-11-14 at 01:13 UTC, and a minute later, at 01:14:32, it logged "Encountered WAL read error, attempting repair" followed by "Starting corruption repair" for segment 8483. The write-ahead log is the file on disk that protects the newest two hours of samples against a crash. Prometheus has served normally since, its configuration reloaded successfully and no further corruption was logged, so this is over. The samples in the damaged part of that segment were dropped by the repair.
 
-```
-kubectl -n app-c-prod logs deploy/app-c-coturn --previous | head -3
-```
+Why the log was damaged is not confirmed. Prometheus had not been killed for memory, so the likely cause is an abrupt stop of the process or its node; the audit has no node access to tell which.
 
-This only reads.
+This exposed problem 2, Prometheus keeps 30 days of metrics on an emptyDir volume.
 
-Check: the first line reads `turnserver: unrecognized option '--no-dtls'`. It names only the first option this build rejects, and it does not say why the tag changed.
+## 1. Database backups never leave the node they are written on
 
-② If ① shows that line, confirm that the pinned build accepts the peer options.
+**Why this one.** If both nodes lose their disks, or something with cluster rights deletes the volumes, the databases and their only dumps go together, and the data cannot be brought back.
 
-```
-docker run --rm coturn/coturn@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3 --help 2>&1 | grep -E 'denied-peer-ip|no-loopback-peers'
-```
+### What is the matter
 
-This only reads.
+There is no backup tool in this cluster, such as Velero, that copies objects and volumes somewhere else. What exists instead are eight CronJobs that run every night between 02:50 and 03:50 and every twelve hours for etcd: `app-a-prod/app-a-postgres-backup`, `app-f-prod/app-f-postgres-backup`, `app-f-prod/app-f-postgres-mx-backup`, `app-f-prod/app-f-postgres-vn-backup`, `app-g-api/app-g-postgres-backup`, `app-h-prod/app-h-mysql-backup`, `kube-system/etcd-snapshot-backup` and `app-i-prod/app-i-postgres-backup`. All eight ran within the last seven days, which is good: the dumps are being made.
 
-Check: the output lists --denied-peer-ip. If it does not, do not bring the relay back yet.
+All eight write their output to a local-path PersistentVolume bound to the node `node-a`, and none of their commands, arguments or environment values mention a tool that copies anything further, such as `s3`, `rclone` or `restic`. The source databases run on the other node, `node-b`, so a disk failure on one node alone leaves either the database or its dump. A failure of both nodes, a deletion of the namespaces or the volumes with cluster rights, or a loss of the site where the two machines stand takes every copy at once. That last kind of event is what a backup is for.
 
-③ If ② lists --denied-peer-ip, change the app-c-coturn Deployment in Git, all in one commit. The repository is acme/acme-k8s-manifests, path prod/app-c. Make these changes:
+Eight of the 15 databases found have no dump job at all: `app-k/app-k-postgres`, `app-l-prod/app-l-postgres`, `app-c-prod/app-c-postgres`, `app-h-prod/app-h-qdrant`, `logging/elasticsearch` and the three stores of `app-ac-prod` (`app-ac-neo4j`, `app-ac-opensearch`, `app-ac-postgres`). The k3s server also keeps its own five etcd snapshots on the server disk. Whether any dump has ever been restored cannot be told from this audit.
 
-- Delete the lines `- --no-dtls` and `- --no-cli`.
-- Pin the image to the digest that runs today, and set imagePullPolicy to IfNotPresent.
-- Set the update strategy to Recreate.
-- Replace the --user credential with one that is not guessable. Today's value is guessable.
-- Add these arguments in range form, because it is unverified whether this build accepts CIDR:
-  - `--denied-peer-ip=<ip>-<ip>`
-  - `--denied-peer-ip=<ip>-<ip>`
-  - `--denied-peer-ip=<ip>-<ip>`
-  - `--denied-peer-ip=<ip>-<ip>`
-  - `--denied-peer-ip=169.254.0.0-169.254.255.255`
+### Why it comes about
+
+The dumps were set up where it was easiest: a CronJob, a PersistentVolumeClaim on the default local-path StorageClass, and a schedule. That solves "I deleted a table by mistake" and nothing larger. This is inferred from the volume and command of each job; no step of any job sends the file onward.
+
+What a backup protects against is decided by where the copy lives, not by how often it is made. A copy on the same disk as the source only helps against a mistake inside the database. A copy on another node of the same cluster survives a node failure, but not what reaches the whole cluster: a script or a person with cluster rights deleting volumes, a namespace removed with everything in it, or a fire or theft where the machines are. The 3-2-1 rule names the answer: three copies, on two kinds of media, one of them off site.
+
+Volumes from local-path-provisioner make this sharper. Such a volume is a directory on one node: the PersistentVolume carries a node affinity for that host, the size in the claim is not enforced, and the directory is removed when the volume is deleted. There is no storage system behind it that could keep a snapshot elsewhere, so the copy out has to be built.
+
+The cluster state has the same question. k3s takes an etcd snapshot twice a day and keeps five on the server, and each snapshot is encrypted with a key derived from the server token. Restoring it on a new machine needs that token, so a snapshot kept without the token restores nothing. And for every kind of backup, one that has never been restored is not known to work: a file that appears every night says the job ran, not that a database comes up from it.
+
+[GitLab](https://about.gitlab.com/blog/2017/02/10/postmortem-of-database-outage-of-january-31/) lost the production database directory to a mistaken command in 2017. Its nightly pg_dump backups had been failing for some time because of a version mismatch, the failure mails were rejected, and the S3 bucket was empty; the data came back from a manual LVM snapshot six hours old. As here, backups were configured and believed to exist, and no one had restored one.
+
+At [InfluxData](https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/) a name collision in the Argo CD configuration made Argo CD delete a whole production environment. The volumes had the reclaim policy Retain, so the data stayed. In this cluster the dump jobs are declared through Argo CD and their volumes are inside the same cluster, so a deletion with cluster rights would reach them too.
+
+### How to watch it
+
+The first thing to watch is whether each dump job still succeeds. kube-state-metrics exports the time of the last successful run of every CronJob, and a rule on its age fires when a job has not succeeded for longer than its schedule allows. This cluster does fire the generic `KubeJobFailed` alert, but the audit did not find a rule on backup age; one would have to be made.
 
 ```yaml
+- alert: BackupCronJobStale
+  expr: time() - kube_cronjob_status_last_successful_time{cronjob=~".*backup.*"} > 86400 * 1.5
+  for: 30m
+```
+
+Once a copy job exists, the same series for that job shows whether the copy left the cluster. Whether a copy restores is not shown by any metric: it is seen by restoring one dump into an empty database now and then and comparing a few row counts, and for k3s by restoring a snapshot on a spare machine with the server token.
+
+### How it is solved
+
+At the scale this cluster is run at, keep the eight dump jobs as they are and add one step that sends their output to object storage outside the cluster. A CronJob that mounts the dump volume read-only and uploads it with restic or rclone to an S3-compatible bucket is enough. restic encrypts before it uploads, keeps versions and deduplicates; its repository password and the bucket credential live in a Secret, and losing the repository password loses the backups, so keep a copy of it outside the cluster. For k3s, turn on the S3 options of the etcd snapshot so that every snapshot is uploaded too, and keep the server token outside the cluster. The databases without a dump job need one first. The example shows the shape of such a container, not a manifest to apply as it is.
+
+```yaml
+containers:
+  - name: offsite
+    image: restic/restic
+    args: ["backup", "/dumps"]
+    envFrom:
+      - secretRef: { name: offsite-backup }
+    volumeMounts:
+      - { name: dumps, mountPath: /dumps, readOnly: true }
+```
+
+The jobs are declared in the repository `example-org/k8s-manifests` on GitHub, managed by Argo CD with selfHeal on, so a job created or changed by hand in the cluster is reverted. The paths are `prod/app-a-prod`, `prod/app-f-kr`, `prod/app-f-mx`, `prod/app-f-vn`, `prod/app-g-api`, `prod/app-h`, `prod/app-i` and `infra/etcd-snapshot-backup`.
+
+What to be careful of when applying it: the dump volumes are local-path volumes bound to `node-a`, so a copy job that mounts them is scheduled onto `node-a` as well, and it has to run after the dump of the same night has finished.
+
+At a larger scale, Velero backs up objects and volumes together on a schedule to object storage in another account, and restores are practised into a scratch cluster on a calendar.
+
+### Evidence
+
+| What | Value | Source |
+|---|---|---|
+| Backup tool installed | none | `inventory.missing_families` |
+| Backup CronJobs | 8 | `resilience.backup.rows` |
+| Of them writing only to a local volume | 8 | `resilience.backup.local_only` |
+| Node holding the dump volumes | node-a | `resilience.backup.rows` |
+| Node holding the source databases | node-b | `resilience.backup.rows` |
+| etcd snapshots kept on the server | 5 | finding `resilience.no-backup.cluster` |
+| Databases found | 15 |
+| Of them without a dump job | 8 | `resilience.backup.databases` |
+
+### Further reading
+
+- [GitLab: Postmortem of database outage of January 31](https://about.gitlab.com/blog/2017/02/10/postmortem-of-database-outage-of-january-31/): how believing a backup exists differs from restoring one.
+- [k3s: etcd-snapshot](https://docs.k3s.io/cli/etcd-snapshot): the S3 options and the restore procedure, including the token it needs.
+- [restic: Preparing a new repository](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html): the storage back ends restic writes to and how the repository password works.
+- [Velero: How Velero Works](https://velero.io/docs/main/how-velero-works/): what a backup, a schedule and a restore do, and what a restore leaves alone.
+
+## 2. Prometheus keeps 30 days of metrics on an emptyDir volume
+
+**Why this one.** The moment the Prometheus pod leaves its node, all 30 days of metrics are gone for good, and every dashboard and every comparison over time starts from empty.
+
+### What is the matter
+
+The single Prometheus of this cluster, `monitoring/prometheus-kube-prometheus-stack-prometheus`, writes its database to the volume `prometheus-kube-prometheus-stack-prometheus-db`, which is an `emptyDir`. The database holds 22.3GiB, the retention is 30 days by time with no size limit (`retentionSize` 0B), and the oldest sample is 31.2 days old, so the full window is there today. It has 174,075 active series and runs at 75% of its 1536Mi memory limit.
+
+An `emptyDir` lives as long as the pod lives on that node. A restart of the container keeps it, which is why the restart of 2026-11-14 kept the 30 days and lost only what the write-ahead log repair dropped; that incident is described above under the title Prometheus restarted and repaired a corrupted write-ahead log. A move of the pod to another node, a node replacement or a delete of the pod does not keep it. The pod is pinned to nodes labelled `role=observability`, so it does not move often, but a drain of that node is enough.
+
+Compactions have not failed in the last seven days, so the disk is not full now. Nothing limits how large the database may grow except the free space of the node filesystem, which this audit already sees as high in use on one node.
+
+### Why it comes about
+
+The kube-prometheus-stack chart creates Prometheus with an `emptyDir` unless `storageSpec` is set in its values, and the StatefulSet has no volume claim template, so it is not set here. The values themselves were not read.
+
+Prometheus keeps the newest data in memory. Incoming samples go into the head block, which covers about two hours and lives in memory; a write-ahead log on disk, in 128MB segments, protects the head against a crash. Every two hours the head is written out as a block, and blocks are compacted in the background into longer ones. Memory therefore follows the number of active series, while disk follows the series and the retention.
+
+Retention is 15 days by time by default, and the size limit is off by default. With only a time limit nothing stops the blocks from outgrowing the volume when the number of series grows; with a full disk compaction fails and in the end writes stop. When both limits are set the first one reached wins, and the Prometheus documentation advises a size limit of at most 80 to 85% of the disk, because a compaction briefly needs more.
+
+Local storage in Prometheus is not replicated: it is a single-node database and has to be treated like one. On an `emptyDir` that database has the life of the pod placement. Kubernetes deletes an `emptyDir` permanently when the pod is removed from its node.
+
+The UK Ministry of Justice lost monitoring on its live cluster for close to two hours in [2023](https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-25-prometheus-on-live-cluster-down.html), when Prometheus kept being OOM killed as the number of namespaces and rules grew; an external Pingdom check raised the page. In [2024](https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2024-04-15-prometheus.html) its Prometheus restarted after a planned change and the write-ahead log replay took longer than the startup probe allowed, so monitoring was lost for over three hours. In both the restart was the dangerous moment, as it was on 2026-11-14 here. [Saifeddine Rajhi](https://seifrajhi.github.io/blog/prometheus-manage-memory-overload/) describes a Prometheus that ran at about 30Gi and needed over 50Gi while replaying its log during a chart upgrade, so it could not come back; this Prometheus at 75% of its limit has less room for a replay than it seems.
+
+### How to watch it
+
+Once the database is on a volume claim, the kubelet exports used and capacity bytes per claim, and the Prometheus mixin ships `PrometheusTSDBCompactionsFailing`. This cluster has `PrometheusTSDBCompactionsFailing`; a rule on the claim filling up has to be made after the claim exists.
+
+```yaml
+- alert: PrometheusVolumeFillingUp
+  expr: |
+    kubelet_volume_stats_used_bytes{persistentvolumeclaim=~"prometheus-.*"}
+      / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"prometheus-.*"} > 0.8
+```
+
+Memory against the limit is the second signal, with the threshold well below the limit because a restart needs more. `prometheus_tsdb_head_series` shows a step up after a deployment that adds a high-cardinality metric. A Prometheus that is down evaluates no rules, so only a check from outside the cluster can report that.
+
+### How it is solved
+
+At the scale this cluster is run at, keep one Prometheus and size it on purpose: give it a persistent volume through `prometheus.prometheusSpec.storageSpec`, set `retentionSize` to 80 to 85% of that volume next to `retention`, and set the memory limit with room for a restart. Accept a gap in the metrics whenever it restarts. The values below show the shape; the sizes are to be taken from the 22.3GiB this database already holds, so a 20Gi volume would be too small for 30 days.
+
+```yaml
+prometheus:
+  prometheusSpec:
+    retention: 30d
+    retentionSize: "34GiB"
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          resources:
+            requests:
+              storage: 40Gi
+```
+
+Prometheus is installed by the Helm release `kube-prometheus-stack` (chart version 79.5.0 from the prometheus-community chart repository), managed by the Argo CD application `monitoring` with selfHeal on. A change made in the cluster is reverted, so change the values where that application declares them.
+
+What to be careful of when applying it: adding a volume claim template changes the pod's volumes, so the pod is recreated, and the new pod starts on an empty volume. The 30 days held in the `emptyDir` today are lost at that moment unless they are copied first. The volume will come from the local-path StorageClass, which pins it to the node it is created on and does not enforce its size, so the retention size limit is what really bounds it. The pod is pinned to `node-b`, where the databases also keep their volumes, so a 40Gi volume shares the free space of that root filesystem with them; check that space before choosing the size. The pod has `terminationGracePeriodSeconds` of 600, so the old pod may take up to ten minutes to stop.
+
+At a larger scale, two Prometheus instances scrape the same targets behind a query layer such as Thanos, or a managed Prometheus service takes the storage out of the cluster.
+
+### Evidence
+
+| What | Value | Source |
+|---|---|---|
+| Storage of the database | emptyDir | `stackhealth.prometheus.storage` |
+| Size on disk | 22.3GiB | `stackhealth.prometheus.tsdb_bytes` |
+| Retention by time | 30d | `stackhealth.prometheus.retention_time` |
+| Retention by size | 0B | `stackhealth.prometheus.retention_size` |
+| Oldest sample | 31.2 days | `stackhealth.prometheus.oldest_sample_days` |
+| Active series | 174,075 | `stackhealth.prometheus.head_series` |
+| Memory in use against limit | 0.752 of 1536Mi | `stackhealth.prometheus.rss_vs_limit` |
+| Write-ahead log corruptions | 1 | `stackhealth.prometheus.wal_corruptions` |
+| Failed compactions, 7 days | 0 | `stackhealth.prometheus.compactions_failed_7d` |
+| Node selector | role=observability | object `statefulset monitoring/prometheus-kube-prometheus-stack-prometheus` |
+
+### Further reading
+
+- [Prometheus: Storage](https://prometheus.io/docs/prometheus/latest/storage/): blocks, the write-ahead log, compaction, both retention limits and the formula for sizing the disk.
+- [Prometheus Operator: Storage](https://prometheus-operator.dev/docs/platform/storage/): how to give Prometheus a volume claim and what resizing one involves.
+- [Robust Perception: How much RAM does Prometheus 2.x need for cardinality and ingestion?](https://www.robustperception.io/how-much-ram-does-prometheus-2-x-need-for-cardinality-and-ingestion/): where the memory goes per series, to estimate a limit from the number of head series.
+- [Saifeddine Rajhi: Prometheus memory overload](https://seifrajhi.github.io/blog/prometheus-manage-memory-overload/): a walk through a Prometheus that could not restart, and how to find the metrics responsible.
+
+## 3. Nine Argo CD applications would delete a whole Namespace if its manifest went missing
+
+**Why this one.** One moved directory or renamed file in the manifest repository would make Argo CD delete a Namespace with every Deployment, Secret and PersistentVolumeClaim in it, and on local-path volumes the data goes with the claim.
+
+### What is the matter
+
+Nine Argo CD applications have automated sync with `prune` on and track a Namespace or a CustomResourceDefinition as one of their own resources: `app-a-prod`, `app-b-prod`, `app-d`, `app-g-api`, `app-ac-prod`, `istio`, `app-k`, `app-n` and `app-l-prod`. Namespaces that Argo CD creates through the `CreateNamespace` option are not counted here, because those are not tracked.
+
+Several of these applications hold databases: `app-a-prod` and `app-g-api` run PostgreSQL with their only dumps on local volumes (problem 1), and `app-ac-prod` runs PostgreSQL, Neo4j and OpenSearch with no dump at all. `istio` is the one most likely to own CRDs. Which of the nine tracks a Namespace and which a CRD is not split out by this audit.
+
+Nothing has gone wrong. This is a state that turns a small mistake in Git into a deletion.
+
+### Why it comes about
+
+The manifests were most likely written with a `Namespace` object at the top of each application directory, which is the natural way to make a directory self-contained, and the applications were set to prune so that removed resources do not linger. Each choice is reasonable alone. That is inferred from the applications' tracked resources; the repository itself was not read.
+
+Automated sync in Argo CD does not delete anything by default: a resource that is no longer in Git stays in the cluster. `prune: true` changes that. From then on a resource that disappears from what Argo CD renders from Git is deleted in the next sync.
+
+"Disappears from Git" covers more than a deliberate removal. A directory that is moved, a file that is renamed, a generator or template that renders a different name all look the same to Argo CD: the old object is no longer among the target resources. The one built-in protection is narrow. Automated sync refuses to prune when an application renders no resources at all, but an application that still renders some resources, only not the Namespace, passes it.
+
+For most kinds a wrong prune removes one object. A Namespace and a CRD are containers. Deleting a Namespace deletes everything in it, while the Namespace sits in Terminating and accepts nothing new. Deleting a CRD deletes every custom object of that kind in the cluster, and recreating the definition starts empty. On local-path volumes a deleted claim also deletes the directory on the node.
+
+At [InfluxData](https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/) a pull request added an Argo CD Application under a name that already existed; the new object replaced the existing application and an entire production environment was deleted, with every API endpoint returning 404 for almost six hours. The volumes had reclaim policy Retain, so the data stayed. The team then added `Prune=false` to stateful resources and Namespaces. In this cluster the volumes are local-path, whose directories are cleaned up when the volume is deleted.
+
+[Argo CD issue 28630](https://github.com/argoproj/argo-cd/issues/28630) reports shared Namespaces managed by Argo CD being deleted and about 97 applications left Missing or OutOfSync. The path there was a manual sync with force, which replaced the Namespace, and `Prune=false` did not prevent it. A Namespace tracked as an application resource is exposed to more than one path.
+
+### How to watch it
+
+There is no metric for pruned resources. What can be watched is the after-effect of the protection: once a Namespace carries `Prune=false`, a sync that would have deleted it leaves the application OutOfSync instead, so an application that stays OutOfSync longer than a rollout takes is the signal to look at. The audit did not check whether this cluster has such a rule.
+
+```yaml
+- alert: ArgoAppOutOfSync
+  expr: argocd_app_info{sync_status="OutOfSync"} == 1
+  for: 30m
+```
+
+The list itself can be seen at any time from the applications' status; the command below is an example of the shape.
+
+```bash
+kubectl get applications.argoproj.io -A -o json | jq -r '.items[] | select(.spec.syncPolicy.automated.prune==true) | .metadata.name as $n | .status.resources[]? | select(.kind=="Namespace" or .kind=="CustomResourceDefinition") | $n+" "+.kind+"/"+.name'
+```
+
+### How it is solved
+
+At the scale this cluster is run at, take the Namespace manifests out of the application directories and let Argo CD create the Namespaces with the sync option `CreateNamespace=true`, or keep the manifests and annotate each Namespace with `Prune=false`. Do the same for CRDs that hold objects you cannot recreate, which is most likely the case in `istio`. A Namespace you really want gone then has to be deleted by hand, and with `Prune=false` the application shows OutOfSync until someone does it. The annotation looks like this:
+
+```yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: app-g-api
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+```
+
+The nine applications are in the namespace `argocd`. Those whose declarations this audit read, `app-a-prod` (path `prod/app-a-prod`), `app-g-api` (path `prod/app-g-api`) and `app-ac-prod` (path `prod/app-ac-prod`), point at the repository `example-org/k8s-manifests` on GitHub with selfHeal on; the other six were not opened. Change the Namespace manifests there; an annotation added by hand in the cluster is reverted on the next sync.
+
+What to be careful of when applying it: removing a Namespace manifest from Git while `prune` is still on is exactly the deletion this problem is about. Add the `Prune=false` annotation and let it sync first, and only then remove the manifest. `CreateNamespace=true` alone is not a protection here: `app-g-api` already has it, and its Namespace still carries the tracking id `app-g-api:/Namespace:/app-g-api`, so it stays tracked.
+
+At a larger scale, Namespaces and CRDs are annotated `Prune=confirm,Delete=confirm` so that a sync which wants to delete them waits for a person, volumes use a StorageClass with reclaim policy Retain, and `FailOnSharedResource=true` stops an application before it changes objects that belong to another one.
+
+### Evidence
+
+| What | Value | Source |
+|---|---|---|
+| Applications with prune that track a Namespace or CRD | 9 | finding `argocd.prune-manages-namespace-or-crd.cluster` |
+| Application names | app-a-prod, app-b-prod, app-d, app-g-api, app-ac-prod, istio, app-k, app-n, app-l-prod | the same finding |
+| Databases in app-ac-prod without a dump job | 3 | `resilience.backup.databases` |
+
+### Further reading
+
+- [Argo CD: Sync Options](https://argo-cd.readthedocs.io/en/stable/user-guide/sync-options/): `Prune=false`, `Prune=confirm`, `Delete=confirm` and `CreateNamespace`, with what each leaves in the sync status.
+- [Argo CD: Automated Sync Policy](https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/): what automated sync deletes by default, what prune adds and what the empty-application protection covers.
+- [InfluxData: Deleting Production in a Few Easy Steps](https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/): a full account of an Argo CD deletion and the changes the team made afterwards.
+- [Argo CD: App Deletion](https://argo-cd.readthedocs.io/en/stable/user-guide/app_deletion/): when deleting an Application also deletes its resources.
+
+## 4. Kubernetes 1.33 is past its end of support
+
+**Why this one.** A vulnerability found in Kubernetes 1.33 from now on will not be patched, and every month of waiting adds work to the upgrade that has to come.
+
+### What is the matter
+
+Both nodes and the server run k3s `v1.33.5+k3s1`. The Kubernetes project ended support for the 1.33 minor on 2026-06-28, 140 days before this audit, so no further patch release of 1.33 will come from upstream.
+
+The API server reports one series of `apiserver_requested_deprecated_apis`: some client still requests `endpoints` in version `v1`, which Kubernetes deprecated in favour of EndpointSlices. The series carries no release in which it is removed, so it does not block the next upgrade, but it is the kind of call to look for before each step.
+
+### Why it comes about
+
+No upgrade is scheduled, so the cluster stays on the version it was installed with or last upgraded to. That is inferred from the version and from the components this audit found, among which there is no system-upgrade-controller.
+
+The Kubernetes project maintains release branches for the three newest minors. A minor gets patch releases for about fourteen months: twelve months of standard support, then two months in which only fixes for vulnerabilities with a CVE, dependency problems and critical core issues are released. After that it is end of life. Vulnerabilities that only affect an old version may not even be reported.
+
+The cost of waiting comes from one rule: the API server must not skip a minor when it is upgraded, even in a single-server cluster. A cluster two or three minors behind needs two or three upgrades in a row, each with its own removed APIs and add-on compatibility to check. kubelets may be up to three minors older than the API server, so nodes can lag, but not without limit, and k3s follows the same skew policy: servers first, then agents, one minor at a time.
+
+Each minor also removes API versions deprecated earlier. Asking the API server does not show which manifests still use them, because it converts objects to whatever version is requested; tools such as Pluto read the manifests and Helm releases instead.
+
+[ZenML](https://status.zenml.io/incidents/bnrlb8tck3v0) ran its production EKS cluster on an outdated Kubernetes version. The upgrade covered several Terraform modules at once, one change removed IAM permissions from the worker nodes, and the workspaces were down for about eight hours. An upgrade that has been put off tends to arrive as several changes in one night.
+
+### How to watch it
+
+The end-of-support date is a calendar fact, not a metric, so it is watched by putting it on the calendar. What can be measured is whether anything still calls an API version that a later minor removes: a series of `apiserver_requested_deprecated_apis` with a `removed_release` label is a client to fix before the upgrade.
+
+```promql
+apiserver_requested_deprecated_apis{removed_release!=""}
+```
+
+The rule `KubeVersionMismatch` exists in this cluster and catches nodes left on different versions during an upgrade.
+
+### How it is solved
+
+At the scale this cluster is run at, put the upgrade on the calendar: one minor at a time, a few weeks after k3s offers it. On k3s a Plan of the system-upgrade-controller that follows a release channel upgrades the server and then the agent node by node, with cordon and drain. Before each step run Pluto over the manifests and Helm releases for API versions the next minor removes. Choose the channel with care: the controller does not protect against a jump of more than one minor, so while the cluster is catching up, a channel tied to the next Kubernetes minor is safer than `stable` or `latest`, which k3s offers next to it. The Plan below shows the shape for the server node, with the channel to be replaced.
+
+```yaml
+apiVersion: upgrade.cattle.io/v1
+kind: Plan
+metadata:
+  name: server-plan
+  namespace: system-upgrade
 spec:
-  strategy:
-    type: Recreate
-  template:
-    spec:
-      containers:
-      - name: coturn
-        image: coturn/coturn@sha256:bbefd3e1fdfdc0d58770fe01b581fd8b00d9f3a5580d00acb77cf719a6bc78e3
-        imagePullPolicy: IfNotPresent
-        # args: the same list as today without '- --no-dtls' and '- --no-cli'
+  concurrency: 1
+  cordon: true
+  nodeSelector:
+    matchExpressions:
+      - { key: node-role.kubernetes.io/control-plane, operator: In, values: ["true"] }
+  serviceAccountName: system-upgrade
+  upgrade:
+    image: rancher/k3s-upgrade
+  channel: https://update.k3s.io/v1-release/channels/stable
 ```
 
-When you push, Argo CD applies the change through the app-c app, which runs with selfHeal. Recreate removes the crashing pod first and then starts one new pod on node-a from the pinned image.
+Nothing in the cluster marks the k3s installation as managed by Argo CD or Helm; k3s is installed on the nodes themselves.
 
-After the change, DTLS and the CLI stay off. Peers in the private, CGNAT and link-local ranges are refused. Clients get the new credential through app-c-web and app-c-signaling.
+What to be careful of when applying it: this cluster has two nodes, the databases run on `node-b` with local-path volumes bound to it, and their dumps sit on `node-a`. A drain of either node stops whatever is pinned to it until the node is back, because local-path volumes cannot follow a pod to the other node. The node `node-b` is also the control-plane node and carries `role=observability`, so the server Plan drains the node where the databases and Prometheus run; Prometheus keeps its 30 days on an `emptyDir`, which a drain deletes, so fix problem 2 first or accept that loss. Take a copy of the databases off the cluster before the first upgrade (problem 1), and expect each database to be down for the length of its node's upgrade. Do not leave the channel at `stable` on 1.33: it can jump more than one minor.
 
-Risk to availability:
+At a larger scale the upgrade is a written, rehearsed procedure: a non-production cluster first, removed APIs scanned in CI, control plane then add-ons then nodes, with PodDisruptionBudgets in place.
 
-- The relay is already down, so the rollout costs no availability.
-- turnserver stops at the first option it rejects, so the log names only --no-dtls.
-- The saved usage text shows --cli but no --no-cli, so --no-cli is removed too.
-- Whether this build accepts every other argument is seen only when it starts.
-
-Risk in the rollout:
-
-- The pod uses hostNetwork and hostPort 3478, and it is pinned to node-a. A new pod can start only after the old pod frees the port, and Recreate deletes the old pod first.
-- The API may reject the change with 'may not be specified when strategy type is Recreate'. If it does, add `rollingUpdate: null` under strategy. That fix is unverified.
-- Argo CD selfHeal reverts a by-hand kubectl edit, so make the change in Git.
-
-Risk once it runs:
-
-- coturn relays for anyone who holds the --user credential, and the web client hands it out.
-- Without the denied ranges, the relay can reach LAN and node addresses from node-a, <ip>. That includes the Postgres NodePorts 30432-30435 of problem 5 and the kubelet on 10250. This is why the ranges go in the same commit.
-- If <public-ip>:3478 is reachable from outside, anyone can use that path. The router's port forwarding was not checked.
-
-Check: after a few minutes, `kubectl -n app-c-prod get pods -l app=app-c-coturn -o wide` shows 1/1 Running on node-a with RESTARTS 0. Then `kubectl -n app-c-prod logs deploy/app-c-coturn | grep -i listener` shows the 3478 listeners.
-
-④ When the pod is Running, confirm that the Deployment is available and the alerts clear.
-
-```
-kubectl -n app-c-prod get deploy app-c-coturn; kubectl -n monitoring port-forward svc/kube-prometheus-stack-alertmanager 9093 & sleep 2; curl -s 'http://localhost:9093/api/v2/alerts?filter=namespace="app-c-prod"' | grep -c alertname
-```
-
-This only reads.
-
-Check: the Deployment shows 1/1 available. The query returns 0 once KubePodCrashLooping and KubeDeploymentReplicasMismatch resolve.
-
-Only a TURN allocation test from a client outside the LAN shows that relaying works. You can run one on the Trickle ICE page with turn:app-c.acme.com:3478.
-
-⑤ When the relay works again, keep the image from moving. Bump the digest only when you want a new coturn release. Move the --user credential into a Secret, referenced from the args or a config file.
-
-This makes a new Deployment revision through Git, rolled out the same way as ③.
-
-Risk: an option the new image does not accept brings back the same crash loop. Before every bump, read `kubectl -n app-c-prod exec deploy/app-c-coturn -- turnserver --help`.
-
-Check: the pod stays Running with 0 restarts, and turnserver --help lists every option in the args.
-
-**Rollback.** Run git revert on the commit, and Argo CD restores the previous Deployment. That Deployment crash-loops again. Nothing is deleted.
-
-**Why this happens.**
-
-- Principle: an image tagged :latest can come up as a different program on any restart. There is no record of which version ran before, so you cannot roll back to it. Pinning a digest and pulling IfNotPresent keeps a restart from changing the program. Exit code 255 with no Unhealthy events means the program itself fails at start, and the previous container log holds the reason.
-- Read: the Kubernetes documentation on Images, for image pull policy and digests. Also the `turnserver --help` output of the pinned version.
-
-**Evidence.**
+### Evidence
 
 | What | Value | Source |
 |---|---|---|
-| Restarts of the coturn container since 2026-03-20 | 10,715 | summary.json |
-| BackOff events, 2026-10-28 to 2026-11-05 | 49,085 | summary.json |
-| KubePodCrashLooping firing | 38.1 days | findings-draft.json |
-| Ready ratio, last 24 hours | 0.0 | findings-draft.json |
-| First log line of the crashed container | unrecognized option '--no-dtls' | extra/coturn-previous-head.txt |
-| Image and pull policy | coturn/coturn:latest, Always | objects/deployments.json |
+| Server version | v1.33.5+k3s1 | `inventory.server_version` |
+| Upstream end of life of 1.33 | 2026-06-28 | finding `platform.k8s-version-eol.cluster` |
+| Days past end of life | 140 | the same finding |
+| Nodes | 2 | `inventory.nodes` |
+| Deprecated API series requested | 1 (endpoints v1) | `metrics.apiserver_requested_deprecated_apis` |
 
-## 2. No backup copy leaves the nodes
+### Further reading
 
-**What is happening.** Seven dump CronJobs run every night, and every dump lands on a local-path volume on node-a or node-b. Five of them sit on node-b, the same single SSD as the database they copy. The five etcd snapshots are on node-b only. app-c-postgres and app-i-postgres have no dump at all. If node-b's disk fails, the production databases, five of the seven dumps and all etcd snapshots are lost together.
+- [Kubernetes: Patch Releases](https://kubernetes.io/releases/patch-releases/): the support period of a minor, what maintenance mode still fixes, and the end-of-life date of each release.
+- [k3s: Automated Upgrades](https://docs.k3s.io/upgrades/automated): how a Plan upgrades a k3s cluster node by node and what the controller does not guard against.
+- [Amazon EKS best practices: Cluster Upgrades](https://docs.aws.amazon.com/eks/latest/best-practices/cluster-upgrades.html): the order of an in-place upgrade and the tools that find removed APIs before it.
 
-- Affected:
-  - app-d-postgres and app-d-postgres-vn: dump volumes on node-b, the same node as the data.
-  - app-f-mysql: dumps go to a volume of the app-f-mysql StatefulSet itself, on node-b.
-  - app-g-postgres: dump volume on node-b, the same node as the data.
-  - app-e-postgres: dump volume on node-b, the same node as the data.
-  - app-c-postgres and app-i-postgres: no dump CronJob in their namespaces.
-  - etcd: 5 snapshots on node-b's disk, and k3s runs without --etcd-s3.
-- Checked and healthy: the Postgres dump CronJobs succeeded on their last run, 2026-11-05 between 02:50 and 03:50 UTC. The app-a-postgres and app-d-postgres-mx dumps go to node-a, away from their databases.
-- Changed for another reason: none.
-- Not checked:
-  - Whether app-f-mysqldump succeeded. The pipe into gzip has no pipefail, so the Job can report success when mysqldump fails.
-  - The content of any dump, and whether one has ever been restored.
-  - Whether someone copies the node directories elsewhere from outside the cluster.
-  - app-d-redis and app-a-redis persistence.
-  - app-h-postgres and app-e-minio, which have no dump.
+## 5. Some alert notifications fail to reach Discord
 
-**Why.** No off-node copy is set up. Confirmed. Every dump ends with gzip into a directory on one node, and k3s runs without --etcd-s3.
+**Why this one.** An alert that fires and is not delivered is an outage nobody hears about, and the always-firing Watchdog alert that would reveal a broken path is routed to a receiver that sends nowhere.
 
-**Suggested fix.**
+### What is the matter
 
-① List the dump files and etcd snapshots on both nodes.
+Alertmanager tried to send 60 notifications in the last 24 hours, and 8 of them failed; the other 52 were delivered. All failures are on the `slack` integration. The receivers of this cluster are named `discord` (the default) and `discord-critical`, so the `slack` integration is most likely how a Discord webhook is called, which Discord supports. Which of the two receivers the failures came from is not split out, so the failures may touch any alert.
 
-```
-ssh node-b 'sudo ls -la --time-style=long-iso /var/lib/rancher/k3s/storage/*backup* /var/lib/rancher/k3s/server/db/snapshots'; ssh node-a 'sudo ls -la --time-style=long-iso /var/lib/rancher/k3s/storage/*backup*'
-```
+The rule `AlertmanagerFailedToSendAlerts` exists in this cluster and was firing in 27 rule evaluation samples over the last seven days; it travels down the same path, so whether it was seen is not known. Alertmanager's configuration reloaded successfully.
 
-This only reads.
+The routing tree sends alerts with severity `info` or `none` to the receiver `null`, which has no integration. `Watchdog`, the alert that always fires to prove the path works, has severity `none` and is firing now, so it goes to `null` and proves nothing.
 
-Check: each directory has a file dated 2026-11-05 or later, larger than a few kilobytes.
+### Why it comes about
 
-Look at the app-f-mysql sizes in particular. Its Job status does not prove the dump worked.
+Why 8 of 60 failed is not known. A share that fails while the rest succeeds points more at rate limits or brief network errors on the way to Discord than at an expired webhook, which would fail every notification; that is inferred from the numbers. The Alertmanager log names the error per notification, and it was not read: logs of this cluster go to Elasticsearch, which this audit does not query.
 
-This does not show that a dump restores. It also misses node-a directories outside /var/lib/rancher/k3s/storage, if the default class there uses another path.
+An alert travels over two hops. Prometheus evaluates the rules and sends what fires to Alertmanager. Alertmanager deduplicates, groups and routes it to a receiver, and the receiver's integration calls the outside service. Each hop can fail while everything looks healthy from inside, because the component that would report the failure is the one that failed. Prometheus here reports no errors sending to Alertmanager and dropped nothing in a day, so the first hop is sound.
 
-② Today, before any other change in this report, copy the dumps, the etcd snapshots and the k3s server token to a machine outside the cluster.
+On the second hop Alertmanager counts each notification and each failure per integration, in `alertmanager_notifications_total` and `alertmanager_notifications_failed_total`. That counter is the only place an expired webhook or a rejected request shows up. Alertmanager does retry, but it raises no alert of its own beyond what a rule asks for, and such an alert travels down the same path.
 
-```
-umask 077; mkdir -p ~/k3s-backup/$(date +%F) && ssh node-b "sudo -n sh -c 'cd /var/lib/rancher/k3s && tar -czf - storage/*backup* server/db/snapshots server/token'" > ~/k3s-backup/$(date +%F)/node-b.tgz && ssh node-a "sudo -n sh -c 'cd /var/lib/rancher/k3s && tar -czf - storage/*backup*'" > ~/k3s-backup/$(date +%F)/node-a.tgz
+That is why the `Watchdog` alert exists. It always fires, so it should always arrive somewhere; sent to an external heartbeat service, its silence becomes the alarm when the whole path breaks.
+
+### How to watch it
+
+The share of failed notifications per integration shows it as it happens. `AlertmanagerFailedToSendAlerts` from the Alertmanager mixin is built on it and is present here.
+
+```promql
+rate(alertmanager_notifications_failed_total[15m])
+  / rate(alertmanager_notifications_total[15m]) > 0.01
 ```
 
-This writes two archives to your machine. The cluster is not changed. The nodes only read their disks.
+For a total failure, route `Watchdog` to a heartbeat service outside the cluster. That route does not exist today.
 
-Risk:
+### How it is solved
 
-- The archive holds database contents and the k3s server token. umask 077 keeps it readable only by you.
-- The glob takes only the dump volumes. It leaves out Elasticsearch, the registry and app-e-minio. The app-a dump directory alone is about 5.9 GB.
-- Reading adds I/O on node-b, which already logs slow etcd applies. Run it outside 02:50-04:30 UTC, when the dump jobs run.
-- The dump CronJobs delete old dumps every day at 03:30 UTC (app-d, app-f-mysql and app-g after 3 days, app-a after 5, app-e after 7), so today's dumps last only that long on the nodes. Every day es-index-retention also deletes Elasticsearch k3s-* indices older than 14 days at 04:20 UTC, and registry-tag-cleanup keeps only the last 5 commit-hash tags per repository at 04:30 UTC.
-- Do not use ssh -t. A terminal corrupts the binary stream.
+At the scale this cluster is run at, read the Alertmanager log in Elasticsearch for the errors on the `slack` integration and fix what it names; if it is rate limiting, a longer `group_interval` or fewer, better grouped alerts reduce the calls. Then add the one check that does not depend on the path itself: a route that sends `Watchdog` to the webhook of an external heartbeat service. The route must come before the one that sends severity `none` to `null`, because the first match wins. The example shows the shape; the address is a placeholder.
 
-If sudo needs a password, sudo -n fails and the command stops. In that case:
+```yaml
+route:
+  receiver: discord
+  routes:
+    - matchers:
+        - alertname = "Watchdog"
+      receiver: heartbeat
+      repeat_interval: 5m
+receivers:
+  - name: heartbeat
+    webhook_configs:
+      - url: https://heartbeat.example/ping/<id>
+```
 
-1. Open an interactive ssh session on the node.
-2. Write the archive there with `sudo tar -czf /root/<node>.tgz …`.
-3. Run `sudo install -m 600 -o $USER`, then copy the archive with scp.
-4. Delete the archive on the node.
+Alertmanager is part of the Helm release `kube-prometheus-stack`, managed by the Argo CD application `monitoring` with selfHeal on, so change the routes in the values that application uses; a change made in the cluster is reverted.
 
-The token path is the k3s default. It is unverified on this node.
+What to be careful of when applying it: Helm replaces a list in the values instead of merging it, so the Watchdog route has to be added to the existing `routes` list next to the routes for `null` and `discord-critical`, not put in its place; pasted as it stands, critical alerts would lose their own receiver and info alerts would start reaching Discord. The heartbeat service pages when the signal stops, so a Prometheus or Alertmanager restart, such as the one on 2026-11-14, will now page too.
 
-Check: `tar -tzf ~/k3s-backup/<date>/node-b.tgz | head -20` lists dump files and etcd-snapshot-node-b-* files. `gzip -t` on the archive reports no error.
+At a larger scale alerts about a failing integration go through a second integration, routes are tested with `amtool config routes test` before they are applied, and Alertmanager runs as a cluster of replicas.
 
-③ This week, make a copy leave the nodes every night:
-
-- Enable k3s etcd snapshots to S3-compatible storage with --etcd-s3.
-- Add an rclone or restic step after each dump that sends the file to the same store.
-- Add dump CronJobs for app-c-postgres and app-i-postgres.
-- Add `set -o pipefail` to app-f-mysql-backup.
-
-These also have no dump or off-node copy and need one: app-h-postgres, app-e-minio, the orphaned volume data-app-z-db-0 in default, and the registry data. The registry data, 32.7 GB on node-b, is also pruned every night by registry-gc and registry-tag-cleanup.
-
-This adds new k3s flags on node-b, which restarts k3s there. It also changes CronJobs in Git and adds new CronJobs in app-c-prod and app-i-prod.
-
-Risk:
-
-- node-b is the only server, so the API is unavailable while k3s restarts.
-- Keep the store credentials in a Secret, not in the CronJob env.
-- The app-i-prod quota already holds 2 of 2 PVCs, so a dump PVC there is refused. Send that dump straight to the store, or raise the quota.
-- That quota also caps cpu and memory, and no LimitRange fills in defaults. The dump Job's container must state requests and limits, or the pod is refused.
-- The app-e-api dump volume and the 5.9 GB app-a dump volume on node-a, which has 24.3 GB free, keep growing with retention.
-
-Check: the bucket has a file with tonight's date for each database. `k3s etcd-snapshot ls` on node-b lists s3 locations.
-
-④ When the first off-node copy exists, restore one dump of each engine into a scratch namespace. Write down how long it took. Use `gunzip -c <file> | psql` for Postgres and `gunzip -c <file> | mysql` for app-f-mysql.
-
-This creates a temporary namespace with a throwaway database pod.
-
-Risk: requests already exceed what one node holds. Run it on node-b outside the dump window, and delete it afterwards. Do not point it at a production Service.
-
-Check: row counts of a few tables match production.
-
-**Rollback.** The copy steps change nothing in the cluster. To undo the k3s change, remove the flags and restart k3s. The CronJob changes are Git commits that git revert undoes.
-
-**Why this happens.**
-
-- Principle: a dump on the same disk as its database dies with it. A backup exists to recover even then, so one copy has to leave the node. A dump that was never restored may not work.
-- Case: at InfluxData in 2023, a wrong object name in a pull request made Argo CD replace a production instance. That deleted its StatefulSets and PersistentVolumeClaims. They recovered from Retain volumes, Velero and object-store backups in just under six hours. Here, seven Argo CD apps run with automated prune, volumes use reclaimPolicy Delete, and no copy exists outside the two nodes. The same mistake would leave nothing to restore.
-- Read: the K3s documentation on etcd-snapshot, for S3 options and restore. Also the PostgreSQL documentation, Backup and Restore: SQL Dump.
-
-**Evidence.**
+### Evidence
 
 | What | Value | Source |
 |---|---|---|
-| Dump CronJobs whose output stays on a node | 7 | summary.json |
-| Dump CronJobs on the same node as their database | 5 | summary.json |
-| etcd snapshots kept off node-b | no | summary.json |
-| Production databases without a dump | 2 | summary.json |
-| app-a dump volume against its 5,120 MB claim | 5,862 MB | summary.json |
+| Notifications attempted, 24 h | 60 | `metrics.am_notifications_1d` |
+| Notifications failed, 24 h | 8 | `observability.alertmanager.notifications_failed_1d` |
+| Integration that failed | slack | the same row |
+| Default receiver | discord | `observability.alertmanager.default_receiver` |
+| Receiver for severity info or none | null | `observability.alertmanager.routes` |
+| Firing now | Watchdog | `observability.alerts.firing_now` |
+| AlertmanagerFailedToSendAlerts, 7 days | 27 samples | `observability.alerts.firing_7d_by_alert` |
+| Alerts Prometheus failed to send, 24 h | 0 dropped | `stackhealth.prometheus.notifications_dropped_1d` |
 
-## 3. Stale alerts, no user-symptom alerts
+### Further reading
 
-**What is happening.** Five warning alerts go to Discord now, and have for days to weeks. They are KubePodCrashLooping and KubeDeploymentReplicasMismatch for app-c-coturn, two KubeJobFailed for app-a-prod, and KubeCPUOvercommit. Alertmanager sent 24 notifications in the last day and none failed, yet the coturn outage went on for 38 days. Of the 161 alert rules, 153 watch causes and 7 watch app metrics, and none was confirmed to check site error ratio or latency.
+- [Prometheus Operator runbooks: Watchdog](https://runbooks.prometheus-operator.dev/runbooks/general/watchdog/): how an always-firing alert proves the whole path works, and what to connect it to.
+- [Alertmanager mixin: alerts](https://raw.githubusercontent.com/prometheus/alertmanager/main/doc/alertmanager-mixin/alerts.libsonnet): the rules that watch Alertmanager itself, with their thresholds.
+- [Prometheus: Alertmanager high availability](https://prometheus.io/docs/alerting/latest/high_availability/): what is replicated between instances and why duplicates are preferred over misses.
 
-- Affected:
-  - app-c-coturn: KubePodCrashLooping has fired for 38.1 days while the pod stayed down.
-  - app-a-sandbox-watchdog: two old failed Jobs from 2026-10-25 and 2026-10-28 keep KubeJobFailed firing. The CronJob succeeds every minute.
-  - Cluster CPU: KubeCPUOvercommit fires because 6.17 cores are requested against the 6.0 cores left if node-b is lost.
-- Checked and healthy: no notification failures in 24 hours, and no active or forgotten silences.
-- Changed for another reason: none.
-- Not checked: what the Discord channel shows and who reads it. Also Grafana alerting, which needs a Grafana token.
+## The next largest problems
 
-**Why.** Cause alerts are left firing until they become background noise. Likely. Evidence: the same five warnings repeat every 4 hours to the default Discord receiver, the failed Jobs were never cleaned up, and the overcommit was never decided on.
+- **CPU limits throttle application, database and monitoring containers.** Nine containers were throttled in between a quarter and three fifths of their scheduling periods over the last day or their pod's life, among them `app-h-prod/app-h-api-server`, `app-g-api/app-g-postgres`, `logging/elasticsearch`, `logging/fluent-bit` and Prometheus itself, and seven more are throttled below the fail line. While a container is throttled, its work waits for the next period even if it is urgent. Severity: high.
+- **MinIO in app-g-api runs at 95% of its memory limit.** The seven-day p95 of the working set of `app-g-api/app-g-minio-0` is 0.95 of its limit, so a small rise in use ends in an OOM kill and a restart. Severity: high.
 
-**Suggested fix.**
+## Since the previous report
 
-① Save the status of the two failed watchdog Jobs, then delete them.
-
-```
-kubectl -n app-a-prod get job app-a-sandbox-watchdog-29881700 app-a-sandbox-watchdog-29887083 -o yaml > watchdog-failed-jobs.yaml && kubectl -n app-a-prod delete job app-a-sandbox-watchdog-29881700 app-a-sandbox-watchdog-29887083
-```
-
-The two Jobs and any remaining pods are removed, and KubeJobFailed for app-a-prod resolves.
-
-Risk: the saved file is their only record. Argo CD does not track Jobs made by a CronJob, so nothing recreates them. The next run that exceeds its 120-second deadline fires the alert again, which is the alert working.
-
-Check: `kubectl -n app-a-prod get jobs | grep -c Failed` returns 0. KubeJobFailed for app-a-prod leaves Alertmanager within minutes.
-
-② Today, fix app-c-coturn as in problem 1. That clears the two app-c-prod alerts.
-
-Check: Alertmanager shows no app-c-prod alert.
-
-③ This week, decide on KubeCPUOvercommit. You have two options:
-
-- Lower the CPU requests of stateless workloads until the total fits on node-a alone. Never lower them on the databases.
-- Accept the risk for a two-node cluster. Route the alert to the null receiver in the kube-prometheus-stack values in Git, with a comment saying why.
-
-Risk: lowering requests restarts those pods, and single-replica Deployments are down while they roll. Routing the alert away hides a real capacity limit. Losing node-b already stops the API, so the alert adds little today. It matters again with a third node.
-
-Check: KubeCPUOvercommit no longer reaches Discord, and the reason sits next to the route.
-
-④ When the noise is gone, add alerts on what users see:
-
-- Enable ingress-nginx controller metrics and a ServiceMonitor.
-- Alert on a 5xx ratio above 1% for 5 minutes, and on p99 latency per host.
-- Add an alert for OOMKilled containers. No rule covers them today.
-
-First, save the current values.
-
-```
-helm -n ingress-nginx get values nginx-ingress -o yaml > nginx-values.yaml
-```
-
-Add `controller.metrics.enabled=true` and `controller.metrics.serviceMonitor.enabled=true` to that file. Then upgrade.
-
-```
-helm -n ingress-nginx upgrade nginx-ingress ingress-nginx/ingress-nginx --version 4.14.0 -f nginx-values.yaml
-```
-
-The two controller pods restart. They carry all public traffic. With 2 replicas, surge 1 and unavailable 0, one pod keeps serving while the new pod schedules and becomes Ready.
-
-Risk: without `-f`, Helm resets the values to chart defaults. That includes the Service type and the MetalLB address <ip>. Without `--version`, Helm also upgrades the controller.
-
-ingress-nginx 1.14.0 is retired upstream, so this is also a good time to plan its replacement.
-
-Check: `kubectl -n monitoring get prometheusrules` shows the new rules. The query nginx_ingress_controller_requests returns series.
-
-**Rollback.** The deleted Jobs are recorded in the saved YAML. Undo the Helm change with `helm rollback nginx-ingress` to the previous revision. The rule and route changes are Git commits that git revert undoes.
-
-**Why this happens.**
-
-- Principle: an alert that has fired for days means nobody is looking, or a false positive was left alone. Real problems get buried in that noise. With alerts only on causes such as CPU or job status, you learn about outages from users.
-- Read: the Google SRE book, chapter 6, Monitoring Distributed Systems. Also the kube-prometheus-stack runbooks for KubeJobFailed and KubeCPUOvercommit.
-
-**Evidence.**
-
-| What | Value | Source |
-|---|---|---|
-| Alerts active on Discord | 5 | summary.json |
-| Notifications sent, last 24 hours | 24 | metrics/am_notifications_1d.json |
-| Failed notifications, last 24 hours | 0 | metrics/alertmanager_notifications_failed_1d.json |
-| Rules on a user symptom, of 161 | 0 | summary.json |
-| KubeCPUOvercommit firing | 30.6 days | findings-draft.json |
-| Oldest KubeJobFailed for app-a-prod | 11.2 days | findings-draft.json |
-
-## 4. Kubernetes 1.33 past end of life
-
-**What is happening.** Both nodes run k3s v1.33.5+k3s1. Upstream support for 1.33 ended on 2026-06-28, so the cluster has gone 130 days without Kubernetes security patches. 1.34 also left support on 2026-10-27, so reaching a supported version takes two upgrades in a row. Both nodes also have pending OS updates and need a reboot.
-
-- Affected: node-b, the k3s server, needs a reboot and has 7 security updates pending. node-a, the agent, needs a reboot and has 1 pending.
-- Checked and healthy: no API objects that 1.34 removes. The k3s certificates have at least 287 days left.
-- Changed for another reason: none.
-- Not checked: whether any CVE fixed after v1.33.5 applies here. Also manifests in Git or Helm charts that are not applied yet.
-
-**Why.** The cluster has stayed on the version it was installed with, and nothing upgrades k3s automatically. Likely. Evidence: no upgrade controller is present in the cluster.
-
-**Suggested fix.**
-
-① Check for APIs removed up to 1.35.
-
-```
-pluto detect-all-in-cluster --target-versions k8s=v1.35.0 -o wide; kubent --target-version 1.35.0
-```
-
-This only reads.
-
-Check: both print no objects. They do not see manifests that exist only in Git, Helm hook templates, or resources they may not list.
-
-② Right before the upgrade, and after problem 2's off-node copy exists, take an etcd snapshot and copy it off the node.
-
-```
-ssh node-b 'sudo k3s etcd-snapshot save --name pre-upgrade-1.34' && ssh node-b "sudo sh -c 'cat /var/lib/rancher/k3s/server/db/snapshots/pre-upgrade-1.34*'" > ~/k3s-backup/pre-upgrade-1.34.db
-```
-
-This adds a snapshot of about 38 MB on node-b and a copy on your machine.
-
-Risk: the nightly cleanup at 03:00 UTC keeps only the 5 newest snapshots, so the copy on the node is gone within about three days. The off-node copy is the one that counts.
-
-The exact file name k3s gives is unverified. If the glob matches more than one file, list the directory and copy the newest.
-
-Check: `ls -l ~/k3s-backup/pre-upgrade-1.34.db` shows about 38 MB.
-
-③ In a maintenance window, upgrade one version at a time, following the k3s manual upgrade guide:
-
-1. Upgrade node-b, the server, to the latest v1.34 k3s release.
-2. Upgrade node-a, the agent.
-3. Check that every node is Ready and every pod is back.
-4. Repeat for v1.35.
-
-Do the OS reboots separately, one node at a time.
-
-k3s restarts on each node with the new version.
-
-Risk while k3s restarts:
-
-- node-b is the only server. While k3s restarts there, the API is down and nothing can be scheduled or changed.
-- Whether running containers keep running through the restart is unverified here.
-
-Risk during the reboots:
-
-- A reboot of node-b stops all 48 pods on it, including every production database, until it is back.
-- A reboot of node-a stops the app-c, app-f and app-d front ends.
-
-Before you restart k3s on node-b:
-
-- node-b's --server flag points at <ip>, an address no node has. Read the k3s config on node-b first.
-- ingress-nginx 1.14.0 and cert-manager 1.14.4 each support a range of Kubernetes versions. Check those ranges against 1.35.
-
-Check: `kubectl get nodes` shows both nodes Ready on the new version. `kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded` shows only the pods that were failing before.
-
-**Rollback.** The snapshot steps are undone by deleting files. k3s cannot be downgraded a version in place. The way back is restoring the pre-upgrade snapshot from ② on the old binary, with the dumps from problem 2.
-
-**Why this happens.**
-
-- Principle: an unsupported version gets no security patches. On k3s you cannot skip a version, so every month of delay makes the upgrade path longer.
-- Case: in 2025, ZenML ran an outdated EKS version and had skipped several upgrades. During the catch-up, a Terraform change removed IAM permissions from the worker nodes, and all workspaces were down for about 8 hours. Here the cluster is also two versions behind, and the catch-up runs on a single server node.
-- Read: the K3s documentation, Upgrades: manual upgrades. Also the Kubernetes documentation, Version Skew Policy.
-
-**Evidence.**
-
-| What | Value | Source |
-|---|---|---|
-| Server version | v1.33.5+k3s1 | inventory.json |
-| Days since end of life | 130 | findings-draft.json |
-| Objects removed in 1.34 | 0 | summary.json |
-| Security updates pending on node-b | 7 | summary.json |
-| k3s certificates, days left | 287 | summary.json |
-
-## 5. Four Postgres DBs open on NodePorts
-
-**What is happening.** Four production databases are open on NodePorts 30432 to 30435 on both nodes, without TLS. A probe reached all four ports on both nodes, from the other node over the LAN and from a Mac over Tailscale. Anyone on the LAN or the tailnet can try passwords against them.
-
-- Affected: app-d-postgres on 30433, app-d-postgres-mx on 30435, app-d-postgres-vn on 30434 and app-g-postgres on 30432. All answered over the LAN and over Tailscale.
-- Checked and healthy: no other Service is exposed this way besides ingress-nginx on 80 and 443. The MetalLB port 7946 did not answer from the other node.
-- Changed for another reason: none.
-- Not checked: whether the router forwards these ports from the internet, how each database authenticates remote clients, and who connects through the ports today.
-
-**Why.** The *-external Services were added in Git for access from outside the cluster and left in place. Likely. Evidence: they carry Argo CD tracking for the apps app-d-kr, app-d-mx, app-d-vn and app-g, and they were created between 2025-11-11 and 2026-03-14.
-
-**Suggested fix.**
-
-① Before closing the ports, see whether something still uses them.
-
-```
-for t in app-d-prod/app-d-postgres-0 app-d-prod/app-d-postgres-mx-0 app-d-prod/app-d-postgres-vn-0 app-g-prod/app-g-postgres-0; do ns=${t%/*}; pod=${t#*/}; echo "== $t"; kubectl -n $ns exec $pod -- sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select client_addr, usename, application_name, backend_start from pg_stat_activity where client_addr is not null"'; done
-```
-
-This runs four read-only queries.
-
-Risk: none to the data. Through a NodePort, the client address likely shows a node or flannel address, not the real client. It shows that something uses a port, not who. Ask the people who hold the passwords too.
-
-Check: addresses outside <ip>/16, or the 10.42.x.0/1 gateway addresses, mean something still uses the NodePorts. Clients that connect only now and then do not show.
-
-② When nobody needs the ports, or those users have a port-forward instead, delete the four *-external Service manifests in Git. They live in prod/app-d-kr, prod/app-d-mx, prod/app-d-vn and prod/app-g. Argo CD prunes the Services.
-
-For by-hand access, they can use:
-
-```
-kubectl -n app-d-prod port-forward svc/app-d-postgres 15432:5432
-```
-
-The four NodePort Services disappear. The ClusterIP Services that the apps and dump jobs use stay as they are. The database pods do not restart.
-
-Risk: any outside client on 30432-30435 loses access at once. Argo CD selfHeal recreates a Service you delete by hand, so make the change in Git.
-
-Check: `kubectl get svc -A | grep -c NodePort` returns 0. `nc -vz -w 3 <node address> 30433` from the Mac over Tailscale fails.
-
-**Rollback.** Run git revert on the commit, and Argo CD recreates the four Services with the same ports.
-
-**Why this happens.**
-
-- Principle: a NodePort listens on every node interface, so a database behind it is guarded by one password. Safer options are a ClusterIP Service with port-forward, or an interface reachable only over Tailscale.
-- Read: the Kubernetes documentation on Service type NodePort. Also the PostgreSQL documentation, The pg_hba.conf File.
-
-**Evidence.**
-
-| What | Value | Source |
-|---|---|---|
-| NodePort of app-g-postgres-external | 30432 | summary.json |
-| NodePort of app-d-postgres-external | 30433 | summary.json |
-| NodePort of app-d-postgres-vn-external | 30434 | summary.json |
-| NodePort of app-d-postgres-mx-external | 30435 | summary.json |
-| All four ports answered, both nodes | over LAN and Tailscale | extra/node-port-probe.txt, extra/node-port-probe-lan.txt |
-
-## Since the previous full run
-
-2026-11-04T22-29-59 (full)
-
-Work the previous report asked for: none
-
-**Appeared.**
-
-- 503 responses from the apiserver at 0.004 per second, measured while collection ran (controlplane.apiserver-5xx)
-- CoreDNS health checks of the upstream resolvers 1.1.1.1 and 8.8.8.8 failed once in the last hour, with no SERVFAIL answers (coredns.forward-upstream-errors)
-- CPUThrottlingHigh for logging/elasticsearch-0, severity info and routed to the null receiver, firing for 3.1 days
-
-**Went away.**
-
-- none
-
-**Changed because the checks changed, not the cluster.**
-
-- The log-signature rules changed in this kubegap version, so four log findings are new for that reason: cert-manager 'propagation check failed' (10 lines, 02:31-03:35 UTC), 'too many open files' from containerd on node-b (32 lines, 03:30-04:17 UTC), and two MetalLB speaker signatures
-
-**Checks whose rule changed between the runs.**
-
-- `logs.signatures.cert-manager.challenge-failed` (warn/medium)
-- `logs.signatures.common.too-many-open-files` (warn/high)
-- `logs.signatures.metallb.speaker-peer-unreachable` (warn/low)
-- `logs.signatures.metallb.speaker-error` (warn/medium)
-
-## Serious, not today
-
-- No SLO tool or SLO recording rule exists. This waits until problem 3 gives the sites symptom alerts.
-- node-b is the only k3s server and the only node allowed to run the production databases. Without node-b, node-a's 6.0 cores fall short of the 6.17 cores requested, and the API stops anyway. Fixing this needs a third node, which is a hardware decision.
-- node-b's single SSD carries etcd, Elasticsearch, Prometheus, the registry and 19 local-path volumes.
-  - Elasticsearch uses 103,451 MB on a 20,480 MB claim.
-  - Prometheus uses 22,004 MB in emptyDir.
-  - The registry uses 32,732 MB.
-  - etcd logged 191 slow applies in 24 hours, the slowest 1,160 ms, with no leader change.
-  - No user-visible effect was found. Disk latency was not measured.
-- Prometheus, with 21.4 GiB and 30 days of history, keeps its data in emptyDir, and so do Alertmanager and Grafana. A pod restart drops that data.
-- Seven Argo CD apps with automated prune manage their own Namespace object, and local-path volumes use reclaimPolicy Delete. Removing a Namespace manifest from Git deletes the namespace and its data.
-- CoreDNS runs one replica, on node-b, with no PodDisruptionBudget.
-- 37 workloads can run on only one node, because of nodeSelector or local volumes. Among them are app-f-api-server with 3 replicas, app-f-admin, app-f-app-x-client and app-d, all pinned to node-a.
-- node-b reached its inotify instance limit, fs.inotify.max_user_instances=128. containerd logged 'too many open files' 32 times between 03:30 and 04:17 UTC, while the nightly Jobs ran.
-- app-e-api/app-e-minio uses 98% of its memory limit at the 7-day p95. No OOM kill appears in the 7-day metrics.
-- Elasticsearch, Kibana and the es-index-retention CronJob in logging set ELASTIC_PASSWORD as a literal env value, not a Secret reference.
-- default/app-y-backend-config has keys named JWT_SECRET, JWT_RELAY_SECRET, TWITTER_CLIENT_SECRET and TWITTER_CLIENT_SECRET_RELAY, and nothing mounts it. The values were not read.
-- Prometheus, Elasticsearch, app-e-postgres and fluent-bit are CPU-throttled in more than 10% of their periods.
-- cert-manager is due to renew app-g-prod-tls on 2026-11-06 and app-e-api-tls on 2026-11-07. They expire on 2026-12-06 and 2026-12-07.
+There is no earlier run to compare with, so this covers only what this run collected.
 
 ## Each area in one line
 
 | Area | What |
 |---|---|
-| resources | Requests run ahead of use for CPU and behind for memory; app-e-minio is at 98% of its memory limit. |
-| scaling | 11 CPU-only HPAs, 6 never scaled; no node autoscaler, as expected for two machines. |
-| observability | 161 cause-only alert rules, 6 always firing; monitoring data on emptyDir; no ingress metrics. |
-| traffic | Retired ingress-nginx, four database NodePorts and a down TURN relay. |
-| resilience | No off-node backup, one server node holding every production database, many single replicas. |
-| hygiene | Mutable image tags, the coturn outage among them; four lingering Failed pods. |
-| storage | Local-path claims not enforced: Elasticsearch at 5 times its claim; all volumes reclaim on delete. |
-| security | No literal secrets found in the flagged script ConfigMaps; no NetworkPolicy default deny or Pod Security enforcement; plaintext Elasticsearch password in env. |
-| cost | 4.9% CPU use of two owned machines; nothing to drop. |
-| tenancy | Production, CI and system workloads share both nodes; no saturation in 7 days. |
-| node OS | Both nodes need a reboot; node-b hit the inotify limit; no kernel errors. |
-| platform | k3s 1.33 past end of life; a single etcd server logging slow applies. |
+| resources | CPU limits throttle nine containers above the fail line and seven below it, MinIO sits at 95% of its memory limit, and Tempo was killed for memory this week. |
+| scaling | No critical or high problem was found here. |
+| observability | Prometheus stores its 30 days on an emptyDir volume, 8 of 60 notifications failed in a day, and the Watchdog alert is routed to a receiver that sends nowhere. |
+| traffic | MetalLB speaker readiness and configuration freshness raised high warnings that were not opened in depth. |
+| resilience | No backup tool exists and all eight backup CronJobs write their dumps to local volumes on the node node-a only. |
+| hygiene | Nine Argo CD applications with prune enabled track a Namespace or CRD as a resource. |
+| storage | The filesystem holding local-path volumes has little free space, raised as a high warning. |
+| security | One ConfigMap, default/app-ai-backend-config, has keys that look like secrets, raised as a high warning. |
+| cost | This audit found no problem here. |
+| tenancy | This audit found no problem here. |
+| node OS | Nodes were not read, by the user's choice; one node root filesystem is high in use as seen from node-exporter. |
+| platform | The cluster runs k3s v1.33.5, 140 days past the upstream end of life of 1.33. |
 
-## What this run could not see
+## Limits of this run
 
-- Loki logs: no Loki Service exists, so nothing was searched there. Run `/kubegap setup` and say where Loki runs, or that it is not installed.
-- Grafana datasources, dashboards and alerts: Grafana answers only logged-in callers. Create a Viewer service-account token in Grafana, and add it as grafana_api_token in the kubegap config file in your own editor.
-- Request rate, errors and latency of the sites: ingress-nginx exposes no metrics. Enable controller metrics and a ServiceMonitor as in problem 3, step ④.
-- Whether the NodePorts and the coturn ports are reachable from the internet: read the router's port-forwarding table, or probe the public address from a network outside the LAN and the tailnet.
-- Disk latency and I/O on node-b: query `rate(node_disk_io_time_seconds_total[5m])` for instance <ip>:9100 in Prometheus.
+**Not judged because the cluster does not hold the data**
+
+- Loki is not installed and the logs go to Elasticsearch, which this audit does not query.
+  - Weaker for it: Why Tempo and app-ac-ai ran out of memory, and why some Discord notifications failed, are inferred without application or Alertmanager logs.
+  - To see it: Read the Alertmanager pod log and the Tempo log for the week in Elasticsearch.
+
+**Not read by kubegap yet**
+
+- 13 components were read only through their objects and metrics; kubegap has no checks of their own for them: actions-runner-controller, elasticsearch-opensearch, fluent-bit, fluent-bit-events, ingress-nginx, istio, kube-state-metrics, metrics-server, node-exporter, opentelemetry-collector, prometheus-operator, reloader, tempo-jaeger.
+  - Weaker for it: a fault inside one of these components is not in this report.
+- The collection stopped at one of its own limits and read only part of: `core.component-logs` (argocd: argocd/argocd-application-controller, argocd: argocd/argocd-applicationset-controller, argocd: argocd/argocd-notifications-controller, argocd: argocd/argocd-repo-server, coredns: kube-system/coredns, external-secrets: external-secrets/external-secrets, fluent-bit: logging/fluent-bit, ingress-nginx: ingress-nginx/nginx-ingress-ingress-nginx-controller, istio: istio-system/istiod, metallb: metallb-system/speaker, tempo-jaeger: monitoring/tempo).
+  - Weaker for it: a number counted from these is a lower bound, and the oldest lines of the day or the rest of a list are not in this report.
+
+**What you answered not to read at the first-run questions**
+
+- Node checks.
+  - What answering adds: up to 26 node checks in a full run, and the node-side read of component metrics that Prometheus does not scrape.
+  - To see it: `/kubegap setup` asks the question again.
 
 ## Numbers
 
-| Severity | fail | warn | vs. previous full run |
-|---|---|---|---|
-| critical | 2 | 2 | fail 0, warn 0 |
-| high | 28 | 68 | fail 0, warn +2 |
-| medium | 73 | 135 | fail +2, warn 0 |
-| low | 9 | 121 | fail 0, warn +1 |
+Severity is for a cluster run at scale small.
 
-Checks behind each problem:
+No earlier full run to compare with.
 
-- problem 1: `events.tracked-warning-reasons.BackOff`, `resilience.restarts-crashloop.app-c-prod/app-c-coturn-549854dfcb-jgp4h:coturn`, `security.privileged-or-host-access.app-c-prod/deployment/app-c-coturn`, `hygiene.mutable-image-tag.app-c-prod/deployment/app-c-coturn:coturn`, `hygiene.polaris-reliability-danger.app-c-prod/deployment/app-c-coturn`, `observability.alert-firing-stale.KubePodCrashLooping/app-c-prod`, `operators.unhealthy-condition.deployments/app-c-prod/app-c-coturn`, `traffic.pod-not-ready.app-c-prod/app-c-coturn`, `observability.alerts-always-firing.KubePodCrashLooping`
-- problem 2: `resilience.no-backup.cluster`, `resilience.backup-same-node.app-d-prod/app-d-postgres-backup`, `resilience.backup-same-node.app-d-prod/app-d-postgres-vn-backup`, `resilience.backup-same-node.app-f-prod/app-f-mysql-backup`, `resilience.backup-same-node.app-g-prod/app-g-postgres-backup`, `storage.local-path-over-capacity.app-a-prod/app-a-postgres-backup-pvc`, `resilience.backup-same-node.app-a-prod/app-a-postgres-backup`, `resilience.backup-same-node.app-d-prod/app-d-postgres-mx-backup`, `resilience.backup-same-node.app-e-api/app-e-postgres-backup`, `platform.k3s-etcd-snapshot-local-only.node-b`, `resilience.cronjob-policy.app-d-prod/app-d-postgres-backup`, `resilience.cronjob-policy.app-d-prod/app-d-postgres-mx-backup`, `resilience.cronjob-policy.app-d-prod/app-d-postgres-vn-backup`, `resilience.cronjob-policy.app-f-prod/app-f-mysql-backup`, `resilience.cronjob-policy.app-g-prod/app-g-postgres-backup`, `resilience.prod-db-without-backup-cronjob.cluster`
-- problem 3: `observability.no-symptom-alerts.cluster`, `observability.failure-mode-uncovered.OOMKill`, `observability.alert-firing-stale.CPUThrottlingHigh/monitoring`, `observability.alert-firing-stale.KubeCPUOvercommit`, `observability.alert-firing-stale.KubeJobFailed/app-a-prod`, `observability.alert-firing-stale.KubeQuotaFullyUsed/app-i-prod`, `observability.alerts-always-firing.CPUThrottlingHigh`, `observability.alerts-always-firing.KubeCPUOvercommit`, `observability.alerts-always-firing.KubeDeploymentReplicasMismatch`, `observability.alerts-always-firing.KubeJobFailed`, `observability.alerts-always-firing.KubeQuotaFullyUsed`, `observability.ingress-controller-metrics-missing.ingress-controller`, `observability.alert-firing-stale.CPUThrottlingHigh/logging`, `observability.page-severity-cause-alerts.cluster`, `observability.severity-channels-not-separated.cluster`
-- problem 4: `platform.k8s-version-eol.cluster`, `node.os-updates-pending.node-a`, `node.os-updates-pending.node-b`, `node.reboot-required.node-a`, `node.reboot-required.node-b`
-- problem 5: `traffic.db-exposed.nodeport/app-d-prod/app-d-postgres-external`, `traffic.db-exposed.nodeport/app-d-prod/app-d-postgres-mx-external`, `traffic.db-exposed.nodeport/app-d-prod/app-d-postgres-vn-external`, `traffic.db-exposed.nodeport/app-g-prod/app-g-postgres-external`
+| Severity | fail | warn |
+|---|---|---|
+| critical | 0 | 2 |
+| high | 15 | 23 |
+| medium | 93 | 173 |
+| low | 13 | 115 |
 
-Details and every table: [`report-details.md`](report-details.md) · kubegap 0.1.2, rubric 0.1.80 · snapshot `~/.kubegap/snapshots/my-cluster/2026-11-05T17-00-00`
+Checks behind each entry:
+
+- Tempo was killed for memory and its pod restarted up to 163 times: `resources.oomkilled-repeated.monitoring/sts/tempo:tempo`, `resources.oomkilled-repeated.app-ac-prod/deploy/app-ac-ai:ai`
+- Prometheus restarted and repaired a corrupted write-ahead log: `logs.signatures.prometheus.wal-corrupt`
+- Database backups never leave the node they are written on: `resilience.no-backup.cluster`, `resilience.backup-same-node.*`
+- Prometheus keeps 30 days of metrics on an emptyDir volume: `prometheus.storage-risk.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus`
+- Nine Argo CD applications would delete a whole Namespace if its manifest went missing: `argocd.prune-manages-namespace-or-crd.cluster`
+- Kubernetes 1.33 is past its end of support: `platform.k8s-version-eol.cluster`
+- Some alert notifications fail to reach Discord: `observability.alertmanager-notification-failed.slack`
+
+Details and every table: [`report-details.md`](report-details.md) · kubegap 0.2.0, rubric 0.1.94 · snapshot `~/.kubegap/snapshots/<context>/2026-11-15T01-02-12`

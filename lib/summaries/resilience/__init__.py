@@ -15,6 +15,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from ...foundations.scrub import command_shape
 from ...foundations.snapshot import event_count, load_json, objects, parse_ts, taken_at
 from ...foundations.workload import eligible_nodes, is_db_like, mounts_pvc, selector_matches, workload_of
 from ...foundations.workload import key as wl_key
@@ -27,7 +28,6 @@ SUSPECT_LIVENESS_RE = re.compile(r"(db|database|mysql|postgres|redis|mongo|kafka
 DB_SELF_PROBE_RE = re.compile(
     r"(pg_isready|mysqladmin|mysql .*-e|redis-cli|valkey-cli|mongosh|mongo .*ping|cqlsh|nodetool|clickhouse-client|rabbitmq-diagnostics|rabbitmqctl|etcdctl endpoint|_cluster/health|minio.*health)", re.IGNORECASE
 )  # standard probes that check the DB's own response — not external dependencies (seen: 6 mysql false positives)
-SHELLS = ("sh", "/bin/sh", "bash", "/bin/bash", "/usr/bin/bash", "ash", "/bin/ash")
 
 
 class Ctx:
@@ -109,7 +109,9 @@ def _probes(cx: Ctx) -> dict:
                     probes[pk] = None
                     continue
                 typ = next((t for t in ("httpGet", "tcpSocket", "exec", "grpc") if t in pr), "?")
-                path = (pr.get("httpGet") or {}).get("path") or (" ".join((pr.get("exec") or {}).get("command") or []) if typ == "exec" else None)
+                path = (pr.get("httpGet") or {}).get("path") or (
+                    " ".join((pr.get("exec") or {}).get("command") or []) or None if typ == "exec" else None
+                )  # None for an exec probe whose command the run did not keep (no app-settings): its text cannot be read for a dependency
                 probes[pk] = {
                     "type": typ,
                     "path": path,
@@ -231,11 +233,11 @@ def _graceful(cx: Ctx) -> dict:
         if not serving:
             continue
         conts = tpl.get("containers") or []
-        shell = [c["name"] for c in conts if (c.get("command") or [None])[0] in SHELLS and "-c" in (c.get("command") or []) + (c.get("args") or [])]
+        shell = [c["name"] for c in conts if command_shape(c)["shell"]]
         pvc_names = [v["persistentVolumeClaim"]["claimName"] for v in tpl.get("volumes") or [] if v.get("persistentVolumeClaim")]
         rwo = [c for c in pvc_names if "ReadWriteMany" not in (pvc_modes.get((o["metadata"]["namespace"], c)) or ["ReadWriteOnce"])]
         ext = sorted({k for c in conts for k in ((c.get("resources") or {}).get("limits") or {}) if "/" in k and not k.startswith("hugepages")})
-        reasons = ([f"RWO PVC {rwo[:2]}"] if rwo else []) + ([f"extended resource {ext}"] if ext else [])
+        reasons = ([f"RWO PVC {rwo}"] if rwo else []) + ([f"extended resource {ext}"] if ext else [])
         rows.append(
             {
                 "workload": wl_key(kind, o),
@@ -384,7 +386,7 @@ def _placement(cx: Ctx) -> dict:
                 "node": nd,
                 "prod_pods": c,
                 "share": round(c / prod_total, 2) if prod_total else None,
-                "prod_workloads": sorted(prod_wl_by_node[nd])[:30],
+                "prod_workloads": sorted(prod_wl_by_node[nd]),
                 "workload_count": len(prod_wl_by_node[nd]),
                 "capacity_type": (ctype or "").lower() or None,
                 "spot": (ctype or "").lower() == "spot",
@@ -550,7 +552,7 @@ def _restarts(cx: Ctx) -> dict:
                 fin = parse_ts(last.get("finishedAt"))
                 oom_last[f"{ns}/{name}/{cs.get('name')}"] = {"finished": last.get("finishedAt"), "age_days": round((now - fin).total_seconds() / 86400, 1) if fin else None, "restarts": cs.get("restartCount") or 0, "prod": ns in cx.prod}
     return {
-        "rows": rows[:40],
+        "rows": rows,
         "by_cause": dict(Counter(r["cause"] for r in rows)),
         "crashloop_now": [f"{r['namespace']}/{r['pod']}" for r in rows if r["crashloop"]],
         "oom_last": oom_last,
@@ -596,7 +598,7 @@ def _priority(cx: Ctx) -> dict:
         "prod_pods_without_class": prod_without,
         "prod_max_priority": prod_max,
         "nonprod_max_priority": nonprod_max,
-        "inversion": inversion[:20],
+        "inversion": inversion,
         "preempted_events": preempted,
         "no_user_classes_with_prod": bool(prod_pods) and not user_pcs,
     }

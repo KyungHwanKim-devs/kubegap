@@ -183,7 +183,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "not_ready": [r["target"] for r in rows if not r["ready"]],
         "not_ready_prod": [r["target"] for r in rows if not r["ready"] and r["prod"]],
         "stale": [r["target"] for r in rows if r["stale"] and r["ready"]],
-        "stale_detail": [{"target": r["target"], "refresh_interval": r["refresh_interval"], "refresh_age_h": r["refresh_age_h"]} for r in rows if r["stale"] and r["ready"]][:6],
+        "stale_detail": [{"target": r["target"], "refresh_interval": r["refresh_interval"], "refresh_age_h": r["refresh_age_h"]} for r in rows if r["stale"] and r["ready"]],
         "refresh_intervals": dict(Counter(r["refresh_interval"] for r in rows)),
         "deletion_policy_delete": [r["target"] for r in rows if r["deletion_policy"] == "Delete"],
         "orphan_creation": [r["target"] for r in rows if r["creation_policy"] == "Orphan"],

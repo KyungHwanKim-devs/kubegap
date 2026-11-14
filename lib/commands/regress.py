@@ -27,8 +27,8 @@ from collections.abc import Callable
 from pathlib import Path
 
 from .. import __version__
-from ..collection import collect
-from ..foundations import paths
+from ..collection import collect, discover
+from ..foundations import paths, scrub, units
 from ..foundations.config import Config
 from ..foundations.snapshot import check_schema, load_json, write_private
 from ..judgement import evaluate
@@ -104,7 +104,67 @@ def degrade(snap: Path) -> None:
     write_private(snap / "inventory.json", json.dumps(inv, ensure_ascii=False, indent=1))
 
 
-VARIANTS: dict[str, Callable[[Path], None] | None] = {"": None, "-degraded": degrade}
+def _outputs(snap: Path, collector: str, st: dict) -> list[Path]:
+    """The files a step wrote into a snapshot: its `out` with each placeholder ({node}, {item}, {item_safe}) open, or the folder a cwlogs step fills."""
+    if st["type"] == "cwlogs":
+        return [snap / "logs" / "cloudwatch"]
+    out = st.get("out")
+    if not out:
+        return []
+    return sorted(snap.glob(re.sub(r"\{[a-z_]+\}", "*", out)))
+
+
+def as_mode(snap: Path, mode: str) -> None:
+    """Turn the copy of a full fixture into what a `mode` run of the same cluster would have written, the way collect and discover write it: the steps
+    of a unit the mode does not collect are recorded as skipped by the mode and their files are not there; without app-settings the objects went through
+    the scrub that keeps no application setting; without cloud-account the inventory holds what the kubeconfig says of the EKS cluster and why the rest is
+    missing; without node-os no node was contacted. (The components found from the EKS add-on list stay as the fixture has them.)"""
+    have = units.of_mode(mode)
+    cr = load_json(snap / "collect-result.json")
+    inv = load_json(snap / "inventory.json")
+    for collector, st in paths.collect_steps():
+        rec = (cr.get(collector) or {}).get("steps") or {}
+        if st["id"] not in rec or st["unit"] in have:
+            continue
+        why = f"a {mode} run does not collect {st['unit']}"
+        rec[st["id"]] = {"ok": True, "skipped": why, "mode_skipped": True, "unit": st["unit"], "out": st.get("out") or st.get("file")}
+        for p in _outputs(snap, collector, st):
+            shutil.rmtree(p) if p.is_dir() else p.unlink()
+    for d in sorted((p for p in snap.rglob("*") if p.is_dir()), reverse=True):  # a folder whose every file was a skipped step's was never made
+        if not any(d.iterdir()):
+            d.rmdir()
+    if "app-settings" not in have:
+        for f in sorted((snap / "objects").glob("*.json")):
+            data = load_json(f)
+            for o in data.get("items") or []:  # the fixture went through the full run's scrub; the marks are taken off so that this scrub decides again
+                if o.get("kind") == "ConfigMap":
+                    o.pop(scrub.MARK, None)
+            write_private(f, json.dumps(scrub.scrub_objects(data, app_settings=False), ensure_ascii=False))
+    agg_path = snap / "logs" / "pods" / "AGGREGATED.json"
+    if "component-log-samples" not in have and agg_path.is_file():  # the counts without any text of a line, as the step writes them with keep_lines false
+        agg = load_json(agg_path)
+        scan = agg["log_scan"]
+        scan["lines_kept"], scan["unclassified_errors"] = False, []
+        for r in scan["signatures"]:
+            r["samples"] = []
+        write_private(agg_path, json.dumps(agg, ensure_ascii=False, indent=1))
+    cluster = inv.get("cluster") or {}
+    if "cloud-account" not in have and cluster.get("eks"):
+        cluster["eks"] = discover.eks_facts_unread(cluster["eks"], Config(), mode)
+        shutil.rmtree(snap / "aws", ignore_errors=True)  # what discovery itself read of the account (describe-cluster, the add-on list)
+    if "node-os" not in have:
+        inv["node_access"] = discover.node_access_unread(mode)
+    write_private(snap / "MODE", mode + "\n")
+    cr["_summary"] = collect.step_summary(cr, mode, cr["_summary"]["seconds_total"])
+    write_private(snap / "collect-result.json", json.dumps(cr, ensure_ascii=False, indent=1))
+    write_private(snap / "inventory.json", json.dumps(inv, ensure_ascii=False, indent=1))
+
+
+def daily(snap: Path) -> None:
+    as_mode(snap, "daily")
+
+
+VARIANTS: dict[str, Callable[[Path], None] | None] = {"": None, "-degraded": degrade, "-daily": daily}
 
 
 def variants() -> list[tuple[str, Path, Callable[[Path], None] | None]]:
@@ -134,10 +194,11 @@ def run(snap: Path) -> dict[str, str]:
     out["summary.json"] = (snap / "summary.json").read_text(encoding="utf-8")
     fd = load_json(snap / "findings-draft.json")
     kept = {
-        "profile": fd.get("profile"),
+        "platform": fd.get("platform"),
+        "scale": fd.get("scale"),
         "rubric_version": fd.get("rubric_version"),
         "check_results": [{k: r.get(k) for k in ("id", "status", "reason", "counts", "skipped_reason") if k in r} for r in fd.get("check_results") or []],
-        "findings": [{k: f.get(k) for k in ("check", "target", "status", "severity", "evidence", "source") if k in f} for f in fd.get("findings") or []],
+        "findings": [{k: f.get(k) for k in ("check", "target", "status", "severity_default", "nature", "evidence", "source") if k in f} for f in fd.get("findings") or []],
     }
     out["findings.json"] = json.dumps(kept, ensure_ascii=False, indent=1) + "\n"
     return {k: normalise(v, snap) for k, v in out.items()}

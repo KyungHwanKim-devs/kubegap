@@ -1,0 +1,428 @@
+{
+ "counted_at": "collection",
+ "log_scan": {
+  "lines_kept": true,
+  "files_scanned": [
+   "logs/pods/argocd/argocd_argocd-application-controller.log",
+   "logs/pods/argocd/argocd_argocd-applicationset-controller.log",
+   "logs/pods/argocd/argocd_argocd-notifications-controller.log",
+   "logs/pods/argocd/argocd_argocd-repo-server.log",
+   "logs/pods/argocd/argocd_argocd-server.log",
+   "logs/pods/cert-manager/cert-manager_cert-manager-cainjector.log",
+   "logs/pods/cert-manager/cert-manager_cert-manager.log",
+   "logs/pods/coredns/kube-system_coredns.log",
+   "logs/pods/elasticsearch-opensearch/logging_elasticsearch.log",
+   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log",
+   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log",
+   "logs/pods/external-secrets/external-secrets_external-secrets.log",
+   "logs/pods/fluent-bit/logging_fluent-bit.log",
+   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log",
+   "logs/pods/ingress-nginx/ingress-nginx_nginx-ingress-ingress-nginx-controller.log",
+   "logs/pods/keda/keda_keda-operator.log",
+   "logs/pods/metallb/metallb-system_controller.log",
+   "logs/pods/metallb/metallb-system_speaker.log",
+   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log"
+  ],
+  "lines_scanned": 19941,
+  "error_lines_unclassified": 202,
+  "signatures": [
+   {
+    "id": "metallb.speaker-error",
+    "name": "MetalLB speaker errors",
+    "component": "metallb",
+    "area": "traffic",
+    "severity": "medium",
+    "sources": [
+     "logs/pods/metallb/*.log"
+    ],
+    "pattern": "\"level\":\"error\"(?!.*\"msg\":\"partial join\")|failed to (announce|send)",
+    "meaning": "ARP/BGP announcement of the external IP failed, so it is unreachable from outside. `failed to announce service` (speaker), `failed to send ARP reply` (also used for NDP), `failed to send BGP update|withdraw|keepalive` are the named lines; the first alternative counts every other error-level line of the speaker and controller pods except `partial join`.",
+    "cause": "Interface selection, L2Advertisement settings, node network.",
+    "verify": "kubectl logs -n metallb-system -l component=speaker --since=1h | grep '\"level\":\"error\"' | grep -v 'partial join' | head",
+    "warn_at": 5,
+    "fail_at": 200,
+    "count": 42,
+    "first": "2026-11-07T01:10:09Z",
+    "last": "2026-11-07T01:23:59Z",
+    "files": {
+     "logs/pods/metallb/metallb-system_speaker.log": 42
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/speaker-xfxlv/speaker] 2026-11-07T10:10:09.141164882+09:00 {\"caller\":\"state.go:668\",\"component\":\"Memberlist\",\"level\":\"error\",\"msg\":\"memberlist: Push/Pull with node-b failed: dial tcp 192.168.90.102:7946: i/o timeout\",\"ts\":\"2026-11-07T0",
+     "[pod/speaker-xfxlv/speaker] 2026-11-07T10:10:49.142209582+09:00 {\"caller\":\"state.go:668\",\"component\":\"Memberlist\",\"level\":\"error\",\"msg\":\"memberlist: Push/Pull with node-b failed: dial tcp 192.168.90.102:7946: i/o timeout\",\"ts\":\"2026-11-07T0",
+     "[pod/speaker-xfxlv/speaker] 2026-11-07T10:11:29.143188340+09:00 {\"caller\":\"state.go:668\",\"component\":\"Memberlist\",\"level\":\"error\",\"msg\":\"memberlist: Push/Pull with node-b failed: dial tcp 192.168.90.102:7946: i/o timeout\",\"ts\":\"2026-11-07T0",
+     "[pod/speaker-xfxlv/speaker] 2026-11-07T10:12:09.144391725+09:00 {\"caller\":\"state.go:668\",\"component\":\"Memberlist\",\"level\":\"error\",\"msg\":\"memberlist: Push/Pull with node-b failed: dial tcp 192.168.90.102:7946: i/o timeout\",\"ts\":\"2026-11-07T0",
+     "[pod/speaker-xfxlv/speaker] 2026-11-07T10:12:49.145924343+09:00 {\"caller\":\"state.go:668\",\"component\":\"Memberlist\",\"level\":\"error\",\"msg\":\"memberlist: Push/Pull with node-b failed: dial tcp 192.168.90.102:7946: i/o timeout\",\"ts\":\"2026-11-07T0"
+    ],
+    "status": "warn"
+   },
+   {
+    "id": "fluent-bit.flush-failed",
+    "name": "fluent-bit chunk flush failed",
+    "component": "fluent-bit",
+    "area": "observability",
+    "severity": "medium",
+    "sources": [
+     "logs/pods/fluent-bit/*.log"
+    ],
+    "pattern": "failed to flush chunk|could not flush|HTTP status=(4|5)\\d\\d",
+    "meaning": "Logs are not being written to the output (Elasticsearch, Loki, CloudWatch) and are retrying. Past the retry limit they are dropped. The lines are \"[ warn] [engine] failed to flush chunk '...', retry in N seconds\" (one per retry) and the output plugin's \"[error] ... HTTP status=NNN URI=...\" or \"could not flush records to host:port\"; the HTTP response body follows on its own lines.",
+    "cause": "Output target down or rejecting (ES disk watermark, mapping conflict), authentication, network.",
+    "verify": "kubectl logs -n <ns> -l app.kubernetes.io/name=fluent-bit --since=1h | grep -c 'failed to flush'",
+    "warn_at": 10,
+    "fail_at": 500,
+    "count": 16,
+    "first": "2026-11-07T00:56:41Z",
+    "last": "2026-11-07T01:23:41Z",
+    "files": {
+     "logs/pods/fluent-bit/logging_fluent-bit.log": 16
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T09:56:41.226336618+09:00 [2026/11/07 00:56:41] [ warn] [engine] failed to flush chunk '1-1794012988.188476469.flb', retry in 11 seconds: task_id=2, input=tail.0 > output=es.0 (out_id=0)",
+     "[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T09:56:46.227840341+09:00 [2026/11/07 00:56:46] [ warn] [engine] failed to flush chunk '1-1794012995.954604939.flb', retry in 7 seconds: task_id=7, input=tail.0 > output=es.0 (out_id=0)",
+     "[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T09:56:46.228154048+09:00 [2026/11/07 00:56:46] [ warn] [engine] failed to flush chunk '1-1794012996.874339673.flb', retry in 10 seconds: task_id=9, input=tail.0 > output=es.0 (out_id=0)",
+     "[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T10:00:51.226275299+09:00 [2026/11/07 01:00:51] [ warn] [engine] failed to flush chunk '1-1794013241.554078153.flb', retry in 10 seconds: task_id=8, input=tail.0 > output=es.0 (out_id=0)",
+     "[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T10:00:51.226279978+09:00 [2026/11/07 01:00:51] [ warn] [engine] failed to flush chunk '1-1794013242.161132668.flb', retry in 11 seconds: task_id=10, input=tail.0 > output=es.0 (out_id=0)"
+    ],
+    "status": "warn"
+   },
+   {
+    "id": "fluent-bit.upstream-down",
+    "name": "fluent-bit cannot connect to its output",
+    "component": "fluent-bit",
+    "area": "observability",
+    "severity": "medium",
+    "sources": [
+     "logs/pods/fluent-bit/*.log"
+    ],
+    "pattern": "no upstream connections available|upstream connection initialization error|[Cc]onnection refused|[Cc]onnection timed out|connection #\\d+ to \\S+ timed out|broken connection",
+    "meaning": "The connection to the output target itself fails. Logs pile up in the memory/file buffer and are eventually dropped. The lines are \"[error] [output:...] no upstream connections available\", \"[error] [src/flb_...c:NNN errno=111] Connection refused\" (glibc wording), \"[upstream] connection #N to host:port timed out after N seconds\" and \"[http_client] broken connection to host:port ?\".",
+    "cause": "Elasticsearch or Loki down, changed Service name/port, network policy.",
+    "verify": "kubectl get svc -A | grep -iE 'elastic|opensearch|loki'",
+    "warn_at": 5,
+    "fail_at": 200,
+    "count": 8,
+    "first": "2026-11-07T00:58:52Z",
+    "last": "2026-11-07T01:19:57Z",
+    "files": {
+     "logs/pods/fluent-bit/logging_fluent-bit.log": 8
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T09:58:52.226252855+09:00 [2026/11/07 00:58:52] [error] [input:kubernetes_events:kubernetes_events.1] upstream connection initialization error",
+     "[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T10:01:36.226118934+09:00 [2026/11/07 01:01:36] [error] [input:kubernetes_events:kubernetes_events.1] upstream connection initialization error",
+     "[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T10:06:56.226172117+09:00 [2026/11/07 01:06:56] [error] [input:kubernetes_events:kubernetes_events.1] upstream connection initialization error",
+     "[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T10:11:36.226140941+09:00 [2026/11/07 01:11:36] [error] [input:kubernetes_events:kubernetes_events.1] upstream connection initialization error",
+     "[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T10:12:36.226331553+09:00 [2026/11/07 01:12:36] [error] [input:kubernetes_events:kubernetes_events.1] upstream connection initialization error"
+    ],
+    "status": "warn"
+   },
+   {
+    "id": "cert-manager.challenge-failed",
+    "name": "ACME challenge validation failed",
+    "component": "cert-manager",
+    "area": "security",
+    "severity": "medium",
+    "sources": [
+     "logs/pods/cert-manager/*.log"
+    ],
+    "pattern": "propagation check failed|error (getting solver for|cleaning up|accepting) challenge|error waiting for authorization",
+    "meaning": "Proof of domain ownership is not passing. Issuance is delayed. Up to 1.20.x the challenge controller logs `propagation check failed` on every self-check; from 1.21.0 the propagation wait is only a V(4) line and the Challenge status reason (`Waiting for HTTP-01 challenge propagation`, read by the verify command), so only the solver, cleanup, accept and authorization errors remain in the log.",
+    "cause": "DNS record propagation delay, ingress not serving the .well-known path, firewall.",
+    "verify": "kubectl describe challenges -A | grep -A3 Reason",
+    "warn_at": 5,
+    "fail_at": 100,
+    "count": 7,
+    "first": "2026-11-06T02:40:26Z",
+    "last": "2026-11-06T02:40:27Z",
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager.log": 7
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:26.398191039Z E1106 02:40:26.398160       1 sync.go:190] \"propagation check failed\" err=\"admission webhook \\\"validate.nginx.ingress.kubernetes.io\\\" denied the requ",
+     "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:26.658827619Z E1106 02:40:26.658696       1 sync.go:190] \"propagation check failed\" err=\"wrong status code '404', expected '200'\" logger=\"cert-manager.challenges\" ",
+     "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:26.680575608Z E1106 02:40:26.680513       1 sync.go:190] \"propagation check failed\" err=\"wrong status code '404', expected '200'\" logger=\"cert-manager.challenges\" ",
+     "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:26.810337597Z E1106 02:40:26.810227       1 sync.go:190] \"propagation check failed\" err=\"wrong status code '404', expected '200'\" logger=\"cert-manager.challenges\" ",
+     "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:26.844583582Z E1106 02:40:26.844493       1 sync.go:190] \"propagation check failed\" err=\"wrong status code '404', expected '200'\" logger=\"cert-manager.challenges\" "
+    ],
+    "status": "warn"
+   },
+   {
+    "id": "metallb.speaker-peer-unreachable",
+    "name": "MetalLB speaker cannot reach a peer speaker",
+    "component": "metallb",
+    "area": "traffic",
+    "severity": "low",
+    "sources": [
+     "logs/pods/metallb/*.log"
+    ],
+    "pattern": "\"msg\":\"partial join\"",
+    "meaning": "A speaker pod that the API server still lists is not reachable on port 7946, so the memberlist join to it times out. The speaker retries once a minute and logs this at level error each time; the speakers that are up keep announcing. It means a node is down (its speaker pod stays listed until evicted) or the memberlist port is blocked between nodes.",
+    "cause": "Node NotReady or powered off, a firewall or NetworkPolicy blocking TCP/UDP 7946 between nodes.",
+    "verify": "kubectl get nodes; kubectl get pods -n metallb-system -l component=speaker -o wide; kubectl logs -n metallb-system -l component=speaker --since=1h | grep -c 'partial join'",
+    "warn_at": 60,
+    "fail_at": 2000,
+    "count": 421,
+    "first": "2026-11-06T22:06:16Z",
+    "last": "2026-11-07T01:09:40Z",
+    "files": {
+     "logs/pods/metallb/metallb-system_speaker.log": 421
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/speaker-xfxlv/speaker] 2026-11-07T07:53:35.218933159+09:00 {\"caller\":\"speakerlist.go:259\",\"error\":\"1 error occurred:\\n\\t* Failed to join 192.168.90.102:7946: dial tcp 192.168.90.102:7946: i/o timeout\\n\\n\",\"expected\":1,\"joined\":0,\"level",
+     "[pod/speaker-xfxlv/speaker] 2026-11-07T07:54:35.219597022+09:00 {\"caller\":\"speakerlist.go:259\",\"error\":\"1 error occurred:\\n\\t* Failed to join 192.168.90.102:7946: dial tcp 192.168.90.102:7946: i/o timeout\\n\\n\",\"expected\":1,\"joined\":0,\"level",
+     "[pod/speaker-xfxlv/speaker] 2026-11-07T07:55:04.305189704+09:00 {\"caller\":\"speakerlist.go:259\",\"error\":\"1 error occurred:\\n\\t* Failed to join 192.168.90.102:7946: dial tcp 192.168.90.102:7946: i/o timeout\\n\\n\",\"expected\":1,\"joined\":0,\"level",
+     "[pod/speaker-xfxlv/speaker] 2026-11-07T07:55:35.218255880+09:00 {\"caller\":\"speakerlist.go:259\",\"error\":\"1 error occurred:\\n\\t* Failed to join 192.168.90.102:7946: dial tcp 192.168.90.102:7946: i/o timeout\\n\\n\",\"expected\":1,\"joined\":0,\"level",
+     "[pod/speaker-xfxlv/speaker] 2026-11-07T07:56:35.219247777+09:00 {\"caller\":\"speakerlist.go:259\",\"error\":\"1 error occurred:\\n\\t* Failed to join 192.168.90.102:7946: dial tcp 192.168.90.102:7946: i/o timeout\\n\\n\",\"expected\":1,\"joined\":0,\"level"
+    ],
+    "status": "warn"
+   },
+   {
+    "id": "cert-manager.orphan-tls-secret",
+    "name": "TLS Secret without an owning Certificate (not managed by cert-manager)",
+    "component": "cert-manager",
+    "area": "hygiene",
+    "severity": "low",
+    "sources": [
+     "logs/pods/cert-manager/*.log"
+    ],
+    "pattern": "unable to fetch certificate that owns the secret.*not found",
+    "meaning": "A TLS Secret carries cert-manager annotations but its Certificate resource is gone. An Ingress may be serving a certificate that will never renew (discovered at expiry). The cainjector prints the line on every event of such a Secret, so the count is events, not Secrets; the verify command lists the Secrets.",
+    "cause": "Certificate deleted but Secret left behind, a namespace move, a hand-made Secret.",
+    "verify": "kubectl get secrets -A --field-selector type=kubernetes.io/tls -o json | jq -r '.items[] | select(.metadata.annotations[\"cert-manager.io/certificate-name\"]) | .metadata.namespace+\"/\"+.metadata.name' ; kubectl get certificates -A",
+    "warn_at": 1,
+    "fail_at": 1000,
+    "count": 96,
+    "first": "2026-11-06T05:52:26Z",
+    "last": "2026-11-07T01:09:11Z",
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager-cainjector.log": 96
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/cert-manager-cainjector-7bf5c557bb-kbtv7/cert-manager-cainjector] 2026-11-06T05:52:26.666496146Z E1106 05:52:26.666384       1 indexers.go:61] \"unable to fetch certificate that owns the secret\" err=\"Certificate.cert-manager.io \\\"app-f-",
+     "[pod/cert-manager-cainjector-7bf5c557bb-kbtv7/cert-manager-cainjector] 2026-11-06T05:52:26.666539338Z E1106 05:52:26.666390       1 indexers.go:61] \"unable to fetch certificate that owns the secret\" err=\"Certificate.cert-manager.io \\\"app-f-",
+     "[pod/cert-manager-cainjector-7bf5c557bb-kbtv7/cert-manager-cainjector] 2026-11-06T05:52:26.666549608Z E1106 05:52:26.666404       1 indexers.go:61] \"unable to fetch certificate that owns the secret\" err=\"Certificate.cert-manager.io \\\"app-f-",
+     "[pod/cert-manager-cainjector-7bf5c557bb-kbtv7/cert-manager-cainjector] 2026-11-06T05:52:26.666559887Z E1106 05:52:26.666410       1 indexers.go:61] \"unable to fetch certificate that owns the secret\" err=\"Certificate.cert-manager.io \\\"app-f-",
+     "[pod/cert-manager-cainjector-7bf5c557bb-kbtv7/cert-manager-cainjector] 2026-11-06T05:52:26.666567361Z E1106 05:52:26.666410       1 indexers.go:61] \"unable to fetch certificate that owns the secret\" err=\"Certificate.cert-manager.io \\\"app-f-"
+    ],
+    "status": "warn"
+   },
+   {
+    "id": "grafana.auth-failed",
+    "name": "Repeated Grafana login failures",
+    "component": "grafana",
+    "area": "security",
+    "severity": "low",
+    "sources": [
+     "logs/pods/grafana/*.log"
+    ],
+    "pattern": "Failed to authenticate|API key is invalid|invalid API key",
+    "meaning": "Many wrong passwords may mean a publicly exposed Grafana is being brute-forced. The line is the Info \"Failed to authenticate request\" client=auth.client.form error=\"[password-auth.failed] failed to authenticate identity: ...\" (Unauthorized errors log at Info); API-key failures carry \"[api-key.invalid] API key is invalid\".",
+    "cause": "Internet exposure plus default accounts, automation using an expired API key.",
+    "verify": "kubectl get ingress -A | grep -i grafana",
+    "warn_at": 20,
+    "fail_at": 500,
+    "count": 10,
+    "first": "2026-11-06T01:46:04Z",
+    "last": "2026-11-06T13:50:10Z",
+    "files": {
+     "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 10
+    },
+    "targets": 1,
+    "samples": [
+     "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T01:46:04.096899096Z logger=authn.service t=2026-11-06T01:46:04.096815008Z level=info msg=\"Failed to authenticate request\" client=auth.client.form error=\"[form-auth.invali",
+     "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T03:32:25.318471876Z logger=authn.service t=2026-11-06T03:32:25.318407477Z level=info msg=\"Failed to authenticate request\" client=auth.client.form error=\"[form-auth.invali",
+     "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T04:00:42.275697980Z logger=authn.service t=2026-11-06T04:00:42.275632717Z level=info msg=\"Failed to authenticate request\" client=auth.client.form error=\"[form-auth.invali",
+     "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T04:34:48.672278119Z logger=authn.service t=2026-11-06T04:34:48.672210973Z level=info msg=\"Failed to authenticate request\" client=auth.client.form error=\"[form-auth.invali",
+     "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T13:46:01.827116484Z logger=authn.service t=2026-11-06T13:46:01.827037235Z level=info msg=\"Failed to authenticate request\" client=auth.client.basic error=\"[password-auth.f"
+    ],
+    "status": "info"
+   }
+  ],
+  "unclassified_errors": [
+   {
+    "pattern": "grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Failed to get settings\" error=\"context canceled\"",
+    "count": 62,
+    "files": {
+     "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 62
+    },
+    "sample": "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T01:46:06.076050797Z logger=context userId=0 orgId=0 uname= t=2026-11-06T01:46:06.075937835Z level=error msg=\"Failed to get settings\" error=\"context canceled\""
+   },
+   {
+    "pattern": "grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Request error\" error=\"Context.HTML - Error rendering template: error. You …",
+    "count": 62,
+    "files": {
+     "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 62
+    },
+    "sample": "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T01:46:06.076501304Z logger=context userId=0 orgId=0 uname= t=2026-11-06T01:46:06.0764408Z level=error msg=\"Request error\" error=\"Context.HTML - Error rendering template: "
+   },
+   {
+    "pattern": "grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Request Completed\" method=GET path=/login status=<n> remote_addr=<ip> …",
+    "count": 62,
+    "files": {
+     "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 62
+    },
+    "sample": "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T01:46:06.076519759Z logger=context userId=0 orgId=0 uname= t=2026-11-06T01:46:06.076478992Z level=error msg=\"Request Completed\" method=GET path=/login status=500 remote_a"
+   },
+   {
+    "pattern": "cert-manager | \"challenge in work queue no longer exists\" err=\"challenge.acme.cert-manager.io \\\"app-i-prod-tls-2-<n>-<n>\\\" not found\" …",
+    "count": 3,
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager.log": 3
+    },
+    "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:51.176999164Z E1106 02:40:51.176850       1 controller.go:208] \"challenge in work queue no longer exists\" err=\"challenge.acme.cert-manager.io \\\"app-i-prod-tls-2-18"
+   },
+   {
+    "pattern": "cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificates-key-manager\" key=\"app-i-prod/app-i-prod-tls\" …",
+    "count": 2,
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager.log": 2
+    },
+    "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:21.056745652Z I1106 02:40:21.056673       1 controller.go:162] \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificates-key-manage"
+   },
+   {
+    "pattern": "cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificaterequests-issuer-acme\" …",
+    "count": 1,
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager.log": 1
+    },
+    "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:21.143814443Z I1106 02:40:21.143674       1 controller.go:162] \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificaterequests-iss"
+   },
+   {
+    "pattern": "cert-manager | ingress 'app-i-prod/cm-acme-http-solver-5rn6c' in work queue no longer exists",
+    "count": 1,
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager.log": 1
+    },
+    "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:47.294427898Z E1106 02:40:47.294338       1 controller.go:98] ingress 'app-i-prod/cm-acme-http-solver-5rn6c' in work queue no longer exists"
+   },
+   {
+    "pattern": "cert-manager | ingress 'app-i-prod/cm-acme-http-solver-xp828' in work queue no longer exists",
+    "count": 1,
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager.log": 1
+    },
+    "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:47.646481606Z E1106 02:40:47.646402       1 controller.go:98] ingress 'app-i-prod/cm-acme-http-solver-xp828' in work queue no longer exists"
+   },
+   {
+    "pattern": "cert-manager | ingress 'app-i-prod/cm-acme-http-solver-gl8s6' in work queue no longer exists",
+    "count": 1,
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager.log": 1
+    },
+    "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:48.969521894Z E1106 02:40:48.969437       1 controller.go:98] ingress 'app-i-prod/cm-acme-http-solver-gl8s6' in work queue no longer exists"
+   },
+   {
+    "pattern": "cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificates-readiness\" key=\"app-i-prod/app-i-prod-tls\" …",
+    "count": 1,
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager.log": 1
+    },
+    "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:50.689200390Z I1106 02:40:50.689049       1 controller.go:162] \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificates-readiness\""
+   },
+   {
+    "pattern": "cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificates-issuing\" key=\"app-i-prod/app-i-prod-tls\" …",
+    "count": 1,
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager.log": 1
+    },
+    "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:50.710471305Z I1106 02:40:50.710316       1 controller.go:162] \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.certificates-issuing\" k"
+   },
+   {
+    "pattern": "cert-manager | \"failed to update status\" logger=\"cert-manager.orders\" resource_name=\"app-i-prod-tls-2-<n>\" resource_namespace=\"app-i-prod\" …",
+    "count": 1,
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager.log": 1
+    },
+    "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:51.134207360Z E1106 02:40:51.134131       1 sync.go:73] \"failed to update status\" logger=\"cert-manager.orders\" resource_name=\"app-i-prod-tls-2-1874360288\" resource"
+   },
+   {
+    "pattern": "cert-manager | \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.orders\" key=\"app-i-prod/app-i-prod-tls-2-<n>\" error=\"Operation …",
+    "count": 1,
+    "files": {
+     "logs/pods/cert-manager/cert-manager_cert-manager.log": 1
+    },
+    "sample": "[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:51.134230454Z I1106 02:40:51.134162       1 controller.go:162] \"re-queuing item due to optimistic locking on resource\" logger=\"cert-manager.orders\" key=\"app-i-prod"
+   },
+   {
+    "pattern": "grafana | logger=infra.usagestats.collector t=<ts> level=error msg=\"Failed to read all Amazon Prometheus data sources\" error=\"plugin …",
+    "count": 1,
+    "files": {
+     "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 1
+    },
+    "sample": "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T06:11:05.413417825Z logger=infra.usagestats.collector t=2026-11-06T06:11:05.413266358Z level=error msg=\"Failed to read all Amazon Prometheus data sources\" error=\"plugin g"
+   },
+   {
+    "pattern": "grafana | logger=infra.usagestats t=<ts> level=error msg=\"Failed to fetch usage stats from provider\" error=\"plugin …",
+    "count": 1,
+    "files": {
+     "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 1
+    },
+    "sample": "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T06:11:05.413473550Z logger=infra.usagestats t=2026-11-06T06:11:05.41330968Z level=error msg=\"Failed to fetch usage stats from provider\" error=\"plugin grafana-amazonpromet"
+   },
+   {
+    "pattern": "grafana | logger=infra.usagestats.collector t=<ts> level=error msg=\"Failed to get advisor usage stats\" error=\"the server could not find the requested …",
+    "count": 1,
+    "files": {
+     "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 1
+    },
+    "sample": "[pod/kube-prometheus-stack-grafana-74c84c99-g4grd/grafana] 2026-11-06T06:11:05.418076524Z logger=infra.usagestats.collector t=2026-11-06T06:11:05.417976706Z level=error msg=\"Failed to get advisor usage stats\" error=\"the server could not fin"
+   }
+  ],
+  "boot_window_skipped": {},
+  "boot_window_seconds": 300,
+  "components_with_logs": [
+   "argocd",
+   "cert-manager",
+   "coredns",
+   "elasticsearch-opensearch",
+   "external-secrets",
+   "fluent-bit",
+   "grafana",
+   "ingress-nginx",
+   "keda",
+   "metallb",
+   "prometheus"
+  ],
+  "lines_by_file": {
+   "logs/pods/argocd/argocd_argocd-application-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-applicationset-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-notifications-controller.log": 1500,
+   "logs/pods/argocd/argocd_argocd-repo-server.log": 1500,
+   "logs/pods/argocd/argocd_argocd-server.log": 1104,
+   "logs/pods/cert-manager/cert-manager_cert-manager-cainjector.log": 120,
+   "logs/pods/cert-manager/cert-manager_cert-manager.log": 66,
+   "logs/pods/coredns/kube-system_coredns.log": 1500,
+   "logs/pods/elasticsearch-opensearch/logging_elasticsearch.log": 29,
+   "logs/pods/external-secrets/external-secrets_external-secrets-cert-controller.log": 1160,
+   "logs/pods/external-secrets/external-secrets_external-secrets-webhook.log": 576,
+   "logs/pods/external-secrets/external-secrets_external-secrets.log": 1500,
+   "logs/pods/fluent-bit/logging_fluent-bit.log": 1200,
+   "logs/pods/grafana/monitoring_kube-prometheus-stack-grafana.log": 879,
+   "logs/pods/ingress-nginx/ingress-nginx_nginx-ingress-ingress-nginx-controller.log": 3000,
+   "logs/pods/keda/keda_keda-operator.log": 26,
+   "logs/pods/metallb/metallb-system_controller.log": 522,
+   "logs/pods/metallb/metallb-system_speaker.log": 1200,
+   "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log": 1059
+  },
+  "scan_signatures_version": "1.1.1"
+ },
+ "karpenter_logs": {
+  "latency_24h": {
+   "n": 0,
+   "p50_s": null,
+   "max_s": null,
+   "slowest": []
+  },
+  "nodeclaims_launched_24h": 0,
+  "disruptions_24h": {},
+  "disrupted_24h": [],
+  "launch_failures_24h": {}
+ },
+ "capped": []
+}

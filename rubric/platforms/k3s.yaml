@@ -1,0 +1,12 @@
+# What is true of a k3s or RKE2 cluster whatever its size. Detected (lib/collection/discover.detect_platform), never asked.
+# A platform file holds facts of the platform only: targets a check must not judge there, and component families the platform makes pointless.
+# What the operator is expected to run at a given size is rubric/scales.yaml; which checks run on which platform is each check's `platforms:`.
+name: k3s
+# Fixed node count: nothing adds nodes, so a node autoscaler is not something that is "missing".
+families_not_expected: [node-autoscaler]
+exclude:
+  traffic.endpoint-zero:
+    - kube-system/kube-prometheus-stack-kube-etcd            # the k3s default datastore is kine (SQLite); an empty etcd metrics Service is expected
+    - kube-system/kube-prometheus-stack-kube-controller-manager   # k3s runs as one process, so per-component Services may be empty
+    - kube-system/kube-prometheus-stack-kube-scheduler
+    - kube-system/kube-prometheus-stack-kube-proxy

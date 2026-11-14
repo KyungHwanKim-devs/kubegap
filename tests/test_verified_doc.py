@@ -70,7 +70,7 @@ def test_the_report_header_names_the_versions_next_to_the_range(tmp_path):
         "context": "c",
         "schema": 1,
         "cluster": {"platform": "k3s", "server_version": "v1.33.5+k3s1", "cluster_name": "c"},
-        "profile": {"name": "lab", "source": "detected"},
+        "scale": {"name": "small", "source": "guessed"},
         "stores": {"prometheus": {"version": "3.7.3"}, "loki": {"version": "1.8"}},
         "nodes": {},
         "node_access": {"method": "none"},

@@ -18,7 +18,6 @@
   suggest: "EKS: set metricsBindAddress 0.0.0.0:10249 via the add-on configurationValues or the kube-proxy-config ConfigMap. kubeadm: edit the kube-proxy ConfigMap and restart."
   verify:
     - "up{job=~\".*kube-proxy.*\"} ; kubectl get cm -n kube-system kube-proxy-config -o yaml | grep metricsBindAddress"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -249,6 +248,7 @@
   target: "'cluster'"
   evidence: "f\"sync p99 cluster-wide {item['sync_p99_s']}s, slowest node {item['sync_p99_max_node']} {item['sync_p99_max_s']}s, nat rules max {item['nat_rules_max']}, Services {item['services']}, endpoints {item['endpoints']}, mode {item['mode']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     One sync = rewriting the whole (or part of the) rule set via iptables-restore. When it is slow, a new pod is Ready but node routing only reflects it seconds later, causing 5xx and connection refused during rolling deployments. It scales with the rule count (services × endpoints) and node CPU.
@@ -257,7 +257,6 @@
   suggest: "Above 1s in iptables mode, move to ipvs or nftables mode (GA in 1.31+). As a stopgap, set minSyncPeriod to 1-2s to batch bursts."
   verify:
     - "histogram_quantile(0.99, sum by (instance, le) (rate(kubeproxy_sync_proxy_rules_duration_seconds_bucket[1h])))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -439,7 +438,6 @@
   suggest: "Check that node's kube-proxy log (logs/pods/kube-proxy/, the journal on k3s) for iptables-restore and sync errors and restart the pod. If it recurs, look at it together with kubeproxy.restore-failures."
   verify:
     - "max by (instance) (kubeproxy_sync_proxy_rules_last_queued_timestamp_seconds - kubeproxy_sync_proxy_rules_last_timestamp_seconds)"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -616,13 +614,13 @@
   target: "'cluster'"
   evidence: "f\"iptables-restore failures over 24 hours (full+partial) {item['restore_failures_24h']}, nodes {item['restore_failure_nodes']}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     When iptables-restore fails, that sync's rules are not applied. Causes: another process (docker, CNI, firewall) holding the iptables lock, rule syntax conflicts, or a missing kernel module. This is the same event as the log signature kube-proxy.iptables-restore-failed.
   suggest: "Read the iptables-restore error lines in the kube-proxy log and check other daemons using iptables on the same node (docker — node.docker-and-containerd, ufw/firewalld)."
   verify:
     - "sum by (instance) (increase(kubeproxy_sync_proxy_rules_iptables_restore_failures_total[24h]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -751,7 +749,6 @@
   suggest: "kube-proxy mode nftables (recommended on 1.33+) or ipvs. On EKS, mode in the add-on configurationValues."
   verify:
     - "max by (instance, table) (kubeproxy_sync_proxy_rules_iptables_total) ; kubectl get svc -A | wc -l"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -931,7 +928,7 @@
   suggest: "Find the node with kubectl get pods -n kube-system -l k8s-app=kube-proxy -o wide and read its log."
   verify:
     - "kubectl get ds -n kube-system kube-proxy ; on the node: curl -s localhost:10256/healthz"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -1163,6 +1160,7 @@
   target: "'cluster'"
   evidence: "f\"conntrack INVALID drops over 1 hour {item['ct_invalid_dropped_1h']} packets (sum over nodes), services with externalTrafficPolicy Local {item['external_traffic_local']}, Services with a Local traffic policy and no endpoint on the node (max over nodes) {item['no_local_endpoint_services']}\""
   severity_default: low
+  nature: occurrence
   symptom_linked: false
   why: >
     kube-proxy drops packets that conntrack judges INVALID (default since 1.29). The counter exists since kube-proxy 1.31 and only in iptables mode with nfacct (pkg/proxy/metrics/metrics.go:302-303@v1.31.14, :417@v1.37.2; absent at v1.30.14), so without it the check is skipped with the reason, never passed. A high count points to asymmetric routing (the reply leaves via another node), conntrack expiry of long-lived connections (tcpEstablishedTimeout), or NAT overlapping with the CNI. Apps see it as intermittent connection resets.
@@ -1173,7 +1171,6 @@
   suggest: "On that node, use conntrack -L to see the peers of the INVALID flows; for long-lived connections, set the app keep-alive interval shorter than the conntrack timeout. Also check NLB/ALB preserve-client-ip and asymmetric paths."
   verify:
     - "sum by (instance) (increase(kubeproxy_iptables_ct_state_invalid_dropped_packets_total[1h]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1393,7 +1390,7 @@
 - id: kubeproxy.node-cmd-unavailable
   name: kube-proxy mode and healthz could not be checked from inside the nodes
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: kubeproxy.summary
   cluster_level: true
@@ -1408,7 +1405,6 @@
   suggest: "Set up node access (eks.ssm-unregistered, deploy/node-access/README.md)."
   verify:
     - "on the node: curl -s localhost:10249/proxyMode"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

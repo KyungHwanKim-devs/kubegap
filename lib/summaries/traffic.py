@@ -16,7 +16,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from ..foundations import versions as _versions  # `versions` is a local name in this module
-from ..foundations.snapshot import event_count, load_json, metric_doc, metric_rows, objects
+from ..foundations.snapshot import event_count, load_json, metric_doc, metric_rows, objects, parse_ts, taken_at
 from ..foundations.workload import workload_of
 
 ADMIN_HOST_RE = re.compile(r"(^|[.-])(admin|grafana|argocd|argo|deploy|kibana|prometheus|alertmanager|minio|registry|pgadmin|phpmyadmin|console|dashboard|jenkins|vault|keycloak|portainer|longhorn|traefik)([.-]|$)", re.IGNORECASE)
@@ -393,7 +393,7 @@ def _ingresses(snap: Path, objs: _Objects, alb: dict) -> list[dict]:
                 "alb_group": ann.get("alb.ingress.kubernetes.io/group.name"),
                 "tls": tls,
                 "scheme": scheme,
-                "lb": lb_hosts[:2],
+                "lb": lb_hosts,
                 "auth_hint": auth,
                 "has_auth_hint": bool(auth),
                 "admin_like": any(ADMIN_HOST_RE.search(h or "") for h in hosts),
@@ -474,7 +474,7 @@ def _exposure(snap: Path, objs: _Objects, ingresses: list[dict], alb: dict) -> l
                 "namespace": ns,
                 "name": name,
                 "target": f"{t.lower()}/{ns}/{name}",
-                "hosts": addrs[:2],
+                "hosts": addrs,
                 "ports": ports,
                 "node_ports": node_ports,
                 "scheme": scheme,
@@ -586,7 +586,7 @@ def _pod_skew(snap: Path, objs: _Objects) -> dict:
             }
         )
     rows.sort(key=lambda r: -(r["skew_ratio"] or 0))
-    return {"available": metric_doc(snap, "pod_network_rx_bytes_1h") is not None, "workloads_measured": len(rows), "rows": rows[:30]}
+    return {"available": metric_doc(snap, "pod_network_rx_bytes_1h") is not None, "workloads_measured": len(rows), "rows": rows}
 
 
 def _readiness(snap: Path, objs: _Objects) -> dict:
@@ -596,6 +596,12 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
             io = e.get("involvedObject") or {}
             if io.get("kind") == "Pod":
                 unhealthy[workload_of(f"{io.get('namespace', '')}/{io.get('name', '')}")] += event_count(e)
+    taken = taken_at(load_json(snap / "inventory.json") or {})
+    age_min: dict[tuple, float] = {}
+    for p in objects(snap, "pods"):
+        born = parse_ts((p.get("metadata") or {}).get("creationTimestamp"))
+        if born and taken:
+            age_min[(p["metadata"].get("namespace"), p["metadata"].get("name"))] = max((taken - born).total_seconds() / 60, 0.0)
     by_wl: dict[str, list] = defaultdict(list)
     for lab, v in metric_rows(snap, "pod_ready_ratio_24h"):
         ns, pod = lab.get("namespace"), lab.get("pod")
@@ -611,7 +617,8 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
                 "pods_below_99": len(pods),
                 "min_ready_ratio_24h": round(worst[1], 4),
                 "worst_pod": worst[0],
-                "not_ready_minutes_24h": round((1 - worst[1]) * 1440),
+                # the ratio is an average over the samples the pod has: a pod younger than 24 hours is measured over its own life, not over 1440 minutes
+                "not_ready_minutes_24h": round((1 - worst[1]) * min(1440.0, age_min.get((wl.split("/")[0], worst[0]), 1440.0))),
                 "unhealthy_events": unhealthy.get(wl, 0),
                 "prod": wl.split("/")[0] in objs.prod,
             }
@@ -624,7 +631,7 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
     available = bool((metric_doc(snap, "pod_ready_ratio_24h") or {}).get("ok"))
     return {
         "available": available,
-        "rows": rows[:40] if available else None,  # None, not []: without the readiness ratio the rows judge nothing (#141)
+        "rows": rows if available else None,  # None, not []: without the readiness ratio the rows judge nothing (#141)
         "skip_reason": None if available else "pod readiness ratio not read (metrics/pod_ready_ratio_24h.json missing or failed)",
         "unhealthy_events_total": sum(unhealthy.values()),
         "endpoints_not_ready": not_ready_eps,

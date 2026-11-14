@@ -112,7 +112,7 @@ def test_detect_reads_only_the_shipper_namespace_and_names_the_store(monkeypatch
     assert got["stores"] == [{"kind": "elasticsearch", "namespace": "logging", "name": "elasticsearch-master", "port": 9200}]
     assert [c[:3] for c in calls if c[1] == "configmaps"] == [["get", "configmaps", "-n"]] and calls[1][3] == "logging", "ConfigMaps of the shipper's namespace only"
     assert logsinks.explain(got) == "logs go to elasticsearch (fluent-bit output es → elasticsearch-master.logging.svc.cluster.local:9200, configmap logging/fluent-bit-config:fluent-bit.conf)"
-    assert logsinks.explain(got, "ko").startswith("로그는 elasticsearch (fluent-bit 출력 es → ") and logsinks.explain(got, "ko").endswith("로 가요")
+    assert logsinks.explain(got, "ko").startswith("로그는 elasticsearch (fluent-bit 출력 es → ") and logsinks.explain(got, "ko").endswith("로 갑니다")
 
 
 def test_a_loki_outside_the_cluster_is_found_in_the_shipper_config(monkeypatch):
@@ -148,10 +148,10 @@ def test_loki_is_not_asked_when_the_logs_go_elsewhere_and_the_report_is_told():
     assert "stores" not in ids
     notes = firstrun.noted(_setup_with(es), Config(), None)
     assert notes == ["loki: not asked. logs go to elasticsearch (fluent-bit output es → es:9200, configmap logging/fluent-bit-config:fluent-bit.conf); Loki is not read"]
-    assert firstrun.noted(_setup_with(es), Config(), None, language="ko") == ["loki: 묻지 않았어요. 로그는 elasticsearch (fluent-bit 출력 es → es:9200, configmap logging/fluent-bit-config:fluent-bit.conf)로 가요. Loki는 읽지 않아요"]
+    assert firstrun.noted(_setup_with(es), Config(), None, language="ko") == ["loki: 묻지 않았습니다. 로그는 elasticsearch (fluent-bit 출력 es → es:9200, configmap logging/fluent-bit-config:fluent-bit.conf)로 갑니다. Loki는 읽지 않습니다"]
     assert firstrun.noted(_setup_with(es), Config({"loki_url": "http://l:3100"}), None) == []
     text = firstrun.render([], "ctx", None, notes)
-    assert text.splitlines()[-2].startswith("note loki: not asked") and "could not see" in text.splitlines()[-1]
+    assert text.splitlines()[-2].startswith("note loki: not asked") and "not a limit of the run" in text.splitlines()[-1]
 
 
 def test_loki_is_still_asked_without_a_shipper_or_with_a_loki_output():

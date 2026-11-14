@@ -1,0 +1,85 @@
+# What a report teaches when an HPA cannot read the metric it scales on. Every page below was opened and read (2026-11-14).
+topic: hpa-metrics-unavailable
+checks: [scaling.metrics-api-unavailable, scaling.hpa-scaling-inactive]
+mechanism: >
+  The HorizontalPodAutoscaler is a control loop in the kube-controller-manager that runs every 15 seconds by default. Each time it reads the current
+  value of its metric and computes desiredReplicas = ceil(currentReplicas x currentMetricValue / desiredMetricValue). It does not measure anything
+  itself. It reads from aggregated APIs: metrics.k8s.io for CPU and memory, custom.metrics.k8s.io and external.metrics.k8s.io for everything else.
+
+
+  The resource metrics path has four links. The kubelet on each node exposes container usage, metrics-server collects it from every kubelet every 15
+  seconds, and the API server serves it as the Metrics API through an APIService registered with the aggregation layer. That needs the network in two
+  directions: the control plane must reach metrics-server, and metrics-server must reach the kubelet port (10250 by default) on every node, with a
+  kubelet certificate it accepts. The Metrics API is used by the HPA, the VPA and kubectl top; nothing else provides CPU and memory for scaling.
+
+
+  When a link breaks, the HPA does not fail loudly. If a metric cannot be turned into a replica count, for example because fetching it from the
+  metrics API returned an error, and the metrics that can still be fetched suggest scaling down, scaling is skipped; only a scale-up suggested by
+  another metric still happens. An HPA with a single CPU target therefore stays at the replica count it had. The same happens for one workload when a
+  container has no CPU request: utilization is a percentage of the request, so it is not defined and the autoscaler takes no action for that metric.
+
+
+  The HPA reports this in its status. The condition ScalingActive says whether the HPA is enabled and able to calculate desired scales; when it is
+  False it generally indicates problems with fetching metrics. It is also False when the target was scaled to zero by hand while minReplicas is above
+  zero, which turns the HPA off until the replica count is changed. An unavailable Metrics API stops every HPA that uses resource metrics at once;
+  an inactive HPA stops one workload. In both cases the load rises and the replica count does not.
+sources:
+  - { title: "Kubernetes: Horizontal Pod Autoscaling", url: "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/" }
+  - { title: "Kubernetes: HorizontalPodAutoscaler Walkthrough", url: "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/" }
+  - { title: "Kubernetes: Resource metrics pipeline", url: "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/" }
+  - { title: "metrics-server README", url: "https://github.com/kubernetes-sigs/metrics-server" }
+detect:
+  - kind: alert
+    what: >
+      An aggregated API that is not available. The API server counts this itself, per APIService name; the kubernetes-mixin rules
+      KubeAggregatedAPIDown (less than 85% available over 10 minutes) and KubeAggregatedAPIErrors are built on these two series.
+    example: |
+      - alert: MetricsAPIUnavailable
+        expr: max by (name) (aggregator_unavailable_apiservice{name=~"v1beta1.(metrics|external.metrics|custom.metrics).k8s.io"}) > 0
+        for: 5m
+  - kind: alert
+    what: >
+      One HPA that cannot compute. kube-state-metrics exports every HPA condition; ScalingActive false for more than a few minutes is the signal.
+      HPAs created by KEDA are left out, because theirs is false whenever the ScaledObject is inactive.
+    example: |
+      - alert: HPAScalingInactive
+        expr: kube_horizontalpodautoscaler_status_condition{condition="ScalingActive", status="false", horizontalpodautoscaler!~"keda-hpa-.*"} == 1
+        for: 10m
+  - kind: metric
+    what: >
+      The HPA controller's own error count, on clusters where the kube-controller-manager can be scraped: metric computations by action and error.
+    example: 'sum by (metric_type, error) (rate(horizontal_pod_autoscaler_controller_metric_computation_total{error!="none"}[5m]))'
+  - kind: command
+    what: The condition and its message for one APIService or one HPA, once an alert has named it.
+    example: 'kubectl get apiservice v1beta1.metrics.k8s.io -o yaml'
+solutions:
+  - scale: [small]
+    approach: >
+      Run the metrics-server the distribution ships, give every container that an HPA scales a CPU request, and add the two alerts above. One replica
+      of metrics-server is enough when the alert exists: while it restarts the HPAs hold their replica count, they do not scale to zero.
+    tools: [metrics-server, kube-state-metrics, Alertmanager]
+    tradeoff: >
+      Nothing new to run. A metrics-server outage is noticed within minutes instead of at the next traffic peak, and during the outage scaling is
+      off.
+  - scale: [medium, large]
+    approach: >
+      Run metrics-server with more than one replica on separate nodes (the project ships a high-availability manifest and a Helm value for it), size
+      its requests to the node count, and make requests on every container a rule of the namespace with a LimitRange default so that no HPA is born
+      inactive. Page on the aggregated-API alert, because it stops all resource-metric HPAs together.
+    tools: [metrics-server, LimitRange, "kubernetes-mixin"]
+    tradeoff: >
+      Losing a node no longer takes the Metrics API with it. It needs at least two schedulable nodes, and the project recommends the API server
+      flag --enable-aggregator-routing=true so that requests are spread over the replicas, which a managed control plane may not let you set.
+    example: |
+      # metrics-server Helm values
+      replicas: 2
+      resources:
+        requests:
+          cpu: 100m
+          memory: 200Mi
+cases: []
+reading:
+  - { title: "Kubernetes: Horizontal Pod Autoscaling", url: "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/", why: "The algorithm in full, including what the controller assumes about pods with missing metrics and pods that are not ready." }
+  - { title: "Kubernetes: HorizontalPodAutoscaler Walkthrough", url: "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/", why: "The appendix explains the three status conditions an HPA reports." }
+  - { title: "Kubernetes: Resource metrics pipeline", url: "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/", why: "The path from cAdvisor to the Metrics API in one diagram; shows which link an error belongs to." }
+  - { title: "metrics-server README", url: "https://github.com/kubernetes-sigs/metrics-server", why: "Requirements, sizing per node and the high-availability installation." }

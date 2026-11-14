@@ -2,6 +2,7 @@
 # The window is 1 hour. A 24-hour count_over_time OOMKilled a single-binary Loki with a small memory limit. Only label value lookups and 1-hour aggregates are used.
 # Placeholders for params values: {now_s} {now_ns} {ago_1h_s} {ago_1h_ns} (the Loki API uses nanoseconds).
 - id: ready
+  unit: component-apis
   type: http
   store: loki
   path: /ready
@@ -10,6 +11,7 @@
   timeout: 15
   source: "grafana/loki pkg/loki/loki.go:361,430,463@v2.6.1, :486,568,606@v2.9.2, :478,570,617@v3.0.0, :590,682,746@v3.7.9 (GET /ready: the text ready with HTTP 200 once every module is Running and each of the ingester, the pattern ingester (since 3.0 :601-606@v3.0.0), the query frontend and, since 3.7, the ingest-limits services :730-744@v3.7.9 answers CheckReady; else 503 with the reason, and a requested shutdown answers 503 first since 2.9 :572-576@v3.0.0, :684-688@v3.7.9; lib/summaries/stackhealth.py and lib/summaries/logs.py compare the text with ready, lib/collection/monitoring.py uses the status at setup)"
 - id: buildinfo
+  unit: component-apis
   type: http
   store: loki
   path: /loki/api/v1/status/buildinfo
@@ -17,6 +19,7 @@
   timeout: 15
   source: "grafana/loki pkg/loki/loki.go:369@v2.6.1, :499@v2.9.2, :491@v3.0.0, :603@v3.7.9, pkg/loki/version_handler.go:12-20@v2.6.1, :12-20@v2.9.2, :12-20@v3.0.0, :12-20@v3.7.9 (GET /loki/api/v1/status/buildinfo: Prometheus's PrometheusVersion struct, prometheus/prometheus web/api/v1/api.go:129-136@v2.49.1, with version, revision, branch, buildUser, buildDate, goVersion; lib/summaries/stackhealth.py and lib/collection/monitoring.py read version)"
 - id: label_namespace_1h
+  unit: component-apis
   type: http
   store: loki
   path: /loki/api/v1/label/namespace/values
@@ -27,6 +30,7 @@
   timeout: 30
   source: "grafana/loki pkg/loki/modules.go:285,688@v2.6.1, :416,881@v2.9.2, :512,1086@v3.0.0, :687,1365@v3.7.9 and pkg/util/constants/api_paths.go:12@v3.7.9 (GET /loki/api/v1/label/{name}/values with start and end in nanoseconds; LabelResponse pkg/loghttp/labels.go:16-19@v2.6.1, :16-19@v2.9.2, :16-19@v3.0.0, :17-20@v3.7.9 with status and data[] of strings; lib/summaries/logs.py reads data)"
 - id: label_pod_1h
+  unit: component-apis
   type: http
   store: loki
   path: /loki/api/v1/label/pod/values
@@ -37,6 +41,7 @@
   timeout: 30
   source: "grafana/loki pkg/loki/modules.go:285,688@v2.6.1, :416,881@v2.9.2, :512,1086@v3.0.0, :687,1365@v3.7.9 and pkg/util/constants/api_paths.go:12@v3.7.9 (GET /loki/api/v1/label/{name}/values with start and end in nanoseconds; LabelResponse pkg/loghttp/labels.go:16-19@v2.6.1, :16-19@v2.9.2, :16-19@v3.0.0, :17-20@v3.7.9 with status and data[] of strings; lib/summaries/logs.py reads data)"
 - id: volume_1h
+  unit: component-apis
   type: http
   store: loki
   path: /loki/api/v1/query
@@ -47,6 +52,7 @@
   timeout: 90
   source: "grafana/loki pkg/loki/modules.go:282,685@v2.6.1, :409,878@v2.9.2, :503,1083@v3.0.0, :678,1362@v3.7.9 and pkg/util/constants/api_paths.go:7@v3.7.9 (GET /loki/api/v1/query with query and time in seconds; QueryResponse pkg/loghttp/query.go:35-37,78-81@v2.6.1, :38-40,201-204@v2.9.2, :47-50,225-228@v3.0.0, :47-50,230-233@v3.7.9 with status and data {resultType, result, stats}; a metric query's result is a vector of {metric, value}; lib/summaries/logs.py reads data.result[].metric and value)"
 - id: errors_1h
+  unit: component-apis
   type: http
   store: loki
   path: /loki/api/v1/query
@@ -57,6 +63,7 @@
   timeout: 90
   source: "grafana/loki pkg/loki/modules.go:282,685@v2.6.1, :409,878@v2.9.2, :503,1083@v3.0.0, :678,1362@v3.7.9 and pkg/util/constants/api_paths.go:7@v3.7.9 (GET /loki/api/v1/query with query and time in seconds; QueryResponse pkg/loghttp/query.go:35-37,78-81@v2.6.1, :38-40,201-204@v2.9.2, :47-50,225-228@v3.0.0, :47-50,230-233@v3.7.9 with status and data {resultType, result, stats}; a metric query's result is a vector of {metric, value}; lib/summaries/logs.py reads data.result[].metric and value)"
 - id: json_1h
+  unit: component-apis
   type: http
   store: loki
   path: /loki/api/v1/query
@@ -67,6 +74,7 @@
   timeout: 90
   source: "grafana/loki pkg/loki/modules.go:282,685@v2.6.1, :409,878@v2.9.2, :503,1083@v3.0.0, :678,1362@v3.7.9 and pkg/util/constants/api_paths.go:7@v3.7.9 (GET /loki/api/v1/query with query and time in seconds; QueryResponse pkg/loghttp/query.go:35-37,78-81@v2.6.1, :38-40,201-204@v2.9.2, :47-50,225-228@v3.0.0, :47-50,230-233@v3.7.9 with status and data {resultType, result, stats}; a metric query's result is a vector of {metric, value}; lib/summaries/logs.py reads data.result[].metric and value)"
 - id: metrics
+  unit: component-apis
   type: http
   store: loki
   path: /metrics
@@ -75,6 +83,7 @@
   timeout: 30
   source: "names and their definitions per version: collectors/loki/pod-metrics.yaml (lib/summaries/stackhealth.py and lib/summaries/logs.py read the text through it); /metrics on the store's port is where the store setup found Loki, observed here, not read in source for this issue"
 - id: metrics.loki
+  unit: metrics
   type: promql
   file: metrics.yaml
   timeout: 30

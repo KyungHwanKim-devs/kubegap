@@ -1,623 +1,556 @@
-# my-cluster — full audit, 2026-11-05 17:18
+# app-u-cluster-eks — full audit, 2026-11-15 02:09
 
-Urgent now: no
+Broken now: none
 
-Today's problems: ① No backups for 7 prod databases ② Prod pods piled on one spot node ③ Kafka listener open to the internet ④ 4 prod ALB health checks failing ⑤ Unsupported EKS, Karpenter and AL2
+The 5 largest problems: ① The production databases have no backup ② Kafka accepts connections from the whole internet ③ The production Neo4j password is written into its manifest ④ Kubernetes 1.32 is past support and Karpenter 0.37 does not support it ⑤ Four production load balancer health checks filter nothing
 
-Since the last run: The 2026-11-03 full run had no report, so there is no way to tell whether its work was done.
+What already happened: Prometheus was killed for running out of memory · Production pods could not be scheduled 91 times in one day
 
-Appeared: 7. They include the new idle spot node node-2-158 with 11 CreateNetworkInterface failures, node-1-62's root disk at 79%, and 80 5xx out of 54,991 requests in 24 hours (0.14%) on app-m-frontend. Most other status shifts, such as the new N+1 warning, come from changed rules, not from the cluster.
-
-Went away: 5. They include node node-2-144 leaving the cluster, Promtail no longer sitting at its memory limit, and kafka-exporter no longer Not Ready, though it has restarted 5 times.
+Scale: medium
 
 ## The cluster at a glance
 
 | What | Value |
 |---|---|
-| Nodes | 8 of 8 Ready |
-| Pods | 139 running, 0 pending, 0 failed |
-| Namespaces | 25, 8 production |
+| Nodes | 9 of 9 Ready |
+| Pods | 131 running, 0 pending, 0 failed |
+| Namespaces | 21, 8 production |
 | Components | 23: actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
 | Metrics and log stores | prometheus 2.49.1 / loki 2.6.1 |
 | Kubernetes | v1.32.13-eks-577a51e (eks) |
 
-## Coming up
+## What already happened
 
-| When | What | Source |
-|---|---|---|
-| 2026-11-07 21:31 KST | system-ondemand 풀 노드 node-1-241(NodeClaim system-ondemand-mxf5q)이 expireAfter 720h에 닿아 교체돼요. prod-app-p/app-p-postgresql-0(레플리카 1, us-east-1a 볼륨)이 다른 노드로 옮겨지는 동안 멈춰요. emptyDir에 있는 loki-stack-0의 로그도 사라져요. | summary.json |
-| 2026-11-07 21:32 KST | 노드 node-2-218(NodeClaim system-ondemand-jvbnl)이 만료돼 교체돼요. prod-app-q/app-q-backend-postgresql-0(레플리카 1, us-east-1c 볼륨)과 emptyDir을 쓰는 Alertmanager가 옮겨져요. 풀 예산이 10%라 앞의 노드와 한 대씩 차례로 교체돼요. | summary.json |
-| 2026-11-08 15:28 KST | 노드 node-2-135(NodeClaim system-ondemand-db9bj)가 만료돼 교체돼요. middleware/kafka-controller-0(브로커 1대)과 prod-app-l-backend/app-l-neo4j-0이 옮겨지는 동안 멈춰요. | summary.json |
-| 2026-11-07 | 지난달 지운 고아 PVC를 지우기 전에 떠 둔 EBS 스냅샷 12개에 delete-after 2026-11-07 태그가 붙어 있어요. 자동으로 지우는 정책은 없지만, 이 날짜에 누가 지우면 그 데이터의 마지막 사본이 없어져요. | aws/ec2-snapshots-30d.json |
-| 2026-12-03 | 쓰이지 않는 ACM 인증서 acmeai.kr이 만료돼요. 갱신 대상이 아니에요. | aws/acm-certificates.json |
-| 2027-03-23 | EKS 1.32의 확장 지원이 끝나요. 표준 지원은 2026-03-23에 이미 끝나서 지금은 확장 지원 요금을 내고 있어요. | aws/describe-cluster-versions.json |
+There is no earlier run to compare with, so this covers only what this run collected.
 
-## 1. No backups for 7 prod databases
+### Prometheus was killed for running out of memory
 
-**What is happening.** All 7 prod databases run as a single replica, with their data on one EBS volume each. There are 3 MySQL, 3 PostgreSQL and 1 Neo4j, and nothing backs any of them up. If a volume breaks or gets deleted, there is no copy to restore. It is ongoing, and three of these pods move to new nodes when nodes expire on the night of 2026-11-07 and the afternoon of 2026-11-08.
+At 14:34:30 UTC on 2026-11-14, about two and a half hours before this audit, the `prometheus` container of `monitoring/prometheus-kube-prometheus-stack-prometheus-0` was ended by the kernel for exceeding its memory limit of 1536Mi, and it restarted. That was its only restart in the last seven days; the pod has restarted 3 times over its whole life. It is running now, so the event itself is over, but the conditions that led to it are still there: its working set is at 73% of the limit, it holds 177,943 active series, and 34% of its CPU periods were throttled over the last 24 hours, so it runs short of CPU through the day as well. Loki in the same namespace was restarted twice in seven days, once for memory.
 
-- Affected: the 7 prod DBs below. All 7 have reclaimPolicy Delete.
-  - prod-app-p/app-p-postgresql: vol-0123456789abcdef0, 10Gi, us-east-1a. It runs on node-1-241, which expires 2026-11-07 21:31 KST.
-  - prod-app-q/app-q-backend-postgresql: vol-0123456789abcdef0, 10Gi, us-east-1c. It runs on node-2-218, which expires 2026-11-07 21:32 KST.
-  - prod-app-l-backend/app-l-neo4j: vol-0123456789abcdef0, 20Gi, us-east-1c. It runs on node-2-135, which expires 2026-11-08 15:28 KST.
-  - prod-app-o/app-o-backend-mysql: vol-0123456789abcdef0, 50Gi, us-east-1a, on node-1-117.
-  - app-s-prod/app-s-backend-postgresql: vol-0123456789abcdef0, 10Gi, us-east-1a, on node-1-117.
-  - prod-app-m/app-m-backend-mysql: vol-0123456789abcdef0, 8Gi, us-east-1c, on node-2-60.
-  - prod-app-n/app-n-backend-prod-mysql: vol-0123456789abcdef0, 8Gi, us-east-1c, on node-2-60.
-  - Not among the 7, but also left out of steps ② and ③: the Kafka broker's volume middleware/data-kafka-controller-0 (vol-0123456789abcdef0, 20Gi, Delete) and another middleware PV (vol-0123456789abcdef0).
-- Checked and healthy:
-  - EBS volumes live apart from nodes, so a node expiry alone does not lose data.
-  - The only snapshots are from 2026-10-06. They were taken before 12 orphan PVCs were deleted, and none are of live prod volumes. They carry a delete-after 2026-11-07 tag, and no policy deletes them automatically, but if someone deletes them on that date the last copy of that data is gone.
-- Changed for another reason: Karpenter's 720h expiry replacement soon moves the DB pods on node-1-241, node-2-218 and node-2-135.
-- Not checked:
-  - whether dumps run outside the cluster
-  - each DB's data size and write volume
-  - whether anyone has ever restored from a volume
+While Prometheus restarts, no rule is evaluated and no alert can fire. Why memory ran out at that moment is not known. A burst of new series, a heavy query or compaction are all possible, and the audit has no per-query record; the kernel log of its node `node-1-117` could not be read because that node is not registered with SSM.
 
-**Why.** Nothing in the account or the cluster makes backups, and the volumes got the dynamic-provisioning default, reclaimPolicy Delete. Confirmed.
+This exposed a weakness listed among the next largest problems, that no alert covers a container killed for memory: the cluster's own monitoring was killed and no rule exists that would have told anyone.
 
-**Suggested fix.**
+### Production pods could not be scheduled 91 times in one day
 
-① Make sure the account really has no snapshot policy and no backup plan.
+In the 24 hours before this audit the scheduler logged "Unable to schedule pod; no fit" 91 times into the control plane log, all of them for three production workloads: `prod-app-x/app-x-api` 39 times, `prod-app-z-backend/app-z-backend` 26 times and `prod-app-z-backend/app-z-embedding-server` 26 times. No pod is pending now, so each of these pods was placed in the end; how many separate pods waited, and for how long, cannot be told from the log lines, since one waiting pod is logged on every retry.
 
-```
-aws dlm get-lifecycle-policies --profile acme --region us-east-1
-```
+The reasons the scheduler gave name nodes tainted `karpenter.sh/disruption: disrupting`, nodes still `not-ready` or `uninitialized`, and too little free CPU or memory on the rest. That is the shape of node replacement: Karpenter consolidated or replaced a node, the pods on it were evicted, and they waited until a new node had started, which takes Karpenter about 61 seconds here. This is inferred from the reasons, not from a record of each eviction.
 
-```
-aws backup list-backup-plans --profile acme --region us-east-1
-```
+It touches problem 4, Kubernetes 1.32 is past support and Karpenter 0.37 does not support it: these three workloads depend on Karpenter producing a node quickly every time, and that is what the version mismatch puts at risk.
 
-These only read.
+## 1. The production databases have no backup
 
-Check: if both return empty lists, there is no backup. These commands do not see backups in other accounts or regions, or dump scripts running outside the cluster.
+**Why this one.** When a volume is deleted or its data is corrupted, the data of seven production services is gone for good, because there is nothing to restore it from.
 
-② Before the node expiry at 2026-11-07 21:31 KST, take EBS snapshots of the 7 prod DB volumes.
+### What is the matter
 
-```
-for v in vol-0123456789abcdef0 vol-0123456789abcdef0 vol-0123456789abcdef0 vol-0123456789abcdef0 vol-0123456789abcdef0 vol-0123456789abcdef0 vol-0123456789abcdef0; do aws ec2 create-snapshot --profile acme --region us-east-1 --volume-id "$v" --description "manual prod db backup 2026-11-06" --tag-specifications 'ResourceType=snapshot,Tags=[{Key=purpose,Value=manual-prod-db-backup}]'; done
-```
+Eight databases run inside this cluster as StatefulSets with their own volume, seven of them in production: `prod-app-t/app-t-backend-postgresql`, `prod-app-x/app-x-postgresql`, `prod-app-s/app-s-backend-mysql`, `prod-app-y/app-y-backend-mysql`, `prod-app-z-backend/app-z-neo4j`, `prod-app-r/app-r-postgresql` and `prod-app-v/app-v-backend-prod-mysql`, plus `dev-app-s/app-s-backend-mysql`. Not one of them has a backup CronJob, and the cluster has no backup tool such as Velero, no VolumeSnapshot and not even the VolumeSnapshot API.
 
-This creates 7 snapshots. Pods and volumes stay as they are, nothing restarts, and snapshot storage is billed.
+On the AWS side the account has no Data Lifecycle Manager policy and no AWS Backup plan. In the last 30 days exactly two EBS snapshots were taken, and both are described as "pre-delete backup" of development volumes in `dev-app-v` and `dev-app-y`; by their description they were taken before those volumes were deleted. Nothing copies the production volumes.
 
-The DBs keep running during the snapshot, so it captures the disk as if the power had been cut. MySQL and PostgreSQL usually recover when they start. Whether Neo4j community opens from such a snapshot is unverified.
+The volumes themselves add to the risk. All seven production database volumes are `gp3` EBS volumes whose PersistentVolume has the reclaim policy `Delete`, so deleting the PersistentVolumeClaim, or the namespace that holds it, deletes the EBS volume with it. The StatefulSets keep their claims when the StatefulSet itself is deleted, but deleting a claim or the namespace still deletes the volume.
 
-The volumes are not encrypted, so the snapshots are not either. No one has tried a restore. The two Kafka volumes are not in this loop.
+What the audit found sound: every one of these volumes is bound, none is filling, and EBS keeps them independent of the nodes, so a node failure or a spot interruption does not lose them. What it cannot see is whether an application team dumps its database somewhere outside Kubernetes, for example from a laptop or a CI job. Nothing in the cluster points at such a copy.
 
-Check: `aws ec2 describe-snapshots --profile acme --region us-east-1 --owner-ids self --filters Name=tag:purpose,Values=manual-prod-db-backup --query 'Snapshots[].[VolumeId,State]' --output table` shows 7 rows, all completed.
+### Why it comes about
 
-③ Set reclaimPolicy to Retain on the 7 prod DB PVs.
+How this cluster came to have no backup cannot be told from its state. The databases were installed from Helm charts, which create the StatefulSet and its volume but no backup, and a cluster grows one service at a time without anyone owning "the backups" as a whole. The two pre-delete snapshots of development volumes show the idea of a copy exists in the team; it has not been turned into something that runs by itself. This is an inference from what is and is not present.
 
-```
-for pv in pvc-1a304f49-fa2e-43ed-a996-df104613c88c pvc-5cccf1df-7624-45a2-833d-2191c5490713 pvc-8d1f15c7-e0e6-4410-bd40-64d7332aef0d pvc-9f1aab56-d94c-499d-8df6-2def93e79427 pvc-a50dcc70-b062-457a-b0e3-07a3e6da2ec6 pvc-ebc5618b-a1af-40d3-b15d-4969ed13487e pvc-f226562f-a020-4027-a0d4-1494585c8b6f; do kubectl --context my-cluster patch pv "$pv" -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'; done
+What a backup protects against depends on where the copy lives. A copy on the same disk as the data only brings back rows deleted by mistake; the disk fails with both. A copy elsewhere in the same cluster survives a node failure but not what reaches the whole cluster: a script or a person with cluster rights deleting volumes, a namespace removed with everything in it, or a mistake in a GitOps tool that prunes a whole environment. In this cluster there is not even the first kind of copy. The EBS volume is the data and the only instance of it.
+
+That is why the usual rule is three copies on two kinds of media with one off site. Kubernetes does not make any of these copies. A VolumeSnapshot is a point-in-time copy on the storage system and exists only through a CSI driver with the snapshot API installed; with the deletion policy `Delete`, removing the VolumeSnapshot object also removes the snapshot. On EKS, the copy can come from AWS instead: a Data Lifecycle Manager policy or an AWS Backup plan takes EBS snapshots on a schedule by tag, outside the cluster's reach.
+
+One more thing holds for every backup. A backup that has never been restored is not known to work: a file that appears every night says the job ran, not that the database comes back from it.
+
+[GitLab](https://about.gitlab.com/blog/2017/02/10/postmortem-of-database-outage-of-january-31/) lost production data in 2017 when an engineer removed the data directory of the production database by mistake. The nightly `pg_dump` backups had been failing because of a version mismatch, the mails that reported it were rejected and the S3 bucket was empty; the data came back only from a snapshot someone had taken by hand six hours earlier. What saved them was a copy nobody had planned as the backup, and this cluster has not even that for its production data.
+
+At [InfluxData](https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/) a name collision in the Argo CD configuration made Argo CD delete a whole production environment. The volumes had the reclaim policy `Retain`, so the data stayed and the objects were rebuilt by hand. This cluster is managed by Argo CD too, and its database volumes have `Delete`, so the same mistake here would take the data with the objects.
+
+### How to watch it
+
+There is nothing to watch yet, because no backup job exists. Once one does, two things are worth a rule. The age of the last successful backup, from kube-state-metrics, catches a job that stopped running. The rule has to be made; this cluster has no rule on CronJob success.
+
+```yaml
+- alert: BackupCronJobStale
+  expr: time() - kube_cronjob_status_last_successful_time{cronjob=~".*backup.*"} > 86400 * 1.5
+  for: 30m
 ```
 
-Only one line of each PV spec changes, and no pod restarts. From then on, a deleted PVC leaves its EBS volume behind.
+When the copy is made by AWS instead, AWS Backup reports failed jobs itself; the job status, not a Kubernetes metric, is what to watch.
 
-PVs carry no Argo CD tracking label, so selfHeal does not revert this. A volume left behind keeps billing until someone deletes it by hand.
+Whether a copy restores is not visible in any metric. The way to see it is to restore one dump or snapshot into an empty database on a schedule and compare a few row counts.
 
-Check: `kubectl --context my-cluster get pv -o custom-columns=NAME:.metadata.name,CLAIM:.spec.claimRef.name,POLICY:.spec.persistentVolumeReclaimPolicy` shows Retain on all 7.
+### How it is solved
 
-④ Set up a backup that runs every day. This step is a plan, so it has no command.
+At the scale this cluster is run at, with real users depending on these services, the fit is Velero together with snapshots made by AWS. Velero, on a Schedule, backs up the Kubernetes objects of each production namespace and the volumes, and writes the objects to an S3 bucket in another account or region. Next to it, an AWS Backup plan or a Data Lifecycle Manager policy snapshots the EBS volumes daily, selected by the tag `kubernetes.io/created-for/pvc/name` that the EBS CSI driver puts on every volume it creates, and copies those snapshots to a second region. With both in place the objects and the data come back together, and the restore is a procedure someone has practised in a scratch cluster. The cost is one more component to run and upgrade, storage for the snapshots, and a few hours on the calendar for restore tests. A Velero restore skips objects that already exist unless told otherwise, and Velero backups expire after 30 days unless a TTL is set.
 
-- Snapshot the volumes tagged KubernetesCluster=my-cluster every day with a DLM policy or an AWS Backup plan, and keep them 7 to 14 days.
-- For each DB, add a CronJob that sends a mysqldump, pg_dump or neo4j-admin dump to S3.
-- Restore one snapshot to a new volume and test that the DB opens.
+For the databases that matter most, a logical dump made by the database's own tool on a CronJob, uploaded to the same bucket, adds a second kind of copy next to the volume snapshot.
 
-Snapshots and dumps then pile up on a fixed schedule.
+Alongside, change the reclaim policy of the production database volumes to `Retain`, so that deleting a claim by mistake leaves the EBS volume in place.
 
-A dump CronJob that saves only to the same node's disk is lost with the node. Neo4j community has no online backup, so a dump may need the DB stopped. That is unverified.
+The shape of a DLM policy selecting the volumes of one namespace by the tag the CSI driver sets, one such target per production namespace, as an example and not as something to apply as it stands:
 
-Picking volumes by tag also snapshots other volumes, such as Prometheus and vm-single, which raises the bill.
+```yaml
+PolicyDetails:
+  ResourceTypes: [VOLUME]
+  TargetTags:
+    - Key: kubernetes.io/created-for/pvc/namespace
+      Value: prod-app-x
+  Schedules:
+    - Name: daily
+      CreateRule: { Interval: 24, IntervalUnit: HOURS, Times: ["18:00"] }
+      RetainRule: { Count: 7 }
+      CrossRegionCopyRules:
+        - TargetRegion: ap-northeast-1
+          Encrypted: true
+          RetainRule: { Interval: 7, IntervalUnit: DAYS }
+```
 
-Check: `aws dlm get-lifecycle-policies` shows one ENABLED policy, and 7 or more snapshots appear the next day.
+Where to change it: the backup itself is new and lives in the AWS account and in a new Velero release. The databases are part of the Argo CD applications of each product, for example `app-x-prod`, `app-t-prod`, `app-y-prod`, `app-v-prod` and `app-z-backend-prod`, all from the repository `https://github.com/example-org/iac` under `apps/prod/<product>`, with selfHeal on. A change made by hand to the StatefulSets in the cluster is reverted, and a dump CronJob added outside the repository is not tracked by anything; add both in that repository. The reclaim policy is a field of the PersistentVolume, which Argo CD does not manage, so it can be patched on each volume directly.
 
-**Rollback.** Delete a snapshot with `aws ec2 delete-snapshot --profile acme --region us-east-1 --snapshot-id <snapshot-id>`. Undo step ③ by running the same loop with Delete instead of Retain, and set a DLM policy to DISABLED or delete it. No step deletes data.
+What to be careful of when applying it: taking a snapshot does not stop a database, and changing a PersistentVolume's reclaim policy does not touch the pod. Each of these databases runs a single replica, so a dump CronJob that locks tables runs against the only instance serving users; schedule it outside busy hours. Restore tests belong in a scratch cluster, so that a test never runs against the production namespaces.
 
-**Why this happens.**
+At a larger scale, the databases move out of the cluster into a managed service such as RDS with point-in-time recovery, the backup account is separate and write-once, and a restore is rehearsed every quarter with a recorded recovery time.
 
-- Principle: A volume survives its node dying. If it is wrongly deleted or broken, though, only a snapshot brings it back. With reclaimPolicy Delete, one namespace deletion or one Argo CD prune removes the volume at once.
-- Case: In 2023 at InfluxData, automation produced a wrong Argo CD Application name and a whole production environment was deleted. Their volumes were Retain and their data was backed up, so they recovered without data loss in a little under 6 hours. Here, Argo CD also manages the 8 prod apps with prune and selfHeal, but the 7 prod DB volumes are Delete and have no backup.
-- Read: the Amazon Data Lifecycle Manager user guide; the Kubernetes documentation on the Reclaim Policy of Persistent Volumes
-
-**Evidence.**
+### Evidence
 
 | What | Value | Source |
 |---|---|---|
-| Backup CronJobs in the cluster, 7 days | 0 | summary.json |
-| DLM lifecycle policies, us-east-1 | none | aws/dlm-lifecycle-policies.json |
-| AWS Backup plans, us-east-1 | none | aws/backup-plans.json |
-| Prod DBs with no backup CronJob | 7 | summary.json |
-| DB workloads with a PVC, dev included | 17 | summary.json |
-| Snapshots of live prod volumes, 30 days | 0 of 12 | aws/ec2-snapshots-30d.json |
+| Databases with their own volume | 8, of them 7 in production | `resilience.backup.databases` |
+| Backup CronJobs for those databases | 0 | `resilience.backup.databases` |
+| Backup tool, etcd snapshots, VolumeSnapshots | none, 0, 0 | `resilience.no-backup` finding |
+| VolumeSnapshot API installed | no | `storage.snapshots.volumesnapshot_crd` |
+| DLM policies, AWS Backup plans | 0, 0 | `eks.no-backup-policy` finding |
+| EBS snapshots in 30 days | 2, both pre-delete copies of dev volumes | `storage.snapshots.ebs_snapshot_descriptions` |
+| Production database volumes with reclaim policy Delete | 7 | `storage.pvcs.prod_db_delete_reclaim` |
+| Storage class of those volumes | gp3 | `storage.pvcs.rows` |
+| Claims kept when the StatefulSet is deleted | yes (`whenDeleted: Retain`) | objects `statefulsets prod-app-z-backend/app-z-neo4j`, `prod-app-x/app-x-postgresql` |
 
-## 2. Prod pods piled on one spot node
+### Further reading
 
-**What is happening.** Spot node node-1-139 (r8gd.xlarge, us-east-1a) holds 20 of the 42 prod pods, from 15 prod workloads. It is 301.9 hours past expireAfter 720h. Karpenter cannot replace it because prod-app-m/app-m-admin carries do-not-disrupt. One spot reclaim stops all of these services at once.
+- [GitLab: Postmortem of database outage of January 31](https://about.gitlab.com/blog/2017/02/10/postmortem-of-database-outage-of-january-31/): how believing a backup exists differs from restoring one.
+- [Velero: How Velero Works](https://velero.io/docs/main/how-velero-works/): what a backup, a schedule and a restore do, and what a restore leaves alone.
+- [restic: Preparing a new repository](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html): the storage back ends restic writes to and how the repository password works, for the dump CronJobs.
+- [k3s: etcd-snapshot](https://docs.k3s.io/cli/etcd-snapshot): the S3 options and the restore procedure; useful as a model of a snapshot that leaves the cluster by itself.
 
-- Affected:
-  - prod-app-o/app-o-ai: all 3 replicas are on this node, with no topologySpread, no PDB and no readiness probe.
-  - prod-app-o/app-o-backend: both replicas are on this node, with no PDB and no readiness probe.
-  - prod-app-r/app-r: both replicas are on this node, with PDB minAvailable 1.
-  - prod-app-l-backend/app-l-frontend: both replicas are on this node, and its preferred podAntiAffinity is not honored. It has PDB minAvailable 1.
-  - The node used all 4 of its ENIs and hit "no available IP" 4 times.
-  - 6 single-replica prod workloads have their only pod here:
-    - app-m-admin
-    - app-o-admin
-    - app-o-frontend
-    - app-p-backend
-    - app-n-admin-frontend
-    - app-s-backend
-- Checked and healthy:
-  - prod-app-m api, backend and frontend are split across node-1-139 and node-1-62 by a required podAntiAffinity, though both nodes are in us-east-1a.
-  - The 2 Karpenter controllers sit on two node group nodes and have a PDB.
-  - No pods were Pending.
-- Changed for another reason: 41 nodes left in 24 hours. Karpenter removed the nodes it had launched for the app-l workers once they were empty, or through consolidation.
-- Not checked:
-  - whether node-1-139 got a spot reclaim warning in the past 42 days
-  - real user traffic on the single-replica services
+## 2. Kafka accepts connections from the whole internet
 
-**Why.** The do-not-disrupt annotation on the app-m-admin pod template stops Karpenter from emptying this node for expiry or consolidation. Prod Deployments have no topologySpreadConstraints, so the scheduler kept putting pods on the node with the most room. Confirmed. Why the annotation was added is unknown.
+**Why this one.** If the broker's authentication is weak or misconfigured, anyone on the internet can read or write the messages that flow between this cluster's services, and data read by a stranger cannot be taken back.
 
-**Suggested fix.**
+### What is the matter
 
-① See what is on the node.
+The Service `middleware/kafka-controller-0-external` is of type LoadBalancer and carries the annotation `service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing`, so the AWS Load Balancer Controller built a public Network Load Balancer for it. It forwards ports 9094 and 443 to the external listener of the only Kafka broker, `kafka-controller-0`, and external-dns publishes it under the name `broker.lab-k.example`. The security group of that load balancer allows port 9094 from `0.0.0.0/0`. The Service sets no `loadBalancerSourceRanges`, so nothing narrows who may connect.
 
+Kafka here is a single broker running Kafka 3.6.1 from the Helm chart `kafka-26.8.1`, with a replication factor of 1. It is the message bus of the cluster: the alert rules `DmmConsumerLagHigh`, `IlBridgeLagHigh`, `IlEditBridgeLagHigh` and `OnPremiseConsumerLagHigh` watch consumers of it, and the last of them suggests that a consumer outside the cluster is why the listener is public. That is inferred from the rule name.
+
+What the audit found sound: the broker has SCRAM users configured (`KAFKA_CLIENT_USERS`, with the passwords taken from the Secret `kafka-user-passwords`), so clients are expected to authenticate. What it could not see is the protocol of the external listener itself, which decides whether a client on port 9094 must authenticate and whether the traffic is encrypted; that setting is not in any object this audit reads. Whether anyone outside has actually connected is not known either.
+
+The databases are exposed in a milder way. The Network Load Balancer `app-u-db-shared`, created outside Kubernetes, puts MySQL, PostgreSQL, Redis and Neo4j ports of production databases on an internet-facing address, but its security group allows at most four single addresses per port. That is an allow-list, not an open door, and it holds as long as the list stays correct.
+
+### Why it comes about
+
+Why the listener was made public cannot be confirmed. A consumer outside the VPC, such as an on-premise system, needs a route to the broker, and an internet-facing load balancer is the quickest one to build. This is inferred from the rule names and the published host name.
+
+A Service of type LoadBalancer puts a port outside the cluster, and who can reach it is decided outside Kubernetes. With the AWS Load Balancer Controller the scheme is internal unless the annotation says `internet-facing`, which this Service does. The allowed sources come from `spec.loadBalancerSourceRanges`, and when that field is empty the controller uses `0.0.0.0/0` and writes a security group that allows the whole internet.
+
+For an HTTP service that is the intended state. For Kafka, PostgreSQL, MySQL or Redis it means the listener of the data store is on the internet, and the only thing between a stranger and the data is the store's own authentication. Nothing in the cluster reports it: the Service is healthy and every consumer works.
+
+An allow-list, as on `app-u-db-shared`, is better and still not private. The address is reachable from everywhere, and only the list decides who gets through, so every edit to that list has to be right.
+
+### How to watch it
+
+The state is a property of the objects and the security group, not a time series, so it is seen in the inventory: a LoadBalancer Service with the internet-facing scheme and no source ranges.
+
+```bash
+kubectl get svc -A -o json | jq -r '.items[] | select(.spec.type=="LoadBalancer") | [.metadata.namespace, .metadata.name, (.metadata.annotations["service.beta.kubernetes.io/aws-load-balancer-scheme"] // "internal"), ((.spec.loadBalancerSourceRanges // []) | join(","))] | @tsv'
 ```
-kubectl --context my-cluster get pods -A -o wide --field-selector spec.nodeName=node-1-139
-```
 
-Then see why the replacement is blocked.
+Who knocks on the port shows in two places once a security group narrows it. The CloudWatch metric `SecurityGroupBlockedFlowCount_Inbound` of the Network Load Balancer counts the flows its security group turned away, and VPC flow logs on the load balancer's network interfaces list the source addresses that connected to port 9094.
 
-```
-kubectl --context my-cluster get events -A --field-selector involvedObject.name=default-n44bh
-```
+### How it is solved
 
-These only read.
+At the scale this cluster is run at, the broker should not have an address on the internet at all. Make the load balancer internal by setting the scheme annotation to `internal`, and give the outside consumer a path into the VPC instead: a site-to-site VPN, a peered network, or the Tailscale network this cluster already uses for `app-ad`. If an internet-facing address has to stay for a while, list the consumer's addresses in `spec.loadBalancerSourceRanges`, so that the security group allows only them, and make sure the external listener requires SASL with TLS. In return, nothing listens for strangers, and the allow-list becomes a second layer instead of the only one. The cost is that every outside client needs a network path into the VPC, which is work on the client's side.
 
-Check: the node has 38 pods, and the DisruptionBlocked event names the do-not-disrupt pod app-m-admin.
-
-② In the IAC repo, add hostname topologySpreadConstraints to the pod templates of app-o-ai, app-o-backend, app-r and app-l-frontend. Add a PDB to app-o-ai and app-o-backend.
+The shape of the change, as an example in the chart's values and not as something to apply as it stands:
 
 ```yaml
-# Add under Deployment spec.template.spec (app-o-ai shown; for the others change only matchLabels)
-topologySpreadConstraints:
-  - maxSkew: 1
-    topologyKey: kubernetes.io/hostname
-    whenUnsatisfiable: DoNotSchedule
-    labelSelector:
-      matchLabels:
-        app.kubernetes.io/instance: app-o-prod
-        app.kubernetes.io/name: ai
----
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: app-o-ai
-  namespace: prod-app-o
-spec:
-  maxUnavailable: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: app-o-prod
-      app.kubernetes.io/name: ai
-```
-
-When Argo CD syncs, the four Deployments roll. New pods go to node-1-62 or to a new app node from Karpenter. The scheduler counts only nodes labeled workload-type=app.
-
-Argo CD selfHeal reverts kubectl changes, so make this change in the repo. Whether the chart value names match this snippet is unverified.
-
-The app-o workloads have no readiness probe. New pods count as Ready at once, and requests can fail before the app is up.
-
-app-o-ai requests 2Gi of memory per pod, and node-1-62 has 0.26 cores of CPU free, so a new node may be needed. maxUnavailable is 0, so old pods stay until the new ones are up.
-
-Check: `kubectl --context my-cluster -n prod-app-o get pods -o wide` shows the ai and backend pods on two or more nodes. `kubectl --context my-cluster -n prod-app-o get pdb` lists app-o-ai and app-o-backend.
-
-③ Once step ② is done, pick a low-traffic time. First ask whoever added the annotation why they added it. Then remove karpenter.sh/do-not-disrupt from app-m-admin's pod annotations in apps/prod/app-m in the IAC repo.
-
-```yaml
-# Remove this line from the app-m-admin pod template annotations (key name in the values file unverified)
-karpenter.sh/do-not-disrupt: "true"
-```
-
-app-m-admin rolls with maxSurge 1, maxUnavailable 0 and readiness on /. The new pod has no annotation, so Karpenter replaces the expired node-1-139.
-
-It launches a new node first, then evicts the 38 pods while honoring PDBs. The default pool budget is 10%, so nodes go one at a time.
-
-The 6 single-replica prod workloads above stop until their new pod is Ready. app-o-admin, app-o-frontend, app-n-admin-frontend and app-s-backend have no readiness probe.
-
-The external-secrets controller (1 replica) and 12 dev pods move too, and the new node may also be spot. If the annotation was protecting a long admin task, that task gets cut off.
-
-Check: `kubectl --context my-cluster get nodeclaims` no longer shows default-n44bh, and `kubectl --context my-cluster get pods -A -o wide --field-selector spec.nodeName=node-1-139` returns an empty list.
-
-④ Change the default NodePool setup so it stops packing pods onto one big node. This step is a plan, so it has no command.
-
-- In the shared values of the prod app charts, add hostname and zone topologySpreadConstraints by default.
-- Cap the instance size of NodePool default, or add a separate on-demand pool for prod.
-- Turn on VPC CNI prefix delegation so nodes hit the ENI limit less often.
-
-App pods then spread over several nodes, and losing one node leaves most services up.
-
-Drift is on, so changing the NodePool requirements replaces default pool nodes one at a time. On-demand costs more.
-
-Prefix delegation reaches existing nodes only once they are replaced.
-
-Check: resilience.placement.prod_max_share in the summary drops below 0.3.
-
-**Rollback.** Every change is a commit in the IAC repo. Revert it and Argo CD puts things back. A replaced node cannot be brought back, and there is no need to.
-
-**Why this happens.**
-
-- Principle: Two replicas exist so one can die while the other carries on. On the same node, both go with that node. Without a declared spread, the scheduler packs pods wherever there is room, and Karpenter consolidation packs them even harder. On spot, one reclaim is enough.
-- Case: At Moonlight, Kubernetes sometimes put all 3 website pods on one node, which made it a single point of failure. Sustained 100% CPU caused kernel panics, and the pods moved and repeated the pattern, so the service went down on and off from January 18 to 22. They fixed it with anti-affinity rules. Here, app-o-ai's 3 replicas and the 2 replicas each of app-o-backend, app-r and app-l-frontend all sit on one spot node, node-1-139.
-- Read: the Kubernetes documentation, Pod Topology Spread Constraints; the Karpenter documentation, Disruption
-
-**Evidence.**
-
-| What | Value | Source |
-|---|---|---|
-| Prod pods on node-1-139 | 20 | summary.json |
-| Share of all 42 prod pods | 0.48 | summary.json |
-| Hours past expireAfter, default-n44bh | 301.9 | summary.json |
-| Replacements blocked by do-not-disrupt, cumulative | 21337 | summary.json |
-| NodeClaims removed by spot reclaim since 2026-08-28 | 261 | summary.json |
-| Free CPU on node-1-62 | 0.26 cores | summary.json |
-
-## 3. Kafka listener open to the internet
-
-**What is happening.** The Service middleware/kafka-controller-0-external created an internet-facing NLB. Its security group opens ports 9094 and 443 to 0.0.0.0/0, in front of a single broker. SASL users are set up, but whether the external listener uses TLS is unknown. The NLB carried about 2.87GB in 24 hours with up to 146 connections at once, so it is in real use.
-
-- Affected: middleware/kafka-controller. Its external listener, container port 9095, is bound to NLB ports 9094 and 443, and the security group allows 0.0.0.0/0.
-- Checked and healthy:
-  - The shared DB NLB acme-db-shared opens each port to 4 or fewer /32 addresses.
-  - Kafka has SASL client users set in KAFKA_CLIENT_USERS.
-- Changed for another reason: none
-- Not checked:
-  - which outside addresses connect
-  - whether the external listener uses TLS
-  - auth failures in the broker log
-
-**Why.** The external access setting of Helm release kafka (bitnami kafka 26.8.1) created an internet-facing NLB without limiting source addresses. So the AWS Load Balancer Controller opened the security group to 0.0.0.0/0. Confirmed.
-
-**Suggested fix.**
-
-① Read only the listener lines from the ConfigMap to see the external listener's protocol.
-
-```
-kubectl --context my-cluster -n middleware get configmap kafka-controller-configuration -o jsonpath='{.data.server\.properties}' | grep -E '^(listeners|advertised\.listeners|listener\.security\.protocol\.map)='
-```
-
-This only reads, and it prints only these three lines.
-
-Check: if EXTERNAL is SASL_SSL in listener.security.protocol.map, the traffic is encrypted. If it is SASL_PLAINTEXT or PLAINTEXT, passwords and data cross the internet unencrypted.
-
-② Find the outside clients. This step is a plan, so it has no command.
-
-Ask the Kafka owner which systems connect from outside. If no one knows, turn on VPC Flow Logs on the NLB subnets for a day and collect the source addresses on 9094 and 443.
-
-Logs then pile up in CloudWatch Logs or S3.
-
-Log storage is billed, so remember to turn the logs off.
-
-Check: you have a list of source addresses.
-
-③ Once you know every client address, narrow loadBalancerSourceRanges on the external Service to those addresses in the Helm values.
-
-```yaml
-# Add to the values of the kafka helm_release (bitnami kafka 26.8.1) in the Terraform code that built the cluster. Key names are unverified.
 externalAccess:
+  enabled: true
   controller:
     service:
+      type: LoadBalancer
+      annotations:
+        service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
       loadBalancerSourceRanges:
-        - <client-ip>/32
-        - <NAT 게이트웨이 EIP>/32  # when pods inside the cluster connect through the external address
+        - <ip>/16
 ```
 
-Before you apply, run terraform plan. Confirm that nothing changes outside the kafka release and that the StatefulSet pod template stays the same.
+Where to change it: the Service carries the Helm marks of the release `kafka` in the namespace `middleware` (chart `kafka-26.8.1`, revision 7). Nothing in the cluster marks it as managed by Argo CD, so change it in the values that release was installed from and upgrade the release; a change made to the Service by hand is overwritten at the next upgrade. The load balancer `app-u-db-shared` was created outside Kubernetes and is changed where it was made, in the AWS account.
 
-The AWS Load Balancer Controller then replaces the 0.0.0.0/0 rule with those addresses. Connections from anywhere else are cut.
+What to be careful of when applying it: this stops the message bus for a while. The broker has a start-up container, `auto-discovery`, that reads the load balancer's address when the pod starts, so after the address changes the broker has to be restarted to hand clients the new one, and with a single broker and a replication factor of 1 that restart stops every producer and consumer until it is back. Plan for the load balancer to get a new, internal address. Every client that connects through `broker.lab-k.example` loses its connection until external-dns has published that address and the client can reach it, and a consumer outside the VPC cannot reconnect at all until its network path exists. The broker's external listener settings in the release values name how clients reach it, so read them together with this change. The example shows only the annotation that changes; the Service also carries the external-dns host name, the load balancer type and the target type, and those have to stay. Do it after the outside consumer has a working path, at a quiet hour. The data volume of the broker is not touched by the restart.
 
-Terraform's helm provider manages this release. A manual helm upgrade gets reverted at the next terraform apply, so change it in the Terraform code.
+At a larger scale, Kafka is reached only over private networking such as PrivateLink, clients authenticate with mutual TLS, and the network rules live in code with review, so no single edit opens a port.
 
-If the plan shows a change to StatefulSet kafka-controller, the single broker restarts and all of Kafka stops.
-
-Pods inside the cluster that use the NLB's external address arrive from the NAT gateway address. Leave that address out and those pods are cut off too, as is any client you missed.
-
-The broker runs on node-2-135, which expires 2026-11-08 15:28 KST. It restarts then whether or not you make this change, so do not schedule this change for that time.
-
-Check: `aws ec2 describe-security-groups --profile acme --region us-east-1 --group-ids sg-0123456789abcdef0 --query 'SecurityGroups[].IpPermissions[].IpRanges'` shows no 0.0.0.0/0. Leave sg-0123456789abcdef0 out of this check, since the prod ALB shares it.
-
-**Rollback.** Revert the Terraform commit and run terraform apply again, and the security group opens again. Delete the flow logs to undo step ②.
-
-**Why this happens.**
-
-- Principle: When a DB or message queue port sits on an internet-facing load balancer, one password is all that guards the data. On AWS, the load balancer's security group decides who can connect. An internal scheme or a VPN is a safer shape.
-- Read: the AWS Load Balancer Controller documentation on Service annotations and loadBalancerSourceRanges; the Apache Kafka documentation on Security
-
-**Evidence.**
+### Evidence
 
 | What | Value | Source |
 |---|---|---|
-| Source of the 9094 inbound rule | 0.0.0.0/0 | summary.json |
-| Bytes processed by the NLB, 24h | 2868958720 | summary.json |
-| Peak concurrent connections, 24h | 146 | summary.json |
-| Exposed port on kafka-controller-0-external | 9094 | summary.json |
+| Service type and scheme | LoadBalancer, internet-facing | object `services middleware/kafka-controller-0-external` |
+| Ports forwarded | 9094, 443 | `traffic.db_exposed` |
+| Sources allowed on 9094 | 0.0.0.0/0 | `traffic.db_exposed` |
+| `loadBalancerSourceRanges` | not set | `traffic.db_exposed` |
+| Published host name | broker.lab-k.example | object `services middleware/kafka-controller-0-external` |
+| Brokers, replication factor | 1, 1 | object `statefulsets middleware/kafka-controller` |
+| Helm release | kafka in middleware, chart kafka-26.8.1, revision 7 | `hygiene.helm.releases` |
+| `app-u-db-shared` ports on an internet-facing address | 8 | `traffic.db_exposed` |
+| `app-u-db-shared` sources allowed per port | at most 4, each a /32 | `traffic.db_exposed` |
 
-## 4. 4 prod ALB health checks failing
+### Further reading
 
-**What is happening.** Every target in 4 prod target groups on the shared ALB acme-prod-lb is unhealthy. The health check goes to /, where the two backends answer 404 and the two frontends answer 307. When every target fails, the ALB sends traffic to all of them. So the services answer now, but a dead pod is not filtered out either.
+- [AWS Load Balancer Controller: Service annotations](https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/service/annotations/): the defaults for scheme, source ranges and security groups that decide who can connect to a Network Load Balancer.
+- [Kubernetes: Service](https://kubernetes.io/docs/concepts/services-networking/service/): what a LoadBalancer Service really opens and how the internal load balancer annotation of each cloud works.
+- [Elastic Load Balancing: Update the security groups for your Network Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-security-groups.html): what an NLB without a security group lets through, and the metric and logs that show blocked traffic.
 
-- Affected:
-  - prod-app-q/app-q-backend: 1 target unhealthy with Target.ResponseCodeMismatch [404]. The pod's readiness on /health, port 3000, passes.
-  - prod-app-l-backend/app-l-backend: 2 targets unhealthy with [404]. Readiness on /health, port 8000, passes.
-  - prod-app-o/app-o-frontend: 1 target unhealthy with [307], a redirect. It has no readiness probe.
-  - prod-app-n/app-n-frontend: 1 target unhealthy with [307]. It has no readiness probe and had 1,482 4xx and 26 5xx in 24 hours.
-- Checked and healthy:
-  - app-q-ai, app-q-studio and app-q-web in prod-app-q already use healthcheck-path /health.
-  - dev-app-n/app-n-frontend and dev-app-t/app-t-backend fail too, but they are dev.
-- Changed for another reason: none
-- Not checked:
-  - which path returns 200 on the two frontends, and where their 307 points
-  - whether /health returns 200 or a 3xx
+## 3. The production Neo4j password is written into its manifest
 
-**Why.** The four Ingresses have no alb.ingress.kubernetes.io/healthcheck-path, so the ALB checks /, and these apps do not answer / with 200. Confirmed.
+**Why this one.** Everyone who can read the manifest repository, the Argo CD UI or the StatefulSet can read the password of a production graph database whose port is on an internet-facing address, and a password once read cannot be made secret again.
 
-**Suggested fix.**
+### What is the matter
 
-① Look at the target health straight from AWS.
+The `neo4j` container of the StatefulSet `prod-app-z-backend/app-z-neo4j` sets the environment variable `NEO4J_AUTH` as a literal value of 26 characters, not as a reference to a Secret. By its name and its length, the value is the user and password of the database; that is inferred from the name, since the value is not read. The audit records only the name and the length, never the value.
 
+The same container already reads the password the right way under another name: `GRAPH_DB_PASSWORD` comes from the key `NEO4J_PASSWORD` of the Secret `app-z-backend-secret`. So a database password already lives in a Secret, and a credential for the same database is written out in plain text next to it; whether the two values are the same cannot be told, because neither is read.
+
+How far it reaches: the StatefulSet is managed by the Argo CD application `app-z-backend-prod` from the repository `https://github.com/example-org/iac`, path `apps/prod/app-z-backend`, so the value is in that Git repository and its whole history, in the Argo CD UI and in the output of `kubectl get statefulset -o yaml` for anyone with read access to workloads in the namespace. The Neo4j Bolt port 7687 of this database is also bound to the internet-facing load balancer `app-u-db-shared`, limited to four addresses by its security group.
+
+What the audit found sound: the rest of the cluster keeps its credentials properly. 36 ExternalSecrets pull values from AWS Secrets Manager through the ClusterSecretStore `aws-secrets-manager`, all of them ready, and no ConfigMap holds a value that looks like a password. A second hit of the same kind, `TS_KUBE_SECRET` in `app-ad`, was looked at and is the name of a Secret, not a credential. Whether this password has been changed since it was first written into the repository cannot be told.
+
+### Why it comes about
+
+The likely history is that the StatefulSet was written first with the password inline and the Secret came later for the application's own use. That is inferred from the two variables side by side; the repository history would tell.
+
+Kubernetes has two objects that look alike. A ConfigMap is for data that is not confidential. A Secret is meant for confidential data, which lets the cluster treat it differently: reading Secrets is granted separately in RBAC, and encryption at rest is configured for them. A password written as a literal `env` value in a StatefulSet gets none of that. It is part of an object that everyone who can read workloads can see, and it travels wherever the manifest goes: the Git repository, `kubectl describe`, the Argo CD UI.
+
+A Secret is not safe by itself either. Its value is only base64 encoded, so a Secret manifest committed to Git is as readable as the plain value. Inside the cluster, list and watch on Secrets reveal the content just as get does, and anyone who may create a pod in a namespace can mount any Secret of that namespace. That is why the usual practice is to keep the value in a store outside the cluster and let only a reference live in Git, which is what this cluster already does for 36 other values.
+
+On EKS the storage side is covered: this cluster has envelope encryption of Secrets turned on. That protects the copy in etcd, not a value written in a manifest.
+
+### How to watch it
+
+A literal value that looks like a credential is found in the manifest before it is merged. kube-linter runs the check `env-var-secret` by default, and running it in the pipeline of the IAC repository catches the next one.
+
+```yaml
+# .kube-linter.yaml in the IAC repository
+checks:
+  include:
+    - env-var-secret
 ```
-aws elbv2 describe-target-health --profile acme --region us-east-1 --target-group-arn $(aws elbv2 describe-target-groups --profile acme --region us-east-1 --names k8s-app-svc-36f816b829 --query 'TargetGroups[0].TargetGroupArn' --output text)
+
+For who reads Secrets in the cluster, the API server audit log at the Metadata level records each read of a Secret with the user. On EKS that is the `audit` log type of the control plane logging, which is not among the four types this cluster sends to CloudWatch (api, authenticator, controllerManager, scheduler); it would have to be turned on.
+
+### How it is solved
+
+At the scale this cluster is run at, the fit is the pattern the cluster already uses. Put the Neo4j credential in AWS Secrets Manager, let an ExternalSecret in `prod-app-z-backend` create a Secret from it through `aws-secrets-manager`, and set `NEO4J_AUTH` from that Secret with `valueFrom.secretKeyRef`. Then change the password, because the old one has been readable in the repository and must be treated as known. The value then has one home outside the cluster, it can be rotated without touching a manifest, and Git holds only a reference. The cost is nothing new: the operator and the store are already running.
+
+The shape of the reference, as an example and not as something to apply as it stands:
+
+```yaml
+env:
+  - name: NEO4J_AUTH
+    valueFrom:
+      secretKeyRef:
+        name: app-z-neo4j-auth
+        key: NEO4J_AUTH
 ```
 
-This only reads.
+Where to change it: the StatefulSet is managed by the Argo CD application `app-z-backend-prod`, repository `https://github.com/example-org/iac`, path `apps/prod/app-z-backend`, revision `main`, with selfHeal on. A change made to the StatefulSet in the cluster is reverted, so make it in the repository. Removing the line from the current files does not remove it from the Git history; changing the password is what makes the old value useless.
 
-Check: State unhealthy with Reason Target.ResponseCodeMismatch. The other three target groups are k8s-app-svc-bb495c72c8, k8s-app-svc-8c88bb317a and k8s-app-svc-032c25d752.
+What to be careful of when applying it: create the ExternalSecret and check that the Secret exists before the StatefulSet refers to it, because a pod that references a missing Secret does not start and this database has no second replica. Changing the environment of the StatefulSet restarts its pod, and `app-z-neo4j` runs a single replica, so the database is unavailable to `app-z-backend` while the pod restarts. The data volume `data-app-z-neo4j-0` is kept across the restart. Moving the value into a Secret does not by itself change the password stored in the existing database on `data-app-z-neo4j-0`; whether Neo4j reads `NEO4J_AUTH` again on a volume that already holds data is not something this audit can tell, so change the password inside Neo4j itself, and update `app-z-backend-secret` in the same change window, or `app-z-backend` cannot log in.
 
-② In the IAC repo, add healthcheck-path /health to the app-q-backend and app-l-backend Ingresses.
+At a larger scale, each workload's access to its Secrets is narrowed in RBAC, reads of Secrets are audited and alerted on, and credentials are short-lived and issued per client rather than one shared password.
+
+### Evidence
+
+| What | Value | Source |
+|---|---|---|
+| Variable set as a literal | `NEO4J_AUTH`, 26 characters | object `statefulsets prod-app-z-backend/app-z-neo4j` |
+| Database password read from a Secret | `GRAPH_DB_PASSWORD` from `app-z-backend-secret` key `NEO4J_PASSWORD` | object `statefulsets prod-app-z-backend/app-z-neo4j` |
+| Replicas of `app-z-neo4j` | 1 | object `statefulsets prod-app-z-backend/app-z-neo4j` |
+| Managed by | Argo CD `app-z-backend-prod`, `apps/prod/app-z-backend`, selfHeal on | `security.plaintext-secret-env` finding |
+| ExternalSecrets in the cluster, not ready | 36, 0 | `security.secrets` |
+| ConfigMaps with password-like values | 0 | `security.secrets.plaintext_configmap` |
+| Envelope encryption of Secrets | on | `inventory.eks.secrets_encryption` |
+| Sources allowed on port 7687 of `app-u-db-shared` | 4 | `traffic.db_exposed` |
+
+### Further reading
+
+- [Kubernetes: Good practices for Kubernetes Secrets](https://kubernetes.io/docs/concepts/security/secrets-good-practices/): what administrators and developers each have to do so that a Secret is more than a renamed ConfigMap.
+- [External Secrets Operator: overview](https://external-secrets.io/latest/introduction/overview/): how Secrets are synchronised from an external store and who owns which resource.
+- [kube-linter: checks](https://raw.githubusercontent.com/stackrox/kube-linter/main/docs/generated/checks.md): the manifest checks for secrets in environment variables and which of them run by default.
+- [EKS: Default envelope encryption for all Kubernetes API Data](https://docs.aws.amazon.com/eks/latest/userguide/envelope-encryption.html): what EKS encrypts by default and what happens when a customer key is disabled or deleted.
+
+## 4. Kubernetes 1.32 is past support and Karpenter 0.37 does not support it
+
+**Why this one.** Seven of the nine nodes of this cluster come from Karpenter, and the next control plane upgrade, whether planned or done by EKS at the end of extended support, leaves Karpenter unable to launch nodes, so pods that lose their node have nowhere to go.
+
+### What is the matter
+
+The control plane runs Kubernetes 1.32 (`v1.32.13-eks-577a51e`) and the nodes run `v1.32.9`. EKS standard support for 1.32 ended on 2026-03-23, 237 days ago, and the cluster has been in extended support since then, which AWS bills per cluster hour; extended support ends on 2027-03-23. The Kubernetes project itself stopped patching 1.32 on 2026-02-28.
+
+Karpenter, which launches seven of the nine nodes through two of its four NodePools (the other two nodes belong to an EKS managed node group), is at version 0.37.0 from the Helm release `karpenter`. Its compatibility table covers Kubernetes 1.23 to 1.30, so the cluster is already two minors outside what this Karpenter supports, and Karpenter said so in its own log at 08:53 UTC on 2026-11-14. It still works today: by its log it launched 7 nodes in the last 24 hours, in about 61 seconds each at the median and 67 seconds at most, with no launch failure.
+
+The one EC2NodeClass, `default`, uses `amiFamily: AL2` with no AMI selector, so new nodes boot the latest Amazon Linux 2 image for the cluster's version. Seven nodes that could be read run Amazon Linux 2 with cgroup v1. EKS's own upgrade insight for 1.33 reports an error for this: AWS stopped publishing EKS-optimised AL2 images on 2025-11-26, and there is none for 1.33.
+
+What the audit found sound: no manifest or Helm release uses an API version that 1.33 removes (Pluto found 0; kubent found 0 but could not read 13 of its lists), and the only deprecated call the API server saw was 2 requests for `componentstatuses`. The rest of the upgrade is therefore mostly about the add-ons and the nodes, not the workloads.
+
+### Why it comes about
+
+The likely history is that the control plane was upgraded to 1.32 when the cluster was built or soon after, and Karpenter, which EKS does not upgrade, stayed at the version it was installed with. The EC2NodeClass still uses the `karpenter.k8s.aws/v1beta1` API of the 0.x line, which fits that picture. This is inferred from the versions; the release history would tell.
+
+A Kubernetes minor is patched for about fourteen months upstream. EKS keeps it in standard support for fourteen months from its own release, then in extended support for twelve more at an extra cost, and at the end of extended support it upgrades the control plane by itself, at any time after the date and without asking. It upgrades only the control plane; nodes and add-ons such as Karpenter stay where they were. And the API server never skips a minor, so a cluster that waits has to cross each minor in turn.
+
+Karpenter is installed and upgraded by the owner of the cluster, separately from the control plane. Each release supports a range of Kubernetes minors; 1.32 needs Karpenter 1.2 or later. Outside its range, Karpenter reports that it is not compatible, and a control plane upgraded further past that range leaves the autoscaler unable to prepare new nodes. Catching up is not one step: the CRDs are tied to the Karpenter version and Helm installs CRDs only on the first install, and some releases can only be reached through an intermediate one.
+
+The AMI family is the other half. An EC2NodeClass names the image family new nodes boot from. 1.32 is the last minor for which EKS released AL2 images, so the day the cluster moves to 1.33 there is no image for `AL2` and no new node can start, whatever the Karpenter version. Until then, new nodes boot an image that no longer gets updates; Amazon Linux 2 itself ended support on 2026-06-30. Without a pinned version, every new image would make Karpenter replace all nodes through drift, by default 10% of the nodes at a time.
+
+[ZenML](https://status.zenml.io/incidents/bnrlb8tck3v0) ran its production EKS cluster on an outdated Kubernetes version and AMI type. When the upgrade finally came it bundled several changes in one night, one of them removed IAM permissions from the worker nodes, and the workspaces were down for about eight hours until the node group was rebuilt. This cluster is in the same position: a version, an autoscaler and an image family that all have to move, and the longer they wait the more of them move at once.
+
+### How to watch it
+
+The mismatch is two version strings and one field, so it is read from the objects before an upgrade rather than alerted on after it. The symptom it would cause can be alerted on: pods pending while Karpenter creates no node.
+
+```promql
+sum(kube_pod_status_phase{phase="Pending"}) > 0
+  and sum(increase(karpenter_nodeclaims_created_total[15m])) == 0
+```
+
+This cluster runs Loki with promtail, so where Karpenter's log reaches Loki the controller's own complaint can be alerted on too. Neither rule exists here; both have to be made.
+
+```logql
+count_over_time({namespace="karpenter"} |= "is not compatible with" [24h]) > 0
+```
+
+For the version itself, the Upgrade insights tab of the cluster in the EKS console and the AWS Health Dashboard list what blocks the next upgrade; the AL2 error above came from there.
+
+### How it is solved
+
+At the scale this cluster is run at, the upgrade becomes a written procedure, done in this order. First Karpenter, because it must support the version the cluster is on before anything else: move it from 0.37 to 1.x one minor at a time through the releases the upgrade guide requires, with the CRDs managed by the `karpenter-crd` chart so they move with each step, and the NodePools and the EC2NodeClass converted to the `v1` API on the way. Then the node image: change `default` to AL2023 with a pinned alias, and give the NodePools a disruption budget that allows no drift replacement in busy hours, so the switch replaces nodes when the team chose it. Then the control plane, one minor at a time from 1.32 to the version you want, each followed by the managed add-ons and the nodes. In return, nodes keep launching after each upgrade, they run a supported image, patches arrive again and extended support billing stops. The cost is engineer time for each step and a non-production cluster to rehearse on, if one exists.
+
+The shape of the node class and the budget, as an example and not as something to apply as it stands:
+
+```yaml
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: default
+spec:
+  amiSelectorTerms:
+    - alias: al2023@v<a release that includes 1.32 images>
+---
+apiVersion: karpenter.sh/v1
+kind: NodePool
+spec:
+  disruption:
+    budgets:
+      - nodes: "10%"
+      - nodes: "0"
+        reasons: [Drifted]
+        schedule: "0 0 * * 1-5"
+        duration: 10h
+```
+
+Where to change it: Karpenter is the Helm release `karpenter` in the namespace `karpenter`. Nothing in the cluster marks the EC2NodeClass `default` as managed by Argo CD or Helm; it carries the annotation of `kubectl apply`, so change it where it is declared, in the manifest it was applied from. The cluster version is changed in the AWS account.
+
+What to be careful of when applying it: the example shows only the fields that change, and the existing `role`, subnet and security group selectors stay; the budget goes into each of the four NodePools. The pinned version has to be a release that has images for the cluster's current minor, or no node can launch. Switching the node class replaces every node Karpenter launched, and fourteen production workloads run a single replica, so each of them stops while its pod moves; four production Deployments also keep all their replicas on one node. The NodePools allow 10% of nodes to be disrupted at a time, so nodes are replaced a few at a time, not all at once. AL2023 uses cgroup v2, so anything that reads cgroup v1 files, old Java 8 builds among them, needs a look before the switch. The Kafka broker and the eight databases run as single-replica StatefulSets on EBS volumes that live in one zone each, so each is down while its pod moves and needs a node in that zone.
+
+At a larger scale, upgrades happen three times a year as routine: release notes reviewed, insights cleared, removed APIs scanned in CI, a non-production cluster upgraded first, and the image pin promoted from a lower environment. When several minors must be crossed at once, building a new cluster on the target version and moving the workloads is weighed against a chain of in-place upgrades.
+
+### Evidence
+
+| What | Value | Source |
+|---|---|---|
+| Control plane version | v1.32.13-eks-577a51e | `platform.k8s-version-eol` finding |
+| End of EKS standard support | 2026-03-23, 237 days ago | `platform.k8s-version-eol` finding |
+| Upstream end of life | 2026-02-28 | `platform.k8s-version-eol` finding |
+| Support type, end of extended support | EXTENDED, 2027-03-23 | `eks.extended-support` finding |
+| Karpenter version, supported range | 0.37.0, 1.23 to 1.30 | `scaling.karpenter` |
+| Karpenter incompatibility in its log | 1 line, 2026-11-14 08:53 UTC | `logs.signatures` finding |
+| Nodes launched in 24 h, median and longest time | 7, 61 s, 67 s | `scaling.karpenter.latency_24h` |
+| EC2NodeClass AMI family, pinned | AL2, no | `karpenter.ec2nodeclass-al2` finding |
+| Nodes on Amazon Linux 2 with cgroup v1 | 7 | `node.cgroup-v1` findings |
+| Manifests using APIs removed in 1.33 | 0 (kubent could not read 13 lists) | `hygiene.deprecated` |
+| Deprecated API calls seen | componentstatuses v1, 2 | `metrics.apiserver_requested_deprecated_apis` |
+| NodePool disruption budget | 10% of nodes, all four NodePools | `scaling.karpenter.nodepools` |
+
+### Further reading
+
+- [Karpenter: Compatibility](https://karpenter.sh/docs/upgrading/compatibility/): the matrix of Kubernetes minors and the Karpenter release each one needs.
+- [Karpenter: Upgrade Guide](https://karpenter.sh/docs/upgrading/upgrade-guide/): the per-release notes, including the releases that must be passed through on the way from 0.37.
+- [Amazon EKS: Understand the Kubernetes version lifecycle on EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html): the EKS calendar, what extended support includes and what the automatic upgrade does and does not touch.
+- [Amazon EKS: Guide to EKS AL2 and AL2-Accelerated AMIs transition features](https://docs.aws.amazon.com/eks/latest/userguide/eks-ami-deprecation-faqs.html): the AL2 end dates and what changes for workloads on AL2023, cgroup v2 above all.
+- [Karpenter: Disruption](https://karpenter.sh/docs/concepts/disruption/): how drift is detected and how budgets limit when and how many nodes are replaced.
+- [Amazon EKS best practices: Cluster Upgrades](https://docs.aws.amazon.com/eks/latest/best-practices/cluster-upgrades.html): the order of an in-place upgrade and the tools that find removed APIs before it.
+
+## 5. Four production load balancer health checks filter nothing
+
+**Why this one.** When a pod of these four services breaks, the load balancer keeps sending users to it, because its health check already marks every target as failed and has stopped telling good from bad.
+
+### What is the matter
+
+Four target groups of the shared production ALB `k8s-lb-b18a4555d7` have no healthy target at all. The ALB checks each target on the path `/` and expects the code 200, and each answers something else.
+
+- `prod-app-t/app-t-backend`, port 3000: the one target answers 404. It served 6,089 requests in the last 24 hours.
+- `prod-app-z-backend/app-z-backend`, port 8000: both targets answer 404. It served 6 requests.
+- `prod-app-y/app-y-frontend`, port 3003: the one target answers 307, a redirect. It served 820 requests.
+- `prod-app-v/app-v-frontend`, port 3000: the one target answers 307. It served 9,936 requests, 30 of them with a 5xx from the target.
+
+Over the last 24 hours the lowest healthy count of each group was 0 and the highest unhealthy count equalled all its targets. The services work for users only because of how an ALB behaves when every target of a group is unhealthy: it fails open and routes to all of them. So these services are up, but their health check does nothing.
+
+The two backends already have a health endpoint: both declare `readinessProbe` and `livenessProbe` on `/health`. The ALB simply asks for `/` instead. The two frontends declare no probe at all, and their `/` answers with a redirect.
+
+How far the effect reaches: three of the four run a single replica, so for them a filtering health check would not keep users away from a broken pod anyway, because there is no other pod to send them to. It matters most for `app-z-backend` with two replicas, and for every service once it is scaled out. What the audit cannot tell is whether any user request actually reached a broken pod through this path.
+
+### Why it comes about
+
+The target groups carry the AWS Load Balancer Controller's default health check of `/` with success code 200, which means the Ingresses set no health check path of their own. The applications answer `/` with 404 or a redirect, so the defaults and the applications never matched. That is confirmed by the target group settings and the reason codes the ALB reports.
+
+The controller turns each Ingress into an ALB, a target group per Service, and listener rules. Here the target type is `ip`, so the ALB sends traffic straight to the pod addresses. The ALB health check is its own, separate from Kubernetes readiness: Kubernetes asks the pod on `/health` and finds it Ready, the ALB asks `/`, gets 404, and after two failures every 15 seconds marks the target unhealthy. A pod can be Ready to Kubernetes and failed to the ALB at the same time, which is the state of all four.
+
+The ALB routes only to healthy targets. When some are unhealthy, the load moves to the rest; when all are unhealthy, it fails open and routes to all of them. That rule keeps a service up when its health check is wrong, and it also hides that the check is wrong: nothing breaks, and the target group shows red in the console where nobody looks. The day one pod of `app-z-backend` truly fails, the ALB cannot tell it from the healthy one and keeps sending it half of the traffic.
+
+### How to watch it
+
+The CloudWatch metric `UnHealthyHostCount` of each target group shows the state, and AWS recommends an alarm on its Minimum statistic above zero for more than one data point, because the Minimum is above zero only when every node of the load balancer sees the target as unhealthy. `HealthyHostCount` shows how many targets carry the load, and `UnhealthyRoutingRequestCount` counts the requests sent through the fail-open path, which on these four groups is all of them. Whether such alarms exist in this account was not checked.
+
+```text
+AWS/ApplicationELB UnHealthyHostCount, statistic Minimum,
+dimensions LoadBalancer + TargetGroup, threshold > 0 for 2 data points
+```
+
+For one target group, the reason code per target says why:
+
+```bash
+aws elbv2 describe-target-health --target-group-arn <arn>
+```
+
+### How it is solved
+
+At the scale this cluster is run at, give every Ingress a health check the application answers. For the two backends that is their existing `/health` endpoint; for the two frontends it is a path that returns 200 without a redirect, which may need a small route in the application. Then add one CloudWatch alarm on `UnHealthyHostCount` per target group, so a wrong health check shows the day it appears. In return, the ALB stops sending requests to a broken pod as soon as there are two of them, and a broken check becomes visible. The cost is a few annotations per Ingress and, for the frontends, a route in the code.
+
+Since the target type is already `ip`, the namespaces can also be labelled for the pod readiness gate, so a rollout waits until the new pod is healthy in the target group before the old one goes. That only helps once the health check passes.
+
+The shape of the annotations on an Ingress, as an example and not as something to apply as it stands:
 
 ```yaml
 metadata:
   annotations:
     alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/success-codes: '200'
 ```
 
-The AWS Load Balancer Controller changes only the health check path of the two target groups, and no pod restarts. Once targets turn healthy, the ALB sends traffic only to healthy targets.
+Where to change it: each service is managed by its own Argo CD application from the repository `https://github.com/example-org/iac`, revision `main`, with selfHeal on: `app-t-prod` at `apps/prod/app-t`, `app-z-backend-prod` at `apps/prod/app-z-backend`, `app-y-prod` at `apps/prod/app-y` and `app-v-prod` at `apps/prod/app-v`. A change made to the Ingress in the cluster is reverted, so make it in the repository.
 
-40 Ingresses share one ALB group, acme-prod-lb. A bad annotation on one Ingress can stall reconciling for the whole group.
+What to be careful of when applying it: changing the health check path does not restart any pod. But the moment the check starts to work, the fail-open state ends, and a target that really fails the new check is taken out of rotation. For the three single-replica services a wrong new path changes nothing, because their one target fails and the ALB stays open to it. For `app-z-backend` with two targets it matters: if one pod passes the new check and the other does not, all traffic goes to the one that passes. The two frontends have no `/health` route today, so the path in the example does not fit them until such a route exists. The target groups keep a deregistration delay of 300 seconds, so a target removed while serving drains slowly.
 
-Readiness counts 200 to 399 as success, but the ALB accepts only 200. If /health returns a 3xx, the check still fails.
+At a larger scale, the readiness gate is on in every application namespace, the controller runs with a PodDisruptionBudget and its own metrics scraped, and health checks are part of the service template, so no Ingress is created without one.
 
-If /health checks the DB, every target fails when the DB goes down, and the ALB goes back to sending traffic to all of them. Argo CD selfHeal is on, so change this in the repo.
-
-Check: run the step ① command twice, with --names k8s-app-svc-bb495c72c8 and then k8s-app-svc-8c88bb317a. Every target shows State healthy.
-
-③ Find a path that returns 200 on the two frontends. First open a port-forward.
-
-```
-kubectl --context my-cluster -n prod-app-n port-forward deploy/app-n-frontend 3000:3000
-```
-
-Then, in another terminal, check the status code.
-
-```
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/
-```
-
-This opens only a local port-forward, and the cluster does not change.
-
-Check: / returns 307 now, which fails the ALB's 200 matcher. Use `curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n'` to see where it redirects, and try other paths until one returns 200. For app-o-frontend, do the same in prod-app-o on port 3003.
-
-④ Once you have a 200 path, add it as healthcheck-path on both frontend Ingresses and as a readinessProbe on both Deployments.
-
-```yaml
-# Ingress
-alb.ingress.kubernetes.io/healthcheck-path: <200-path>
-# Deployment containers[0]
-readinessProbe:
-  httpGet:
-    path: <200-path>
-    port: http
-  periodSeconds: 10
-```
-
-The Ingress change touches only the target group settings. The readinessProbe changes the pod template, so a rolling update runs.
-
-Both Deployments have 1 replica, maxSurge 25% and maxUnavailable 25%, so the new pod starts first. If the path is wrong, the new pod never gets Ready and the rollout stalls.
-
-After 600 seconds the rollout only gets marked ProgressDeadlineExceeded, and Kubernetes does not roll back by itself. The old pod keeps answering in the meantime.
-
-Check: `kubectl --context my-cluster -n prod-app-n rollout status deploy/app-n-frontend` and `kubectl --context my-cluster -n prod-app-o rollout status deploy/app-o-frontend` both finish. Then the step ① command shows healthy with --names k8s-app-svc-36f816b829 and with k8s-app-svc-032c25d752.
-
-**Rollback.** Every change is a repo commit. Revert it and Argo CD puts things back, with the health check on / again.
-
-**Why this happens.**
-
-- Principle: The ALB stops sending traffic to a target its own health check calls unhealthy. When all targets are unhealthy, it sends to all of them, so nothing looks broken, but the check filters out nothing. This check is separate from Kubernetes readiness, so a Ready pod can still be dropped by the ALB.
-- Read: the AWS Load Balancer Controller documentation on Ingress annotations; the Elastic Load Balancing documentation on target group health checks
-
-**Evidence.**
+### Evidence
 
 | What | Value | Source |
 |---|---|---|
-| app-n-frontend requests, 24h | 9938 | summary.json |
-| app-n-frontend healthy targets | 0 of 1 | summary.json |
-| app-q-backend requests, 24h | 5849 | summary.json |
-| app-l-backend healthy targets | 0 of 2 | summary.json |
-| app-o-frontend requests, 24h | 1258 | summary.json |
+| Target groups with no healthy target | 4 | `traffic.alb.unhealthy_target_groups` |
+| Health check path and expected code | `/`, 200 | `traffic.alb.target_groups` |
+| `app-t-backend` answer, targets, requests 24 h | 404, 0 of 1 healthy, 6,089 | `traffic.alb.target_groups` |
+| `app-z-backend` answer, targets, requests 24 h | 404, 0 of 2 healthy, 6 | `traffic.alb.target_groups` |
+| `app-y-frontend` answer, targets, requests 24 h | 307, 0 of 1 healthy, 820 | `traffic.alb.target_groups` |
+| `app-v-frontend` answer, targets, requests 24 h, target 5xx | 307, 0 of 1 healthy, 9,936, 30 | `traffic.alb.target_groups` |
+| Lowest healthy count and highest unhealthy count over 24 h | 0, equal to all targets in each group | `traffic.alb.unhealthy_target_groups` |
+| Probe path of the two backends | `/health` | objects `deployments prod-app-t/app-t-backend`, `prod-app-z-backend/app-z-backend` |
+| Replicas | 1, 2, 1, 1 | the same deployments |
+| Target type, deregistration delay | ip, 300 s | `traffic.alb.target_groups` |
 
-## 5. Unsupported EKS, Karpenter and AL2
+### Further reading
 
-**What is happening.** EKS 1.32's standard support ended on 2026-03-23, so the cluster now pays for extended support, which ends on 2027-03-23. Karpenter 0.37.0 supports Kubernetes only up to 1.30. Its EC2NodeClass default runs Amazon Linux 2, which has had no new EKS AMIs since 2025-11-26 and has none for 1.33. Unless the three are sorted out in order, new nodes may not come up at the next upgrade, and the node group AMI is already 331 days old.
+- [Elastic Load Balancing: Health checks for Application Load Balancer target groups](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-health-checks.html): the health check settings, the fail-open rule and the reason codes a target reports.
+- [Elastic Load Balancing: CloudWatch metrics for your Application Load Balancer](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html): which statistic of `UnHealthyHostCount` to alarm on and what the target group health metrics count.
+- [AWS Load Balancer Controller: Pod readiness gate](https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/pod_readiness_gate/): why a small rolling update can empty a target group, and the conditions under which the gate is injected.
 
-- Affected: karpenter/karpenter logged "failed validating kubernetes version" once, at 2026-11-04 17:48 KST.
-- Checked and healthy:
-  - Karpenter still launches nodes. It has made 859 NodeClaims since its leader started, and 41 nodes got ready in 24 hours at a p50 of 58 seconds.
-  - The 4 EKS add-ons are ACTIVE with 0 health issues.
-- Changed for another reason: none
-- Not checked:
-  - whether the workloads run fine on cgroup v2 under AL2023
-  - whether charts or manifests use APIs removed in 1.33
+## The next largest problems
 
-**Why.** Most likely, Karpenter and the EC2NodeClass were not upgraded when EKS went to 1.32. Likely: the cluster is on 1.32 while Karpenter is still 0.37 and the node class is still AL2.
+- **The cluster API endpoint is open to the whole internet.** The public endpoint of `app-u-cluster-eks` allows `0.0.0.0/0`, so the API server answers anyone; only IAM authentication stands between a leaked credential and the cluster. Severity: high.
+- **NetworkPolicies are stored but not enforced.** Three NetworkPolicies exist in `prod-app-t`, `prod-app-x` and `prod-app-r`, but the VPC CNI node agent runs with `--enable-network-policy=false` and no PolicyEndpoint exists, so all traffic passes as if they were not there. Severity: high.
+- **The app-ad VPN container can administer the node network.** The `tailscale` container of `prod-app-z-backend/app-ad` has `NET_ADMIN`, mounts `/dev/net/tun` from the host and may run as root, so whoever takes over that container can change networking on its node. Severity: high.
+- **Alertmanager and Loki keep their data on emptyDir.** Both run one replica and store their data in an emptyDir volume, so a restart loses Alertmanager's silences and notification state and all logs Loki holds. Severity: high.
+- **No alert covers a container killed for memory.** Of 157 alert rules none fires on an OOM kill, so no rule would have fired for the Prometheus restart of 2026-11-14. Severity: high.
+- **A system node has already run out of pod IP addresses once.** On `node-1-116`, a `t8i.small` with three of three network interfaces attached, the VPC CNI answered "no available IP" once since it started; it now uses 6 of 9 pod addresses. Severity: high.
 
-**Suggested fix.**
+## Since the previous report
 
-① Look at the EKS upgrade insights for anything that blocks the upgrade.
-
-```
-aws eks list-insights --profile acme --region us-east-1 --cluster-name my-cluster --output table
-```
-
-This only reads.
-
-Check: Amazon Linux 2 compatibility shows ERROR. Note down any other ERROR or WARNING items too.
-
-② Move from AL2 to AL2023. This step is a plan, so it has no command.
-
-Create a new AL2023 EC2NodeClass for the build-arm64 pool and test it with the CI runners first. If nothing breaks, change amiFamily on the default class to AL2023.
-
-Drift is on, so changing the default class replaces the 6 Karpenter nodes one per pool at a time.
-
-Every replacement moves the pods on that node, and single-replica services and DBs stop meanwhile.
-
-node-1-139 also blocks drift replacement because of do-not-disrupt, as in problem 2. AL2023 uses cgroup v2, so older JVMs and runtimes may read memory limits differently.
-
-Check: `kubectl --context my-cluster get nodes -o wide` shows Amazon Linux 2023 as OS-IMAGE on every node.
-
-③ Once AL2023 is in place, problem 2 has replaced node-1-139, and no node is past 720h at upgrade time: upgrade Karpenter from 0.37 to 1.0. Then go on to a 1.x that supports 1.32 and 1.33. This step is a plan, so it has no command.
-
-The API changes from v1beta1 to v1, so follow the order in the official upgrade guide. NodePool and EC2NodeClass move to the v1 API.
-
-While the controller is down during the upgrade, no new node comes up. Workloads that scale from zero, such as the app-l workers, wait.
-
-From v1, expiry is forced. An expired node is emptied at once, ignoring do-not-disrupt, and no replacement node is launched first.
-
-Right after the upgrade, every pod on a node past 720h gets evicted at once, and single-replica services stop. Today that node is node-1-139, with 20 prod pods.
-
-Without a terminationGracePeriod, a pod held by a PDB can keep its node around forever.
-
-Check: `kubectl --context my-cluster -n karpenter get deploy karpenter -o jsonpath='{.spec.template.spec.containers[0].image}'` shows the new version, and "failed validating kubernetes version" no longer appears in the log.
-
-④ Once Karpenter supports 1.33, upgrade EKS to 1.33 along with the system_core node group AMI and the 4 add-ons. This step is a plan, so it has no command. Finish before 2027-03-23.
-
-The control plane, the 2 node group nodes and the add-ons move to new versions.
-
-The two node group nodes run 3 prod MySQL, app-s PostgreSQL and argocd-application-controller, and these stop while their node is replaced. Take the snapshots from problem 1 before the upgrade.
-
-Check: `aws eks describe-cluster --profile acme --region us-east-1 --name my-cluster --query cluster.version` returns 1.33.
-
-**Rollback.** The EKS control plane version cannot be undone, so check the insights and backups before upgrading. The AMI and Karpenter can step back, but that gets hard once the Karpenter CRDs move to v1. That is why the snapshots in problem 1 come first.
-
-**Why this happens.**
-
-- Principle: A minor version out of support gets no security patches, and EKS charges for extended support. Outside its support table, Karpenter can fail to find an AMI and so cannot launch nodes. From 1.33 there are no AL2 AMIs at all.
-- Case: In 2025 at ZenML, Terraform turned on KMS secret encryption during a production EKS upgrade. That dropped IAM permissions from the worker nodes, and pods were unreachable from outside the cluster for about 8 hours. They fixed it by rebuilding the node group, and an old Kubernetes version and AMI type were among the contributing factors. This cluster also runs 1.32 past standard support, on AL2 AMIs, with an unsupported Karpenter. Doing all the overdue upgrades at once stacks up the same kind of risk.
-- Read: the Karpenter documentation, Upgrading to v1.0 and Compatibility; the Amazon EKS documentation, Kubernetes version lifecycle and moving to AL2023
-
-**Evidence.**
-
-| What | Value | Source |
-|---|---|---|
-| EKS support type | EXTENDED | inventory.json |
-| End of extended support, 1.32 | 2027-03-23 | aws/describe-cluster-versions.json |
-| Karpenter version | 0.37.0 | summary.json |
-| Highest Kubernetes supported by Karpenter 0.37 | 1.30 | summary.json |
-| AMI family of EC2NodeClass default | AL2 | summary.json |
-
-## Since the previous full run
-
-2026-11-03T11-17-15 full 점검이에요. 그 점검에는 리포트가 없어서, 시킨 일을 했는지는 따질 수 없어요.
-
-Work the previous report asked for: none
-
-**Appeared.**
-
-- 노드 node-2-158(build-arm64 풀, c6gn.xlarge 스팟)이 2026-11-05 15:49 KST에 새로 떴어요. 7일 CPU p95가 0.02라 유휴 노드로 잡혔고, 이 노드에서 EC2 CreateNetworkInterface 실패가 11번 있었어요.
-- 노드 node-1-62의 루트 디스크 사용률이 79%가 됐어요.
-- prod-app-o/app-o-frontend가 하루 종일 CPU 스로틀링을 받아요. 지금 비율은 0.15예요.
-- prod-app-l-backend의 app-l-file-worker는 CPU 요청이 1코어인데 krr 권장값은 0.128코어예요. app-l-graph-worker도 1코어 요청에 권장값 0.542코어예요. keda-hpa-app-l-file-worker는 7일 동안 원하는 레플리카 수가 48번 바뀌었어요.
-- prod-app-m/app-m-frontend(www.example-b.ai)에서 24시간 동안 요청 54991건 중 5xx가 80건(0.14%) 났어요.
-- Grafana(monitor.my-cluster)의 요청 가중 p95가 2.8초예요.
-- API 서버가 초당 0.004건의 503을 냈어요. 수집 중에 잰 값이라 kubegap이 보낸 요청이 섞였을 수 있어요.
-
-**Went away.**
-
-- 노드 node-2-144가 클러스터를 떠났어요. 그 노드의 유휴 노드 경고와 cgroup v1 경고도 같이 없어졌어요.
-- Promtail의 메모리 사용이 limit에 붙어 있던 문제가 없어졌어요.
-- middleware/kafka-exporter의 Not Ready가 없어졌어요. 다만 파드 재시작 수는 5번이에요.
-- 노드 <ip>와 <ip>의 네트워크 오류 경고가 없어졌어요.
-- Prometheus의 OOM 기록(2026-10-06)이 30일이 지나 집계에서 빠졌어요.
-
-**Changed because the checks changed, not the cluster.**
-
-- 노드 하나를 잃었을 때 버티는지(N+1) 경고가 새로 생겼어요. 클러스터가 바뀐 게 아니라, app 노드에만 뜰 수 있는 파드를 그 노드들의 남은 자리로 따로 계산하도록 체크가 바뀐 결과예요(rubric 0.1.65).
-- 외부 DB NLB acme-db-shared가 fail에서 warn으로 내려왔어요. 보안 그룹 규칙을 읽어서 /32 주소 목록으로만 열린 걸 보도록 체크가 바뀐 결과예요(rubric 0.1.64).
-- prod-app-m/app-m-frontend 스로틀링이 fail에서 warn으로, Prometheus 스로틀링이 warn에서 fail로 바뀌었어요. 5분 비율 대신 24시간 비율로 보도록 체크가 바뀐 결과예요(rubric 0.1.66).
-- prod-app-q/app-q-ai의 반복 OOM이 warn에서 fail로 올라갔어요. 살아 있는 파드만 보던 체크가 7일 동안 끝난 파드까지 세도록 바뀐 결과예요(rubric 0.1.66).
-- app-q-ai의 p95 지연이 fail에서 warn으로, app-l-frontend의 지연 경고는 없어졌어요. 요청 가중 p95로 보도록 체크가 바뀐 결과예요(rubric 0.1.65).
-- arc-runners 러너 파드의 큰 요청 경고는 러너 파드 이름이 바뀐 것이지 새로 생긴 게 아니에요.
-- prod 네임스페이스 8개의 쿼터 없음과 prod-app-l-backend의 LimitRange 없음이 warn에서 fail로 바뀌었어요. ResourceQuota와 LimitRange 오브젝트는 두 점검 사이에 바뀌지 않았어요. 체크 기록에는 이 규칙이 바뀌었다는 설명이 없어서, 규칙 변경인지는 확인하지 못했어요.
-
-## Serious, not today
-
-- No symptom alerts and no SLOs. 0 of 157 alert rules watch user symptoms, and nothing alerts on OOM, scheduling failure or IP exhaustion. Nothing gets lost or exposed today, so this waits.
-- The EKS public API endpoint is open to 0.0.0.0/0. IAM guards access, and narrowing it first needs the source addresses of CI and of people.
-- 3 NetworkPolicies, in prod-app-q, prod-app-p and app-s-prod, block nothing because aws-eks-nodeagent runs with --enable-network-policy=false. Turning it on applies them at once and can cut traffic, so review the policies first.
-- Monitoring data sits on emptyDir. Loki storage and Alertmanager data vanish when their pods move, and the upcoming node expiry can wipe Loki's logs. Loki died once from OOM on 2026-10-25. Prometheus uses 73% of its 1536Mi memory limit and has a CPU throttling ratio of 0.28.
-- argocd/argocd-application-controller-0 restarted 42 times, last ending OOMKilled on 2026-10-30. It syncs every prod app, and its memory limit change is done separately.
-- prod-app-q/app-q-ai lost 3 pods to OOM in 7 days and runs 1 replica now.
-- Kubernetes events are not kept anywhere, so they vanish after about an hour.
-- System nodes node-1-241 (t8i.small) and node-2-218 (t8i.medium) hit their ENI limit, with pod IPs at 6/9 and 13/15, and prefix delegation is off.
-- prod-app-l-backend/tts-proxy runs as root with NET_ADMIN and a /dev/net/tun hostPath. It is a Tailscale sidecar, so it may need these.
-- Root disks are at 81% on node-1-139 and 79% on node-1-62, and kubelet image GC failed twice on node-1-139. Replacing that node in problem 2 clears it.
-- ExternalSecret database/mysql-app-n-secret has failed to sync since 2026-10-08, with 2556 UpdateFailed.
-- Frontends are throttled on CPU all day: prod-app-m/app-m-frontend at 0.23–0.28 and prod-app-o/app-o-frontend at 0.15. Two dev frontends are the same.
-- All 8 instances have IMDS hop limit 2, and EC2NodeClass default does not set root volume encryption.
-- 115 Unhealthy probe events came from prod-app-m/app-m-backend pods, promtail and app-l-file-worker.
+There is no earlier run to compare with, so this covers only what this run collected.
 
 ## Each area in one line
 
 | Area | What |
 |---|---|
-| resources | 요청 과다 컨테이너 34개와 OOM 세 건이 있어요. 프론트엔드는 하루 종일 스로틀링을 받아요. |
-| scaling | 만료를 넘긴 노드 하나와 곧 만료되는 노드 세 대가 있어요. HPA 대부분은 늘어난 적이 없어요. |
-| observability | 증상 알림과 SLO가 없고, 잘못 잡힌 컨트롤플레인 알림이 57.8일째 울려요. |
-| traffic | Kafka가 인터넷에 열려 있고, prod 헬스 체크 4개가 아무것도 걸러내지 못해요. |
-| resilience | prod DB 백업이 없고, prod 파드 절반이 스팟 노드 한 대에 있어요. |
-| hygiene | 변경과 장애의 시각을 맞출 재료가 없어요. 오래된 ReplicaSet이 353개 남아 있어요. |
-| storage | prod DB 볼륨이 reclaimPolicy Delete이고 StorageClass 3개가 암호화되지 않았어요. |
-| security | API 엔드포인트가 전체 공개이고 NetworkPolicy가 적용되지 않아요. |
-| cost | 노드 비용의 95%가 유휴이고, 요청을 줄이면 월 162.65 USD쯤 줄어요. |
-| tenancy | prod 네임스페이스 8개에 쿼터가 없지만, 7일 동안 이웃 영향의 근거는 없어요. |
-| node OS | AL2 노드는 cgroup v1이고 노드 그룹 두 대는 읽지 못했어요. |
-| platform | EKS, Karpenter, AMI가 모두 지원 범위 밖이거나 끝나 가요. |
+| resources | Prometheus uses 73% of its 1536Mi memory limit and had 34% of its CPU periods throttled over the day; most other containers request far more CPU than they use. |
+| scaling | Karpenter launches nodes in about a minute, but the scheduler logged 91 placement failures for production pods in a day while nodes were being replaced, and 20 serving Deployments have no HPA. |
+| observability | 157 alert rules exist but none watches a user symptom, no rule covers OOM kills, and Alertmanager and Loki lose their data on restart. |
+| traffic | Kafka is reachable from the internet without a source limit, and four production target groups have no healthy target because the ALB checks / and the applications answer it with 404 or a redirect. |
+| resilience | No backup tool, snapshot policy or backup CronJob exists; 14 production workloads run one replica and 10 keep all replicas in one zone. |
+| hygiene | Several images use mutable tags such as latest, and one EKS upgrade insight is open. |
+| storage | Every production database volume uses the reclaim policy Delete with no snapshot, and the CSI snapshot API is not installed. |
+| security | The API endpoint is open to 0.0.0.0/0, NetworkPolicies are not enforced, a Neo4j password is written in plain text and one VPN container has NET_ADMIN. |
+| cost | Extended support for 1.32 is being billed, and requested capacity is well above what is used. |
+| tenancy | Five production namespaces lack a boundary such as a quota or a NetworkPolicy, and development workloads share nodes with production. |
+| node OS | Seven nodes run cgroup v1 on Amazon Linux 2, and two nodes could not be read because they are not registered with SSM. |
+| platform | Kubernetes 1.32 is 237 days past EKS standard support, Karpenter 0.37 supports only up to 1.30, and the node class still uses AL2. |
 
-## What this run could not see
+## Limits of this run
 
-- Inside node-1-117 and node-2-60, the two system_core node group nodes, because they are not registered in SSM. Disk, kernel log, kubelet and containerd journals, and VPC CNI IPAMD were not read, and these nodes run argocd-application-controller, 3 prod MySQL and app-s PostgreSQL. To see them, attach AmazonSSMManagedInstanceCore to the node group IAM role and confirm the SSM agent is online.
-- Inside any node from the next run on, because the SSM document kubegap-node-read no longer matches the repo version. To fix it, run `kubegap setup --context my-cluster --install-ssm-document`.
-- Grafana data sources and dashboards, because there is no read token. To see them, create a Viewer service account token in Grafana and put it in grafana_api_token in config.yaml yourself.
-- Who changed what and when, because EKS audit logging is off. To see it, turn on audit in EKS control plane logging.
-- Whether the Kafka external listener uses TLS, because only the length and shape of ConfigMap values were kept. To see it, run step ① of problem 3.
-- Which addresses connect to the Kafka NLB and the DB NLB, because there are no NLB flow logs. To see them, turn on VPC Flow Logs on the NLB subnets for a day.
-- Whether DB dumps run outside the cluster, such as on developer PCs or in jobs in other accounts. To find out, ask each service owner where their dumps are and when they last tested a restore.
+**Not judged because the cluster does not hold the data**
+
+- Two nodes, node-1-117 and node-2-60, are not registered with SSM, so their operating system and kernel log were not read.
+  - Weaker for it: Whether the kernel itself killed processes on the node that runs Prometheus cannot be told.
+  - To see it: Attach AmazonSSMManagedInstanceCore to the node IAM role used by those nodes.
+- The configuration of the external Kafka listener (protocol and authentication) is not in any object this audit reads.
+  - Weaker for it: Problem 2 cannot say whether a stranger reaching port 9094 must authenticate.
+  - To see it: Read the listener settings in the values of the Helm release kafka in middleware.
+
+**Not read by kubegap yet**
+
+- 8 components were read only through their objects and metrics; kubegap has no checks of their own for them: actions-runner-controller, external-dns, kube-state-metrics, metrics-server, node-exporter, prometheus-operator, promtail, victoria-metrics.
+  - Weaker for it: a fault inside one of these components is not in this report.
+- The collection stopped at one of its own limits and read only part of: `core.component-logs` (argocd: argocd/argocd-application-controller, argocd: argocd/argocd-applicationset-controller, argocd: argocd/argocd-notifications-controller, argocd: argocd/argocd-repo-server, ebs-csi: kube-system/ebs-csi-controller, external-dns: kube-system/external-dns, external-secrets: external-secrets/external-secrets, external-secrets: external-secrets/external-secrets-cert-controller, loki: monitoring/loki-stack).
+  - Weaker for it: a number counted from these is a lower bound, and the oldest lines of the day or the rest of a list are not in this report.
+
+**What you answered not to read at the first-run questions**
+
+- none
 
 ## Numbers
 
-| Severity | fail | warn | vs. previous full run |
-|---|---|---|---|
-| critical | 1 | 0 | fail 0, warn +1 |
-| high | 25 | 24 | fail -1, warn +1 |
-| medium | 126 | 166 | fail +9, warn -4 |
-| low | 16 | 140 | fail 0, warn +1 |
+Severity is for a cluster run at scale medium.
 
-Checks behind each problem:
+1 findings whose severity the analysis changed are counted at the changed level.
 
-- problem 1: `resilience.no-backup.cluster`, `eks.no-backup-policy.cluster`, `resilience.prod-db-without-backup-cronjob.cluster`, `storage.prod-db-reclaim-delete.cluster`, `storage.csi-snapshot-unavailable.cluster`, `logs.signatures.ebs-csi.snapshot-crd-missing`
-- problem 2: `resilience.prod-concentration.node-1-139`, `resilience.replicas-same-node.prod-app-o/deployment/app-o-ai`, `resilience.replicas-same-node.prod-app-o/deployment/app-o-backend`, `resilience.replicas-same-node.prod-app-r/deployment/app-r`, `resilience.replicas-same-node.prod-app-l-backend/deployment/app-l-frontend`, `resilience.n-plus-one.cluster`, `scaling.karpenter-expired-not-replaced.default-n44bh`, `vpccni.node-ip-exhaustion.node-1-139`, `resilience.no-pdb.prod-app-o/app-o-ai`, `resilience.no-pdb.prod-app-o/app-o-backend`, `resilience.replicas-same-zone.prod-app-m/deployment/app-m-api`, `resilience.replicas-same-zone.prod-app-m/deployment/app-m-backend`, `resilience.replicas-same-zone.prod-app-m/deployment/app-m-frontend`, `resilience.replicas-same-zone.prod-app-l-backend/deployment/app-l-backend`, `resilience.replicas-same-zone.prod-app-l-backend/deployment/app-l-embedding-server`
-- problem 3: `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external`, `traffic.db-exposed.nlb/acme-db-shared`
-- problem 4: `traffic.alb-unhealthy-targets.prod-app-q/app-q-backend`, `traffic.alb-unhealthy-targets.prod-app-l-backend/app-l-backend`, `traffic.alb-unhealthy-targets.prod-app-o/app-o-frontend`, `traffic.alb-unhealthy-targets.prod-app-n/app-n-frontend`, `traffic.alb-unhealthy-targets.dev-app-n/app-n-frontend`, `traffic.alb-unhealthy-targets.dev-app-t/app-t-backend`
-- problem 5: `platform.k8s-version-eol.cluster`, `eks.extended-support.cluster`, `platform.karpenter-version-compat.cluster`, `karpenter.ec2nodeclass-al2.cluster`, `hygiene.eks-upgrade-insight.Amazon Linux 2 compatibility`, `eks.node-os-skew.cluster`, `eks.nodegroup-ami-old.nodegroups`, `logs.signatures.karpenter.version-unsupported`, `node.cgroup-v1.node-2-158`
+No earlier full run to compare with.
 
-Details and every table: [`report-details.md`](report-details.md) · kubegap 0.1.2, rubric 0.1.80 · snapshot `~/.kubegap/snapshots/my-cluster/2026-11-05T17-00-00`
+| Severity | fail | warn |
+|---|---|---|
+| critical | 1 | 0 |
+| high | 22 | 27 |
+| medium | 105 | 153 |
+| low | 15 | 126 |
+
+Checks behind each entry:
+
+- Prometheus was killed for running out of memory: `resources.oomkilled.*`, `resources.oomkilled-repeated.*`, `resources.cpu-throttling.*`, `prometheus.memory-pressure.*`
+- Production pods could not be scheduled 91 times in one day: `controlplane.scheduler-unschedulable.*`
+- The production databases have no backup: `resilience.no-backup.*`, `eks.no-backup-policy.*`
+- Kafka accepts connections from the whole internet: `traffic.db-exposed.*`
+- The production Neo4j password is written into its manifest: `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j`
+- Kubernetes 1.32 is past support and Karpenter 0.37 does not support it: `platform.k8s-version-eol.*`, `platform.karpenter-version-compat.*`, `karpenter.ec2nodeclass-al2.*`, `logs.signatures.karpenter.version-unsupported`, `eks.extended-support.*`, `hygiene.eks-upgrade-insight.*`, `node.cgroup-v1.*`
+- Four production load balancer health checks filter nothing: `traffic.alb-unhealthy-targets.*`
+
+Details and every table: [`report-details.md`](report-details.md) · kubegap 0.2.0, rubric 0.1.94 · snapshot `~/.kubegap/snapshots/<context>/2026-11-15T02-09-39`

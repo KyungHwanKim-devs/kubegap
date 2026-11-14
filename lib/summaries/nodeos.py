@@ -437,8 +437,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     out["pod_logs"].sort(key=lambda e: -e["mb"])
     out["pod_dirs"].sort(key=lambda e: -e["mb"])
     # the two lists hold the largest items found on the nodes that were read; when no node was read they hold nothing, which is not "nothing large": None makes the two checks skip
-    out["pod_logs"] = out["pod_logs"][:40] if out["collected"] else None
-    out["pod_dirs"] = out["pod_dirs"][:40] if out["collected"] else None
+    out["pod_logs"] = out["pod_logs"] if out["collected"] else None
+    out["pod_dirs"] = out["pod_dirs"] if out["collected"] else None
     out["cluster"] = {
         "collected": len(out["collected"]),
         "not_collected": len(out["not_collected"]),

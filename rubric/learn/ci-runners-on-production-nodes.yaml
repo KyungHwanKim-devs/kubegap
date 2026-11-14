@@ -1,0 +1,108 @@
+# What a report teaches when CI runners and production pods share nodes. Every page below was opened and read (2026-11-14).
+topic: ci-runners-on-production-nodes
+checks: [tenancy.ci-shares-prod-nodes, tenancy.ci-no-dedicated-pool]
+mechanism: >
+  The scheduler decides where a pod goes from its requests, and the kubelet reserves at least the requested amount for the container. What a
+  container then uses is a different matter: when the node has the resource available, a container is allowed to use more than its request. A CPU
+  limit is the only hard stop, enforced by throttling; a memory limit is enforced by killing the container under memory pressure. A CI runner is a
+  pod whose usage has little to do with its request. It idles until a job arrives and then compiles, tests and builds images with everything the
+  node gives it.
+
+
+  A runner pod with no placement constraint is placed like any other pod: on whichever node has room for its requests. That is usually a node that
+  also runs production pods. From then on the two share what requests do not divide. Quotas cannot protect against all kinds of resource sharing,
+  network traffic for example, and the Kubernetes multi-tenancy guide names node isolation as the better answer for that.
+
+
+  Memory is where sharing becomes an outage. When a node runs short, the kubelet evicts pods to reclaim memory, and it does not respect a
+  PodDisruptionBudget or the pod's termination grace period while doing so; with hard thresholds (memory.available below 100Mi by default) the grace
+  period is zero. It evicts first the pods whose usage exceeds their requests, ordered by priority and by how far they are over. A production pod
+  that runs above a small request is in that first group together with the runner that caused the pressure. If the kernel runs out of memory before
+  the kubelet acts, the container with the highest score is killed, and pods with low or no requests score highest.
+
+
+  Separation needs two halves. A taint on the build nodes repels every pod that does not tolerate it, so production stays off them. A toleration on
+  the runner only allows it onto the tainted nodes; it may still use any other node. To keep runners only there, the nodes also carry a label and the
+  runner a node selector or node affinity for it. With the selector but no taint, runners go to the build nodes and production pods follow them
+  there. With neither, the build load lands wherever the scheduler finds room.
+sources:
+  - { title: "Kubernetes: Resource Management for Pods and Containers", url: "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/" }
+  - { title: "Kubernetes: Node-pressure Eviction", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/" }
+  - { title: "Kubernetes: Taints and Tolerations", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/" }
+  - { title: "Kubernetes: Multi-tenancy", url: "https://kubernetes.io/docs/concepts/security/multi-tenancy/" }
+detect:
+  - kind: metric
+    what: >
+      How long a node that runs both kinds of pod was actually full. Minutes in which the containers of a node used more than 90% of its allocatable
+      CPU, over a week; at zero the runners shared the node without taking anything from anyone.
+    example: |
+      sum by (node) (rate(container_cpu_usage_seconds_total{container!="",id!="/"}[5m])
+        * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))
+      / sum by (node) (kube_node_status_allocatable{resource="cpu"}) > 0.9
+  - kind: metric
+    what: >
+      Whether production pays for it. The share of CPU periods in which production containers were throttled, per namespace, and evictions of
+      production pods; compare the times with the times builds ran.
+    example: |
+      sum by (namespace) (increase(container_cpu_cfs_throttled_periods_total{container!=""}[1h]))
+        / sum by (namespace) (increase(container_cpu_cfs_periods_total{container!=""}[1h]))
+  - kind: dashboard
+    what: >
+      CPU and memory per node split by namespace, with the runner namespace in its own colour. Build peaks on nodes that also carry production
+      namespaces are visible at a glance.
+    example: 'sum by (node, namespace) (rate(container_cpu_usage_seconds_total{container!=""}[5m]) * on (namespace, pod) group_left(node) max by (namespace, pod, node) (kube_pod_info))'
+  - kind: command
+    what: Which nodes run runner pods right now.
+    example: 'kubectl get pods -n <runner namespace> -o wide'
+solutions:
+  - scale: [small]
+    approach: >
+      With two or three nodes and no node autoscaler there is nothing to separate onto. Make the runner a bounded neighbour instead: explicit CPU
+      and memory requests and limits in the runner pod template, so that it is scheduled with its real size and cannot take more than its limit,
+      and a low maximum number of concurrent runners. Watch the minutes the node spent full.
+    tools: ["Actions Runner Controller", "resource requests and limits"]
+    tradeoff: >
+      No extra node to pay for. Builds are slower because the limit throttles them, and disk and network are still shared with production.
+    example: |
+      # gha-runner-scale-set values
+      maxRunners: 2
+      template:
+        spec:
+          containers:
+            - name: runner
+              resources:
+                requests: { cpu: "1", memory: 2Gi }
+                limits: { cpu: "2", memory: 4Gi }
+  - scale: [medium, large]
+    approach: >
+      Give builds their own nodes. A node pool (a Karpenter NodePool or a node group) with a NoSchedule taint and a label, and in the runner pod
+      template the matching toleration and node selector. The runner scale set accepts a full pod spec, so both are set there once. Put limits on
+      the pool so that a burst of builds has a ceiling. Where runners execute code from outside the team, GitHub's own guidance goes further:
+      production workloads should run in isolation, and sharing a cluster with them can be a security risk, which points to a separate cluster.
+    tools: ["Actions Runner Controller", Karpenter, "taints and tolerations"]
+    tradeoff: >
+      Build load cannot reach production nodes and the cost of CI is visible as its own nodes. Those nodes sit idle between builds unless the pool
+      scales to zero, and a pool that scales from zero adds a node start to the first job.
+    example: |
+      # NodePool
+      spec:
+        template:
+          metadata:
+            labels: { workload-type: build }
+          spec:
+            taints:
+              - { key: workload-type, value: build, effect: NoSchedule }
+
+      # gha-runner-scale-set values
+      template:
+        spec:
+          nodeSelector: { workload-type: build }
+          tolerations:
+            - { key: workload-type, operator: Equal, value: build, effect: NoSchedule }
+cases: []
+reading:
+  - { title: "Kubernetes: Taints and Tolerations", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/", why: "The dedicated-nodes use case explains in one paragraph why a taint and a label are both needed." }
+  - { title: "Kubernetes: Node-pressure Eviction", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/", why: "The order in which the kubelet picks pods to evict, which decides who pays when a build fills a node." }
+  - { title: "Kubernetes: Multi-tenancy", url: "https://kubernetes.io/docs/concepts/security/multi-tenancy/", why: "Node isolation next to the other isolation tools, with what each does and does not protect." }
+  - { title: "GitHub Docs: Deploying runner scale sets with Actions Runner Controller", url: "https://docs.github.com/en/actions/tutorials/use-actions-runner-controller/deploy-runner-scale-sets", why: "How the runner pod template is customised and what GitHub recommends about isolating runners." }
+  - { title: "Amazon EKS best practices: Karpenter", url: "https://docs.aws.amazon.com/eks/latest/best-practices/karpenter.html", why: "A worked NodePool with a taint and the matching toleration, and the advice to keep NodePools mutually exclusive." }

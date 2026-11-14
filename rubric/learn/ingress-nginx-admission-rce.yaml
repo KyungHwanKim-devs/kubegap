@@ -1,0 +1,83 @@
+# What a report teaches when an ingress-nginx controller older than the IngressNightmare fix still serves its admission webhook. Every page below was opened and read (2026-11-14).
+topic: ingress-nginx-admission-rce
+checks: [traffic.ingress-nginx-vulnerable-version]
+mechanism: >
+  ingress-nginx checks every Ingress before it is stored. The API server sends the object to the controller's validating admission webhook, the
+  controller builds a temporary NGINX configuration from its template and the submitted Ingress, and runs `nginx -t` on it. The feature exists to
+  warn users about a broken Ingress before it takes effect.
+
+
+  The webhook is an HTTP endpoint without authentication. It is meant for the API server, but any pod that can open a connection to it can send its
+  own AdmissionReview request. In many setups the pod network is reachable by every workload in the cloud VPC, or by anyone on the corporate
+  network.
+
+
+  Before the fix, several values of the Ingress were copied into the configuration without sanitising: the auth-url annotation (CVE-2025-24514), the
+  auth-tls-match-cn annotation (CVE-2025-1097) and the object's UID (CVE-2025-1098). Whoever sends the request can therefore add NGINX directives.
+  CVE-2025-1974, rated 9.8, turns that into code execution: the ssl_engine directive loads a shared library, and although the configuration is only
+  tested and never applied, the directive runs during the test. The library gets there through NGINX itself, which writes large request bodies to
+  temporary files.
+
+
+  The code then runs in the controller pod, and by default ingress-nginx can read all Secrets in the cluster. That is why the result is described as
+  cluster takeover with no credentials and no administrative access required.
+
+
+  The fixes are in ingress-nginx v1.12.1 and v1.11.5. With the admission webhook turned off the injection path is closed, at the price of the
+  validation. The project is in best-effort maintenance until March 2026; after that there are no further releases, bug fixes or security updates,
+  so a flaw found later will not be fixed.
+sources:
+  - { title: "Kubernetes blog: Ingress-nginx CVE-2025-1974: What You Need to Know", url: "https://kubernetes.io/blog/2025/03/24/ingress-nginx-cve-2025-1974/" }
+  - { title: "Wiz: IngressNightmare: 9.8 Critical Unauthenticated Remote Code Execution Vulnerabilities in Ingress NGINX", url: "https://www.wiz.io/blog/ingress-nginx-kubernetes-vulnerabilities" }
+  - { title: "Kubernetes blog: Ingress NGINX Retirement: What You Need to Know", url: "https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/" }
+detect:
+  - kind: alert
+    what: >
+      An attempt, seen at run time. Wiz describes two signals a runtime security sensor can raise on the controller pod: malicious admission review
+      requests and anomalous loads of a shared library by NGINX.
+    example: 'runtime rule: the nginx process of the ingress-nginx controller loads a shared library from a temporary or /proc path'
+  - kind: dashboard
+    what: >
+      The image version of every ingress-nginx controller, kept in whatever inventory or image scanner the cluster already has, compared with
+      1.12.1 and 1.11.5. A tag without a version cannot be cleared.
+    example: 'controller image tag < v1.11.5, or >= v1.12.0 and < v1.12.1'
+  - kind: command
+    what: Whether the cluster runs ingress-nginx at all, the check the Kubernetes announcement gives.
+    example: 'kubectl get pods --all-namespaces --selector app.kubernetes.io/name=ingress-nginx'
+solutions:
+  - scale: [small, medium, large]
+    approach: >
+      Upgrade the controller to v1.12.1 or later, or v1.11.5 on the 1.11 line. This fixes all five vulnerabilities and is the remedy the maintainers
+      call the best and easiest. If the upgrade cannot happen right away, turn the admission webhook off through the Helm value until it has, and
+      turn it back on afterwards.
+    tools: ["ingress-nginx Helm chart"]
+    tradeoff: >
+      The upgrade removes the flaw. Turning the webhook off removes the way in but also the check that warns about an incorrect Ingress before it
+      takes effect.
+    example: |
+      controller:
+        admissionWebhooks:
+          enabled: false
+  - scale: [medium, large]
+    approach: >
+      Keep the webhook and close the network path to it: a NetworkPolicy that lets only the Kubernetes API server reach the admission endpoint of the
+      controller, and a check that the endpoint is not reachable from outside the cluster. Then plan the move away from ingress-nginx, to Gateway API
+      or another ingress controller, since the project stops receiving security fixes.
+    tools: [NetworkPolicy, "Gateway API"]
+    tradeoff: >
+      Validation stays and a pod can no longer talk to the webhook, which also holds for a flaw found later in the same endpoint. The policy has to
+      be correct for where the API server's traffic comes from, or valid Ingress changes are rejected. The migration touches every Ingress that
+      relies on ingress-nginx annotations.
+cases:
+  - company: Wiz Research (disclosure)
+    year: 2025
+    url: "https://www.wiz.io/blog/ingress-nginx-kubernetes-vulnerabilities"
+    summary: >
+      Wiz disclosed four unauthenticated remote code execution vulnerabilities in the ingress-nginx admission controller, scored 9.8. It estimated
+      that about 43% of cloud environments were vulnerable and found over 6,500 clusters that exposed a vulnerable admission controller to the public
+      internet.
+    match: This is the disclosure of the exact flaw the check looks for; it is a research report, not an incident at one company.
+reading:
+  - { title: "Kubernetes blog: Ingress-nginx CVE-2025-1974: What You Need to Know", url: "https://kubernetes.io/blog/2025/03/24/ingress-nginx-cve-2025-1974/", why: "The maintainers' own account: who can reach the webhook, what to upgrade to and how to turn the webhook off meanwhile." }
+  - { title: "Wiz: IngressNightmare", url: "https://www.wiz.io/blog/ingress-nginx-kubernetes-vulnerabilities", why: "The attack chain step by step, which explains why a configuration that is only tested still runs code." }
+  - { title: "Kubernetes blog: Ingress NGINX Retirement: What You Need to Know", url: "https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/", why: "What stops in March 2026 and why an upgrade is not the last step." }

@@ -2,7 +2,7 @@
 # node item: cmd, nodes(all|server|agent), out(logs/node/{node}/<name>), requires (entry of the permission table: journal|kernlog|dmesg|k3s-db|crictl|sudo-any). If requires is not satisfied the node is skipped as "no node access".
 # Control-plane logs (journal steps) and k3s-node.sh (config, ports, flannel, journald, datastore, certificates, registries, containerd, local-path, disk, temperature) plus the containerd log.
 - id: k3s-journal-errors
-  modes: [full]   # skipped by the daily run
+  unit: control-plane-logs
   type: node
   nodes: all
   requires: journal
@@ -17,7 +17,7 @@
   out: logs/node/{node}/k3s-errors-24h.log
   timeout: 60
 - id: k3s-journal-stats
-  modes: [full]   # skipped by the daily run
+  unit: control-plane-logs
   type: node
   nodes: all
   requires: journal
@@ -29,7 +29,7 @@
   out: logs/node/{node}/k3s-stats-24h.txt
   timeout: 60
 - id: k3s-scheduler-unschedulable
-  modes: [full]   # skipped by the daily run
+  unit: control-plane-logs
   type: node
   nodes: server
   requires: journal
@@ -37,7 +37,7 @@
   out: logs/node/{node}/k3s-scheduler-unschedulable-24h.log
   timeout: 60
 - id: k3s-webhook-failures
-  modes: [full]   # skipped by the daily run
+  unit: control-plane-logs
   type: node
   nodes: server
   requires: journal
@@ -45,7 +45,7 @@
   out: logs/node/{node}/k3s-webhook-failures-24h.log
   timeout: 60
 - id: k3s-etcd-slow
-  modes: [full]   # skipped by the daily run
+  unit: control-plane-logs
   type: node
   nodes: server
   requires: journal
@@ -54,7 +54,7 @@
   out: logs/node/{node}/k3s-etcd-slow-24h.log
   timeout: 60
 - id: kubelet-pleg
-  modes: [full]   # skipped by the daily run
+  unit: node-os
   type: node
   nodes: all
   requires: journal
@@ -63,14 +63,14 @@
   timeout: 60
 # ---- k3s platform node inspection. script ships the file from this folder to the node. Tokens are redacted inside the script. ----
 - id: k3s-node
-  modes: [full]   # skipped by the daily run
+  unit: node-os
   type: node
   nodes: all
   script: k3s-node.sh
   out: logs/node/{node}/k3s-platform.txt
   timeout: 90
 - id: containerd-log
-  modes: [full]   # skipped by the daily run
+  unit: node-os
   type: node
   nodes: all
   cmd: sudo -n /usr/bin/tail -n 2000 /var/lib/rancher/k3s/agent/containerd/containerd.log 2>/dev/null | grep -E 'level=(warn|error|fatal)' | tail -n 1500

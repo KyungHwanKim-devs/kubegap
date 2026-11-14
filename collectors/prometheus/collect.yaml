@@ -1,6 +1,7 @@
 # Prometheus itself and its alerting rules (observability coverage and the observability stack)
 # http item: GET against the address of store (prometheus|alertmanager|loki|grafana). Uses the configured URL if present, otherwise a port-forward. headers come from the token in config.yaml.
 - id: rules
+  unit: component-apis
   type: http
   store: prometheus
   path: /api/v1/rules
@@ -8,6 +9,7 @@
   timeout: 60
   source: "prometheus/prometheus web/api/v1/api.go:398,1354@v2.49.1, :450,1504@v3.7.3, :501,1708@v3.15.1 (GET /api/v1/rules; the response is RuleDiscovery.groups[] :1304-1315@v2.49.1, :1453-1465@v3.7.3, :1657-1669@v3.15.1 with name, file, rules[]; an alerting rule :1324-1339@v2.49.1, :1474-1489@v3.7.3, :1678-1693@v3.15.1 carries state, name, query, duration, labels, annotations, alerts[], health, lastError (omitted when empty) and type; a recording rule :1342-1351@v2.49.1, :1492-1501@v3.7.3, :1696-1705@v3.15.1 carries name, query, health, lastError, type; health is ok, err or unknown rules/rule.go:31-33 at the three; state is inactive, pending or firing rules/alerting.go:54-60,66-70@v2.49.1, :54-60,66-70@v3.7.3, :60-66,72-76@v3.15.1, plus unknown for a rule not yet evaluated since 3.8 :53-54@v3.8.1, :57-58,71@v3.15.1, absent at v3.7.3; lib/summaries/observability.py reads them)"
 - id: targets
+  unit: component-apis
   type: http
   store: prometheus
   path: /api/v1/targets?state=any
@@ -15,6 +17,7 @@
   timeout: 60
   source: "prometheus/prometheus web/api/v1/api.go:381,990@v2.49.1, :430,1142@v3.7.3, :470,1297@v3.15.1 (GET /api/v1/targets?state=any; TargetDiscovery :910-912@v2.49.1, :1062-1064@v3.7.3, :1198-1200@v3.15.1 with activeTargets[] and droppedTargets[]; a Target :880-895@v2.49.1, :1031-1046@v3.7.3, :1167-1182@v3.15.1 carries labels, lastError, health, scrapeInterval, scrapeTimeout; health is up, down or unknown scrape/target.go:44@v2.49.1, :42@v3.7.3, :57@v3.15.1; lib/summaries/observability.py and lib/summaries/stackhealth.py read them)"
 - id: runtime
+  unit: component-apis
   type: http
   store: prometheus
   path: /api/v1/status/runtimeinfo
@@ -23,6 +26,7 @@
   source: "prometheus/prometheus web/api/v1/api.go:388,1498@v2.49.1, :437,1720@v3.7.3, :478,1924@v3.15.1 (GET /api/v1/status/runtimeinfo; RuntimeInfo :139-144@v2.49.1, :168-175@v3.7.3, :183-190@v3.15.1 with startTime, reloadConfigSuccess, lastConfigTime, corruptionCount; 3.x adds hostname and serverTime, not read; lib/summaries/stackhealth.py reads the four)"
 # Prometheus self health. All read-only GET. config (/api/v1/status/config) is not read because scrape configs may hold credentials.
 - id: tsdb-status
+  unit: component-apis
   type: http
   store: prometheus
   path: /api/v1/status/tsdb
@@ -30,6 +34,7 @@
   timeout: 30
   source: "prometheus/prometheus web/api/v1/api.go:391,1555@v2.49.1, :440,1790@v3.7.3, :481,2049@v3.15.1 (GET /api/v1/status/tsdb; TSDBStatus :1537-1540@v2.49.1, :1759-1762@v3.7.3, :1986-1989@v3.15.1 with headStats, seriesCountByMetricName[], labelValueCountByLabelName[]; HeadStats :1528-1531@v2.49.1, :1750-1753@v3.7.3, :1977-1980@v3.15.1 with numSeries, numLabelPairs, chunkCount; a TSDBStat :1522-1524@v2.49.1, :1744-1746@v3.7.3, :1971-1973@v3.15.1 is name and value; lib/summaries/stackhealth.py reads them, lib/collection/monitoring.py reads numSeries at setup)"
 - id: flags
+  unit: component-apis
   type: http
   store: prometheus
   path: /api/v1/status/flags
@@ -37,6 +42,7 @@
   timeout: 30
   source: "prometheus/prometheus web/api/v1/api.go:390,1517@v2.49.1, :439,1739@v3.7.3, :480,1943@v3.15.1 (GET /api/v1/status/flags: every command-line flag name mapped to its value as a string; kubegap reads storage.tsdb.retention.time and .size cmd/prometheus/main.go:324,327@v2.49.1, :450,453@v3.7.3, :518,521@v3.15.1 (marked [DEPRECATED] at v3.15.1, still served), web.enable-lifecycle and web.enable-admin-api :282,285@v2.49.1, :402,405@v3.7.3, :470,473@v3.15.1, query.timeout :414@v2.49.1, :555@v3.7.3, :643@v3.15.1; lib/summaries/stackhealth.py and lib/collection/monitoring.py read them)"
 - id: buildinfo
+  unit: component-apis
   type: http
   store: prometheus
   path: /api/v1/status/buildinfo
@@ -44,6 +50,7 @@
   timeout: 30
   source: "prometheus/prometheus web/api/v1/api.go:389,1506@v2.49.1, :438,1728@v3.7.3, :479,1932@v3.15.1 (GET /api/v1/status/buildinfo; PrometheusVersion :129-136@v2.49.1, :158-165@v3.7.3, :173-180@v3.15.1 with version, revision, branch, buildUser, buildDate, goVersion; lib/summaries/stackhealth.py and lib/collection/monitoring.py read version)"
 - id: metrics.observability
+  unit: metrics
   type: promql
   file: metrics.yaml
   timeout: 60

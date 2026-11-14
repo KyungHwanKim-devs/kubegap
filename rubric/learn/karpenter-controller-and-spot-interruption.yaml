@@ -1,0 +1,95 @@
+# What a report teaches when Karpenter itself is fragile or does not hear spot interruptions. Every page below was opened and read (2026-11-14).
+topic: karpenter-controller-and-spot-interruption
+checks: [karpenter.controller-availability, scaling.karpenter-no-interruption-queue]
+mechanism: >
+  Karpenter is one Deployment that does several jobs for the whole cluster: it watches the pods the scheduler could not place, launches nodes that
+  fit them, removes nodes that are no longer needed, and reacts to events that are about to take a node away. The scheduler still does the
+  scheduling; Karpenter only launches the capacity. While the controller is not running none of this happens, so the controller has to be running
+  before it can scale anything, including the node it would itself need.
+
+
+  That is the reason for the rule in the EKS best practices: do not run Karpenter on a node that is managed by Karpenter; run it on a small node
+  group with at least one worker node, or on Fargate. The Helm chart encodes the rule. Its defaults are 2 replicas, a node affinity that keeps the
+  pods off any node carrying the karpenter.sh/nodepool label, a required anti-affinity per host name, a zone spread with DoNotSchedule, a
+  PodDisruptionBudget with maxUnavailable 1, and the priority class system-cluster-critical. The defaults have a consequence the troubleshooting page
+  lists: with a node group of one node the second replica cannot be scheduled, and Karpenter cannot launch a node for it, because it needs a node
+  that is not Karpenter-managed. The answer is a node group of two, or one replica.
+
+
+  Spot is the second half. EC2 issues an interruption notice two minutes before it stops or terminates a spot instance, as an EventBridge event and
+  in the instance metadata, on a best effort basis. Karpenter does not see EventBridge by itself. It reads an SQS queue, and someone has to create the
+  queue and the EventBridge rules that forward the events into it, then give Karpenter the queue name (the chart value settings.interruptionQueue,
+  the argument --interruption-queue). The chart default is an empty string, and interruption handling is disabled when it is not set.
+
+
+  With the queue, a spot warning makes Karpenter start a replacement node and taint and drain the old one in parallel, and its node start time is
+  generally short enough for the replacement to be ready before EC2 takes the instance. Without it, the two minutes pass unused: the node is not
+  drained, the instance is terminated, and the pods on it end with it and are only then rescheduled. The same queue carries scheduled maintenance and
+  instance stopping and terminating events. Rebalance recommendations are published as events but not acted on.
+sources:
+  - { title: "Amazon EKS best practices: Karpenter", url: "https://docs.aws.amazon.com/eks/latest/best-practices/karpenter.html" }
+  - { title: "Karpenter Helm chart README", url: "https://github.com/aws/karpenter-provider-aws/blob/main/charts/karpenter/README.md" }
+  - { title: "Karpenter: Troubleshooting", url: "https://karpenter.sh/docs/troubleshooting/" }
+  - { title: "Karpenter: Disruption", url: "https://karpenter.sh/docs/concepts/disruption/" }
+  - { title: "Karpenter: FAQ", url: "https://karpenter.sh/docs/faq/" }
+  - { title: "Amazon EC2: Spot Instance interruption notices", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html" }
+detect:
+  - kind: alert
+    what: >
+      A controller that is not there. Karpenter reports whether its view of the cluster is in sync; when no instance reports 1, nothing is
+      provisioning or handling interruptions.
+    example: |
+      - alert: KarpenterNotRunning
+        expr: absent(karpenter_cluster_state_synced == 1)
+        for: 5m
+  - kind: metric
+    what: >
+      Whether interruption messages arrive at all. With spot nodes in use and a working queue, the count of received messages grows; a counter that
+      does not exist or never moves on a cluster with spot nodes means the queue is not configured or the EventBridge rules do not reach it.
+    example: 'sum by (message_type) (increase(karpenter_interruption_received_messages_total[24h]))'
+  - kind: metric
+    what: >
+      How long a message waits before Karpenter handles it, out of a budget of two minutes, and how long pods take from creation to running.
+    example: 'histogram_quantile(0.99, sum by (le) (rate(karpenter_interruption_message_queue_duration_seconds_bucket[1h])))'
+  - kind: command
+    what: Where the controller pods run and whether the queue name is set on the Deployment.
+    example: 'kubectl get pods -n karpenter -o wide'
+solutions:
+  - scale: [small]
+    approach: >
+      One replica on a node Karpenter does not manage (a managed node group of one, or a Fargate profile for the karpenter namespace), and the
+      interruption queue set up from the CloudFormation template of the getting-started guide if any NodePool allows spot. Accept that while that
+      one pod restarts no node is launched, and alert when it stays away.
+    tools: [Karpenter, "EKS managed node group", SQS, EventBridge]
+    tradeoff: >
+      The smallest setup that cannot remove its own footing and does not lose the two minutes. A restart of the controller, or the loss of its one
+      node, pauses scale-out and interruption handling until it is back.
+    example: |
+      # Karpenter Helm values
+      replicas: 1
+      settings:
+        interruptionQueue: my-cluster
+  - scale: [medium, large]
+    approach: >
+      Keep the chart defaults and give them the nodes they need: 2 replicas on a managed node group of at least two nodes in different zones, the
+      PodDisruptionBudget, the interruption queue, and on-demand allowed next to spot in the NodePools so that a spot shortage falls back. Alert on
+      the controller and on the interruption metrics, and use Karpenter's own handling rather than Node Termination Handler alongside it.
+    tools: [Karpenter, "EKS managed node group", SQS, EventBridge, Prometheus]
+    tradeoff: >
+      A node loss or an upgrade of the node group leaves one replica running, and spot nodes are drained inside the notice. It costs two always-on
+      nodes outside Karpenter's management that have to be patched and upgraded by another mechanism, and the notice itself stays best effort, so
+      workloads on spot still have to survive a node that vanishes.
+    example: |
+      # Karpenter Helm values (chart defaults shown, queue name added)
+      replicas: 2
+      podDisruptionBudget:
+        name: karpenter
+        maxUnavailable: 1
+      settings:
+        interruptionQueue: my-cluster
+cases: []
+reading:
+  - { title: "Karpenter: Disruption", url: "https://karpenter.sh/docs/concepts/disruption/", why: "The interruption section lists every event Karpenter reacts to and what it does; the rest explains consolidation, drift and expiration." }
+  - { title: "Amazon EKS best practices: Karpenter", url: "https://docs.aws.amazon.com/eks/latest/best-practices/karpenter.html", why: "Where to run the controller, why to enable interruption handling with spot, and how limits and billing alarms fit together." }
+  - { title: "Amazon EC2: Spot Instance interruption notices", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html", why: "What the two-minute notice is, how it is delivered and that it is best effort." }
+  - { title: "Karpenter: Metrics", url: "https://karpenter.sh/docs/reference/metrics/", why: "The names of the interruption, NodeClaim and NodePool metrics the alerts are written against." }

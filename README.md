@@ -4,47 +4,178 @@
 
 [![CI](https://github.com/KyungHwanKim-devs/kubegap/actions/workflows/ci.yml/badge.svg)](https://github.com/KyungHwanKim-devs/kubegap/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE) ![Agent Skills](https://img.shields.io/badge/Agent%20Skills-SKILL.md-black) ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-3776AB) ![read-only](https://img.shields.io/badge/cluster%20access-read--only-success)
 
-I built kubegap while running three clusters on my own, each on a different platform: a small k3s cluster, an EKS cluster, and Kubernetes on Azure. Alerts and dashboards catch only what someone set them up to catch. Anything else you find by digging through the cluster by hand, and I did not have time to do that on three clusters every day. So I gave that job to an AI agent.
+kubegap is a skill for AI agents that audits a Kubernetes cluster read-only and writes a report of the problems that need attention now, each with its evidence. You run it with one command inside an agent such as Claude Code or Codex.
 
-Type `/kubegap` in Claude Code, or `$kubegap` in Codex, and the agent reads the state of the cluster, evaluates it against 411 checks in 12 areas, picks the problems that need attention now, and writes a report. Each problem comes with its evidence, its cause and how to fix it. On one EKS cluster, it found that a spot reclaim had stopped a backend for two minutes without a single alert firing.
+```
+/kubegap          # daily audit: 3 to 5 minutes, a report of one or two screens
+/kubegap full     # full audit: reads the whole cluster in depth and writes the long report
+```
 
-Of the 411 checks, 113 link to public incident reports and postmortems, 209 write-ups in total, including some from Airbnb and Buffer. The links for each check are in [`docs/CHECKS.md`](docs/CHECKS.md). The remaining checks are configuration rules, and for those the report says there is no public case rather than making one up. Every problem in a report has a "Why this happens" part with the principle behind it, public cases, and official documents or books to read next, such as the Kubernetes documentation, the AWS documentation and Google's *Site Reliability Engineering*. The [EKS sample report](samples/en/eks/full/report.md) shows what this looks like.
+- **What it looks for.** Alerts and dashboards catch what someone set them up to catch. kubegap looks at the rest: backups that never leave the cluster, alerts that reach nobody, every replica on one node, a Kubernetes version past its end of support. There are 411 checks in 12 areas.
+- **What you get.** A Markdown report. It says what is broken now, what happened in the meantime and which few problems matter most, and for each of those what it is, why it matters and what to do, in the names and numbers of your cluster.
+- **What it does not do.** It changes nothing in the cluster: it only reads. It runs no server and installs nothing in the cluster. It is not a monitoring or alerting tool, and it does not fix problems for you.
 
-kubegap depends on facts about other tools, such as metric names, log messages and API fields. I looked these up in each tool's source code, version by version, and cited them in [`references/sources.md`](references/sources.md). Those tables now run to more than 1,500 rows.
+![kubegap in a terminal: it evaluates a snapshot, lists the serious findings check by check, and opens one finding with its evidence](docs/media/kubegap-run.gif)
 
-kubegap is a skill in the [Agent Skills](https://agentskills.io) format: a folder holding a procedure for the agent to follow and the scripts it uses. There is no server to keep running. It only reads the cluster and changes nothing. It is not a monitoring or alerting tool, and it does not fix problems for you. It finds the gaps in your cluster and in the monitoring you already have.
+*The evaluate and read steps. The snapshot on screen is the test fixture committed in this repository, and every name in it is a placeholder.*
 
-![A kubegap run: collection, first-pass evaluation, then two report files](docs/media/kubegap-run.gif)
+## How it works
 
-*A real audit. Cluster details are masked.*
+kubegap is a skill in the [Agent Skills](https://agentskills.io) format: a folder with a procedure for the agent to follow (`SKILL.md`) and the Python scripts that procedure calls. A command runs these four steps in order.
 
-## What the report looks like
+| Step | Who | What happens |
+|---|---|---|
+| 1. Collect | scripts | Read objects and events with `kubectl` and query the Prometheus, Alertmanager, Grafana and Loki in the cluster. A full audit also reads the inside of the nodes and the cloud account (AWS for EKS). What was read is saved to one folder on your machine, the snapshot. |
+| 2. Evaluate | scripts | Hold the snapshot against the 411 checks. A check is one rule that says "this state is a problem". Scripts decide, so the same snapshot gives the same result. |
+| 3. Analyse | the agent | Read the verdicts, open the raw material of the snapshot where a verdict needs confirming, join the findings that share a cause, and choose what matters most. |
+| 4. Report | the agent and scripts | The agent writes the text that explains each problem; a script checks its numbers, its links and its form and assembles the report file. A text that fails the check is not assembled. |
 
-A report opens with one screen: whether anything is broken right now, today's problems, and whether what the previous report asked for was done. Then the cluster at a glance (nodes, pods, namespaces, components, stores) and what is coming up (node and certificate expiries, end of support, cleanup jobs), both written by code from the snapshot. Each problem has six parts: what is happening and who is affected (only what was actually looked at), why, a suggested fix, how to roll it back, why this happens, and the evidence with the files it came from. After the problems: a table of what the previous report asked for and whether it was done, every other critical or high item in one line, and in full mode one line per area. Each step says what the cluster does when you run it, what restarts or goes down, and how to see that it worked. Before the report is written, a separate agent reads every step against the cluster objects and removes or holds what could do harm. Below is the first problem from a sample report of a full audit on an EKS cluster. Cluster details are masked. Click the image to read the whole report.
+In no step does the agent send a command to the cluster. Only the scripts of step 1 touch it, and they run read commands only. What reaches the agent's model is what the snapshot holds, and Secret values are not read by any audit. What is stored is described under [How it handles your cluster and your data](#how-it-handles-your-cluster-and-your-data).
 
-[![The first problem of the EKS sample report: seven production databases without a backup, with evidence, cause, action and why this happens](docs/media/report-eks-top.png)](samples/en/eks/full/report.md)
-
-Complete sample reports, daily and full, for an EKS cluster and a small k3s cluster are in [`samples/`](samples/README.md).
-
-![Scrolling through the daily report of the k3s sample](docs/media/report-daily.gif)
-
-### Daily and full audits
-
-Run the daily audit as your routine, and the full audit when you want to go through the whole cluster properly.
+## Daily and full audits
 
 | | Daily audit | Full audit |
 |---|---|---|
 | Command | `/kubegap` | `/kubegap full` |
+| Takes | 3 to 5 minutes (2 min 30 s on a two-node k3s cluster, 4 min on a nine-node EKS cluster) | around 15 minutes (14 and 15 on the same two clusters); longer when the inside of the nodes is read |
 | When | every day | taking over a cluster, before an upgrade, a quarterly review, after an incident |
-| Problems in the report | the 3 to work on today | 5 |
+| Report | one or two screens: what is broken now, what happened since the last audit, the three things that matter most | the long report: up to five of the largest problems, each explained with how it comes about, how to watch it, how it is solved at each scale, and the evidence |
+| Reads | Kubernetes objects and events, metrics, counts of known failure patterns in the logs of platform components | everything the daily audit reads, plus the inside of the nodes, control-plane logs, the cloud account, application settings and the results of extra tools |
+| Does not read | nodes, the AWS API, the command, args, environment values and ConfigMap keys of applications, the text of log lines | Secret values |
 | Compared with | the previous daily audit | the previous full audit |
-| Reads | Kubernetes objects and events, component logs, the data in Prometheus and Loki. On EKS, also the AWS inventory | everything the daily audit reads, plus the inside of the nodes, control-plane logs and the results of extra tools. On EKS, also cost and ECR |
 
-A daily audit does not count what only the full audit collects as a problem or as a pass. The report says it was not seen.
+The daily audit exists for three reasons. A full audit takes long. A full audit reads the cluster in depth, and you may not want all of that on your disk and in a model. A full report holds many kinds of information, and what matters now does not stand out. So the daily audit reads less, keeps less and writes less.
 
-Each audit produces two files. `report.md` is the report for people to read, and `report-details.md` has every verdict in tables. In a full audit, `report-details.md` also has the details of all 12 areas.
+What the daily audit could not judge for lack of reading is counted neither as a problem nor as a pass. The last section of its report, "What this audit did not look at", says what was not read and what cannot be known for it. What each mode reads is declared in one file, [`collectors/units.yaml`](collectors/units.yaml), and both the collection code and that section of the report follow it.
 
-Scripts judge 409 of the 411 checks, so the same data gives the same result. The agent judges the other 2. It then reads the results, decides what is most urgent and writes the report. If it changes a script's verdict, it records the change and the reason in `report-details.md`.
+## What the report looks like
+
+**The daily report** has this order.
+
+1. The first screen: the titles of what is broken now, what happened since the last audit, and the three things that matter most
+2. The cluster at a glance: nodes, pods, namespaces, components, version
+3. What is broken now and what happened: what, when, how often, and whether it is still going on
+4. The three things that matter most: for each, what it is, why it matters, what to do, further reading
+5. What else is open, and what changed since the last audit
+6. What this audit did not look at
+
+**The full report** explains up to five of the largest problems in six sections each: what is the matter, why it comes about, how to watch it, how it is solved (by scale), evidence, further reading. Around them come what is broken now, what already happened, the next largest problems, what changed since the previous report, what is coming up (certificates expiring, end of support), each area in one line, and the limits of the run. It is a diagnosis with explanations, not a list of commands to type. Every verdict is in a second file, `report-details.md`, as tables.
+
+In both reports a number in the text has to match the value in the snapshot and a link has to be one of a page someone opened and read, or the report is not assembled. A check that has public incident reports behind it carries them ([`docs/CHECKS.md`](docs/CHECKS.md)).
+
+Below is the top of the sample full report of an EKS cluster. Click it to open the whole report.
+
+[![The top of the EKS sample full report: the first screen, the cluster at a glance, what already happened, and the first problem, "The production databases have no backup"](docs/media/report-full.png)](samples/en/eks/full/report.md)
+
+A daily report is this long: the k3s sample, scrolled from top to bottom.
+
+[![Scrolling through the daily report of the k3s sample](docs/media/report-daily.gif)](samples/en/k3s/daily/report.md)
+
+Reports from real clusters with the names replaced are in [`samples/`](samples/README.md). You choose the report language (English or Korean) when you run it.
+
+## Install and run
+
+You will need:
+
+- **An AI agent.** Claude Code or Codex works. So does another agent that reads the Agent Skills format and can run shell commands, such as Cursor or GitHub Copilot.
+- **kubectl with read access to the cluster.** If your permissions are narrow, whatever kubectl cannot read is left out of the report.
+- **python3 3.11 or newer.** kubegap's scripts are written in Python, so this is the one thing you have to install beforehand. The python3 that comes with macOS may be older.
+- **jq.** If it is missing, kubegap offers to install it.
+- **On EKS, the AWS CLI.** kubegap offers to install this too. Without it, the AWS side is not read.
+
+kubegap runs on macOS and Linux, and on Windows inside WSL2.
+
+With Node.js 22.20 or newer, one line installs it. Leave out `-g` to install it for the current folder only.
+
+```bash
+npx skills add KyungHwanKim-devs/kubegap -g
+```
+
+Without Node.js, clone the repository and create a symbolic link in your agent's skills folder. The link must be named `kubegap`.
+
+```bash
+git clone https://github.com/KyungHwanKim-devs/kubegap ~/src/kubegap
+
+# Claude Code
+mkdir -p ~/.claude/skills && ln -s ~/src/kubegap ~/.claude/skills/kubegap
+
+# Codex
+mkdir -p ~/.agents/skills && ln -s ~/src/kubegap ~/.agents/skills/kubegap
+```
+
+Then open your agent and type `/kubegap` in Claude Code or `$kubegap` in Codex. The rest of this page uses `/kubegap`. During the audit the agent may ask for permission to run commands, and at the end it gives you the path of the report.
+
+## The first run
+
+kubegap runs without a config file, but you will not see everything from the start. How much you see depends on what is already set up in the cluster and on your machine.
+
+Every run starts with two questions: whether you want the report in English or Korean, and whether to audit the cluster kubectl currently points at. [`docs/SETUP.md`](docs/SETUP.md) shows how to set these in advance.
+
+A daily audit asks two more things at most: at what scale you run this cluster (the severity of a problem depends on it), and whether to fix the folder the snapshots go to when other users can read it. With nothing configured it reads objects and events through the Kubernetes API, and if Prometheus, Alertmanager, Loki or Grafana have a Service in the cluster, it finds them and reads them.
+
+A full audit reads deeper, so there are four more things to decide. On EKS it reads the AWS side with the profile in your kubeconfig or, if there is none, your AWS CLI default; if a permission is missing, only the checks that depend on that call are left out. Of the four, the agent asks only about the ones not yet set up, and you answer by picking from a list of choices. Each one says what it does and what it adds to the report, and all of them can be skipped. Until you choose, kubegap installs nothing, uploads nothing and does not connect to any node.
+
+- **Extra tools.** These are tools kubegap runs and reads the results of, such as krr, which works out suitable requests, pluto, which finds deprecated APIs, and polaris, which checks manifests. On EKS the AWS CLI is offered here too. The agent shows which tools are missing and which checks each one feeds. They are installed only on your machine; [the table in `docs/SETUP.md`](docs/SETUP.md#optional-tools) says where each one lands and what the report says without it.
+- **Checks inside the nodes.** This comes up when there is no way to reach the nodes yet. If you choose it, kubegap goes into each node and reads the disk, the kernel log and the runtime state. That is up to 26 more checks in a full audit, plus the k3s log and etcd snapshot checks on k3s.
+- **Grafana token.** The dashboards and datasources that Helm put into ConfigMaps are read from there, with no token and no question. Grafana's own metric says how many dashboards exist in all; this question comes up only when Grafana holds more, which means some were made in Grafana itself, and it says how many. The agent then shows you how to create a read-only token; once you put it in the config file yourself, those dashboards join the list too.
+- **Monitoring tool addresses.** This comes up when Prometheus, Alertmanager, Loki or Grafana has no Service in the cluster. If the tool runs outside the cluster, give its address. If you never installed it, say so. Loki is not asked about when your log shipper's configuration says the logs go somewhere else, such as Elasticsearch or CloudWatch Logs; the report then says so.
+
+If you skip something, only that part is missing from the report, and the rest of the audit carries on. What kubegap could not see goes in the report under "The limits of this run" and is never counted as a pass. Skipped questions are remembered per cluster and not asked again, unless a tool or monitoring tool goes missing that was not missing before. If you change your mind, run `/kubegap setup` to choose again.
+
+Anything to be saved to the config file is shown to you first and saved only after you confirm.
+
+### How kubegap reaches the nodes
+
+Node checks run in the full audit. The way in depends on the kind of cluster.
+
+- **EKS.** Read commands run on the nodes as root through AWS Systems Manager. Your AWS account needs the SSM document `kubegap-node-read`, which fixes the commands that may run. If you choose to upload it, kubegap does that for you, and the credentials it uses need `ssm:CreateDocument`. The node role needs `AmazonSSMManagedInstanceCore`.
+- **k3s, RKE2 and clusters you installed yourself.** kubegap connects with the user and key from your local SSH setup. The node's host key must be in `known_hosts`, and some logs can be read only if that user has the right groups or sudoers entries. If a node does not respond, kubegap tells you why and lets you accept the host key, enter an address yourself, or continue with the nodes that do respond.
+- **GKE, AKS and other platforms with neither SSM nor SSH.** kubegap does not read the nodes there. The node checks are reported as not collected, and everything that comes from the Kubernetes API, Prometheus and node-exporter is audited as usual.
+
+If access is already in place, kubegap reads the nodes without asking. That means the SSM document is in the EKS account, or the config file has `ssh:` or `node_access: ssh`. SSH is never used until you choose it, even where it would work. A daily audit contacts no node even when access is in place.
+
+## Commands
+
+```
+/kubegap                                         # daily audit
+/kubegap full                                    # full audit
+/kubegap full focus <area>                       # collect everything, analyze and report on one area
+/kubegap explain <finding id> --snapshot latest  # follow one finding of the last audit down to the raw data
+/kubegap --compare <A> <B>                       # run a new audit and add a comparison of earlier audits A and B to the report
+/kubegap --context <name>                        # audit another context in your kubeconfig
+/kubegap setup                                   # choose again what the first run asked
+```
+
+The area names for `focus` are in the table below. With `focus` on a daily audit, the checks that need material a daily audit does not read are left out.
+
+`explain` collects nothing new. `--snapshot latest` tells it to use the most recently collected data. Finding ids are at the bottom of the report under "Checks behind each problem", several for each problem.
+
+For `--compare`, A and B are folder names such as `2026-11-05T08-30-12`. Each audit creates one of these folders under `~/.kubegap/snapshots/<context name>/`, with any special characters in the context name replaced by `_`. A date alone also works, but it picks the last audit of that day, daily or full. Use folder names so that daily is compared with daily and full with full.
+
+## What it checks
+
+There are 411 checks in 12 areas. Each check is one condition that counts as a problem. The full list is in [`docs/CHECKS.md`](docs/CHECKS.md), which also links to the public incidents behind a check where there are any.
+
+| Area | `focus` name | Checks | Examples |
+|---|---|---|---|
+| Resources | `resources` | 15 | containers requesting more than 3x their 7-day p95 usage, repeated OOMKills, nodes full of requests but with single-digit utilization |
+| Scaling | `scaling` | 27 | HPAs stuck at their minimum for 15 days, expired Karpenter nodes that are not replaced, KEDA external triggers without a fallback |
+| Observability | `observability` | 64 | no symptom-based alerts, alerts firing for 7 days straight, a monitoring stack on emptyDir, ingress controller metrics that are not scraped |
+| Traffic | `traffic` | 61 | database ports open to the internet, unhealthy ALB targets, a deregistration delay longer than the termination grace period |
+| Resilience | `resilience` | 43 | replicas packed onto one node, no PDB, backup dumps on the same disk as the data, workloads that can run on only one node |
+| Hygiene | `hygiene` | 35 | `latest` tags, deprecated APIs, Helm releases stuck in pending or failed, dependence on hand-applied node labels |
+| Storage | `storage` | 25 | unencrypted EBS volumes, StorageClasses with expansion turned off, local-path volumes over capacity |
+| Security | `security` | 46 | NetworkPolicies that are not enforced, IMDSv1 allowed, plaintext secrets in environment variables, wildcard RBAC |
+| Cost | `cost` | 13 | idle compute ratio, the monthly cost of oversized requests, ECR repositories with no lifecycle policy |
+| Multi-tenancy | `tenancy` | 13 | prod namespaces without quotas, NetworkPolicies or PSA, CI and prod sharing nodes |
+| Node OS | `node` | 37 | disk and inodes, kernel OOMs and NIC errors, no kubelet reservations, cgroup v1, images over 3 GiB |
+| Platform | `platform` | 32 | Kubernetes end of support, outdated add-ons, AMI age, service quotas near their limit, slow k3s etcd, secrets encryption turned off |
+
+Of the 37 Node OS checks, 26 can be seen only by reaching the nodes.
+
+Not all 409 apply to every cluster. Checks for a component such as Karpenter, Argo CD or cert-manager run only when that component is installed. A daily audit covers at most 300, leaving out the 111 that need material it does not read, such as the inside of a node or the cloud account.
+
+What is expected depends on the scale you run the cluster at. kubegap asks once per cluster: small (no dedicated SRE or DevOps engineer), medium (someone is responsible for operations and real users depend on it) or large (a dedicated team, outages hit revenue or an SLA). The answer sets how serious each finding is: a missing SLO is low on a small cluster and critical on a large one, while a missing backup is serious at every scale. Without an answer the scale is guessed from the node count and the report says so. The platform (EKS, k3s, other) is detected and only decides which checks can run.
 
 ## Which clusters it works on
 
@@ -106,110 +237,6 @@ The facts kubegap relies on were read in the source of these components at these
 71 facts in references/sources.md are marked unverified: observed on the reference clusters, not read in source.
 <!-- verified-table:end -->
 
-## Install and run
-
-You will need:
-
-- **An AI agent.** Claude Code or Codex works. So does another agent that reads the Agent Skills format and can run shell commands, such as Cursor or GitHub Copilot.
-- **kubectl with read access to the cluster.** If your permissions are narrow, whatever kubectl cannot read is left out of the report.
-- **python3 3.11 or newer.** kubegap's scripts are written in Python, so this is the one thing you have to install beforehand. The python3 that comes with macOS may be older.
-- **jq.** If it is missing, kubegap offers to install it.
-- **On EKS, the AWS CLI.** kubegap offers to install this too. Without it, the AWS side is not read.
-
-kubegap runs on macOS and Linux, and on Windows inside WSL2.
-
-With Node.js 22.20 or newer, one line installs it. Leave out `-g` to install it for the current folder only.
-
-```bash
-npx skills add KyungHwanKim-devs/kubegap -g
-```
-
-Without Node.js, clone the repository and create a symbolic link in your agent's skills folder. The link must be named `kubegap`.
-
-```bash
-git clone https://github.com/KyungHwanKim-devs/kubegap ~/src/kubegap
-
-# Claude Code
-mkdir -p ~/.claude/skills && ln -s ~/src/kubegap ~/.claude/skills/kubegap
-
-# Codex
-mkdir -p ~/.agents/skills && ln -s ~/src/kubegap ~/.agents/skills/kubegap
-```
-
-Then open your agent and type `/kubegap` in Claude Code or `$kubegap` in Codex. The rest of this page uses `/kubegap`. During the audit the agent may ask for permission to run commands, and at the end it gives you the paths of the two report files.
-
-## The first run
-
-kubegap runs without a config file, but you will not see everything from the start. How much you see depends on what is already set up in the cluster and on your machine.
-
-Every run starts with two questions: whether you want the report in English or Korean, and whether to audit the cluster kubectl currently points at. [`docs/SETUP.md`](docs/SETUP.md) shows how to set these in advance.
-
-With nothing configured, kubegap reads objects, events, and the logs and metrics of component pods through the Kubernetes API. If Prometheus, Alertmanager, Loki or Grafana have a Service in the cluster, it finds them and reads the metrics and logs they hold. On EKS it also reads the AWS side, using the profile in your kubeconfig or, if there is none, your AWS CLI default. If a permission is missing, only the checks that depend on that call are left out.
-
-To see more, there are four things to decide. The agent asks only about the ones not yet set up, and you answer by picking from a list of choices. Each one says what it does and what it adds to the report, and all of them can be skipped. Until you choose, kubegap installs nothing, uploads nothing and does not connect to any node.
-
-- **Extra tools.** These are tools kubegap runs and reads the results of, such as krr, which works out suitable requests, pluto, which finds deprecated APIs, and polaris, which checks manifests. On EKS the AWS CLI is offered here too. The agent shows which tools are missing and which checks each one feeds. They are installed only on your machine; [the table in `docs/SETUP.md`](docs/SETUP.md#optional-tools) says where each one lands and what the report says without it.
-- **Checks inside the nodes.** This comes up when there is no way to reach the nodes yet. If you choose it, kubegap goes into each node and reads the disk, the kernel log and the runtime state. That is up to 26 more checks in a full audit, plus the k3s log and etcd snapshot checks on k3s.
-- **Grafana token.** The dashboards and datasources that Helm put into ConfigMaps are read from there, with no token and no question. Grafana's own metric says how many dashboards exist in all; this question comes up only when Grafana holds more, which means some were made in Grafana itself, and it says how many. The agent then shows you how to create a read-only token; once you put it in the config file yourself, those dashboards join the list too.
-- **Monitoring tool addresses.** This comes up when Prometheus, Alertmanager, Loki or Grafana has no Service in the cluster. If the tool runs outside the cluster, give its address. If you never installed it, say so. Loki is not asked about when your log shipper's configuration says the logs go somewhere else, such as Elasticsearch or CloudWatch Logs; the report then says so.
-
-If you skip something, only that part is missing from the report, and the rest of the audit carries on. What kubegap could not see goes in the report under "What this run could not see" and is never counted as a pass. Skipped questions are remembered per cluster and not asked again, unless a tool or monitoring tool goes missing that was not missing before. If you change your mind, run `/kubegap setup` to choose again.
-
-Anything to be saved to the config file is shown to you first and saved only after you confirm.
-
-### How kubegap reaches the nodes
-
-Node checks run in the full audit. The way in depends on the kind of cluster.
-
-- **EKS.** Read commands run on the nodes as root through AWS Systems Manager. Your AWS account needs the SSM document `kubegap-node-read`, which fixes the commands that may run. If you choose to upload it, kubegap does that for you, and the credentials it uses need `ssm:CreateDocument`. The node role needs `AmazonSSMManagedInstanceCore`.
-- **k3s, RKE2 and clusters you installed yourself.** kubegap connects with the user and key from your local SSH setup. The node's host key must be in `known_hosts`, and some logs can be read only if that user has the right groups or sudoers entries. If a node does not respond, kubegap tells you why and lets you accept the host key, enter an address yourself, or continue with the nodes that do respond.
-- **GKE, AKS and other platforms with neither SSM nor SSH.** kubegap does not read the nodes there. The node checks are reported as not collected, and everything that comes from the Kubernetes API, Prometheus and node-exporter is audited as usual.
-
-If access is already in place, kubegap reads the nodes without asking. That means the SSM document is in the EKS account, or the config file has `ssh:` or `node_access: ssh`. SSH is never used until you choose it, even where it would work. Once node access is set up, a daily audit can also read, from the nodes, the metrics of components Prometheus does not scrape.
-
-## Commands
-
-```
-/kubegap                                         # daily audit
-/kubegap full                                    # full audit
-/kubegap full focus <area>                       # collect everything, analyze and report on one area
-/kubegap explain <finding id> --snapshot latest  # follow one finding of the last audit down to the raw data
-/kubegap --compare <A> <B>                       # run a new audit and add a comparison of earlier audits A and B to the report
-/kubegap --context <name>                        # audit another context in your kubeconfig
-/kubegap setup                                   # choose again what the first run asked
-```
-
-The area names for `focus` are in the table below. With `focus` on a daily audit, the checks that only a full audit collects are left out.
-
-`explain` collects nothing new. `--snapshot latest` tells it to use the most recently collected data. Finding ids are at the bottom of the report under "Checks behind each problem", several for each problem.
-
-For `--compare`, A and B are folder names such as `2026-11-05T08-30-12`. Each audit creates one of these folders under `~/.kubegap/snapshots/<context name>/`, with any special characters in the context name replaced by `_`. A date alone also works, but it picks the last audit of that day, daily or full. Use folder names so that daily is compared with daily and full with full.
-
-## What it checks
-
-There are 411 checks in 12 areas. Each check is one condition that counts as a problem. The full list is in [`docs/CHECKS.md`](docs/CHECKS.md), which also links to the public incidents behind a check where there are any.
-
-| Area | `focus` name | Checks | Examples |
-|---|---|---|---|
-| Resources | `resources` | 15 | containers requesting more than 3x their 7-day p95 usage, repeated OOMKills, nodes full of requests but with single-digit utilization |
-| Scaling | `scaling` | 27 | HPAs stuck at their minimum for 15 days, expired Karpenter nodes that are not replaced, KEDA external triggers without a fallback |
-| Observability | `observability` | 64 | no symptom-based alerts, alerts firing for 7 days straight, a monitoring stack on emptyDir, ingress controller metrics that are not scraped |
-| Traffic | `traffic` | 61 | database ports open to the internet, unhealthy ALB targets, a deregistration delay longer than the termination grace period |
-| Resilience | `resilience` | 43 | replicas packed onto one node, no PDB, backup dumps on the same disk as the data, workloads that can run on only one node |
-| Hygiene | `hygiene` | 35 | `latest` tags, deprecated APIs, Helm releases stuck in pending or failed, dependence on hand-applied node labels |
-| Storage | `storage` | 25 | unencrypted EBS volumes, StorageClasses with expansion turned off, local-path volumes over capacity |
-| Security | `security` | 46 | NetworkPolicies that are not enforced, IMDSv1 allowed, plaintext secrets in environment variables, wildcard RBAC |
-| Cost | `cost` | 13 | idle compute ratio, the monthly cost of oversized requests, ECR repositories with no lifecycle policy |
-| Multi-tenancy | `tenancy` | 13 | prod namespaces without quotas, NetworkPolicies or PSA, CI and prod sharing nodes |
-| Node OS | `node` | 37 | disk and inodes, kernel OOMs and NIC errors, no kubelet reservations, cgroup v1, images over 3 GiB |
-| Platform | `platform` | 32 | Kubernetes end of support, outdated add-ons, AMI age, service quotas near their limit, slow k3s etcd, secrets encryption turned off |
-
-Of the 37 Node OS checks, 26 can be seen only by reaching the nodes.
-
-Not all 409 apply to every cluster. Checks for a component such as Karpenter, Argo CD or cert-manager run only when that component is installed. A daily audit covers at most 329, leaving out the 82 that are full-only.
-
-What is expected depends on the kind and size of the cluster. EKS is held to the production baseline. k3s, RKE2 and clusters of 3 nodes or fewer get the small-cluster baseline, which still expects backups, SLOs and an alert router, but not multi-zone spread or PDBs. You can change this with `--profile`.
-
 ## How it handles your cluster and your data
 
 kubegap only reads the cluster. It reads pods, Deployments, events, logs and metrics, and it creates, changes and deletes nothing. It reaches Prometheus and Grafana through a port-forward, which leaves nothing behind in the cluster either.
@@ -220,11 +247,13 @@ Secret values are not collected. kubegap sees only their names and types. The `h
 
 ConfigMap values are not stored either. kubegap keeps the length and shape of each key, and the real value only for keys it has to parse, such as the CoreDNS Corefile and the kube-proxy configuration.
 
-Component pod logs are read by a script, which counts them by error type, keeps masked samples and deletes the originals. This happens before the agent writes the report, so the agent never sees those raw logs.
+The logs of platform component pods are read by a script, which counts how many lines match each known failure pattern while it reads. No log line is written to the snapshot as it was. A full audit keeps up to five masked sample lines per pattern; a daily audit keeps the counts only.
+
+A daily audit does not keep how your applications are configured either. Outside the system namespaces (the platform components, such as `kube-system` and `monitoring`), the command and args of containers, environment values and ConfigMap keys are dropped before a file is written.
 
 On nodes, only a fixed set of read commands runs. All of them are listed in [`deploy/node-access/COMMANDS.md`](deploy/node-access/COMMANDS.md).
 
-Collected data is stored on your machine under `~/.kubegap/`, one folder per audit. A full audit takes about 40 MB, and `scripts/kubegap prune` removes old folders.
+Collected data is stored on your machine under `~/.kubegap/`, one folder per audit. A full audit takes about 40 MB and a daily one about 20 MB, and `scripts/kubegap prune` removes old folders.
 
 Every permission is listed in [`docs/PERMISSIONS.md`](docs/PERMISSIONS.md), and the collected data is described in [`docs/DATA.md`](docs/DATA.md). The ClusterRole and IAM policy for a security review are in [`deploy/permissions/`](deploy/permissions/).
 

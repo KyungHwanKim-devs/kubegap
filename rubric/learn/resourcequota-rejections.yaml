@@ -1,0 +1,98 @@
+# What a report teaches when a ResourceQuota is about to reject what the namespace needs next. Every page below was opened and read (2026-11-14).
+topic: resourcequota-rejections
+checks: [tenancy.quota-near-limit, tenancy.quota-without-limitrange]
+mechanism: >
+  A ResourceQuota limits what one namespace may hold in total: the sum of CPU and memory requests and limits of its pods, the storage its claims
+  request, and counts of objects such as persistentvolumeclaims or pods. It is enforced at admission. When a create or update would exceed a hard
+  value, the API server rejects the request with 403 Forbidden and a message that names the constraint, for example "exceeded quota: mem-cpu-demo,
+  requested: requests.memory=700Mi, used: requests.memory=600Mi, limited: requests.memory=1Gi". What already exists is never touched: neither
+  contention nor a changed quota affects resources that were already created. A quota is an absolute number, independent of the capacity of the
+  cluster; adding nodes does not raise it.
+
+
+  The rejection lands on whoever creates the object, and for pods that is rarely a person. Creating a Deployment that would exceed the quota
+  succeeds; it is its pods that may not all be created, and that shows only in the status of the Deployment. A namespace at 95% of its quota
+  therefore works perfectly until the next thing that needs one more pod or one more claim: a rolling update that has to create the new pod before
+  it removes the old one, an HPA scaling up, a StatefulSet adding a replica with its own PersistentVolumeClaim.
+
+
+  A quota on CPU or memory has a second effect. Once requests.cpu or requests.memory (or the limits) are under quota, every new pod must state a
+  request or limit for that resource, otherwise the quota system may reject the pod. A pod template that was fine yesterday (a Job, a sidecar
+  injected by a tool, a chart with empty resources) is refused the day the quota arrives.
+
+
+  A LimitRange closes that gap. Its admission controller fills in a default request and limit for containers that state none, at pod creation.
+  Three properties matter. It applies only to new pods: pods that exist continue unchanged. It does not check its own defaults for consistency: a
+  default limit below a request that the pod does state makes the pod invalid. And with two or more LimitRanges in a namespace it is not
+  deterministic which default is applied.
+sources:
+  - { title: "Kubernetes: Resource Quotas", url: "https://kubernetes.io/docs/concepts/policy/resource-quotas/" }
+  - { title: "Kubernetes: Configure Memory and CPU Quotas for a Namespace", url: "https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/quota-memory-cpu-namespace/" }
+  - { title: "Kubernetes: Limit Ranges", url: "https://kubernetes.io/docs/concepts/policy/limit-range/" }
+detect:
+  - kind: alert
+    what: >
+      Used over hard, per quota and resource, from kube-state-metrics. The kubernetes-mixin ships three rules on this ratio, each held for 15
+      minutes: KubeQuotaAlmostFull (above 0.9 and below 1), KubeQuotaFullyUsed (equal to 1) and KubeQuotaExceeded (above 1).
+    example: |
+      - alert: KubeQuotaAlmostFull
+        expr: |
+          max without (instance, job, type) (kube_resourcequota{type="used"})
+            / on (namespace, resource, resourcequota) group_left()
+          (max without (instance, job, type) (kube_resourcequota{type="hard"}) > 0)
+          > 0.9
+        for: 15m
+  - kind: alert
+    what: >
+      A rollout that does not progress. When the quota refuses the new pod, the Deployment reports Progressing false; the kubernetes-mixin rule
+      KubeDeploymentRolloutStuck fires on that after 15 minutes.
+    example: 'kube_deployment_status_condition{condition="Progressing", status="false"} != 0'
+  - kind: command
+    what: Used and hard side by side for one namespace, and the message on the workload whose pods were refused.
+    example: 'kubectl describe quota -n <namespace>'
+solutions:
+  - scale: [small]
+    approach: >
+      Ask first whether the quota earns its place. On a cluster one person runs, a quota protects against a runaway namespace; keep it for that,
+      with hard values well above normal use, add a LimitRange with default requests in every namespace that has a CPU or memory quota, and run the
+      one alert at 90%. A namespace that keeps touching its quota in normal operation has a quota that is too small, not a tenant that is too large.
+    tools: [ResourceQuota, LimitRange, "kube-state-metrics"]
+    tradeoff: >
+      Two small objects per namespace and one alert. Defaults from a LimitRange are a guess that applies to every container without requests, so a
+      pod that needs more than the default is squeezed until it states its own.
+    example: |
+      apiVersion: v1
+      kind: LimitRange
+      metadata:
+        name: defaults
+      spec:
+        limits:
+          - type: Container
+            defaultRequest:
+              cpu: 50m
+              memory: 64Mi
+            default:
+              memory: 256Mi
+  - scale: [medium]
+    approach: >
+      Create quota and LimitRange together from one template whenever a namespace is created, so that no namespace has one without the other, and
+      route the quota alerts to the team that owns the namespace. Review hard values against real usage on a calendar instead of when a deploy
+      fails.
+    tools: [ResourceQuota, LimitRange, Helm, "kubernetes-mixin"]
+    tradeoff: >
+      A deploy is no longer the way a full quota is discovered. Someone owns the numbers, and raising one becomes a small change request.
+  - scale: [large]
+    approach: >
+      Manage quotas as policy. Restrict who may update or delete a ResourceQuota (the documentation suggests a ValidatingAdmissionPolicy), let a
+      controller or a namespace management tool adjust hard values or share one quota over a group of namespaces, and keep the sum of all quotas in
+      view against the allocatable capacity of the cluster.
+    tools: [ResourceQuota, ValidatingAdmissionPolicy, "kubernetes-mixin"]
+    tradeoff: >
+      Tenants cannot lift their own ceiling and capacity planning has one number per tenant. Every legitimate increase now waits for the policy
+      owner, and quotas that add up to more than the cluster holds are resolved first come, first served.
+cases: []
+reading:
+  - { title: "Kubernetes: Resource Quotas", url: "https://kubernetes.io/docs/concepts/policy/resource-quotas/", why: "Every resource name a quota can limit, the scopes, and the sentence about pods that must state requests." }
+  - { title: "Kubernetes: Limit Ranges", url: "https://kubernetes.io/docs/concepts/policy/limit-range/", why: "How defaults are injected and the example of a default limit that conflicts with a request." }
+  - { title: "Kubernetes: Configure Memory and CPU Quotas for a Namespace", url: "https://kubernetes.io/docs/tasks/administer-cluster/manage-resources/quota-memory-cpu-namespace/", why: "A ten-minute exercise that produces the exact rejection message." }
+  - { title: "kubernetes-mixin: alerts/resource_alerts.libsonnet", url: "https://raw.githubusercontent.com/kubernetes-monitoring/kubernetes-mixin/master/alerts/resource_alerts.libsonnet", why: "The quota alert rules as they are shipped, to copy rather than rewrite." }

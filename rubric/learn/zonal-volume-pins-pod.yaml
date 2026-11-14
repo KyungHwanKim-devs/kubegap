@@ -1,0 +1,86 @@
+# What a report teaches when a volume lives in a zone that has no node, or one. Every page below was opened and read (2026-11-14).
+topic: zonal-volume-pins-pod
+checks: [resilience.az-volume-without-nodes]
+mechanism: >
+  An EBS volume and the instance it is attached to must be in the same Availability Zone. Kubernetes carries that fact on the PersistentVolume as
+  node affinity: it limits what nodes the volume can be accessed from, and pods that use the volume are only scheduled to nodes selected by it. The
+  zone is chosen once. With volumeBindingMode WaitForFirstConsumer, binding and provisioning wait until a pod using the claim is created, so the
+  first volume is created where that pod can run; with Immediate the volume is provisioned without knowledge of the pod's scheduling requirements,
+  which may result in unschedulable pods. Either way, from then on the pod follows the volume and not the other way round.
+
+
+  So a database pod whose volume is in zone a can run only on a node in zone a. If its node is replaced or reclaimed and no node in zone a exists,
+  the scheduler finds no feasible node and the pod remains unscheduled until one appears. With one node in the zone, that node is the only place the
+  pod can run.
+
+
+  Whether a node appears depends on the autoscaler. Karpenter detects storage requirements: when a PersistentVolume already exists for the claim it
+  includes the volume's zone in the pod's scheduling requirements and launches there, if a NodePool allows that zone. A NodePool that only allows
+  spot never launches on-demand capacity, and when the allowed spot types are not available the pods stay pending until capacity is replenished.
+  Karpenter does not balance or rebalance the zones of its nodes. With Cluster Autoscaler, the AWS guidance for EBS-backed workloads is node groups that are identical except for
+  the zone, with balance-similar-node-groups enabled.
+sources:
+  - { title: "Amazon EBS volumes", url: "https://docs.aws.amazon.com/ebs/latest/userguide/ebs-volumes.html" }
+  - { title: "Kubernetes: Persistent Volumes", url: "https://kubernetes.io/docs/concepts/storage/persistent-volumes/" }
+  - { title: "Kubernetes: Kubernetes Scheduler", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/" }
+  - { title: "Kubernetes: Storage Classes", url: "https://kubernetes.io/docs/concepts/storage/storage-classes/" }
+  - { title: "Karpenter: Scheduling", url: "https://karpenter.sh/docs/concepts/scheduling/" }
+  - { title: "Amazon EKS best practices: Cluster Autoscaler", url: "https://docs.aws.amazon.com/eks/latest/best-practices/cas.html" }
+  - { title: "Amazon EKS best practices: Karpenter", url: "https://docs.aws.amazon.com/eks/latest/best-practices/karpenter.html" }
+detect:
+  - kind: alert
+    what: >
+      A pod of a stateful workload that stays Pending. kube-state-metrics exports the phase of every pod; the kubernetes-mixin rule KubePodNotReady
+      covers pods that are Pending or not ready for 15 minutes. The FailedScheduling event on the pod is where the scheduler writes why no node was feasible.
+    example: |
+      - alert: StatefulPodPending
+        expr: kube_pod_status_phase{phase="Pending", namespace=~".*prod.*"} == 1
+        for: 10m
+  - kind: metric
+    what: >
+      Nodes per zone. kube-state-metrics exports node labels on kube_node_labels only for the labels allowed with --metric-labels-allowlist, so the
+      zone label has to be allowed first. A zone that holds volumes and
+      drops to one node or none is the state this check describes.
+    example: 'count by (label_topology_kubernetes_io_zone) (kube_node_labels)'
+  - kind: command
+    what: The zone each volume is pinned to, next to the zone of each node.
+    example: "kubectl get pv -o custom-columns=NAME:.metadata.name,CLAIM:.spec.claimRef.name,ZONE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
+solutions:
+  - scale: [small]
+    approach: >
+      Keep the stateful workload in one zone and make sure a node can always be launched there: the NodePool that serves it lists that zone in its
+      requirements and allows on-demand next to spot, so that Karpenter can fall back when spot is not available. Accept that the workload is down
+      while the replacement node starts.
+    tools: [Karpenter]
+    tradeoff: >
+      The pod is never stuck for lack of a node in its zone, with no extra standing capacity. One zone remains a single point of failure and the
+      on-demand fallback costs more while it is in use.
+    example: |
+      requirements:
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values: ["ap-northeast-2a", "ap-northeast-2c"]
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+  - scale: [medium]
+    approach: >
+      Keep at least two nodes in the zone that holds the volume, so that the pod has somewhere to go before a new node is up. With Cluster
+      Autoscaler, use one node group per zone, identical except for the zone, and enable balance-similar-node-groups.
+    tools: [Karpenter, "Cluster Autoscaler"]
+    tradeoff: >
+      Losing one node costs a reschedule and a volume re-attach instead of a wait for new capacity. A second node in that zone is paid for whether or
+      not it is needed.
+  - scale: [large]
+    approach: >
+      Stop depending on one zone: run the stateful application as replicas spread across zones, each with its own volume in its own zone, so that the
+      loss of a zone or of its nodes removes one replica and not the service.
+    tools: [StatefulSet, topologySpreadConstraints]
+    tradeoff: >
+      The application stays up through the loss of a zone. It needs an application that replicates its own data, and one volume and at least one
+      node per zone.
+cases: []
+reading:
+  - { title: "Karpenter: Scheduling", url: "https://karpenter.sh/docs/concepts/scheduling/", why: "How Karpenter reads the zone of an existing volume and what it does not balance." }
+  - { title: "Kubernetes: Storage Classes", url: "https://kubernetes.io/docs/concepts/storage/storage-classes/", why: "Immediate against WaitForFirstConsumer, and allowedTopologies." }
+  - { title: "Amazon EKS best practices: Cluster Autoscaler", url: "https://docs.aws.amazon.com/eks/latest/best-practices/cas.html", why: "The EBS section: one node group per zone and node group balancing." }

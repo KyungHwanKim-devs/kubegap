@@ -1,0 +1,97 @@
+# What a report teaches when the AWS Load Balancer Controller, its load balancers or their target health are off. Every page below was opened and read (2026-11-14).
+topic: aws-load-balancer-controller
+checks: [albctl.controller-availability, albctl.ingress-without-lb, traffic.alb-unhealthy-targets]
+mechanism: >
+  The AWS Load Balancer Controller watches Ingress events from the API server and turns each Ingress into AWS objects: an ALB, one target group for
+  each Service the Ingress names, a listener for every port and a rule for every path. In instance mode, the default, the ALB sends traffic to a
+  NodePort on the nodes; in ip mode it sends traffic straight to the pod IPs.
+
+
+  An Ingress without an address is an ALB that was never built. The controller places an internet-facing ALB in subnets tagged
+  kubernetes.io/role/elb and an internal one in subnets tagged kubernetes.io/role/internal-elb, drops subnets with fewer than 8 free addresses, picks
+  one subnet per Availability Zone, and an ALB needs two subnets in different zones. The scheme is internal unless the annotation says
+  internet-facing.
+
+
+  The Helm chart runs two replicas and only one is active, through leader election; its default anti-affinity is soft and it creates no
+  PodDisruptionBudget. While no replica runs, the existing ALBs keep serving, but pods are no longer registered or deregistered as they change, so a
+  rollout leaves the target group pointing at addresses that are gone.
+
+
+  Registration is slower than a rollout even with a healthy controller: new pods can be Ready before the controller has registered them, and the old
+  pods are removed while the target group holds only targets in Initial or Draining state. The pod readiness gate closes that gap. With the namespace
+  labelled, the controller injects a readiness condition and the rollout waits until the new pod is healthy in the target group. It works only with
+  ip targets.
+
+
+  The ALB health check is separate from Kubernetes readiness. The controller's defaults are path /, success code 200, an interval of 15 seconds and
+  two failures to mark a target unhealthy, so an application that answers / with a redirect or 404 is unhealthy to the ALB while its pods are Ready.
+  The ALB routes only to healthy targets. When every target of a group is unhealthy it fails open and routes to all of them, so the failing health
+  check filters nothing.
+sources:
+  - { title: "AWS Load Balancer Controller: How it works", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/how-it-works/" }
+  - { title: "AWS Load Balancer Controller: Subnet auto-discovery", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/subnet_discovery/" }
+  - { title: "AWS Load Balancer Controller: Pod readiness gate", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/pod_readiness_gate/" }
+  - { title: "AWS Load Balancer Controller: Ingress annotations", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/ingress/annotations/" }
+  - { title: "AWS Load Balancer Controller: Configurations", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/configurations/" }
+  - { title: "aws-load-balancer-controller Helm chart README", url: "https://github.com/kubernetes-sigs/aws-load-balancer-controller/blob/main/helm/aws-load-balancer-controller/README.md" }
+  - { title: "Elastic Load Balancing: Health checks for Application Load Balancer target groups", url: "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-health-checks.html" }
+detect:
+  - kind: alert
+    what: >
+      A CloudWatch alarm on UnHealthyHostCount in the AWS/ApplicationELB namespace, per LoadBalancer and TargetGroup. AWS recommends the Minimum
+      statistic and alarming on a non-zero value for more than one data point: Minimum is non-zero only when every load balancer node sees the
+      target as unhealthy.
+    example: 'AWS/ApplicationELB UnHealthyHostCount, statistic Minimum, dimensions LoadBalancer + TargetGroup, threshold > 0 for 2 data points'
+  - kind: metric
+    what: >
+      UnhealthyRoutingRequestCount counts the requests routed through the fail-open path, and HealthyHostCount shows how many targets are left to
+      carry the load. Both are per target group.
+    example: 'AWS/ApplicationELB UnhealthyRoutingRequestCount, statistic Sum'
+  - kind: metric
+    what: >
+      Whether the controller itself runs and can be disrupted safely: the Ready state of its pods and the disruptions its PodDisruptionBudget allows,
+      both from kube-state-metrics. The chart also creates a ServiceMonitor for the controller's own metrics when serviceMonitor.enabled is set.
+    example: 'sum(kube_pod_status_ready{namespace="kube-system", pod=~"aws-load-balancer-controller.*", condition="true"})'
+  - kind: command
+    what: >
+      Why one target is unhealthy. The API returns a reason code for each target, for example Target.ResponseCodeMismatch with the codes received or
+      Target.Timeout. For an Ingress without an address, the Events of the Ingress carry the controller's reconcile error.
+    example: 'aws elbv2 describe-target-health --target-group-arn <arn>'
+solutions:
+  - scale: [small]
+    approach: >
+      Keep the two replicas of the chart and give every Ingress a health check the application answers: a path that returns 200 and the success
+      codes the application really sends. Tag the subnets once. One CloudWatch alarm on UnHealthyHostCount covers the rest.
+    tools: ["AWS Load Balancer Controller", "CloudWatch alarm"]
+    tradeoff: >
+      The ALB stops sending requests to a broken pod and a broken health check becomes visible, for a few annotations per Ingress. Rollouts can still
+      drop requests for the seconds between a pod being Ready and being registered.
+    example: |
+      metadata:
+        annotations:
+          alb.ingress.kubernetes.io/target-type: ip
+          alb.ingress.kubernetes.io/healthcheck-path: /healthz
+          alb.ingress.kubernetes.io/success-codes: '200'
+  - scale: [medium, large]
+    approach: >
+      Use ip targets and label the application namespaces for the pod readiness gate, so a rollout waits for the target group. Give the controller a
+      PodDisruptionBudget and a spread over nodes through the chart values, and scrape it with the chart's ServiceMonitor.
+    tools: ["AWS Load Balancer Controller", "Prometheus Operator ServiceMonitor", "CloudWatch alarm"]
+    tradeoff: >
+      Rollouts no longer run ahead of the load balancer. The gate is injected by the controller's webhook: with the failure policy Fail, pods cannot
+      be created while the controller is down, and with Ignore, the default from v2.11.0, pods created during that time have no gate. The chart
+      states that its PodDisruptionBudget needs at least 2 controller replicas and 3 worker nodes.
+    example: |
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: shop
+        labels:
+          elbv2.k8s.aws/pod-readiness-gate-inject: enabled
+cases: []
+reading:
+  - { title: "AWS Load Balancer Controller: Pod readiness gate", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/pod_readiness_gate/", why: "Why a small rolling update can empty a target group, and the conditions under which the gate is injected." }
+  - { title: "Elastic Load Balancing: Health checks for Application Load Balancer target groups", url: "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/target-group-health-checks.html", why: "The health check settings, the fail-open rule and the reason codes a target reports." }
+  - { title: "Elastic Load Balancing: CloudWatch metrics for your Application Load Balancer", url: "https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html", why: "Which statistic of UnHealthyHostCount to alarm on and what the target group health metrics count." }
+  - { title: "AWS Load Balancer Controller: Subnet auto-discovery", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/deploy/subnet_discovery/", why: "The tags and the filters that decide whether an ALB can be placed at all." }

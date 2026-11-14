@@ -7,7 +7,7 @@ Finding ids are `<area>.<check id>.<ns>/<resource>` or `.cluster`.
 
 Check expressions (`expr`, `warn_expr`, `target`, `evidence`) are Python evaluated with `eval` over a restricted builtins dict (SAFE_BUILTINS);
 that restriction only keeps honest expressions small and is NOT a sandbox against malicious input. Expressions therefore come only from the
-repository's own checks.yaml and rubric profiles, never from user config: config.yaml can set thresholds, profile names and suppressions, not code.
+repository's own checks.yaml and rubric files, never from user config: config.yaml can set thresholds, the scale and suppressions, not code.
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from ... import __version__
-from ...foundations import paths, rubric
+from ...foundations import paths, rubric, units
 from ...foundations.config import Config
 from ...foundations.snapshot import load_json, write_private
 from .context import Context
@@ -40,25 +40,28 @@ HANDLERS: dict[str, Callable[[Context, dict, Run], dict]] = {
 
 
 def evaluate_check(check: dict, cx: Context, thresholds: dict) -> dict:
-    """Evaluate one check and return {status, counts, findings[], reason?}. Namespace profiles come from `cx.ns_profiles`."""
+    """Evaluate one check and return {status, counts, findings[], reason?}."""
     handler = HANDLERS.get(check["type"])
     if handler is None:
         return Run.skip(f"unknown type {check['type']}")
     return handler(cx, check, Run(check, cx, thresholds))
 
 
-def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, tools_present: set[str] | None = None, echo=print) -> dict:
+def evaluate(snap: Path, cfg: Config, *, scale_answer: str | None = None, tools_present: set[str] | None = None, echo=print) -> dict:
     inv = load_json(snap / "inventory.json") or {}
     summary = load_json(snap / "summary.json") or {}
-    pname = profile_override or cfg.get("profile") or (inv.get("profile") or {}).get("name") or "prod"
-    profile = rubric.load_profile(pname)
+    platform = (inv.get("cluster") or {}).get("platform")
+    # The scale as it stands now: config.yaml, then the first-run answer, so answering the question and evaluating the same snapshot again changes the verdicts.
+    # With neither, what discovery recorded (its guess from the node count).
+    scale = rubric.resolve_scale(cfg, scale_answer, (inv.get("nodes") or {}).get("count") or 0)
+    if scale["source"] == "guessed" and inv.get("scale"):
+        scale = inv["scale"]
     collectors = inv.get("collectors_enabled") or ["core"]
     checks, errors = rubric.load_checks(collectors)
-    ns_profiles = {pat: rubric.load_profile(str(name)) for pat, name in (cfg.get("namespace_profiles") or {}).items()}  # namespace-level profiles
-    cx = Context(snap, inv, summary, profile, ns_profiles)
-    mode = paths.snapshot_mode(
-        snap
-    )  # daily or full. A check marked `modes: [full]` needs inputs the daily run does not collect, so it is reported as not-collected instead of being evaluated on missing data (which would turn "file absent" into false absence findings)
+    cx = Context(snap, inv, summary, scale["name"], cfg.get("dev_namespaces"))
+    # A check that names a collection unit under `needs` is reported as not-collected when the run's mode does not collect the unit, instead of being
+    # evaluated on data that is not there (which would turn "file absent" into a finding of absence, or into a pass).
+    mode = paths.snapshot_mode(snap)
     active_sup, expired_sup = rubric.active_suppressions(cfg.get("suppress"), cx.today)
     overrides = cfg.get("overrides") or {}
 
@@ -69,6 +72,8 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
     errors = list(errors) + known_errors
     catalog = rubric.catalog_hash()
     for c in checks:
+        by_scale = c["severity_default"] if isinstance(c["severity_default"], dict) else None
+        c = {**c, "severity_default": rubric.severity_for(c, scale["name"])}  # from here on a check carries the one level of this cluster's scale
         rec = {
             "id": c["id"],
             "name": c["name"],
@@ -80,13 +85,16 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
         }
         if c["id"] in known:
             rec["known_issues"] = known[c["id"]]  # open defects of kubegap that affect this check; the finding carries them too, so a tool note cites the number instead of describing the defect again
-        applies = pname in (c.get("profiles") or []) or (profile.get("base") in (c.get("profiles") or []))  # derived profiles (small-prod, multi-az-prod, dev) inherit the check set of their base profile
-        if not applies or c["id"] in (profile.get("disabled_checks") or []):
-            rec.update(status="disabled", reason=f"disabled in profile {pname}")
+        if by_scale:
+            rec["severity_by_scale"] = by_scale
+        why_not = rubric.applies(c, platform, scale["name"])
+        if why_not:
+            rec.update(status="disabled", reason=why_not)
             results.append(rec)
             continue
-        if c.get("modes") and mode not in c["modes"]:
-            rec.update(status="not-collected", reason=f"inputs not collected in {mode} mode (collected by: {', '.join(c['modes'])})")
+        absent = units.missing(c.get("needs"), mode)
+        if absent:
+            rec.update(status="not-collected", reason=f"a {mode} run does not collect {', '.join(absent)}", needs=absent)
             results.append(rec)
             continue
         req_tool = c.get("requires_tool")
@@ -94,7 +102,7 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
             rec.update(status="tool-missing", reason=f"tool {req_tool} missing")
             results.append(rec)
             continue
-        thresholds = rubric.resolve_thresholds(c, profile, overrides)
+        thresholds = rubric.resolve_thresholds(c, platform, scale["name"], overrides)
         try:
             r = evaluate_check(c, cx, thresholds)
         except Exception as e:  # A bug in one check must not stop the whole run. Recorded in the report appendix
@@ -132,8 +140,9 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
         "snapshot": str(snap),
         "mode": mode,
         "context": inv.get("context"),
-        "profile": {"name": pname, "source": "override" if profile_override else (inv.get("profile") or {}).get("source"), "missing_file": profile.get("missing", False)},
-        "checks": {"total": len(checks), "by_status": counts_by("status", results), "load_errors": errors},
+        "platform": platform,
+        "scale": scale,
+        "checks": {"total": len(checks), "by_status": counts_by("status", results), "load_errors": errors + rubric.load_learn()[1]},
         "severity_rules": rubric.load_severity_rules(),
         "findings": sorted(findings, key=lambda f: (["critical", "high", "medium", "low", "info"].index(f["severity_default"]), f["status"] != "fail", f["id"])),
         "findings_count": {
@@ -144,13 +153,15 @@ def evaluate(snap: Path, cfg: Config, *, profile_override: str | None = None, to
         "suppressed": suppressed,
         "expired_suppressions": expired_sup,
         "llm_checks": [f for f in findings if f["status"] == "llm"],
+        # what the report teaches about the checks that found something (rubric/learn/): how it works, how to watch it, how to solve it at each scale
+        "learn": rubric.learn_for({f["check"] for f in findings}),
         "check_results": results,
     }
     write_private(snap / "findings-draft.json", json.dumps(out, ensure_ascii=False, indent=1, default=str))
     if echo:
         bs = out["checks"]["by_status"]
         echo(
-            f"profile {pname}, mode {mode}, {len(checks)} checks: evaluated {bs.get('done', 0)}, disabled {bs.get('disabled', 0)}, skipped {bs.get('skip', 0)}, not collected in this mode {bs.get('not-collected', 0)}, errors {bs.get('error', 0)}, tool missing {bs.get('tool-missing', 0)}"
+            f"scale {scale['name']} [{scale['source']}], platform {platform}, mode {mode}, {len(checks)} checks: evaluated {bs.get('done', 0)}, disabled {bs.get('disabled', 0)}, skipped {bs.get('skip', 0)}, not collected in this mode {bs.get('not-collected', 0)}, errors {bs.get('error', 0)}, tool missing {bs.get('tool-missing', 0)}"
         )
         if errors:
             echo("load errors: " + "; ".join(errors))

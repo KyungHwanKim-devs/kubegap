@@ -1,0 +1,122 @@
+# What a report teaches when containers are killed at their memory limit or run close to it. Every page below was opened and read (2026-11-14).
+topic: container-memory-limit-oom
+checks: [resources.oomkilled, resources.oomkilled-repeated, resources.memory-limit-near-p95]
+mechanism: >
+  A memory limit becomes the memory limit of the container's cgroup, and the kernel enforces it. CPU over the limit is throttled; for
+  memory the enforcement is a kill: when the container tries to allocate more than the limit, the kernel's out-of-memory subsystem stops one of
+  the processes in the container. If that process is PID 1 and the container may be restarted, the kubelet restarts it. The pod stays, the other
+  containers of the pod are not touched, and what is left is a last state of Terminated with reason OOMKilled, exit code 137, and a restart count
+  one higher. Requests that the process was serving are lost, and until the container is ready again the workload has one replica less.
+
+
+  The limit is one number for every replica, and replicas of one workload carry the same load. When the load pushes one over the limit it pushes
+  all of them, so they die together and come back into the same load. That is how a memory limit set from historical usage turns a traffic spike
+  into an outage rather than a slow-down.
+
+
+  A container whose 7-day p95 working set is at 90% of its limit is the state before the kill: p99 and the maximum have probably touched the limit
+  already. The cause is either a limit below what the application really needs or a leak; a graph that only climbs is a leak, and raising the
+  limit then only moves the date.
+
+
+  The request matters as well. A container that uses more than its memory request is a candidate for eviction when the node is under pressure;
+  a pod whose requests equal its limits for every container is in the Guaranteed class and is evicted last.
+
+
+  Counting the kills is harder than it looks. The status of a pod only keeps the last termination, and a rollout replaces the pod and its history
+  with it, so a workload deployed several times a day shows one death at most. Counting over a week needs the stored series of the replaced pods,
+  or the kernel log of the node.
+sources:
+  - { title: "Kubernetes: Resource Management for Pods and Containers", url: "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/" }
+  - { title: "Kubernetes: Pod Quality of Service Classes", url: "https://kubernetes.io/docs/concepts/workloads/pods/pod-qos/" }
+  - { title: "Kubernetes: Node-pressure Eviction", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/" }
+  - { title: "Zalando: January 2019 cluster DNS outage postmortem", url: "https://github.com/zalando-incubator/kubernetes-on-aws/blob/dev/docs/postmortems/jan-2019-dns-outage.md" }
+detect:
+  - kind: metric
+    what: >
+      The signal before the kill: the 7-day p95 of the working set against the limit, per container. Above 0.9 the next increase in load is a
+      restart.
+    example: |
+      quantile_over_time(0.95, container_memory_working_set_bytes{container!=""}[7d:15m])
+        / on (namespace, pod, container) kube_pod_container_resource_limits{resource="memory"}
+  - kind: alert
+    what: >
+      The signal after it: a container that restarted in the last hour and whose last termination reason is OOMKilled. kube-state-metrics exports
+      both series. The reason label stays on a pod long after the kill, so the rule needs the restart to be recent.
+    example: |
+      - alert: ContainerOOMKilled
+        expr: |
+          increase(kube_pod_container_status_restarts_total[1h]) > 0
+          and on (namespace, pod, container)
+          kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+  - kind: metric
+    what: >
+      How often over a week, replaced pods included: every pod that carried the OOMKilled reason at any time in 7 days, with its restarts in that
+      window. Restarts are an upper bound, because a failed probe restarts a container too.
+    example: |
+      max_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[7d]) == 1
+      increase(kube_pod_container_status_restarts_total[7d])
+  - kind: command
+    what: >
+      The exact count for the last day, on the node: the kernel writes one oom-kill line per kill.
+    example: "journalctl -k --since -24h | grep oom-kill"
+solutions:
+  - scale: [small]
+    approach: >
+      Read a recommendation and write the new limit into the manifest by hand. KRR is a command-line tool that runs on your own machine against
+      the Prometheus you already have; by default it takes the maximum memory use of the past week and adds 15%. Raise the request together with
+      the limit for anything that must not be evicted.
+    tools: [KRR]
+    tradeoff: >
+      Nothing is installed in the cluster and the answer is immediate. It is a manual step that has to be repeated when the workload changes, and
+      it sizes a leak as if it were real demand.
+    example: |
+      resources:
+        requests:
+          memory: 768Mi
+        limits:
+          memory: 768Mi
+  - scale: [medium]
+    approach: >
+      Install the Vertical Pod Autoscaler and create a VerticalPodAutoscaler per workload in the mode Off. The recommender then keeps a target and a
+      lower and upper bound in the status of the object, computed from historical usage and from out-of-memory events, and nothing is changed
+      for you. Alert on the p95-to-limit ratio so that a container is resized before it is killed.
+    tools: ["Vertical Pod Autoscaler", KRR]
+    tradeoff: >
+      A current recommendation for every workload without anyone running a tool. The Vertical Pod Autoscaler is not part of core Kubernetes: it
+      has to be installed, needs a metrics source such as Metrics Server, and needs time to gather data before it recommends.
+    example: |
+      apiVersion: autoscaling.k8s.io/v1
+      kind: VerticalPodAutoscaler
+      metadata:
+        name: api
+      spec:
+        targetRef:
+          apiVersion: apps/v1
+          kind: Deployment
+          name: api
+        updatePolicy:
+          updateMode: "Off"
+  - scale: [large]
+    approach: >
+      Let the Vertical Pod Autoscaler apply its recommendations (mode Recreate, or InPlaceOrRecreate where pods can be resized in place), with a
+      PodDisruptionBudget on every workload it manages, and keep the limits of shared components such as cluster DNS far above their usual use.
+    tools: ["Vertical Pod Autoscaler", PodDisruptionBudget]
+    tradeoff: >
+      Limits follow usage without a person. In Recreate mode a change is applied by evicting the pod, so each resize is a restart; the updater
+      respects PodDisruptionBudgets, which is why they have to exist first.
+cases:
+  - company: Zalando
+    year: 2019
+    url: "https://github.com/zalando-incubator/kubernetes-on-aws/blob/dev/docs/postmortems/jan-2019-dns-outage.md"
+    summary: >
+      A downstream timeout made clients retry, the request spike became a spike of DNS queries, and the CoreDNS pods reached their memory limit of
+      100Mi and were OOM-killed at the same time. They kept being killed under the constant load, so the cluster had no DNS at all and the shop
+      showed high error rates for over an hour. The on-call engineer raised the requests and limits to 2000Mi by hand. Monitoring inside the
+      cluster failed with DNS and the page came late.
+    match: A limit set from historical usage, the same for every replica, so one spike killed all replicas together and kept killing them.
+reading:
+  - { title: "Kubernetes: Resource Management for Pods and Containers", url: "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/", why: "How requests and limits are enforced, and the worked example of a container that is terminated at its memory limit." }
+  - { title: "Zalando: January 2019 cluster DNS outage postmortem", url: "https://github.com/zalando-incubator/kubernetes-on-aws/blob/dev/docs/postmortems/jan-2019-dns-outage.md", why: "How a 100Mi limit on one shared component took a whole cluster down, with the contributing factors listed." }
+  - { title: "Kubernetes: Vertical Pod Autoscaling", url: "https://kubernetes.io/docs/concepts/workloads/autoscaling/vertical-pod-autoscale/", why: "The components, what a recommendation is based on and what each update mode does to running pods." }
+  - { title: "Robusta KRR", url: "https://github.com/robusta-dev/krr", why: "A recommender that needs nothing in the cluster, and how its defaults compare with the Vertical Pod Autoscaler." }

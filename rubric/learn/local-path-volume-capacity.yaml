@@ -1,0 +1,75 @@
+# What a report teaches when local-path volumes hold more than their claims say or their node's filesystem is nearly full. Every page below was
+# opened and read (2026-11-14); the k3s paths are from this repository's source notes (references/sources.md).
+topic: local-path-volume-capacity
+checks: [storage.local-path-over-capacity, storage.local-path-fs-near-full]
+mechanism: >
+  A volume of local-path-provisioner is a directory. When a claim is created, the provisioner makes a directory under its configured path on the
+  node where the pod runs (on k3s, under the storage directory of the k3s data directory) and creates a PersistentVolume that points at it, with a
+  node affinity for that host name. The size in the claim is not applied to anything: the project's README lists "no support for the volume
+  capacity limit" among its limits and says the capacity limit is ignored. A claim of 5Gi can therefore hold whatever the filesystem underneath
+  can hold.
+
+
+  So the real limit of every local-path volume on a node is the same one: the free space of the filesystem the directories live on, which on a
+  default installation is also the filesystem of the operating system, the container images, the logs and the cluster's own datastore. One volume
+  that grows takes space from all the others and from the node itself. The per-claim view does not help either: for these volumes the kubelet's
+  volume statistics are missing or describe the whole node disk, so alerts written for kubelet_volume_stats say nothing about a single claim.
+
+
+  The kubelet reacts to the filesystem, not to the volume. It treats the node's main filesystem as nodefs, and its default hard eviction threshold
+  is 10% available space (5% of inodes). Below it the node gets the DiskPressure condition; the kubelet first removes dead containers and unused
+  images, then evicts pods, ranked by how much disk they use. Eviction removes pods, not the data of a local-path
+  volume, which is only cleaned up when the volume is deleted, and the evicted pod can only come back to the same node because its volume is
+  there. What would be one full volume on network storage is a node failure here, and on a single-server k3s the datastore on the same filesystem
+  stops accepting writes with it.
+sources:
+  - { title: "local-path-provisioner README", url: "https://github.com/rancher/local-path-provisioner" }
+  - { title: "Kubernetes: Node-pressure Eviction", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/" }
+  - { title: "node_exporter: node-mixin alerts", url: "https://raw.githubusercontent.com/prometheus/node_exporter/master/docs/node-mixin/alerts/alerts.libsonnet" }
+detect:
+  - kind: alert
+    what: >
+      The free space of the node filesystem that holds the volumes, from node-exporter. The node mixin, which kube-prometheus-stack installs, has
+      two rules for it: NodeFilesystemAlmostOutOfSpace on the level and NodeFilesystemSpaceFillingUp on a linear prediction. This is the alert
+      that stands in for the per-volume alert local-path cannot have, so its threshold belongs above the kubelet's 10% eviction line.
+    example: |
+      - alert: LocalPathFilesystemLow
+        expr: node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"} < 0.25
+        for: 30m
+  - kind: metric
+    what: When the filesystem is full at the current trend, the number that turns a level into a deadline.
+    example: 'predict_linear(node_filesystem_avail_bytes{mountpoint="/"}[6h], 14 * 24 * 3600) < 0'
+  - kind: command
+    what: Which volume holds the space. No metric shows the size of a single local-path directory; it is measured on the node.
+    example: 'sudo du -sm /var/lib/rancher/k3s/storage/* | sort -rn | head'
+solutions:
+  - scale: [small]
+    approach: >
+      Keep local-path and manage the one real limit. Alert on the node filesystem, give the data that grows (search indexes, logs, backups) a
+      retention setting, and put the volumes on a disk of their own with the provisioner's nodePathMap, so that a volume that fills its disk no
+      longer fills the operating system's. Set the claim sizes to what the data really needs; they are documentation, and wrong documentation
+      misleads the next sizing decision.
+    tools: [local-path-provisioner, node-exporter]
+    tradeoff: >
+      A runaway volume now stops its neighbours on the data disk but not the node or the datastore. It costs a second disk per node, and the
+      sizes are still not enforced.
+    example: |
+      {
+        "nodePathMap": [
+          { "node": "DEFAULT_PATH_FOR_NON_LISTED_NODES", "paths": ["/data/local-path"] }
+        ]
+      }
+  - scale: [medium, large]
+    approach: >
+      Move the data that matters to storage where a volume is a device of its own rather than a directory. On a k3s cluster with several nodes that
+      is typically Longhorn, a distributed block storage system that keeps replicas of each volume on different nodes and can snapshot and back up
+      to NFS or S3; on a cloud it is the provider's CSI driver. Keep local-path for caches and scratch data.
+    tools: [Longhorn, "cloud CSI driver"]
+    tradeoff: >
+      A volume has its own size, and with replicas it survives the loss of a node, which a directory with a host-name affinity never does. Longhorn
+      is a storage system to run: every replica of a volume runs in its own container, so a volume with three replicas adds four containers.
+cases: []
+reading:
+  - { title: "local-path-provisioner README", url: "https://github.com/rancher/local-path-provisioner", why: "What the provisioner does and does not do, and the configuration that decides where volumes land on each node." }
+  - { title: "Kubernetes: Node-pressure Eviction", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/", why: "The thresholds, what the kubelet reclaims first and how it picks the pods to evict." }
+  - { title: "Longhorn: What is Longhorn?", url: "https://longhorn.io/docs/latest/what-is-longhorn/", why: "How replicated block volumes work and what running them adds to a cluster." }

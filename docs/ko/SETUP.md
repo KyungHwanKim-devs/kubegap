@@ -30,12 +30,15 @@ kubegap은 자격 증명을 따로 저장하지 않습니다. kubeconfig, AWS CL
 
 | 질문 | 묻는 때 | 선택지 |
 |---|---|---|
+| `scale` | 설정에 `scale`이 없고 이 클러스터에서 아직 답한 적이 없을 때 | 소형 · 중형 · 대형 |
 | `home-mode` | `~/.kubegap` 아래 폴더를 이 컴퓨터의 다른 사용자가 읽을 수 있을 때 (옛 kubegap이 만들었거나 직접 권한을 넓힌 경우) | 지금 고치기 (`kubegap protect-home`, chmod 700) · 그대로 두기 |
 | `tools` | 추가 도구가 설치되어 있지 않을 때 | 전부 설치 · 건너뛰기 · 도구 이름을 적어 그 도구만 설치 |
 | `ssm-document` | EKS에서 SSM 문서가 없거나 kubegap에 들어 있는 SSM 문서보다 오래됐을 때 | 올리기 · 건너뛰기 |
 | `node-ssh` | k3s, RKE2 또는 kubegap이 알아보지 못한 플랫폼이고, 설정 파일에 노드 접속(`ssh:` 블록이나 `node_access`)이 없을 때 | 지금 SSH 확인 · 건너뛰기. 응답하지 않는 노드가 있으면 호스트 키 받기 또는 다시 확인 · 응답한 노드만 쓰기 · 건너뛰기 · 노드별 주소 입력 |
 | `grafana-token` | Grafana를 찾았고 토큰이 없는데, 사이드카용 대시보드·데이터소스 ConfigMap이 하나도 없거나 Grafana가 세는 대시보드가 그 ConfigMap보다 많을 때 | 방법 보기 · 건너뛰기 |
 | `stores` | Prometheus, Alertmanager, Loki, Grafana 중 클러스터에 Service가 없는 것이 있을 때. 로그 수집기(fluent-bit, fluentd, promtail) 설정에 로그가 다른 곳으로 간다고 적혀 있으면 Loki는 묻지 않고, 리포트에 어디로 가는지 적습니다 | 설치 안 함 · 다음에 다시 묻기 · 주소 입력 |
+
+daily 점검은 앞의 둘(`scale`, `home-mode`)만 묻습니다. 노드를 읽지 않고 AWS API를 부르지 않고 추가 도구도 돌리지 않으므로, 나머지 질문은 첫 full 점검 때 묻습니다.
 
 답은 클러스터별로 `~/.kubegap/snapshots/<context>/answers.json`에 저장됩니다. 건너뛴 질문은 다시 묻지 않고, 무엇을 건너뛰었는지는 리포트에 적습니다. 전부 다시 고르려면 `/kubegap setup`을 실행하세요.
 
@@ -52,7 +55,7 @@ scripts/kubegap answer --context <name> --forget     # 이 클러스터의 답�
 
 디스크, inode, 커널 로그, kubelet 설정, 컨테이너 런타임은 Kubernetes API로 볼 수 없습니다. 그래서 kubegap은 노드에서 정해 둔 읽기 명령만 실행해서 이 정보를 읽습니다. 명령 목록은 [`deploy/node-access/COMMANDS.md`](../../deploy/node-access/COMMANDS.md)에 있습니다.
 
-kubegap을 쓰면서 내 컴퓨터 바깥에 무언가를 준비해야 할 수 있는 곳은 여기뿐입니다. full 점검은 노드 점검 항목을 판정할 때 노드에 접속합니다. daily 점검은 Prometheus가 수집하지 않고 API 서버 프록시로도 닿지 않는 컴포넌트의 `/metrics`를 읽을 때만 접속합니다.
+kubegap을 쓰면서 내 컴퓨터 바깥에 무언가를 준비해야 할 수 있는 곳은 여기뿐입니다. 노드에 접속하는 것은 full 점검뿐입니다. daily 점검은 접속이 준비돼 있어도 노드에 접속하지 않습니다.
 
 **EKS.** SSM으로 노드를 읽습니다. 실행할 명령은 SSM 문서 [`deploy/permissions/ssm-document.yaml`](../../deploy/permissions/ssm-document.yaml) 하나에 고정되어 있고, 이 SSM 문서가 AWS 계정에 있어야 합니다. 첫 실행에서 올릴지 묻습니다. 올릴 때는 지금 쓰는 자격 증명으로 한 번 호출하고, `ssm:CreateDocument`, `ssm:UpdateDocument`, `ssm:UpdateDocumentDefaultVersion`, `ssm:ListDocumentVersions` 권한이 필요합니다. 점검 자체에는 이 권한이 필요 없습니다. 노드 IAM 역할에는 `AmazonSSMManagedInstanceCore`가 있어야 합니다. EKS 최적화 AMI에서는 SSM 에이전트가 이미 돌고 있습니다.
 
@@ -83,13 +86,13 @@ kubegap은 helm, krr, polaris, pluto, kubent를 `PATH`에서 찾습니다. EKS�
 <!-- tools-table:begin -->
 | 도구 | 하는 일 | 쓰는 점검 항목 | 모드 | 설치 방법과 위치 | 없으면 |
 |---|---|---|---|---|---|
-| aws | EKS, EC2, SSM, CloudWatch 조회(EKS 프로필에서만) | eks.* (11), ecr.* (8), cost.idle-compute-high, cost.request-waste, cost.on-demand-in-spot-pool, cost.unused-eip, cost.idle-load-balancer, cost.idle-node, controlplane.scheduler-unschedulable, controlplane.webhook-call-failures, controlplane.controller-error-repeat, controlplane.apiserver-slow-traces, controlplane.authenticator-failures, controlplane.etcd-slow, node.* (26, full mode) | daily, full(ECR·컨트롤플레인 로그·노드·가격과 비용 데이터는 full에서만) | Homebrew `awscli` → 실패하면 고정 버전 2.39.3을 awscli.amazonaws.com에서 받아 sha256 + OpenPGP 서명 확인 뒤 `.tools/bin/`, linux만 | EKS·ECR·비용 항목은 수집되지 않고, 컨트롤플레인 로그 항목과 노드 항목은 리포트에 그렇게 적힙니다 |
+| aws | EKS, EC2, SSM, CloudWatch 조회(EKS에서만) | eks.* (11), ecr.* (8), cost.idle-compute-high, cost.request-waste, cost.on-demand-in-spot-pool, cost.unused-eip, cost.idle-load-balancer, cost.idle-node, controlplane.scheduler-unschedulable, controlplane.webhook-call-failures, controlplane.controller-error-repeat, controlplane.apiserver-slow-traces, controlplane.authenticator-failures, controlplane.etcd-slow, node.* (26, full mode) | full. daily 점검은 AWS API를 부르지 않습니다. EKS에서는 kubectl이 로그인하려고 `aws eks get-token`을 실행합니다 | Homebrew `awscli` → 실패하면 고정 버전 2.39.3을 awscli.amazonaws.com에서 받아 sha256 + OpenPGP 서명 확인 뒤 `.tools/bin/`, linux만 | EKS·ECR·비용 항목은 수집되지 않고, 컨트롤플레인 로그 항목과 노드 항목은 리포트에 그렇게 적힙니다 |
 | helm | Helm 릴리스 상태와 나이(Helm이 Secret에 두는 릴리스 기록을 읽음) | hygiene.helm-release-not-deployed, hygiene.helm-release-stale | full | Homebrew `helm` → 실패하면 고정 버전 v4.3.1을 get.helm.sh에서 받아 sha256 확인 뒤 `.tools/bin/` | 그 항목은 '도구 없음'으로 적힙니다 |
 | krr | 리소스 requests 추천(Robusta KRR, Prometheus 기반) | resources.krr-recommendation | full | `.tools/krr-venv/` 전용 Python virtualenv, `deploy/krr-requirements.txt`(파일마다 sha256) → 실패하면 Homebrew `robusta-dev/krr/krr` (서드파티 tap) | 그 항목은 '도구 없음'으로 적힙니다 |
 | polaris | 매니페스트 정적 점검과 가벼운 보안 점검 | hygiene.polaris-reliability-danger, security.polaris-security-danger | full | 고정 버전 v10.2.6을 FairwindsOps/polaris에서 받아 sha256 확인 뒤 `.tools/bin/` → 실패하면 Homebrew `FairwindsOps/tap/polaris` (서드파티 tap) | 그 항목은 '도구 없음'으로 적힙니다 |
 | pluto | 지원이 끝난 API 탐지 | hygiene.deprecated-api | full | 고정 버전 v5.24.5을 FairwindsOps/pluto에서 받아 sha256 확인 뒤 `.tools/bin/` → 실패하면 Homebrew `FairwindsOps/tap/pluto` (서드파티 tap) | 그 항목은 입력을 읽지 못해 건너뜁니다(통과로 세지 않음) |
 | kubent | 지원이 끝난 API 탐지(Pluto 보완) | hygiene.deprecated-api | full | Homebrew `kubent` → 실패하면 고정 버전 0.7.3을 doitintl/kube-no-trouble에서 받아 sha256 확인 뒤 `.tools/bin/` | 그 항목은 입력을 읽지 못해 건너뜁니다(통과로 세지 않음) |
-| ssh | 작은 k3s 클러스터의 노드 접근(k3s 프로필) | node.* (26, full mode) | full | kubegap이 설치하지 않습니다. macOS와 대부분의 Linux에 기본으로 있고, 슬림 컨테이너 이미지에는 없을 수 있습니다(배포판 패키지 openssh-client) | 노드 항목은 '노드 접근 없음'으로 적힙니다 |
+| ssh | k3s와 RKE2의 노드 접근 | node.* (26, full mode) | full | kubegap이 설치하지 않습니다. macOS와 대부분의 Linux에 기본으로 있고, 슬림 컨테이너 이미지에는 없을 수 있습니다(배포판 패키지 openssh-client) | 노드 항목은 '노드 접근 없음'으로 적힙니다 |
 <!-- tools-table:end -->
 
 설치는 이렇게 합니다.
@@ -140,15 +143,14 @@ scripts/kubegap config set prometheus_url http://prometheus.example.internal:909
 | 키 | 쓰임 |
 |---|---|
 | `mode: full` | full 점검을 기본값으로 합니다 |
-| `profile`, `namespace_profiles` | kubegap이 클러스터나 네임스페이스에 적용하는 기준을 바꿉니다 |
+| `scale`, `dev_namespaces` | `scale`(small·medium·large)은 질문 없이 운영 규모를 정하고, `dev_namespaces`는 운영이 아닌 네임스페이스를 지정합니다 |
 | `suppress`, `overrides` | 점검 항목을 끄거나 기준값을 바꿉니다 |
 | `retention`, `snapshots_root` | 모은 데이터를 얼마나 남길지, 어디에 둘지 정합니다 |
-| `keep_component_logs` | 컴포넌트 파드 로그의 원본을 남깁니다. 어떤 뜻인지는 [DATA.md](DATA.md#읽는-것)에 있습니다 |
 | `apiserver_job` | apiserver를 수집하는 job 이름을 지정합니다 |
 
 ## 모은 데이터
 
-점검할 때마다 `~/.kubegap/snapshots/<context>/<timestamp>/` 폴더가 하나 생깁니다. 이 폴더를 스냅샷이라고 부릅니다. 스냅샷에는 모은 파일과 리포트 파일 두 개가 들어 있고, kubegap은 같은 모드의 지난 점검과 이 데이터를 비교합니다. 폴더와 파일은 내 사용자만 읽을 수 있게 만듭니다. full 스냅샷 하나는 40 MB쯤 됩니다.
+점검할 때마다 `~/.kubegap/snapshots/<context>/<timestamp>/` 폴더가 하나 생깁니다. 이 폴더를 스냅샷이라고 부릅니다. 스냅샷에는 모은 파일과 리포트(`report.md`, full 점검이면 `report-details.md`도)가 들어 있고, kubegap은 같은 모드의 지난 점검과 이 데이터를 비교합니다. 폴더와 파일은 내 사용자만 읽을 수 있게 만듭니다. full 스냅샷 하나는 40 MB쯤, daily 스냅샷 하나는 20 MB쯤 됩니다.
 
 ```bash
 scripts/kubegap prune --context <name> --keep-daily 14 --keep-full 4 --dry-run
@@ -162,10 +164,10 @@ scripts/kubegap prune --context <name> --keep-daily 14 --keep-full 4 --dry-run
 
 ```yaml
 # ~/.kubegap/config.yaml
-mode: daily          # 노드 스크립트, CloudWatch 로그, 비용 데이터, 외부 도구를 쓰지 않습니다
+mode: daily          # 노드 접속, AWS API 호출, 추가 도구가 없고, 애플리케이션의 command·args·환경 변수 값·ConfigMap 키를 남기지 않습니다
 node_access: none    # SSM send-command, SSH를 쓰지 않습니다
 install_tools: never # 이 컴퓨터에 아무것도 설치하지 않습니다
-# grafana_api_token 없음: Grafana 데이터소스와 대시보드 목록을 읽지 않습니다
+# grafana_api_token 없음: Grafana 화면에서 직접 만든 대시보드는 목록에 없습니다(ConfigMap으로 넣은 것은 읽습니다)
 ```
 
 kubeconfig에는 전용 사용자를 만들어 kubegap에 들어 있는 ClusterRole [`deploy/permissions/clusterrole.yaml`](../../deploy/permissions/clusterrole.yaml)에 묶으세요. 이 역할은 `get`과 `list`만 허용하고 Secret은 제외합니다.
@@ -186,7 +188,8 @@ scripts/kubegap iam-policy --context <name>                         # 노드 읽
 - 노드 스크립트와 kubelet 설정을 읽는 `node.*` 점검 항목 26개. Prometheus의 노드 메트릭을 읽는 10개는 그대로 돌아갑니다.
 - Helm 점검 항목 2개: `hygiene.helm-release-not-deployed`, `hygiene.helm-release-stale`
 - EKS의 컨트롤플레인 로그 점검 항목 6개: `controlplane.scheduler-unschedulable`, `webhook-call-failures`, `controller-error-repeat`, `apiserver-slow-traces`, `authenticator-failures`, `etcd-slow`
-- 비용 데이터, ECR, 서비스 쿼터, EBS 메트릭을 읽는 점검 항목
+- AWS 계정을 읽는 점검 항목 전부. 비용, ECR, 서비스 쿼터, EBS, 로드밸런서 설정과 메트릭, 백업 정책이 여기에 들어갑니다. daily 점검은 AWS API를 부르지 않으므로 IAM 정책이 아예 필요 없습니다
+- 애플리케이션 설정을 읽는 점검 항목. 데이터베이스에 백업 작업이 있는지, ConfigMap에 적힌 비밀 값, 메모리 제한보다 큰 JVM 힙이 여기에 들어갑니다
 - krr, polaris, pluto, kubent의 결과
 - Prometheus가 수집하지 않는 컴포넌트의 `/metrics`를 노드에서 읽는 것. API 서버 프록시까지 막혀 있으면 그 컴포넌트의 `*.metrics-unreadable` 점검 항목이 warn을 냅니다.
 

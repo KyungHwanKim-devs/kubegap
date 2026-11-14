@@ -1,6 +1,6 @@
 """Read config.yaml. The file is optional; without it we run with an empty config.
 
-Known keys: context, profile, confirm_context (bool, default true), install_tools (ask|always|never, default ask), aws_profile, aws_region, prometheus_url, loki_url, alertmanager_url, grafana_url, apiserver_job (the job label of the apiserver scrape; detected when unset),
+Known keys: context, scale (small|medium|large; overrides the first-run answer), dev_namespaces[], confirm_context (bool, default true), install_tools (ask|always|never, default ask), aws_profile, aws_region, prometheus_url, loki_url, alertmanager_url, grafana_url, apiserver_job (the job label of the apiserver scrape; detected when unset),
 node_access(ssm|ssh|none), ssh(user, key, port, hosts, prefer_hostname, accept_new_hosts), ssm_document (ask|always|never, default ask), keep_component_logs (bool, default false), retention(keep_daily, keep_full), suppress[], overrides{}.
 """
 
@@ -13,7 +13,7 @@ from . import yamlite
 
 KNOWN_KEYS = {
     "context",
-    "profile",
+    "scale",
     "aws_profile",
     "aws_region",
     "prometheus_url",
@@ -24,7 +24,7 @@ KNOWN_KEYS = {
     "ssh",
     "suppress",
     "overrides",
-    "namespace_profiles",
+    "dev_namespaces",
     "language",
     "mode",
     "confirm_context",
@@ -33,7 +33,6 @@ KNOWN_KEYS = {
     "apiserver_job",
     "snapshots_root",
     "ssm_document",
-    "keep_component_logs",
     "retention",
     "components",
 }
@@ -57,11 +56,6 @@ class Config(dict):
         """Whether `kubegap setup` may upload the kubegap-node-read SSM document to the account: ask (default; the agent asks once), always, never."""
         v = str(self.get("ssm_document", "ask")).lower()
         return v if v in INSTALL_POLICIES else "ask"
-
-    @property
-    def keep_component_logs(self) -> bool:
-        """false (default): summarize deletes logs/pods/ after the logs section is built, so the agent cannot read raw component logs. true keeps them (they may then reach the model API)."""
-        return bool(self.get("keep_component_logs", False))
 
     @property
     def confirm_context(self) -> bool:
