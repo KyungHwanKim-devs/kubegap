@@ -96,7 +96,7 @@ def run_aws_step(st: dict, sid: str, name: str, eks: dict, cfg: Config, snap: Pa
         if not r.ok and st.get("tolerate_errors") and "NotFound" in ((r.stderr or "") + (r.error or "")):
             return item or sid, {"ok": True, "out": None, "error": None, "note": "none (NotFound — normal response)"}, None  # ecr get-lifecycle-policy's LifecyclePolicyNotFoundException means "no policy", not a failure
         rec = {"ok": r.ok, "out": str(out.relative_to(snap)) if r.ok else None, "error": None if r.ok else (r.error or r.stderr.strip()[-200:])}
-        if r.ok and _aws.more_to_read(r.stdout):
+        if r.ok and not st.get("first_only") and _aws.more_to_read(r.stdout):
             rec["at_limit"] = True  # the response carries a token for the next page: the list in the file is not all there is
         line = None if (st.get("tolerate_errors") and not r.ok) else f"    {'saved ' + str(out.relative_to(snap)) if r.ok else 'failed' + (f' ({item})' if item else '') + ': ' + str(rec['error'])[:120]}"
         return item or sid, rec, line

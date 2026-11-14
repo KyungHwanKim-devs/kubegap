@@ -55,3 +55,14 @@ def test_the_limits_section_names_the_steps_that_stopped_at_a_limit(tmp_path):
     assert "실제보다 적을 수 있고" in text
     (tmp_path / "summary.json").write_text(json.dumps({"collection": {"at_limit": {}}}))
     assert "자체 제한" not in sections.limits({}, tmp_path, "ko")
+
+
+def test_a_step_that_takes_the_first_item_on_purpose_is_not_at_a_limit(tmp_path, monkeypatch):
+    """`pricing get-products --max-results 1` returns one product and a token for the rest: that is the request, not a list that was cut."""
+    from lib.collection.collect import cloud_steps
+
+    monkeypatch.setattr(cloud_steps._aws, "aws", lambda args, **kw: shell.Result(cmd=["aws"], code=0, stdout=json.dumps({"PriceList": ["x"], "NextToken": "t"})))
+    eks = {"name": "c", "region": "ap-northeast-2"}
+    step = {"id": "pricing", "type": "aws", "args": ["pricing", "get-products", "--max-results", "1"], "out": "aws/pricing.json"}
+    assert cloud_steps.run_aws_step(step, "pricing", "eks-platform", eks, Config(), tmp_path, RunLog(None), 10, None)["at_limit"] == ["pricing"]
+    assert cloud_steps.run_aws_step({**step, "first_only": True}, "pricing", "eks-platform", eks, Config(), tmp_path, RunLog(None), 10, None)["at_limit"] == []
