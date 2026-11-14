@@ -77,12 +77,51 @@ TEXT = {
         "unseen_secrets": "Secret 값은 어느 점검에서도 읽지 않습니다.",
         "unseen_at_limit": "수집이 자체 제한에 걸려 일부만 읽은 것이 있습니다: {names}. 여기에서 센 숫자는 실제보다 적을 수 있습니다.",
         "unseen_checks": "그래서 점검 항목 {total}개 가운데 {unseen}개는 이번에 보지 못했습니다. 노드 안쪽, 비용, 없어질 API 같은 항목이고, 문제로도 통과로도 세지 않았습니다.",
-        "unseen_serious": "특히 아래와 같은 문제는 심각할 수 있는데도 노드 안쪽이나 클라우드 계정을 읽어야 보여서 daily 점검으로는 알 수 없습니다. 이 리포트에 없다고 해서 문제가 없다는 뜻이 아닙니다.",
+        "unseen_serious": "특히 아래와 같은 문제는 심각할 수 있는데도 노드 안쪽이나 클라우드 계정, 애플리케이션 설정을 읽어야 보여서 daily 점검으로는 알 수 없습니다. 이 리포트에 없다고 해서 문제가 없다는 뜻이 아닙니다.",
         "unseen_full": "이것들을 확인하고, 원인을 원본까지 열어 따지고, 문제마다 원리와 점검 방법과 규모별 해결 방안을 길게 설명하는 것은 `/kubegap full`입니다.",
         "first_unseen": "daily 점검이 볼 수 없는 심각한 문제가 {n}가지 있습니다. 목록은 맨 아래에 있고, 확인하려면 `/kubegap full`을 돌립니다.",
         "ids": "점검 항목 id (`/kubegap explain <id>`)",
         "tail": "kubegap {version}, rubric {rubric} · 스냅샷 `{snap}`",
-    }
+    },
+    "en": {
+        "title": "# {cluster} — daily audit, {when}",
+        "verdict": "Broken now: {broken} · Happened since the last audit: {happened} · Matter most now: {top}",
+        "first_broken": "Broken now",
+        "first_happened": "Happened since the last audit",
+        "first_top": "What matters most now",
+        "first_scale": "Scale",
+        "none": "nothing",
+        "broken": "Broken now",
+        "happened": "What happened since the last audit",
+        "happened_none": "Nothing new was found to have happened.",
+        "top": "What matters most now",
+        "top_none": "No problem of high severity was found.",
+        "what": "What it is",
+        "why": "Why it matters",
+        "do": "What to do",
+        "read": "Further reading",
+        "since_new": "It appeared in this audit for the first time.",
+        "since_old": "It has stood since the audit of {when}. This is audit number {n} to see it.",
+        "ongoing": "It is still going on.",
+        "ended": "It is over now.",
+        "rest": "What else is open",
+        "since": "What changed since the last audit",
+        "period": "Compared with the audit of {start}.",
+        "no_previous": "This is the first daily audit of this cluster, so there is no earlier one to compare with. What is listed happened within the period this audit collected.",
+        "appeared": "Appeared",
+        "gone": "Went away",
+        "objects": "{added} objects were added, {removed} were removed and {changed} changed.",
+        "unseen": "What this audit did not look at",
+        "unseen_intro": "A daily audit is the light one. It read the Kubernetes API and the metric and log stores only.",
+        "unseen_secrets": "Secret values are not read by any audit.",
+        "unseen_at_limit": "The collection stopped at one of its own limits and read only part of: {names}. A number counted from these may be lower than the real one.",
+        "unseen_checks": "So {unseen} of the {total} checks were not looked at this time: the inside of the nodes, cost, APIs about to be removed and the like. They are counted neither as a problem nor as a pass.",
+        "unseen_serious": "In particular, the problems below can be serious and still cannot be seen by a daily audit, because they show only in the inside of a node, in the cloud account or in how applications are configured. That they are not in this report does not mean they are not there.",
+        "unseen_full": "To check these, to follow a cause down to the raw material, and to have each problem explained with its principle, how to watch it and how it is solved at each scale, run `/kubegap full`.",
+        "first_unseen": "There are {n} kinds of serious problem a daily audit cannot see. They are listed at the end; to check them, run `/kubegap full`.",
+        "ids": "Check ids (`/kubegap explain <id>`)",
+        "tail": "kubegap {version}, rubric {rubric} · snapshot `{snap}`",
+    },
 }
 
 
@@ -327,6 +366,8 @@ def unseen_phrases(snap: Path, language: str) -> list[str]:
     """The serious things this daily run could not find, in the reader's words, without repeats."""
     inv = load_json(snap / "inventory.json") or {}
     checks = serious_full_only((inv.get("cluster") or {}).get("platform"), inv.get("collectors_enabled"))
+    if language not in UNSEEN:  # the check's own name is its English phrase; the Korean ones are written out above
+        return list(dict.fromkeys(str(c["name"]) for c in checks))
     return list(dict.fromkeys(UNSEEN[language][c["id"]] for c in checks if c["id"] in UNSEEN[language]))
 
 

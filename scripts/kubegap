@@ -173,14 +173,22 @@ def cmd_iam_policy(args) -> int:
     info = kube.context_info(ctx, args.kubeconfig)
     e = info.get("eks") or {}
     if not info.get("is_eks") or not e.get("account") or not e.get("name"):
-        print(f"kubegap iam-policy: context {ctx!r} does not name an EKS cluster with its account (the kubeconfig cluster name is not an EKS ARN). Fill <ACCOUNT_ID> and <CLUSTER_NAME> in deploy/permissions/iam-policy.json by hand.", file=sys.stderr)
+        print(
+            f"kubegap iam-policy: context {ctx!r} does not name an EKS cluster with its account (the kubeconfig cluster name is not an EKS ARN). Fill <ACCOUNT_ID> and <CLUSTER_NAME> in deploy/permissions/iam-policy.json by hand.",
+            file=sys.stderr,
+        )
         return EXIT_ERROR
     text = (ROOT / "deploy" / "permissions" / "iam-policy.json").read_text(encoding="utf-8")
     policy = json.loads(text.replace("<ACCOUNT_ID>", e["account"]).replace("<CLUSTER_NAME>", e["name"]))
     if args.without_node_access:
         policy["Statement"] = [s for s in policy["Statement"] if "ssm:SendCommand" not in ([s["Action"]] if isinstance(s["Action"], str) else s["Action"])]
     print(json.dumps(policy, indent=2))
-    print(f"kubegap iam-policy: filled for account {e['account']}, cluster {e['name']}" + (", without the two ssm:SendCommand statements (node checks are skipped)" if args.without_node_access else "") + ". Nothing was sent to AWS; attach it yourself.", file=sys.stderr)
+    print(
+        f"kubegap iam-policy: filled for account {e['account']}, cluster {e['name']}"
+        + (", without the two ssm:SendCommand statements (node checks are skipped)" if args.without_node_access else "")
+        + ". Nothing was sent to AWS; attach it yourself.",
+        file=sys.stderr,
+    )
     return EXIT_OK
 
 
@@ -289,7 +297,10 @@ def cmd_collect(args) -> int:
             print(f"error: a collection is already in progress for this context: {other} (run.log updated {int(_time.time() - rl.stat().st_mtime)} s ago). Wait for it to finish or override with --force.")
             return EXIT_ERROR
     snap = _new_snapshot(args, ctx)
-    write_private(snap / "INCOMPLETE", "progress: discovering the cluster, no collector started yet\nIf this file remains, the snapshot was interrupted. An interrupted folder was once picked up as the diff baseline, so the marker keeps it out of latest and previous.\n")
+    write_private(
+        snap / "INCOMPLETE",
+        "progress: discovering the cluster, no collector started yet\nIf this file remains, the snapshot was interrupted. An interrupted folder was once picked up as the diff baseline, so the marker keeps it out of latest and previous.\n",
+    )
     log = RunLog(snap / "run.log", echo=args.verbose)
     log.meta(kubegap=__version__, context=ctx, command="collect", args={k: v for k, v in vars(args).items() if k != "func"})  # the handler object printed as `<function … at 0x…>`, a memory address in run.log
     print(f"context {ctx} -> {snap}\n== discover")
@@ -371,7 +382,10 @@ def cmd_diff(args) -> int:
     else:
         a = paths.previous_snapshot(b)
         if a is not None and schema_of(a) != paths.SCHEMA_VERSION:
-            print(f"kubegap diff: the earlier {paths.snapshot_mode(b)} snapshot {a.name} has format version {schema_of(a)}, this kubegap reads version {paths.SCHEMA_VERSION}: not compared (the next run will be). Only history.csv is updated.", file=sys.stderr)
+            print(
+                f"kubegap diff: the earlier {paths.snapshot_mode(b)} snapshot {a.name} has format version {schema_of(a)}, this kubegap reads version {paths.SCHEMA_VERSION}: not compared (the next run will be). Only history.csv is updated.",
+                file=sys.stderr,
+            )
             a = None
         if a is None:
             print(f"kubegap diff: no earlier {paths.snapshot_mode(b)} snapshot to compare {b.name} with (daily compares with daily, full with full). Only history.csv is updated.", file=sys.stderr)
@@ -451,9 +465,6 @@ def cmd_assemble(args) -> int:
 
     snap = _resolve_snapshot_arg(args, args.snapshot)
     mode = paths.snapshot_mode(snap)
-    if args.language != "ko":
-        print(f"kubegap assemble: the {args.language} report is not written yet; the Korean report is settled first and the English one follows", file=sys.stderr)
-        return EXIT_ERROR
     if mode == "daily":
         path = snap / "report" / "daily.json"
         if not path.is_file():
@@ -545,13 +556,15 @@ def cmd_checks(args) -> int:
         for a in areas:
             print(f"\n## {a}\n\n| id | What it checks | Severity | Runs on | Collector | Public cases | Known issues |\n|---|---|---|---|---|---|---|")
             for c in sorted(by_area[a], key=lambda c: c["id"]):
+
                 def cite(x):
                     i = library["cases"].get(x["url"].rstrip("/")) if library else None
                     return f"[{x['who']}]({x['url']})" + (f" · [{i}]({library['base']}/{i})" if i else "")
+
                 cases = ", ".join(cite(x) for x in c.get("cases") or [])
                 issues = ", ".join(f"[#{k['issue']}](https://github.com/KyungHwanKim-devs/kubegap/issues/{k['issue']})" for k in known.get(c["id"]) or [])
-                sev = c['severity_default']
-                sev = ' / '.join(sev[k] for k in _rubric.SCALES) if isinstance(sev, dict) else sev
+                sev = c["severity_default"]
+                sev = " / ".join(sev[k] for k in _rubric.SCALES) if isinstance(sev, dict) else sev
                 print(f"| `{c['id']}` | {c['name']} | {sev} | {', '.join((c.get('platforms') or []) + (c.get('scales') or []))} | {c['collector']} | {cases} | {issues} |")
         return EXIT_OK
     for a in areas:

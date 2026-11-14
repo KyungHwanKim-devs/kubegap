@@ -151,3 +151,14 @@ def test_a_number_nobody_can_check_is_not_accepted(tmp_path):
     top = _facts()["top"]
     made_up = {**top[0], "facts": [{"what": "x", "value": 7, "derived": True, "source_file": "summary.json", "json_path": "backup.cronjobs"}]}
     assert any("`derived` is not accepted in a daily report" in e for e in daily.check(_facts(top=[made_up, top[1]]), snap))
+
+
+def test_an_english_daily_report_is_assembled(tmp_path):
+    snap = _snap(tmp_path)
+    (snap / "MODE").write_text("daily\n")
+    text = daily.assemble(snap, _facts(), "en", "0.1.93", "0.2.0")
+    assert "— daily audit," in text and "## What matters most now" in text and "**What to do.**" in text
+    section = text.split("## What this audit did not look at")[1]
+    assert "- It contacted no node." in section and "- Secret values are not read by any audit." in section and "run `/kubegap full`" in section
+    # the serious things it cannot see are named by the checks' own English names
+    assert any(f"- {c['name']}" in section for c in daily.serious_full_only("k3s", None))

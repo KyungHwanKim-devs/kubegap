@@ -220,3 +220,27 @@ def test_the_report_is_assembled_with_one_source_for_every_title(tmp_path):
     assert "| 2026-11-20 | 인증서를 갱신합니다. | summary.json |" in text and "| 비용 | 이번 점검에서 문제를 찾지 못했습니다. |" in text
     assert "- 인그레스 요청 메트릭이 없습니다.\n  - 약해지는 결론: 사용자가 받은 오류 수를 모릅니다." in text
     assert "- 백업이 클러스터 밖에 없음: `resilience.no-backup.cluster`" in text and "- 알림 2건이 전달되지 않음: `observability.alertmanager-notification-failed.slack`, `traffic.pod-not-ready.*`" in text
+
+
+def test_an_english_report_is_assembled_from_english_files(tmp_path):
+    """The headings the English guide tells the agent to write (references/full-en.md) are the ones the code looks for."""
+    from lib.output import parts
+
+    h = parts.HEADINGS["en"]
+    snap = _snap(tmp_path)
+    o = _outline(area_summary=dict.fromkeys(F.AREAS, "This audit found no problem here."))
+    o["happened"][0]["title"], o["problems"][0]["title"], o["problems"][1]["title"] = "Two alerts were not delivered", "Backups never leave the cluster", "Every replica is on one node"
+    happened = "\n\n".join(f"### {i['title']}\n\nIt happened." for i in o["happened"])
+    sections = "\n\n".join(f"### {name}\n\nText." for name in h["sections"])
+    _write(
+        snap,
+        o,
+        overview=f"## {h['happened']}\n\n{happened}\n\n## {h['next']}\n\nNo critical or high problem remains outside the five.\n",
+        problems=[f"## {n}. {p['title']}\n\n**Why this one.** A reason.\n\n{sections}\n" for n, p in enumerate(o["problems"], 1)],
+    )
+    assert report.problems_with(snap, "en") == []
+    text = report.assemble(snap, "en", "0.1.93", "0.2.0")
+    assert "The 2 largest problems: ① Backups never leave the cluster ② Every replica is on one node" in text
+    guide = (Path(__file__).resolve().parent.parent / "references" / "full-en.md").read_text(encoding="utf-8")
+    for name in (*h["sections"], h["broken"], h["happened"], h["next"], h["since"]):
+        assert f"## {name}\n" in guide or f"### {name}\n" in guide, name
