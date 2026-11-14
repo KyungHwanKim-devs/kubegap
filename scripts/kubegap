@@ -356,7 +356,7 @@ def cmd_evaluate(args) -> int:
     _evaluate.evaluate(snap, cfg, scale_answer=_firstrun.scale_decision(snap.parent), tools_present=tools_present)
     from lib.output import diff as _diff
 
-    paths.ensure_private_dir(snap / "llm", base=snap)  # where the analysis writes facts.json next: made here, private like the rest of the snapshot
+    paths.ensure_private_dir(snap / "report", base=snap)  # where the agent writes the outline and its sections next: made here, private like the rest of the snapshot
     _diff.append_history(snap)  # the row is written as soon as the verdicts exist: a run that stops before `diff` used to leave no line in history.csv
     return EXIT_OK
 
@@ -377,7 +377,6 @@ def cmd_diff(args) -> int:
             print(f"kubegap diff: no earlier {paths.snapshot_mode(b)} snapshot to compare {b.name} with (daily compares with daily, full with full). Only history.csv is updated.", file=sys.stderr)
             hp = _diff.append_history(b)
             print(f"history: {hp}" if hp else "history: not recorded (findings-draft.json or inventory.json missing)")
-            _slim_daily(b)
             return EXIT_OK
     if a == b:
         print("kubegap diff: A and B are the same snapshot.", file=sys.stderr)
@@ -386,28 +385,17 @@ def cmd_diff(args) -> int:
     _diff.print_summary(d)
     hp = _diff.append_history(b)
     print(f"saved: {b / 'diff.json'}" + (f", history: {hp}" if hp else ", history: not recorded (findings-draft.json missing)"))
-    if not args.snapshot_a:  # the run's own comparison, not a look back at two old snapshots
-        _slim_daily(b)
     return EXIT_OK
 
 
-def _slim_daily(snap) -> None:
-    """A daily run keeps no raw objects, events or logs once it is judged and compared (lib/output/slim.py)."""
-    from lib.output import slim as _slim
-
-    gone = _slim.slim(snap)
-    if gone:
-        print(f"daily: raw material deleted ({', '.join(gone)}); the summary, the findings and objects-digest.json stay")
-
-
 def cmd_render_details(args) -> int:
-    """Assemble report-details.md from the snapshot files and the `analysis` block of <snapshot>/llm/facts.json (see lib/output/render.py)."""
+    """Assemble report-details.md from the snapshot files and the `analysis` block of <snapshot>/report/outline.json (see lib/output/render.py)."""
     from lib.output import render as _render
 
     snap = _resolve_snapshot_arg(args, args.snapshot)
     p = _render.render_details(snap, language=args.language)
     missing = _render.empty_analysis_fields(snap, paths.snapshot_mode(snap))
-    print(f"saved: {p}" + (f" (analysis fields left empty in llm/facts.json: {', '.join(missing)})" if missing else " (every analysis field present)"))
+    print(f"saved: {p}" + (f" (analysis fields left empty in report/outline.json: {', '.join(missing)})" if missing else " (every analysis field present)"))
     return EXIT_OK
 
 
@@ -452,28 +440,41 @@ def _skipped_questions(args, snap: Path, language: str) -> list[dict]:
     return _firstrun.skipped(setup, load_config(args.config), snap.parent, language=language)
 
 
-def cmd_write_report(args) -> int:
-    """Write report.md from llm/facts.json with separate agents (lib/output/writer.py). Takes minutes; run it in the background and read its progress lines."""
-    from lib.output import writer as _writer
+def cmd_assemble(args) -> int:
+    """Put report.md together from what the agent wrote under <snapshot>/report/ (lib/output/report.py for a full run, lib/output/daily.py for
+    a daily one). First it names everything that is wrong with those files; while there is something, no report is written. It starts no
+    agent."""
+    import json as _json
+
+    from lib.output import daily as _daily
+    from lib.output import report as _report
 
     snap = _resolve_snapshot_arg(args, args.snapshot)
-    host = None if args.host == "auto" else args.host
-    host = host or _writer.detect_host()
-    if paths.snapshot_mode(snap) == "daily":
-        host = host or "none"  # a daily report is assembled by code from the facts; no agent is started
-    if not host:
-        print("kubegap write-report: neither claude nor codex can be started here. Do the steps in this session, each from a clean start: references/check-solutions-<language>.md on the solutions of the facts, references/write-overview-<language>.md and references/write-problem-<language>.md (once per problem) to write, references/check-facts-<language>.md to check the text, references/replace-<language>.md to replace what it named.", file=sys.stderr)
+    mode = paths.snapshot_mode(snap)
+    if args.language != "ko":
+        print(f"kubegap assemble: the {args.language} report is not written yet; the Korean report is settled first and the English one follows", file=sys.stderr)
         return EXIT_ERROR
-    try:
-        skipped = _skipped_questions(args, snap, args.language)
-        p = _writer.write_report(snap, args.language, host, paths.rubric_version(), __version__, skipped=skipped, say=lambda m: print(m, flush=True))
-    except _writer.WriterError as e:
-        print(f"kubegap write-report: {e}", file=sys.stderr)
-        return EXIT_ERROR
-    if paths.snapshot_mode(snap) == "daily":
-        print(f"saved: {p}")
+    if mode == "daily":
+        path = snap / "report" / "daily.json"
+        if not path.is_file():
+            print(f"kubegap assemble: {path} does not exist. Write it first (references/daily-{args.language}.md)", file=sys.stderr)
+            return EXIT_ERROR
+        try:
+            facts = _json.loads(path.read_text(encoding="utf-8"))
+        except ValueError as e:
+            print(f"kubegap assemble: {path} is not JSON: {e}", file=sys.stderr)
+            return EXIT_ERROR
+        issues = _daily.check(facts, snap, args.language)
     else:
-        print(f"saved: {p} (written with {host}; every agent's text is in llm/writing/, the facts as the analysis wrote them in llm/facts-analysis.json)")
+        issues = _report.problems_with(snap, args.language)
+    for line in issues:
+        print(f"- {line}")
+    if issues:
+        print(f"assemble: {len(issues)} to fix; no report written")
+        return EXIT_ERROR
+    text = _daily.assemble(snap, facts, args.language, paths.rubric_version(), __version__) if mode == "daily" else _report.assemble(snap, args.language, paths.rubric_version(), __version__, _skipped_questions(args, snap, args.language))
+    write_private(snap / "report.md", text)
+    print(f"assemble: nothing to fix\nsaved: {snap / 'report.md'}")
     return EXIT_OK
 
 
@@ -507,30 +508,6 @@ def cmd_show(args) -> int:
         return EXIT_ERROR
     print(text)
     return EXIT_OK
-
-
-def cmd_check_facts(args) -> int:
-    """Check llm/facts.json against the contract (lib/output/facts.py) and print every rule it breaks. The analysis runs this until nothing is
-    printed; the report is not written from facts that fail it."""
-    import json as _json
-
-    from lib.output import facts as _facts
-
-    snap = _resolve_snapshot_arg(args, args.snapshot)
-    path = snap / "llm" / "facts.json"
-    if not path.is_file():
-        print(f"kubegap check-facts: {path} does not exist. The analysis writes it first (references/facts-<language>.md)", file=sys.stderr)
-        return EXIT_ERROR
-    try:
-        facts = _json.loads(path.read_text(encoding="utf-8"))
-    except ValueError as e:
-        print(f"kubegap check-facts: {path} is not JSON: {e}", file=sys.stderr)
-        return EXIT_ERROR
-    problems = _facts.check(facts, snap, paths.snapshot_mode(snap))
-    for line in problems:
-        print(f"- {line}")
-    print(f"facts: {len(problems)} to fix" if problems else "facts: nothing to fix")
-    return EXIT_ERROR if problems else EXIT_OK
 
 
 def cmd_checks(args) -> int:
@@ -916,7 +893,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--mode", choices=list(paths.MODES), help="with B = latest: the latest snapshot of this mode. A defaults to the previous snapshot of the same mode")
     s.set_defaults(func=cmd_diff)
 
-    s = sub.add_parser("render-details", parents=[common], help="assemble report-details.md from the snapshot plus the analysis block of <snapshot>/llm/facts.json (SKILL.md calls this before mask)")
+    s = sub.add_parser("render-details", parents=[common], help="assemble report-details.md from the snapshot plus the analysis block of <snapshot>/report/outline.json (the full guide calls this before mask)")
     s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
     s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
     s.add_argument("--language", choices=["en", "ko"], default="en", help="language of the headings and fixed phrases; data inside tables stays English")
@@ -938,17 +915,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--all", action="store_true", help="table, finding: everything")
     s.set_defaults(func=cmd_show)
 
-    s = sub.add_parser("check-facts", parents=[common], help="check llm/facts.json against the contract: the order of the problems, nothing serious left out, sources inside the snapshot, the three kinds of limits")
-    s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
-    s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
-    s.set_defaults(func=cmd_check_facts)
-
-    s = sub.add_parser("write-report", parents=[common], help="write report.md from llm/facts.json with separate agents: a solution check on the objects, one writer for the overview and one per problem, a fact check, a sentence replacer (claude -p or codex exec)")
+    s = sub.add_parser("assemble", parents=[common], help="put report.md together from the files under <snapshot>/report/ that the agent wrote; names what is wrong with them first and writes no report until nothing is. Starts no agent")
     s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
     s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
     s.add_argument("--language", choices=["en", "ko"], default="en")
-    s.add_argument("--host", choices=["auto", "claude", "codex"], default="auto", help="which CLI starts the agents. auto: the one this session runs in, else the one installed")
-    s.set_defaults(func=cmd_write_report)
+    s.set_defaults(func=cmd_assemble)
 
     s = sub.add_parser("protect-home", parents=[common], help="chmod 700 the folders under ~/.kubegap that other users can read; the Fix now of the home-mode first-run question")
     s.set_defaults(func=cmd_protect_home)

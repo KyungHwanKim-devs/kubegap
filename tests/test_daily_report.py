@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from lib.output import daily, writer
+from lib.output import daily
 
 URL = "https://example.com/backup"
 FINDINGS = [
@@ -18,7 +18,7 @@ FINDINGS = [
 
 def _snap(root: Path, name="2026-11-14T09-00-00", findings=FINDINGS, mode="daily") -> Path:
     s = root / "c" / name
-    (s / "llm").mkdir(parents=True)
+    (s / "report").mkdir(parents=True)
     (s / "MODE").write_text(mode + "\n")
     fd = {
         "findings": findings,
@@ -34,7 +34,6 @@ def _snap(root: Path, name="2026-11-14T09-00-00", findings=FINDINGS, mode="daily
 
 def _facts(**over) -> dict:
     f = {
-        "schema": 2,
         "broken_now": [],
         "happened": {"incidents": [{"id": "A", "title": "web이 OOM으로 재시작함", "what": "prod/web 컨테이너가 메모리 한도에 닿아 두 번 재시작했습니다.", "state": "ended", "finding_ids": ["resources.oomkilled.prod/web"]}]},
         "top": [
@@ -116,25 +115,6 @@ def test_the_report_is_printed_from_the_facts_with_what_code_knows(tmp_path):
     assert "`/kubegap full`" in text and "- 백업이 클러스터 밖에 없음: `resilience.no-backup.cluster`" in text
 
 
-def test_write_report_starts_no_agent_for_a_daily_snapshot(tmp_path):
-    snap = _snap(tmp_path)
-    (snap / "llm" / "facts.json").write_text(json.dumps(_facts()))
-
-    def run(*a, **k):
-        raise AssertionError("a daily report starts no agent")
-
-    said = []
-    p = writer.write_report(snap, "ko", "none", "0.1.91", "0.2.0", say=said.append, run=run)
-    assert p.read_text().startswith("# lab — daily 점검") and any("no separate writer" in s for s in said)
-    (snap / "llm" / "facts.json").write_text(json.dumps(_facts(top=[])))
-    try:
-        writer.write_report(snap, "ko", "none", "0.1.91", "0.2.0", say=said.append, run=run)
-    except writer.WriterError as e:
-        assert "daily contract" in str(e)
-    else:
-        raise AssertionError("facts that leave a high failure out are refused")
-
-
 def test_every_serious_check_a_daily_run_cannot_judge_is_named_for_the_reader():
     """A reader must not take the absence of these for a pass, so the report lists them; a new full-only critical or high check needs its phrase."""
     for platform in ("k3s", "eks", "other"):
@@ -151,3 +131,10 @@ def test_the_daily_report_lists_what_it_cannot_find_for_this_cluster(tmp_path):
     assert "- 노드 디스크가 차는 것" in text and "- k3s 내부 인증서의 만료" in text and "ACM 인증서" not in text  # k3s, not EKS
     assert "이 리포트에 없다고 해서 문제가 없다는 뜻이 아닙니다." in text
     assert "daily 점검이 볼 수 없는 심각한 문제가" in text.split("## 클러스터 한눈에")[0]  # said on the first screen too
+
+
+def test_a_number_nobody_can_check_is_not_accepted(tmp_path):
+    snap = _snap(tmp_path)
+    top = _facts()["top"]
+    made_up = {**top[0], "facts": [{"what": "x", "value": 7, "derived": True, "source_file": "summary.json", "json_path": "backup.cronjobs"}]}
+    assert any("`derived` is not accepted in a daily report" in e for e in daily.check(_facts(top=[made_up, top[1]]), snap))

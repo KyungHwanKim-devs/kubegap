@@ -12,7 +12,7 @@ from pathlib import Path
 
 from ..foundations import paths
 from ..foundations.snapshot import load_json
-from . import facts as _facts
+from . import outline as _facts
 from .render import table
 
 SEVERITIES = ("critical", "high", "medium", "low")

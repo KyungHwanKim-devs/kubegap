@@ -5,42 +5,41 @@ model, and a full report holds too many kinds of information for someone new to 
 full report. It answers three questions: is something broken now, what happened since the last run, and which three things matter most.
 Each of the three is told in three short parts (what it is, why it matters, what to do) with one page to read.
 
-No separate agent writes it. The session that analysed the run writes `llm/facts.json` in the daily shape (references/daily-<language>.md),
+No separate agent writes it. The session that analysed the run writes `report/daily.json` in the daily shape (references/daily-<language>.md),
 reading the summary and the findings only: the raw objects are already deleted (lib/output/slim.py). `check` refuses what a reader should not
 get (a number the summary does not hold, an address no learn topic carries, a made-up term, the conversational sentence ending, a part that
 runs long), and `assemble` prints the report from the facts with everything countable written by code.
 
 The facts of a daily run (schema 2):
 
-    {"schema": 2,
-     "broken_now": [{"title": "", "what": "", "finding_ids": []}],
+    {"broken_now": [{"title": "", "what": "", "finding_ids": []}],
      "happened": {"incidents": [{"id": "A", "title": "", "what": "", "state": "ended|ongoing|unknown", "finding_ids": [], "facts": []}]},
      "top": [{"id": "1", "title": "", "loss": "irreversible|outage|partial|degraded", "what": "", "why": "", "do": "",
               "read": {"title": "", "url": ""}, "finding_ids": [], "facts": []}],
      "rest": [{"title": "", "finding_ids": []}],
      "since_last": {"appeared": [""], "gone": [""]},
-     "analysis": {"severity_changes": []}}
+     "severity_changes": []}
 """
 
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
 from ..foundations import paths
 from ..foundations import rubric as _rubric
 from ..foundations.snapshot import load_json
-from . import facts as _facts
 from . import glossary as _glossary
+from . import outline as _facts
+from . import parts as _writer
 from . import sections as _sections
-from . import writer as _writer
+from .report import HAEYO
 
 TOP = 3
 STATES = ("ended", "ongoing", "unknown")
 # How long each part may run, in sentences. A daily report is read in a minute; the long explanation is the full report's.
 SENTENCES = {"what": 4, "why": 3, "do": 4, "incident": 4, "broken": 3}
-# a sentence that ends in "~요" (사라져요, 있어요, 이에요); "~세요", "~까요" and "~나요" are requests and questions and stay
-HAEYO = re.compile(r"[가-힣]*[가-힣](?<![세까나])요(?=[.!]|\s*$)", re.MULTILINE)
 _SENTENCE_END = re.compile(r"[.?!](?=\s|$)")
 
 TEXT = {
@@ -78,7 +77,6 @@ TEXT = {
         "unseen_aws": "AWS API를 부르지 않았습니다.",
         "unseen_logs": "컴포넌트 로그는 오류 종류별 개수만 셌고, 로그 글은 남기지 않았습니다.",
         "unseen_values": "Secret 값과 ConfigMap 값은 읽지 않았고, 애플리케이션의 환경 변수 값은 남기지 않았습니다.",
-        "unseen_raw": "판정이 끝난 뒤 원본 오브젝트와 이벤트를 지웠습니다. 이 컴퓨터에는 요약과 판정 결과만 남아 있고, 리포트를 쓰는 AI 모델에 전달된 것도 그것뿐입니다.",
         "unseen_checks": "그래서 점검 항목 {total}개 가운데 {unseen}개는 이번에 보지 못했습니다. 노드 안쪽, 비용, 없어질 API 같은 항목이고, 문제로도 통과로도 세지 않았습니다.",
         "unseen_serious": "특히 아래와 같은 문제는 심각할 수 있는데도 노드 안쪽이나 클라우드 계정을 읽어야 보여서 daily 점검으로는 알 수 없습니다. 이 리포트에 없다고 해서 문제가 없다는 뜻이 아닙니다.",
         "unseen_full": "이것들을 확인하고, 원인을 원본까지 열어 따지고, 문제마다 원리와 점검 방법과 규모별 해결 방안을 길게 설명하는 것은 `/kubegap full`입니다.",
@@ -160,10 +158,51 @@ def learn_urls(fd: dict) -> set[str]:
     return out
 
 
+def _resolve(doc, path: str):
+    """The value at `a.b[0].c`. Raises KeyError or IndexError or TypeError when the path does not exist."""
+    for part in re.findall(r"[^.\[\]]+|\[\d+\]", path):
+        doc = doc[int(part[1:-1])] if part.startswith("[") else doc[part]
+    return doc
+
+
+def _numbered(facts: dict):
+    """(label, number) for every number an entry of the daily file carries with its source."""
+    for kind, entries in (("broken_now", facts.get("broken_now") or []), ("incident", (facts.get("happened") or {}).get("incidents") or []), ("top", facts.get("top") or [])):
+        for e in entries:
+            for n in (e.get("facts") or []) if isinstance(e, dict) else []:
+                if isinstance(n, dict):
+                    yield f"{kind} {e.get('id') or e.get('title')}: {n.get('what')}", n
+
+
+def verify_numbers(snap: Path, facts: dict) -> list[str]:
+    """Numbers whose source does not say what the facts say. A path with `*` or `...` is too."""
+    out: list[str] = []
+    docs: dict[str, object] = {}
+    for label, n in _numbered(facts):
+        src, path = n.get("source_file"), str(n.get("json_path") or "")
+        if n.get("derived"):
+            continue
+        f = snap / str(src or "")
+        if not src or not f.is_file():
+            out.append(f"{label}: source file {src} does not exist")
+            continue
+        if not path or "*" in path or "..." in path or not src.endswith(".json"):
+            continue
+        try:
+            doc = docs.setdefault(src, json.loads(f.read_text(encoding="utf-8")))
+            found = _resolve(doc, path)
+        except (KeyError, IndexError, TypeError, ValueError):
+            out.append(f"{label}: {path} is not in {src}")
+            continue
+        value = n.get("value")
+        wanted = [str(v) for v in value] if isinstance(value, list) else [str(value)]
+        if not all(w in json.dumps(found, ensure_ascii=False, default=str) for w in wanted):
+            out.append(f"{label}: facts say {value}, {src} {path} says {str(found)[:120]}")
+    return out
+
+
 def check(facts: dict, snap: Path, language: str = "ko") -> list[str]:
     """Every rule the daily facts break, one line each, worded for the session that has to fix it."""
-    if facts.get("schema") != _facts.SCHEMA:
-        return [f"schema is {facts.get('schema')!r}; this kubegap reads facts of schema {_facts.SCHEMA} (references/daily-<language>.md)"]
     out: list[str] = []
     if facts.get("problems") or facts.get("next"):
         out.append("a daily run writes `top` (three at most) and `rest`, not `problems` and `next`: those are the full report's (references/daily-<language>.md)")
@@ -235,12 +274,14 @@ def check(facts: dict, snap: Path, language: str = "ko") -> list[str]:
             out.append(f"{label}: ends a sentence in 해요체 ({HAEYO.search(text).group(0)}); the report is written in 합니다체")
         out += [f"{label}: {hit}" for hit in _glossary.find(text, terms)]
 
-    # a number is what the summary says it is: the raw files are gone, so every source is a file that stays
-    stand_in = {"broken_now": broken, "happened": {"incidents": incidents}, "problems": top}
-    out += _writer.verify_numbers(snap, stand_in)
-    for label, src in _facts._sources(stand_in):
-        if not _facts._inside(snap, src):
-            out.append(f"{label}: source {src} is outside the snapshot")
+    # a number is what the file it names says it is; a `derived` mark is not accepted in a daily report, where nothing checks it afterwards
+    for _label, n in _numbered(facts):
+        if n.get("derived"):
+            out.append(f"{_label}: `derived` is not accepted in a daily report; give the file and the path the number is at, or leave the number out")
+    out += verify_numbers(snap, facts)
+    for label, n in _numbered(facts):
+        if n.get("source_file") and not _facts._inside(snap, str(n["source_file"])):
+            out.append(f"{label}: source {n['source_file']} is outside the snapshot")
     return out
 
 
@@ -266,7 +307,7 @@ def _unseen(snap: Path, t: dict, language: str) -> str:
     lines = [t["unseen_intro"], "", f"- {t['unseen_nodes']}"]
     if (inv.get("cluster") or {}).get("platform") == "eks":
         lines.append(f"- {t['unseen_aws']}")
-    lines += [f"- {t['unseen_logs']}", f"- {t['unseen_values']}", f"- {t['unseen_raw']}", ""]
+    lines += [f"- {t['unseen_logs']}", f"- {t['unseen_values']}", ""]
     lines += [t["unseen_checks"].format(total=(fd.get("checks") or {}).get("total", 0), unseen=by.get("not-collected", 0)), ""]
     serious = unseen_phrases(snap, language)
     if serious:

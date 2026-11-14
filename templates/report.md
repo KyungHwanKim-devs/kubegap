@@ -1,12 +1,12 @@
 <!--
 kubegap human report, saved as <snapshot>/report.md.
-`scripts/kubegap write-report` assembles it (lib/output/writer.py `assemble`): agents write the sections marked "agent" from llm/facts.json
-in the language's guides (references/write-overview-<language>.md, references/write-problem-<language>.md); code writes every other section
-from the snapshot and the facts. The reference half (every table, every automatic verdict, the analysis record) is report-details.md.
+`scripts/kubegap assemble` puts it together (lib/output/report.py): the agent that analysed the run writes the sections marked "agent"
+under <snapshot>/report/ as references/full-<language>.md says; code writes every other section from the snapshot and the outline.
+The reference half (every table, every automatic verdict, the analysis record) is report-details.md.
 
 What it is. A diagnosis the reader learns from: what already happened, the largest problems and why each comes about, how each is watched
 and how it is solved in practice at the scale the cluster is run at. It is not a list of commands to type; the reader acts through their
-own process. A daily report carries what happened and what changed and picks no problems (the rows marked "full").
+own process. The daily report has its own, short layout, at the end of this file.
 -->
 # {{cluster_name}} — {{mode}} audit, {{date}}
 
@@ -68,7 +68,7 @@ Checks behind each entry: … <!-- code -->
 Details and every table: [`report-details.md`](report-details.md) · kubegap {{version}}, rubric {{rubric}} · snapshot `{{path}}`
 
 <!-- ============================ the daily report ============================
-A daily report is assembled by lib/output/daily.py from llm/facts.json; no separate agent writes it and it has no report-details.md.
+A daily report is assembled by lib/output/daily.py from report/daily.json, which the agent that analysed the run wrote; it has no report-details.md.
 
 # <cluster> — daily run, <when>
 <broken n> · <happened n> · <most important n>          code: the first screen, from the titles

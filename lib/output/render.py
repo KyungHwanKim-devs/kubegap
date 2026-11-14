@@ -1,9 +1,9 @@
-"""Render `report-details.md`: the reference half of a report, assembled by code from the snapshot files plus the `analysis` block of the facts.
+"""Render `report-details.md`: the reference half of a report, assembled by code from the snapshot files plus the `analysis` block of the report's outline.
 
-A report has two files. `report.md` is for people: `scripts/kubegap write-report` writes it from `llm/facts.json` with separate agents. `report-details.md`
+A report has two files. `report.md` is for people: the agent that analysed the run writes it and `scripts/kubegap assemble` puts it together. `report-details.md`
 is for the next run's agent and for anyone who wants to dig: every table that can be produced mechanically is produced here (counts, critical/high list,
 absence, suppressed, collectors run, checks evaluated, signature matches, the full first-pass table), and the parts that need judgment come from the
-`analysis` block the LLM wrote into `llm/facts.json` (references/facts-<language>.md):
+`analysis` block the agent wrote into `report/outline.json` (references/full-<language>.md):
 
   analysis.severity_changes   final severity/status changes against the first pass, with reasons
   analysis.recounts           every aggregate the LLM recounted against the first pass, with reasons
@@ -205,10 +205,13 @@ def table(headers: list[str], rows: list[list], none: str = "none") -> str:
 
 
 def analysis_block(snap: Path) -> dict:
-    """The `analysis` block of `llm/facts.json`, or an empty dict when the facts are missing or hold none."""
-    facts = load_json(snap / "llm" / "facts.json") or {}
-    a = facts.get("analysis") if isinstance(facts, dict) else None
-    return a if isinstance(a, dict) else {}
+    """The `analysis` block of `report/outline.json`, or an empty dict when it is missing or holds none."""
+    out = load_json(snap / "report" / "outline.json") or {}
+    a = out.get("analysis") if isinstance(out, dict) else None
+    a = dict(a) if isinstance(a, dict) else {}
+    if isinstance(out, dict) and out.get("severity_changes"):  # the outline keeps these at the top, where the order of the problems is checked from them
+        a["severity_changes"] = out["severity_changes"]
+    return a
 
 
 def empty_analysis_fields(snap: Path, mode: str) -> list[str]:
@@ -240,9 +243,9 @@ def _persisted(diff: dict | None) -> dict[str, int]:
 
 def keep_report(snap: Path, now: _dt.datetime | None = None) -> Path | None:
     """Move an existing report out of the way before another one is written from the same snapshot, for example in the other language.
-    `report.md`, `report-details.md` and `llm/` have one path each, so without this the second report replaces the first. The earlier report goes to
+    `report.md`, `report-details.md` and `report/` (what the agent wrote) have one path each, so without this the second report replaces the first. The earlier report goes to
     `earlier-reports/<time>/` in the snapshot. Returns that folder, or None when there is nothing to keep."""
-    names = [n for n in ("report.md", "report-details.md", "llm") if (snap / n).exists()]
+    names = [n for n in ("report.md", "report-details.md", "report") if (snap / n).exists()]
     if not names:
         return None
     stamp = (now or _dt.datetime.now().astimezone()).strftime("%Y-%m-%dT%H-%M-%S")
@@ -308,7 +311,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
     w("")
     w(
         lab.get("intro")
-        or "Reference half of the report, assembled by `scripts/kubegap render-details` from the snapshot files plus the analysis block of `llm/facts.json`. The human report is `report.md` next to this file. Headings follow the report language; data inside tables is English."
+        or "Reference half of the report, assembled by `scripts/kubegap render-details` from the snapshot files plus the analysis block of `report/outline.json`. The human report is `report.md` next to this file. Headings follow the report language; data inside tables is English."
     )
     w("")
     prom = stores.get("prometheus") or {}

@@ -545,7 +545,7 @@ def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = Fa
 
 
 def skipped(setup: dict, cfg: Config, ctx_dir: Path | None, *, language: str = "en") -> list[dict]:
-    """Questions answered with "skip" whose gap is still there: `write-report` lists them in the report's limits section, under "left out by choice"."""
+    """Questions answered with "skip" whose gap is still there: `assemble` lists them in the report's limits section, under "left out by choice"."""
     answers = load_answers(ctx_dir)
     return [{"id": q["id"], "header": q["header"], "gain": q["gain"], "at": answers[q["id"]].get("at")} for q in questions(setup, cfg, ctx_dir, all_=True, language=language) if (answers.get(q["id"]) or {}).get("choice") == SKIP]
 
@@ -574,7 +574,7 @@ _RENDER = {
         "config": "   (dry run, show the lines, write only after the user picks Write)",
         "typed": "  typed answer: ",
         "skipped": "skipped earlier",
-        "tail": '  -> write-report lists these in the report under "Limits of this run"; do not write them into the facts',
+        "tail": '  -> `assemble` lists these in the report under "Limits of this run"; do not write them yourself',
         "note": "note",
         "note_tail": "  -> not a limit of the run: do not write these into the report",
     },
@@ -584,7 +584,7 @@ _RENDER = {
         "config": "   (dry run으로 바뀔 줄을 먼저 보여 주고, 사용자가 '쓰기'를 고른 뒤에만 씁니다)",
         "typed": "  typed answer: ",
         "skipped": "skipped earlier",
-        "tail": "  -> write-report가 리포트의 '이번 점검의 한계'에 넣는다. 사실 파일에는 적지 않는다",
+        "tail": "  -> assemble이 리포트의 '이번 점검의 한계'에 넣는다. 직접 적지 않는다",
         "note": "note",
         "note_tail": "  -> 점검의 한계가 아니다. 리포트에 적지 않는다",
     },

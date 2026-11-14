@@ -109,4 +109,4 @@ In a headless run (`claude -p`, `codex exec`, a schedule) there is no window and
 
 ## 8. In the report
 
-`setup` and `questions` end with `skipped earlier [...]` lines for the questions the user skipped while the gap is still there. `write-report` puts each of them into the report section "Limits of this run" under "Left out by choice", with what answering would add; you do not write them into the facts.
+`setup` and `questions` end with `skipped earlier [...]` lines for the questions the user skipped while the gap is still there. `assemble` puts each of them into the report section "Limits of this run" under "Left out by choice", with what answering would add; you do not write them into the facts.

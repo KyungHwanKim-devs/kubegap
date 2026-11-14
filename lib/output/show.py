@@ -22,6 +22,7 @@ from pathlib import Path
 
 from ..foundations import rubric
 from ..foundations.snapshot import load_json
+from . import outline as _outline
 
 ROWS = 20  # rows of a table shown without --all
 INLINE = 5  # items of a list inside a row shown before "and N more"
@@ -103,6 +104,7 @@ def finding(snap: Path, ident: str, *, limit: int = 5, all_: bool = False) -> st
     shown_ = hits if all_ else hits[:limit]
     out = [f"{len(hits)} finding{'s' if len(hits) != 1 else ''} match {ident!r}" + (f"; showing the first {len(shown_)} (--all for every one). All ids: {brief([f['id'] for f in hits], 12)}" if len(shown_) < len(hits) else "")]
     topics = {t["topic"]: t for t in fd.get("learn") or []}
+    owners = _outline.owners(snap)
     for f in shown_:
         out += ["", f"== {f['id']}", f"status {f['status']}, severity {f['severity_default']}, {f.get('nature', 'state')}" + (", overdue" if f.get("overdue") else "") + f"; check: {f.get('name')}"]
         out.append(f"evidence: {f.get('evidence')}")
@@ -116,6 +118,13 @@ def finding(snap: Path, ident: str, *, limit: int = 5, all_: bool = False) -> st
                 out.append(f"{key}: {' '.join(str(f[key]).split())}")
         if f.get("source"):
             out.append(f"source: {f['source']}" + (f"  (kubegap show table {str(f['source']).split(':', 1)[1]})" if str(f["source"]).startswith("summary.json:") else ""))
+        if "/" in str(f.get("target")):
+            who = _outline.declared_in(owners, str(f["target"]).split(":")[0])
+            out.append(
+                f"declared in: {json.dumps(who, ensure_ascii=False)}"
+                if who
+                else "declared in: nothing in the cluster says (no Argo CD Application lists it and it carries no Helm release mark); name the resource and do not guess a repository"
+            )
         mine = [name for name, t in topics.items() if f.get("check") in (t.get("checks") or [])]
         if mine:
             out.append(f"learn topic: {', '.join(mine)}  (kubegap show learn {mine[0]})")

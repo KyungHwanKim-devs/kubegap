@@ -5,7 +5,7 @@ Usage: scripts/make-fixture.py <snapshot folder> <destination folder> [--map ~/.
 
 What it does, in this order:
 1. Copies the collected inputs and leaves out what summarize, evaluate and render produce (summary.json, findings-draft.json, report.md,
-   report-details.md, diff.json, llm/, earlier-reports/, extra/, INCOMPLETE), so the fixture is an input, never an expectation.
+   report-details.md, diff.json, report/, earlier-reports/, extra/, INCOMPLETE), so the fixture is an input, never an expectation.
 2. Trims what no reader uses, mechanically (no reader-specific key lists, so a new reader finds the fields a real snapshot has):
    JSON is written compact; `metadata.managedFields` goes except on ConfigMaps (lib/summaries/hygiene reads their change times); CRD
    `spec.versions[].schema` and `additionalPrinterColumns` go (readers take name, group and scope); a string over --max-string
@@ -41,7 +41,7 @@ from lib.foundations import mask, yamlite
 
 _scrub_sample = importlib.import_module("scrub-sample")
 
-DERIVED = {"summary.json", "findings-draft.json", "report.md", "report-details.md", "diff.json", "llm", "earlier-reports", "extra", "INCOMPLETE"}
+DERIVED = {"summary.json", "findings-draft.json", "report.md", "report-details.md", "diff.json", "report", "earlier-reports", "extra", "INCOMPLETE"}
 TEXT_SUFFIXES = {".log", ".txt", ".prom", ".csv", ".md", ".yaml", ".yml"}
 HOME_RE = re.compile(r"/Users/[A-Za-z0-9._-]+|" + re.escape(str(pathlib.Path.home())))  # the machine's home directory in run.log command lines; not every /home/<x>, which is a container path
 

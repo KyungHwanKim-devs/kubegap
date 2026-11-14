@@ -85,13 +85,13 @@ def _snap(tmp_path, with_fragments: bool):
         )
     )
     if with_fragments:
-        (s / "llm").mkdir()
+        (s / "report").mkdir()
         analysis = {
             "severity_changes": [{"finding_id": "a.b.ns/x", "final": "medium", "reason": "lab | pipe"}],
             "tool_notes": [{"n": 2, "text": "none <b>", "still_open_from": 1}],
             "commands_outside_snapshot": [{"command": "ssh node 'ls /etc/cron.d'", "saved_as": "extra/cron.txt"}],
         }
-        (s / "llm" / "facts.json").write_text(json.dumps({"problems": [], "analysis": analysis}))
+        (s / "report" / "outline.json").write_text(json.dumps({"problems": [], "analysis": analysis}))
     return s
 
 
@@ -275,15 +275,15 @@ def test_a_second_report_from_one_snapshot_keeps_the_first(tmp_path):
     import datetime as dt
 
     snap = tmp_path / "2026-11-05T17-00-00"
-    (snap / "llm").mkdir(parents=True)
+    (snap / "report").mkdir(parents=True)
     (snap / "report.md").write_text("first")
     (snap / "report-details.md").write_text("details")
-    (snap / "llm" / "changes.md").write_text("why")
+    (snap / "report" / "overview.md").write_text("why")
     now = dt.datetime(2026, 11, 5, 18, 0, 0, tzinfo=dt.timezone.utc)
     kept = render.keep_report(snap, now=now)
     assert kept == snap / "earlier-reports" / "2026-11-05T18-00-00"
-    assert (kept / "report.md").read_text() == "first" and (kept / "llm" / "changes.md").read_text() == "why"
-    assert not (snap / "report.md").exists() and not (snap / "llm").exists()
+    assert (kept / "report.md").read_text() == "first" and (kept / "report" / "overview.md").read_text() == "why"
+    assert not (snap / "report.md").exists() and not (snap / "report").exists()
     assert render.keep_report(snap) is None
     (snap / "report.md").write_text("second")
     again = render.keep_report(snap, now=now)
