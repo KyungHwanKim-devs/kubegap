@@ -14,6 +14,7 @@ import pytest
 
 from lib.collection import discover, kube
 from lib.commands import firstrun
+from lib.foundations import units
 from lib.foundations.config import Config as _Config
 from lib.foundations.runlog import RunLog
 
@@ -270,7 +271,7 @@ def test_render_names_every_option_with_its_command(tmp_path):
 
 
 def test_node_check_count_is_the_catalog_s_and_is_worded_as_an_upper_bound():
-    full_only_node = [c for c in firstrun._checks() if c["id"].startswith("node.") and c.get("modes") == ["full"]]
+    full_only_node = [c for c in firstrun._checks() if c["id"].startswith("node.") and units.missing(c.get("needs"), "daily")]
     assert firstrun.node_script_checks() == len(full_only_node) > 0
     # some of them run on one platform only, which is why every text says "up to"
     assert any(c.get("platforms") for c in full_only_node)

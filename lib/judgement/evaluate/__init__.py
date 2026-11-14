@@ -19,7 +19,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from ... import __version__
-from ...foundations import paths, rubric
+from ...foundations import paths, rubric, units
 from ...foundations.config import Config
 from ...foundations.snapshot import load_json, write_private
 from .context import Context
@@ -59,9 +59,9 @@ def evaluate(snap: Path, cfg: Config, *, scale_answer: str | None = None, tools_
     collectors = inv.get("collectors_enabled") or ["core"]
     checks, errors = rubric.load_checks(collectors)
     cx = Context(snap, inv, summary, scale["name"], cfg.get("dev_namespaces"))
-    mode = paths.snapshot_mode(
-        snap
-    )  # daily or full. A check marked `modes: [full]` needs inputs the daily run does not collect, so it is reported as not-collected instead of being evaluated on missing data (which would turn "file absent" into false absence findings)
+    # A check that names a collection unit under `needs` is reported as not-collected when the run's mode does not collect the unit, instead of being
+    # evaluated on data that is not there (which would turn "file absent" into a finding of absence, or into a pass).
+    mode = paths.snapshot_mode(snap)
     active_sup, expired_sup = rubric.active_suppressions(cfg.get("suppress"), cx.today)
     overrides = cfg.get("overrides") or {}
 
@@ -92,8 +92,9 @@ def evaluate(snap: Path, cfg: Config, *, scale_answer: str | None = None, tools_
             rec.update(status="disabled", reason=why_not)
             results.append(rec)
             continue
-        if c.get("modes") and mode not in c["modes"]:
-            rec.update(status="not-collected", reason=f"inputs not collected in {mode} mode (collected by: {', '.join(c['modes'])})")
+        absent = units.missing(c.get("needs"), mode)
+        if absent:
+            rec.update(status="not-collected", reason=f"a {mode} run does not collect {', '.join(absent)}", needs=absent)
             results.append(rec)
             continue
         req_tool = c.get("requires_tool")

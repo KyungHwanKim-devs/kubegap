@@ -1,0 +1,134 @@
+# Collection units: what kubegap reads from a cluster, in pieces a mode chooses from.
+#
+# A mode (daily, full) is the list of units that name it under `modes`. Every step of every collectors/*/collect.yaml names the unit it
+# belongs to (`unit:`), and a check that cannot be judged without a unit names it (`needs:`). Nothing else decides what a mode reads: there
+# is no per-step or per-check list of modes, and the code asks "is this unit collected" (lib/foundations/units.py), never "is this daily".
+#
+# Fields
+#   id            the name steps and checks use
+#   reads         what is asked of the cluster or the account, in one sentence a user can read (docs/DATA.md and the report quote it)
+#   keeps         what of it is written to the snapshot
+#   drops         what is read and not written (dropped in memory, before a file exists)
+#   sensitivity   low              what runs, in what state, with what numbers
+#                 config           settings of the user's own applications, which can hold a credential or business detail
+#                 logs             log lines
+#                 node             the inside of a node (needs node access or the node proxy)
+#                 cloud            the cloud account
+#                 secret-adjacent  a tool that reads Secrets to answer
+#   modes         the modes that collect it
+#   full_only_because   for a unit of low sensitivity that the daily run still leaves out: why (it is slow)
+#   unseen        for a unit the daily run leaves out: what a reader cannot learn without it, as a phrase per language that completes
+#                 "this run did not look at …" (the daily report and docs/DATA.md print it)
+#
+# Rule (tests/test_units.py): every unit of the daily mode has sensitivity low.
+
+- id: cluster-objects
+  reads: "Every kind the API server lists (kubectl get, list). Secrets are never requested."
+  keeps: "Each object as the API returns it: spec, status, labels, annotations, image, resources, probes, volumes, references to Secrets and ConfigMaps by name."
+  drops: "ConfigMap values (replaced by length and shape; a few keys of platform components kubegap parses are kept, lib/foundations/scrub.py KEEP_VALUES). The value of an environment variable whose name looks like a credential. The copy of the manifest in kubectl.kubernetes.io/last-applied-configuration. Outside the system namespaces, unless app-settings is collected too: every literal environment value, every command and args list, and every key of a ConfigMap."
+  sensitivity: low
+  modes: [daily, full]
+
+- id: app-settings
+  reads: "Nothing more from the cluster: of the objects above, outside the system namespaces, it keeps what cluster-objects drops."
+  keeps: "command and args of containers and probes, literal environment values (never one whose name looks like a credential), and of each ConfigMap the key names with the length and shape of each value."
+  sensitivity: config
+  modes: [full]
+  unseen:
+    en: "how your applications are started and configured (command, arguments, environment values, ConfigMap keys): whether a database has a backup job, a credential written into a ConfigMap, a JVM heap larger than its limit"
+    ko: "애플리케이션이 어떻게 시작되고 설정되는지(command, args, 환경 변수 값, ConfigMap 키). 데이터베이스에 백업 작업이 있는지, ConfigMap에 적힌 비밀 값, 메모리 제한보다 큰 JVM 힙이 여기에 해당합니다"
+
+- id: events
+  reads: "Events of every namespace (kubectl get events)."
+  keeps: "Each event: reason, message, count, the object it is about, first and last time."
+  sensitivity: low
+  modes: [daily, full]
+
+- id: live-usage
+  reads: "CPU and memory in use now, per node and per container (kubectl top, from metrics-server)."
+  keeps: "The lines kubectl prints."
+  sensitivity: low
+  modes: [daily, full]
+
+- id: metrics
+  reads: "Prometheus instant queries (collectors/*/metrics.yaml) and the /metrics page of platform components (collectors/*/pod-metrics.yaml)."
+  keeps: "The series each query returns, and of a /metrics page the series the file names."
+  sensitivity: low
+  modes: [daily, full]
+
+- id: component-apis
+  reads: "The read-only HTTP APIs of Prometheus, Alertmanager, Grafana and Loki: rules, targets, flags, the Alertmanager configuration (Alertmanager masks its own secrets), silences, datasource and dashboard definitions, Loki label and volume queries."
+  keeps: "The responses."
+  sensitivity: low
+  modes: [daily, full]
+
+- id: component-log-counts
+  reads: "The last 24 hours of logs of the platform components found in the cluster (kubectl logs; CoreDNS, the ingress controller, Argo CD, Karpenter and the like). Application logs are not read."
+  keeps: "How many lines matched each known failure pattern, the first and last time, and which workload. For Karpenter, the times it took to bring a node up and why it removed one."
+  drops: "Every log line. The lines are counted in memory and no file of them is written."
+  sensitivity: low
+  modes: [daily, full]
+
+- id: component-log-samples
+  reads: "Nothing more from the cluster: of the same component logs it keeps a little text."
+  keeps: "Up to five masked sample lines per failure pattern, and the error lines that match no pattern, grouped by their text."
+  sensitivity: logs
+  modes: [full]
+  unseen:
+    en: "the text of component log lines (only how many matched a known failure pattern is counted)"
+    ko: "플랫폼 구성 요소 로그의 문장(알려진 실패 패턴에 맞은 줄 수만 셉니다)"
+
+- id: node-os
+  reads: "The inside of each node, over SSH or SSM when node access was chosen: kernel log, disk and inode use, kubelet and containerd journal, sysctl, the k3s server's files and certificates, the CNI's local state."
+  keeps: "The output of the read-only script collectors/core/node-os.sh and of the node steps of the platform collectors."
+  sensitivity: node
+  modes: [full]
+  unseen:
+    en: "the inside of a node: a node disk filling up, kernel out-of-memory kills, certificates of a k3s server about to expire, etcd snapshots of k3s, kubelet and container runtime errors"
+    ko: "노드 안쪽. 노드 디스크가 차는 것, 커널의 메모리 부족 종료, k3s 서버 인증서 만료, k3s etcd 스냅샷, kubelet과 컨테이너 런타임 오류가 여기에 해당합니다"
+
+- id: kubelet-config
+  reads: "The effective kubelet configuration of each node, through the API server's node proxy (get --raw /api/v1/nodes/<node>/proxy/configz)."
+  keeps: "The configuration: eviction thresholds, reserved resources, log rotation, maxPods."
+  sensitivity: node
+  modes: [full]
+  unseen:
+    en: "kubelet settings (eviction thresholds, reserved resources, maxPods)"
+    ko: "kubelet 설정(축출 기준, 예약 자원, maxPods)"
+
+- id: control-plane-logs
+  reads: "Logs of the control plane: on EKS the CloudWatch log group of the cluster (API server, authenticator, controller manager, scheduler), on k3s the server's journal."
+  keeps: "The lines the queries select: slow requests, failed webhook calls, authentication failures, repeated controller errors, slow etcd."
+  sensitivity: logs
+  modes: [full]
+  unseen:
+    en: "control plane logs: slow API requests, failing admission webhooks, authentication failures, a slow etcd"
+    ko: "컨트롤 플레인 로그. 느린 API 요청, 실패하는 어드미션 웹훅, 인증 실패, 느린 etcd가 여기에 해당합니다"
+
+- id: cloud-account
+  reads: "The AWS account of an EKS cluster, read-only (aws CLI: EKS, EC2, ELB, ECR, ACM, Service Quotas, CloudWatch metrics, Cost Explorer, AWS Backup)."
+  keeps: "The responses: cluster and node group settings, add-on versions, subnets and free addresses, security groups, volumes and snapshots, load balancer settings and metrics, image scan settings, certificates, quotas, cost of the last 30 days."
+  sensitivity: cloud
+  modes: [full]
+  unseen:
+    en: "the AWS account: whether backups exist (AWS Backup, snapshots), subnets running out of addresses, a public cluster endpoint, security groups open to the world, load balancer errors and settings, image scanning, certificates and quotas, cost"
+    ko: "AWS 계정. 백업이 있는지(AWS Backup, 스냅샷), 서브넷 주소 고갈, 공개된 클러스터 엔드포인트, 전체에 열린 보안 그룹, 로드밸런서 오류와 설정, 이미지 스캔, 인증서와 할당량, 비용이 여기에 해당합니다"
+
+- id: workload-tools
+  reads: "What four read-only tools find when they are installed: krr (request and limit recommendations from 7 days of Prometheus history), Polaris (workload best practices), kubent and pluto (API versions a later Kubernetes removes)."
+  keeps: "Each tool's JSON output."
+  sensitivity: low
+  modes: [full]
+  full_only_because: "the tools take minutes (krr about three on a two-node cluster)"
+  unseen:
+    en: "what the extra tools find: request and limit recommendations from a week of use, API versions the next Kubernetes removes"
+    ko: "추가 도구가 찾는 것. 일주일 사용량으로 본 requests·limits 권고, 다음 Kubernetes 버전에서 없어지는 API 버전이 여기에 해당합니다"
+
+- id: helm-releases
+  reads: "The list of Helm releases (helm list). Helm keeps a release in a Secret, so this read needs permission to read Secrets; the shipped ClusterRole does not grant it."
+  keeps: "What helm list prints: name, namespace, status, revision, chart and app version, time. Values are not read."
+  sensitivity: secret-adjacent
+  modes: [full]
+  unseen:
+    en: "Helm releases (a release that failed or was left half-installed)"
+    ko: "Helm 릴리스(실패했거나 설치 도중에 멈춘 릴리스)"

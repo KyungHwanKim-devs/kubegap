@@ -234,7 +234,7 @@ def helm_missing_note(snap: Path) -> str:
     if step.get("tool_missing"):
         return "helm is not installed; the Helm checks are skipped (kubegap setup --install-only helm)"
     if step.get("mode_skipped"):
-        return "helm list is not collected in daily mode; the Helm checks run in a full run"
+        return f"helm list is not read: {step.get('skipped')}; the Helm checks run in a full run"
     if "forbidden" in err.lower() and "secret" in err.lower():
         return "helm list failed: Helm stores release records in Secrets and the credentials used have no secrets read permission (the shipped kubegap ClusterRole leaves it out on purpose). The Helm checks are skipped"
     if err:

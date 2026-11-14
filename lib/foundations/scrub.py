@@ -29,6 +29,7 @@ the `type: kubectl` steps through `json_scrubber`, which lib/foundations/shell a
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 
@@ -123,13 +124,34 @@ def env_secret_like(name: str, value) -> bool:
     return env_name_secret_like(name)
 
 
-# Namespaces of the platform and its add-ons. A daily run keeps literal environment values only here: the checks that read a value read it from a
-# component (Karpenter feature gates, VPC CNI warm targets, MetalLB speaker settings), and an application's configuration is the user's own.
+# Namespaces of the platform and its add-ons. A run that does not collect the unit app-settings (collectors/units.yaml; the daily run) keeps command,
+# args, literal environment values and ConfigMap keys only here: the checks that read one read it from a component (Karpenter feature gates, VPC CNI
+# warm targets, MetalLB speaker settings, the flags of a controller), and an application's configuration is the user's own.
 SYSTEM_NS_PREFIX = ("kube-", "karpenter", "monitoring", "cert-manager", "external-secrets", "ingress-nginx", "metallb-system", "keda", "argocd", "arc-system", "arc-systems", "logging", "reloader")
 
 
 def system_namespace(ns) -> bool:
     return isinstance(ns, str) and ns.startswith(SYSTEM_NS_PREFIX)
+
+
+# What a check asks of a command without reading it: whether it is a shell running a script (`sh -c …`: the shell is PID 1 and does not pass SIGTERM on)
+# and whether it only holds the container open (a prepull DaemonSet that sleeps). Worked out before a command is dropped and kept under MARK, as the
+# verdict of a credential-like variable is, so the checks give the same answer when the command itself is not written.
+SHELLS = ("sh", "/bin/sh", "bash", "/bin/bash", "/usr/bin/bash", "ash", "/bin/ash")
+_HOLDER_RE = re.compile(r"\b(sleep|pause|tail -f)\b")
+
+
+def command_shape(c: dict) -> dict:
+    """`{"shell": bool, "holder": bool, "digest": str | None}` of a container's (or an exec probe's) command and args: from the lists when they are
+    there, from what the scrub recorded when it dropped them. The digest tells two commands apart, and the same command in two runs, without the text."""
+    mark = c.get(MARK)
+    if isinstance(mark, dict) and isinstance(mark.get("command_shape"), dict):
+        return dict(mark["command_shape"])
+    command, args = [str(a) for a in c.get("command") or []], [str(a) for a in c.get("args") or []]
+    if not command and not args:
+        return {"shell": False, "holder": False, "digest": None}
+    digest = hashlib.sha256(json.dumps([command, args], ensure_ascii=False).encode()).hexdigest()[:16]
+    return {"shell": bool(command) and command[0] in SHELLS and "-c" in command + args, "holder": bool(_HOLDER_RE.search(" ".join(command + args))), "digest": digest}
 
 
 def scrub_env(env: list, *, every: bool = False) -> None:
@@ -182,14 +204,25 @@ def shape(v) -> str:
     return "word"
 
 
-def scrub_configmap(cm: dict) -> dict:
-    """Replace the values of one ConfigMap in place (see module docstring) and record what was there under `kubegap_scrub`."""
+def scrub_configmap(cm: dict, *, app_settings: bool = True) -> dict:
+    """Replace the values of one ConfigMap in place (see module docstring) and record what was there under `kubegap_scrub`. Without `app_settings`
+    a ConfigMap outside the system namespaces keeps no key either: its name, labels and size are what a daily run knows of it."""
     if MARK in cm:
         return cm
     meta = cm.get("metadata") or {}
     ns, name = meta.get("namespace") or "", meta.get("name") or ""
     data = cm.get("data") or {}
     binary = cm.get("binaryData") or {}
+    if not app_settings and not system_namespace(ns):
+        ann = meta.get("annotations") or {}
+        dropped_ann = [k for k in COPY_ANNOTATIONS if k in ann]
+        for k in dropped_ann:
+            ann[k] = {"len": len(str(ann[k])), "shape": shape(ann[k])}
+        chars = sum(len(str(v)) for v in data.values()) + sum(len(str(v)) for v in binary.values())
+        cm.pop("data", None)
+        cm.pop("binaryData", None)
+        cm[MARK] = {"values_dropped": True, "keys_dropped": len(data) + len(binary), "data_chars": chars, "annotations_dropped": dropped_ann}
+        return cm
     keep = _keys_for(KEEP_VALUES, ns, name)
     presence = _keys_for(PRESENCE_ONLY, ns, name)
     lines = _keys_for(LINE_COUNT_ONLY, ns, name)
@@ -271,16 +304,16 @@ class ScrubFailed(shell._NamedError):
     """Scrubbing raised, so the text must not be written. The message starts with "scrub failed:"."""
 
 
-def scrub_or_error(obj, *, light: bool = False) -> str | None:
+def scrub_or_error(obj, *, app_settings: bool = True) -> str | None:
     """Scrub `obj` in place. None on success; on any exception the message "scrub failed: <type>: <text>" and the caller writes nothing."""
     try:
-        scrub_objects(obj, light=light)
+        scrub_objects(obj, app_settings=app_settings)
     except Exception as e:
         return f"scrub failed: {type(e).__name__}: {e}"
     return None
 
 
-def json_scrubber(*, light: bool = False):
+def json_scrubber(*, app_settings: bool = True):
     """A `shell.run` transform for kubectl JSON output plus the item count it saw.
 
     Returns (fn, info). `fn(text)` parses the JSON, scrubs it and returns the scrubbed JSON text; text that is not JSON is returned unchanged,
@@ -296,7 +329,7 @@ def json_scrubber(*, light: bool = False):
             return text
         except Exception as e:
             raise ScrubFailed(f"scrub failed: {type(e).__name__}: {e}") from e
-        err = scrub_or_error(data, light=light)
+        err = scrub_or_error(data, app_settings=app_settings)
         if err:
             raise ScrubFailed(err)
         try:
@@ -308,9 +341,12 @@ def json_scrubber(*, light: bool = False):
     return fn, info
 
 
-def scrub_objects(obj, *, light: bool = False, _ns=None):
-    """Walk kubectl JSON (a single object or a List) and apply the Secret and ConfigMap rules in place. Returns the same object. `light` is the
-    daily run: outside the system namespaces every literal environment value is dropped, not only the credential-like ones."""
+def scrub_objects(obj, *, app_settings: bool = True, _ns=None):
+    """Walk kubectl JSON (a single object or a List) and apply the Secret and ConfigMap rules in place. Returns the same object. With
+    `app_settings` false (the run does not collect that unit) nothing an application is configured with is kept outside the system namespaces:
+    every literal environment value goes, not only the credential-like ones, and so does every `command` and `args` list, of a container, a
+    probe or a hook; the number of items and `command_shape` stay under `kubegap_scrub`, so "has a command", "is a shell script", "only sleeps"
+    and "the same command as before" remain readable."""
     if isinstance(obj, dict):
         kind = obj.get("kind")
         if isinstance(kind, str) and isinstance(obj.get("metadata"), dict):
@@ -323,19 +359,24 @@ def scrub_objects(obj, *, light: bool = False, _ns=None):
                 if k in ann:
                     ann[k] = {"len": len(str(ann[k])), "shape": shape(ann[k])}
         elif isinstance(kind, str) and kind in CONFIGMAP_KINDS:
-            scrub_configmap(obj)
+            scrub_configmap(obj, app_settings=app_settings)
             return obj
         meta = obj.get("metadata")
         if isinstance(kind, str) and isinstance(meta, dict) and isinstance(meta.get("annotations"), dict):
             _reduce_applied(meta["annotations"])
+        bare = not app_settings and not system_namespace(_ns)
         env = obj.get("env")
         if isinstance(env, list):
-            scrub_env(env, every=light and not system_namespace(_ns))
+            scrub_env(env, every=bare)
+        if bare and (isinstance(obj.get("command"), list) or isinstance(obj.get("args"), list)):
+            shape_ = command_shape(obj)
+            gone = {k: len(obj.pop(k)) for k in ("command", "args") if isinstance(obj.get(k), list)}
+            obj[MARK] = {**(obj.get(MARK) if isinstance(obj.get(MARK), dict) else {}), "items_dropped": gone, "command_shape": shape_}
         for v in obj.values():
-            scrub_objects(v, light=light, _ns=_ns)
+            scrub_objects(v, app_settings=app_settings, _ns=_ns)
     elif isinstance(obj, list):
         for v in obj:
-            scrub_objects(v, light=light, _ns=_ns)
+            scrub_objects(v, app_settings=app_settings, _ns=_ns)
     return obj
 
 

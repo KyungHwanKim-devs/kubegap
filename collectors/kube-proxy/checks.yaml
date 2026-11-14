@@ -1390,7 +1390,7 @@
 - id: kubeproxy.node-cmd-unavailable
   name: kube-proxy mode and healthz could not be checked from inside the nodes
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: kubeproxy.summary
   cluster_level: true

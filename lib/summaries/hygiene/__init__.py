@@ -167,7 +167,7 @@ def _images(cx: Ctx) -> dict:
                         "tag_kind": kind_tag,
                         "pull_policy": pull,
                         "registry": registry,
-                        "holder": bool(re.search(r"\b(sleep|pause|tail -f)\b", " ".join([str(a) for a in (c.get("command") or [])] + [str(a) for a in (c.get("args") or [])]))),  # prepull holder containers that pre-fetch images onto nodes
+                        "holder": scrub.command_shape(c)["holder"],  # prepull holder containers that pre-fetch images onto nodes
                         "mutable": kind_tag in ("latest", "untagged"),
                         "always_pull_with_tag": pull == "Always" and kind_tag == "tag",
                     }

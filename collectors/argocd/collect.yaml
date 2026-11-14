@@ -3,6 +3,7 @@
 # server settings (admin, SSO, exec, insecure, RBAC default policy), whether notifications are configured, and controller metrics (sync results, k8s API errors, cluster cache age, git request failures, redis errors, gRPC errors).
 # Prometheus does not scrape the metrics (0 series observed, no ServiceMonitor). pod-metrics reads them via the proxy, falling back to curl from inside a node.
 - id: application-controller-metrics
+  unit: metrics
   type: pod-metrics
   namespace: argocd
   selector: app.kubernetes.io/name=argocd-application-controller
@@ -15,6 +16,7 @@
   keep: '^(argocd_app_(sync_total|reconcile_(sum|count))|argocd_app_k8s_request_total\{.*response_code="[45][0-9][0-9]"|argocd_cluster_(cache_age_seconds|api_resource_objects|api_resources|connection_status|events_total|info)|argocd_redis_request_total|argocd_kubectl_exec_(total|pending)|process_(start_time|resident_memory_bytes))'
   timeout: 30
 - id: repo-server-metrics
+  unit: metrics
   type: pod-metrics
   namespace: argocd
   selector: app.kubernetes.io/name=argocd-repo-server
@@ -26,6 +28,7 @@
   keep: '^(argocd_git_(request_total|lsremote_fail_total|fetch_fail_total|request_duration_seconds_(sum|count))|argocd_repo_pending_request_total|argocd_redis_request_total|process_(start_time|resident_memory_bytes))'
   timeout: 30
 - id: server-metrics
+  unit: metrics
   type: pod-metrics
   namespace: argocd
   selector: app.kubernetes.io/name=argocd-server

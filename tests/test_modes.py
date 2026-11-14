@@ -4,19 +4,12 @@ from __future__ import annotations
 
 import json
 
-from lib.collection import collect
-from lib.foundations import paths, rubric
+from lib.foundations import paths, rubric, units
 
 
-def test_step_in_mode_defaults_to_every_mode():
-    assert collect.step_in_mode({"id": "x", "type": "kubectl"}, "daily")
-    assert collect.step_in_mode({"id": "x", "type": "kubectl"}, "full")
-
-
-def test_step_marked_full_is_skipped_by_daily():
-    st = {"id": "krr", "type": "tool", "modes": ["full"]}
-    assert not collect.step_in_mode(st, "daily")
-    assert collect.step_in_mode(st, "full")
+def test_a_step_runs_when_the_mode_collects_its_unit():
+    assert units.collected("daily", "events") and units.collected("full", "events")
+    assert not units.collected("daily", "workload-tools") and units.collected("full", "workload-tools")
 
 
 def test_snapshot_mode_defaults_to_full_without_marker(tmp_path):
@@ -72,11 +65,12 @@ def test_latest_snapshot_by_mode(tmp_path):
     assert paths.resolve_snapshot("latest", "c", tmp_path) == f1
 
 
-def test_validate_modes_field():
+def test_a_check_names_the_units_it_needs_and_no_modes():
     base = {"id": "a.b", "name": "n", "area": "a", "type": "summary", "severity_default": "low", "rule": {"expr": "True"}, "test": {"cases": []}}
-    assert not [e for e in rubric.validate({**base, "modes": ["full"]}, "t") if "modes" in e]
-    assert [e for e in rubric.validate({**base, "modes": ["weekly"]}, "t") if "modes" in e]
-    assert [e for e in rubric.validate({**base, "modes": []}, "t") if "modes" in e]
+    assert not [e for e in rubric.validate({**base, "needs": ["node-os"]}, "t") if "needs" in e]
+    assert [e for e in rubric.validate({**base, "needs": ["weekly"]}, "t") if "needs" in e]
+    assert [e for e in rubric.validate({**base, "needs": []}, "t") if "needs" in e]
+    assert [e for e in rubric.validate({**base, "modes": ["full"]}, "t") if "modes" in e]
 
 
 def test_tenancy_pools_accept_string_taints(tmp_path):

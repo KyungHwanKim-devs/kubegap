@@ -15,7 +15,7 @@ from pathlib import Path
 from .. import __version__
 from ..collection import aws, kube, logsinks, monitoring, nodecommands
 from ..collection import discover as _discover
-from ..foundations import paths
+from ..foundations import paths, units
 from ..foundations.config import Config
 from ..foundations.runlog import RunLog
 from ..foundations.snapshot import write_private
@@ -225,9 +225,9 @@ def run_setup(
 
     # 4. AWS ------------------------------------------------------------------------------------------------
     _p("\n== 4/4 AWS permissions (EKS only)")
-    if cluster.get("is_eks") and mode == "daily":
-        result["aws"] = {"usable": None, "why": "not checked: a daily run calls no AWS API", "checks": {}}
-        _p("  not checked: a daily run calls no AWS API (a full run checks the permissions it needs)")
+    if cluster.get("is_eks") and not units.collected(mode, "cloud-account"):
+        result["aws"] = {"usable": None, "why": f"not checked: a {mode} run calls no AWS API", "checks": {}}
+        _p(f"  not checked: a {mode} run calls no AWS API (a full run checks the permissions it needs)")
     elif cluster.get("is_eks"):
         if "aws" in [t["name"] for t in status if not t["present"]]:
             result["aws"] = {"usable": False, "why": "aws CLI missing"}

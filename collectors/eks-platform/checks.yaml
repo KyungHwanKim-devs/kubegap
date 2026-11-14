@@ -1,6 +1,6 @@
 # EKS platform checks. Reads cluster.eks in inventory.json and the aws/ folder.
 - id: eks.audit-log-off
-  modes: [full]  # reads AWS APIs, which a daily run does not call
+  needs: [cloud-account]
   name: Control plane audit log disabled
   area: platform
   type: inventory
@@ -56,7 +56,7 @@
               addons: {}
 
 - id: eks.public-endpoint-open
-  modes: [full]  # reads AWS APIs, which a daily run does not call
+  needs: [cloud-account]
   name: Cluster public endpoint open to the whole world
   area: security
   type: inventory
@@ -134,7 +134,7 @@
 - id: eks.addon-outdated
   name: Managed add-on is not the latest version
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: inventory
   each: cluster.eks.addons
   rule:
@@ -243,10 +243,10 @@
                       - defaultVersion: true
 
 - id: eks.node-os-skew
-  modes: [full]  # reads AWS APIs, which a daily run does not call
   name: Node OS, kernel and container runtime skew
   area: platform
   type: inventory
+  needs: [cloud-account]
   cluster_level: true
   rule:
     expr: "len(inv['nodes'].get('os_images', [])) > 1 and len(inv['nodes'].get('runtimes', [])) > 1"
@@ -350,7 +350,7 @@
               - "containerd://2.1"
 
 - id: eks.ssm-unregistered
-  modes: [full]  # reads AWS APIs, which a daily run does not call
+  needs: [cloud-account]
   name: Node not registered with SSM
   area: platform
   type: inventory
@@ -419,7 +419,7 @@
 - id: eks.extended-support
   name: Extended support billing in effect
   area: cost
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: inventory
   cluster_level: true
   rule:
@@ -515,7 +515,7 @@
 - id: eks.no-backup-policy
   name: No EBS snapshot policy (DLM) or AWS Backup plan
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: inventory
   rule:
     needs: "aws_file('dlm-lifecycle-policies.json') is not None and aws_file('backup-plans.json') is not None"
@@ -675,7 +675,7 @@
           present: false
 
 - id: eks.acm-certificate-expiring
-  modes: [full]  # reads AWS APIs, which a daily run does not call
+  needs: [cloud-account]
   name: ACM certificate in use is expiring soon, expired, or cannot auto-renew
   area: security
   type: summary
@@ -786,7 +786,7 @@
 - id: eks.service-quota-near-limit
   name: AWS service quota usage near the limit (at the limit, node, LB and IP creation fail silently)
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: eksplatform.quotas
   cluster_level: true
@@ -858,7 +858,7 @@
           max_ratio: 0.6
           max_ratio_name: "VPC count"
 - id: storage.ebs-volume-io-saturated
-  modes: [full]  # reads AWS APIs, which a daily run does not call
+  needs: [cloud-account]
   name: EBS volume I/O saturation (queue length, IOPS limit, burst balance) — root volumes included
   area: storage
   type: summary
@@ -940,7 +940,7 @@
           max_queue: 0.26
           max_iops_ratio: 0.05
 - id: eks.security-group-open-to-world
-  modes: [full]  # reads AWS APIs, which a daily run does not call
+  needs: [cloud-account]
   name: Cluster security group inbound open to 0.0.0.0/0 (other than 443)
   area: security
   type: summary
@@ -1009,7 +1009,7 @@
           public_cidrs:
             - "0.0.0.0/0"
 - id: eks.nodegroup-ami-old
-  modes: [full]  # reads AWS APIs, which a daily run does not call
+  needs: [cloud-account]
   name: Managed node group AMI is old (kernel and containerd patches not applied)
   area: platform
   type: summary

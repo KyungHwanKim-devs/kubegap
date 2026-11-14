@@ -2,7 +2,7 @@
 - id: vpccni.node-ip-exhaustion
   name: Node pod IPs near the limit of its instance type
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.nodes
   rule:
@@ -215,7 +215,7 @@
 - id: vpccni.no-available-ip
   name: ipamd has already answered "no available IP" on a node
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.nodes
   rule:
@@ -277,7 +277,7 @@
 - id: vpccni.max-pods-exceeds-ip-capacity
   name: Node max-pods is larger than the number of IPs the CNI can hand out
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.nodes
   rule:
@@ -376,7 +376,7 @@
 - id: vpccni.prefix-delegation-off
   name: nitro nodes but prefix delegation is off (IP limit is 16x smaller)
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.warm.summary
   cluster_level: true
@@ -501,7 +501,7 @@
             - "ip-10-0-2-60.us-east-1.compute.internal"
             - "ip-10-0-2-83.us-east-1.compute.internal"
 - id: vpccni.subnet-ips-low
-  modes: [full]  # reads AWS APIs, which a daily run does not call
+  needs: [cloud-account]
   name: Node subnet has few free IPs
   area: traffic
   type: summary
@@ -652,7 +652,7 @@
 - id: vpccni.ec2-api-errors
   name: aws-node accumulating EC2 API call failures (IAM, throttling, subnet)
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.nodes
   rule:
@@ -817,7 +817,7 @@
 - id: vpccni.metrics-unreadable
   name: Nodes whose ipamd metrics could not be read (IP usage is an estimate only)
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: vpccni.warm.summary
   cluster_level: true
@@ -949,7 +949,7 @@
 - id: vpccni.external-snat-off-with-private-routes
   name: Pod traffic to peered networks is SNATed to the node IP (external SNAT off while the VPC has peering, transit gateway or VPN routes)
   area: traffic
-  modes: [full]   # the VPC route tables are collected in the full run only
+  needs: [cloud-account]
   type: summary
   each: vpccni.snat
   cluster_level: true

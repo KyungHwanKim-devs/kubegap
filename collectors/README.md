@@ -5,7 +5,7 @@ One collector = one folder. Each folder has these files (the first four always, 
 | File | Role |
 |---|---|
 | `detect` | Rule that decides whether the component is installed. If false, the collector is skipped; if the component's family is expected at the cluster's scale (`rubric/scales.yaml`), this becomes an absence finding |
-| `collect.yaml` | List of steps to run (kubectl, PromQL, AWS CLI, CloudWatch, node commands, external tools). Each step has an id, timeout, failure handling and output path |
+| `collect.yaml` | List of steps to run (kubectl, PromQL, AWS CLI, CloudWatch, node commands, external tools). Each step has an id, the collection unit it belongs to (`unit:`, one of `collectors/units.yaml`; the unit decides which modes run the step), timeout, failure handling and output path |
 | `checks.yaml` | List of check definitions, each with embedded `test.cases` |
 | `signatures.yaml` | Log signatures for this component |
 | `metrics.yaml`, `cwlogs.yaml` | PromQL and CloudWatch Logs Insights queries referenced by `collect.yaml` (where used) |

@@ -6,7 +6,7 @@
 # 4) ipamd log: the IP management daemon writes zap JSON to /var/log/aws-routed-eni/ipamd.log on the node, not to the pod log (the pod log holds the entrypoint's logrus lines only),
 #    so the three vpc-cni log signatures read it from the node: the lines of level warn and higher of the last 24 hours, capped like the kubelet journal (#158). Output logs/node/<node>/ipamd-24h.log.
 - id: ipamd-metrics
-  modes: [full]   # skipped by the daily run
+  unit: node-os
   type: node
   nodes: all
   cmd: curl -s -m 5 http://127.0.0.1:61678/metrics | grep -E '^awscni_' | grep -vE 'per_cidr|_bucket'
@@ -14,7 +14,7 @@
   out: logs/node/{node}/awscni.prom
   timeout: 30
 - id: ipamd-log
-  modes: [full]   # skipped by the daily run
+  unit: node-os
   type: node
   nodes: all
   cmd: >
@@ -27,7 +27,7 @@
   out: logs/node/{node}/ipamd-24h.log
   timeout: 60
 - id: instance-type-network
-  modes: [full]   # a daily run makes no AWS API call
+  unit: cloud-account
   type: aws
   source: "ec2 DescribeInstanceTypes: output DescribeInstanceTypesResult awscli/botocore/data/ec2/2016-11-15/service-2.json:29382@2.39.3, input DescribeInstanceTypesRequest :29351; fields in references/sources.md (#125)"
   for_each: instance_types

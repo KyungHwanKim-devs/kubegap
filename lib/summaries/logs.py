@@ -19,7 +19,7 @@ import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from ..foundations import paths
+from ..foundations import paths, units
 from ..foundations import podmetrics as _pm
 from ..foundations.logtext import normalize_message
 from ..foundations.mask import mask_text, strip_control
@@ -454,7 +454,7 @@ LOG_SCAN_KEYS = ("files_scanned", "lines_scanned", "lines_kept", "error_lines_un
 
 def scan_section(snap: Path, sigs: list[Signature]) -> dict:
     """Everything in the logs section that needs the raw files: the signature scan plus the file and component lists."""
-    res = scan(snap, sigs, keep_lines=paths.snapshot_mode(snap) != "daily")
+    res = scan(snap, sigs, keep_lines=units.collected(snap, "component-log-samples"))
     ldir = snap / "logs"
     files = [str(f.relative_to(snap)) for f in sorted(ldir.rglob("*")) if f.is_file()] if ldir.is_dir() else []
     pods_dir = snap / COMPONENT_LOGS_DIR

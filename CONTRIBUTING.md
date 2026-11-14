@@ -1,6 +1,6 @@
 # Contributing
 
-kubegap is a read-only audit of a Kubernetes cluster: `collect` writes a snapshot, `summarize` turns it into summary.json, `evaluate` judges the checks of `collectors/*/checks.yaml`, and the report is written from that. Code lives in `lib/` in six layer packages (`foundations`, `collection`, `summaries`, `judgement`, `output`, `commands`); what to collect and what counts as a problem lives in data files next to it (`collectors/*/*.yaml`, `rubric/`, `signatures/`, `references/*.yaml`). This file is the procedure, the rules and the review checklist. The mechanics behind them, such as what the regression harness compares, what `modes:` does, how tools are pinned, which helper lives where and how the layers may import each other, are in [`references/development.md`](references/development.md).
+kubegap is a read-only audit of a Kubernetes cluster: `collect` writes a snapshot, `summarize` turns it into summary.json, `evaluate` judges the checks of `collectors/*/checks.yaml`, and the report is written from that. Code lives in `lib/` in six layer packages (`foundations`, `collection`, `summaries`, `judgement`, `output`, `commands`); what to collect and what counts as a problem lives in data files next to it (`collectors/*/*.yaml`, `rubric/`, `signatures/`, `references/*.yaml`). This file is the procedure, the rules and the review checklist. The mechanics behind them, such as what the regression harness compares, what collection units and modes are, how tools are pinned, which helper lives where and how the layers may import each other, are in [`references/development.md`](references/development.md).
 
 한국어는 아래에 있습니다. [Korean follows the English.](#기여하기)
 
@@ -71,7 +71,7 @@ Maintainers and the review agent go through the same list, in this order, and th
 
 # 기여하기
 
-kubegap 은 Kubernetes 클러스터를 읽기 전용으로 점검합니다. `collect` 가 스냅샷을 쓰고, `summarize` 가 summary.json 으로 바꾸고, `evaluate` 가 `collectors/*/checks.yaml` 의 체크를 판정하고, 그 결과로 리포트를 씁니다. 코드는 `lib/` 의 층 패키지 여섯(`foundations`·`collection`·`summaries`·`judgement`·`output`·`commands`)에 있고, 무엇을 모으고 무엇을 문제로 치는지는 그 옆의 데이터 파일(`collectors/*/*.yaml`·`rubric/`·`signatures/`·`references/*.yaml`)에 있습니다. 이 파일은 절차와 규칙과 리뷰 체크리스트입니다. 그 뒤의 기계적인 것, 곧 회귀 하네스가 무엇을 비교하는지, `modes:` 가 무엇을 하는지, 도구를 어떻게 고정하는지, 어느 헬퍼가 어디 사는지, 층이 서로 무엇을 import 해도 되는지는 [`references/development.md`](references/development.md) 에 있습니다.
+kubegap 은 Kubernetes 클러스터를 읽기 전용으로 점검합니다. `collect` 가 스냅샷을 쓰고, `summarize` 가 summary.json 으로 바꾸고, `evaluate` 가 `collectors/*/checks.yaml` 의 체크를 판정하고, 그 결과로 리포트를 씁니다. 코드는 `lib/` 의 층 패키지 여섯(`foundations`·`collection`·`summaries`·`judgement`·`output`·`commands`)에 있고, 무엇을 모으고 무엇을 문제로 치는지는 그 옆의 데이터 파일(`collectors/*/*.yaml`·`rubric/`·`signatures/`·`references/*.yaml`)에 있습니다. 이 파일은 절차와 규칙과 리뷰 체크리스트입니다. 그 뒤의 기계적인 것, 곧 회귀 하네스가 무엇을 비교하는지, 수집 단위와 모드가 무엇인지, 도구를 어떻게 고정하는지, 어느 헬퍼가 어디 사는지, 층이 서로 무엇을 import 해도 되는지는 [`references/development.md`](references/development.md) 에 있습니다.
 
 ## 체크를 더하거나 고치는 절차, 끝까지
 

@@ -1720,7 +1720,7 @@
           traffic_unhealthy_target_groups: 6
           cluster_name_arg: "my-cluster-eks"
 - id: albctl.target-group-without-tgb
-  modes: [full]  # reads AWS APIs, which a daily run does not call
+  needs: [cloud-account]
   name: Target group in AWS that no TargetGroupBinding owns
   area: traffic
   type: summary

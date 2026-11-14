@@ -7,6 +7,8 @@
 #   aws              : aws CLI (used by the eks-platform collector)
 # Common: timeout (seconds), on_fail (skip|abort, default skip)
 - id: objects.dump-all
+  unit: cluster-objects
+  adds: [app-settings]
   type: kubectl-dump-all
   timeout: 120
   exclude:
@@ -25,21 +27,25 @@
     - nodes.metrics.k8s.io
     - packagerevisions.*             # very large
 - id: events
+  unit: events
   type: kubectl
   args: [get, events, -A, -o, json]
   out: events.json
   timeout: 120
 - id: top.nodes
+  unit: live-usage
   type: kubectl
   args: [top, nodes, --no-headers]
   out: metrics/top-nodes.txt
   timeout: 30
 - id: top.pods
+  unit: live-usage
   type: kubectl
   args: [top, pods, -A, --no-headers, --containers]
   out: metrics/top-pods.txt
   timeout: 60
 - id: metrics.core
+  unit: metrics
   type: promql
   file: metrics.yaml
   timeout: 30
@@ -47,7 +53,7 @@
 # node item: script ships a file from collectors/core/ to the node and runs it (EKS = SSM as root, SSH = login user plus kubegap-sudoers read-only commands).
 # No requires: the script leaves sections it has no permission for empty and the parser (lib/summaries/nodeos.py) records them as "no permission". Output logs/node/<node>/os.txt.
 - id: node-os
-  modes: [full]   # skipped by the daily run
+  unit: node-os
   type: node
   nodes: all
   script: node-os.sh
@@ -55,7 +61,7 @@
   timeout: 120
 # Effective kubelet config (eviction thresholds, reserved resources, log rotation, maxPods). Read through the apiserver node proxy without node access (all platforms).
 - id: kubelet-configz
-  modes: [full]   # skipped by the daily run
+  unit: kubelet-config
   type: kubectl
   for_each: nodes
   args: [get, --raw, "/api/v1/nodes/{item}/proxy/configz"]
@@ -65,6 +71,8 @@
 # component-logs: kubectl logs (--all-containers --prefix --timestamps) for each workload of a detected component (components_present). User application logs are not fetched (that is Loki's job).
 # Output logs/pods/<component>/<ns>_<workload>.log. Signatures (signatures/catalog.yaml) read these files. No file is written for an empty log.
 - id: component-logs
+  unit: component-log-counts
+  adds: [component-log-samples]
   type: component-logs
   since: 24h
   tail: 1500
@@ -74,7 +82,7 @@
 # KRR (Robusta): per-container request/limit recommendations from 7 days of Prometheus history. Read-only (kube API list + PromQL). Output tools/krr.json → summary.resources.krr.
 # Skipped when the tool is missing (report section "tool missing"); the check resources.krr-recommendation becomes tool-missing. Takes about 3 minutes on a small 2-node cluster. Reuses the Prometheus port-forward opened by Stores.
 - id: krr
-  modes: [full]   # skipped by the daily run
+  unit: workload-tools
   type: tool
   tool: krr
   cmd: [krr, simple, -c, "{context}", -p, "{prometheus_url}", -f, json, -q, --logtostderr, --fileoutput, "{out}", --max-workers, "4"]
@@ -84,7 +92,7 @@
   timeout: 900
 # ---- Structure and hygiene tools. All read-only. polaris, kubent and helm read the cluster (Polaris cannot read List objects from snapshot files); pluto reads what objects.dump-all saved. Typical runtime on a 7-node EKS cluster: polaris ~4s, pluto <1s, kubent ~10s, helm <1s ----
 - id: polaris
-  modes: [full]   # skipped by the daily run
+  unit: workload-tools
   type: tool
   tool: polaris
   # Not --only-show-failed-tests: it drops every controller whose only failures are controller-level checks (missingPodDisruptionBudget, deploymentMissingReplicas …),
@@ -95,7 +103,7 @@
   out: tools/polaris.json
   timeout: 300
 - id: pluto
-  modes: [full]   # skipped by the daily run
+  unit: workload-tools
   type: tool
   tool: pluto
   # `detect -` reads a manifest List on stdin and contacts nothing. The List is built by lib/foundations/lastapplied.py from the objects saved above, so this step depends on objects.dump-all
@@ -110,7 +118,7 @@
   out: tools/pluto.json
   timeout: 60
 - id: kubent
-  modes: [full]   # skipped by the daily run
+  unit: workload-tools
   type: tool
   tool: kubent
   # --log-level=debug: the per-List lines `Retrieving: <gvr>` and `Failed to retrieve: <gvr>: <err>` (pkg/collector/cluster.go:121,124@0.7.3) are Debug, the default level is Info
@@ -121,7 +129,7 @@
   timeout: 300
 # Helm keeps each release record in a Secret (sh.helm.release.v1.<name>.v<n>), so `helm list` reads Secrets. kubegap stores only what list prints: name, namespace, status, revision, chart and app version, updated. User values (`helm get values`) are not collected: they often hold credentials. The shipped ClusterRole has no secrets permission, so with it this step fails and the Helm checks are skipped (lib/summaries/hygiene says why).
 - id: helm-list
-  modes: [full]   # skipped by the daily run
+  unit: helm-releases
   type: tool
   tool: helm
   cmd: [helm, list, -A, -o, json, --kube-context, "{context}", --deployed, --failed, --pending, --uninstalling, --uninstalled]

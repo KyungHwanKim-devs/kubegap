@@ -39,7 +39,7 @@ import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ..foundations import paths, shell
+from ..foundations import paths, shell, units
 from ..foundations.snapshot import write_private, write_private_bytes
 
 
@@ -817,14 +817,14 @@ def by_name(name: str) -> Tool | None:
 
 
 def check_ids(patterns: list[str], catalog: dict[str, dict]) -> list[str]:
-    """The check ids of the catalog (id -> check) that `patterns` name, sorted: an id, `<prefix>.*`, `<prefix>.*@full` (full-mode-only
-    checks of that prefix), or "*"."""
+    """The check ids of the catalog (id -> check) that `patterns` name, sorted: an id, `<prefix>.*`, `<prefix>.*@full` (the checks of that prefix
+    that need a collection unit the daily run leaves out), or "*"."""
     out: set[str] = set()
     for pat in patterns:
         if pat == "*":
             out |= set(catalog)
         elif pat.endswith(".*@full"):
-            out |= {c for c, chk in catalog.items() if c.startswith(pat[: -len("*@full")]) and chk.get("modes") == ["full"]}
+            out |= {c for c, chk in catalog.items() if c.startswith(pat[: -len("*@full")]) and units.missing(chk.get("needs"), "daily")}
         elif pat.endswith(".*"):
             out |= {c for c in catalog if c.startswith(pat[:-1])}
         elif pat in catalog:

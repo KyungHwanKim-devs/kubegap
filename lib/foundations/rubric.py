@@ -7,6 +7,7 @@ import functools as _functools
 import json
 
 from . import paths, yamlite
+from . import units as _units
 
 TYPES = ("metric", "object", "summary", "inventory", "absence", "aws", "llm", "signature")
 SEVERITIES = ("critical", "high", "medium", "low", "info")
@@ -122,7 +123,7 @@ def load_known_issues() -> tuple[dict[str, list[dict]], list[str]]:
     return out, errors
 
 
-# The parts of a check that decide its verdict. Not here: the texts (rewording is not a rule change) and the gates `modes`, `platforms`, `scales`, `requires_tool`,
+# The parts of a check that decide its verdict. Not here: the texts (rewording is not a rule change) and the gates `needs`, `platforms`, `scales`, `requires_tool`,
 # whose effect is already visible in check_results.status (not-collected, disabled, tool-missing) and is classified by diff from that status.
 RULE_HASH_KEYS = ("type", "inputs", "join_on", "join_any", "each", "cluster_level", "target", "rule", "exclude_transient")
 
@@ -196,9 +197,11 @@ def validate(check: dict, source: str) -> list[str]:
     if "measured" in check and not (isinstance(check["measured"], str) and check["measured"].strip()):
         # What was measured on the clusters the check was written on; the report keeps it apart from public cases
         errs.append(f"{source}: {check.get('id')} measured must be non-empty text")
-    modes = check.get("modes")
-    if modes is not None and (not isinstance(modes, list) or not modes or any(m not in ("daily", "full") for m in modes)):
-        errs.append(f"{source}: {check.get('id')} modes must be a non-empty list of daily/full")
+    if "modes" in check:
+        errs.append(f"{source}: {check.get('id')} has `modes`; a check names the collection units it cannot be judged without (`needs`), and the units say which modes collect them (collectors/units.yaml)")
+    needs = check.get("needs")
+    if needs is not None and (not isinstance(needs, list) or not needs or any(n not in _units.ids() for n in needs)):
+        errs.append(f"{source}: {check.get('id')} needs must be a non-empty list of collection units ({', '.join(_units.ids())})")
     cid = check.get("id") or ""
     if cid.count(".") < 1:
         errs.append(f"{source}: id {cid!r} must have the form <area>.<check-id>")

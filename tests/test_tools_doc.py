@@ -50,7 +50,7 @@ def test_every_tool_is_run_by_a_step_or_is_a_client():
 
 
 def test_checks_text_counts_a_prefix_and_keeps_an_id():
-    catalog = {"node.a": {"modes": ["full"]}, "node.b": {}, "eks.x": {}, "resources.krr-recommendation": {"requires_tool": "krr"}}
+    catalog = {"node.a": {"needs": ["node-os"]}, "node.b": {}, "eks.x": {}, "resources.krr-recommendation": {"requires_tool": "krr"}}
     assert tools.checks_text(["node.*", "resources.krr-recommendation"], catalog) == "node.* (2), resources.krr-recommendation"
     assert tools.checks_text(["node.*@full"], catalog) == "node.* (1, full mode)"
     assert tools.check_ids(["node.*@full"], catalog) == ["node.a"], "the Prometheus-read node checks run without node access and are not counted"

@@ -2,7 +2,7 @@
 - id: platform.k3s-secrets-encryption-off
   name: k3s Secret encryption at rest is off (--secrets-encryption)
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: k3s.nodes
   platforms: [k3s]
@@ -321,7 +321,7 @@
 - id: platform.k3s-check-config-missing
   name: k3s check-config reports missing kernel settings
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: k3s.cluster
   cluster_level: true
@@ -407,7 +407,7 @@
 - id: platform.k3s-etcd-snapshot-stale
   name: Embedded etcd snapshots missing or stale
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: k3s.nodes
   platforms: [k3s]
@@ -755,7 +755,7 @@
 - id: platform.k3s-etcd-snapshot-local-only
   name: etcd snapshots exist only on the server node disk (no off-site copy)
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: k3s.nodes
   platforms: [k3s]
@@ -917,7 +917,7 @@
 - id: platform.k3s-certificate-expiring
   name: k3s internal certificates expiring soon
   area: security
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: k3s.nodes
   platforms: [k3s]
@@ -1146,7 +1146,7 @@
 - id: platform.k3s-journald-unbounded
   name: No journald size cap (k3s logs fill the disk)
   area: node
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: k3s.nodes
   platforms: [k3s]
@@ -1446,7 +1446,7 @@
 - id: platform.k3s-apiserver-bind-all
   name: apiserver 6443 is open on all interfaces
   area: security
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: k3s.cluster
   cluster_level: true
@@ -1533,7 +1533,7 @@
 - id: node.smartmontools-missing
   name: smartmontools missing (disk SMART status not visible)
   area: node
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: k3s.nodes
   platforms: [k3s]
@@ -1757,7 +1757,7 @@
 - id: node.thermal-high
   name: Node temperature high
   area: node
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: k3s.nodes
   platforms: [k3s]
@@ -1981,7 +1981,7 @@
 - id: platform.k3s-datastore-slow
   name: k3s datastore (etcd/kine) requests are slow (apply latency, fdatasync, leader changes)
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: k3s.cluster.datastore
   cluster_level: true
@@ -2197,7 +2197,7 @@
 - id: platform.k3s-datastore-large
   name: k3s datastore DB is large (near the 2GiB etcd quota)
   area: platform
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: k3s.cluster.datastore
   cluster_level: true

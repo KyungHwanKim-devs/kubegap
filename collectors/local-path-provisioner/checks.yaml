@@ -2,7 +2,7 @@
 - id: storage.local-path-over-capacity
   name: local-path volume usage exceeds the PVC capacity (capacity is not enforced)
   area: storage
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.over_capacity
   platforms: [k3s]
@@ -33,7 +33,7 @@
 - id: storage.local-path-node-pinned
   name: Workloads pinned to a node by a local-path PV (cannot start if that node dies)
   area: storage
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.summary
   cluster_level: true
@@ -76,7 +76,7 @@
 - id: storage.local-path-fs-near-full
   name: Node filesystem hosting local-path volumes has little free space (volumes have no capacity limit)
   area: storage
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.summary
   cluster_level: true
@@ -743,7 +743,7 @@
 - id: storage.local-path-orphan-dirs
   name: local-path directories without a PV remain (leftover data from deleted PVCs)
   area: storage
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.summary
   cluster_level: true
@@ -1156,7 +1156,7 @@
 - id: storage.local-path-prod-delete-reclaim
   name: prod local-path PVs have reclaimPolicy Delete (deleting the PVC deletes the data immediately, no snapshot)
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.summary
   cluster_level: true
@@ -1416,7 +1416,7 @@
 - id: storage.local-path-provisioner-unhealthy
   name: local-path-provisioner is not ready or its configuration is empty
   area: storage
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: local_path.summary
   cluster_level: true

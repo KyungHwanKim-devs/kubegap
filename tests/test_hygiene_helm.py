@@ -18,7 +18,7 @@ def test_missing_note_distinguishes_permission_tool_and_mode(tmp_path):
     assert "Secrets" in n and "permission" in n and "ClusterRole" in n
     _write(tmp_path, {"ok": False, "skipped": "tool helm missing", "tool_missing": "helm"})
     assert "not installed" in hygiene.toolreports.helm_missing_note(tmp_path)
-    _write(tmp_path, {"ok": True, "skipped": "not collected in daily mode", "mode_skipped": True})
+    _write(tmp_path, {"ok": True, "skipped": "a daily run does not collect helm-releases", "mode_skipped": True})
     assert "daily" in hygiene.toolreports.helm_missing_note(tmp_path)
     _write(tmp_path, {"ok": False, "error": "context deadline exceeded"})
     assert "context deadline exceeded" in hygiene.toolreports.helm_missing_note(tmp_path)

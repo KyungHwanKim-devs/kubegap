@@ -15,13 +15,13 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from ...foundations import paths, yamlite
+from ...foundations import paths, units, yamlite
 from ...foundations.config import Config
 from ...foundations.runlog import RunLog
 from ...foundations.snapshot import remove_stale_temp, write_private
 from ..prom import Prometheus
 from .cloud_steps import step_alb_metrics, step_aws, step_cw_metrics, step_cwlogs
-from .context import CollectState, NodeRunner, StepContext, Stores, step_in_mode
+from .context import CollectState, NodeRunner, StepContext, Stores
 from .http_steps import step_http, step_promql
 from .k8s_steps import step_component_logs, step_kubectl, step_kubectl_dump_all, step_pod_metrics
 from .node_steps import step_node
@@ -89,8 +89,9 @@ def run_collector(
         sid, typ = st["id"], st["type"]
         if echo:
             echo(f"  [{name}] {sid}")
-        if not step_in_mode(st, mode):
-            result["steps"][sid] = ctx.skip(sid, f"not collected in {mode} mode", {"ok": True, "skipped": f"not collected in {mode} mode", "mode_skipped": True, "out": st.get("out") or st.get("file")})
+        if not units.collected(mode, st["unit"]):
+            why = f"a {mode} run does not collect {st['unit']}"
+            result["steps"][sid] = ctx.skip(sid, why, {"ok": True, "skipped": why, "mode_skipped": True, "unit": st["unit"], "out": st.get("out") or st.get("file")})
             continue
         handler = STEP_HANDLERS.get(typ)
         if handler is None:

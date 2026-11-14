@@ -29,6 +29,7 @@ from pathlib import Path
 
 from ..foundations import paths
 from ..foundations import rubric as _rubric
+from ..foundations import units as _units
 from ..foundations.snapshot import load_json
 from . import glossary as _glossary
 from . import outline as _facts
@@ -106,6 +107,11 @@ UNSEEN = {
         "storage.local-path-over-capacity": "local-path 볼륨이 요청한 용량을 넘은 것",
         "storage.local-path-fs-near-full": "노드 디스크가 차는 것",
         "controlplane.webhook-call-failures": "API 서버의 웹훅 호출 실패",
+        "controlplane.scheduler-unschedulable": "스케줄러가 파드를 배치하지 못한 기록",
+        "hygiene.deprecated-api": "다음 Kubernetes 버전에서 없어지는 API를 쓰는 것",
+        "resilience.backup-same-node": "백업이 원본 데이터베이스와 같은 노드에만 있는 것",
+        "resilience.prod-db-without-backup-cronjob": "백업 작업이 없는 운영 데이터베이스",
+        "security.plaintext-configmap-secret": "ConfigMap에 적힌 비밀 값",
         "security.eks-secrets-encryption-off": "EKS의 Secret 암호화 설정",
         "security.imds-hop-limit": "파드가 노드의 IAM 자격 증명에 닿을 수 있는 설정",
         "traffic.alb-unhealthy-targets": "로드밸런서 뒤의 비정상 대상",
@@ -122,12 +128,12 @@ UNSEEN = {
 
 
 def serious_full_only(platform: str | None, collectors: list[str] | None) -> list[dict]:
-    """The checks a daily run cannot judge although their finding would be serious: full-only, critical or high at some scale, and belonging
-    to this cluster (its platform, and a collector that ran)."""
+    """The checks a daily run cannot judge although their finding would be serious: they need a collection unit the daily run leaves out
+    (collectors/units.yaml), are critical or high at some scale, and belong to this cluster (its platform, and a collector that ran)."""
     out = []
     for c in _rubric.catalog():
         sev = c["severity_default"]
-        if c.get("modes") != ["full"] or not any(v in ("critical", "high") for v in (sev.values() if isinstance(sev, dict) else [sev])):
+        if not _units.missing(c.get("needs"), "daily") or not any(v in ("critical", "high") for v in (sev.values() if isinstance(sev, dict) else [sev])):
             continue
         if _rubric.applies(c, platform, "large") or (collectors is not None and c.get("collector") not in collectors):
             continue

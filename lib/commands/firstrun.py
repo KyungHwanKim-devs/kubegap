@@ -32,7 +32,7 @@ import json
 from pathlib import Path
 
 from ..collection.discover import SSH_PLATFORMS
-from ..foundations import paths, rubric
+from ..foundations import paths, rubric, units
 from ..foundations.config import Config
 from ..foundations.snapshot import load_json, write_private
 from . import tools
@@ -57,7 +57,7 @@ def node_script_checks() -> int:
     """Checks that read the node scripts or the kubelet configuration: the `node.*` checks a daily run does not collect. The `node.*` metric
     checks read Prometheus and run without node access. This is the catalog's count; a few of them run on one platform only (two are for
     k3s), so the texts say "up to"."""
-    return sum(1 for c in _checks() if c["id"].startswith("node.") and c.get("modes") == ["full"])
+    return sum(1 for c in _checks() if c["id"].startswith("node.") and units.missing(c.get("needs"), "daily"))
 
 
 # ---------- remembered answers ----------

@@ -2,7 +2,7 @@
 - id: traffic.flannel-mtu-mismatch
   name: flannel vxlan MTU is not the underlay interface MTU − 50
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: flannel.nodes
   platforms: [k3s]
@@ -215,7 +215,7 @@
 - id: traffic.flannel-errors
   name: flannel.1 interface errors and drops
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: flannel.nodes
   platforms: [k3s]
@@ -438,7 +438,7 @@
 - id: traffic.podcidr-near-full
   name: Node pod CIDR nearly full
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: flannel.podcidr
   platforms: [k3s]
@@ -480,7 +480,7 @@
 - id: traffic.flannel-sysctl-off
   name: ip_forward or bridge-nf-call-iptables disabled on a flannel node (same-node Service traffic breaks)
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: flannel.summary
   cluster_level: true
@@ -566,7 +566,7 @@
 - id: traffic.flannel-vxlan-cross-subnet
   name: Nodes in different subnets connected over flannel vxlan (unencrypted)
   area: security
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: flannel.summary
   cluster_level: true
@@ -683,7 +683,7 @@
 - id: traffic.flannel-drops-growing
   name: Errors and drops on flannel.1/cni0 increasing over 24 hours
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: flannel.summary
   cluster_level: true
@@ -836,7 +836,7 @@
 - id: traffic.flannel-node-data-missing
   name: Some nodes' flannel data could not be read
   area: traffic
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [node-os]
   type: summary
   each: flannel.summary
   cluster_level: true

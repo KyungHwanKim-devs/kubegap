@@ -12,7 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from lib.foundations import yamlite
+from lib.foundations import units, yamlite
 
 ROOT = Path(__file__).resolve().parent.parent
 ROLE_FILE = ROOT / "deploy" / "permissions" / "clusterrole.yaml"
@@ -427,8 +427,8 @@ def _steps_in_cell(cell: str, steps: dict[str, dict]) -> list[str]:
 def _mode_of(step_names: list[str], steps: dict[str, dict]) -> str | None:
     if not step_names:
         return None
-    modes = {tuple(steps[s].get("modes") or ()) for s in step_names}
-    return "full" if modes == {("full",)} else "both"
+    daily = units.of_mode("daily")
+    return "full" if all(steps[s]["unit"] not in daily for s in step_names) else "both"
 
 
 def test_permissions_doc_kubernetes_table_matches_the_clusterrole():
@@ -473,7 +473,7 @@ def test_permissions_doc_steps_and_modes_match_the_collectors():
             if not named:
                 assert mode_cell.startswith("both"), (cells[0], mode_cell)
                 continue
-            full_only = [s for s in named if tuple(steps[s].get("modes") or ()) == ("full",)]
+            full_only = [s for s in named if steps[s]["unit"] not in units.of_mode("daily")]
             if _mode_of(named, steps) == "full" and not has_lib:
                 assert mode_cell == "full", (cells[0], mode_cell)
             else:

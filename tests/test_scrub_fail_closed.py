@@ -38,7 +38,7 @@ def fake_kubectl(tmp_path, monkeypatch):
 
 def _ctx(tmp_path, inv=None):
     log = RunLog(tmp_path / "run.log")
-    return collect.StepContext(name="core", folder=tmp_path, context=None, cfg=Config(), inv=inv or {}, snap=tmp_path, log=log, kubeconfig=None, prom=None, stores=None, node_access=None, echo=None, state=collect.CollectState())
+    return collect.StepContext(name="core", folder=tmp_path, context=None, cfg=Config(), inv=inv or {}, snap=tmp_path, log=log, kubeconfig=None, prom=None, stores=None, node_access=None, echo=None, state=collect.CollectState(), mode="full")
 
 
 def _canary_on_disk(root: Path) -> list[str]:
@@ -230,4 +230,4 @@ def test_discover_records_a_scrub_failure_per_kind_and_writes_the_others(tmp_pat
 def test_discover_source_uses_scrub_or_error_before_every_object_write():
     src = (Path(discover.__file__)).read_text(encoding="utf-8")
     body = src[src.index("def write_objects()") : src.index("ctx_info = kube.context_info")]
-    assert "scrub.scrub_or_error(data, light=daily)" in body and "failures[kind] = err" in body and "scrub_objects(" not in body
+    assert 'scrub.scrub_or_error(data, app_settings="app-settings" in have)' in body and "failures[kind] = err" in body and "scrub_objects(" not in body

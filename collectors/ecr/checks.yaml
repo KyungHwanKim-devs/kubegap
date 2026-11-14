@@ -2,7 +2,7 @@
 - id: ecr.scan-disabled
   name: ECR image vulnerability scanning disabled (no scanOnPush, no registry scan rules)
   area: security
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -746,7 +746,7 @@
 - id: ecr.tag-mutable-prod
   name: ECR repositories used by prod have mutable tags (a different image can be pushed under the same tag)
   area: security
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -1147,7 +1147,7 @@
 - id: ecr.no-lifecycle-policy
   name: ECR repositories without a lifecycle policy (images accumulate forever)
   area: cost
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -1773,7 +1773,7 @@
 - id: ecr.stale-storage
   name: Images accumulating in repositories not pulled for more than 90 days (storage that only costs money)
   area: cost
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -2605,7 +2605,7 @@
 - id: ecr.dockerhub-dependency
   name: Cluster pulls Docker Hub images directly with no pull-through cache (rate limits, outage propagation)
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -3240,7 +3240,7 @@
 - id: ecr.pull-failures
   name: Image pull failure events (ErrImagePull, BackOff)
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -3880,7 +3880,7 @@
 - id: ecr.no-replication
   name: No ECR replication rules (a region outage takes the images with it)
   area: resilience
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true
@@ -4458,7 +4458,7 @@
 - id: ecr.untagged-images
   name: Untagged images accumulating (no lifecycle untagged rule, or too loose)
   area: cost
-  modes: [full]   # needs inputs the daily run does not collect
+  needs: [cloud-account]
   type: summary
   each: ecr.summary
   cluster_level: true

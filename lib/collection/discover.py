@@ -35,7 +35,7 @@ import re
 from pathlib import Path
 
 from .. import __version__
-from ..foundations import paths, podmetrics, scrub
+from ..foundations import paths, podmetrics, scrub, units
 from ..foundations import rubric as _rubric
 from ..foundations.components import COMPONENTS, match_name
 from ..foundations.config import Config
@@ -269,8 +269,19 @@ def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log:
     return out
 
 
-DAILY_NO_AWS = "not read in a daily run (a daily run makes no AWS API call; a full run does)"
-DAILY_NO_NODES = "a daily run contacts no node; a full run reads the nodes when node access was chosen"
+def not_collected(mode: str, unit: str) -> str:
+    """Why something is unread, when the reason is that the run's mode does not collect its unit: the text the inventory carries in place of the data."""
+    return f"a {mode} run does not collect {unit} (collected by: {', '.join(units.modes_of(unit))})"
+
+
+def eks_facts_unread(eks: dict, cfg: Config, mode: str) -> dict:
+    """The EKS facts of the inventory when cloud-account is not collected: what the kubeconfig says, and why the rest is not there."""
+    return {"name": eks.get("name"), "region": cfg.get("aws_region") or eks.get("region"), "account": eks.get("account"), "profile": cfg.get("aws_profile") or eks.get("profile"), "error": not_collected(mode, "cloud-account")}
+
+
+def node_access_unread(mode: str) -> dict:
+    """The node access of the inventory when node-os is not collected: no node is contacted."""
+    return {"method": "none", "source": "mode", "reasons": [not_collected(mode, "node-os")], "ssm_registered": [], "ssm_unregistered": None}
 
 
 def _eks_facts(eks: dict, cfg: Config, snap: Path, log: RunLog) -> dict:
@@ -329,9 +340,9 @@ def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfi
     command: discovery is a collection module and does not read first-run answers itself; it has no default because nothing may contact a node by omission."""
     log = log or RunLog(snap / "run.log")
     log.stage("discover", "start", context=context)
-    # A daily run reads the Kubernetes API and the stores only: it calls no AWS API, contacts no node, and keeps no literal environment value outside
-    # the system namespaces. What it leaves unread is said in the inventory, so that the checks that need it are skipped with the reason and never pass.
-    daily = mode == "daily"
+    # The mode decides which units are read (collectors/units.yaml). Without cloud-account no AWS API is called, without node-os no node is contacted,
+    # without app-settings nothing an application is configured with is written. What is left unread is said in the inventory with the reason.
+    have = units.of_mode(mode)
     taken = _dt.datetime.now().astimezone()
     objs: dict = {}
     failures: dict = {}
@@ -347,7 +358,7 @@ def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfi
         for kind, data in objs.items():
             if data is None:
                 continue
-            err = scrub.scrub_or_error(data, light=daily)
+            err = scrub.scrub_or_error(data, app_settings="app-settings" in have)
             if err:  # the kind is not written at all; inventory.json records why under fetch_failures and run.log carries the failure
                 failures[kind] = err
                 log.command(id=f"discover.scrub-{kind}", cmd=["scrub", kind], code=0, seconds=0.0, error=err)
@@ -361,9 +372,8 @@ def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfi
     nodes = _node_summary(items(objs.get("nodes")))
     eks_facts = None
     aws_addons = None
-    if ctx_info.get("is_eks") and daily:
-        e = ctx_info.get("eks") or {}
-        eks_facts = {"name": e.get("name"), "region": cfg.get("aws_region") or e.get("region"), "account": e.get("account"), "profile": cfg.get("aws_profile") or e.get("profile"), "error": DAILY_NO_AWS}
+    if ctx_info.get("is_eks") and "cloud-account" not in have:
+        eks_facts = eks_facts_unread(ctx_info.get("eks") or {}, cfg, mode)
     elif ctx_info.get("is_eks"):
         eks_facts = _eks_facts(ctx_info.get("eks") or {}, cfg, snap, log)
         aws_addons = list((eks_facts.get("addons") or {}).keys())
@@ -371,8 +381,8 @@ def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfi
     platform, platform_reasons = detect_platform(ctx_info, nodes, comps, objs)
     write_objects()
     scale = _rubric.resolve_scale(cfg, scale_answer, nodes["count"])
-    if daily:
-        node_access = {"method": "none", "source": "mode", "reasons": [DAILY_NO_NODES], "ssm_registered": [], "ssm_unregistered": None}
+    if "node-os" not in have:
+        node_access = node_access_unread(mode)
     else:
         node_access = _node_access(platform, nodes, cfg, ctx_info.get("eks") if ctx_info.get("is_eks") else None, log, context=context, kubeconfig=kubeconfig, ssh_state=ssh_state)
 
