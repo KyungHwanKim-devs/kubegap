@@ -5,7 +5,7 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: k3s.nodes
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     needs: "item.get('role') != 'server' or item.get('server') is not None"
     needs_reason: "k3s server platform file not read (logs/node/<node>/k3s-platform.txt)"
@@ -20,7 +20,7 @@
     - "sudo k3s secrets-encrypt status"
   notes: k3s secrets encryption
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "skip"
         item:
@@ -219,7 +219,7 @@
   area: platform
   type: summary
   each: k3s.cluster.server_url_stale
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     expr: "True"
   target: "item['node']"
@@ -231,7 +231,7 @@
   verify:
     - "systemctl cat k3s | grep -A1 -- --server"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -246,7 +246,7 @@
   type: summary
   each: k3s.cluster
   cluster_level: true
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     expr: "item.get('version_skew') is True"
   target: "'cluster'"
@@ -258,7 +258,7 @@
   verify:
     - "kubectl get nodes -o wide"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -325,7 +325,7 @@
   type: summary
   each: k3s.cluster
   cluster_level: true
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     needs: "item.get('servers_read')"
     needs_reason: "no k3s server's platform file read (logs/node/<node>/k3s-platform.txt)"
@@ -339,7 +339,7 @@
   verify:
     - "k3s check-config"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "skip"
         item:
@@ -410,7 +410,7 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: k3s.nodes
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     expr: "item.get('role') == 'server' and (item.get('server') or {}).get('db_kind') == 'etcd' and ((item.get('server') or {}).get('etcd_snapshots') is not None) and (not (item.get('server') or {}).get('etcd_snapshots') or ((item.get('server') or {}).get('snapshot_latest_age_h') or 0) > 26) and 'k3s etcd-snapshot ls (no sudoers entry or no snapshots)' not in item.get('gaps', [])"
     warn_expr: "item.get('role') == 'server' and (item.get('server') or {}).get('db_kind') == 'etcd' and ((item.get('server') or {}).get('snapshot_interval_h') or 0) > 13"
@@ -423,7 +423,7 @@
   verify:
     - "sudo k3s etcd-snapshot ls"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -758,7 +758,7 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: k3s.nodes
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     needs: "item.get('role') != 'server' or item.get('server') is not None"
     needs_reason: "k3s server platform file not read (logs/node/<node>/k3s-platform.txt)"
@@ -772,7 +772,7 @@
   verify:
     - "sudo k3s etcd-snapshot ls; sudo ls -la /var/lib/rancher/k3s/server/db/snapshots"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "skip"
         item:
@@ -920,7 +920,7 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: k3s.nodes
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     expr: "item.get('role') == 'server' and ((item.get('server') or {}).get('certificates_min_days_left') is not None) and (item.get('server') or {}).get('certificates_min_days_left') < 30"
     warn_expr: "item.get('role') == 'server' and ((item.get('server') or {}).get('certificates_min_days_left') is not None) and (item.get('server') or {}).get('certificates_min_days_left') < 90"
@@ -933,7 +933,7 @@
   verify:
     - "sudo k3s certificate check"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -1149,7 +1149,7 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: k3s.nodes
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     warn_expr: "item.get('journald') is not None and not item['journald'].get('bounded') and (item['journald'].get('disk_mb') or 0) >= 500"
   target: "item['node']"
@@ -1163,7 +1163,7 @@
   verify:
     - "journalctl --disk-usage; cat /etc/systemd/journald.conf"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "warn"
         item:
@@ -1369,7 +1369,7 @@
   type: summary
   each: k3s.cluster
   cluster_level: true
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     expr: "len(item.get('disabled_without_replacement') or []) > 0"
   target: "'cluster'"
@@ -1381,7 +1381,7 @@
   verify:
     - "kubectl get svc -A | grep -i pending; kubectl get ingressclass"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -1450,7 +1450,7 @@
   type: summary
   each: k3s.cluster
   cluster_level: true
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     needs: "item.get('servers_read')"
     needs_reason: "no k3s server's platform file read (logs/node/<node>/k3s-platform.txt)"
@@ -1464,7 +1464,7 @@
   verify:
     - "sudo ss -ltnp | grep 6443; curl -sk https://<public-ip>:6443/version"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "skip"
         item:
@@ -1536,7 +1536,7 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: k3s.nodes
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     needs: "item.get('collected')"
     needs_reason: "nodes not collected"
@@ -1550,7 +1550,7 @@
   verify:
     - "sudo smartctl -H /dev/sda"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "warn"
         item:
@@ -1760,7 +1760,7 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: k3s.nodes
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     expr: "(item.get('thermal_max_c') or 0) >= 85"
     warn_expr: "(item.get('thermal_max_c') or 0) >= 75"
@@ -1773,7 +1773,7 @@
   verify:
     - "cat /sys/class/thermal/thermal_zone*/temp; sensors"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -2001,7 +2001,7 @@
   suggest: "Move etcd to a different disk (NVMe) via --data-dir, or reduce disk I/O on the same node (move Elasticsearch and backups to another node). If etcd_disk_wal_fsync_duration_seconds p99 exceeds 10ms it is a disk problem. For kine (SQLite): journalctl -u k3s | grep 'slow sql'."
   verify:
     - "ssh <server> sudo journalctl -u k3s --since -1h | grep -cE 'took too long|slow fdatasync|leader changed'"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "skip"
@@ -2214,7 +2214,7 @@
   suggest: "After k3s etcd-snapshot, run ETCDCTL_API=3 etcdctl --endpoints 127.0.0.1:2379 defrag (certificates in /var/lib/rancher/k3s/server/tls/etcd/). Find large key ranges with etcdctl get --prefix --keys-only /registry/events | wc -l."
   verify:
     - "ssh <server> sudo du -sm /var/lib/rancher/k3s/server/db"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "fail"

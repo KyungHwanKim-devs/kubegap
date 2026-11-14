@@ -12,7 +12,7 @@
     warn_expr: "item['controller_all_same_node']"
   target: "'cluster'"
   evidence: "f\"ebs-csi-controller replicas {item['controller_replicas']} / ready {item['controller_ready']}, all on one node {item['controller_all_same_node']}, node plugin {item['node_ready']}/{item['node_desired']}, version {item['version']} (add-on {item['addon_version']}, latest {item['addon_latest']})\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: true
   why: >
     Without the controller, new PVC provisioning, attach after node replacement, snapshots and expansion all stop — when a node dies and a StatefulSet moves, the PV cannot attach to the new node and the pod stays Pending. The default is 2 replicas with leader election; if both are on the same node, both disappear when that node fails.
@@ -21,7 +21,7 @@
   suggest: "Keep replicas 2 and confirm podAntiAffinity (present in the defaults). Also check that the node plugin (ebs-csi-node) is Ready on every node."
   verify:
     - "kubectl get deploy -n kube-system ebs-csi-controller -o wide ; kubectl get ds -n kube-system ebs-csi-node"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -257,7 +257,7 @@
   suggest: "Set a role with AmazonEBSCSIDriverPolicy as the add-on serviceAccountRoleArn and remove EBS permissions from the node role."
   verify:
     - "kubectl get sa -n kube-system ebs-csi-controller-sa -o jsonpath='{.metadata.annotations}' ; aws eks describe-addon --addon-name aws-ebs-csi-driver --query addon.serviceAccountRoleArn"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -384,7 +384,7 @@
   suggest: "Follow the attachError message: AttachmentLimitExceeded → the node attach limit (storage.node-attach-limit); 'already attached' → force detach from the old node (aws ec2 detach-volume --force risks data — first confirm the pod is not running on another node)."
   verify:
     - "kubectl get volumeattachments -o custom-columns=NAME:.metadata.name,PV:.spec.source.persistentVolumeName,NODE:.spec.nodeName,ATTACHED:.status.attached,ERR:.status.attachError.message"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -575,7 +575,7 @@
   suggest: "Set parameters.encrypted \"true\" on the gp3 class (+ optional kmsKeyId). Or aws ec2 enable-ebs-encryption-by-default (per region). Existing volumes only change via snapshot → encrypted copy."
   verify:
     - "kubectl get sc -o custom-columns=NAME:.metadata.name,PROV:.provisioner,ENC:.parameters.encrypted,EXP:.allowVolumeExpansion ; aws ec2 get-ebs-encryption-by-default"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -754,7 +754,7 @@
   suggest: "Read the FailedMount event message and the ebs-csi-node logs (logs/pods/ebs-csi/). Device name conflicts, filesystem corruption and incomplete attach are common."
   verify:
     - "sum by (method_name, grpc_status_code) (increase(csi_operations_seconds_count{driver_name=\"ebs.csi.aws.com\"}[24h]))"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -992,7 +992,7 @@
   suggest: "If slow, check the controller --batching (enabled) and EC2 API throttling (visible only when ebscsi.controller-metrics is enabled). With many nodes, raise attacher --worker-threads."
   verify:
     - "histogram_quantile(0.99, sum by (method_name, le) (rate(csi_operations_seconds_bucket{driver_name=\"ebs.csi.aws.com\"}[24h])))"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1279,7 +1279,7 @@
   suggest: "Add-on configurationValues: controller.enableMetrics true (+ kube-prometheus-stack picks up the ServiceMonitor by label)."
   verify:
     - "count({__name__=~\"(aws_ebs_csi|cloudprovider_aws)_api_request_duration_seconds_count\"})"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -1407,7 +1407,7 @@
   suggest: "In the add-on values, sidecars.attacher.additionalArgs --timeout=300s and similar. batching is already enabled."
   verify:
     - "kubectl get deploy -n kube-system ebs-csi-controller -o jsonpath='{.spec.template.spec.containers[*].args}' | tr ' ' '\\n' | grep timeout"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"

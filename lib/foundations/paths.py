@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent  # lib/foundations/paths.py
 BIN_DIR = ROOT / "scripts"
 LIB_DIR = ROOT / "lib"
 RUBRIC_DIR = ROOT / "rubric"
-PROFILES_DIR = RUBRIC_DIR / "profiles"
+PLATFORMS_DIR = RUBRIC_DIR / "platforms"
 COLLECTORS_DIR = ROOT / "collectors"
 
 

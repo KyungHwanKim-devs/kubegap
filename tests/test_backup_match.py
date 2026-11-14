@@ -7,7 +7,7 @@ from pathlib import Path
 
 from lib.summaries import resilience
 
-INV = {"cluster": {"platform": "k3s"}, "namespaces": {"prod_like": ["prod-a", "prod-b"]}, "profile": {"name": "lab"}, "nodes": {"nodes": []}}
+INV = {"cluster": {"platform": "k3s"}, "namespaces": {"prod_like": ["prod-a", "prod-b"]}, "scale": {"name": "small", "source": "guessed"}, "nodes": {"nodes": []}}
 
 
 def _sts(ns, name, image, labels=None):

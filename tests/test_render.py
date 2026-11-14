@@ -18,7 +18,7 @@ def _snap(tmp_path, with_fragments: bool):
                 "taken_at": "2026-10-26T10:00:00+09:00",
                 "signatures_version": "1.0.0",
                 "cluster": {"platform": "k3s", "server_version": "v1.33.0+k3s1", "cluster_name": "lab"},
-                "profile": {"name": "lab", "source": "detected"},
+                "scale": {"name": "small", "source": "guessed"},
                 "nodes": {"count": 2, "ready": 2},
                 "namespaces": {"count": 3},
                 "pods": {"count": 10},

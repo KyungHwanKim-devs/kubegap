@@ -25,7 +25,6 @@
   verify:
     - "kubectl -n monitoring top pod -l app.kubernetes.io/name=prometheus --containers"
     - "kubectl -n monitoring get pod -l app.kubernetes.io/name=prometheus -o jsonpath='{.items[*].status.containerStatuses[?(@.name==\"prometheus\")].lastState}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -474,7 +473,6 @@
   verify:
     - "kubectl -n monitoring exec prometheus-kube-prometheus-stack-prometheus-0 -c prometheus -- df -h /prometheus"
     - "kubectl -n monitoring get pvc"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1031,7 +1029,6 @@
   suggest: "Drop unused _bucket series with metricRelabelings on the ServiceMonitors (kube-apiserver, kube-etcd). If an app metric is at the top, remove IDs and URLs from its labels. Check the top metrics each time via /api/v1/status/tsdb."
   verify:
     - "kubectl -n monitoring port-forward svc/kube-prometheus-stack-prometheus 9090 & curl -s localhost:9090/api/v1/status/tsdb | jq '.data.seriesCountByMetricName[:10]'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1481,7 +1478,6 @@
   suggest: "For slow targets, check the response size (curl -w %{size_download}) and trim with metricRelabelings or raise scrapeTimeout. For sampleLimit exceeded, raise sampleLimit on that ServiceMonitor or reduce the metrics."
   verify:
     - "curl -s localhost:9090/api/v1/query --data-urlencode 'query=topk(10, scrape_duration_seconds)'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1829,7 +1825,6 @@
   suggest: "For heavy groups, raise the interval (1m) or split the query into recording rules. If the CPU limit is tight (500m), raise it."
   verify:
     - "curl -s localhost:9090/api/v1/rules | jq '[.data.groups[] | {name, interval, lastEvaluation, evaluationTime}] | sort_by(-.evaluationTime)[:5]'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2278,7 +2273,6 @@
   suggest: "Check the Alertmanager pod status and the 'Error sending alert' lines in the Prometheus log. For reload failures, check the rule validation errors in the prometheus-operator log."
   verify:
     - "curl -s localhost:9090/api/v1/alertmanagers | jq '.data'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2732,7 +2726,7 @@
   suggest: "prometheus.prometheusSpec.replicas: 2 + podAntiAffinity. For long-term retention, a Thanos sidecar."
   verify:
     - "kubectl -n monitoring get prometheus -o jsonpath='{.items[*].spec.replicas}'"
-  profiles: [prod]
+  scales: [medium, large]
   test:
     cases:
       - expect: "warn"
@@ -2968,7 +2962,6 @@
   suggest: "Upgrade the kube-prometheus-stack chart (Prometheus 3.x needs chart 66+). If staying on 2.x, at least 2.53 LTS."
   verify:
     - "curl -s localhost:9090/api/v1/status/buildinfo | jq .data.version"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

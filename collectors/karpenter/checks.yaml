@@ -10,7 +10,7 @@
     warn_expr: "not item['has_pdb']"
   target: "'cluster'"
   evidence: "f\"karpenter v{item['version']}: replicas {item['replicas']} / ready {item['ready']}, all on one node {item['all_same_node']}, running on a Karpenter-made node {item['on_karpenter_node']}, PDB {item['has_pdb']}, leader identified {item['leader_found']}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: true
   why: >
     Without the controller, no nodes come up for Pending pods and nobody handles the 2-minute spot interruption warning (interruption queue), so pods are cut off without a drain. If the controller runs on a node it created, consolidating that node removes its own footing — the Karpenter docs say to put it on a managed node group or Fargate.
@@ -19,7 +19,7 @@
   suggest: "Keep replicas 2 + PDB and pin it to a managed node group with a nodeSelector."
   verify:
     - "kubectl get pods -n karpenter -o wide ; kubectl get pdb -n karpenter"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -379,7 +379,7 @@
   suggest: "Switch amiFamily to AL2023 and set amiSelectorTerms alias al2023@v2026… (pinned version). Drift is on (Drift=true), so nodes are replaced in sequence — set budgets first. Karpenter 0.37 should be upgraded to 1.x first (platform.karpenter-version-compat)."
   verify:
     - "kubectl get ec2nodeclass -o jsonpath='{.items[*].spec.amiFamily}' ; kubectl get ec2nodeclass -o jsonpath='{.items[*].spec.amiSelectorTerms}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -569,7 +569,7 @@
   suggest: "EC2NodeClass metadataOptions.httpPutResponseHopLimit 1 (pods using IRSA or Pod Identity are unaffected), blockDeviceMappings.ebs.encrypted true. Nodes are replaced through drift."
   verify:
     - "kubectl get ec2nodeclass default -o jsonpath='{.spec.metadataOptions}{\"\\n\"}{.spec.blockDeviceMappings}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -925,7 +925,7 @@
   suggest: "A dedicated role with KarpenterControllerPolicy via IRSA or Pod Identity."
   verify:
     - "kubectl get sa -n karpenter karpenter -o jsonpath='{.metadata.annotations}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1116,7 +1116,7 @@
   suggest: "Mix on-demand into the prod NodePool (capacity-type spot,on-demand + weights) or widen the instance types to lower the reclaim probability. If CordonAndDrain is low compared to interruption messages, check the queue permissions."
   verify:
     - "karpenter_interruption_received_messages from the pod /metrics (metrics/pod/karpenter/)"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1465,7 +1465,7 @@
   suggest: "Raise the limits (see the cost section for a cost ceiling) or split the pool."
   verify:
     - "kubectl get nodepools -o custom-columns=NAME:.metadata.name,LIMITS:.spec.limits,USAGE:.status.resources"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1736,7 +1736,7 @@
   suggest: "Compare non-Ready entries in kubectl get nodeclaims with instances shutting down in the EC2 console."
   verify:
     - "kubectl get nodeclaims ; karpenter_consistency_errors from the pod /metrics"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -2010,7 +2010,7 @@
   suggest: "FEATURE_GATES=SpotToSpotConsolidation=true plus a wide instance type list in the NodePool. Turn it off again if churn appears."
   verify:
     - "kubectl get deploy -n karpenter karpenter -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 FEATURE"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -2276,7 +2276,7 @@
   suggest: "Helm values serviceMonitor.enabled true. Then it accumulates in Prometheus and trends become visible."
   verify:
     - "kubectl get servicemonitor -A | grep -i karpenter"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"

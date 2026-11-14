@@ -14,10 +14,16 @@ import pytest
 
 from lib.collection import discover, kube
 from lib.commands import firstrun
-from lib.foundations.config import Config
+from lib.foundations.config import Config as _Config
 from lib.foundations.runlog import RunLog
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def Config(data=None):
+    """A config with the scale already decided: every test below is about one of the other questions, and the scale question would head
+    each list. The scale question has its own test, which uses the bare config."""
+    return _Config({"scale": "medium", **(data or {})})
 
 
 def _tool(name, present=True, required=False, checks=None):
@@ -217,7 +223,7 @@ def _all_questions(tmp_path, language="en"):
     out = []
     eks = _setup("eks", doc={"present": False, "current": False}, stores_ok=False, tools=tools)
     eks["machine"] = {"open_dirs": [{"path": "/home/u/.kubegap", "mode": "0755"}]}
-    out += firstrun.questions(eks, Config(), None, language=language)
+    out += firstrun.questions(eks, _Config(), None, language=language)
     out += firstrun.questions(_setup("k3s"), Config(), None, language=language)
     out += firstrun.questions(_setup("k3s"), Config(), tmp_path, language=language)
     out += firstrun.questions(_setup("aks"), Config(), None, language=language)
@@ -230,7 +236,7 @@ def _all_questions(tmp_path, language="en"):
 
 def test_every_question_fits_both_choice_windows_and_can_be_skipped(tmp_path):
     qs = _all_questions(tmp_path)
-    assert {q["id"] for q in qs} == {"home-mode", "tools", "ssm-document", "node-ssh", "grafana-token", "stores"}
+    assert {q["id"] for q in qs} == {"scale", "home-mode", "tools", "ssm-document", "node-ssh", "grafana-token", "stores"}
     assert {q["id"] for q in _all_questions(tmp_path, "ko")} == {q["id"] for q in qs}, "the Korean block asks the same questions"
     for q in qs:
         assert 2 <= len(q["options"]) <= 3, q["id"]  # Codex request_user_input: 2-3 options
@@ -266,8 +272,8 @@ def test_render_names_every_option_with_its_command(tmp_path):
 def test_node_check_count_is_the_catalog_s_and_is_worded_as_an_upper_bound():
     full_only_node = [c for c in firstrun._checks() if c["id"].startswith("node.") and c.get("modes") == ["full"]]
     assert firstrun.node_script_checks() == len(full_only_node) > 0
-    # some of them are for one profile only, which is why every text says "up to"
-    assert any(c.get("profiles") for c in full_only_node)
+    # some of them run on one platform only, which is why every text says "up to"
+    assert any(c.get("platforms") for c in full_only_node)
     q = firstrun.questions(_setup("k3s"), Config({"grafana_api_token": "x"}), None)[0]
     assert q["gain"][0].startswith(f"up to {len(full_only_node)} node checks in a full run")
 
@@ -288,6 +294,7 @@ def test_answer_and_questions_commands(tmp_path, capsys):
     ctx_dir = tmp_path / "c"
     ctx_dir.mkdir()
     (ctx_dir / "setup.json").write_text(json.dumps(_setup("k3s")))
+    (tmp_path / "config.yaml").write_text("scale: medium\n")  # decided, so the list starts at the node question
     base = ["--context", "c", "--snapshots-root", str(tmp_path), "--config", str(tmp_path / "config.yaml")]
     assert cli.main(["questions", *base]) == 0
     assert "[node-ssh]" in capsys.readouterr().out
@@ -394,7 +401,7 @@ def test_readme_numbers_and_question_names_match_the_code():
     setup_doc = (ROOT / "docs" / "SETUP.md").read_text(encoding="utf-8")
     assert f"the {n} `node.*` checks" in setup_doc
     first_run = (ROOT / "references" / "first-run.md").read_text(encoding="utf-8")
-    for qid in ("tools", "ssm-document", "node-ssh", "grafana-token", "stores"):
+    for qid in ("scale", "tools", "ssm-document", "node-ssh", "grafana-token", "stores"):
         assert f"| `{qid}` |" in setup_doc and f"| `{qid}` |" in first_run, qid
 
 
@@ -406,6 +413,23 @@ def test_setup_doc_names_every_key_config_set_writes():
     for key in configedit.SETTABLE:
         assert f"`{key}`" in line or (key.endswith("_url") and "the four `<store>_url` keys" in line), key
     assert "`ssh.hosts.<node>`" in line
+
+
+def test_scale_is_asked_first_once_per_cluster_and_config_overrides_the_answer(tmp_path):
+    from lib.foundations import rubric
+
+    s = _setup("k3s", nodes=2)
+    q = firstrun.questions(s, _Config({"grafana_api_token": "x", "node_access": "none"}), tmp_path)[0]
+    assert q["id"] == "scale" and [o["id"] for o in q["options"]] == ["small", "medium", "large"]
+    assert all(o["remember"] and not o["run"] and not o["config"] for o in q["options"])
+    assert firstrun.scale_decision(tmp_path) is None
+    assert rubric.resolve_scale({}, firstrun.scale_decision(tmp_path), 2) == {"name": "small", "source": "guessed", "nodes": 2}
+    assert rubric.resolve_scale({}, None, 9)["name"] == "medium" and rubric.resolve_scale({}, None, 21)["name"] == "large"
+    firstrun.record_answer(tmp_path, "scale", "large")
+    assert firstrun.scale_decision(tmp_path) == "large"
+    assert rubric.resolve_scale({}, firstrun.scale_decision(tmp_path), 2) == {"name": "large", "source": "answered"}
+    assert rubric.resolve_scale({"scale": "medium"}, "large", 2) == {"name": "medium", "source": "config.yaml"}
+    assert "scale" not in _ids(s, _Config({"scale": "small"}), tmp_path / "other") and "scale" not in _ids(s, _Config(), tmp_path)
 
 
 def test_home_mode_question_comes_first_and_fix_runs_protect_home():

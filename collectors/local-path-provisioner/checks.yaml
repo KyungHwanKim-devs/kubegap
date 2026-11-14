@@ -5,7 +5,7 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: local_path.over_capacity
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     expr: "True"
   target: "item['namespace'] + '/' + item['pvc']"
@@ -17,7 +17,7 @@
   verify:
     - "sudo du -sm /var/lib/rancher/k3s/storage/*"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -37,7 +37,7 @@
   type: summary
   each: local_path.summary
   cluster_level: true
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     warn_expr: "(item.get('pv_count') or 0) > 0"
   target: "'cluster'"
@@ -49,7 +49,7 @@
   verify:
     - "kubectl get pv -o custom-columns=NAME:.metadata.name,CLAIM:.spec.claimRef.name,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "warn"
         item:
@@ -97,7 +97,7 @@
   suggest: "On the tight node, clean up the largest directories first (du -sm /var/lib/rancher/k3s/storage/*) or shorten backup PVC retention. To actually enforce capacity, use Longhorn or NFS instead of local-path, or mount a separate disk via nodePathMap to keep volumes off the OS disk."
   verify:
     - "ssh <node> df -h / && sudo du -sm /var/lib/rancher/k3s/storage/* | sort -rn | head"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "fail"
@@ -760,7 +760,7 @@
   suggest: "Confirm from the directory name (pvc-<uid>_<ns>_<pvc>) that the PVC really is gone, then delete it. Released PVs: kubectl delete pv."
   verify:
     - "ssh <node> sudo ls /var/lib/rancher/k3s/storage | sed 's/_.*//' | sort > /tmp/dirs; kubectl get pv -o name | sed 's#.*/##' | sort > /tmp/pvs; comm -23 /tmp/dirs /tmp/pvs"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "warn"
@@ -1173,7 +1173,7 @@
   suggest: "For DB and backup PVCs, create a second StorageClass with reclaimPolicy Retain (local-path-retain), or patch existing PVs with kubectl patch pv <pv> -p '{\"spec\":{\"persistentVolumeReclaimPolicy\":\"Retain\"}}'. Keep backups on another node or outside the cluster (S3, NAS)."
   verify:
     - "kubectl get pv -o custom-columns=PV:.metadata.name,NS:.spec.claimRef.namespace,PVC:.spec.claimRef.name,RECLAIM:.spec.persistentVolumeReclaimPolicy,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "warn"
@@ -1434,7 +1434,7 @@
   suggest: "kubectl -n kube-system logs deploy/local-path-provisioner. The default class is set by the storageclass.kubernetes.io/is-default-class annotation."
   verify:
     - "kubectl -n kube-system get deploy local-path-provisioner; kubectl get sc"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "fail"

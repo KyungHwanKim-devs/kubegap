@@ -63,7 +63,7 @@ def test_excluded_uses_case_sensitive_globs():
 
 
 def _ctx(inv: dict) -> Context:
-    return Context(Path("/nonexistent"), inv, {}, {"name": "prod"})
+    return Context(Path("/nonexistent"), inv, {}, "large")
 
 
 def test_days_until():
@@ -162,7 +162,7 @@ def test_image_repo():
 def _cx_with_pods(tmp_path, pods):
     (tmp_path / "objects").mkdir()
     (tmp_path / "objects" / "pods.json").write_text(json.dumps({"items": pods}), encoding="utf-8")
-    return Context(tmp_path, {}, {}, {"name": "prod"})
+    return Context(tmp_path, {}, {}, "large")
 
 
 def test_db_like_labels_look_up_the_pod_container(tmp_path):

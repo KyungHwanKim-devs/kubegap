@@ -8,7 +8,7 @@
 
 ## 5. 읽는 순서
 
-1. **`inventory.json`.** 이 클러스터가 뭔지 파악해요. `cluster.platform`, `server_version`, `profile`, `nodes`(개수, 버전, OS, 런타임, 존, capacity-type 쏠림), `namespaces.prod_like`, `components_present`, `missing_families`, `stores`(Prometheus와 Loki 보존 기간). EKS면 `cluster.eks`(로깅, 엔드포인트, 애드온, 지원 종류)와 `node_access`(SSM에 안 잡힌 노드)도요.
+1. **`inventory.json`.** 이 클러스터가 뭔지 파악해요. `cluster.platform`, `server_version`, `scale`(운영 규모와 그 출처: 설정, 첫 실행 답, 노드 수로 짐작), `nodes`(개수, 버전, OS, 런타임, 존, capacity-type 쏠림), `namespaces.prod_like`, `components_present`, `missing_families`, `stores`(Prometheus와 Loki 보존 기간). EKS면 `cluster.eks`(로깅, 엔드포인트, 애드온, 지원 종류)와 `node_access`(SSM에 안 잡힌 노드)도요.
 2. **`findings-draft.json`.** 코드가 낸 자동 판정이에요. `findings`는 심각한 순이고 항목마다 `id`, `status`(fail/warn), `severity_default`, `symptom_linked`, `target`, `evidence`(목록이고 파드 여럿을 합쳤으면 `instances`도), `source`(원본 파일 경로), `why`, `suggest`, `verify`, `cases`(공개된 장애 기록), `measured`(체크를 만든 클러스터에서 잰 값이지 사례가 아니에요), `thresholds`, `details`(규칙이 본 재료 전체)가 있어요. `check_results`에는 체크별 통과·실패 수와 건너뜀·오류 이유, 그 밖에 `suppressed`, `expired_suppressions`, `severity_rules`(규칙 원문), `llm_checks`(type: llm, 규칙 없이 판단할 것)가 있어요.
 3. **`summary.json`.** 이벤트(Reason별 누적 횟수, 처음과 마지막 시각, 주요 대상, Warning 샘플), 메트릭(질의별 통계와 상위 30개), 오브젝트(재시작 상위, Pending, CrashLoop 같은 대기 이유, Failed 파드, 가용성이 모자란 Deployment, 레플리카 1, Ready 엔드포인트 없는 Service, 노드 압박), 실행 기록. 자동 판정에 안 잡혔는데 이상한 건 따로 적어 둬요. `events.reasons`에 `UpdateFailed`가 천 번 넘게 쌓인 항목, `restarts_top`에 재시작 수천 번인 파드, Evicted 파드 십여 개, `cardinality_top_metrics` 같은 것.
 4. **지난 스냅샷과 지난 리포트.** `diff.json`의 `a` 경로가 지난 스냅샷이에요. 거기 `inventory.json`, `findings-draft.json`, `summary.json`과, 있으면 리포트 두 파일도 읽어요. `report.md`에서는 그때 문제와 조치를(뭘 했는지 말하려면 필요해요), `report-details.md`에서는 분석 기록(심각도 조정, 다시 센 숫자, 도구 메모 번호)을 봐요. 두 파일로 나뉘기 전 스냅샷은 `report.md` 하나에 다 있어요. 같은 모드의 지난 스냅샷이 없으면 비교는 없어요.
@@ -32,7 +32,7 @@
 - `resilience.single-eligible-node`는 제약별로 묶어 한 줄씩. `replicas-same-node`·`single-replica-in-prod`·`no-pdb`·`no-readiness-probe`는 워크로드당 회복력 표 한 줄. `db-probe-timeout`과 `exec-probe`가 한 컨테이너면 하나.
 - `mutable-image-tag`·`always-pull-with-tag`·`polaris tagNotSpecified`는 워크로드당 한 줄. `storage.csi-snapshot-unavailable`과 그 로그 시그니처는 하나. 몇 달째 실패 중인 ExternalSecret 하나와 거기 딸린 ESO·오퍼레이터·로그 항목은 하나. `security.imds-hop-limit`과 `karpenter.ec2nodeclass-hardening`의 IMDS 부분은 하나.
 - 테넌트 경계 체크 여섯은 네임스페이스당 표 하나(쿼터, LimitRange, NetworkPolicy, PSA). 노드마다 값이 같은 것(`node.cgroup-v1`)은 클러스터 수준 한 줄. 노드 디스크가 찬 건 `FreeDiskSpaceFailed`·`node.disk-usage`·kubelet image-gc·shim 시그니처를 합쳐 하나. AL2 지원 종료는 "AL2 → AL2023 이전" 하나(`eks-upgrade-insight(AL2)`, `ec2nodeclass-al2`, `node-os-skew`, `cgroup-v1`, `nodegroup-ami-old`). SSM에 안 잡힌 노드는 하나(`eks.ssm-unregistered`, `node.os-not-collected`, `vpccni.metrics-unreadable`).
-- 보안 그룹이 `/32`로 좁혀 둔 뒤의 `traffic.db-exposed` 경고는 medium. 작은 k3s의 NodePort는 LAN 노출이라 심각도 규칙 ④로 medium. `summary.objects.nodes.gone_24h`에 있는 노드는 그 기간에 클러스터를 떠난 것이니 그렇게 쓰고, 남은 시계열을 문제로 삼지 않아요.
+- 보안 그룹이 `/32`로 좁혀 둔 뒤의 `traffic.db-exposed` 경고는 medium. 소형 클러스터의 `traffic.db-exposed`는 체크가 이미 medium으로 내요. `summary.objects.nodes.gone_24h`에 있는 노드는 그 기간에 클러스터를 떠난 것이니 그렇게 쓰고, 남은 시계열을 문제로 삼지 않아요.
 
 **문제를 `llm/facts.json`에 적기 전에, 파일을 열어 둔 채로 아래에 답해요.** 사실 파일(`references/facts-ko.md`)에 답마다 들어갈 칸이 있어요.
 
@@ -52,7 +52,7 @@
 
 **서로 충돌하는 발견은 정리해요.** 같은 워크로드에 노드 요청 과다(요청 낮추기)와 CPU 스로틀링(limit 빼기)이 같이 걸리면 limit부터 빼고, 요청은 7일 p95를 본 뒤에만 줄여요. 같은 네임스페이스에 OOMKilled와 메모리 limit 없음이 같이 있으면 limit을 빼지 말고 p95로 정해요. over-request 체크가 "database-like"로 표시한 데이터베이스·캐시·메시지 큐는 요청을 p95로 절대 안 줄여요. CPU limit이 있으면 빼고 요청은 두고, 그것 때문에 노드가 과요청이면 그것들이나 다른 파드를 옮겨요.
 
-**심각도 규칙을 적용해요(`findings-draft.severity_rules`).** ① `symptom_linked`이고 실제 증상(5xx, 재시작 급증, Evicted, 지연)이 요약이나 이벤트에 보이면 한 단계 올려요. ② 지난 리포트에서 "해결"로 표시한 게 다시 나오면 "재발"로 표시하고 한 단계 올려요. 다만 `diff.json.findings.rename_suspects`에 있으면 이름이 바뀐 걸 의심하고 재발로 보지 않아요. ③ SLO 없음, 증상 알림 없음, 백업 없음, N+1 안 됨은 체크가 fail이면 critical, warn이면 high예요. warn은 완화 신호를 찾았다는 뜻이니 `analysis.severity_changes`에 이유 없이 critical로 올리지 않아요. ④ 프로파일 맥락: lab 프로파일, 노드 1~3대에서는 "multi-AZ" 항목과 "HPA 없음"(`scaling.no-hpa-serving-prod`)은 info 이하. ⑤ 자동 판정을 뒤집으면(두 단계 이상, 또는 fail→pass) 그 항목에 이유를 써요.
+**심각도 규칙을 적용해요(`findings-draft.severity_rules`).** ① `symptom_linked`이고 실제 증상(5xx, 재시작 급증, Evicted, 지연)이 요약이나 이벤트에 보이면 한 단계 올려요. ② 지난 리포트에서 "해결"로 표시한 게 다시 나오면 "재발"로 표시하고 한 단계 올려요. 다만 `diff.json.findings.rename_suspects`에 있으면 이름이 바뀐 걸 의심하고 재발로 보지 않아요. ③ SLO 없음, 증상 알림 없음, 백업 없음, N+1 안 됨이 warn이면 완화 신호를 찾았다는 뜻이라 체크의 심각도보다 한 단계 아래예요. `analysis.severity_changes`에 이유 없이 다시 올리지 않아요. ④ 심각도에는 운영 규모가 이미 들어 있어요(`findings-draft.json`의 `scale`, 규모마다 값이 다른 체크는 `check_results`의 `severity_by_scale`). "클러스터가 작으니까"로 한 번 더 내리지 않고, 더 큰 조직의 기준에 맞춰 올리지도 않아요. ⑤ 자동 판정을 뒤집으면(두 단계 이상, 또는 fail→pass) 그 항목에 이유를 써요.
 
 ### 체크가 바뀌어서 생기거나 사라진 발견은 결함이 아니에요
 

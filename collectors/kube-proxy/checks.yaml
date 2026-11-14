@@ -18,7 +18,6 @@
   suggest: "EKS: set metricsBindAddress 0.0.0.0:10249 via the add-on configurationValues or the kube-proxy-config ConfigMap. kubeadm: edit the kube-proxy ConfigMap and restart."
   verify:
     - "up{job=~\".*kube-proxy.*\"} ; kubectl get cm -n kube-system kube-proxy-config -o yaml | grep metricsBindAddress"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -257,7 +256,6 @@
   suggest: "Above 1s in iptables mode, move to ipvs or nftables mode (GA in 1.31+). As a stopgap, set minSyncPeriod to 1-2s to batch bursts."
   verify:
     - "histogram_quantile(0.99, sum by (instance, le) (rate(kubeproxy_sync_proxy_rules_duration_seconds_bucket[1h])))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -439,7 +437,6 @@
   suggest: "Check that node's kube-proxy log (logs/pods/kube-proxy/, the journal on k3s) for iptables-restore and sync errors and restart the pod. If it recurs, look at it together with kubeproxy.restore-failures."
   verify:
     - "max by (instance) (kubeproxy_sync_proxy_rules_last_queued_timestamp_seconds - kubeproxy_sync_proxy_rules_last_timestamp_seconds)"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -622,7 +619,6 @@
   suggest: "Read the iptables-restore error lines in the kube-proxy log and check other daemons using iptables on the same node (docker — node.docker-and-containerd, ufw/firewalld)."
   verify:
     - "sum by (instance) (increase(kubeproxy_sync_proxy_rules_iptables_restore_failures_total[24h]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -751,7 +747,6 @@
   suggest: "kube-proxy mode nftables (recommended on 1.33+) or ipvs. On EKS, mode in the add-on configurationValues."
   verify:
     - "max by (instance, table) (kubeproxy_sync_proxy_rules_iptables_total) ; kubectl get svc -A | wc -l"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -931,7 +926,7 @@
   suggest: "Find the node with kubectl get pods -n kube-system -l k8s-app=kube-proxy -o wide and read its log."
   verify:
     - "kubectl get ds -n kube-system kube-proxy ; on the node: curl -s localhost:10256/healthz"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -1173,7 +1168,6 @@
   suggest: "On that node, use conntrack -L to see the peers of the INVALID flows; for long-lived connections, set the app keep-alive interval shorter than the conntrack timeout. Also check NLB/ALB preserve-client-ip and asymmetric paths."
   verify:
     - "sum by (instance) (increase(kubeproxy_iptables_ct_state_invalid_dropped_packets_total[1h]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1408,7 +1402,6 @@
   suggest: "Set up node access (eks.ssm-unregistered, deploy/node-access/README.md)."
   verify:
     - "on the node: curl -s localhost:10249/proxyMode"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

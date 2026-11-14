@@ -78,11 +78,11 @@ def test_sre_book_citation_names_the_change_management_chapter():
 def test_support_end_names_its_source(tmp_path):
     (tmp_path / "aws").mkdir()
     (tmp_path / "aws" / "describe-cluster-versions.json").write_text('{"clusterVersions": [{"clusterVersion": "1.32", "endOfStandardSupportDate": "2026-03-23T00:00:00+00:00", "versionStatus": "STANDARD_SUPPORT"}]}')
-    eks = Context(tmp_path, {"today": "2026-11-03", "cluster": {"platform": "eks", "eks": {"name": "c"}}}, {}, {"name": "prod"})
+    eks = Context(tmp_path, {"today": "2026-11-03", "cluster": {"platform": "eks", "eks": {"name": "c"}}}, {}, "large")
     ends = eks.k8s_support_ends("v1.32.13-eks-abc")
     assert ends["eks_standard"] == "2026-03-23" and ends["upstream"] == "2026-02-28" and ends["primary_source"] == "EKS end of standard support"
     assert eks.eol_badge("v1.32.13-eks-abc") == "EKS end of standard support 2026-03-23, 225 days past; upstream end of life 2026-02-28"
-    k3s = Context(tmp_path, {"today": "2026-11-03", "cluster": {"platform": "k3s"}}, {}, {"name": "lab"})
+    k3s = Context(tmp_path, {"today": "2026-11-03", "cluster": {"platform": "k3s"}}, {}, "small")
     assert k3s.k8s_support_ends("v1.31.2+k3s1")["primary_source"] == "upstream end of life"
     assert k3s.eol_badge("v1.31.2+k3s1") == "upstream end of life 2025-11-11, 357 days past"  # the date eol.yaml gives (the file said 10-28 until #130)
     assert k3s.eol_badge("v9.99.0") == "end of support unknown"

@@ -43,7 +43,10 @@ LABELS: dict[str, dict[str, str]] = {
         "Value": "값",
         "kube context / cluster": "kube context / 클러스터",
         "Run time / mode": "실행 시각 / 모드",
-        "Profile": "프로파일",
+        "Scale": "운영 규모",
+        "answered": "첫 실행 질문에서 고름",
+        "guessed": "묻지 못해 노드 수로 짐작",
+        "config.yaml": "config.yaml",
         "kubegap / rubric / signatures": "kubegap / 점검 항목 버전 / 로그 시그니처 버전",
         "Verified against": "검증한 버전 범위",
         "(no component version read)": "(읽은 구성 요소 버전 없음)",
@@ -61,7 +64,7 @@ LABELS: dict[str, dict[str, str]] = {
         "Severity (default)": "심각도(기본값)",
         "vs. previous run of this mode": "같은 모드의 지난 점검 대비",
         "no previous run of this mode": "같은 모드의 지난 점검 없음",
-        "Checks {total}: evaluated {done}, disabled by profile {disabled}, skipped {skip}, not collected in this mode {nc}, errors {error}, tool missing {tool}, LLM-judged {llm}. Suppressed findings {suppressed}.": "점검 항목 {total}개 중 판정 {done}개, 프로파일에서 끈 것 {disabled}개, 건너뜀 {skip}개, 이 모드에서 수집 안 함 {nc}개, 오류 {error}개, 도구 없음 {tool}개, 에이전트 판정 {llm}개예요. 숨긴 항목은 {suppressed}개예요.",
+        "Checks {total}: evaluated {done}, not run on this platform or at this scale {disabled}, skipped {skip}, not collected in this mode {nc}, errors {error}, tool missing {tool}, LLM-judged {llm}. Suppressed findings {suppressed}.": "점검 항목 {total}개 중 판정 {done}개, 이 플랫폼이나 규모에서는 안 보는 것 {disabled}개, 건너뜀 {skip}개, 이 모드에서 수집 안 함 {nc}개, 오류 {error}개, 도구 없음 {tool}개, 에이전트 판정 {llm}개예요. 숨긴 항목은 {suppressed}개예요.",
         "### 1-1. Final judgment vs. first pass (adjustments)": "### 1-1. 자동 판정과 최종 판정이 다른 곳",
         "## 2. Critical and high failing now (first pass)": "## 2. 지금 fail인 critical과 high (자동 판정)",
         "Finding": "항목",
@@ -147,6 +150,7 @@ LABELS: dict[str, dict[str, str]] = {
         "Checks absent or gated off in this run": "이번 점검에 없거나 돌지 않은 항목",
         "Checks whose rule changed between the runs": "두 점검 사이에 판정 규칙이 바뀐 항목",
         "Checks whose thresholds in force changed": "적용된 임계값이 바뀐 항목",
+        "Checks whose own severity changed (the scale of the cluster, or the check)": "운영 규모나 점검 기준이 바뀌어 심각도가 달라진 항목",
         "The two runs were made with different versions ({changes}); a key or a query renamed between them is a difference of the tool, not of the cluster.": "두 점검을 만든 버전이 달라요({changes}). 그 사이에 이름이 바뀐 키나 질의는 클러스터가 아니라 도구가 달라진 거예요.",
         "Metric queries only in the previous run": "지난 점검에만 있는 메트릭 질의",
         "Metric queries only in this run": "이번 점검에만 있는 메트릭 질의",
@@ -319,7 +323,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
                     f"{inv.get('taken_at')} / {mode} "
                     + L("(collection {seconds} s, {skipped} steps skipped by mode, {failed} failed)", seconds=coll.get("seconds_total"), skipped=len(coll.get("mode_skipped_steps") or []), failed=len(coll.get("failed_steps") or [])),
                 ],
-                [L("Profile"), f"`{(inv.get('profile') or {}).get('name')}` ({(inv.get('profile') or {}).get('source')})"],
+                [L("Scale"), f"`{(fd.get('scale') or inv.get('scale') or {}).get('name')}` ({L((fd.get('scale') or inv.get('scale') or {}).get('source') or '')})"],
                 [L("kubegap / rubric / signatures"), f"{fd.get('kubegap') or __version__} / {fd.get('rubric_version')} / {inv.get('signatures_version')}"],
                 [L("Verified against"), " · ".join(f"{name} {note}" for name, note in _verified_notes(inv, language)) or L("(no component version read)")],
                 [L("Nodes / namespaces / pods / CRDs"), f"{nodes.get('count')} (Ready {nodes.get('ready')}) / {(inv.get('namespaces') or {}).get('count')} / {(inv.get('pods') or {}).get('count')} / {(inv.get('crds') or {}).get('count')}"],
@@ -350,7 +354,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
     bs = (fd.get("checks") or {}).get("by_status") or {}
     w(
         L(
-            "Checks {total}: evaluated {done}, disabled by profile {disabled}, skipped {skip}, not collected in this mode {nc}, errors {error}, tool missing {tool}, LLM-judged {llm}. Suppressed findings {suppressed}.",
+            "Checks {total}: evaluated {done}, not run on this platform or at this scale {disabled}, skipped {skip}, not collected in this mode {nc}, errors {error}, tool missing {tool}, LLM-judged {llm}. Suppressed findings {suppressed}.",
             total=(fd.get("checks") or {}).get("total"),
             done=bs.get("done", 0),
             disabled=bs.get("disabled", 0),
@@ -430,6 +434,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
                 ("dropped_checks", "Checks absent or gated off in this run"),
                 ("rule_changed", "Checks whose rule changed between the runs"),
                 ("thresholds_changed", "Checks whose thresholds in force changed"),
+                ("severity_changed", "Checks whose own severity changed (the scale of the cluster, or the check)"),
             ):
                 rows = crit.get(key) or []
                 if rows:

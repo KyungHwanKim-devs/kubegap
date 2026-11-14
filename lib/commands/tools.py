@@ -126,7 +126,7 @@ TOOLS: list[Tool] = [
     Tool("python3", "Runs the collect, summarize and evaluate scripts", required=True, brew="python", checks=["*"], note="This script itself runs on Python, so it cannot be missing"),
     Tool(
         "aws",
-        "EKS, EC2, SSM and CloudWatch queries (needed only for the EKS profile)",
+        "EKS, EC2, SSM and CloudWatch queries (needed only on EKS)",
         brew="awscli",
         download={
             "version": "2.39.3",
@@ -269,7 +269,7 @@ TOOLS: list[Tool] = [
     ),
     Tool(
         "ssh",
-        "Small k3s cluster node access (small k3s cluster profile)",
+        "Node access on k3s and RKE2",
         brew=None,
         version_args=["-V"],
         checks=["node.*@full"],
@@ -907,13 +907,13 @@ def catalog() -> dict[str, dict]:
 
 
 _ROLE_KO = {
-    "aws": "EKS, EC2, SSM, CloudWatch 조회(EKS 프로필에서만)",
+    "aws": "EKS, EC2, SSM, CloudWatch 조회(EKS에서만)",
     "helm": "Helm 릴리스 상태와 나이(Helm이 Secret에 두는 릴리스 기록을 읽음)",
     "krr": "리소스 requests 추천(Robusta KRR, Prometheus 기반)",
     "polaris": "매니페스트 정적 점검과 가벼운 보안 점검",
     "pluto": "지원이 끝난 API 탐지",
     "kubent": "지원이 끝난 API 탐지(Pluto 보완)",
-    "ssh": "작은 k3s 클러스터의 노드 접근(k3s 프로필)",
+    "ssh": "k3s와 RKE2의 노드 접근",
 }
 _MODES_KO = {
     "full": "full",

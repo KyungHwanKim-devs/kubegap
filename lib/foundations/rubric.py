@@ -1,4 +1,4 @@
-"""Rubric loader. Reads checks.yaml, validates the schema, and resolves thresholds and enablement from the profile and config.yaml."""
+"""Rubric loader. Reads checks.yaml, validates the schema, and resolves severity, thresholds and enablement from the platform (detected), the scale (asked) and config.yaml."""
 
 from __future__ import annotations
 
@@ -10,22 +10,78 @@ from . import paths, yamlite
 
 TYPES = ("metric", "object", "summary", "inventory", "absence", "aws", "llm", "signature")
 SEVERITIES = ("critical", "high", "medium", "low", "info")
-REQUIRED = ("id", "name", "area", "type", "severity_default", "why", "profiles")
+REQUIRED = ("id", "name", "area", "type", "severity_default", "why")
+SCALES = ("small", "medium", "large")
+PLATFORM_FAMILIES = ("eks", "k3s", "other")
 
 
 class RubricError(ValueError):
     pass
 
 
-def load_profile(name: str) -> dict:
-    p = paths.PROFILES_DIR / f"{name}.yaml"
-    if not p.is_file():
-        return {"name": name, "missing": True, "disabled_checks": [], "thresholds": {}, "exclude": {}, "expected_families": None}
-    d = yamlite.load_file(p) or {}
-    d.setdefault("disabled_checks", [])
-    d.setdefault("thresholds", {})
+def platform_family(platform: str | None) -> str:
+    """The platform file and the `platforms:` value a detected platform reads: RKE2 shares k3s (one binary, same datastore and node layout);
+    everything that is neither EKS nor k3s is "other"."""
+    if platform in ("k3s", "rke2"):
+        return "k3s"
+    return "eks" if platform == "eks" else "other"
+
+
+def load_platform(platform: str | None) -> dict:
+    """rubric/platforms/<family>.yaml: the targets a check must not judge on that platform and the component families it makes pointless."""
+    fam = platform_family(platform)
+    d = yamlite.load_file(paths.PLATFORMS_DIR / f"{fam}.yaml") or {}
+    d["name"] = fam
     d.setdefault("exclude", {})
+    d.setdefault("families_not_expected", [])
     return d
+
+
+@_functools.lru_cache(maxsize=1)
+def load_scales() -> dict:
+    return yamlite.load_file(paths.RUBRIC_DIR / "scales.yaml") or {}
+
+
+def guess_scale(nodes: int) -> str:
+    """The scale used when nobody answered the question: by node count, with the limits of rubric/scales.yaml."""
+    g = load_scales().get("guess_by_nodes") or {}
+    if nodes <= int(g.get("small", 3)):
+        return "small"
+    return "medium" if nodes <= int(g.get("medium", 20)) else "large"
+
+
+def resolve_scale(cfg: dict, answered: str | None, nodes: int) -> dict:
+    """{name, source}. config.yaml `scale` wins, then the answer to the first-run question for this cluster, then the guess."""
+    v = str(cfg.get("scale") or "").lower()
+    if v in SCALES:
+        return {"name": v, "source": "config.yaml"}
+    v = str(answered or "").lower()
+    if v in SCALES:
+        return {"name": v, "source": "answered"}
+    return {"name": guess_scale(nodes), "source": "guessed", "nodes": nodes}
+
+
+def expected_families(scale: str, platform: dict) -> list[str]:
+    fams = (load_scales().get("expected_families") or {}).get(scale) or []
+    return [f for f in fams if f not in (platform.get("families_not_expected") or [])]
+
+
+def severity_for(check: dict, scale: str) -> str:
+    """The first-pass severity of a check at a scale. A check writes one level for every scale or one per scale."""
+    v = check.get("severity_default")
+    return v[scale] if isinstance(v, dict) else v
+
+
+def applies(check: dict, platform: str | None, scale: str) -> str | None:
+    """None when the check runs here, else why not. `platforms:` and `scales:` are optional; leaving one out means all."""
+    fam = platform_family(platform)
+    if check.get("platforms") and fam not in check["platforms"]:
+        return f"not for platform {fam} (runs on: {', '.join(check['platforms'])})"
+    if check.get("scales") and scale not in check["scales"]:
+        return f"not expected at scale {scale} (expected at: {', '.join(check['scales'])})"
+    if check.get("type") == "absence" and check.get("family") and check["family"] not in expected_families(scale, load_platform(platform)):
+        return f"family {check['family']} is not expected at scale {scale} on platform {fam}"
+    return None
 
 
 def load_severity_rules() -> dict:
@@ -63,7 +119,7 @@ def load_known_issues() -> tuple[dict[str, list[dict]], list[str]]:
     return out, errors
 
 
-# The parts of a check that decide its verdict. Not here: the texts (rewording is not a rule change) and the gates `modes`, `profiles`, `requires_tool`,
+# The parts of a check that decide its verdict. Not here: the texts (rewording is not a rule change) and the gates `modes`, `platforms`, `scales`, `requires_tool`,
 # whose effect is already visible in check_results.status (not-collected, disabled, tool-missing) and is classified by diff from that status.
 RULE_HASH_KEYS = ("type", "inputs", "join_on", "join_any", "each", "cluster_level", "target", "rule", "exclude_transient")
 
@@ -112,8 +168,18 @@ def validate(check: dict, source: str) -> list[str]:
             errs.append(f"{source}: {check.get('id', '?')} is missing {k}")
     if check.get("type") not in TYPES:
         errs.append(f"{source}: {check.get('id')} type {check.get('type')!r} must be one of {TYPES}")
-    if check.get("severity_default") not in SEVERITIES:
-        errs.append(f"{source}: {check.get('id')} severity_default {check.get('severity_default')!r}")
+    sev = check.get("severity_default")
+    if isinstance(sev, dict):
+        if sorted(sev) != sorted(SCALES) or any(v not in SEVERITIES for v in sev.values()):
+            errs.append(f"{source}: {check.get('id')} severity_default per scale needs exactly {SCALES}, each one of {SEVERITIES}: {sev!r}")
+    elif sev not in SEVERITIES:
+        errs.append(f"{source}: {check.get('id')} severity_default {sev!r}")
+    for key, allowed in (("platforms", PLATFORM_FAMILIES), ("scales", SCALES)):
+        v = check.get(key)
+        if v is not None and (not isinstance(v, list) or not v or any(x not in allowed for x in v)):
+            errs.append(f"{source}: {check.get('id')} {key} must be a non-empty list of {allowed}")
+    if "profiles" in check:
+        errs.append(f"{source}: {check.get('id')} has `profiles`; a check names `platforms` and `scales` instead")
     rule = check.get("rule") or {}
     if check.get("type") not in ("absence", "llm") and not (rule.get("expr") or rule.get("warn_expr")):
         # A rule with only warn_expr is a warn-only check (it can never fail); a rule with neither would never produce a finding
@@ -173,21 +239,17 @@ def load_checks(collectors: list[str]) -> tuple[list[dict], list[str]]:
     return checks, errors
 
 
-def resolve_thresholds(check: dict, profile: dict, cfg_overrides: dict) -> dict:
-    """Override order: rule.threshold.<profile> -> profile file thresholds -> config.yaml overrides."""
+def resolve_thresholds(check: dict, platform: str | None, scale: str, cfg_overrides: dict) -> dict:
+    """A threshold is one number, or a mapping with `default` and the platforms or scales that differ from it. The scale's value wins over the
+    platform's. config.yaml overrides win over both."""
     rule = check.get("rule") or {}
-    pname = profile.get("name")
+    fam = platform_family(platform)
     out = {}
     for key in ("threshold", "warn_threshold"):
         v = rule.get(key)
         if isinstance(v, dict):
-            v = v.get(pname, v.get(profile.get("base") or "", v.get("default")))  # a new profile inherits thresholds from its base profile
+            v = v.get(scale, v.get(fam, v.get("default")))
         out[key] = v
-    prof_t = (profile.get("thresholds") or {}).get(check["id"]) or {}
-    if "fail" in prof_t:
-        out["threshold"] = prof_t["fail"]
-    if "warn" in prof_t:
-        out["warn_threshold"] = prof_t["warn"]
     ov = (cfg_overrides or {}).get(check["id"]) or {}
     if "threshold" in ov:
         out["threshold"] = ov["threshold"]

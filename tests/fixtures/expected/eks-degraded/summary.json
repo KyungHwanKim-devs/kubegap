@@ -9,7 +9,7 @@
   "taken_at": "2026-11-07T10:33:37+09:00",
   "platform": "eks",
   "server_version": "v1.32.13-eks-577a51e",
-  "profile": "prod",
+  "scale": "medium",
   "node_access": "none",
   "nodes": 9,
   "namespaces": 26,
@@ -41,10 +41,9 @@
   ],
   "missing_families": [
    "backup",
-   "event-retention",
-   "slo",
    "certificates",
-   "progressive-delivery"
+   "event-retention",
+   "slo"
   ],
   "stores": {
    "loki": {

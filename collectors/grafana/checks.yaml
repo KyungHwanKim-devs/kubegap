@@ -21,7 +21,6 @@
   suggest: "Raise Loki limits_config max_outstanding_per_tenant (default 100 → 2048) and querier.max-concurrent, and narrow the range of log panels in Grafana dashboards. For Prometheus: query.max-concurrency and query.timeout."
   verify:
     - "kubectl -n monitoring port-forward svc/kube-prometheus-stack-grafana 3000:80 & curl -s localhost:3000/metrics | grep grafana_datasource_request_total"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -288,7 +287,6 @@
   suggest: "Bump the grafana subchart version in the kube-prometheus-stack chart (10 → 11 → 12; check the impact of Angular panel removal)."
   verify:
     - "curl -s https://<grafana>/api/health"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -459,7 +457,6 @@
   suggest: "Look at Error/NoData in Grafana Alerting → rule state. Not splitting into two systems alongside Prometheus rules is easier to manage."
   verify:
     - "curl -s localhost:3000/metrics | grep grafana_alerting_rule_evaluation_failures_total"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -628,7 +625,6 @@
   suggest: "Node access (SSM, SSH) or a ServiceMonitor (grafana.serviceMonitor.enabled). For the datasource list, put a Viewer service account token in config.yaml grafana_api_token."
   verify:
     - "kubectl get --raw /api/v1/namespaces/monitoring/pods/<grafana-pod>:3000/proxy/metrics | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

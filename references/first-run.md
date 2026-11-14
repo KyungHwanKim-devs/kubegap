@@ -76,6 +76,7 @@ A question the user closes without choosing (escape, an empty answer) counts as 
 
 | id | Asked when | Choices | Skipping costs |
 |---|---|---|---|
+| `scale` | config.yaml has no `scale` and this cluster's answers hold none | Small · Medium · Large (each remembered for this cluster; none runs anything) | closed without choosing: the scale is guessed from the node count (3 or fewer small, 20 or fewer medium, else large) and the report's first screen says it was guessed |
 | `home-mode` | a folder under `~/.kubegap` is readable by other users (setup.json `machine.open_dirs`) | Fix now (`protect-home`, chmod 700 on those folders, not remembered because the gap is gone) · Leave it | nothing in the report; the snapshots stay readable by other users of the machine |
 | `tools` | optional tools are not on this machine and `install_tools` is `ask` | Install all (`setup --install-only` with the names listed) · Skip · typed: names to install only those (`setup --install-only a,b`, then `answer tools skip` for the rest) | the checks of those tools are reported as "tool missing" or skip because their input is not read |
 | `ssm-document` | EKS, and the SSM document `kubegap-node-read` is missing or older than the local file | Upload or Update (`setup --install-ssm-document`) · Skip | the node checks are "no node access" |

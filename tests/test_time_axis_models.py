@@ -153,7 +153,7 @@ def _inv_with_nodes():
 
 
 def test_node_gone_compares_instance_ip_and_node_name_against_inventory():
-    cx = Context(None, _inv_with_nodes(), {}, {"name": "prod"})
+    cx = Context(None, _inv_with_nodes(), {}, "large")
     assert cx.node_gone({"instance": "10.0.1.203:9100", "device": "eth0"}, "node") == "10.0.1.203"
     assert cx.node_gone({"instance": "10.0.1.62:9100"}, "node") is None
     assert cx.node_gone({"node": "ip-10-0-1-139.internal"}) is None
@@ -162,12 +162,12 @@ def test_node_gone_compares_instance_ip_and_node_name_against_inventory():
     assert cx.node_gone({"instance": "10.0.1.149:443"}, "controlplane") is None  # an apiserver instance is not a node
     assert cx.node_gone({"instance": "10.0.1.203:8080", "pod": "ksm-1", "namespace": "monitoring"}, "resources") is None  # kube-state-metrics' own series
     assert cx.node_gone({"instance": "[fd00::7]:9100"}, "node") == "fd00::7"
-    assert Context(None, {}, {}, {"name": "prod"}).node_gone({"instance": "10.0.1.203:9100"}, "node") is None  # no node list, as in the embedded cases
+    assert Context(None, {}, {}, "large").node_gone({"instance": "10.0.1.203:9100"}, "node") is None  # no node list, as in the embedded cases
 
 
 def test_metric_check_skips_gone_node_and_records_it(tmp_path):
     _metric(tmp_path, "node_network_errors_1d", [({"instance": "10.0.1.203:9100", "device": "eth0"}, 317.0), ({"instance": "10.0.1.62:9100", "device": "eth0"}, 4.0)])
-    cx = Context(tmp_path, _inv_with_nodes(), {}, {"name": "prod"})
+    cx = Context(tmp_path, _inv_with_nodes(), {}, "large")
     check = {
         "id": "node.network-errors",
         "name": "n",
@@ -203,7 +203,7 @@ def test_nodes_gone_24h_gives_up_when_the_exporter_is_not_on_the_host_network(tm
 
 def test_join_any_judges_a_series_present_in_one_input_only(tmp_path):
     _metric(tmp_path, "cpu_throttle_ratio_5m", [({"namespace": "a", "pod": "w-6d7ff4dcdb-abcde", "container": "c"}, 0.6)])
-    cx = Context(tmp_path, {}, {}, {"name": "prod"})
+    cx = Context(tmp_path, {}, {}, "large")
     check = {
         "id": "resources.cpu-throttling",
         "name": "n",

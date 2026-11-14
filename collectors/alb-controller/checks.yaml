@@ -10,7 +10,7 @@
     warn_expr: "not item['has_pdb'] or not item['anti_affinity']"
   target: "'cluster'"
   evidence: "f\"aws-load-balancer-controller v{item['version']}: replicas {item['replicas']} / ready {item['ready']}, all on one node {item['all_same_node']}, PDB {item['has_pdb']}, podAntiAffinity {item['anti_affinity']}, leader pod found {item['leader_found']}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: false
   why: >
     Even when the controller stops, the ALBs and target groups it already created keep serving traffic. But targets are no longer registered or deregistered as pods change (RegisterTargets/DeregisterTargets), so after a rolling deploy traffic goes to dead pod IPs or new pods never receive traffic, and new Ingress or certificate changes are not applied.
@@ -19,7 +19,7 @@
   suggest: "Keep replicas 2 + podAntiAffinity + PDB (minAvailable 1). Check that both replicas do not land on the same node during node replacement (Karpenter)."
   verify:
     - "kubectl get deploy -n kube-system aws-load-balancer-controller -o wide ; kubectl get pdb -n kube-system"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -416,7 +416,7 @@
   suggest: "Attach a dedicated role with AWSLoadBalancerControllerIAMPolicy via IRSA or Pod Identity and remove ELB permissions from the node role."
   verify:
     - "kubectl get sa -n kube-system aws-load-balancer-controller -o jsonpath='{.metadata.annotations}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -591,7 +591,7 @@
   suggest: "Keep the namespaceSelector on the mpod webhook and use a controller PDB so both replicas do not go down at once. Keep a runbook step for switching failurePolicy to Ignore in an emergency."
   verify:
     - "kubectl get mutatingwebhookconfiguration aws-load-balancer-webhook -o jsonpath='{.webhooks[*].namespaceSelector}'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -917,7 +917,7 @@
   suggest: "Run kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller | grep -i 'reconciler error' to find which Ingress it is, then fix the annotation, certificate or security group."
   verify:
     - "kubectl describe ingress -A | grep -A3 Events | grep -i fail"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1241,7 +1241,7 @@
   suggest: "Reduce the number of target groups (ALB group sharing may already be in place) or the pod churn rate (HPA flapping, CronJob pods). If retries rise, tune the --aws-api-throttle argument and look for Throttling in the controller logs."
   verify:
     - "aws_api_call_duration_seconds_count and aws_api_call_retries_sum from the pod /metrics (metrics/pod/alb-controller/)"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -1488,7 +1488,7 @@
   suggest: "If stale, look for that TGB's reconcile error in the controller logs. Delete TGBs whose Service is missing and clean up the target group on the AWS side too."
   verify:
     - "kubectl get targetgroupbindings -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,SVC:.spec.serviceRef.name,GEN:.metadata.generation,OBS:.status.observedGeneration"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1737,7 +1737,7 @@
   verify:
     - "aws elbv2 describe-target-groups --query 'TargetGroups[].TargetGroupName'"
     - "kubectl get targetgroupbindings -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ARN:.spec.targetGroupARN"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "skip"
@@ -1776,7 +1776,7 @@
   suggest: "Read the Events in kubectl describe ingress and the controller logs. Subnet tags, ACM certificates and group name conflicts are the common causes."
   verify:
     - "kubectl get ingress -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ADDR:.status.loadBalancer.ingress[0].hostname"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1949,7 +1949,7 @@
   suggest: "Set loadBalancerClass service.k8s.aws/nlb on the Service (a new LB is created and the DNS name changes, so plan the cutover)."
   verify:
     - "kubectl get svc -A -o json | jq -r '.items[] | select(.spec.type==\"LoadBalancer\") | \"\\(.metadata.namespace)/\\(.metadata.name) \\(.spec.loadBalancerClass) \\(.metadata.annotations[\"service.beta.kubernetes.io/aws-load-balancer-type\"])\"'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -2122,7 +2122,7 @@
   suggest: "Enable the ServiceMonitor (serviceMonitor.enabled true) so Prometheus scrapes it and kubegap uses that. Otherwise prepare node access (SSM registration)."
   verify:
     - "kubectl get --raw /api/v1/namespaces/kube-system/pods/<pod>:8080/proxy/metrics | head"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"

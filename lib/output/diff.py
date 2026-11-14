@@ -140,7 +140,7 @@ def diff_findings(a: Path, b: Path) -> dict:
     # whether the check existed and was allowed to run on each side (absent, disabled, not-collected, tool-missing, error), the rule_hash of its verdict-deciding
     # parts and the thresholds in force. A check that was `skip` on one side (its inputs were absent, as when Argo CD was installed between the runs) is a cluster
     # change, and the row carries both statuses and the skip reason so the report can say so.
-    crit: dict[str, list] = {"new_checks": [], "dropped_checks": [], "rule_changed": [], "thresholds_changed": []}
+    crit: dict[str, list] = {"new_checks": [], "dropped_checks": [], "rule_changed": [], "thresholds_changed": [], "severity_changed": []}
     GATED = ("disabled", "not-collected", "tool-missing", "error")
 
     def gate(c: dict | None) -> bool:
@@ -158,6 +158,8 @@ def diff_findings(a: Path, b: Path) -> dict:
             return "rule_changed"
         if (x.get("thresholds") or {}) != (y.get("thresholds") or {}):
             return "thresholds_changed"
+        if x.get("severity_default") != y.get("severity_default"):
+            return "severity_changed"  # the check's own level differs: the cluster's scale was answered or changed between the runs, or the check was re-levelled
         return None
 
     def crit_row(f: dict, kind: str, bucket: str) -> dict:
@@ -217,7 +219,7 @@ def diff_findings(a: Path, b: Path) -> dict:
 
     return {
         "rubric_version": [da.get("rubric_version"), db.get("rubric_version")],
-        "profile": [(da.get("profile") or {}).get("name"), (db.get("profile") or {}).get("name")],
+        "scale": [(da.get("scale") or {}).get("name"), (db.get("scale") or {}).get("name")],
         "counts_before": {"fail": sev(da, "fail"), "warn": sev(da, "warn")},
         "counts_after": {"fail": sev(db, "fail"), "warn": sev(db, "warn")},
         "new": new,
@@ -226,7 +228,7 @@ def diff_findings(a: Path, b: Path) -> dict:
         "rename_suspects": rename_suspects,
         "criteria_changes": {
             **crit,
-            "note": "Findings whose check did not exist or was gated off on one side (new_checks, dropped_checks), whose rule_hash differs (rule_changed) or whose thresholds in force differ (thresholds_changed) are criteria changes and are kept out of new, resolved and changed.",
+            "note": "Findings whose check did not exist or was gated off on one side (new_checks, dropped_checks), whose rule_hash differs (rule_changed) whose thresholds in force differ (thresholds_changed) or whose own severity differs, as when the scale of the cluster was answered between the runs (severity_changed), are criteria changes and are kept out of new, resolved and changed.",
         },
         "summary": {"new": len(new), "resolved": len(resolved), "changed": len(changed), "criteria_changes": sum(len(v) for v in crit.values())},
     }
@@ -250,7 +252,7 @@ def diff_inventory(a: Path, b: Path) -> dict:
     return {
         "taken_at": [ia.get("taken_at"), ib.get("taken_at")],
         "server_version": [(ia.get("cluster") or {}).get("server_version"), (ib.get("cluster") or {}).get("server_version")],
-        "profile": [(ia.get("profile") or {}).get("name"), (ib.get("profile") or {}).get("name")],
+        "platform": [(ia.get("cluster") or {}).get("platform"), (ib.get("cluster") or {}).get("platform")],
         "node_count": [(ia.get("nodes") or {}).get("count"), (ib.get("nodes") or {}).get("count")],
         "nodes_added": sorted(nodes_b - nodes_a),
         "nodes_removed": sorted(nodes_a - nodes_b),
@@ -390,7 +392,7 @@ def persisted_findings(b: Path, lookback: int = 10) -> dict:
 
 # ---------- history.csv ----------
 
-HISTORY_COLUMNS = ["snapshot", "taken_at", "context", "profile", "rubric_version", "signatures_version", "critical", "high", "medium", "low", "info", "warn", "suppressed", "checks_evaluated", "nodes", "components"]
+HISTORY_COLUMNS = ["snapshot", "taken_at", "context", "scale", "rubric_version", "signatures_version", "critical", "high", "medium", "low", "info", "warn", "suppressed", "checks_evaluated", "nodes", "components"]
 
 
 def append_history(snap: Path) -> Path | None:
@@ -404,7 +406,7 @@ def append_history(snap: Path) -> Path | None:
         "snapshot": snap.name,
         "taken_at": inv.get("taken_at"),
         "context": inv.get("context"),
-        "profile": (fd.get("profile") or {}).get("name"),
+        "scale": (fd.get("scale") or {}).get("name"),
         "rubric_version": fd.get("rubric_version"),
         "signatures_version": inv.get("signatures_version"),
         **{k: fails.get(k, 0) for k in ("critical", "high", "medium", "low", "info")},

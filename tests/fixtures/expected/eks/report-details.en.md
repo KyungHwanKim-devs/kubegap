@@ -6,8 +6,8 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 |---|---|
 | kube context / cluster | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
 | Run time / mode | 2026-11-07T10:33:37+09:00 / full (collection 300.7 s, 0 steps skipped by mode, 6 failed) |
-| Profile | `prod` (detected) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.87 / 1.1.0 |
+| Scale | `medium` (guessed) |
+| kubegap / rubric / signatures | <kubegap> / 0.1.88 / 1.1.0 |
 | Verified against | Kubernetes v1.32.13-eks-577a51e (verified 1.30 to 1.37) · Prometheus 2.49.1 (verified 2.49 to 3.15) · Alertmanager 0.26.0 (verified 0.26 to 0.34) · Loki 2.6.1 (verified 2.6 to 3.7) · Grafana 10.2.3 (verified 10.2 to 13.3) |
 | Nodes / namespaces / pods / CRDs | 9 (Ready 9) / 26 / 154 / 47 |
 | Components (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
@@ -20,13 +20,13 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 
 | Severity (default) | fail | warn | vs. previous run of this mode |
 |---|---|---|---|
-| critical | 1 | 3 | no previous run of this mode |
-| high | 36 | 29 | no previous run of this mode |
-| medium | 117 | 172 | no previous run of this mode |
+| critical | 1 | 0 | no previous run of this mode |
+| high | 35 | 32 | no previous run of this mode |
+| medium | 118 | 172 | no previous run of this mode |
 | low | 17 | 145 | no previous run of this mode |
-| info | 2 | 0 | no previous run of this mode |
+| info | 1 | 0 | no previous run of this mode |
 
-Checks 367: evaluated 360, disabled by profile 2, skipped 3, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
+Checks 367: evaluated 359, not run on this platform or at this scale 3, skipped 3, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
 
 ### 1-1. Final judgment vs. first pass (adjustments)
 
@@ -50,7 +50,6 @@ Checks 367: evaluated 360, disabled by profile 2, skipped 3, not collected in th
 | `karpenter.ec2nodeclass-al2.cluster` | high |  | EC2NodeClass 1 total, amiFamily AL2 ['default'], AMI families ['AL2'], AMI not pinned (auto-tracks latest) ['default'] |
 | `observability.failure-mode-uncovered.OOMKill` | high |  | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
 | `observability.loki-oomkilled.cluster` | high |  | Loki pods [('loki-stack-0', 1, 'OOMKilled', '2026-10-25T00:15:41Z')]. Storage {'tmp': 'emptyDir', 'config': 'secret', 'storage': 'emptyDir'}, memory RSS 289MB |
-| `observability.no-event-retention.cluster` | high |  | no component of family event-retention in inventory.components |
 | `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | high |  | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
 | `observability.stack-storage-emptydir.monitoring/loki-stack` | high |  | emptyDir volumes: tmp, storage, replicas 1 |
 | `platform.k8s-version-eol.cluster` | high |  | server v1.32.13-eks-577a51e: EKS end of standard support 2026-03-23, 229 days past; upstream end of life 2026-02-28 |
@@ -97,12 +96,11 @@ No earlier full snapshot to compare with.
 | Finding | Status | Severity | Why it should exist | Proposal |
 |---|---|---|---|---|
 | `resilience.no-backup.cluster` | fail | critical | There is no way to recover cluster state (objects) and PV data. Deleting a namespace by mistake or a broken etcd or PV is the end. A CronJob dump without a tool is often "a backup kept on the same … | Velero (plus EBS snapshots or PV backup). On EKS at least a DLM snapshot policy. In a small k3s cluster, k3s etcd-snapshot or a state.db copy plus PV directory backup. Test a restore; a dump that was … |
-| `observability.no-slo.cluster` | warn | critical | Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first. | Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress. |
-| `observability.no-event-retention.cluster` | fail | high | Kubernetes events are kept for only one hour by default. FailedScheduling, OOMKilling and Unhealthy from the night are gone by morning. The most undervalued material is lost. | Ship events to Loki or Elasticsearch with kubernetes-event-exporter. Alternatively, the promtail/alloy event source if Loki exists, or `[INPUT] kubernetes_events` with fluent-bit (detection … |
+| `observability.no-slo.cluster` | warn | high | Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first. | Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress. |
+| `observability.no-event-retention.cluster` | fail | medium | Kubernetes events are kept for only one hour by default. FailedScheduling, OOMKilling and Unhealthy from the night are gone by morning. The most undervalued material is lost. | Ship events to Loki or Elasticsearch with kubernetes-event-exporter. Alternatively, the promtail/alloy event source if Loki exists, or `[INPUT] kubernetes_events` with fluent-bit (detection … |
 | `security.no-certificate-manager.cluster` | warn | medium | When TLS certificate renewal is manual, services keep going down from expiry. cert-manager (or ACM plus ALB on EKS) automates renewal. On EKS, ALBs using ACM certificates work without cert-manager … | Install cert-manager, or if ACM is in use, suppress this check in config.yaml with a reason. |
-| `hygiene.no-progressive-delivery.cluster` | fail | info | A rolling update is "replace everything", so a defect in the new version reaches all traffic immediately. Without a canary tool (some traffic -> check metrics -> expand), deployment verification … | As services grow, automate canary judgment with Argo Rollouts (same ecosystem as Argo CD) + AnalysisTemplate (ALB 5xx, p95 Prometheus queries). |
 
-Expected families missing (inventory): backup, event-retention, slo, certificates, progressive-delivery.
+Expected families missing (inventory): backup, certificates, event-retention, slo.
 
 ## 6. Suppressed, tool missing, not collected
 
@@ -155,7 +153,7 @@ Deprecated-API tools: kubent 28 of 41 Lists answered (13 refused or not served);
 
 ### 7-2. Checks evaluated
 
-367 checks: disabled 2, done 360, llm 2, skip 3. Load errors: none.
+367 checks: disabled 3, done 359, llm 2, skip 3. Load errors: none.
 
 ### 7-3. Signature matches and unclassified errors
 
@@ -214,9 +212,6 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | id | Status | Default severity | Evidence |
 |---|---|---|---|
 | `resilience.no-backup.cluster` | fail | critical | no backup tool (family backup). Alternative signals: etcd snapshots 0, backup-like CronJobs that ran in the last 7 days [], VolumeSnapshots 0. If signals exist, the LLM checks whether copies leave the node |
-| `observability.no-slo.cluster` | warn | critical | no SLO tool. Signals: sli/slo recording rules [], burn rate alerts [], slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'] known issue #15 |
-| `observability.no-symptom-alerts.cluster` | warn | critical | 157 alert rules: symptom 0, cause 138, app metrics (assumed symptom) 14. Symptom ratio 0.0. Symptom rules: [] |
-| `resilience.n-plus-one.cluster` | warn | critical | Allocatable without the largest node ip-10-0-1-139.ap-northeast-2.compute.internal (3.92 cores, 29.8GB): CPU 15.45 cores vs total requests 11.51 (OK), memory 46.3GB vs 45.7GB (OK). Pods on that node 34 (prod 23). Pods that fit on no other node []. Pools short of room: 32 pods limited to … |
 | `controlplane.scheduler-unschedulable.prod-app-x/app-x-api` | fail | high | 24h 'Unable to schedule pod; no fit' 7 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
 | `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-file-worker` | fail | high | 24h 'Unable to schedule pod; no fit' 51 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
 | `controlplane.scheduler-unschedulable.prod-app-z-backend/app-z-graph-worker` | fail | high | 24h 'Unable to schedule pod; no fit' 11 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node( |
@@ -226,7 +221,6 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `karpenter.ec2nodeclass-al2.cluster` | fail | high | EC2NodeClass 1 total, amiFamily AL2 ['default'], AMI families ['AL2'], AMI not pinned (auto-tracks latest) ['default'] |
 | `observability.failure-mode-uncovered.OOMKill` | fail | high | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
 | `observability.loki-oomkilled.cluster` | fail | high | Loki pods [('loki-stack-0', 1, 'OOMKilled', '2026-10-25T00:15:41Z')]. Storage {'tmp': 'emptyDir', 'config': 'secret', 'storage': 'emptyDir'}, memory RSS 289MB |
-| `observability.no-event-retention.cluster` | fail | high | no component of family event-retention in inventory.components |
 | `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | fail | high | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
 | `observability.stack-storage-emptydir.monitoring/loki-stack` | fail | high | emptyDir volumes: tmp, storage, replicas 1 |
 | `platform.k8s-version-eol.cluster` | fail | high | server v1.32.13-eks-577a51e: EKS end of standard support 2026-03-23, 229 days past; upstream end of life 2026-02-28 |
@@ -266,7 +260,10 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `node.disk-usage.10.0.1.139:9100:/` | warn | high | usage 0.85 |
 | `observability.failure-mode-uncovered.Scheduling failure` | warn | high | user symptom: new pods do not start. No alert rule covers this failure mode |
 | `observability.failure-mode-uncovered.VPC CNI IP exhaustion` | warn | high | user symptom: pods Pending without network. No alert rule covers this failure mode |
+| `observability.no-slo.cluster` | warn | high | no SLO tool. Signals: sli/slo recording rules [], burn rate alerts [], slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'] known issue #15 |
+| `observability.no-symptom-alerts.cluster` | warn | high | 157 alert rules: symptom 0, cause 138, app metrics (assumed symptom) 14. Symptom ratio 0.0. Symptom rules: [] |
 | `prometheus.memory-pressure.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus` | warn | high | working set / limit 0.655 (limit 1536Mi), active series 165690, Prometheus container last terminated OOMKilled True (2026-11-05T08:21:29Z), restarts 2, OOMKilled containers in the monitoring namespace ['loki-stack-0/loki', 'prometheus-kube-prometheus-stack-prometheus-0/prometheus'], restarts over 7 … |
+| `resilience.n-plus-one.cluster` | warn | high | Allocatable without the largest node ip-10-0-1-139.ap-northeast-2.compute.internal (3.92 cores, 29.8GB): CPU 15.45 cores vs total requests 11.51 (OK), memory 46.3GB vs 45.7GB (OK). Pods on that node 34 (prod 23). Pods that fit on no other node []. Pools short of room: 32 pods limited to … |
 | `resilience.replicas-same-node.prod-app-x/deployment/app-x-api` | warn | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-137.ap-northeast-2.compute.internal': 1}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
 | `resilience.restarts-crashloop.argocd/argocd-application-controller-0:application-controller` | warn | high | 42 restarts, state Running, last termination OOMKilled (exit 137) 2026-10-30T09:00:04Z, cause class OOM (memory limit), Unhealthy events 0, node reboot time None |
 | `resources.cpu-throttling.dev-app-s/deploy/app-s-frontend:frontend` | warn | high | ["pod app-s-frontend-6578574c-qx5nj: throttling ratio now 0.00, 24 h or the pod's life 0.23: throttled through the day, below the fail line; no 5-minute value, under 0.01 now", "pod app-s-frontend-999976975-nf4rv: throttling ratio now 0.12, 24 h or the pod's life 0.11: throttled through the day … |
@@ -305,6 +302,7 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `observability.alerts-always-firing.KubeSchedulerDown` | fail | medium | 7d firing samples 20157 (same level as Watchdog = never stops firing) |
 | `observability.log-coverage-gap.cluster` | fail | medium | Of 147 pods Running for over 1h, 83 are absent from Loki pod labels (ratio 0.565). Nodes with every pod missing: []. By namespace: {'kube-system': 23, 'monitoring': 22, 'prod-app-z-backend': 5, 'keda': 3, 'middleware': 3, 'prod-app-t': 3, 'prod-app-s': 3, 'argocd': 2, 'dev-app-s': 2, 'dev-app-y' … |
 | `observability.loki-retention-unbounded.cluster` | fail | medium | Loki 2.6.1, retention_period 31d, retention_enabled false |
+| `observability.no-event-retention.cluster` | fail | medium | no component of family event-retention in inventory.components |
 | `operators.unhealthy-condition.externalsecrets/database/mysql-app-v-secret` | fail | medium | Ready=False (SecretSyncedError) for 7795.6 hours: could not get secret data from provider |
 | `resilience.db-probe-timeout.prod-app-s/statefulset/app-s-backend-mysql:mysql` | fail | medium | prod-app-s/statefulset/app-s-backend-mysql container mysql: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe present |
 | `resilience.db-probe-timeout.prod-app-v/statefulset/app-v-backend-prod-mysql:mysql` | fail | medium | prod-app-v/statefulset/app-v-backend-prod-mysql container mysql: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe present |
@@ -734,77 +732,9 @@ Signature catalog 1.1.0, 40 files, 23879 lines scanned (components: actions-runn
 | `traffic.alb-protection-off.k8s-lab-kprodlb-b18a4555d7` | warn | low | ALB k8s-lab-kprodlb-b18a4555d7: deletion_protection False, access_logs False, target groups in the ingress group 41 |
 | `vpccni.metrics-unreadable.cluster` | warn | low | 2 of 9 nodes without readable ipamd metrics (localhost:61678): ['ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal'] |
 | `eks.audit-log-off.cluster` | fail | info | enabled logs ['api', 'authenticator', 'controllerManager', 'scheduler'], disabled logs ['audit'] |
-| `hygiene.no-progressive-delivery.cluster` | fail | info | No progressive-delivery component (Argo Rollouts, Flagger). All deployments are rolling updates (replace everything) -- ALB weighted target groups are not used either |
 
 The table cuts each evidence at 300 characters and a check may cut a list in its evidence; nothing is lost. Every finding below carries, folded, the material its rule judged, taken from `findings-draft.json` `details`.
 
-<details><summary><code>observability.no-symptom-alerts.cluster</code></summary>
-
-```json
-{
- "alerting": 157,
- "by_class": {
-  "app-cause": 5,
-  "app": 14,
-  "cause": 138
- },
- "symptom_ratio": 0.0,
- "symptom_rules": []
-}
-```
-
-</details>
-<details><summary><code>resilience.n-plus-one.cluster</code></summary>
-
-```json
-{
- "allocatable_cpu_without_largest": 15.45,
- "allocatable_memory_gb_without_largest": 46.3,
- "autoscaler": true,
- "autoscaler_name": "karpenter",
- "available": true,
- "cannot_fit_elsewhere": [],
- "cpu_ok": true,
- "karpenter": true,
- "largest_node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
- "largest_node_cpu": 3.92,
- "largest_node_memory_gb": 29.8,
- "memory_ok": true,
- "ok": false,
- "pods_on_largest_node": 34,
- "pools_short": [
-  {
-   "eligible_nodes": [
-    "ip-10-0-1-137.ap-northeast-2.compute.internal",
-    "ip-10-0-1-245.ap-northeast-2.compute.internal",
-    "ip-10-0-2-100.ap-northeast-2.compute.internal"
-   ],
-   "pods": 32,
-   "needed_cpu": 2.79,
-   "free_cpu": 2.62,
-   "needed_memory_gb": 14.81,
-   "free_memory_gb": 11.64
-  },
-  {
-   "eligible_nodes": [
-    "ip-10-0-1-137.ap-northeast-2.compute.internal",
-    "ip-10-0-1-245.ap-northeast-2.compute.internal"
-   ],
-   "pods": 1,
-   "needed_cpu": 0.5,
-   "free_cpu": 0.28,
-   "needed_memory_gb": 4.0,
-   "free_memory_gb": 8.39
-  }
- ],
- "prod_pods_on_largest_node": 23,
- "requests_cpu_total": 11.51,
- "requests_memory_gb_total": 45.7,
- "tight": false
-}
-```
-
-</details>
 <details><summary><code>controlplane.scheduler-unschedulable.prod-app-x/app-x-api</code></summary>
 
 ```json
@@ -1861,6 +1791,22 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>observability.no-symptom-alerts.cluster</code></summary>
+
+```json
+{
+ "alerting": 157,
+ "by_class": {
+  "app-cause": 5,
+  "app": 14,
+  "cause": 138
+ },
+ "symptom_ratio": 0.0,
+ "symptom_rules": []
+}
+```
+
+</details>
 <details><summary><code>prometheus.memory-pressure.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus</code></summary>
 
 ```json
@@ -1880,6 +1826,57 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "restarts": 2,
  "rss_vs_limit": 0.655,
  "target": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+}
+```
+
+</details>
+<details><summary><code>resilience.n-plus-one.cluster</code></summary>
+
+```json
+{
+ "allocatable_cpu_without_largest": 15.45,
+ "allocatable_memory_gb_without_largest": 46.3,
+ "autoscaler": true,
+ "autoscaler_name": "karpenter",
+ "available": true,
+ "cannot_fit_elsewhere": [],
+ "cpu_ok": true,
+ "karpenter": true,
+ "largest_node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+ "largest_node_cpu": 3.92,
+ "largest_node_memory_gb": 29.8,
+ "memory_ok": true,
+ "ok": false,
+ "pods_on_largest_node": 34,
+ "pools_short": [
+  {
+   "eligible_nodes": [
+    "ip-10-0-1-137.ap-northeast-2.compute.internal",
+    "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "ip-10-0-2-100.ap-northeast-2.compute.internal"
+   ],
+   "pods": 32,
+   "needed_cpu": 2.79,
+   "free_cpu": 2.62,
+   "needed_memory_gb": 14.81,
+   "free_memory_gb": 11.64
+  },
+  {
+   "eligible_nodes": [
+    "ip-10-0-1-137.ap-northeast-2.compute.internal",
+    "ip-10-0-1-245.ap-northeast-2.compute.internal"
+   ],
+   "pods": 1,
+   "needed_cpu": 0.5,
+   "free_cpu": 0.28,
+   "needed_memory_gb": 4.0,
+   "free_memory_gb": 8.39
+  }
+ ],
+ "prod_pods_on_largest_node": 23,
+ "requests_cpu_total": 11.51,
+ "requests_memory_gb_total": 45.7,
+ "tight": false
 }
 ```
 

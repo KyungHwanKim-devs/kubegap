@@ -59,7 +59,7 @@ def test_latest_snapshot_by_mode(tmp_path):
 
 
 def test_validate_modes_field():
-    base = {"id": "a.b", "name": "n", "area": "a", "type": "summary", "severity_default": "low", "rule": {"expr": "True"}, "profiles": ["eks"], "test": {"cases": []}}
+    base = {"id": "a.b", "name": "n", "area": "a", "type": "summary", "severity_default": "low", "rule": {"expr": "True"}, "test": {"cases": []}}
     assert not [e for e in rubric.validate({**base, "modes": ["full"]}, "t") if "modes" in e]
     assert [e for e in rubric.validate({**base, "modes": ["weekly"]}, "t") if "modes" in e]
     assert [e for e in rubric.validate({**base, "modes": []}, "t") if "modes" in e]

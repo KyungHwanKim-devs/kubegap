@@ -5,7 +5,7 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: flannel.nodes
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     expr: "item.get('flannel') is not None and item['flannel'].get('mtu_ok') is False"
   target: "item['node']"
@@ -17,7 +17,7 @@
   verify:
     - "ip -d link show flannel.1 | grep mtu; ping -M do -s 1400 <pod IP on another node>"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -218,7 +218,7 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: flannel.nodes
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     expr: "item.get('flannel') is not None and ((item['flannel'].get('rx_errors') or 0) + (item['flannel'].get('tx_errors') or 0)) > 0"
     warn_expr: "item.get('flannel') is not None and ((item['flannel'].get('rx_dropped') or 0) + (item['flannel'].get('tx_dropped') or 0)) > 1000"
@@ -231,7 +231,7 @@
   verify:
     - "ip -s link show flannel.1"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -440,7 +440,7 @@
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
   each: flannel.podcidr
-  profiles: [lab]
+  platforms: [k3s]
   rule:
     expr: "(item.get('ratio') or 0) >= 0.8"
     warn_expr: "(item.get('ratio') or 0) >= 0.6"
@@ -453,7 +453,7 @@
   verify:
     - "kubectl get nodes -o jsonpath='{.items[*].spec.podCIDR}'; kubectl get pods -A -o wide --field-selector spec.nodeName=<node> | wc -l"
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -496,7 +496,7 @@
   suggest: "sysctl -w net.ipv4.ip_forward=1 net.bridge.bridge-nf-call-iptables=1 and persist in /etc/sysctl.d/99-kubernetes.conf (br_netfilter module in /etc/modules-load.d). k3s sets these at startup, but other tools can revert them."
   verify:
     - "sysctl net.ipv4.ip_forward net.bridge.bridge-nf-call-iptables"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "fail"
@@ -582,7 +582,7 @@
   suggest: "If nodes span subnets, use the k3s server argument --flannel-backend=wireguard-native (all nodes must restart) or run the flannel underlay over a node-to-node VPN."
   verify:
     - "kubectl get nodes -o jsonpath='{range .items[*]}{.metadata.name}{\" \"}{.metadata.annotations.flannel\\.alpha\\.coreos\\.com/backend-type}{\" \"}{.metadata.annotations.flannel\\.alpha\\.coreos\\.com/public-ip}{\"\\n\"}{end}'"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "warn"
@@ -702,7 +702,7 @@
   suggest: "Run ip -s link show flannel.1 twice 10 minutes apart to see which direction, and check MTU with ping -M do -s 1400 <pod IP on another node>. Together with ethtool -S errors on the underlay NIC."
   verify:
     - "curl -s localhost:9090/api/v1/query --data-urlencode 'query=increase(node_network_transmit_drop_total{device=\"flannel.1\"}[1d])'"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "fail"
@@ -849,7 +849,7 @@
   suggest: "ssh <node> ip -d link show flannel.1. If absent, journalctl -u k3s | grep -i flannel."
   verify:
     - "ssh <node> ip -d link show flannel.1"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "warn"

@@ -27,7 +27,7 @@
   verify:
     - "on the node: curl -s localhost:61678/metrics | grep -E 'awscni_(assigned_ip_addresses|total_ip_addresses|eni_max|no_available_ip_addresses)'"
     - "kubectl get events -A --field-selector reason=FailedCreatePodSandBox | grep -i 'assign'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "skip"
@@ -237,7 +237,7 @@
   verify:
     - "on the node: curl -s localhost:61678/metrics | grep awscni_no_available_ip_addresses"
     - "kubectl get events -A --field-selector reason=FailedCreatePodSandBox | grep -i 'assign'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "skip"
@@ -295,7 +295,7 @@
   suggest: "Set kubelet.maxPods in the Karpenter EC2NodeClass to the IP limit (x16 with prefix delegation), or enable prefix delegation to raise the IP limit."
   verify:
     - "kubectl get node <node> -o jsonpath='{.status.allocatable.pods}' ; aws ec2 describe-instance-types --instance-types <type> --query 'InstanceTypes[].NetworkInfo.[MaximumNetworkInterfaces,Ipv4AddressesPerInterface]'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -397,7 +397,7 @@
   suggest: "Set ENABLE_PREFIX_DELEGATION=true and WARM_PREFIX_TARGET=1 on aws-node (via add-on configurationValues). It applies to new nodes only, so it takes effect as Karpenter replaces nodes. Raise max-pods as well."
   verify:
     - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 PREFIX"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "skip"
@@ -523,7 +523,7 @@
   suggest: "A subnet cannot be widened; instead attach a secondary CIDR to the VPC and use custom networking (ENIConfig) to place only pods there. Or tidy per-node reservations with prefix delegation."
   verify:
     - "aws ec2 describe-subnets --subnet-ids <id> --query 'Subnets[].AvailableIpAddressCount'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -580,7 +580,7 @@
   suggest: "Only when the subnet is tight: WARM_IP_TARGET=5, MINIMUM_IP_TARGET=10 or so. With prefix delegation, WARM_PREFIX_TARGET=1 is the default and these settings are ignored."
   verify:
     - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 -E 'WARM|MINIMUM'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -668,7 +668,7 @@
   suggest: "Find the failing API name in the aws-node logs (logs/pods/vpc-cni/); for IAM fix the node role policy, for throttling reduce the concurrent scale-out burst."
   verify:
     - "kubectl logs -n kube-system -l k8s-app=aws-node --since=24h | grep -iE 'error|throttl' | head"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -832,7 +832,7 @@
   suggest: "Register with SSM (eks.ssm-unregistered) or install cni-metrics-helper (awscni_* to CloudWatch or Prometheus)."
   verify:
     - "kubectl get pods -n kube-system -l k8s-app=aws-node -o wide"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -887,7 +887,7 @@
   verify:
     - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].image}{\"\\n\"}{range .spec.template.spec.containers[0].env[*]}{.name}={.value}{\"\\n\"}{end}' | grep -E 'amazon-k8s-cni|SNAT'"
     - "on a node: sudo iptables -t nat -S | grep -- '-j SNAT'   # expect --random-fully on the SNAT rule"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -966,7 +966,7 @@
   verify:
     - "kubectl get ds -n kube-system aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | tr ',' '\\n' | grep -A1 SNAT"
     - "aws ec2 describe-route-tables --filters Name=vpc-id,Values=<vpc id> --query 'RouteTables[].Routes[?VpcPeeringConnectionId != null || TransitGatewayId != null || CoreNetworkArn != null || LocalGatewayId != null || (GatewayId && starts_with(GatewayId, `vgw-`))]'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"

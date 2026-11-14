@@ -619,7 +619,7 @@ def summarize(snap: Path, echo=print, *, keep_component_logs: bool = False) -> d
             "taken_at": inv.get("taken_at"),
             "platform": inv["cluster"]["platform"],
             "server_version": inv["cluster"].get("server_version"),
-            "profile": inv["profile"]["name"],
+            "scale": (inv.get("scale") or {}).get("name"),
             "node_access": inv["node_access"]["method"],
             "nodes": inv["nodes"]["count"],
             "namespaces": inv["namespaces"]["count"],

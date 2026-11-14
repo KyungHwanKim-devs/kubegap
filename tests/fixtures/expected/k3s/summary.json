@@ -9,7 +9,7 @@
   "taken_at": "2026-11-07T10:22:59+09:00",
   "platform": "k3s",
   "server_version": "v1.33.5+k3s1",
-  "profile": "lab",
+  "scale": "small",
   "node_access": "ssh",
   "nodes": 2,
   "namespaces": 26,
@@ -40,8 +40,7 @@
    "reloader"
   ],
   "missing_families": [
-   "backup",
-   "slo"
+   "backup"
   ],
   "stores": {
    "prometheus": {

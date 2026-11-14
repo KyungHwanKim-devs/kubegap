@@ -34,7 +34,7 @@ When the number of findings moves between two runs, the reader needs to know whe
 
 ## 6. Absence is a finding
 
-A separate check type, `absence`, fails when something the profile expects is not installed at all: a metrics store, a log store, alert routing, backups, event retention, SLO definitions. The most expensive gaps in small operations are the things nobody set up, and no metric can show that because the metric does not exist.
+A separate check type, `absence`, fails when something expected at the cluster's scale is not installed at all: a metrics store, a log store, alert routing, backups, event retention, SLO definitions. The most expensive gaps in small operations are the things nobody set up, and no metric can show that because the metric does not exist.
 
 ## 7. EKS is the baseline, k3s is the variant, built together
 
@@ -88,7 +88,7 @@ The first version was one long file, and the parts a person needs were buried un
 
 ## 18. Profiles are expectation levels, not platforms
 
-A profile says how strict to be: `prod`, `lab`, `small-prod`, `multi-az-prod`, `dev`. The platform is detected separately and gates platform collectors. Earlier profile names that mixed the two are kept as aliases. A production k3s cluster and a lab EKS cluster both exist; naming profiles after platforms judged the first too gently and the second too harshly.
+How strict to be is the scale: small, medium or large, asked once per cluster because it cannot be read from the cluster (who runs it, who depends on it, what an outage costs). The platform is detected separately and decides only which checks can run. A check states its severity per scale. A production k3s cluster and a two-node EKS cluster both exist; deriving the expectation from the platform or the node count judged the first too gently and the second too harshly, and one fixed severity per check held a personal cluster to an SLA team's standard.
 
 ## 19. English is the repository language; the report language is asked for
 

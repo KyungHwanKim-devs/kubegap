@@ -19,7 +19,6 @@
   suggest: "Walk down from the Conditions/Events of kubectl describe certificate <name> → certificaterequest → order → challenge (cmctl status certificate <name>)."
   verify:
     - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,READY:.status.conditions[?(@.type==\"Ready\")].status,NOTAFTER:.status.notAfter"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -367,7 +366,6 @@
   suggest: "Try a manual renewal with cmctl renew <name> and watch the Challenge state. For HTTP-01, check that http://<host>/.well-known/acme-challenge/ is reachable from outside."
   verify:
     - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,RENEW:.status.renewalTime,NOTAFTER:.status.notAfter | sort -k3"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -650,7 +648,6 @@
   suggest: "Read the Reason in kubectl describe challenge -A. For HTTP-01, run curl -v http://<host>/.well-known/acme-challenge/x from outside."
   verify:
     - "kubectl get orders,challenges -A"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1004,7 +1001,6 @@
   suggest: "Check Status in kubectl describe clusterissuer <name>. Confirm the ACME account key Secret (privateKeySecretRef) exists."
   verify:
     - "kubectl get clusterissuers,issuers -A -o wide"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1156,7 +1152,6 @@
   suggest: "Change the Certificate's issuerRef to production and trigger reissuance with kubectl delete secret <tls>."
   verify:
     - "kubectl get certificates -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,ISSUER:.spec.issuerRef.name | grep -i staging"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1374,7 +1369,6 @@
   suggest: "Add the cert-manager.io/cluster-issuer annotation to the Ingress so ingress-shim creates the Certificate. For external CA certificates that are not a Certificate, at least monitor expiry (blackbox exporter probe_ssl_earliest_cert_expiry)."
   verify:
     - "kubectl get ingress -A -o json | jq -r '.items[] | .metadata.namespace+\"/\"+.metadata.name+\" \"+((.spec.tls//[])|map(.secretName)|join(\",\"))'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1594,7 +1588,6 @@
   suggest: "kubectl -n cert-manager logs deploy/cert-manager --since=24h | grep -iE 'error|failed' | sort | uniq -c | sort -rn | head"
   verify:
     - "kubectl get --raw /api/v1/namespaces/cert-manager/pods/<controller-pod>:9402/proxy/metrics | grep -E 'certmanager_controller_sync_error_count|certmanager_http_acme_client_request_count'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1872,7 +1865,6 @@
   suggest: "Upgrade the cert-manager Helm chart one minor at a time (including the CRD upgrade: --set crds.enabled=true or kubectl apply cert-manager.crds.yaml)."
   verify:
     - "kubectl -n cert-manager get deploy -o jsonpath='{range .items[*]}{.metadata.name}{\" \"}{.spec.template.spec.containers[0].image}{\"\\n\"}{end}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -2084,7 +2076,6 @@
   suggest: "Helm values prometheus.servicemonitor.enabled true. Otherwise node access (SSM or SSH)."
   verify:
     - "kubectl get --raw /api/v1/namespaces/cert-manager/pods/<controller-pod>:9402/proxy/metrics | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

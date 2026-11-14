@@ -247,11 +247,11 @@ def test_a_bgp_status_of_a_node_that_is_gone_does_not_count(tmp_path):
 
 
 def test_every_metallb_check_runs_wherever_metallb_is_present():
-    """`profiles: [lab]` reported all six as disabled on a kubeadm cluster of 4 nodes or more (small-prod, lib/collection/discover.py), so being read was not enough."""
+    """A MetalLB check limited to k3s was reported as disabled on a kubeadm cluster, so being read was not enough: none of them names a platform or a scale."""
     from lib.foundations import yamlite
 
     checks = yamlite.load_file(ROOT / "collectors/metallb/checks.yaml")
-    assert len(checks) == 8 and all(set(c["profiles"]) == {"prod", "lab"} for c in checks)
+    assert len(checks) == 8 and all("platforms" not in c and "scales" not in c for c in checks)
 
 
 def test_a_metric_file_without_a_metallb_series_is_not_a_read(tmp_path):

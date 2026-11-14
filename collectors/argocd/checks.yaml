@@ -20,7 +20,6 @@
   suggest: "Use argocd app diff <app> to see the difference, then fix Git (or add ignoreDifferences if the drift is intended) and sync. For Degraded, read that workload's events and logs. For conditions, follow the CONDITIONS message in argocd app get <app>."
   verify:
     - "kubectl get applications.argoproj.io -A -o custom-columns=NAME:.metadata.name,SYNC:.status.sync.status,HEALTH:.status.health.status,COND:.status.conditions[*].type"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -458,7 +457,6 @@
   suggest: "Use argocd app history <app> and operationState.message to find the failure cause. For repeated failures, fix the manifest or review syncOptions (Replace=true, ServerSideApply=true)."
   verify:
     - "kubectl get applications.argoproj.io -A -o json | jq -r '.items[] | select(.status.operationState.phase!=\"Succeeded\") | .metadata.name+\" \"+.status.operationState.phase+\" \"+(.status.operationState.message//\"\")'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -806,7 +804,6 @@
   suggest: "If manual approval is intended, leave it and note it in the report. Otherwise set syncPolicy.automated: {prune: true, selfHeal: true}."
   verify:
     - "kubectl get applications.argoproj.io -A -o custom-columns=NAME:.metadata.name,NS:.spec.destination.namespace,AUTO:.spec.syncPolicy.automated.selfHeal,PRUNE:.spec.syncPolicy.automated.prune"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -1079,7 +1076,6 @@
   suggest: "Annotate Namespaces with argocd.argoproj.io/sync-options: Prune=false, or create namespaces via syncOptions CreateNamespace=true and remove them from the manifests. Move CRDs into a separate Application with prune off. Also review the Application finalizer in Argo CD 2.6+ and preservedResourcesOnDeletion on ApplicationSets."
   verify:
     - "kubectl get applications.argoproj.io -A -o json | jq -r '.items[] | select(.spec.syncPolicy.automated.prune==true) | .metadata.name as $n | .status.resources[]? | select(.kind==\"Namespace\" or .kind==\"CustomResourceDefinition\") | $n+\" \"+.kind+\"/\"+.name'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1348,7 +1344,6 @@
   suggest: "Create an AppProject per environment and team, narrow sourceRepos (organization repositories only), destinations (that environment's namespaces only) and clusterResourceWhitelist, then move the apps. Leave the default project empty."
   verify:
     - "kubectl get appprojects.argoproj.io -n argocd -o custom-columns=NAME:.metadata.name,REPOS:.spec.sourceRepos,DEST:.spec.destinations"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1696,7 +1691,6 @@
   verify:
     - "kubectl -n argocd get cm argocd-cm -o jsonpath='{.data.admin\\.enabled}{\"\\n\"}{.data.dex\\.config}{.data.oidc\\.config}'"
     - "kubectl -n argocd get cm argocd-rbac-cm -o yaml"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2124,7 +2118,6 @@
   suggest: "Add Ingress spec.tls or ALB certificate-arn + listen-ports 443 and redirect 80→443. Keep server.insecure only when the ingress has TLS."
   verify:
     - "kubectl -n argocd get ingress -o yaml | grep -A3 'tls:\\|certificate-arn\\|listen-ports'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2471,7 +2464,7 @@
   suggest: "Use the HA manifests (install/ha) or Helm values server.replicas 2, repoServer.replicas 2, redis-ha.enabled true, and add PDBs. On a small k3s cluster leave it and note it in the report."
   verify:
     - "kubectl -n argocd get deploy,sts -o custom-columns=NAME:.metadata.name,READY:.status.readyReplicas,REPLICAS:.spec.replicas"
-  profiles: [prod]
+  scales: [medium, large]
   test:
     cases:
       - expect: "fail"
@@ -2817,7 +2810,6 @@
   suggest: "Confirm branch protection on the repository (1 reviewer, required CI). To make promotion explicit, have prod track a tag or an environment branch (release)."
   verify:
     - "kubectl get applications.argoproj.io -A -o custom-columns=NAME:.metadata.name,REV:.spec.source.targetRevision,REPO:.spec.source.repoURL"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -3069,7 +3061,6 @@
   suggest: "Add service.slack (or webhook) and trigger.on-sync-failed / on-health-degraded to argocd-notifications-cm, then the notifications.argoproj.io/subscribe annotation on Applications (or defaultTriggers). Or enable the ServiceMonitor and use the official Argo CD Prometheus rules."
   verify:
     - "kubectl -n argocd get cm argocd-notifications-cm -o yaml"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -3337,7 +3328,6 @@
   suggest: "If argocd_git_lsremote_fail_total rises, check the repo credentials (expiry) and the GitHub rate limit. For k8s API 429, lower controller.status.processors or reduce watched resources with resource.exclusions. For redis failures, check redis pod restarts and memory."
   verify:
     - "kubectl -n argocd logs deploy/argocd-repo-server --since=1h | grep -i 'rate limit\\|authentication\\|failed to' | tail"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3847,7 +3837,6 @@
   suggest: "Upgrade 2.14 → 3.0 → 3.x following the upgrade notes (RBAC default policy change, log format, fine-grained RBAC). With Helm, use the argo-cd chart 8.x."
   verify:
     - "kubectl -n argocd get deploy argocd-server -o jsonpath='{.spec.template.spec.containers[0].image}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -4112,7 +4101,6 @@
   suggest: "Helm values controller.metrics.serviceMonitor.enabled, repoServer.metrics.serviceMonitor.enabled and server.metrics.serviceMonitor.enabled true. Otherwise node access (SSM or SSH)."
   verify:
     - "kubectl get --raw /api/v1/namespaces/argocd/pods/argocd-application-controller-0:8082/proxy/metrics | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

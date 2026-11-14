@@ -2,11 +2,11 @@
 
 From Pods, DaemonSets, Deployments, StatefulSets, CRDs, Namespaces, StorageClasses, Nodes and `aws eks describe-cluster` (on EKS),
 work out what the cluster is and what is installed, and write `inventory.json`. Prometheus/Loki retention, SSM-registered nodes,
-profile guess and node access method are decided here too. The objects are saved to `objects/<kind>.json` after component detection,
+scale and node access method are decided here too. The objects are saved to `objects/<kind>.json` after component detection,
 scrubbed by lib/foundations/scrub.py (no Secret data, no ConfigMap values), so that collect does not fetch them again.
 
 k3s detection rule: `+k3s` in the node kubelet version, StorageClass `local-path`, `local-path-provisioner` in kube-system.
-When detected: profile guess `k3s`, node access `ssh`, EKS platform collector disabled.
+When detected: node access `ssh`, EKS platform collector disabled.
 
 Adding a platform (e.g. GKE or AKS)
 -----------------------------------
@@ -23,7 +23,8 @@ platform is wired in at these points and nowhere else:
 7. Summary modules that branch on `inventory.cluster.platform`: `controlplane.py` (control plane log source), `security.py`
    (`_aws`, IRSA/pod identity), `cost.py` (pricing and spot facts), `observability.py` (`_failure_modes` applicability),
    `lib/summaries/resilience` (spot/AZ expectations), plus `storage`, `kubeproxy`, `hygiene` and `k3s` which read it.
-8. `rubric/profiles/<name>.yaml` + `_profile` here: a profile with the platform's expected families and disabled checks.
+8. `rubric/platforms/<family>.yaml` and `lib/foundations/rubric.platform_family`: a platform that shares neither the EKS nor the k3s facts reads `other.yaml`;
+   give it its own file when a check has to leave targets out there. Which checks run on it is each check's `platforms:`.
 """
 
 from __future__ import annotations
@@ -222,22 +223,6 @@ def detect_platform(ctx_info: dict, nodes: dict, comps: dict | None = None, objs
     return "unknown", reasons or ["no evidence for EKS, k3s, GKE or AKS (kubeadm etc.)"]
 
 
-def _profile(platform: str, nodes: dict, cfg: Config, override: str | None) -> dict:
-    if override:
-        return {"name": override, "source": "cli --profile", "reasons": []}
-    if cfg.get("profile"):
-        return {"name": str(cfg["profile"]), "source": "config.yaml", "reasons": []}
-    if platform == "eks":
-        return {"name": "prod", "source": "detected", "reasons": ["platform eks"]}
-    if platform in ("k3s", "rke2") or nodes["count"] <= 3:
-        return {"name": "lab", "source": "detected", "reasons": [f"platform {platform}", f"{nodes['count']} nodes (3 or fewer)"] if nodes["count"] <= 3 else [f"platform {platform}"]}
-    # 1.0 has only the eks and small k3s cluster profiles. Anything else uses the eks baseline and records the reasoning.
-    zones = [z for z in (nodes.get("zones") or []) if z]
-    if nodes["count"] > 20 or len(zones) >= 3:
-        return {"name": "multi-az-prod", "source": "detected", "reasons": [f"platform {platform}", f"{nodes['count']} nodes, {len(zones)} AZs"]}
-    return {"name": "small-prod", "source": "detected", "reasons": [f"platform {platform} (not EKS or k3s)", f"{nodes['count']} nodes (4-20), {len(zones)} AZs — inherits the checks of the base profile eks, quota and cost checks disabled"]}
-
-
 def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log: RunLog, *, context: str | None = None, kubeconfig: str | None = None, ssh_state: str = "yes") -> dict:
     """ssh_state is the user's SSH decision (`lib/commands/firstrun.ssh_decision`, passed in by the command): on an SSH platform a node is contacted only when the user decided so ("yes": a config entry, a
     probe they ran, or the first-run answer). "skipped" and "open" give no backend, with the reason and how to change it. config.yaml
@@ -334,8 +319,9 @@ def _eks_facts(eks: dict, cfg: Config, snap: Path, log: RunLog) -> dict:
     return out
 
 
-def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfig: str | None = None, log: RunLog | None = None, profile_override: str | None = None, echo=print) -> dict:
-    """`ssh_state` is the user's decision about reading nodes over SSH (\"yes\", \"skipped\" or \"open\"), made by `lib/commands/firstrun.ssh_decision` and passed in by the
+def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfig: str | None = None, log: RunLog | None = None, scale_answer: str | None = None, echo=print) -> dict:
+    """`scale_answer` is the scale the user chose for this cluster in the first-run question (`lib/commands/firstrun.scale_decision`), None when it was
+    never answered; config.yaml `scale` wins over it and the node count stands in when both are absent. `ssh_state` is the user's decision about reading nodes over SSH (\"yes\", \"skipped\" or \"open\"), made by `lib/commands/firstrun.ssh_decision` and passed in by the
     command: discovery is a collection module and does not read first-run answers itself; it has no default because nothing may contact a node by omission."""
     log = log or RunLog(snap / "run.log")
     log.stage("discover", "start", context=context)
@@ -374,7 +360,7 @@ def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfi
     comps = detect_components(objs, aws_addons)
     platform, platform_reasons = detect_platform(ctx_info, nodes, comps, objs)
     write_objects()
-    profile = _profile(platform, nodes, cfg, profile_override)
+    scale = _rubric.resolve_scale(cfg, scale_answer, nodes["count"])
     node_access = _node_access(platform, nodes, cfg, ctx_info.get("eks") if ctx_info.get("is_eks") else None, log, context=context, kubeconfig=kubeconfig, ssh_state=ssh_state)
 
     # Stores: service discovery + connect and read retention (same code as setup)
@@ -410,12 +396,8 @@ def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfi
 
     present = {k: v for k, v in comps.items() if v["present"]}
     families_present = {v["family"] for v in present.values()}
-    # Expected families live in rubric/profiles/<name>.yaml (the same source lib/judgement/evaluate uses); a profile with a base inherits from it
-    prof = _rubric.load_profile(profile["name"])
-    expected = prof.get("expected_families")
-    if expected is None and prof.get("base"):
-        expected = _rubric.load_profile(prof["base"]).get("expected_families")
-    expected = expected or []
+    # What is expected at this scale, minus what the platform makes pointless (the same source lib/judgement/evaluate uses)
+    expected = _rubric.expected_families(scale["name"], _rubric.load_platform(platform))
     missing_families = [f for f in expected if f not in families_present and f != "pod-identity-or-irsa"]
 
     inv = {
@@ -426,7 +408,7 @@ def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfi
         "context": context,
         "taken_at": taken.isoformat(timespec="seconds"),
         "cluster": {"platform": platform, "platform_reasons": platform_reasons, "server_version": server_version, "server": ctx_info.get("server"), "cluster_name": ctx_info.get("cluster_name"), "eks": eks_facts},
-        "profile": profile,
+        "scale": scale,
         # The namespace, selector and port each pod-metrics step will read, found in the workloads just fetched (or set in config.yaml, or the step's default);
         # collectors run concurrently, so the step cannot wait for the core object dump (#136)
         "pod_metrics_targets": podmetrics.discover_targets(objs, cfg),
@@ -443,11 +425,11 @@ def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfi
         "expected_families": expected,
         "missing_families": missing_families,
         "stores": stores,
-        "collectors_enabled": _collectors_enabled(platform, profile["name"], present),
+        "collectors_enabled": _collectors_enabled(platform, present),
         "fetch_failures": failures,
     }
     write_private(snap / "inventory.json", json.dumps(inv, ensure_ascii=False, indent=2, default=str))
-    log.stage("discover", "end", platform=platform, profile=profile["name"], components=len(present))
+    log.stage("discover", "end", platform=platform, scale=scale["name"], components=len(present))
     return inv
 
 
@@ -486,7 +468,7 @@ def platform_collector(platform: str) -> str | None:
     return alias if alias and (paths.COLLECTORS_DIR / alias).is_dir() else None
 
 
-def _collectors_enabled(platform: str, profile: str, present: dict) -> list[str]:
+def _collectors_enabled(platform: str, present: dict) -> list[str]:
     """Decide which collector folders to enable. core always, `<platform>-platform` when that folder exists, the rest by installed component name."""
     enabled = ["core"]
     pc = platform_collector(platform)

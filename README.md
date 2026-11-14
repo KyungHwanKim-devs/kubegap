@@ -208,7 +208,7 @@ Of the 37 Node OS checks, 26 can be seen only by reaching the nodes.
 
 Not all 409 apply to every cluster. Checks for a component such as Karpenter, Argo CD or cert-manager run only when that component is installed. A daily audit covers at most 329, leaving out the 82 that are full-only.
 
-What is expected depends on the kind and size of the cluster. EKS is held to the production baseline. k3s, RKE2 and clusters of 3 nodes or fewer get the small-cluster baseline, which still expects backups, SLOs and an alert router, but not multi-zone spread or PDBs. You can change this with `--profile`.
+What is expected depends on the scale you run the cluster at. kubegap asks once per cluster: small (no dedicated SRE or DevOps engineer), medium (someone is responsible for operations and real users depend on it) or large (a dedicated team, outages hit revenue or an SLA). The answer sets how serious each finding is: a missing SLO is low on a small cluster and critical on a large one, while a missing backup is serious at every scale. Without an answer the scale is guessed from the node count and the report says so. The platform (EKS, k3s, other) is detected and only decides which checks can run.
 
 ## How it handles your cluster and your data
 

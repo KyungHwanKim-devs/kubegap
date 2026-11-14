@@ -21,7 +21,7 @@
   verify:
     - "aws ecr get-registry-scanning-configuration"
     - "aws ecr describe-repositories --query 'repositories[?imageScanningConfiguration.scanOnPush==`false`].repositoryName'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -763,7 +763,7 @@
   suggest: "aws ecr put-image-tag-mutability --repository-name <r> --image-tag-mutability IMMUTABLE (CI re-pushing the same tag will fail, so put the git sha in the tag). In Terraform, image_tag_mutability."
   verify:
     - "aws ecr describe-repositories --query 'repositories[?imageTagMutability==`MUTABLE`].repositoryName'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -1165,7 +1165,7 @@
   suggest: "Attach the same policy to those repositories (aws ecr put-lifecycle-policy). With a Terraform module, make lifecycle_policy the default."
   verify:
     - "for r in $(aws ecr describe-repositories --query 'repositories[].repositoryName' --output text); do aws ecr get-lifecycle-policy --repository-name $r >/dev/null 2>&1 || echo no-policy $r; done"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -1791,7 +1791,7 @@
   suggest: "Confirm with the owner and delete repositories with no pull history, or cut their lifecycle to 'latest 5 only'. For large repositories such as ML images, reduce the retained count from 30 to 10."
   verify:
     - "aws ecr describe-images --repository-name <r> --query 'max_by(imageDetails, &lastRecordedPullTime).lastRecordedPullTime'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "fail"
@@ -2627,7 +2627,7 @@
   verify:
     - "aws ecr describe-pull-through-cache-rules"
     - "kubectl get pods -A -o jsonpath='{range .items[*]}{range .spec.containers[*]}{.image}{\"\\n\"}{end}{end}' | grep -vE '^[0-9]+\\.dkr\\.ecr|^public\\.ecr|^registry\\.k8s|^quay|^ghcr' | sort -u"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -3265,7 +3265,7 @@
   suggest: "Classify by the message in the Events of kubectl describe pod <pod> (401 Unauthorized, manifest unknown, toomanyrequests, i/o timeout)."
   verify:
     - "kubectl get events -A --field-selector reason=Failed | grep -i pull"
-  profiles: [prod]  # ECR is an EKS-only collector (the selftest caught this during clone validation)
+  platforms: [eks]  # ECR is an EKS-only collector (the selftest caught this during clone validation)
   test:
     cases:
       - expect: "fail"
@@ -3896,7 +3896,7 @@
   suggest: "If a DR region is defined, replicate only the prod repositories with aws ecr put-replication-configuration (repositoryFilters). Otherwise write 'single-region dependency' in the report."
   verify:
     - "aws ecr describe-registry"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"
@@ -4474,7 +4474,7 @@
   suggest: "Confirm the lifecycle untagged rule, and note in the report that multi-arch child manifests are normal. Judge actual space by GiB per repository."
   verify:
     - "aws ecr list-images --repository-name <r> --filter tagStatus=UNTAGGED --query 'length(imageIds)'"
-  profiles: [prod]
+  platforms: [eks]
   test:
     cases:
       - expect: "warn"

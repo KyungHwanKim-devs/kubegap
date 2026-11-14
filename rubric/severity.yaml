@@ -8,9 +8,9 @@ rules:
     text: Raise one level when the item is directly linked to a user-facing symptom (error rate, latency, availability). Example - missing graceful shutdown on a service that is actually returning 5xx goes high -> critical.
   - id: recurrence
     text: If something marked "resolved" in the previous report appears again, raise one level and mark it "recurrence". Same namespace, same check and a similar name suggests a resource rename; do not treat that as a recurrence.
-  - id: critical-absences
-    text: Four absences start at the top severity - no SLO defined, no symptom alerts, no backup tool, N+1 not met. When the check says fail, the item is critical. When the check says warn, it found a mitigating signal (sli/slo recording rules, burn-rate alerts or slo-labelled rules without an SLO tool; a few symptom alerts, or app-metric alerts that look at errors, latency, success or lag, under 15% of the alerting rules; etcd snapshots, VolumeSnapshots or backup CronJobs that are not suspended and succeeded in the last 7 days; Karpenter or cluster-autoscaler for N+1) and the item is high; raising it back to critical needs a reason in adjustments.md, for example when the app-metric alerts turn out to watch no user-facing symptom, or the backup CronJob writes to the same node. The profile-context rule applies to these four as to any other item.
-  - id: profile-context
-    text: Fit the profile context. "No multi-AZ spread" on a 2-node cluster is info at most.
+  - id: mitigated-absence
+    text: A check that looks for something missing (no SLO, no symptom alerts, no backup, N+1 not met) says warn when it found a mitigating signal - sli/slo recording rules or burn-rate alerts without an SLO tool; a few symptom alerts; etcd snapshots, VolumeSnapshots or backup CronJobs that succeeded in the last 7 days; a node autoscaler for N+1. A warn of these checks is one level below the check's severity. Raising it back needs a reason in the analysis record, for example when the backup CronJob writes to the same node as its source.
+  - id: scale
+    text: Severity already reflects the scale the cluster is run at (findings-draft.json `scale`; a check lists its level per scale in `severity_by_scale`). Do not lower a finding again "because the cluster is small", and do not raise one to match what a larger organization would expect.
   - id: explain-override
     text: When the LLM overturns the first-pass status (changes severity by two or more levels, or turns a fail into a pass), it writes the reason next to that item in the report.

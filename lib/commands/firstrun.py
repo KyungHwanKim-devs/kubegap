@@ -54,8 +54,8 @@ def _checks() -> tuple[dict, ...]:
 
 def node_script_checks() -> int:
     """Checks that read the node scripts or the kubelet configuration: the `node.*` checks a daily run does not collect. The `node.*` metric
-    checks read Prometheus and run without node access. This is the catalog's count; a profile can switch a few of them off (two are for
-    the lab profile only), so the texts say "up to"."""
+    checks read Prometheus and run without node access. This is the catalog's count; a few of them run on one platform only (two are for
+    k3s), so the texts say "up to"."""
     return sum(1 for c in _checks() if c["id"].startswith("node.") and c.get("modes") == ["full"])
 
 
@@ -107,6 +107,12 @@ def ssh_decision(ctx_dir: Path | None, cfg: Config) -> str:
 # ---------- the questions ----------
 
 
+def scale_decision(ctx_dir: Path | None) -> str | None:
+    """The scale the user chose for this cluster ("small", "medium", "large"), None when the question was never answered. Passed to discovery
+    and evaluation by the command; config.yaml `scale` wins over it there (lib/foundations/rubric.resolve_scale)."""
+    return (load_answers(ctx_dir).get("scale") or {}).get("choice")
+
+
 def _opt(id: str, label: str, description: str, run: list[str] | None = None, *, remember: bool = True, show: list[str] | None = None, config: list[str] | None = None) -> dict:
     """`run`: kubegap arguments the agent runs after this choice (it adds --context). `show`: lines the agent prints for the user, who acts on
     them. `config`: a [key, value] the choice puts into config.yaml, which the agent writes only after showing the dry run and a second
@@ -131,6 +137,42 @@ def _n(L: str, n: int, en_one: str, en_many: str, ko: str) -> str:
 # Every question is written twice, in English and in Korean, from what the question is for. The Korean is not a translation of the English:
 # the person reading the window is deciding what kubegap may touch, and a sentence they have to decode is a wrong choice waiting to happen
 # (#173). tests/test_firstrun.py checks the Korean against the translation-pattern list the writing guides use.
+
+
+def _q_scale(setup: dict, cfg: Config, L: str) -> dict | None:
+    """How the cluster is run. One question, asked first, because the answer decides how serious each finding is and how far the suggested
+    fixes go. Closing the window without choosing leaves it open: the run guesses from the node count and the report says it guessed."""
+    if str(cfg.get("scale") or "").lower() in ("small", "medium", "large"):
+        return None
+    if L == "ko":
+        q = {
+            "header": "운영 규모",
+            "question": "이 클러스터는 어떤 규모로 운영하나요?",
+            "explain": "같은 문제라도 규모에 따라 무게가 달라요. 답에 맞춰 심각도와 권하는 해결 수준을 정해요. 애매하면 장애가 났을 때 감당할 수 있는 수준으로 고르세요.",
+            "gain": ["작은 클러스터에 큰 조직 기준을 들이대지 않아요. 고르지 않으면 노드 수로 짐작하고 리포트에 그렇게 적어요"],
+            "small": ("소형", "전담 SRE/DevOps 엔지니어 없이 운영하는 작은 클러스터예요. 개인, 사이드 프로젝트, 소규모 팀."),
+            "medium": ("중형", "운영 담당자가 있고, 실제 사용자가 쓰는 서비스가 올라가 있어요."),
+            "large": ("대형", "전담 팀이 있고, 장애가 매출이나 계약(SLA)에 바로 영향을 줘요."),
+        }
+    else:
+        q = {
+            "header": "Scale",
+            "question": "At what scale do you run this cluster?",
+            "explain": "The same finding weighs differently at different scales. The answer sets the severity of each finding and how far the suggested fixes go. If unsure, pick by how much of an outage you could absorb.",
+            "gain": ["a small cluster is not held to a large organization's standard; without an answer the scale is guessed from the node count and the report says so"],
+            "small": ("Small", "A small cluster run without a dedicated SRE or DevOps engineer: personal, side project, small team."),
+            "medium": ("Medium", "Someone is responsible for operations and real users depend on the services."),
+            "large": ("Large", "A dedicated team runs it and an outage hits revenue or a contract (SLA) directly."),
+        }
+    return {
+        "id": "scale",
+        "header": q["header"],
+        "question": q["question"],
+        "explain": q["explain"],
+        "gain": q["gain"],
+        "options": [_opt(k, *q[k]) for k in ("small", "medium", "large")],
+        "typed": None,
+    }
 
 
 def _q_home_mode(setup: dict, cfg: Config, L: str) -> dict | None:
@@ -476,6 +518,7 @@ def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = Fa
     node_access = _load(ctx_dir, NODE_ACCESS_FILE)
     out = []
     builders = (
+        _q_scale(setup, cfg, L),
         _q_home_mode(setup, cfg, L),
         _q_tools(setup, cfg, L),
         _q_ssm_document(setup, cfg, L),

@@ -49,7 +49,7 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 | 이름 | 뜻 |
 |---|---|
 | `core/objects.dump-all` | `collectors/core/collect.yaml`의 수집 단계 `objects.dump-all`입니다. ClusterRole이 허용하는 리소스 종류를 한 번씩 나열해 `objects/<kind>.json`에 저장합니다. Kubernetes 권한 대부분이 이 단계에서 쓰입니다 |
-| `lib/collection/discover.py` | 수집 전에 몇 가지 종류를 읽어 클러스터의 플랫폼, 컴포넌트, 프로파일을 판단합니다. 프로파일은 kubegap이 클러스터에 적용할 기준입니다 |
+| `lib/collection/discover.py` | 수집 전에 몇 가지 종류를 읽어 클러스터의 플랫폼과 컴포넌트를 판단합니다 |
 | daily, full | daily 점검과 full 점검입니다. 따로 적지 않은 권한은 둘 다 씁니다. full이라고 적은 것은 full 점검에서만 씁니다 |
 
 ## 점검 종류별로 쓰는 권한
@@ -124,7 +124,7 @@ PromQL로 판정하는 모든 항목이 이 연결에 기댑니다. `type: metri
 |---|---|---|
 | `services` | `lib/collection/monitoring.py`가 `get svc -A`로 네 모니터링 도구를 찾습니다. 트래픽, 복원력, 플랫폼, albctl, kubeproxy, 오퍼레이터의 80개 항목이 씁니다 | 설정에 URL이 없으면 모니터링 도구를 찾지 못합니다. `traffic.*`의 서비스 항목은 `skip`이 됩니다 |
 | `endpoints` | `traffic.endpoint-zero`, `operators.webhook-no-endpoints` | 둘 다 `skip`이 됩니다. 이때 `summary.webhooks.no_endpoints`는 `None`입니다 |
-| `namespaces` | 네임스페이스 수, prod로 보이는 네임스페이스, 프로파일을 판단합니다. 복원력의 네임스페이스별 항목, `security.psa-not-enforced`, 멀티테넌시의 25개 항목이 씁니다 | 프로파일 탐지가 설정값을 쓰고, prod와 lab 분류가 비어 있습니다 |
+| `namespaces` | 네임스페이스 수와 prod로 보이는 네임스페이스를 판단합니다. 복원력의 네임스페이스별 항목, `security.psa-not-enforced`, 멀티테넌시의 25개 항목이 씁니다 | 네임스페이스를 운영과 개발로 나눈 분류가 비어 있습니다 |
 | `persistentvolumes` | 스토리지 18개, 복원력, ebscsi, k3s local-path 플랫폼 항목까지 64개 항목이 씁니다 | 스토리지 항목 `skip` |
 | `persistentvolumeclaims` | 스토리지, 복원력의 36개 항목이 씁니다 | 스토리지 항목 `skip` |
 | `resourcequotas`, `limitranges` | `tenancy.*` 12개 | 멀티테넌시 항목 `skip` |
@@ -275,7 +275,7 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 | daily | 365 | 280 | 20 | 5 (그중 4개는 권한이 다 있어도 건너뜁니다. ingress-nginx 점검 항목 2개, `observability.fluentbit-output-errors`, `observability.alert-metric-without-dashboard`는 이 클러스터에 설치되거나 설정된 것이 없어서입니다. `hygiene.deprecated-api`는 pluto와 kubent가 full 전용 단계라서 건너뜁니다) | 56 (full 전용 입력) |
 | full | 365 | 295 | 57 | 6 (같은 4개에 Helm 점검 항목 2개가 더해집니다. 기본 ClusterRole이 Secret을 막아서 `helm list`가 돌지 못합니다) | 0 |
 
-각 줄에서 남는 4개는 `prod` 프로파일에서 끈 2개와 LLM 점검 항목 2개입니다. 시험한 컴퓨터에 없던 도구(krr, polaris)의 항목은 뺐습니다.
+각 줄에서 남는 4개는 이 플랫폼에서 돌지 않는 2개와 LLM 점검 항목 2개입니다. 시험한 컴퓨터에 없던 도구(krr, polaris)의 항목은 뺐습니다.
 
 없는 권한 때문에 못 보는 것은 아래와 같습니다. 하나하나 이유를 붙여 건너뜀으로 적히고, 통과로 세지 않습니다.
 

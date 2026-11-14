@@ -78,6 +78,7 @@ HEADINGS = {
         "crit_dropped": "Checks that did not run this time",
         "crit_rule": "Checks whose rule changed between the runs",
         "crit_thresholds": "Checks whose thresholds changed between the runs",
+        "crit_severity": "Checks whose severity changed between the runs because the scale of the cluster or the check did",
         "none": "none",
     },
     "ko": {
@@ -124,6 +125,7 @@ HEADINGS = {
         "crit_dropped": "이번에 돌지 않은 점검 항목",
         "crit_rule": "두 점검 사이에 판정 규칙이 바뀐 항목",
         "crit_thresholds": "두 점검 사이에 임계값이 바뀐 항목",
+        "crit_severity": "두 점검 사이에 운영 규모나 점검 기준이 바뀌어 심각도가 달라진 항목",
         "none": "없음",
     },
 }
@@ -349,7 +351,7 @@ def criteria_changes(snap: Path, h: dict) -> list[str]:
     diff = load_json(snap / "diff.json") or {}
     crit = ((diff.get("findings") or {}).get("criteria_changes")) or {}
     out: list[str] = []
-    for key, label in (("new_checks", "crit_new"), ("dropped_checks", "crit_dropped"), ("rule_changed", "crit_rule"), ("thresholds_changed", "crit_thresholds")):
+    for key, label in (("new_checks", "crit_new"), ("dropped_checks", "crit_dropped"), ("rule_changed", "crit_rule"), ("thresholds_changed", "crit_thresholds"), ("severity_changed", "crit_severity")):
         rows = [r for r in crit.get(key) or [] if isinstance(r, dict) and r.get("id")]
         if rows:
             out += [f"**{h[label]}.**", *(f"- `{r['id']}` ({r.get('status')}/{r.get('severity_default')})" for r in rows), ""]

@@ -29,7 +29,17 @@ def _fake_snapshot(tmp_path):
     d.mkdir(parents=True)
     (d / "kube-system_coredns.log").write_text("2026-10-27T10:00:00Z [ERROR] plugin/errors: 2 example.com. A: read udp: i/o timeout token=abcdef1234567890\n" * 3, encoding="utf-8")
     (tmp_path / "inventory.json").write_text(
-        json.dumps({"collectors_enabled": ["core", "coredns"], "cluster": {"platform": "k3s"}, "profile": {"name": "lab"}, "node_access": {"method": "none"}, "nodes": {"count": 1}, "namespaces": {"count": 1}, "crds": {"count": 0}}),
+        json.dumps(
+            {
+                "collectors_enabled": ["core", "coredns"],
+                "cluster": {"platform": "k3s"},
+                "scale": {"name": "small", "source": "guessed"},
+                "node_access": {"method": "none"},
+                "nodes": {"count": 1},
+                "namespaces": {"count": 1},
+                "crds": {"count": 0},
+            }
+        ),
         encoding="utf-8",
     )
     return tmp_path

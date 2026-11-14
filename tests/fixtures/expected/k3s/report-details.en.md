@@ -6,8 +6,8 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 |---|---|
 | kube context / cluster | `default` / default (k3s, v1.33.5+k3s1) |
 | Run time / mode | 2026-11-07T10:22:59+09:00 / full (collection 262.7 s, 0 steps skipped by mode, 0 failed) |
-| Profile | `lab` (detected) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.87 / 1.1.0 |
+| Scale | `small` (guessed) |
+| kubegap / rubric / signatures | <kubegap> / 0.1.88 / 1.1.0 |
 | Verified against | Kubernetes v1.33.5+k3s1 (verified 1.30 to 1.37) · Prometheus 3.7.3 (verified 2.49 to 3.15) · Alertmanager 0.29.0 (verified 0.26 to 0.34) · Grafana 12.2.1 (verified 10.2 to 13.3) |
 | Nodes / namespaces / pods / CRDs | 2 (Ready 2) / 26 / 153 / 64 |
 | Components (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
@@ -20,13 +20,13 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 
 | Severity (default) | fail | warn | vs. previous run of this mode |
 |---|---|---|---|
-| critical | 2 | 2 | no previous run of this mode |
-| high | 28 | 67 | no previous run of this mode |
-| medium | 72 | 139 | no previous run of this mode |
-| low | 9 | 122 | no previous run of this mode |
-| info | 0 | 0 | no previous run of this mode |
+| critical | 0 | 1 | no previous run of this mode |
+| high | 15 | 20 | no previous run of this mode |
+| medium | 86 | 182 | no previous run of this mode |
+| low | 9 | 116 | no previous run of this mode |
+| info | 0 | 11 | no previous run of this mode |
 
-Checks 349: evaluated 295, disabled by profile 41, skipped 11, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
+Checks 349: evaluated 294, not run on this platform or at this scale 44, skipped 9, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
 
 ### 1-1. Final judgment vs. first pass (adjustments)
 
@@ -40,25 +40,14 @@ Checks 349: evaluated 295, disabled by profile 41, skipped 11, not collected in 
 
 | Finding | Severity | Consecutive runs | Evidence |
 |---|---|---|---|
-| `observability.no-slo.cluster` | critical |  | no SLO tool. Signals: sli/slo recording rules [], burn rate alerts [], slo-labelled rules [] known issue #15 |
-| `resilience.n-plus-one.cluster` | critical |  | Allocatable without the largest node node-b (12.0 cores, 30.7GB): CPU 6.0 cores vs total requests 6.12 (OK), memory 30.7GB vs 23.8GB (OK). Pods on that node 48 (prod 15). Pods that fit on no other node [{'namespace' … |
 | `argocd.prune-manages-namespace-or-crd.cluster` | high |  | apps with prune enabled that manage a Namespace or CRD as a resource ['argocd/application/app-a-prod', 'argocd/application/app-b-prod', 'argocd/application/app-d', 'argocd/application/app-g-api' … |
-| `coredns.availability.cluster` | high |  | replicas 1, nodes with pods 1 of 2 ({'node-b': 1}), PDB [], spread declared (antiAffinity/topologySpread) True, restarts total 1 |
 | `events.tracked-warning-reasons.BackOff` | high |  | Container keeps dying and the restart interval grows (CrashLoopBackOff). 60363 occurrences total (1 events, trend over 1 snapshots [60363], flat), first 2026-10-28T22:06:36Z last 2026-11-07T01:21:42Z. Top objects … |
-| `observability.failure-mode-uncovered.OOMKill` | high |  | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
-| `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | high |  | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
-| `observability.stack-storage-emptydir.monitoring/kube-prometheus-stack-grafana` | high |  | emptyDir volumes: storage, sc-dashboard-volume, sc-datasources-volume, replicas 1 |
-| `observability.stack-storage-emptydir.monitoring/prometheus-kube-prometheus-stack-prometheus` | high |  | emptyDir volumes: config-out, prometheus-kube-prometheus-stack-prometheus-db, replicas 1 |
 | `platform.k3s-datastore-slow.cluster` | high |  | datastore etcd (servers ['node-b']), warn lines in 24h 375 (hit the 200-line cap - there were more): slow apply 169 (max 1432.2ms, over 1s 2), slow fdatasync 3, leader changes 0, request stats 192, DB 595MB |
 | `platform.k8s-version-eol.cluster` | high |  | server v1.33.5+k3s1: upstream end of life 2026-06-28, 132 days past |
 | `resilience.backup-same-node.app-f-prod/app-f-postgres-backup` | high |  | app-f-prod/app-f-postgres-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b') … |
 | `resilience.backup-same-node.app-f-prod/app-f-postgres-vn-backup` | high |  | app-f-prod/app-f-postgres-vn-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-vn-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b') … |
 | `resilience.backup-same-node.app-h-prod/app-h-mysql-backup` | high |  | app-h-prod/app-h-mysql-backup: schedule '50 2 * * *', dump PVCs ['mysql-backup-app-h-mysql-0'] → nodes ['node-b'], hostPath [], source DB [('app-h-prod/statefulset/app-h-mysql', 'node-b') … |
 | `resilience.backup-same-node.app-i-prod/app-i-postgres-backup` | high |  | app-i-prod/app-i-postgres-backup: schedule '0 3 * * *', dump PVCs ['app-i-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-i-prod/statefulset/app-i-postgres', 'node-b')], off-node copy hint (s3 … |
-| `resilience.replicas-same-node.app-f-prod/deployment/app-f` | high |  | replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible … |
-| `resilience.replicas-same-node.app-h-prod/deployment/app-h-admin` | high |  | replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible … |
-| `resilience.replicas-same-node.app-h-prod/deployment/app-h-api-server` | high |  | replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible … |
-| `resilience.replicas-same-node.app-h-prod/deployment/app-h-app-q-client` | high |  | replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible … |
 | `resilience.restarts-crashloop.app-c-prod/app-c-coturn-549854dfcb-jgp4h:coturn` | high |  | 11193 restarts, state CrashLoopBackOff, last termination Error (exit 255) 2026-11-07T01:18:42Z, cause class crash (exit 255), Unhealthy events 0, node reboot time None |
 | `resources.memory-limit-near-p95.app-g-api/sts/app-g-minio:minio` | high |  | pod app-g-minio-0: 7d memory working set p95 / limit = 0.98 |
 | `security.plaintext-configmap-secret.app-a-prod/configmap/marketing-scripts` | high |  | app-a-prod/configmap/marketing-scripts: keys ['discord_sales_bot.py:TOKEN', 'discord_sales_bot.py:OPENAI_API_KEY', 'marketing_autopost.py:client_secret', 'marketing_autopost.py:resource_owner_secret'] … |
@@ -66,10 +55,6 @@ Checks 349: evaluated 295, disabled by profile 41, skipped 11, not collected in 
 | `storage.local-path-over-capacity.app-a-prod/app-a-postgres-backup-pvc` | high |  | node node-a uses 5862MB / capacity 5120MB (1.14x). workloads ['app-a-prod/app-a-postgres-backup'] |
 | `storage.local-path-over-capacity.logging/data-elasticsearch-0` | high |  | node node-b uses 107797MB / capacity 20480MB (5.26x). workloads ['logging/elasticsearch-0'] |
 | `tenancy.quota-near-limit.app-l-prod/app-l-prod-quota` | high |  | app-l-prod/app-l-prod-quota: near limit ['persistentvolumeclaims'] (max ratio 1.0). hard {'limits.cpu': '4', 'limits.memory': '8Gi', 'persistentvolumeclaims': '2', 'requests.cpu': '2', 'requests.memory': '4Gi' … |
-| `traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-external` | high |  | nodeport app-f-prod/app-f-postgres-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
-| `traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-mx-external` | high |  | nodeport app-f-prod/app-f-postgres-mx-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
-| `traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-vn-external` | high |  | nodeport app-f-prod/app-f-postgres-vn-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
-| `traffic.db-exposed.nodeport/app-i-prod/app-i-postgres-external` | high |  | nodeport app-i-prod/app-i-postgres-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
 
 (consecutive-run counts need diff.json; none for this snapshot)
 
@@ -89,10 +74,9 @@ No earlier full snapshot to compare with.
 
 | Finding | Status | Severity | Why it should exist | Proposal |
 |---|---|---|---|---|
-| `observability.no-slo.cluster` | fail | critical | Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first. | Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress. |
 | `resilience.no-backup.cluster` | warn | critical | There is no way to recover cluster state (objects) and PV data. Deleting a namespace by mistake or a broken etcd or PV is the end. A CronJob dump without a tool is often "a backup kept on the same … | Velero (plus EBS snapshots or PV backup). On EKS at least a DLM snapshot policy. In a small k3s cluster, k3s etcd-snapshot or a state.db copy plus PV directory backup. Test a restore; a dump that was … |
 
-Expected families missing (inventory): backup, slo.
+Expected families missing (inventory): backup.
 
 ## 6. Suppressed, tool missing, not collected
 
@@ -100,7 +84,7 @@ Expected families missing (inventory): backup, slo.
 - Suppression expired 0: none
 - Tool missing 0: none
 - Not collected in full mode 0: none
-- Skipped or errored 11: `observability.log-volume-change` (skip: summary.logs.loki.volume_change missing), `security.no-secrets-manager` (skip: profile lab does not require family secrets-manager), `scaling.no-node-autoscaler` (skip: profile lab does not require family node-autoscaler), `observability.log-coverage-gap` (skip: summary.logs.loki.coverage missing), `observability.loki-not-ready` (skip: nothing to judge: loki not present), `observability.loki-ingest-discarded` (skip: summary.logs.agents.loki_metrics missing), `observability.promtail-dropped` (skip: summary.logs.agents.promtail missing), `observability.log-error-ratio-high` (skip: summary.logs.loki.namespaces_1h missing), `observability.unstructured-logs` (skip: summary.logs.loki.namespaces_1h missing), `traffic.ingress-5xx-ratio` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)), `traffic.ingress-p95-latency` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29))
+- Skipped or errored 9: `observability.log-volume-change` (skip: summary.logs.loki.volume_change missing), `observability.log-coverage-gap` (skip: summary.logs.loki.coverage missing), `observability.loki-not-ready` (skip: nothing to judge: loki not present), `observability.loki-ingest-discarded` (skip: summary.logs.agents.loki_metrics missing), `observability.promtail-dropped` (skip: summary.logs.agents.promtail missing), `observability.log-error-ratio-high` (skip: summary.logs.loki.namespaces_1h missing), `observability.unstructured-logs` (skip: summary.logs.loki.namespaces_1h missing), `traffic.ingress-5xx-ratio` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)), `traffic.ingress-p95-latency` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29))
 - Judged in part 0 (some targets lacked what the rule needs; those are not judged, not passed): none
 - Query returned no series 6 (every metric name the query reads has series, so nothing happened; a name with no series would be a skip): `resources.oomkilled`, `resources.large-request-binpacking`, `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `node.network-errors`, `scaling.pod-pending-long`
 
@@ -145,7 +129,7 @@ Deprecated-API tools: kubent 28 of 41 Lists answered (13 refused or not served);
 
 ### 7-2. Checks evaluated
 
-349 checks: disabled 41, done 295, llm 2, skip 11. Load errors: none.
+349 checks: disabled 44, done 294, llm 2, skip 9. Load errors: none.
 
 ### 7-3. Signature matches and unclassified errors
 
@@ -206,27 +190,15 @@ Signature catalog 1.1.0, 23 files, 25969 lines scanned (components: argocd, cert
 
 | id | Status | Default severity | Evidence |
 |---|---|---|---|
-| `observability.no-slo.cluster` | fail | critical | no SLO tool. Signals: sli/slo recording rules [], burn rate alerts [], slo-labelled rules [] known issue #15 |
-| `resilience.n-plus-one.cluster` | fail | critical | Allocatable without the largest node node-b (12.0 cores, 30.7GB): CPU 6.0 cores vs total requests 6.12 (OK), memory 30.7GB vs 23.8GB (OK). Pods on that node 48 (prod 15). Pods that fit on no other node [{'namespace': 'app-a-prod', 'pod': 'app-a-postgres-0', 'node': 'node-b', 'cpu': 0.2 … |
-| `observability.no-symptom-alerts.cluster` | warn | critical | 161 alert rules: symptom 0, cause 153, app metrics (assumed symptom) 7. Symptom ratio 0.0. Symptom rules: [] |
 | `resilience.no-backup.cluster` | warn | critical | no backup tool (family backup). Alternative signals: etcd snapshots 5, backup-like CronJobs that ran in the last 7 days ['app-a-prod/app-a-postgres-backup', 'app-f-prod/app-f-postgres-backup', 'app-f-prod/app-f-postgres-mx-backup', 'app-f-prod/app-f-postgres-vn-backup' … |
 | `argocd.prune-manages-namespace-or-crd.cluster` | fail | high | apps with prune enabled that manage a Namespace or CRD as a resource ['argocd/application/app-a-prod', 'argocd/application/app-b-prod', 'argocd/application/app-d', 'argocd/application/app-g-api', 'argocd/application/app-k', 'argocd/application/app-n', 'argocd/application/app-l-prod'] (namespaces … |
-| `coredns.availability.cluster` | fail | high | replicas 1, nodes with pods 1 of 2 ({'node-b': 1}), PDB [], spread declared (antiAffinity/topologySpread) True, restarts total 1 |
 | `events.tracked-warning-reasons.BackOff` | fail | high | Container keeps dying and the restart interval grows (CrashLoopBackOff). 60363 occurrences total (1 events, trend over 1 snapshots [60363], flat), first 2026-10-28T22:06:36Z last 2026-11-07T01:21:42Z. Top objects: ['Pod/app-c-prod/app-c-coturn-549854dfcb-jgp4h'] |
-| `observability.failure-mode-uncovered.OOMKill` | fail | high | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
-| `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | fail | high | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
-| `observability.stack-storage-emptydir.monitoring/kube-prometheus-stack-grafana` | fail | high | emptyDir volumes: storage, sc-dashboard-volume, sc-datasources-volume, replicas 1 |
-| `observability.stack-storage-emptydir.monitoring/prometheus-kube-prometheus-stack-prometheus` | fail | high | emptyDir volumes: config-out, prometheus-kube-prometheus-stack-prometheus-db, replicas 1 |
 | `platform.k3s-datastore-slow.cluster` | fail | high | datastore etcd (servers ['node-b']), warn lines in 24h 375 (hit the 200-line cap - there were more): slow apply 169 (max 1432.2ms, over 1s 2), slow fdatasync 3, leader changes 0, request stats 192, DB 595MB |
 | `platform.k8s-version-eol.cluster` | fail | high | server v1.33.5+k3s1: upstream end of life 2026-06-28, 132 days past |
 | `resilience.backup-same-node.app-f-prod/app-f-postgres-backup` | fail | high | app-f-prod/app-f-postgres-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-vn' … |
 | `resilience.backup-same-node.app-f-prod/app-f-postgres-vn-backup` | fail | high | app-f-prod/app-f-postgres-vn-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-vn-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b') … |
 | `resilience.backup-same-node.app-h-prod/app-h-mysql-backup` | fail | high | app-h-prod/app-h-mysql-backup: schedule '50 2 * * *', dump PVCs ['mysql-backup-app-h-mysql-0'] → nodes ['node-b'], hostPath [], source DB [('app-h-prod/statefulset/app-h-mysql', 'node-b'), ('app-h-prod/statefulset/app-h-mysql', 'node-b'), ('app-h-prod/statefulset/app-h-qdrant', 'node-a')], off-node … |
 | `resilience.backup-same-node.app-i-prod/app-i-postgres-backup` | fail | high | app-i-prod/app-i-postgres-backup: schedule '0 3 * * *', dump PVCs ['app-i-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-i-prod/statefulset/app-i-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False |
-| `resilience.replicas-same-node.app-f-prod/deployment/app-f` | fail | high | replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration … |
-| `resilience.replicas-same-node.app-h-prod/deployment/app-h-admin` | fail | high | replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration … |
-| `resilience.replicas-same-node.app-h-prod/deployment/app-h-api-server` | fail | high | replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration … |
-| `resilience.replicas-same-node.app-h-prod/deployment/app-h-app-q-client` | fail | high | replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration … |
 | `resilience.restarts-crashloop.app-c-prod/app-c-coturn-549854dfcb-jgp4h:coturn` | fail | high | 11193 restarts, state CrashLoopBackOff, last termination Error (exit 255) 2026-11-07T01:18:42Z, cause class crash (exit 255), Unhealthy events 0, node reboot time None |
 | `resources.memory-limit-near-p95.app-g-api/sts/app-g-minio:minio` | fail | high | pod app-g-minio-0: 7d memory working set p95 / limit = 0.98 |
 | `security.plaintext-configmap-secret.app-a-prod/configmap/marketing-scripts` | fail | high | app-a-prod/configmap/marketing-scripts: keys ['discord_sales_bot.py:TOKEN', 'discord_sales_bot.py:OPENAI_API_KEY', 'marketing_autopost.py:client_secret', 'marketing_autopost.py:resource_owner_secret'], mounted/referenced by ['app-a-prod/cronjob/marketing-autopost-en' … |
@@ -234,60 +206,15 @@ Signature catalog 1.1.0, 23 files, 25969 lines scanned (components: argocd, cert
 | `storage.local-path-over-capacity.app-a-prod/app-a-postgres-backup-pvc` | fail | high | node node-a uses 5862MB / capacity 5120MB (1.14x). workloads ['app-a-prod/app-a-postgres-backup'] |
 | `storage.local-path-over-capacity.logging/data-elasticsearch-0` | fail | high | node node-b uses 107797MB / capacity 20480MB (5.26x). workloads ['logging/elasticsearch-0'] |
 | `tenancy.quota-near-limit.app-l-prod/app-l-prod-quota` | fail | high | app-l-prod/app-l-prod-quota: near limit ['persistentvolumeclaims'] (max ratio 1.0). hard {'limits.cpu': '4', 'limits.memory': '8Gi', 'persistentvolumeclaims': '2', 'requests.cpu': '2', 'requests.memory': '4Gi', 'requests.storage': '30Gi'}, used {'limits.cpu': '1800m', 'limits.memory': '2Gi' … |
-| `traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-external` | fail | high | nodeport app-f-prod/app-f-postgres-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
-| `traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-mx-external` | fail | high | nodeport app-f-prod/app-f-postgres-mx-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
-| `traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-vn-external` | fail | high | nodeport app-f-prod/app-f-postgres-vn-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
-| `traffic.db-exposed.nodeport/app-i-prod/app-i-postgres-external` | fail | high | nodeport app-i-prod/app-i-postgres-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
 | `logs.signatures.common.too-many-open-files` | warn | high | 20 occurrences (2026-11-06T11:56:00Z ~ 2026-11-07T00:00:00Z), thresholds warn 1/fail 10. Files: ['logs/node/node-b/containerd-24h.log']. Samples: ['time="2026-11-06T11:56:00.627384264Z" level=warning msg="error from *cgroupsv2.Manager.EventChan" error="failed to create inotify fd: too many open … |
 | `node.disk-usage.192.168.90.101:9100:/` | warn | high | usage 0.77 |
 | `prometheus.storage-risk.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus` | warn | high | storage emptyDir (PVC None), PVC usage None, TSDB 20.9GiB, retention 30d (size cap 0B), actual oldest sample 30.3 days, failed compactions over 7 days 0, WAL corruptions 0, corruptions at startup 0 |
 | `resilience.backup-same-node.app-a-prod/app-a-postgres-backup` | warn | high | app-a-prod/app-a-postgres-backup: schedule '15 3 * * *', dump PVCs ['app-a-postgres-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-a-prod/statefulset/app-a-postgres', 'node-b'), ('app-a-prod/statefulset/app-a-redis', 'node-b')], off-node copy hint (s3, rclone, restic) False |
 | `resilience.backup-same-node.app-f-prod/app-f-postgres-mx-backup` | warn | high | app-f-prod/app-f-postgres-mx-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-mx-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b') … |
 | `resilience.backup-same-node.app-g-api/app-g-postgres-backup` | warn | high | app-g-api/app-g-postgres-backup: schedule '50 3 * * *', dump PVCs ['app-g-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-g-api/statefulset/app-g-minio', 'node-b'), ('app-g-api/statefulset/app-g-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False |
-| `resilience.replicas-same-node.app-a-prod/deployment/app-a-backend` | warn | high | replicas 2 (Running 2), node distribution {'node-b': 1, 'node-a': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2 |
-| `resilience.replicas-same-node.app-a-prod/deployment/app-a-frontend` | warn | high | replicas 2 (Running 2), node distribution {'node-b': 1, 'node-a': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2 |
-| `resilience.replicas-same-node.app-a-prod/deployment/app-a-gateway` | warn | high | replicas 2 (Running 2), node distribution {'node-a': 1, 'node-b': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2 |
-| `resilience.replicas-same-node.ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller` | warn | high | replicas 2 (Running 2), node distribution {'node-b': 2}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2 |
 | `resilience.restarts-crashloop.cert-manager/cert-manager-7c4b5b58df-4v7td:cert-manager-controller` | warn | high | 12 restarts, state Running, last termination Unknown (exit 255) 2026-10-28T19:25:01Z, cause class Unknown, Unhealthy events 0, node reboot time None |
 | `resilience.restarts-crashloop.cert-manager/cert-manager-cainjector-7bf5c557bb-kbtv7:cert-manager-cainjector` | warn | high | 14 restarts, state Running, last termination Unknown (exit 255) 2026-10-28T19:25:01Z, cause class Unknown, Unhealthy events 0, node reboot time None |
 | `resilience.restarts-crashloop.keda/keda-operator-85ff5bb446-lwkl6:keda-operator` | warn | high | 10 restarts, state Running, last termination Unknown (exit 255) 2026-10-28T19:25:01Z, cause class Unknown, Unhealthy events 0, node reboot time None |
-| `resilience.single-eligible-node.app-a-prod/statefulset/app-a-postgres` | warn | high | app-a-prod/statefulset/app-a-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-a-prod/statefulset/app-a-redis` | warn | high | app-a-prod/statefulset/app-a-redis: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-c-prod/deployment/app-c-coturn` | warn | high | app-c-prod/deployment/app-c-coturn: eligible nodes ['node-a'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-a'}"], unavoidable pin reasons ['hostNetwork'], replicas 1, serves traffic False |
-| `resilience.single-eligible-node.app-c-prod/deployment/app-c-signaling` | warn | high | app-c-prod/deployment/app-c-signaling: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-c-prod/deployment/app-c-web` | warn | high | app-c-prod/deployment/app-c-web: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-c-prod/statefulset/app-c-postgres` | warn | high | app-c-prod/statefulset/app-c-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate postgres-data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-f-prod/deployment/app-f` | warn | high | app-f-prod/deployment/app-f: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 2, serves traffic True |
-| `resilience.single-eligible-node.app-f-prod/deployment/app-f-admin` | warn | high | app-f-prod/deployment/app-f-admin: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-f-prod/deployment/app-f-mx` | warn | high | app-f-prod/deployment/app-f-mx: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-f-prod/deployment/app-f-mx-worker` | warn | high | app-f-prod/deployment/app-f-mx-worker: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic False |
-| `resilience.single-eligible-node.app-f-prod/deployment/app-f-vn` | warn | high | app-f-prod/deployment/app-f-vn: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-f-prod/deployment/app-f-vn-worker` | warn | high | app-f-prod/deployment/app-f-vn-worker: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic False |
-| `resilience.single-eligible-node.app-f-prod/deployment/app-f-worker` | warn | high | app-f-prod/deployment/app-f-worker: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic False |
-| `resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres` | warn | high | app-f-prod/statefulset/app-f-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-postgres-data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres-mx` | warn | high | app-f-prod/statefulset/app-f-postgres-mx: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-postgres-mx-data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres-vn` | warn | high | app-f-prod/statefulset/app-f-postgres-vn: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-postgres-vn-data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-f-prod/statefulset/app-f-redis` | warn | high | app-f-prod/statefulset/app-f-redis: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-redis-data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-g-api/statefulset/app-g-minio` | warn | high | app-g-api/statefulset/app-g-minio: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-g-minio-data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-g-api/statefulset/app-g-postgres` | warn | high | app-g-api/statefulset/app-g-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-g-postgres-data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-h-prod/deployment/app-h-admin` | warn | high | app-h-prod/deployment/app-h-admin: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 3, serves traffic True |
-| `resilience.single-eligible-node.app-h-prod/deployment/app-h-api-server` | warn | high | app-h-prod/deployment/app-h-api-server: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 3, serves traffic True |
-| `resilience.single-eligible-node.app-h-prod/deployment/app-h-app-p` | warn | high | app-h-prod/deployment/app-h-app-p: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-h-prod/deployment/app-h-app-q-client` | warn | high | app-h-prod/deployment/app-h-app-q-client: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 2, serves traffic True |
-| `resilience.single-eligible-node.app-h-prod/deployment/app-h-embed` | warn | high | app-h-prod/deployment/app-h-embed: eligible nodes ['node-a'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-a'}"], unavoidable pin reasons ['extended resource nvidia.com/gpu'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-h-prod/deployment/app-h-excel-agent` | warn | high | app-h-prod/deployment/app-h-excel-agent: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-h-prod/statefulset/app-h-mysql` | warn | high | app-h-prod/statefulset/app-h-mysql: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate mysql-backup', 'local-path volumeClaimTemplate mysql-data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-h-prod/statefulset/app-h-qdrant` | warn | high | app-h-prod/statefulset/app-h-qdrant: eligible nodes ['node-a'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-a'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-h-qdrant-data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-i-prod/deployment/app-i` | warn | high | app-i-prod/deployment/app-i: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.app-i-prod/statefulset/app-i-postgres` | warn | high | app-i-prod/statefulset/app-i-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-i-postgres-data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.logging/deployment/kibana` | warn | high | logging/deployment/kibana: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.logging/statefulset/elasticsearch` | warn | high | logging/statefulset/elasticsearch: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons ['local-path volumeClaimTemplate data'], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-grafana` | warn | high | monitoring/deployment/kube-prometheus-stack-grafana: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-kube-state-metrics` | warn | high | monitoring/deployment/kube-prometheus-stack-kube-state-metrics: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-operator` | warn | high | monitoring/deployment/kube-prometheus-stack-operator: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager` | warn | high | monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus` | warn | high | monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
-| `resilience.single-eligible-node.registry/statefulset/registry` | warn | high | registry/statefulset/registry: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate registry-data'], replicas 1, serves traffic True |
 | `resources.cpu-throttling.app-g-api/sts/app-g-postgres:postgres` | warn | high | pod app-g-postgres-0: throttling ratio now 0.47, no 24-hour value: under 0.001 through the day or the query was not collected, so this is a spike this moment at most |
 | `resources.cpu-throttling.logging/ds/fluent-bit:fluent-bit` | warn | high | ['pod fluent-bit-nnsb5: throttling ratio now 0.30, no 24-hour value: under 0.001 through the day or the query was not collected, so this is a spike this moment at most', 'pod fluent-bit-c7fr8: throttling ratio now 0.27, no 24-hour value: under 0.001 through the day or the query was not collected … |
 | `resources.cpu-throttling.logging/sts/elasticsearch:elasticsearch` | warn | high | pod elasticsearch-0: throttling ratio now 0.45, no 24-hour value: under 0.001 through the day or the query was not collected, so this is a spike this moment at most |
@@ -298,14 +225,9 @@ Signature catalog 1.1.0, 23 files, 25969 lines scanned (components: argocd, cert
 | `security.plaintext-secret-env.logging/cronjob/es-index-retention:retention` | warn | high | Container retention env ['ELASTIC_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.plaintext-secret-env.logging/deployment/kibana:kibana` | warn | high | Container kibana env ['ELASTICSEARCH_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.plaintext-secret-env.logging/statefulset/elasticsearch:elasticsearch` | warn | high | Container elasticsearch env ['ELASTIC_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded) |
-| `security.privileged-or-host-access.app-c-prod/deployment/app-c-coturn` | warn | high | ['hostNetwork'], containers allowing root ['coturn'] |
 | `storage.local-path-fs-near-full.cluster` | warn | high | root filesystem per node {'node-a': {'avail_ratio': 0.231, 'size_gib': 106.7, 'growth_gib_per_day': -0.48, 'avail_gib': 24.6, 'days_to_full': None, 'volumes_gib': 6.0}, 'node-b': {'avail_ratio': 0.491, 'size_gib': 454.9, 'growth_gib_per_day': 0.54, 'avail_gib': 223.4, 'days_to_full': 414 … |
-| `tenancy.ci-shares-prod-nodes.node-a` | warn | high | Node node-a (pool (no-pool)): prod pods 32 (['app-a-prod', 'app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']) together with CI pods 1 (['arc-actions-runner-controller-5c9d9ffd65-766b6']). Heavy runners True, minutes above 90% node CPU in 7d 0.0, memory limit … |
-| `tenancy.ci-shares-prod-nodes.node-b` | warn | high | Node node-b (pool (no-pool)): prod pods 15 (['app-a-prod', 'app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']) together with CI pods 2 (['lab-a-runner-8tt2w-cpndm', 'lab-a-runner-8tt2w-d2pwq']). Heavy runners True, minutes above 90% node CPU in 7d 0.0, memory limit … |
-| `tenancy.quota-without-limitrange.app-a-prod/app-a-prod-quota` | warn | high | app-a-prod/app-a-prod-quota: requests entries in hard ['requests.memory'], LimitRange False (default request False), containers without requests right now 0 |
-| `tenancy.quota-without-limitrange.app-b-prod/app-b-prod-quota` | warn | high | app-b-prod/app-b-prod-quota: requests entries in hard ['requests.cpu', 'requests.memory', 'requests.storage'], LimitRange False (default request False), containers without requests right now 0 |
-| `tenancy.quota-without-limitrange.app-l-prod/app-l-prod-quota` | warn | high | app-l-prod/app-l-prod-quota: requests entries in hard ['requests.cpu', 'requests.memory', 'requests.storage'], LimitRange False (default request False), containers without requests right now 0 |
 | `controlplane.etcd-slow.cluster` | fail | medium | 24h 'apply request took too long' 169 times, slow request stats 192, ReadIndex delays 11, leader changes 0, max 1472ms (if the 200-line log cap was hit, the real count is higher) |
+| `coredns.availability.cluster` | fail | medium | replicas 1, nodes with pods 1 of 2 ({'node-b': 1}), PDB [], spread declared (antiAffinity/topologySpread) True, restarts total 1 |
 | `coredns.nxdomain-ratio-high.cluster` | fail | medium | NXDOMAIN share of responses in 1h 0.701, queries per second 32.29, NXDOMAIN share of queries forwarded upstream 0.818 (upstreams ['1.1.1.1:53', '8.8.8.8:53']), pods with default ndots (5) 153, autopath False, cache hit ratio 0.8443 |
 | `eso.store-static-credentials.cluster` | fail | medium | stores with static key auth ['ClusterSecretStore/aws-secret-store'] (all auth methods {'ClusterSecretStore/aws-secret-store': 'static-key(Secret)'}), providers ['aws'], ExternalSecrets 39 (prod 33) |
 | `hygiene.mutable-image-tag.app-a-prod/deployment/app-a-phoenix:phoenix` | fail | medium | image arizephoenix/phoenix:latest (tag latest, imagePullPolicy IfNotPresent, registry docker.io) |
@@ -327,7 +249,11 @@ Signature catalog 1.1.0, 23 files, 25969 lines scanned (components: argocd, cert
 | `observability.alerts-always-firing.KubeJobFailed` | fail | medium | 7d firing samples 40320 (same level as Watchdog = never stops firing) |
 | `observability.alerts-always-firing.KubePodCrashLooping` | fail | medium | 7d firing samples 20160 (same level as Watchdog = never stops firing) |
 | `observability.alerts-always-firing.KubeQuotaFullyUsed` | fail | medium | 7d firing samples 20160 (same level as Watchdog = never stops firing) |
+| `observability.failure-mode-uncovered.OOMKill` | fail | medium | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
 | `observability.ingress-controller-metrics-missing.ingress-controller` | fail | medium | 29 ingresses, 0 ingress-controller request metric series, namespaces with app http_* metrics [], ALB CloudWatch False — per-backend gaps are the 29 golden-signals-missing (warn) findings |
+| `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | fail | medium | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
+| `observability.stack-storage-emptydir.monitoring/kube-prometheus-stack-grafana` | fail | medium | emptyDir volumes: storage, sc-dashboard-volume, sc-datasources-volume, replicas 1 |
+| `observability.stack-storage-emptydir.monitoring/prometheus-kube-prometheus-stack-prometheus` | fail | medium | emptyDir volumes: config-out, prometheus-kube-prometheus-stack-prometheus-db, replicas 1 |
 | `platform.k3s-etcd-snapshot-local-only.node-b` | fail | medium | all 5 snapshots at file:///var/lib/rancher/k3s/server/db/snapshots (same node, same disk). No S3 config (--etcd-s3) |
 | `platform.k3s-secrets-encryption-off.node-b` | fail | medium | k3s secrets-encrypt status: Disabled, no configuration file found. Datastore etcd 595MB |
 | `resilience.db-probe-timeout.app-a-prod/statefulset/app-a-postgres:postgres` | fail | medium | app-a-prod/statefulset/app-a-postgres container postgres: liveness exec timeout 1s, period 15s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent |
@@ -341,6 +267,11 @@ Signature catalog 1.1.0, 23 files, 25969 lines scanned (components: argocd, cert
 | `resilience.db-probe-timeout.app-h-prod/statefulset/app-h-qdrant:qdrant` | fail | medium | app-h-prod/statefulset/app-h-qdrant container qdrant: liveness httpGet timeout 1s, period 10s, failureThreshold 3, readiness httpGet timeout 1s, startupProbe absent |
 | `resilience.db-probe-timeout.app-i-prod/statefulset/app-i-postgres:postgres` | fail | medium | app-i-prod/statefulset/app-i-postgres container postgres: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent |
 | `resilience.db-probe-timeout.app-l-prod/deployment/app-l-postgres:postgres` | fail | medium | app-l-prod/deployment/app-l-postgres container postgres: liveness exec timeout 1s, period 20s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent |
+| `resilience.n-plus-one.cluster` | fail | medium | Allocatable without the largest node node-b (12.0 cores, 30.7GB): CPU 6.0 cores vs total requests 6.12 (OK), memory 30.7GB vs 23.8GB (OK). Pods on that node 48 (prod 15). Pods that fit on no other node [{'namespace': 'app-a-prod', 'pod': 'app-a-postgres-0', 'node': 'node-b', 'cpu': 0.2 … |
+| `resilience.replicas-same-node.app-f-prod/deployment/app-f` | fail | medium | replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration … |
+| `resilience.replicas-same-node.app-h-prod/deployment/app-h-admin` | fail | medium | replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration … |
+| `resilience.replicas-same-node.app-h-prod/deployment/app-h-api-server` | fail | medium | replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration … |
+| `resilience.replicas-same-node.app-h-prod/deployment/app-h-app-q-client` | fail | medium | replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration … |
 | `resilience.single-node-dependency.app-c-prod/deployment/app-c-coturn` | fail | medium | ['nodeSelector kubernetes.io/hostname=node-a'], replicas 1 |
 | `resilience.single-node-dependency.app-c-prod/statefulset/app-c-postgres` | fail | medium | ['nodeSelector kubernetes.io/hostname=node-b'], replicas 1 |
 | `resilience.single-node-dependency.app-h-prod/deployment/app-h-embed` | fail | medium | ['nodeSelector kubernetes.io/hostname=node-a'], replicas 1 |
@@ -376,6 +307,10 @@ Signature catalog 1.1.0, 23 files, 25969 lines scanned (components: argocd, cert
 | `tenancy.prod-boundary-missing.app-f-prod` | fail | medium | app-f-prod: ResourceQuota False, NetworkPolicies 0 (enforced by the cluster True), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 12 |
 | `tenancy.prod-boundary-missing.app-h-prod` | fail | medium | app-h-prod: ResourceQuota False, NetworkPolicies 0 (enforced by the cluster True), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 12 |
 | `tenancy.prod-boundary-missing.app-i-prod` | fail | medium | app-i-prod: ResourceQuota False, NetworkPolicies 0 (enforced by the cluster True), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 12 |
+| `traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-external` | fail | medium | nodeport app-f-prod/app-f-postgres-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
+| `traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-mx-external` | fail | medium | nodeport app-f-prod/app-f-postgres-mx-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
+| `traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-vn-external` | fail | medium | nodeport app-f-prod/app-f-postgres-vn-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
+| `traffic.db-exposed.nodeport/app-i-prod/app-i-postgres-external` | fail | medium | nodeport app-i-prod/app-i-postgres-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address |
 | `traffic.pod-not-ready.app-c-prod/app-c-coturn` | fail | medium | 24h minimum Ready ratio 0.0 (pod app-c-coturn-549854dfcb-jgp4h, about 1440 min not ready), pods below 0.99 1, Unhealthy events 0 |
 | `argocd.admin-account-no-sso.cluster` | warn | medium | admin.enabled True, SSO (dex/oidc) False, anonymous False, RBAC policy.default '' / policy.csv 0 lines, exec.enabled False, URL None |
 | `argocd.app-out-of-sync-or-unhealthy.cluster` | warn | medium | Applications 18 (prod 10), OutOfSync ['argocd/application/root'] (prod []), Degraded/Missing/Unknown [] (prod []), Progressing (rolling out, not abnormal) ['argocd/application/app-c'], apps with conditions ['ExcludedResourceWarning']: ['argocd/application/app-n'], last operation failed [] |
@@ -444,6 +379,7 @@ Signature catalog 1.1.0, 23 files, 25969 lines scanned (components: argocd, cert
 | `observability.golden-signals-missing.logging/kibana` | warn | medium | hosts ['kibana.lab-a.example'], backends ['kibana'], no app http_* metrics, no ingress controller metrics, source none |
 | `observability.golden-signals-missing.monitoring/monitoring-grafana-ingress` | warn | medium | hosts ['grafana.lab-a.example'], backends ['kube-prometheus-stack-grafana'], no app http_* metrics, no ingress controller metrics, source none |
 | `observability.golden-signals-missing.registry/registry` | warn | medium | hosts ['registry.lab-a.example'], backends ['registry'], no app http_* metrics, no ingress controller metrics, source none |
+| `observability.no-symptom-alerts.cluster` | warn | medium | 161 alert rules: symptom 0, cause 153, app metrics (assumed symptom) 7. Symptom ratio 0.0. Symptom rules: [] |
 | `observability.page-severity-cause-alerts.cluster` | warn | medium | of 161 alert rules, 40 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AppQClusterCPU80', 'AppQClusterMem80', 'AppQBackendDown', 'AppQFrontendDown', 'AppQPostgresDown', 'AppQGatewayDown']), classes {'cause': 153, 'app-cause': 1, 'app': 7}, severity … |
 | `operators.unhealthy-condition.deployments/app-c-prod/app-c-coturn` | warn | medium | Available=False (MinimumReplicasUnavailable) for 0.6 hours: Deployment does not have minimum availability. |
 | `resilience.cronjob-policy.app-f-prod/app-f-postgres-backup` | warn | medium | schedule '30 3 * * *', concurrencyPolicy Allow, activeDeadlineSeconds None, backoffLimit None, podFailurePolicy False, startingDeadlineSeconds None, ttl None, active Jobs 0. Gaps: ['concurrencyPolicy Allow (overlap allowed)', 'activeDeadlineSeconds missing (a stuck Job runs forever)', 'backoffLimit … |
@@ -459,6 +395,47 @@ Signature catalog 1.1.0, 23 files, 25969 lines scanned (components: argocd, cert
 | `resilience.prod-db-without-backup-cronjob.app-c-prod/statefulset/app-c-postgres` | warn | medium | statefulset app-c-postgres (Service app-c-postgres, PVC postgres-data-app-c-postgres-0): no backup CronJob names it; the namespace has no backup CronJob |
 | `resilience.prod-db-without-backup-cronjob.app-h-prod/statefulset/app-h-qdrant` | warn | medium | statefulset app-h-qdrant (Service app-h-qdrant, PVC app-h-qdrant-data-app-h-qdrant-0): no backup CronJob names it; the namespace's backup CronJobs dump other databases: app-h-mysql-backup -> app-h-mysql |
 | `resilience.prod-db-without-backup-cronjob.app-l-prod/deployment/app-l-postgres` | warn | medium | deployment app-l-postgres (Service app-l-postgres, PVC app-l-postgres-data): no backup CronJob names it; the namespace has no backup CronJob |
+| `resilience.replicas-same-node.app-a-prod/deployment/app-a-backend` | warn | medium | replicas 2 (Running 2), node distribution {'node-b': 1, 'node-a': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2 |
+| `resilience.replicas-same-node.app-a-prod/deployment/app-a-frontend` | warn | medium | replicas 2 (Running 2), node distribution {'node-b': 1, 'node-a': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2 |
+| `resilience.replicas-same-node.app-a-prod/deployment/app-a-gateway` | warn | medium | replicas 2 (Running 2), node distribution {'node-a': 1, 'node-b': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2 |
+| `resilience.replicas-same-node.ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller` | warn | medium | replicas 2 (Running 2), node distribution {'node-b': 2}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2 |
+| `resilience.single-eligible-node.app-a-prod/statefulset/app-a-postgres` | warn | medium | app-a-prod/statefulset/app-a-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-a-prod/statefulset/app-a-redis` | warn | medium | app-a-prod/statefulset/app-a-redis: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-c-prod/deployment/app-c-coturn` | warn | medium | app-c-prod/deployment/app-c-coturn: eligible nodes ['node-a'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-a'}"], unavoidable pin reasons ['hostNetwork'], replicas 1, serves traffic False |
+| `resilience.single-eligible-node.app-c-prod/deployment/app-c-signaling` | warn | medium | app-c-prod/deployment/app-c-signaling: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-c-prod/deployment/app-c-web` | warn | medium | app-c-prod/deployment/app-c-web: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-c-prod/statefulset/app-c-postgres` | warn | medium | app-c-prod/statefulset/app-c-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate postgres-data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-f-prod/deployment/app-f` | warn | medium | app-f-prod/deployment/app-f: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 2, serves traffic True |
+| `resilience.single-eligible-node.app-f-prod/deployment/app-f-admin` | warn | medium | app-f-prod/deployment/app-f-admin: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-f-prod/deployment/app-f-mx` | warn | medium | app-f-prod/deployment/app-f-mx: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-f-prod/deployment/app-f-mx-worker` | warn | medium | app-f-prod/deployment/app-f-mx-worker: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic False |
+| `resilience.single-eligible-node.app-f-prod/deployment/app-f-vn` | warn | medium | app-f-prod/deployment/app-f-vn: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-f-prod/deployment/app-f-vn-worker` | warn | medium | app-f-prod/deployment/app-f-vn-worker: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic False |
+| `resilience.single-eligible-node.app-f-prod/deployment/app-f-worker` | warn | medium | app-f-prod/deployment/app-f-worker: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic False |
+| `resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres` | warn | medium | app-f-prod/statefulset/app-f-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-postgres-data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres-mx` | warn | medium | app-f-prod/statefulset/app-f-postgres-mx: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-postgres-mx-data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres-vn` | warn | medium | app-f-prod/statefulset/app-f-postgres-vn: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-postgres-vn-data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-f-prod/statefulset/app-f-redis` | warn | medium | app-f-prod/statefulset/app-f-redis: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-redis-data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-g-api/statefulset/app-g-minio` | warn | medium | app-g-api/statefulset/app-g-minio: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-g-minio-data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-g-api/statefulset/app-g-postgres` | warn | medium | app-g-api/statefulset/app-g-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-g-postgres-data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-h-prod/deployment/app-h-admin` | warn | medium | app-h-prod/deployment/app-h-admin: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 3, serves traffic True |
+| `resilience.single-eligible-node.app-h-prod/deployment/app-h-api-server` | warn | medium | app-h-prod/deployment/app-h-api-server: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 3, serves traffic True |
+| `resilience.single-eligible-node.app-h-prod/deployment/app-h-app-p` | warn | medium | app-h-prod/deployment/app-h-app-p: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-h-prod/deployment/app-h-app-q-client` | warn | medium | app-h-prod/deployment/app-h-app-q-client: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 2, serves traffic True |
+| `resilience.single-eligible-node.app-h-prod/deployment/app-h-embed` | warn | medium | app-h-prod/deployment/app-h-embed: eligible nodes ['node-a'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-a'}"], unavoidable pin reasons ['extended resource nvidia.com/gpu'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-h-prod/deployment/app-h-excel-agent` | warn | medium | app-h-prod/deployment/app-h-excel-agent: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-h-prod/statefulset/app-h-mysql` | warn | medium | app-h-prod/statefulset/app-h-mysql: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate mysql-backup', 'local-path volumeClaimTemplate mysql-data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-h-prod/statefulset/app-h-qdrant` | warn | medium | app-h-prod/statefulset/app-h-qdrant: eligible nodes ['node-a'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-a'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-h-qdrant-data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-i-prod/deployment/app-i` | warn | medium | app-i-prod/deployment/app-i: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{"matchExpressions": [{"key": "role", "operator": "NotIn", "values": ["observability"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.app-i-prod/statefulset/app-i-postgres` | warn | medium | app-i-prod/statefulset/app-i-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'storage': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate app-i-postgres-data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.logging/deployment/kibana` | warn | medium | logging/deployment/kibana: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.logging/statefulset/elasticsearch` | warn | medium | logging/statefulset/elasticsearch: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons ['local-path volumeClaimTemplate data'], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-grafana` | warn | medium | monitoring/deployment/kube-prometheus-stack-grafana: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-kube-state-metrics` | warn | medium | monitoring/deployment/kube-prometheus-stack-kube-state-metrics: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-operator` | warn | medium | monitoring/deployment/kube-prometheus-stack-operator: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager` | warn | medium | monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus` | warn | medium | monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'role': 'observability'}"], unavoidable pin reasons [], replicas 1, serves traffic True |
+| `resilience.single-eligible-node.registry/statefulset/registry` | warn | medium | registry/statefulset/registry: eligible nodes ['node-b'] (of 2 nodes), constraints ["nodeSelector {'kubernetes.io/hostname': 'node-b'}"], unavoidable pin reasons ['local-path volumeClaimTemplate registry-data'], replicas 1, serves traffic True |
 | `resilience.single-node-dependency.registry/statefulset/registry` | warn | medium | ['nodeSelector kubernetes.io/hostname=node-b'], replicas 1 |
 | `resources.cpu-request-overprovisioned.app-a-prod/deploy/app-a-backend:backend` | warn | medium | ['pod app-a-backend-79c97cbbd6-kkc2d: 7d CPU p95 0.003 cores / request 0.10 cores = 0.03', 'pod app-a-backend-79c97cbbd6-ztv7h: 7d CPU p95 0.002 cores / request 0.10 cores = 0.02'] |
 | `resources.cpu-request-overprovisioned.app-a-prod/deploy/app-a-frontend:frontend` | warn | medium | ['pod app-a-frontend-574ff75654-6sqcp: 7d CPU p95 0.006 cores / request 0.10 cores = 0.06', 'pod app-a-frontend-574ff75654-rjbzg: 7d CPU p95 0.006 cores / request 0.10 cores = 0.06'] |
@@ -501,6 +478,7 @@ Signature catalog 1.1.0, 23 files, 25969 lines scanned (components: argocd, cert
 | `resources.krr-recommendation.logging/deployment/kibana:kibana` | warn | medium | CPU request over by 0.19 cores: CPU request 0.2 → 0.01 cores, CPU limit 0.5 → none, memory request 512 → 446 MB, memory limit 1024 → 446 MB. KRR severity CRITICAL (CPU req OK, CPU limit WARNING, memory req GOOD, memory limit CRITICAL) |
 | `resources.krr-recommendation.registry/statefulset/registry:registry` | warn | medium | memory request under by 155 MB: CPU request 0.05 → 0.01 cores, CPU limit 0.5 → none, memory request 128 → 283 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req OK, memory limit OK) |
 | `security.no-default-deny.cluster` | warn | medium | Namespaces with default-deny (ingress, empty podSelector) [], prod without one ['app-a-prod', 'app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']. Enforced True |
+| `security.privileged-or-host-access.app-c-prod/deployment/app-c-coturn` | warn | medium | ['hostNetwork'], containers allowing root ['coturn'] |
 | `security.psa-not-enforced.cluster` | warn | medium | Namespaces with an enforce label ['metallb-system'], prod without one ['app-a-prod', 'app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']. Share of containers allowing root 0.71 (58 prod workloads) |
 | `security.rbac-wildcard.argocd-application-controller` | warn | medium | ClusterRole argocd-application-controller: * in verbs and resources, bound subjects [('ServiceAccount', 'argocd', 'argocd-application-controller')] |
 | `security.sa-token-mounted-without-rbac.cluster` | warn | medium | Workloads with token mounted 79/81, of which 37 prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: ['app-a-prod/deployment/app-a-frontend', 'app-a-prod/deployment/app-a-gateway', 'app-a-prod/deployment/app-a-phoenix', 'app-a-prod/statefulset/app-a-postgres' … |
@@ -632,247 +610,29 @@ Signature catalog 1.1.0, 23 files, 25969 lines scanned (components: argocd, cert
 | `scaling.hpa-cpu-only-prod.app-a-prod/deployment/app-a-frontend` | warn | low | HPA app-a-prod/app-a-frontend: metrics ['cpu'], current CPU 3% / target 70% |
 | `scaling.hpa-no-behavior-prod.app-a-prod/deployment/app-a-backend` | warn | low | HPA app-a-prod/app-a-backend: no behavior (defaults: scaleDown 300s, scaleUp immediate), 3.0 desired changes over 7 days |
 | `scaling.hpa-no-behavior-prod.app-a-prod/deployment/app-a-frontend` | warn | low | HPA app-a-prod/app-a-frontend: no behavior (defaults: scaleDown 300s, scaleUp immediate), 2.0 desired changes over 7 days |
-| `scaling.no-hpa-serving-prod.app-a-prod/app-a-gateway` | warn | low | replicas 2, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.app-a-prod/app-a-phoenix` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.app-a-prod/app-a-umami` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.app-b-prod/app-b-backend` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.app-b-prod/app-b-frontend` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.app-c-prod/app-c-signaling` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.app-c-prod/app-c-web` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.app-h-prod/app-h-embed` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.app-h-prod/app-h-excel-agent` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.app-l-prod/app-l-api` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.app-l-prod/app-l-web` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `storage.local-path-node-pinned.cluster` | warn | low | 26 local-path PVs, by node {'node-a': 7, 'node-b': 19}, node disk used {'node-a': 6194, 'node-b': 144743}MB. top: [('logging', 'data-elasticsearch-0', 'node-b', 107797, ['logging/elasticsearch-0']), ('registry', 'registry-data-registry-0', 'node-b', 32732, ['registry/registry-0']), ('app-a-prod' … |
 | `storage.local-path-prod-delete-reclaim.cluster` | warn | low | 19 of 19 prod PVs are Delete ['app-l-prod/app-l-postgres-data', 'app-f-prod/app-f-postgres-mx-backup-pvc', 'app-i-prod/app-i-postgres-backup-pvc', 'app-f-prod/app-f-postgres-vn-data-app-f-postgres-vn-0', 'app-b-prod/app-b-artifacts', 'app-a-prod/data-app-a-redis-0' … |
+| `tenancy.ci-shares-prod-nodes.node-a` | warn | low | Node node-a (pool (no-pool)): prod pods 32 (['app-a-prod', 'app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']) together with CI pods 1 (['arc-actions-runner-controller-5c9d9ffd65-766b6']). Heavy runners True, minutes above 90% node CPU in 7d 0.0, memory limit … |
+| `tenancy.ci-shares-prod-nodes.node-b` | warn | low | Node node-b (pool (no-pool)): prod pods 15 (['app-a-prod', 'app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']) together with CI pods 2 (['lab-a-runner-8tt2w-cpndm', 'lab-a-runner-8tt2w-d2pwq']). Heavy runners True, minutes above 90% node CPU in 7d 0.0, memory limit … |
+| `tenancy.quota-without-limitrange.app-a-prod/app-a-prod-quota` | warn | low | app-a-prod/app-a-prod-quota: requests entries in hard ['requests.memory'], LimitRange False (default request False), containers without requests right now 0 |
+| `tenancy.quota-without-limitrange.app-b-prod/app-b-prod-quota` | warn | low | app-b-prod/app-b-prod-quota: requests entries in hard ['requests.cpu', 'requests.memory', 'requests.storage'], LimitRange False (default request False), containers without requests right now 0 |
+| `tenancy.quota-without-limitrange.app-l-prod/app-l-prod-quota` | warn | low | app-l-prod/app-l-prod-quota: requests entries in hard ['requests.cpu', 'requests.memory', 'requests.storage'], LimitRange False (default request False), containers without requests right now 0 |
 | `traffic.lb-external-traffic-local.loadbalancer/ingress-nginx/nginx-ingress-ingress-nginx-controller` | warn | low | Service ingress-nginx/nginx-ingress-ingress-nginx-controller: externalTrafficPolicy Local, ports [80, 443], addresses ['192.168.90.201'] |
 | `traffic.metallb-single-lb-service.cluster` | warn | low | mode layer2, 1 LoadBalancer services, pool used 1/10, leader node-b (1.0), pinned by nodeSelectors False, 2 nodes |
+| `scaling.no-hpa-serving-prod.app-a-prod/app-a-gateway` | warn | info | replicas 2, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.app-a-prod/app-a-phoenix` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.app-a-prod/app-a-umami` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.app-b-prod/app-b-backend` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.app-b-prod/app-b-frontend` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.app-c-prod/app-c-signaling` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.app-c-prod/app-c-web` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.app-h-prod/app-h-embed` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.app-h-prod/app-h-excel-agent` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.app-l-prod/app-l-api` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.app-l-prod/app-l-web` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 
 The table cuts each evidence at 300 characters and a check may cut a list in its evidence; nothing is lost. Every finding below carries, folded, the material its rule judged, taken from `findings-draft.json` `details`.
 
-<details><summary><code>resilience.n-plus-one.cluster</code></summary>
-
-```json
-{
- "allocatable_cpu_without_largest": 6.0,
- "allocatable_memory_gb_without_largest": 30.7,
- "autoscaler": false,
- "available": true,
- "cannot_fit_elsewhere": [
-  {
-   "namespace": "app-a-prod",
-   "pod": "app-a-postgres-0",
-   "node": "node-b",
-   "cpu": 0.2,
-   "memory_gb": 0.5,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "app-a-prod",
-   "pod": "app-a-redis-0",
-   "node": "node-b",
-   "cpu": 0.02,
-   "memory_gb": 0.03,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "app-c-prod",
-   "pod": "app-c-postgres-0",
-   "node": "node-b",
-   "cpu": 0.05,
-   "memory_gb": 0.25,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "app-f-prod",
-   "pod": "app-f-postgres-0",
-   "node": "node-b",
-   "cpu": 0.05,
-   "memory_gb": 0.12,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "app-f-prod",
-   "pod": "app-f-postgres-mx-0",
-   "node": "node-b",
-   "cpu": 0.05,
-   "memory_gb": 0.12,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "app-f-prod",
-   "pod": "app-f-postgres-vn-0",
-   "node": "node-b",
-   "cpu": 0.05,
-   "memory_gb": 0.12,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "app-f-prod",
-   "pod": "app-f-redis-0",
-   "node": "node-b",
-   "cpu": 0.02,
-   "memory_gb": 0.03,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "app-g-api",
-   "pod": "app-g-minio-0",
-   "node": "node-b",
-   "cpu": 0.05,
-   "memory_gb": 0.12,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "app-g-api",
-   "pod": "app-g-postgres-0",
-   "node": "node-b",
-   "cpu": 0.05,
-   "memory_gb": 0.12,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "app-h-prod",
-   "pod": "app-h-mysql-0",
-   "node": "node-b",
-   "cpu": 0.2,
-   "memory_gb": 1.56,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "logging",
-   "pod": "elasticsearch-0",
-   "node": "node-b",
-   "cpu": 0.2,
-   "memory_gb": 2.0,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "logging",
-   "pod": "kibana-59c97cdf75-ht2zf",
-   "node": "node-b",
-   "cpu": 0.2,
-   "memory_gb": 0.5,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "app-i-prod",
-   "pod": "app-i-postgres-0",
-   "node": "node-b",
-   "cpu": 0.05,
-   "memory_gb": 0.09,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "monitoring",
-   "pod": "alertmanager-kube-prometheus-stack-alertmanager-0",
-   "node": "node-b",
-   "cpu": 0.0,
-   "memory_gb": 0.2,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "monitoring",
-   "pod": "kube-prometheus-stack-grafana-74c84c99-g4grd",
-   "node": "node-b",
-   "cpu": 0.05,
-   "memory_gb": 0.5,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "monitoring",
-   "pod": "kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2",
-   "node": "node-b",
-   "cpu": 0.0,
-   "memory_gb": 0.0,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "monitoring",
-   "pod": "kube-prometheus-stack-operator-74656dd4f5-5fmv5",
-   "node": "node-b",
-   "cpu": 0.0,
-   "memory_gb": 0.0,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "monitoring",
-   "pod": "prometheus-kube-prometheus-stack-prometheus-0",
-   "node": "node-b",
-   "cpu": 0.2,
-   "memory_gb": 1.0,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  },
-  {
-   "namespace": "registry",
-   "pod": "registry-0",
-   "node": "node-b",
-   "cpu": 0.05,
-   "memory_gb": 0.12,
-   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
-   "eligible_nodes": []
-  }
- ],
- "cpu_ok": true,
- "karpenter": false,
- "largest_node": "node-b",
- "largest_node_cpu": 12.0,
- "largest_node_memory_gb": 30.7,
- "memory_ok": true,
- "ok": false,
- "pods_on_largest_node": 48,
- "pools_short": [
-  {
-   "eligible_nodes": [],
-   "pods": 19,
-   "needed_cpu": 1.49,
-   "free_cpu": 0,
-   "needed_memory_gb": 7.41,
-   "free_memory_gb": 0.0
-  }
- ],
- "prod_pods_on_largest_node": 15,
- "requests_cpu_total": 6.12,
- "requests_memory_gb_total": 23.8,
- "tight": true
-}
-```
-
-</details>
-<details><summary><code>observability.no-symptom-alerts.cluster</code></summary>
-
-```json
-{
- "alerting": 161,
- "by_class": {
-  "cause": 153,
-  "app-cause": 1,
-  "app": 7
- },
- "symptom_ratio": 0.0,
- "symptom_rules": []
-}
-```
-
-</details>
 <details><summary><code>argocd.prune-manages-namespace-or-crd.cluster</code></summary>
 
 ```json
@@ -887,24 +647,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "argocd/application/app-n",
   "argocd/application/app-l-prod"
  ]
-}
-```
-
-</details>
-<details><summary><code>coredns.availability.cluster</code></summary>
-
-```json
-{
- "nodes_total": 2,
- "nodes_with_pods": 1,
- "pdb": [],
- "pods_by_node": {
-  "node-b": 1
- },
- "replicas": 1,
- "restarts_total": 1,
- "single_replica": true,
- "spread_declared": true
 }
 ```
 
@@ -931,50 +673,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "severity_hint": "high",
  "trend": "flat",
  "type": "Warning"
-}
-```
-
-</details>
-<details><summary><code>observability.failure-mode-uncovered.OOMKill</code></summary>
-
-```json
-{
- "importance": "critical",
- "mode": "OOMKill",
- "symptom": "pods die and requests fail or slow down"
-}
-```
-
-</details>
-<details><summary><code>observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager</code></summary>
-
-```json
-{
- "namespace": "monitoring",
- "name": "alertmanager-kube-prometheus-stack-alertmanager",
- "kind": "StatefulSet"
-}
-```
-
-</details>
-<details><summary><code>observability.stack-storage-emptydir.monitoring/kube-prometheus-stack-grafana</code></summary>
-
-```json
-{
- "namespace": "monitoring",
- "name": "kube-prometheus-stack-grafana",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>observability.stack-storage-emptydir.monitoring/prometheus-kube-prometheus-stack-prometheus</code></summary>
-
-```json
-{
- "namespace": "monitoring",
- "name": "prometheus-kube-prometheus-stack-prometheus",
- "kind": "StatefulSet"
 }
 ```
 
@@ -1152,122 +850,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resilience.replicas-same-node.app-f-prod/deployment/app-f</code></summary>
-
-```json
-{
- "all_same_node": true,
- "anti_affinity": null,
- "eligible_nodes": 1,
- "nodes": {
-  "node-a": 2
- },
- "prod": true,
- "replicas": 2,
- "running": 2,
- "single_eligible_node": true,
- "topology_spread": [
-  {
-   "key": "kubernetes.io/hostname",
-   "max_skew": 1,
-   "when": "DoNotSchedule"
-  }
- ],
- "workload": "app-f-prod/deployment/app-f",
- "zones": {
-  "null": 2
- }
-}
-```
-
-</details>
-<details><summary><code>resilience.replicas-same-node.app-h-prod/deployment/app-h-admin</code></summary>
-
-```json
-{
- "all_same_node": true,
- "anti_affinity": null,
- "eligible_nodes": 1,
- "nodes": {
-  "node-a": 3
- },
- "prod": true,
- "replicas": 3,
- "running": 3,
- "single_eligible_node": true,
- "topology_spread": [
-  {
-   "key": "kubernetes.io/hostname",
-   "max_skew": 1,
-   "when": "DoNotSchedule"
-  }
- ],
- "workload": "app-h-prod/deployment/app-h-admin",
- "zones": {
-  "null": 3
- }
-}
-```
-
-</details>
-<details><summary><code>resilience.replicas-same-node.app-h-prod/deployment/app-h-api-server</code></summary>
-
-```json
-{
- "all_same_node": true,
- "anti_affinity": null,
- "eligible_nodes": 1,
- "nodes": {
-  "node-a": 3
- },
- "prod": true,
- "replicas": 3,
- "running": 3,
- "single_eligible_node": true,
- "topology_spread": [
-  {
-   "key": "kubernetes.io/hostname",
-   "max_skew": 1,
-   "when": "DoNotSchedule"
-  }
- ],
- "workload": "app-h-prod/deployment/app-h-api-server",
- "zones": {
-  "null": 3
- }
-}
-```
-
-</details>
-<details><summary><code>resilience.replicas-same-node.app-h-prod/deployment/app-h-app-q-client</code></summary>
-
-```json
-{
- "all_same_node": true,
- "anti_affinity": null,
- "eligible_nodes": 1,
- "nodes": {
-  "node-a": 2
- },
- "prod": true,
- "replicas": 2,
- "running": 2,
- "single_eligible_node": true,
- "topology_spread": [
-  {
-   "key": "kubernetes.io/hostname",
-   "max_skew": 1,
-   "when": "DoNotSchedule"
-  }
- ],
- "workload": "app-h-prod/deployment/app-h-app-q-client",
- "zones": {
-  "null": 2
- }
-}
-```
-
-</details>
 <details><summary><code>resilience.restarts-crashloop.app-c-prod/app-c-coturn-549854dfcb-jgp4h:coturn</code></summary>
 
 ```json
@@ -1411,90 +993,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "requests.memory": "512Mi",
   "requests.storage": "20Gi"
  }
-}
-```
-
-</details>
-<details><summary><code>traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-external</code></summary>
-
-```json
-{
- "allowed_sources": {},
- "hosts": [],
- "name": "app-f-postgres-external",
- "namespace": "app-f-prod",
- "note": "DB port open on an external address",
- "ports": [
-  5432
- ],
- "scheme": "node-ip (all node interfaces)",
- "sg_exposure": null,
- "source_ranges": null,
- "target": "nodeport/app-f-prod/app-f-postgres-external",
- "type": "nodeport"
-}
-```
-
-</details>
-<details><summary><code>traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-mx-external</code></summary>
-
-```json
-{
- "allowed_sources": {},
- "hosts": [],
- "name": "app-f-postgres-mx-external",
- "namespace": "app-f-prod",
- "note": "DB port open on an external address",
- "ports": [
-  5432
- ],
- "scheme": "node-ip (all node interfaces)",
- "sg_exposure": null,
- "source_ranges": null,
- "target": "nodeport/app-f-prod/app-f-postgres-mx-external",
- "type": "nodeport"
-}
-```
-
-</details>
-<details><summary><code>traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-vn-external</code></summary>
-
-```json
-{
- "allowed_sources": {},
- "hosts": [],
- "name": "app-f-postgres-vn-external",
- "namespace": "app-f-prod",
- "note": "DB port open on an external address",
- "ports": [
-  5432
- ],
- "scheme": "node-ip (all node interfaces)",
- "sg_exposure": null,
- "source_ranges": null,
- "target": "nodeport/app-f-prod/app-f-postgres-vn-external",
- "type": "nodeport"
-}
-```
-
-</details>
-<details><summary><code>traffic.db-exposed.nodeport/app-i-prod/app-i-postgres-external</code></summary>
-
-```json
-{
- "allowed_sources": {},
- "hosts": [],
- "name": "app-i-postgres-external",
- "namespace": "app-i-prod",
- "note": "DB port open on an external address",
- "ports": [
-  5432
- ],
- "scheme": "node-ip (all node interfaces)",
- "sg_exposure": null,
- "source_ranges": null,
- "target": "nodeport/app-i-prod/app-i-postgres-external",
- "type": "nodeport"
 }
 ```
 
@@ -1666,104 +1164,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resilience.replicas-same-node.app-a-prod/deployment/app-a-backend</code></summary>
-
-```json
-{
- "all_same_node": false,
- "anti_affinity": null,
- "eligible_nodes": 2,
- "nodes": {
-  "node-b": 1,
-  "node-a": 1
- },
- "prod": true,
- "replicas": 2,
- "running": 2,
- "single_eligible_node": false,
- "spread_declared": false,
- "topology_spread": [],
- "workload": "app-a-prod/deployment/app-a-backend",
- "zones": {
-  "null": 2
- }
-}
-```
-
-</details>
-<details><summary><code>resilience.replicas-same-node.app-a-prod/deployment/app-a-frontend</code></summary>
-
-```json
-{
- "all_same_node": false,
- "anti_affinity": null,
- "eligible_nodes": 2,
- "nodes": {
-  "node-b": 1,
-  "node-a": 1
- },
- "prod": true,
- "replicas": 2,
- "running": 2,
- "single_eligible_node": false,
- "spread_declared": false,
- "topology_spread": [],
- "workload": "app-a-prod/deployment/app-a-frontend",
- "zones": {
-  "null": 2
- }
-}
-```
-
-</details>
-<details><summary><code>resilience.replicas-same-node.app-a-prod/deployment/app-a-gateway</code></summary>
-
-```json
-{
- "all_same_node": false,
- "anti_affinity": null,
- "eligible_nodes": 2,
- "nodes": {
-  "node-a": 1,
-  "node-b": 1
- },
- "prod": true,
- "replicas": 2,
- "running": 2,
- "single_eligible_node": false,
- "spread_declared": false,
- "topology_spread": [],
- "workload": "app-a-prod/deployment/app-a-gateway",
- "zones": {
-  "null": 2
- }
-}
-```
-
-</details>
-<details><summary><code>resilience.replicas-same-node.ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller</code></summary>
-
-```json
-{
- "all_same_node": true,
- "anti_affinity": null,
- "eligible_nodes": 2,
- "nodes": {
-  "node-b": 2
- },
- "prod": false,
- "replicas": 2,
- "running": 2,
- "single_eligible_node": false,
- "topology_spread": [],
- "workload": "ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller",
- "zones": {
-  "null": 2
- }
-}
-```
-
-</details>
 <details><summary><code>resilience.restarts-crashloop.cert-manager/cert-manager-7c4b5b58df-4v7td:cert-manager-controller</code></summary>
 
 ```json
@@ -1823,779 +1223,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "restarts": 10,
  "unhealthy_events": 0,
  "waiting": null
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-a-prod/statefulset/app-a-postgres</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'storage': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate data"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-a-prod/statefulset/app-a-postgres"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-a-prod/statefulset/app-a-redis</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'storage': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate data"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-a-prod/statefulset/app-a-redis"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-c-prod/deployment/app-c-coturn</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'kubernetes.io/hostname': 'node-a'}"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "hostNetwork"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": false,
- "workload": "app-c-prod/deployment/app-c-coturn"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-c-prod/deployment/app-c-signaling</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-c-prod/deployment/app-c-signaling"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-c-prod/deployment/app-c-web</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-c-prod/deployment/app-c-web"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-c-prod/statefulset/app-c-postgres</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'kubernetes.io/hostname': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate postgres-data"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-c-prod/statefulset/app-c-postgres"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 2,
- "serves_traffic": true,
- "workload": "app-f-prod/deployment/app-f"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-admin</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-f-prod/deployment/app-f-admin"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-mx</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-f-prod/deployment/app-f-mx"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-mx-worker</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 1,
- "serves_traffic": false,
- "workload": "app-f-prod/deployment/app-f-mx-worker"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-vn</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-f-prod/deployment/app-f-vn"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-vn-worker</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 1,
- "serves_traffic": false,
- "workload": "app-f-prod/deployment/app-f-vn-worker"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-worker</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 1,
- "serves_traffic": false,
- "workload": "app-f-prod/deployment/app-f-worker"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'storage': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate app-f-postgres-data"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-f-prod/statefulset/app-f-postgres"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres-mx</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'storage': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate app-f-postgres-mx-data"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-f-prod/statefulset/app-f-postgres-mx"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres-vn</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'storage': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate app-f-postgres-vn-data"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-f-prod/statefulset/app-f-postgres-vn"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-f-prod/statefulset/app-f-redis</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'storage': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate app-f-redis-data"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-f-prod/statefulset/app-f-redis"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-g-api/statefulset/app-g-minio</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'storage': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate app-g-minio-data"
- ],
- "prod": false,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-g-api/statefulset/app-g-minio"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-g-api/statefulset/app-g-postgres</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'storage': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate app-g-postgres-data"
- ],
- "prod": false,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-g-api/statefulset/app-g-postgres"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-admin</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 3,
- "serves_traffic": true,
- "workload": "app-h-prod/deployment/app-h-admin"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-api-server</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 3,
- "serves_traffic": true,
- "workload": "app-h-prod/deployment/app-h-api-server"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-app-p</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-h-prod/deployment/app-h-app-p"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-app-q-client</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 2,
- "serves_traffic": true,
- "workload": "app-h-prod/deployment/app-h-app-q-client"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-embed</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'kubernetes.io/hostname': 'node-a'}"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "extended resource nvidia.com/gpu"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-h-prod/deployment/app-h-embed"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-excel-agent</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-h-prod/deployment/app-h-excel-agent"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-h-prod/statefulset/app-h-mysql</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'kubernetes.io/hostname': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate mysql-backup",
-  "local-path volumeClaimTemplate mysql-data"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-h-prod/statefulset/app-h-mysql"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-h-prod/statefulset/app-h-qdrant</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'kubernetes.io/hostname': 'node-a'}"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate app-h-qdrant-data"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-h-prod/statefulset/app-h-qdrant"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-i-prod/deployment/app-i</code></summary>
-
-```json
-{
- "constraints": [
-  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
- ],
- "eligible_nodes": [
-  "node-a"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-i-prod/deployment/app-i"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.app-i-prod/statefulset/app-i-postgres</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'storage': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate app-i-postgres-data"
- ],
- "prod": true,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "app-i-prod/statefulset/app-i-postgres"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.logging/deployment/kibana</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'role': 'observability'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": false,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "logging/deployment/kibana"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.logging/statefulset/elasticsearch</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'role': 'observability'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate data"
- ],
- "prod": false,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "logging/statefulset/elasticsearch"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-grafana</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'role': 'observability'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": false,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "monitoring/deployment/kube-prometheus-stack-grafana"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-kube-state-metrics</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'role': 'observability'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": false,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "monitoring/deployment/kube-prometheus-stack-kube-state-metrics"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-operator</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'role': 'observability'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": false,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "monitoring/deployment/kube-prometheus-stack-operator"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'role': 'observability'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": false,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'role': 'observability'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [],
- "prod": false,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-eligible-node.registry/statefulset/registry</code></summary>
-
-```json
-{
- "constraints": [
-  "nodeSelector {'kubernetes.io/hostname': 'node-b'}"
- ],
- "eligible_nodes": [
-  "node-b"
- ],
- "nodes_total": 2,
- "pin_reasons": [
-  "local-path volumeClaimTemplate registry-data"
- ],
- "prod": false,
- "replicas": 1,
- "serves_traffic": true,
- "workload": "registry/statefulset/registry"
 }
 ```
 
@@ -2773,24 +1400,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>security.privileged-or-host-access.app-c-prod/deployment/app-c-coturn</code></summary>
-
-```json
-{
- "flags": [
-  "hostNetwork"
- ],
- "host_access": true,
- "root_allowed_containers": [
-  "coturn"
- ],
- "severe": false,
- "system": false,
- "workload": "app-c-prod/deployment/app-c-coturn"
-}
-```
-
-</details>
 <details><summary><code>storage.local-path-fs-near-full.cluster</code></summary>
 
 ```json
@@ -2826,143 +1435,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>tenancy.ci-shares-prod-nodes.node-a</code></summary>
-
-```json
-{
- "ci_heavy": true,
- "ci_pod_list": [
-  {
-   "pod": "arc-actions-runner-controller-5c9d9ffd65-766b6",
-   "namespace": "arc-systems",
-   "owner_kind": "ReplicaSet",
-   "cpu_request": 0.0,
-   "heavy": true
-  }
- ],
- "ci_pods": 1,
- "cpu_saturated_minutes_7d": 0.0,
- "memory_limit_overcommit": 1.04,
- "node": "node-a",
- "pool": "(no-pool)",
- "prod_namespaces": [
-  "app-a-prod",
-  "app-b-prod",
-  "app-c-prod",
-  "app-f-prod",
-  "app-h-prod",
-  "app-i-prod",
-  "app-l-prod"
- ],
- "prod_pods": 32,
- "separation_possible": false,
- "shares_ci_prod": true
-}
-```
-
-</details>
-<details><summary><code>tenancy.ci-shares-prod-nodes.node-b</code></summary>
-
-```json
-{
- "ci_heavy": true,
- "ci_pod_list": [
-  {
-   "pod": "lab-a-runner-8tt2w-cpndm",
-   "namespace": "arc-systems",
-   "owner_kind": "Runner",
-   "cpu_request": 0.5,
-   "heavy": true
-  },
-  {
-   "pod": "lab-a-runner-8tt2w-d2pwq",
-   "namespace": "arc-systems",
-   "owner_kind": "Runner",
-   "cpu_request": 0.5,
-   "heavy": true
-  }
- ],
- "ci_pods": 2,
- "cpu_saturated_minutes_7d": 0.0,
- "memory_limit_overcommit": 0.99,
- "node": "node-b",
- "pool": "(no-pool)",
- "prod_namespaces": [
-  "app-a-prod",
-  "app-b-prod",
-  "app-c-prod",
-  "app-f-prod",
-  "app-h-prod",
-  "app-i-prod",
-  "app-l-prod"
- ],
- "prod_pods": 15,
- "separation_possible": false,
- "shares_ci_prod": true
-}
-```
-
-</details>
-<details><summary><code>tenancy.quota-without-limitrange.app-a-prod/app-a-prod-quota</code></summary>
-
-```json
-{
- "containers_without_requests": 0,
- "hard": {
-  "count/pods": "200",
-  "limits.memory": "80Gi",
-  "requests.memory": "60Gi"
- },
- "has_limitrange": false,
- "limitrange_default_request": false,
- "requires_requests": true,
- "target": "app-a-prod/app-a-prod-quota"
-}
-```
-
-</details>
-<details><summary><code>tenancy.quota-without-limitrange.app-b-prod/app-b-prod-quota</code></summary>
-
-```json
-{
- "containers_without_requests": 0,
- "hard": {
-  "limits.cpu": "4",
-  "limits.memory": "8Gi",
-  "persistentvolumeclaims": "2",
-  "requests.cpu": "2",
-  "requests.memory": "4Gi",
-  "requests.storage": "20Gi"
- },
- "has_limitrange": false,
- "limitrange_default_request": false,
- "requires_requests": true,
- "target": "app-b-prod/app-b-prod-quota"
-}
-```
-
-</details>
-<details><summary><code>tenancy.quota-without-limitrange.app-l-prod/app-l-prod-quota</code></summary>
-
-```json
-{
- "containers_without_requests": 0,
- "hard": {
-  "limits.cpu": "4",
-  "limits.memory": "8Gi",
-  "persistentvolumeclaims": "2",
-  "requests.cpu": "2",
-  "requests.memory": "4Gi",
-  "requests.storage": "30Gi"
- },
- "has_limitrange": false,
- "limitrange_default_request": false,
- "requires_requests": true,
- "target": "app-l-prod/app-l-prod-quota"
-}
-```
-
-</details>
 <details><summary><code>controlplane.etcd-slow.cluster</code></summary>
 
 ```json
@@ -2972,6 +1444,24 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "max_ms": 1472.28968,
  "readindex_slow": 11,
  "request_stats_slow": 192
+}
+```
+
+</details>
+<details><summary><code>coredns.availability.cluster</code></summary>
+
+```json
+{
+ "nodes_total": 2,
+ "nodes_with_pods": 1,
+ "pdb": [],
+ "pods_by_node": {
+  "node-b": 1
+ },
+ "replicas": 1,
+ "restarts_total": 1,
+ "single_replica": true,
+ "spread_declared": true
 }
 ```
 
@@ -3416,6 +1906,17 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 {
  "alertname": "KubeQuotaFullyUsed",
  "samples_7d": 20160.0
+}
+```
+
+</details>
+<details><summary><code>observability.failure-mode-uncovered.OOMKill</code></summary>
+
+```json
+{
+ "importance": "critical",
+ "mode": "OOMKill",
+ "symptom": "pods die and requests fail or slow down"
 }
 ```
 
@@ -3971,6 +2472,39 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   }
  ],
  "namespaces_with_app_http_metrics": []
+}
+```
+
+</details>
+<details><summary><code>observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager</code></summary>
+
+```json
+{
+ "namespace": "monitoring",
+ "name": "alertmanager-kube-prometheus-stack-alertmanager",
+ "kind": "StatefulSet"
+}
+```
+
+</details>
+<details><summary><code>observability.stack-storage-emptydir.monitoring/kube-prometheus-stack-grafana</code></summary>
+
+```json
+{
+ "namespace": "monitoring",
+ "name": "kube-prometheus-stack-grafana",
+ "kind": "Deployment"
+}
+```
+
+</details>
+<details><summary><code>observability.stack-storage-emptydir.monitoring/prometheus-kube-prometheus-stack-prometheus</code></summary>
+
+```json
+{
+ "namespace": "monitoring",
+ "name": "prometheus-kube-prometheus-stack-prometheus",
+ "kind": "StatefulSet"
 }
 ```
 
@@ -4990,6 +3524,329 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>resilience.n-plus-one.cluster</code></summary>
+
+```json
+{
+ "allocatable_cpu_without_largest": 6.0,
+ "allocatable_memory_gb_without_largest": 30.7,
+ "autoscaler": false,
+ "available": true,
+ "cannot_fit_elsewhere": [
+  {
+   "namespace": "app-a-prod",
+   "pod": "app-a-postgres-0",
+   "node": "node-b",
+   "cpu": 0.2,
+   "memory_gb": 0.5,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "app-a-prod",
+   "pod": "app-a-redis-0",
+   "node": "node-b",
+   "cpu": 0.02,
+   "memory_gb": 0.03,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "app-c-prod",
+   "pod": "app-c-postgres-0",
+   "node": "node-b",
+   "cpu": 0.05,
+   "memory_gb": 0.25,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "app-f-prod",
+   "pod": "app-f-postgres-0",
+   "node": "node-b",
+   "cpu": 0.05,
+   "memory_gb": 0.12,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "app-f-prod",
+   "pod": "app-f-postgres-mx-0",
+   "node": "node-b",
+   "cpu": 0.05,
+   "memory_gb": 0.12,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "app-f-prod",
+   "pod": "app-f-postgres-vn-0",
+   "node": "node-b",
+   "cpu": 0.05,
+   "memory_gb": 0.12,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "app-f-prod",
+   "pod": "app-f-redis-0",
+   "node": "node-b",
+   "cpu": 0.02,
+   "memory_gb": 0.03,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "app-g-api",
+   "pod": "app-g-minio-0",
+   "node": "node-b",
+   "cpu": 0.05,
+   "memory_gb": 0.12,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "app-g-api",
+   "pod": "app-g-postgres-0",
+   "node": "node-b",
+   "cpu": 0.05,
+   "memory_gb": 0.12,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "app-h-prod",
+   "pod": "app-h-mysql-0",
+   "node": "node-b",
+   "cpu": 0.2,
+   "memory_gb": 1.56,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "logging",
+   "pod": "elasticsearch-0",
+   "node": "node-b",
+   "cpu": 0.2,
+   "memory_gb": 2.0,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "logging",
+   "pod": "kibana-59c97cdf75-ht2zf",
+   "node": "node-b",
+   "cpu": 0.2,
+   "memory_gb": 0.5,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "app-i-prod",
+   "pod": "app-i-postgres-0",
+   "node": "node-b",
+   "cpu": 0.05,
+   "memory_gb": 0.09,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "monitoring",
+   "pod": "alertmanager-kube-prometheus-stack-alertmanager-0",
+   "node": "node-b",
+   "cpu": 0.0,
+   "memory_gb": 0.2,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "monitoring",
+   "pod": "kube-prometheus-stack-grafana-74c84c99-g4grd",
+   "node": "node-b",
+   "cpu": 0.05,
+   "memory_gb": 0.5,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "monitoring",
+   "pod": "kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2",
+   "node": "node-b",
+   "cpu": 0.0,
+   "memory_gb": 0.0,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "monitoring",
+   "pod": "kube-prometheus-stack-operator-74656dd4f5-5fmv5",
+   "node": "node-b",
+   "cpu": 0.0,
+   "memory_gb": 0.0,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "monitoring",
+   "pod": "prometheus-kube-prometheus-stack-prometheus-0",
+   "node": "node-b",
+   "cpu": 0.2,
+   "memory_gb": 1.0,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  },
+  {
+   "namespace": "registry",
+   "pod": "registry-0",
+   "node": "node-b",
+   "cpu": 0.05,
+   "memory_gb": 0.12,
+   "reason": "scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node",
+   "eligible_nodes": []
+  }
+ ],
+ "cpu_ok": true,
+ "karpenter": false,
+ "largest_node": "node-b",
+ "largest_node_cpu": 12.0,
+ "largest_node_memory_gb": 30.7,
+ "memory_ok": true,
+ "ok": false,
+ "pods_on_largest_node": 48,
+ "pools_short": [
+  {
+   "eligible_nodes": [],
+   "pods": 19,
+   "needed_cpu": 1.49,
+   "free_cpu": 0,
+   "needed_memory_gb": 7.41,
+   "free_memory_gb": 0.0
+  }
+ ],
+ "prod_pods_on_largest_node": 15,
+ "requests_cpu_total": 6.12,
+ "requests_memory_gb_total": 23.8,
+ "tight": true
+}
+```
+
+</details>
+<details><summary><code>resilience.replicas-same-node.app-f-prod/deployment/app-f</code></summary>
+
+```json
+{
+ "all_same_node": true,
+ "anti_affinity": null,
+ "eligible_nodes": 1,
+ "nodes": {
+  "node-a": 2
+ },
+ "prod": true,
+ "replicas": 2,
+ "running": 2,
+ "single_eligible_node": true,
+ "topology_spread": [
+  {
+   "key": "kubernetes.io/hostname",
+   "max_skew": 1,
+   "when": "DoNotSchedule"
+  }
+ ],
+ "workload": "app-f-prod/deployment/app-f",
+ "zones": {
+  "null": 2
+ }
+}
+```
+
+</details>
+<details><summary><code>resilience.replicas-same-node.app-h-prod/deployment/app-h-admin</code></summary>
+
+```json
+{
+ "all_same_node": true,
+ "anti_affinity": null,
+ "eligible_nodes": 1,
+ "nodes": {
+  "node-a": 3
+ },
+ "prod": true,
+ "replicas": 3,
+ "running": 3,
+ "single_eligible_node": true,
+ "topology_spread": [
+  {
+   "key": "kubernetes.io/hostname",
+   "max_skew": 1,
+   "when": "DoNotSchedule"
+  }
+ ],
+ "workload": "app-h-prod/deployment/app-h-admin",
+ "zones": {
+  "null": 3
+ }
+}
+```
+
+</details>
+<details><summary><code>resilience.replicas-same-node.app-h-prod/deployment/app-h-api-server</code></summary>
+
+```json
+{
+ "all_same_node": true,
+ "anti_affinity": null,
+ "eligible_nodes": 1,
+ "nodes": {
+  "node-a": 3
+ },
+ "prod": true,
+ "replicas": 3,
+ "running": 3,
+ "single_eligible_node": true,
+ "topology_spread": [
+  {
+   "key": "kubernetes.io/hostname",
+   "max_skew": 1,
+   "when": "DoNotSchedule"
+  }
+ ],
+ "workload": "app-h-prod/deployment/app-h-api-server",
+ "zones": {
+  "null": 3
+ }
+}
+```
+
+</details>
+<details><summary><code>resilience.replicas-same-node.app-h-prod/deployment/app-h-app-q-client</code></summary>
+
+```json
+{
+ "all_same_node": true,
+ "anti_affinity": null,
+ "eligible_nodes": 1,
+ "nodes": {
+  "node-a": 2
+ },
+ "prod": true,
+ "replicas": 2,
+ "running": 2,
+ "single_eligible_node": true,
+ "topology_spread": [
+  {
+   "key": "kubernetes.io/hostname",
+   "max_skew": 1,
+   "when": "DoNotSchedule"
+  }
+ ],
+ "workload": "app-h-prod/deployment/app-h-app-q-client",
+ "zones": {
+  "null": 2
+ }
+}
+```
+
+</details>
 <details><summary><code>resilience.single-node-dependency.app-c-prod/deployment/app-c-coturn</code></summary>
 
 ```json
@@ -5675,6 +4532,90 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "rbac_subject_count": 0,
  "shares_nodes_with_prod": true,
  "tenants_total": 12
+}
+```
+
+</details>
+<details><summary><code>traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-external</code></summary>
+
+```json
+{
+ "allowed_sources": {},
+ "hosts": [],
+ "name": "app-f-postgres-external",
+ "namespace": "app-f-prod",
+ "note": "DB port open on an external address",
+ "ports": [
+  5432
+ ],
+ "scheme": "node-ip (all node interfaces)",
+ "sg_exposure": null,
+ "source_ranges": null,
+ "target": "nodeport/app-f-prod/app-f-postgres-external",
+ "type": "nodeport"
+}
+```
+
+</details>
+<details><summary><code>traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-mx-external</code></summary>
+
+```json
+{
+ "allowed_sources": {},
+ "hosts": [],
+ "name": "app-f-postgres-mx-external",
+ "namespace": "app-f-prod",
+ "note": "DB port open on an external address",
+ "ports": [
+  5432
+ ],
+ "scheme": "node-ip (all node interfaces)",
+ "sg_exposure": null,
+ "source_ranges": null,
+ "target": "nodeport/app-f-prod/app-f-postgres-mx-external",
+ "type": "nodeport"
+}
+```
+
+</details>
+<details><summary><code>traffic.db-exposed.nodeport/app-f-prod/app-f-postgres-vn-external</code></summary>
+
+```json
+{
+ "allowed_sources": {},
+ "hosts": [],
+ "name": "app-f-postgres-vn-external",
+ "namespace": "app-f-prod",
+ "note": "DB port open on an external address",
+ "ports": [
+  5432
+ ],
+ "scheme": "node-ip (all node interfaces)",
+ "sg_exposure": null,
+ "source_ranges": null,
+ "target": "nodeport/app-f-prod/app-f-postgres-vn-external",
+ "type": "nodeport"
+}
+```
+
+</details>
+<details><summary><code>traffic.db-exposed.nodeport/app-i-prod/app-i-postgres-external</code></summary>
+
+```json
+{
+ "allowed_sources": {},
+ "hosts": [],
+ "name": "app-i-postgres-external",
+ "namespace": "app-i-prod",
+ "note": "DB port open on an external address",
+ "ports": [
+  5432
+ ],
+ "scheme": "node-ip (all node interfaces)",
+ "sg_exposure": null,
+ "source_ranges": null,
+ "target": "nodeport/app-i-prod/app-i-postgres-external",
+ "type": "nodeport"
 }
 ```
 
@@ -7442,6 +6383,22 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>observability.no-symptom-alerts.cluster</code></summary>
+
+```json
+{
+ "alerting": 161,
+ "by_class": {
+  "cause": 153,
+  "app-cause": 1,
+  "app": 7
+ },
+ "symptom_ratio": 0.0,
+ "symptom_rules": []
+}
+```
+
+</details>
 <details><summary><code>observability.page-severity-cause-alerts.cluster</code></summary>
 
 ```json
@@ -7831,6 +6788,877 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "app-l-postgres"
  ],
  "target": "app-l-prod/deployment/app-l-postgres"
+}
+```
+
+</details>
+<details><summary><code>resilience.replicas-same-node.app-a-prod/deployment/app-a-backend</code></summary>
+
+```json
+{
+ "all_same_node": false,
+ "anti_affinity": null,
+ "eligible_nodes": 2,
+ "nodes": {
+  "node-b": 1,
+  "node-a": 1
+ },
+ "prod": true,
+ "replicas": 2,
+ "running": 2,
+ "single_eligible_node": false,
+ "spread_declared": false,
+ "topology_spread": [],
+ "workload": "app-a-prod/deployment/app-a-backend",
+ "zones": {
+  "null": 2
+ }
+}
+```
+
+</details>
+<details><summary><code>resilience.replicas-same-node.app-a-prod/deployment/app-a-frontend</code></summary>
+
+```json
+{
+ "all_same_node": false,
+ "anti_affinity": null,
+ "eligible_nodes": 2,
+ "nodes": {
+  "node-b": 1,
+  "node-a": 1
+ },
+ "prod": true,
+ "replicas": 2,
+ "running": 2,
+ "single_eligible_node": false,
+ "spread_declared": false,
+ "topology_spread": [],
+ "workload": "app-a-prod/deployment/app-a-frontend",
+ "zones": {
+  "null": 2
+ }
+}
+```
+
+</details>
+<details><summary><code>resilience.replicas-same-node.app-a-prod/deployment/app-a-gateway</code></summary>
+
+```json
+{
+ "all_same_node": false,
+ "anti_affinity": null,
+ "eligible_nodes": 2,
+ "nodes": {
+  "node-a": 1,
+  "node-b": 1
+ },
+ "prod": true,
+ "replicas": 2,
+ "running": 2,
+ "single_eligible_node": false,
+ "spread_declared": false,
+ "topology_spread": [],
+ "workload": "app-a-prod/deployment/app-a-gateway",
+ "zones": {
+  "null": 2
+ }
+}
+```
+
+</details>
+<details><summary><code>resilience.replicas-same-node.ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller</code></summary>
+
+```json
+{
+ "all_same_node": true,
+ "anti_affinity": null,
+ "eligible_nodes": 2,
+ "nodes": {
+  "node-b": 2
+ },
+ "prod": false,
+ "replicas": 2,
+ "running": 2,
+ "single_eligible_node": false,
+ "topology_spread": [],
+ "workload": "ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller",
+ "zones": {
+  "null": 2
+ }
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-a-prod/statefulset/app-a-postgres</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'storage': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate data"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-a-prod/statefulset/app-a-postgres"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-a-prod/statefulset/app-a-redis</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'storage': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate data"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-a-prod/statefulset/app-a-redis"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-c-prod/deployment/app-c-coturn</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'kubernetes.io/hostname': 'node-a'}"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "hostNetwork"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": false,
+ "workload": "app-c-prod/deployment/app-c-coturn"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-c-prod/deployment/app-c-signaling</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-c-prod/deployment/app-c-signaling"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-c-prod/deployment/app-c-web</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-c-prod/deployment/app-c-web"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-c-prod/statefulset/app-c-postgres</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'kubernetes.io/hostname': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate postgres-data"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-c-prod/statefulset/app-c-postgres"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 2,
+ "serves_traffic": true,
+ "workload": "app-f-prod/deployment/app-f"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-admin</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-f-prod/deployment/app-f-admin"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-mx</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-f-prod/deployment/app-f-mx"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-mx-worker</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": false,
+ "workload": "app-f-prod/deployment/app-f-mx-worker"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-vn</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-f-prod/deployment/app-f-vn"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-vn-worker</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": false,
+ "workload": "app-f-prod/deployment/app-f-vn-worker"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-f-prod/deployment/app-f-worker</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": false,
+ "workload": "app-f-prod/deployment/app-f-worker"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'storage': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate app-f-postgres-data"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-f-prod/statefulset/app-f-postgres"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres-mx</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'storage': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate app-f-postgres-mx-data"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-f-prod/statefulset/app-f-postgres-mx"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-f-prod/statefulset/app-f-postgres-vn</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'storage': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate app-f-postgres-vn-data"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-f-prod/statefulset/app-f-postgres-vn"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-f-prod/statefulset/app-f-redis</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'storage': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate app-f-redis-data"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-f-prod/statefulset/app-f-redis"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-g-api/statefulset/app-g-minio</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'storage': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate app-g-minio-data"
+ ],
+ "prod": false,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-g-api/statefulset/app-g-minio"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-g-api/statefulset/app-g-postgres</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'storage': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate app-g-postgres-data"
+ ],
+ "prod": false,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-g-api/statefulset/app-g-postgres"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-admin</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 3,
+ "serves_traffic": true,
+ "workload": "app-h-prod/deployment/app-h-admin"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-api-server</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 3,
+ "serves_traffic": true,
+ "workload": "app-h-prod/deployment/app-h-api-server"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-app-p</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-h-prod/deployment/app-h-app-p"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-app-q-client</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 2,
+ "serves_traffic": true,
+ "workload": "app-h-prod/deployment/app-h-app-q-client"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-embed</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'kubernetes.io/hostname': 'node-a'}"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "extended resource nvidia.com/gpu"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-h-prod/deployment/app-h-embed"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-h-prod/deployment/app-h-excel-agent</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-h-prod/deployment/app-h-excel-agent"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-h-prod/statefulset/app-h-mysql</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'kubernetes.io/hostname': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate mysql-backup",
+  "local-path volumeClaimTemplate mysql-data"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-h-prod/statefulset/app-h-mysql"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-h-prod/statefulset/app-h-qdrant</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'kubernetes.io/hostname': 'node-a'}"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate app-h-qdrant-data"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-h-prod/statefulset/app-h-qdrant"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-i-prod/deployment/app-i</code></summary>
+
+```json
+{
+ "constraints": [
+  "required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]"
+ ],
+ "eligible_nodes": [
+  "node-a"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-i-prod/deployment/app-i"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.app-i-prod/statefulset/app-i-postgres</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'storage': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate app-i-postgres-data"
+ ],
+ "prod": true,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "app-i-prod/statefulset/app-i-postgres"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.logging/deployment/kibana</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'role': 'observability'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": false,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "logging/deployment/kibana"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.logging/statefulset/elasticsearch</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'role': 'observability'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate data"
+ ],
+ "prod": false,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "logging/statefulset/elasticsearch"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-grafana</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'role': 'observability'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": false,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "monitoring/deployment/kube-prometheus-stack-grafana"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-kube-state-metrics</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'role': 'observability'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": false,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "monitoring/deployment/kube-prometheus-stack-kube-state-metrics"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.monitoring/deployment/kube-prometheus-stack-operator</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'role': 'observability'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": false,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "monitoring/deployment/kube-prometheus-stack-operator"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'role': 'observability'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": false,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'role': 'observability'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [],
+ "prod": false,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+}
+```
+
+</details>
+<details><summary><code>resilience.single-eligible-node.registry/statefulset/registry</code></summary>
+
+```json
+{
+ "constraints": [
+  "nodeSelector {'kubernetes.io/hostname': 'node-b'}"
+ ],
+ "eligible_nodes": [
+  "node-b"
+ ],
+ "nodes_total": 2,
+ "pin_reasons": [
+  "local-path volumeClaimTemplate registry-data"
+ ],
+ "prod": false,
+ "replicas": 1,
+ "serves_traffic": true,
+ "workload": "registry/statefulset/registry"
 }
 ```
 
@@ -8715,6 +8543,24 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "app-i-prod",
   "app-l-prod"
  ]
+}
+```
+
+</details>
+<details><summary><code>security.privileged-or-host-access.app-c-prod/deployment/app-c-coturn</code></summary>
+
+```json
+{
+ "flags": [
+  "hostNetwork"
+ ],
+ "host_access": true,
+ "root_allowed_containers": [
+  "coturn"
+ ],
+ "severe": false,
+ "system": false,
+ "workload": "app-c-prod/deployment/app-c-coturn"
 }
 ```
 
@@ -14272,127 +14118,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>scaling.no-hpa-serving-prod.app-a-prod/app-a-gateway</code></summary>
-
-```json
-{
- "namespace": "app-a-prod",
- "name": "app-a-gateway",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.app-a-prod/app-a-phoenix</code></summary>
-
-```json
-{
- "namespace": "app-a-prod",
- "name": "app-a-phoenix",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.app-a-prod/app-a-umami</code></summary>
-
-```json
-{
- "namespace": "app-a-prod",
- "name": "app-a-umami",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.app-b-prod/app-b-backend</code></summary>
-
-```json
-{
- "namespace": "app-b-prod",
- "name": "app-b-backend",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.app-b-prod/app-b-frontend</code></summary>
-
-```json
-{
- "namespace": "app-b-prod",
- "name": "app-b-frontend",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.app-c-prod/app-c-signaling</code></summary>
-
-```json
-{
- "namespace": "app-c-prod",
- "name": "app-c-signaling",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.app-c-prod/app-c-web</code></summary>
-
-```json
-{
- "namespace": "app-c-prod",
- "name": "app-c-web",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.app-h-prod/app-h-embed</code></summary>
-
-```json
-{
- "namespace": "app-h-prod",
- "name": "app-h-embed",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.app-h-prod/app-h-excel-agent</code></summary>
-
-```json
-{
- "namespace": "app-h-prod",
- "name": "app-h-excel-agent",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.app-l-prod/app-l-api</code></summary>
-
-```json
-{
- "namespace": "app-l-prod",
- "name": "app-l-api",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.app-l-prod/app-l-web</code></summary>
-
-```json
-{
- "namespace": "app-l-prod",
- "name": "app-l-web",
- "kind": "Deployment"
-}
-```
-
-</details>
 <details><summary><code>storage.local-path-node-pinned.cluster</code></summary>
 
 ```json
@@ -14811,6 +14536,143 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>tenancy.ci-shares-prod-nodes.node-a</code></summary>
+
+```json
+{
+ "ci_heavy": true,
+ "ci_pod_list": [
+  {
+   "pod": "arc-actions-runner-controller-5c9d9ffd65-766b6",
+   "namespace": "arc-systems",
+   "owner_kind": "ReplicaSet",
+   "cpu_request": 0.0,
+   "heavy": true
+  }
+ ],
+ "ci_pods": 1,
+ "cpu_saturated_minutes_7d": 0.0,
+ "memory_limit_overcommit": 1.04,
+ "node": "node-a",
+ "pool": "(no-pool)",
+ "prod_namespaces": [
+  "app-a-prod",
+  "app-b-prod",
+  "app-c-prod",
+  "app-f-prod",
+  "app-h-prod",
+  "app-i-prod",
+  "app-l-prod"
+ ],
+ "prod_pods": 32,
+ "separation_possible": false,
+ "shares_ci_prod": true
+}
+```
+
+</details>
+<details><summary><code>tenancy.ci-shares-prod-nodes.node-b</code></summary>
+
+```json
+{
+ "ci_heavy": true,
+ "ci_pod_list": [
+  {
+   "pod": "lab-a-runner-8tt2w-cpndm",
+   "namespace": "arc-systems",
+   "owner_kind": "Runner",
+   "cpu_request": 0.5,
+   "heavy": true
+  },
+  {
+   "pod": "lab-a-runner-8tt2w-d2pwq",
+   "namespace": "arc-systems",
+   "owner_kind": "Runner",
+   "cpu_request": 0.5,
+   "heavy": true
+  }
+ ],
+ "ci_pods": 2,
+ "cpu_saturated_minutes_7d": 0.0,
+ "memory_limit_overcommit": 0.99,
+ "node": "node-b",
+ "pool": "(no-pool)",
+ "prod_namespaces": [
+  "app-a-prod",
+  "app-b-prod",
+  "app-c-prod",
+  "app-f-prod",
+  "app-h-prod",
+  "app-i-prod",
+  "app-l-prod"
+ ],
+ "prod_pods": 15,
+ "separation_possible": false,
+ "shares_ci_prod": true
+}
+```
+
+</details>
+<details><summary><code>tenancy.quota-without-limitrange.app-a-prod/app-a-prod-quota</code></summary>
+
+```json
+{
+ "containers_without_requests": 0,
+ "hard": {
+  "count/pods": "200",
+  "limits.memory": "80Gi",
+  "requests.memory": "60Gi"
+ },
+ "has_limitrange": false,
+ "limitrange_default_request": false,
+ "requires_requests": true,
+ "target": "app-a-prod/app-a-prod-quota"
+}
+```
+
+</details>
+<details><summary><code>tenancy.quota-without-limitrange.app-b-prod/app-b-prod-quota</code></summary>
+
+```json
+{
+ "containers_without_requests": 0,
+ "hard": {
+  "limits.cpu": "4",
+  "limits.memory": "8Gi",
+  "persistentvolumeclaims": "2",
+  "requests.cpu": "2",
+  "requests.memory": "4Gi",
+  "requests.storage": "20Gi"
+ },
+ "has_limitrange": false,
+ "limitrange_default_request": false,
+ "requires_requests": true,
+ "target": "app-b-prod/app-b-prod-quota"
+}
+```
+
+</details>
+<details><summary><code>tenancy.quota-without-limitrange.app-l-prod/app-l-prod-quota</code></summary>
+
+```json
+{
+ "containers_without_requests": 0,
+ "hard": {
+  "limits.cpu": "4",
+  "limits.memory": "8Gi",
+  "persistentvolumeclaims": "2",
+  "requests.cpu": "2",
+  "requests.memory": "4Gi",
+  "requests.storage": "30Gi"
+ },
+ "has_limitrange": false,
+ "limitrange_default_request": false,
+ "requires_requests": true,
+ "target": "app-l-prod/app-l-prod-quota"
+}
+```
+
+</details>
 <details><summary><code>traffic.lb-external-traffic-local.loadbalancer/ingress-nginx/nginx-ingress-ingress-nginx-controller</code></summary>
 
 ```json
@@ -14844,6 +14706,127 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "pinned_by_selector": false,
  "total_ips": 10,
  "used": 1
+}
+```
+
+</details>
+<details><summary><code>scaling.no-hpa-serving-prod.app-a-prod/app-a-gateway</code></summary>
+
+```json
+{
+ "namespace": "app-a-prod",
+ "name": "app-a-gateway",
+ "kind": "Deployment"
+}
+```
+
+</details>
+<details><summary><code>scaling.no-hpa-serving-prod.app-a-prod/app-a-phoenix</code></summary>
+
+```json
+{
+ "namespace": "app-a-prod",
+ "name": "app-a-phoenix",
+ "kind": "Deployment"
+}
+```
+
+</details>
+<details><summary><code>scaling.no-hpa-serving-prod.app-a-prod/app-a-umami</code></summary>
+
+```json
+{
+ "namespace": "app-a-prod",
+ "name": "app-a-umami",
+ "kind": "Deployment"
+}
+```
+
+</details>
+<details><summary><code>scaling.no-hpa-serving-prod.app-b-prod/app-b-backend</code></summary>
+
+```json
+{
+ "namespace": "app-b-prod",
+ "name": "app-b-backend",
+ "kind": "Deployment"
+}
+```
+
+</details>
+<details><summary><code>scaling.no-hpa-serving-prod.app-b-prod/app-b-frontend</code></summary>
+
+```json
+{
+ "namespace": "app-b-prod",
+ "name": "app-b-frontend",
+ "kind": "Deployment"
+}
+```
+
+</details>
+<details><summary><code>scaling.no-hpa-serving-prod.app-c-prod/app-c-signaling</code></summary>
+
+```json
+{
+ "namespace": "app-c-prod",
+ "name": "app-c-signaling",
+ "kind": "Deployment"
+}
+```
+
+</details>
+<details><summary><code>scaling.no-hpa-serving-prod.app-c-prod/app-c-web</code></summary>
+
+```json
+{
+ "namespace": "app-c-prod",
+ "name": "app-c-web",
+ "kind": "Deployment"
+}
+```
+
+</details>
+<details><summary><code>scaling.no-hpa-serving-prod.app-h-prod/app-h-embed</code></summary>
+
+```json
+{
+ "namespace": "app-h-prod",
+ "name": "app-h-embed",
+ "kind": "Deployment"
+}
+```
+
+</details>
+<details><summary><code>scaling.no-hpa-serving-prod.app-h-prod/app-h-excel-agent</code></summary>
+
+```json
+{
+ "namespace": "app-h-prod",
+ "name": "app-h-excel-agent",
+ "kind": "Deployment"
+}
+```
+
+</details>
+<details><summary><code>scaling.no-hpa-serving-prod.app-l-prod/app-l-api</code></summary>
+
+```json
+{
+ "namespace": "app-l-prod",
+ "name": "app-l-api",
+ "kind": "Deployment"
+}
+```
+
+</details>
+<details><summary><code>scaling.no-hpa-serving-prod.app-l-prod/app-l-web</code></summary>
+
+```json
+{
+ "namespace": "app-l-prod",
+ "name": "app-l-web",
+ "kind": "Deployment"
 }
 ```
 

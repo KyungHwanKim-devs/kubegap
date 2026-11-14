@@ -1,0 +1,10 @@
+# Every platform that is neither EKS nor k3s/RKE2 (GKE, AKS, kubeadm, unrecognized). Checks written for a cloud control plane apply; the
+# EKS and k3s collectors stay off because their folders are enabled by platform. See rubric/platforms/k3s.yaml for what belongs here.
+name: other
+families_not_expected: []
+exclude:
+  traffic.endpoint-zero:
+    - kube-system/kube-prometheus-stack-kube-controller-manager
+    - kube-system/kube-prometheus-stack-kube-scheduler
+    - kube-system/kube-prometheus-stack-kube-etcd
+    - kube-system/kube-prometheus-stack-kube-proxy

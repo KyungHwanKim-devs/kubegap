@@ -23,8 +23,8 @@
   rule:
     expr: "v.get('cpu_throttle_ratio_24h', 0) >= threshold"
     warn_expr: "v.get('cpu_throttle_ratio_24h', 0) >= warn_threshold or v.get('cpu_throttle_ratio_5m', 0) >= threshold"
-    threshold: { prod: 0.25, lab: 0.25 }
-    warn_threshold: { prod: 0.10, lab: 0.10 }
+    threshold: 0.25
+    warn_threshold: 0.10
   target: "workload(labels) + ':' + labels['container']"
   evidence: "_throttling_text(labels, v, threshold, warn_threshold)"
   severity_default: high
@@ -55,7 +55,6 @@
     - "sum by (namespace, pod, container) (rate(container_cpu_cfs_throttled_periods_total[5m])) / sum by (namespace, pod, container) (rate(container_cpu_cfs_periods_total[5m]))"
     - "On the node (SSM/SSH): nr_throttled and throttled_usec in cat /sys/fs/cgroup/<pod path>/cpu.stat"
   notes: Until rubric 0.1.66 the 5-minute ratio alone decided fail and warn. A finding that goes from fail to warn across that version is the criteria change, not a fix.
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"   # throttled through the day
@@ -147,7 +146,6 @@
   verify:
     - "kubectl get pods -A -o json | jq -r '.items[] | select(.status.containerStatuses[]?.lastState.terminated.reason==\"OOMKilled\") | .metadata.namespace+\"/\"+.metadata.name'"
     - "On the node: journalctl -k | grep -i oom"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -218,7 +216,7 @@
   rule:
     expr: "item.get('kernel_kills_24h', 0) >= threshold or item.get('restarts_of_those_pods', 0) >= threshold"
     warn_expr: "item.get('pods_oomkilled', 0) >= 1 or item.get('kernel_kills_24h', 0) >= 1"
-    threshold: { prod: 3, lab: 3 }
+    threshold: 3
   target: "item['target']"
   evidence: "_oom_text(item)"
   severity_default: high
@@ -239,7 +237,6 @@
     - "journalctl -k --since -24h | grep oom-kill"
     - "kubectl get events -A --field-selector reason=OOMKilling"
   notes: Until rubric 0.1.66 this was a metric check on cAdvisor's container_oom_events_total with the live pods' restarts as fallback, so it saw only the pods alive at collection time. A count that rises across that version is the criteria change. On a snapshot without metrics/oom_pods_7d.json the check skips; a node whose os.txt came from the older node script contributes no attributed kills and the evidence says so.
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"   # kernel kills
@@ -265,8 +262,8 @@
   rule:
     expr: "v.get('node_memory_request_ratio', 0) >= threshold and v.get('node_memory_usage_ratio_p95_7d', v.get('node_memory_usage_ratio', 1)) <= 0.35"
     warn_expr: "v.get('node_memory_request_ratio', 0) >= warn_threshold and v.get('node_memory_usage_ratio_p95_7d', v.get('node_memory_usage_ratio', 1)) <= 0.45"
-    threshold: { prod: 0.80, lab: 0.80 }
-    warn_threshold: { prod: 0.65, lab: 0.65 }
+    threshold: 0.80
+    warn_threshold: 0.65
   target: "labels['node']"
   evidence: "f\"memory requests/allocatable {v.get('node_memory_request_ratio', 0):.2f}, working set/allocatable 7d p95 {v.get('node_memory_usage_ratio_p95_7d', float('nan')):.2f} (instant {v.get('node_memory_usage_ratio', float('nan')):.2f})\""
   severity_default: medium
@@ -278,7 +275,6 @@
   verify:
     - "sum(kube_pod_container_resource_requests{resource=\"memory\"}) by (node) / sum(kube_node_status_allocatable{resource=\"memory\"}) by (node)"
     - "kubectl top nodes"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -359,7 +355,6 @@
   suggest: Set the memory limit to 1.3-1.5x the 7-day p95 working set. Keep the request near p95.
   verify:
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].resources}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -479,7 +474,6 @@
   suggest: Set at least a request so the pod becomes Burstable.
   verify:
     - "kubectl get pods -n <ns> -o custom-columns=NAME:.metadata.name,QOS:.status.qosClass"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -508,8 +502,8 @@
   rule:
     expr: "v.get('node_cpu_request_ratio', 0) >= threshold and v.get('node_cpu_usage_ratio_p95_7d', v.get('node_cpu_usage_ratio_5m', 1)) <= 0.25"
     warn_expr: "v.get('node_cpu_request_ratio', 0) >= warn_threshold and v.get('node_cpu_usage_ratio_p95_7d', v.get('node_cpu_usage_ratio_5m', 1)) <= 0.30"
-    threshold: { prod: 0.80, lab: 0.80 }
-    warn_threshold: { prod: 0.65, lab: 0.65 }
+    threshold: 0.80
+    warn_threshold: 0.65
   target: "labels['node']"
   evidence: "f\"CPU requests/allocatable {v.get('node_cpu_request_ratio', 0):.2f}, usage/allocatable 7d p95 {v.get('node_cpu_usage_ratio_p95_7d', float('nan')):.2f} (5m instant {v.get('node_cpu_usage_ratio_5m', float('nan')):.2f})\""
   severity_default: medium
@@ -523,7 +517,6 @@
   verify:
     - "sum(kube_pod_container_resource_requests{resource=\"cpu\"}) by (node) / sum(kube_node_status_allocatable{resource=\"cpu\"}) by (node)"
     - "kubectl top nodes"
-  profiles: [prod, lab]
 
 # ---------- Resources: 7-day p95 vs request/limit, KRR ----------
   test:
@@ -602,8 +595,8 @@
   rule:
     expr: "value <= threshold and v.get('container_cpu_request_cores', 0) >= 0.25 and not db_like(labels)"
     warn_expr: "value <= warn_threshold"
-    threshold: { prod: 0.20, lab: 0.20 }
-    warn_threshold: { prod: 0.35, lab: 0.35 }
+    threshold: 0.20
+    warn_threshold: 0.35
   target: "workload(labels) + ':' + labels['container']"
   evidence: "f\"pod {labels['pod']}: 7d CPU p95 {v.get('cpu_p95_7d_cores', 0):.3f} cores / request {v.get('container_cpu_request_cores', 0):.2f} cores = {value:.2f}{'; database-like: keep the request' if db_like(labels) else ''}\""
   severity_default: medium
@@ -621,7 +614,6 @@
     - "quantile_over_time(0.95, rate(container_cpu_usage_seconds_total{namespace=\"<ns>\",container=\"<c>\"}[5m])[7d:15m])"
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].resources.requests.cpu}'"
   notes: Threshold 0.3 split into fail 0.2 and warn 0.35 to avoid flapping at the 0.3 boundary. fail only for requests of 250m or more (dozens of pods with the 100m default would otherwise all fail). Database-like containers stay at warn since rubric 0.1.63; a Neo4j StatefulSet at 1% of its request used to fail and the report advised cutting it to the p95.
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -796,8 +788,8 @@
   rule:
     expr: "value >= threshold"
     warn_expr: "value >= warn_threshold"
-    threshold: { prod: 0.90, lab: 0.90 }
-    warn_threshold: { prod: 0.75, lab: 0.75 }
+    threshold: 0.90
+    warn_threshold: 0.75
   target: "workload(labels) + ':' + labels['container']"
   evidence: "f\"pod {labels['pod']}: 7d CPU p95 / limit = {value:.2f}\""
   severity_default: medium
@@ -810,7 +802,6 @@
   suggest: "Remove the CPU limit or raise it to p95 x 2. Keep the request (scheduling basis). Before removing it, confirm that other pods on the node are protected by their requests from losing CPU."
   verify:
     - "quantile_over_time(0.95, rate(container_cpu_usage_seconds_total{namespace=\"<ns>\",container=\"<c>\"}[5m])[7d:15m]) / on(namespace,pod,container) kube_pod_container_resource_limits{resource=\"cpu\"}"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -857,8 +848,8 @@
   rule:
     expr: "value <= threshold and v.get('container_memory_request_bytes', 0) >= 1073741824 and not db_like(labels)"
     warn_expr: "value <= warn_threshold"
-    threshold: { prod: 0.20, lab: 0.20 }
-    warn_threshold: { prod: 0.35, lab: 0.35 }
+    threshold: 0.20
+    warn_threshold: 0.35
   target: "workload(labels) + ':' + labels['container']"
   evidence: "f\"pod {labels['pod']}: 7d memory working set p95 {v.get('memory_p95_7d_bytes', 0)/1048576:.0f} MB / request {v.get('container_memory_request_bytes', 0)/1048576:.0f} MB = {value:.2f}{'; database-like: keep the request' if db_like(labels) else ''}\""
   severity_default: low
@@ -871,7 +862,6 @@
   suggest: "Lower the request to p95 x 1.3 (slightly more than the 15% memory buffer of KRR simple). Setting limit equal to request (Guaranteed) makes OOM behaviour predictable. For a database-like container keep the request; size it from the database's configured cache, such as shared_buffers or innodb_buffer_pool_size, plus headroom, not from the p95."
   verify:
     - "quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"<ns>\",container=\"<c>\"}[7d:15m])"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1013,8 +1003,8 @@
   rule:
     expr: "value >= threshold"
     warn_expr: "value >= warn_threshold"
-    threshold: { prod: 0.90, lab: 0.90 }
-    warn_threshold: { prod: 0.80, lab: 0.80 }
+    threshold: 0.90
+    warn_threshold: 0.80
   target: "workload(labels) + ':' + labels['container']"
   evidence: "f\"pod {labels['pod']}: 7d memory working set p95 / limit = {value:.2f}\""
   severity_default: high
@@ -1031,7 +1021,6 @@
   verify:
     - "quantile_over_time(0.95, container_memory_working_set_bytes{namespace=\"<ns>\",container=\"<c>\"}[7d:15m]) / on(namespace,pod,container) kube_pod_container_resource_limits{resource=\"memory\"}"
     - "kubectl get pod -n <ns> <pod> -o jsonpath='{.status.containerStatuses[*].lastState.terminated.reason}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1075,7 +1064,7 @@
   inputs: [large_request_containers]
   rule:
     expr: "value >= threshold"
-    threshold: { prod: 0.5, lab: 0.5 }
+    threshold: 0.5
   target: "workload(labels) + ':' + labels['container']"
   evidence: "f\"pod {labels['pod']}: request is {value*100:.0f}% of the median node allocatable\""
   severity_default: medium
@@ -1086,7 +1075,6 @@
   suggest: "Check that the request reflects real usage (p95). If it really needs that much, move it to a dedicated NodePool (large instances) or split the workload."
   verify:
     - "kubectl get pods -A -o custom-columns=NS:.metadata.namespace,POD:.metadata.name,CPU:.spec.containers[*].resources.requests.cpu,MEM:.spec.containers[*].resources.requests.memory | sort -k3 -h | tail"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1141,7 +1129,6 @@
   verify:
     - "krr simple -n <ns> -p http://localhost:9090"
   notes: tool-missing when krr is not installed. Install with `kubegap setup --install-only krr`
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1221,7 +1208,6 @@
   verify:
     - "kubectl get endpoints -n <ns> <service>"
     - "kubectl get pods -n <ns> -l <selector>"
-  profiles: [prod, lab]
 
 # ---------- Resilience ----------
   test:
@@ -1249,7 +1235,6 @@
   suggest: replicas 2 or more plus a PDB with minAvailable 1. If it holds state, move to a StatefulSet with external storage.
   verify:
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.replicas}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1378,9 +1363,9 @@
   suggest: "A PDB with minAvailable: 1 or maxUnavailable: 25%. But minAvailable equal to replicas blocks drains forever."
   verify:
     - "kubectl get pdb -n <ns>"
-  profiles: [prod]
+  scales: [medium, large]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         objects:
@@ -1506,7 +1491,6 @@
   suggest: An httpGet or tcpSocket readinessProbe. exec forks a process every time and loads the node. Do not put a DB ping in liveness.
   verify:
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].readinessProbe}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1645,7 +1629,6 @@
   suggest: "preStop: sleep 5-10 to wait for propagation before shutting down. Set terminationGracePeriodSeconds longer than the in-flight processing time. The app should reject new requests on SIGTERM and finish the ones in progress."
   verify:
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].lifecycle}'"
-  profiles: [prod, lab]
 
 # ---------- Node OS (what node-exporter can tell) ----------
   test:
@@ -1797,8 +1780,8 @@
   rule:
     expr: "value >= threshold"
     warn_expr: "value >= warn_threshold"
-    threshold: { prod: 0.80, lab: 0.80 }
-    warn_threshold: { prod: 0.70, lab: 0.70 }
+    threshold: 0.80
+    warn_threshold: 0.70
   target: "labels.get('instance')"
   evidence: "f\"conntrack usage {value:.2f}\""
   severity_default: high
@@ -1810,7 +1793,6 @@
   verify:
     - "node_nf_conntrack_entries / node_nf_conntrack_entries_limit"
     - "On the node: sysctl net.netfilter.nf_conntrack_max net.netfilter.nf_conntrack_count"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1851,8 +1833,8 @@
   rule:
     expr: "value >= threshold"
     warn_expr: "value >= warn_threshold"
-    threshold: { prod: 0.85, lab: 0.80 }
-    warn_threshold: { prod: 0.75, lab: 0.70 }
+    threshold: { default: 0.85, k3s: 0.80 }
+    warn_threshold: { default: 0.75, k3s: 0.70 }
   target: "labels.get('instance', '') + ':' + labels.get('mountpoint', '')"
   evidence: "f\"usage {value:.2f}\""
   severity_default: high
@@ -1865,7 +1847,6 @@
   verify:
     - "1 - node_filesystem_avail_bytes / node_filesystem_size_bytes"
     - "On the node: df -h / /var/lib/containerd ; crictl imagefsinfo"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1906,8 +1887,8 @@
   rule:
     expr: "value >= threshold"
     warn_expr: "value >= warn_threshold"
-    threshold: { prod: 0.85, lab: 0.85 }
-    warn_threshold: { prod: 0.75, lab: 0.75 }
+    threshold: { default: 0.85, k3s: 0.8 }  # one disk holds every local-path volume, so warn earlier
+    warn_threshold: { default: 0.75, k3s: 0.7 }
   target: "labels.get('instance', '') + ':' + labels.get('mountpoint', '')"
   evidence: "f\"inode usage {value:.2f}\""
   severity_default: high
@@ -1918,7 +1899,6 @@
   suggest: "On the node: df -i ; remove unused images (crictl rmi --prune is a suggestion only)"
   verify:
     - "1 - node_filesystem_files_free / node_filesystem_files"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -1958,7 +1938,7 @@
   inputs: [ntp_offset_seconds]
   rule:
     expr: "value >= threshold"
-    threshold: { prod: 0.1, lab: 0.1 }
+    threshold: 0.1
   target: "labels.get('instance')"
   evidence: "f\"clock offset {value:.3f}s\""
   severity_default: high
@@ -1967,7 +1947,6 @@
   suggest: "On the node: timedatectl status, chronyc tracking. EKS AMIs use chrony against 169.254.169.123."
   verify:
     - "abs(node_timex_offset_seconds) > 0.1"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2008,7 +1987,6 @@
   suggest: Check the chrony or systemd-timesyncd status.
   verify:
     - "node_timex_sync_status"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2042,7 +2020,6 @@
   verify:
     - "node_memory_SwapTotal_bytes"
     - "On the node: free -m ; cat /proc/meminfo | grep Swap"
-  profiles: [prod, lab]
 
 # ---------- Observability / absence ----------
   test:
@@ -2071,13 +2048,12 @@
     # no tool (Sloth, Pyrra), but sli:/slo: recording rules, burn rate alerts or slo-labelled rules lower this to warn
     warn_expr: "bool((summary.get('observability') or {}).get('slo', {}).get('any_signal'))"
   evidence: "f\"no SLO tool. Signals: sli/slo recording rules {(summary.get('observability') or {}).get('slo', {}).get('sli_recording_rules')}, burn rate alerts {(summary.get('observability') or {}).get('slo', {}).get('burn_rate_alerts')}, slo-labelled rules {(summary.get('observability') or {}).get('slo', {}).get('slo_labelled_rules')}\""
-  severity_default: critical
+  severity_default: { small: low, medium: high, large: critical }
   symptom_linked: false
   why: Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first.
   suggest: Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress.
   verify:
     - "kubectl get crd | grep -E 'sloth|pyrra'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2149,7 +2125,7 @@
     warn_expr: "item.get('alerting', 0) > 0 and (item['by_class'].get('symptom', 0) + item['by_class'].get('app', 0)) / max(item.get('alerting', 1), 1) < 0.15"
   target: "'cluster'"
   evidence: "f\"{item['alerting']} alert rules: symptom {item['by_class'].get('symptom', 0)}, cause {item['by_class'].get('cause', 0)}, app metrics (assumed symptom) {item['by_class'].get('app', 0)}. Symptom ratio {item.get('symptom_ratio')}. Symptom rules: {item['symptom_rules'][:8]}\""
-  severity_default: critical
+  severity_default: { small: medium, medium: high, large: critical }
   symptom_linked: false
   why: >
     "CPU 80%" is a cause; users do not know about CPU. "5xx ratio above 1% for 5 minutes" is a symptom. Without symptom alerts, outages are learned from user reports.
@@ -2158,7 +2134,6 @@
   verify:
     - "summary.json observability.rules.symptom_rules / app_rules ; kubectl get prometheusrules -A"
   notes: "Classification history: at first only http_*, grpc_*, ingress and SLO metrics counted as symptoms, so the app's own metrics (queue length, processing delay) were all classified as cause and the check reported 0 symptoms as critical. Now only container_*, node_* and kube_* are cause; other app metrics are assumed symptoms (app) and the LLM reclassifies them from name and description. That is why expr counts symptom and app separately."
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2210,7 +2185,6 @@
   suggest: For never-fired rules covering core failure modes, query the expr metric directly in Prometheus to confirm it exists. Delete useless rules.
   verify:
     - "count by (alertname) (count_over_time(ALERTS{alertstate=\"firing\"}[15d]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -2255,7 +2229,6 @@
   suggest: Disable false-positive rules in values (for example kube-prometheus-stack kubeControllerManager.enabled=false). Fix the pod behind real problems; until then silence it with an expiry.
   verify:
     - "topk(20, sum by (alertname) (count_over_time(ALERTS{alertstate=\"firing\"}[7d])))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2283,7 +2256,6 @@
   suggest: Point the default receiver at a channel humans read and send only Watchdog to null. Make per-severity channels explicit in routes (critical=page, warning=channel, info=null).
   verify:
     - "route.receiver and receivers in alertmanager/status.json config.original"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2354,7 +2326,6 @@
   suggest: Check the Alertmanager log for per-integration errors and fix the receiver configuration.
   verify:
     - "sum by (integration) (increase(alertmanager_notifications_failed_total[1d]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2385,7 +2356,6 @@
   suggest: Expire the silence and fix the root cause, or delete the rule if it really should be ignored forever.
   verify:
     - "alertmanager/silences.json ; amtool silence query"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2409,7 +2379,7 @@
     warn_expr: "True"
   target: "item['mode']"
   evidence: "f\"user symptom: {item['symptom']}. No alert rule covers this failure mode\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: true
   why: >
     A matrix of 16 failure modes (OOMKill, CrashLoop, node NotReady, disk/PVC, inode, certificate expiry, 5xx, p99, backup failure, HPA max, Pending, scheduling failure, image pull, DNS, VPC CNI IPs, node provisioning)
@@ -2421,7 +2391,6 @@
   suggest: For each empty mode add the kube-prometheus-stack default rule (most exist) or one per-service rule. Symptom modes (5xx, p99) first.
   verify:
     - "summary.json observability.failure_modes.matrix"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2455,7 +2424,6 @@
   suggest: For ingress-nginx, enable the metrics port and ServiceMonitor. For an ALB, pull CloudWatch metrics into Prometheus (yace, cloudwatch-exporter) or set ALB-based 5xx and p99 alerts as CloudWatch alarms. The real fix is http tools metrics in the app.
   verify:
     - "count by (namespace) ({__name__=~\"http_request_duration_seconds_bucket|http_requests_total\"}) ; nginx_ingress_controller_requests"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -2511,7 +2479,6 @@
   suggest: "For a surge, look at the top log patterns of that namespace (summary.logs.unclassified_errors) together with restarts (summary.resilience.restarts). For a vanished namespace, check pod status and promtail targets (observability.log-coverage-gap)."
   verify:
     - "logcli query --since=1h 'sum by (namespace) (count_over_time({namespace=~\".+\"}[1h]))'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -2576,7 +2543,6 @@
   suggest: "Add routes for severity=\"critical\" (or page) -> paging channel and severity=\"warning\" -> ticket or low-priority channel, with a different repeat_interval per severity."
   verify:
     - "amtool config routes show --config.file=<alertmanager.yaml>"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -2758,7 +2724,6 @@
   suggest: "Lower cause rules to severity warning (ticket, dashboard) and keep critical only on symptom rules (5xx ratio, p99, SLO burn rate). Leave platform rules such as node NotReady and etcd as exceptions."
   verify:
     - "kubectl get prometheusrules -A -o json | jq -r '.items[].spec.groups[].rules[] | select(.alert and .labels.severity==\"critical\") | .alert+\" \"+.expr' | head -40"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -2867,7 +2832,6 @@
   suggest: "Enable the pool and queue metrics of the app framework (HikariCP, SQLAlchemy pool, uvicorn/gunicorn worker busy, Kafka consumer lag, Redis connected_clients). Failing that, put container CPU throttling and memory working set on a dashboard as saturation proxies."
   verify:
     - "curl -s localhost:9090/api/v1/query --data-urlencode 'query=count by (namespace) ({__name__=~\".*(queue|pool|inflight|in_flight|consumer_lag).*\"})'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -2958,7 +2922,6 @@
   suggest: "Creating SLO CRDs with Sloth or Pyrra generates the recording rules and multi-window burn rate alerts together. If writing by hand, use the six-window rules from SRE Workbook chapter 5."
   verify:
     - "kubectl get prometheusrules -A -o json | jq -r '.items[].spec.groups[].rules[] | select(.alert) | select(.expr|test(\"burn|error_budget\")) | .alert'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -3009,7 +2972,6 @@
   suggest: Read the target lastError (connection refused, TLS, auth). Disable the control plane jobs on EKS and k3s.
   verify:
     - "health != up ; up == 0 in prometheus/targets.json"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3054,7 +3016,6 @@
   suggest: Velero (plus EBS snapshots or PV backup). On EKS at least a DLM snapshot policy. In a small k3s cluster, k3s etcd-snapshot or a state.db copy plus PV directory backup. Test a restore; a dump that was never restored may not work.
   verify:
     - "kubectl get crd backups.velero.io ; aws dlm get-lifecycle-policies"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3152,13 +3113,12 @@
   area: observability
   type: absence
   family: event-retention
-  severity_default: high
+  severity_default: { small: low, medium: medium, large: high }
   symptom_linked: false
   why: Kubernetes events are kept for only one hour by default. FailedScheduling, OOMKilling and Unhealthy from the night are gone by morning. The most undervalued material is lost.
   suggest: Ship events to Loki or Elasticsearch with kubernetes-event-exporter. Alternatively, the promtail/alloy event source if Loki exists, or `[INPUT] kubernetes_events` with fluent-bit (detection recognizes it as `fluent-bit-events` and passes this check).
   verify:
     - "kubectl get deploy -A | grep -i event-exporter"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3196,12 +3156,11 @@
   area: observability
   type: absence
   family: metrics-store
-  severity_default: critical
+  severity_default: { small: high, medium: critical, large: critical }
   symptom_linked: false
   why: Without Prometheus (or VictoriaMetrics, AMP) none of this skill's metric checks or alerting can work. There is no way to state "normal" in numbers.
   suggest: Install kube-prometheus-stack. On EKS, AMP is also an option.
   verify: ["kubectl get svc -A | grep -E 'prometheus|victoria'"]
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3239,12 +3198,11 @@
   area: observability
   type: absence
   family: logs-store
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: false
   why: Container logs vanish with the pod. After an incident, "what error happened then" cannot be answered, and all log signature checks are inactive.
   suggest: Loki (plus promtail/alloy) or Elasticsearch/OpenSearch (plus fluent-bit). On EKS, CloudWatch Logs is also an option.
   verify: ["kubectl get svc -A | grep -E 'loki|elasticsearch|opensearch'"]
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3282,12 +3240,11 @@
   area: observability
   type: absence
   family: alert-router
-  severity_default: critical
+  severity_default: { small: high, medium: critical, large: critical }
   symptom_linked: false
   why: Alert rules fire but reach no human. Without routing, grouping and silences, an alert is just red text on a dashboard.
   suggest: Enable the kube-prometheus-stack Alertmanager and configure receivers (Slack, PagerDuty). A null default receiver is effectively the same as none (see observability.alertmanager-default-null).
   verify: ["kubectl get svc -A | grep alertmanager"]
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3330,9 +3287,8 @@
   why: Secrets created from git or by hand cannot be rotated, audited or traced after a leak. A tool such as External Secrets Operator makes an external vault (Secrets Manager, Vault) the source of truth.
   suggest: External Secrets Operator or Secrets Store CSI. In a small k3s cluster sealed-secrets is enough.
   verify: ["kubectl get crd | grep -E 'externalsecrets|secretproviderclasses|sealedsecrets'"]
-  profiles: [prod, lab]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         inventory:
@@ -3376,7 +3332,6 @@
   why: When TLS certificate renewal is manual, services keep going down from expiry. cert-manager (or ACM plus ALB on EKS) automates renewal. On EKS, ALBs using ACM certificates work without cert-manager, but then an ACM expiry check is needed instead.
   suggest: Install cert-manager, or if ACM is in use, suppress this check in config.yaml with a reason.
   verify: ["kubectl get crd certificates.cert-manager.io ; aws acm list-certificates"]
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3419,11 +3374,10 @@
   why: Pending pods do not add nodes. Pods added by an HPA cannot be placed, so scaling stops at the node count. A small k3s cluster has a fixed node count and does not require this (not in the profile expected_families, so skip).
   suggest: On EKS, Karpenter (recommended) or Cluster Autoscaler.
   verify: ["kubectl get crd nodepools.karpenter.sh ; kubectl get deploy -A | grep cluster-autoscaler"]
-  profiles: [prod, lab]
 
 # ---------- Storage ----------
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         inventory:
@@ -3474,9 +3428,9 @@
   suggest: Delete the StorageClass if no PVC uses it; otherwise plan a migration to gp3 (ebs.csi.aws.com). Confirm that the default StorageClass is gp3.
   verify:
     - "kubectl get sc ; kubectl get pvc -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,SC:.spec.storageClassName | grep gp2"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         inventory:
@@ -3513,7 +3467,6 @@
   suggest: "Set allowVolumeExpansion: true on the StorageClass (applies to existing PVs too; it is not an immutable field)."
   verify:
     - "kubectl get sc -o custom-columns=NAME:.metadata.name,PROV:.provisioner,EXPAND:.allowVolumeExpansion"
-  profiles: [prod, lab]
 
 # ---------- Observability: retention ----------
   test:
@@ -3560,7 +3513,6 @@
   suggest: "Enable limits_config.retention_period and compactor.retention_enabled: true together. Review with the PVC usage check."
   verify:
     - "retention_enabled and retention_period in Loki /config (read by kubegap setup)"
-  profiles: [prod, lab]
 
 # ---------- Security ----------
   test:
@@ -3605,7 +3557,6 @@
   suggest: Start with production namespaces, a default-deny ingress policy plus allows for the same namespace and the ingress controller. Before applying, confirm that the CNI actually enforces policy.
   verify:
     - "kubectl get networkpolicy -A ; kubectl -n kube-system get ds aws-node -o jsonpath='{.spec.template.spec.containers[0].env}' | grep -o 'ENABLE_NETWORK_POLICY[^}]*'"
-  profiles: [prod, lab]
 
 # ---------- Events ----------
   test:
@@ -3674,7 +3625,6 @@
     - "kubectl get events -A --field-selector reason=<Reason> --sort-by=.lastTimestamp"
     - "snapshots/<context>/events-history.json"
   notes: lib/summaries/events.py TRACKED
-  profiles: [prod, lab]
 
 # ---------- Operators in general ----------
   test:
@@ -3744,7 +3694,6 @@
   suggest: "kubectl describe <kind> -n <ns> <name> for the full message and events, then open the operator's log. If several objects of the same kind are affected, look at the operator itself first (pod restarts, webhook)."
   verify:
     - "kubectl get <kind> -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,READY:'.status.conditions[?(@.type==\"Ready\")].status'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3789,7 +3738,6 @@
   suggest: Recover the webhook pods and consider switching failurePolicy to Ignore until they are back. Give the webhook pods a PDB and 2 replicas.
   verify:
     - "kubectl get endpoints -n <ns> <service> ; kubectl get validatingwebhookconfiguration,mutatingwebhookconfiguration -o yaml | grep -B2 -A2 failurePolicy"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3832,7 +3780,6 @@
   verify:
     - "kubectl get mutatingwebhookconfiguration,validatingwebhookconfiguration -o yaml | grep -A8 namespaceSelector"
   notes: Jetstack 2019
-  profiles: [prod, lab]
 
 # ---------- Control plane ----------
   test:
@@ -3869,7 +3816,6 @@
   suggest: Read the reason (err=...) and lower the request, widen the NodePool allowed types or limits, or relax affinity. If it recurs, check whether the workload's request is larger than the node size.
   verify:
     - "logs/cloudwatch/scheduler_unschedulable_samples.json or logs/node/<server>/k3s-scheduler-unschedulable-24h.log"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3908,7 +3854,6 @@
   suggest: Look at the top (resource, verb) pairs in summary.controlplane.apiserver_metrics.top_requests and lower the QPS of the controller or CI hammering that resource. Identifying the sender needs the audit log. For your own controllers, use informer caches.
   verify:
     - "sum(rate(apiserver_request_total{code=\"429\"}[5m])) ; topk(10, sum by (resource, verb) (rate(apiserver_request_total[5m])))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3951,7 +3896,6 @@
   suggest: Correlate with webhook failure logs and etcd errors at the same time. EKS is managed, so some parts cannot be fixed; check AWS Support and Insights.
   verify:
     - "sum by (code) (rate(apiserver_request_total{code=~\"5..\"}[5m]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -3988,8 +3932,8 @@
   rule:
     expr: "value == value and value >= threshold"
     warn_expr: "value == value and value >= warn_threshold"
-    threshold: { prod: 1.0, lab: 1.0 }
-    warn_threshold: { prod: 0.5, lab: 0.5 }
+    threshold: 1.0
+    warn_threshold: 0.5
   target: "labels.get('verb', '?')"
   evidence: "f\"{labels.get('verb')} p99 {value:.3f}s\""
   severity_default: medium
@@ -4002,7 +3946,6 @@
   suggest: Clean up the resources piled up in storage_objects_top (ttlSecondsAfterFinished). Read the op in the Trace logs.
   verify:
     - "histogram_quantile(0.99, sum by (le, verb) (rate(apiserver_request_duration_seconds_bucket{verb!~\"WATCH|CONNECT\"}[5m])))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -4049,7 +3992,6 @@
   suggest: Check the resources and replicas of that webhook's pods, and review timeoutSeconds and failurePolicy.
   verify:
     - "histogram_quantile(0.99, sum by (le, name) (rate(apiserver_admission_webhook_admission_duration_seconds_bucket[5m])))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -4096,9 +4038,9 @@
   suggest: Check the webhook pods and endpoints (operators.webhook-no-endpoints). Consider an Ignore policy until recovery.
   verify:
     - "logs/cloudwatch/apiserver_webhook_failures.json"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         item:
@@ -4128,9 +4070,9 @@
   suggest: Identify the resource from the top_errors messages and fix it. Reduce noise warnings by aligning component versions.
   verify:
     - "logs/cloudwatch/controller_manager_error_samples.json"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         item:
@@ -4173,9 +4115,9 @@
   suggest: For List, have clients use informers and clean up resources; for conversion webhooks, check the version of that CRD's operator.
   verify:
     - "logs/cloudwatch/apiserver_slow_traces.json"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         item:
@@ -4210,9 +4152,9 @@
   suggest: Check the source (ARN) per message and fix the mapping or close the endpoint.
   verify:
     - "logs/cloudwatch/authenticator_failures.json"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         item:
@@ -4249,11 +4191,11 @@
   suggest: Move the etcd data directory to a dedicated disk, check the fsync p99 metric (etcd_disk_wal_fsync_duration_seconds) against 10ms, and separate heavy PVs (DB, Elasticsearch) from the same disk.
   verify:
     - "logs/node/<server>/k3s-etcd-slow-24h.log ; histogram_quantile(0.99, rate(etcd_disk_wal_fsync_duration_seconds_bucket[5m]))"
-  profiles: [lab]
+  platforms: [k3s]
 
 # ---------- Platform common ----------
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:
       - expect: "fail"
         item:
@@ -4299,11 +4241,10 @@
   suggest: Upgrade one minor at a time. First check the removed APIs with Pluto or kubent.
   verify:
     - "kubectl version ; rubric/k8s-versions.yaml ; (EKS) aws eks describe-cluster-versions"
-  profiles: [prod, lab]
 
 # ---- Node OS (area node). Material is summary.nodeos (lib/summaries/nodeos.py). Read from inside the node, so only what does not overlap with the node-exporter metric checks (node.conntrack-usage etc.) lives here. ----
   test:
-    profile: "lab"
+    platform: "k3s"
     cases:  # `today` pins the date so the verdicts do not drift as end-of-support dates in rubric/k8s-versions.yaml pass
       - expect: "fail"
         inventory:
@@ -4329,7 +4270,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -4558,7 +4498,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -4781,7 +4720,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -5003,7 +4941,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -5325,7 +5262,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -5548,7 +5484,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -5872,7 +5807,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -6092,7 +6026,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -6417,7 +6350,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True) and item['cri'].get('available')"
@@ -6638,7 +6570,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -6958,7 +6889,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.pod_logs
   rule:
     expr: "item['mb'] >= 1024"
@@ -7003,7 +6933,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.pod_dirs
   rule:
     expr: "item['mb'] >= 10240"
@@ -7049,7 +6978,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -7373,7 +7301,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -7792,7 +7719,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -8114,7 +8040,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True) and item['kubelet'].get('available')"
@@ -8435,7 +8360,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True) and item['kubelet'].get('available')"
@@ -8756,7 +8680,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -9075,7 +8998,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.nodes
   rule:
     needs: "item.get('collected', True)"
@@ -9397,7 +9319,6 @@
   area: node
   modes: [full]   # needs inputs the daily run does not collect
   type: summary
-  profiles: [prod, lab]
   each: nodeos.not_collected
   rule:
     expr: "True"
@@ -9427,7 +9348,6 @@
     expr: "True"
   severity_default: medium
   symptom_linked: false
-  profiles: [prod, lab]
   why: Each finding carries the signature's area, severity, meaning and usual cause. The value of this check itself is a placeholder.
   notes: Finding id is logs.signatures.<signature id>. count >= fail_at means fail, >= warn_at means warn.
   test:
@@ -9511,7 +9431,6 @@
   type: summary
   each: logs
   cluster_level: true
-  profiles: [prod, lab]
   rule:
     expr: "sum(e['count'] for e in item.get('unclassified_errors') or []) >= 2000"
     warn_expr: "len(item.get('unclassified_errors') or []) > 0"
@@ -9556,7 +9475,6 @@
   type: summary
   each: logs.loki.coverage
   cluster_level: true
-  profiles: [prod, lab]
   rule:
     needs: "item.get('available')"
     needs_reason: "coverage not available"
@@ -9613,7 +9531,6 @@
   type: summary
   each: logs.loki
   cluster_level: true
-  profiles: [prod, lab]
   rule:
     needs: "item.get('present')"
     needs_reason: "loki not present"
@@ -9674,7 +9591,6 @@
   type: summary
   each: logs.loki
   cluster_level: true
-  profiles: [prod, lab]
   rule:
     expr: "item.get('oomkilled') is True"
   target: "'cluster'"
@@ -9734,7 +9650,6 @@
   type: summary
   each: logs.agents.loki_metrics
   cluster_level: true
-  profiles: [prod, lab]
   rule:
     expr: "(item.get('discarded_1h') or 0) >= 10000"
     warn_expr: "(item.get('discarded_1h') or 0) > 0"
@@ -9767,7 +9682,6 @@
   type: summary
   each: logs.agents.promtail
   cluster_level: true
-  profiles: [prod, lab]
   rule:
     expr: "(item.get('dropped_entries_1h') or 0) >= 1000"
     warn_expr: "(item.get('dropped_entries_1h') or 0) > 0 or (item.get('request_errors_1h') or 0) >= 10 or item.get('metrics_scraped') is False"
@@ -9810,7 +9724,6 @@
   type: summary
   each: logs.agents.fluent-bit
   cluster_level: true
-  profiles: [prod, lab]
   rule:
     expr: "(item.get('retries_failed_1h') or 0) > 0 or (item.get('dropped_records_1h') or 0) > 0 or (item.get('output_errors_1h') or 0) >= 100"
     warn_expr: "(item.get('output_errors_1h') or 0) > 0 or item.get('records_in_1h') == 0 or item.get('metrics_scraped') is False"
@@ -9866,7 +9779,6 @@
   area: observability
   type: summary
   each: logs.loki.namespaces_1h
-  profiles: [prod, lab]
   rule:
     expr: "item['lines_1h'] >= 1000 and (item.get('error_ratio') or 0) >= 0.5"
     warn_expr: "item['lines_1h'] >= 1000 and (item.get('error_ratio') or 0) >= 0.2"
@@ -9910,7 +9822,6 @@
   area: observability
   type: summary
   each: logs.loki.namespaces_1h
-  profiles: [prod, lab]
   rule:
     warn_expr: "item['lines_1h'] >= 5000 and item.get('json_ratio') is not None and item['json_ratio'] < 0.2 and not item['namespace'].startswith('kube-')"
   target: "item['namespace']"
@@ -9953,11 +9864,10 @@
   area: observability
   type: object
   inputs: [objects/statefulsets.json, objects/deployments.json]
-  profiles: [prod, lab]
   rule:
     expr: "('prometheus' in name or 'grafana' in name or 'loki' in name or 'alertmanager' in name or 'thanos' in name or 'victoria' in name or 'tempo' in name or 'mimir' in name) and not spec.get('volumeClaimTemplates') and any(('emptyDir' in v) and (v['name'].endswith('-db') or v['name'] in ('storage', 'data', 'loki-data', 'grafana-storage', 'prometheus-data', 'alertmanager-data')) for v in (pod_spec(obj).get('volumes') or []))"
   evidence: "'emptyDir volumes: ' + ', '.join(v['name'] for v in (pod_spec(obj).get('volumes') or []) if 'emptyDir' in v) + f\", replicas {spec.get('replicas')}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: false
   why: >
     Prometheus, Alertmanager, Loki and Grafana data disappears with the pod. When the pod moves to another node or restarts after an OOMKill, metric retention, alert silences, logs and dashboards start from zero.
@@ -10041,7 +9951,6 @@
   area: observability
   type: metric
   inputs: [alerts_firing_stale_days]
-  profiles: [prod, lab]
   rule:
     expr: "value >= 7 and labels.get('alertname') not in ('Watchdog', 'InfoInhibitor')"  # these two are designed to fire always, so they are excluded
     warn_expr: "value >= 3 and labels.get('alertname') not in ('Watchdog', 'InfoInhibitor')"
@@ -10110,7 +10019,7 @@
   suggest: "(1) Lower requests to the p95 level (KRR) so nodes empty out and Karpenter consolidation removes them. (2) Move the system pool to smaller instances (t family). (3) Absorb the managed node group into a Karpenter pool."
   verify:
     - "sum(rate(container_cpu_usage_seconds_total{container!=\"\"}[5m])) / sum(kube_node_status_allocatable{resource=\"cpu\"})"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "skip"
@@ -10186,7 +10095,7 @@
   suggest: "Start lowering requests on the workloads from resources.cpu-request-overprovisioned and resources.krr-recommendation. Confirm the effect in the node count of the next snapshot (summary.cost.node_count_trend)."
   verify:
     - "Compare kubectl get nodes | wc -l before and after adjusting requests"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "skip"
@@ -10233,7 +10142,7 @@
   suggest: "Manually disrupt that node (`kubectl delete nodeclaim`, suggestion only) and Karpenter relaunches it as spot. If it keeps happening, spot supply for that instance family is short, so widen the requirements."
   verify:
     - "kubectl get nodes -L karpenter.sh/capacity-type,karpenter.sh/nodepool"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "warn"
@@ -10284,7 +10193,7 @@
   suggest: "`aws ec2 release-address --allocation-id <id>` (suggestion only). First check whether DNS points at that IP."
   verify:
     - "aws ec2 describe-addresses --query 'Addresses[?AssociationId==null].PublicIp'"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "skip"
@@ -10339,7 +10248,7 @@
   suggest: "Delete it if unused (in Terraform if it is defined there). If it is in use and just quiet for 24 hours, leave it."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/NetworkELB --metric-name ProcessedBytes --dimensions Name=LoadBalancer,Value=<dim> --statistics Sum --period 86400 --start-time <24h ago> --end-time <now>"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "skip"
@@ -10392,7 +10301,7 @@
   suggest: "Look through the node's pod list for the reason they cannot move (annotations, PDB, hostPath). If there is none, check the consolidation decisions in the Karpenter logs."
   verify:
     - "kubectl describe node <node> | grep -A20 'Non-terminated Pods'"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "warn"
@@ -10425,7 +10334,7 @@
   suggest: "Lower requests to the p95 level (KRR). Once N-1 fits, power off one node or repurpose it."
   verify:
     - "sum(rate(container_cpu_usage_seconds_total{container!=\"\"}[1h])) / sum(kube_node_status_allocatable{resource=\"cpu\"})"
-  profiles: [lab]
+  platforms: [k3s]
   test:
     cases:
       - expect: "skip"
@@ -10465,7 +10374,7 @@
     expr: "bool(item['cluster_admin_non_system']) or bool(item['cluster_admin_namespace_bindings'])"
   target: "'cluster'"
   evidence: "f\"cluster-admin ClusterRoleBindings {[(b['binding'], b['non_system']) for b in item['cluster_admin_non_system']]}, namespace RoleBindings -> cluster-admin {item['cluster_admin_namespace_bindings'][:5]}. All cluster-admin bindings {[(b['binding'], [s['name'] for s in b['subjects']]) for b in item['cluster_admin_bindings']]}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: false
   why: cluster-admin reads and changes every resource (Secrets included) in every namespace. The system:masters group and the EKS add-on manager are defaults; anything else bound to a user, group or ServiceAccount needs an individual reason. Bound to a CI runner or an ops tool SA, the whole cluster falls the moment that pod is compromised.
   cases:
@@ -10474,7 +10383,6 @@
   suggest: "Replace with a least-privilege ClusterRole or narrow to a namespace Role. On EKS, use access entries with a policy per IAM principal."
   verify:
     - "kubectl get clusterrolebindings -o json | jq -r '.items[] | select(.roleRef.name==\"cluster-admin\") | .metadata.name+\": \"+(.subjects|tostring)'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -10563,7 +10471,6 @@
   suggest: "Leave what the operator design requires and state it in the report. For user workload SAs, list only the resources and verbs they need."
   verify:
     - "kubectl get clusterroles -o json | jq -r '.items[] | select(.rules[]? | (.verbs|index(\"*\")) and (.resources|index(\"*\"))) | .metadata.name'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -10622,7 +10529,6 @@
   suggest: "Narrow to a namespace Role and restrict to specific Secrets with resourceNames."
   verify:
     - "kubectl auth can-i list secrets --all-namespaces --as=system:serviceaccount:<ns>:<sa>"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -10660,7 +10566,6 @@
   suggest: "Set `automountServiceAccountToken: false` on the Deployment (or on the SA). Only workloads that use the API keep true."
   verify:
     - "kubectl get pods -A -o json | jq -r '.items[] | select(.spec.automountServiceAccountToken!=false) | .metadata.namespace+\"/\"+.metadata.name' | wc -l"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -10693,7 +10598,7 @@
     warn_expr: "item['host_access'] and not item['system']"
   target: "item['workload']"
   evidence: "f\"{item['flags']}, containers allowing root {item['root_allowed_containers']}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: false
   why: >
     privileged, hostPID, hostIPC and SYS_ADMIN/NET_ADMIN remove container isolation. If that container is compromised, the node is compromised. System DaemonSets such as CNI, CSI and node-exporter need it by design and are kept separately as severe_system. hostNetwork and hostPath are rated one level lower (warn).
@@ -10705,7 +10610,6 @@
   suggest: "Add only the capabilities that are truly needed, specific capabilities instead of privileged, CSI instead of hostPath. Prevent recurrence with a PSA baseline/restricted label on the namespace."
   verify:
     - "kubectl get pods -A -o json | jq -r '.items[] | select(.spec.containers[].securityContext.privileged==true or .spec.hostPID==true) | .metadata.namespace+\"/\"+.metadata.name'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -10791,7 +10695,6 @@
   suggest: "On prod namespaces: `pod-security.kubernetes.io/warn: baseline` -> fix the violating pods -> `enforce: baseline`. System namespaces stay privileged."
   verify:
     - "kubectl get ns -o json | jq -r '.items[] | .metadata.name+\" \"+(.metadata.labels[\"pod-security.kubernetes.io/enforce\"] // \"none\")'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -10842,7 +10745,6 @@
   suggest: "Move to a Secret and use valueFrom.secretKeyRef. If there is an external store, pull it in with an ExternalSecret. Rotate the value (treat it as already exposed)."
   verify:
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].env[?(@.value)].name}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -10878,7 +10780,6 @@
   suggest: "kubectl describe externalsecret events, the SecretStore's authentication (IRSA role and policy), and whether the key exists in the external store."
   verify:
     - "kubectl get externalsecrets -A | grep -v SecretSynced"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -10906,7 +10807,7 @@
   suggest: "aws eks associate-encryption-config --cluster-name <c> --encryption-config '[{\"resources\":[\"secrets\"],\"provider\":{\"keyArn\":\"<kms>\"}}]' (suggestion only)."
   verify:
     - "aws eks describe-cluster --name <c> --query 'cluster.encryptionConfig'"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -10970,7 +10871,6 @@
   suggest: "VPC CNI add-on configurationValues {\"enableNetworkPolicy\": \"true\"} (aws eks update-addon, suggestion only) -> confirm PolicyEndpoints are created -> then default-deny."
   verify:
     - "kubectl -n kube-system get ds aws-node -o jsonpath='{.spec.template.spec.containers[?(@.name==\"aws-eks-nodeagent\")].args}'; kubectl get policyendpoints -A"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "skip"
@@ -11039,7 +10939,6 @@
   suggest: "Per namespace: a podSelector {} + policyTypes [Ingress] policy -> allow paths from the ingress controller and monitoring -> then the needed service-to-service paths."
   verify:
     - "kubectl get networkpolicies -A -o json | jq -r '.items[] | select(.spec.podSelector=={} and (.spec.ingress==null or .spec.ingress==[])) | .metadata.namespace'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "skip"
@@ -11104,7 +11003,7 @@
   suggest: "Karpenter EC2NodeClass spec.metadataOptions.httpPutResponseHopLimit 1, and 1 in the managed node group launch template as well. Only hostNetwork pods (CNI, CSI) need IMDS and they work with hop 1."
   verify:
     - "aws ec2 describe-instances --filters Name=tag:kubernetes.io/cluster/<c>,Values=owned --query 'Reservations[].Instances[].MetadataOptions.HttpPutResponseHopLimit'"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "skip"
@@ -11174,7 +11073,6 @@
   suggest: "A shared chart securityContext: runAsNonRoot true, allowPrivilegeEscalation false, capabilities drop ALL, readOnlyRootFilesystem true (emptyDir for writable paths). PSA restricted enforces the same."
   verify:
     - "polaris audit --context <ctx> --format pretty --only-show-failed-tests --severity danger"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -11230,7 +11128,6 @@
   verify:
     - "kubelet_volume_stats_used_bytes{persistentvolumeclaim=\"<pvc>\"} / kubelet_volume_stats_capacity_bytes"
     - "kubectl -n <ns> exec <pod> -- df -h <mount>"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "skip"
@@ -11353,7 +11250,6 @@
   suggest: "Clean up small files (old cache) or expand the volume. If the app creates many files, move to object storage."
   verify:
     - "kubelet_volume_stats_inodes_used{persistentvolumeclaim=\"<pvc>\"} / kubelet_volume_stats_inodes"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -11447,7 +11343,6 @@
   suggest: "Expand the volume or add a retention policy (log rotation, TTL). If the growth is logs or temp files, move them to emptyDir or object storage."
   verify:
     - "kubelet_volume_stats_available_bytes{persistentvolumeclaim=\"<pvc>\"} / (deriv(kubelet_volume_stats_used_bytes{persistentvolumeclaim=\"<pvc>\"}[7d]) * 86400)"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -11516,7 +11411,6 @@
   suggest: "`storageclass.kubernetes.io/is-default-class: \"true\"` on exactly one."
   verify:
     - "kubectl get sc"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -11574,7 +11468,7 @@
   suggest: "volumeBindingMode WaitForFirstConsumer (a StorageClass is immutable, so create a new one and switch)."
   verify:
     - "kubectl get sc -o custom-columns=NAME:.metadata.name,BINDING:.volumeBindingMode,PROV:.provisioner"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "warn"
@@ -11636,7 +11530,6 @@
   suggest: "Keep a separate StorageClass with reclaimPolicy Retain for DBs, or patch existing PVs with `kubectl patch pv <pv> -p '{\"spec\":{\"persistentVolumeReclaimPolicy\":\"Retain\"}}'` (suggestion only). Exclude PVCs from Argo CD prune."
   verify:
     - "kubectl get pv -o custom-columns=NAME:.metadata.name,CLAIM:.spec.claimRef.name,RECLAIM:.spec.persistentVolumeReclaimPolicy"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -11703,7 +11596,7 @@
   suggest: "Check each volume's origin via tags (kubernetes.io/created-for/pv/name) -> snapshot -> delete. This is an account-wide query, so volumes outside this cluster are mixed in (separate them by the KubernetesCluster tag)."
   verify:
     - "aws ec2 describe-volumes --filters Name=status,Values=available --query 'Volumes[].[VolumeId,Size,VolumeType,CreateTime]' --output table"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -11777,7 +11670,7 @@
   suggest: "`aws ec2 modify-volume --volume-id <id> --volume-type gp3` (online, suggestion only). The gp2 StorageClass itself is storage.legacy-intree-storageclass."
   verify:
     - "aws ec2 describe-volumes --filters Name=volume-type,Values=gp2 Name=tag:KubernetesCluster,Values=<cluster> --query 'length(Volumes)'"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "warn"
@@ -11844,7 +11737,7 @@
   suggest: "`aws ec2 enable-ebs-encryption-by-default` (account setting, suggestion only), StorageClass parameters.encrypted: \"true\"."
   verify:
     - "aws ec2 get-ebs-encryption-by-default"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "warn"
@@ -11905,7 +11798,7 @@
   suggest: "Spread PVC pods across nodes with topologySpread, use larger instances or add nodes. VPC CNI prefix delegation reduces ENI consumption and raises the limit."
   verify:
     - "kubectl get csinodes -o custom-columns=NODE:.metadata.name,LIMIT:.spec.drivers[0].allocatable.count; kubectl get volumeattachments | awk '{print $4}' | sort | uniq -c"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -11950,7 +11843,6 @@
   suggest: "Event messages in `kubectl describe pod`, `kubectl get volumeattachments`, EBS CSI controller logs."
   verify:
     - "kubectl get events -A --field-selector reason=FailedAttachVolume; kubectl get events -A --field-selector reason=FailedMount"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -12013,7 +11905,7 @@
   suggest: "Install the EKS snapshot-controller add-on -> VolumeSnapshotClass (ebs.csi.aws.com) -> daily snapshots of prod PVCs on a DLM or Velero schedule."
   verify:
     - "kubectl get crd volumesnapshots.snapshot.storage.k8s.io; kubectl get volumesnapshotclasses; aws eks describe-addon --cluster-name <c> --addon-name snapshot-controller"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -12090,7 +11982,6 @@
   suggest: "Follow the fix in the Polaris docs for each check (polaris.docs.fairwinds.com/checks). Fix it in the chart template so it applies to every workload."
   verify:
     - "polaris audit --context <ctx> --format pretty --only-show-failed-tests --severity danger"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -12186,7 +12077,6 @@
   verify:
     - "kubectl get <kind> <name> -n <namespace> -o jsonpath='{.metadata.annotations.kubectl\\.kubernetes\\.io/last-applied-configuration}'"
     - "kubent -t <next minor>"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -12257,7 +12147,7 @@
   suggest: "`aws eks describe-insight --cluster-name <c> --id <id>` for details (which resources are affected)."
   verify:
     - "aws eks list-insights --cluster-name <c> --query 'insights[?insightStatus.status!=`PASSING`].[name,insightStatus.status]'"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -12295,7 +12185,6 @@
   suggest: "`helm history <release> -n <ns>` to find the last good revision -> `helm rollback`, or clean up the pending secret and upgrade."
   verify:
     - "helm list -A --failed --pending"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -12358,7 +12247,6 @@
   suggest: "Compare with `helm search repo <chart> --versions | head`, read the changelog and go one step at a time."
   verify:
     - "helm list -A -o json | jq -r '.[] | .updated+\" \"+.namespace+\"/\"+.name+\" \"+.chart'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -12412,7 +12300,6 @@
   suggest: "Pin the tag to a version (or digest) and use imagePullPolicy IfNotPresent. CI bumps the tag and Argo CD applies it."
   verify:
     - "kubectl get deploy,sts,ds -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{\" \"}{.spec.template.spec.containers[*].image}{\"\\n\"}{end}' | grep -E ':latest|[^:]+$'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -12483,7 +12370,6 @@
   suggest: "imagePullPolicy IfNotPresent. Deployments change the tag, so Always is not needed."
   verify:
     - "kubectl get deploy -A -o json | jq -r '.items[] | .spec.template.spec.containers[] | select(.imagePullPolicy==\"Always\") | .image'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -12532,7 +12418,6 @@
   suggest: "Put app.kubernetes.io/name, instance, version, part-of and managed-by into the chart or kustomize base common labels (commonLabels)."
   verify:
     - "kubectl get deploy -A -o json | jq -r '.items[] | select((.metadata.labels // {} | keys | map(startswith(\"app.kubernetes.io/\")) | any) | not) | .metadata.namespace+\"/\"+.metadata.name'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -12572,7 +12457,6 @@
   suggest: "Move to a dedicated namespace and block creation in default with a ResourceQuota of 0 or a Kyverno policy."
   verify:
     - "kubectl get all -n default"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -12599,7 +12483,6 @@
   suggest: "For each candidate, check creation time and content with `kubectl describe cm` and delete. Put it in the chart so the lifecycle is shared."
   verify:
     - "kubectl get cm -n <ns> <name> -o yaml | head -30"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -13074,7 +12957,6 @@
   suggest: "Confirm the owning component of each candidate and delete. Pull secrets from an external store with External Secrets so lifecycles match."
   verify:
     - "kubectl get secret -n <ns> <name> -o jsonpath='{.type} {.metadata.creationTimestamp} {.metadata.ownerReferences}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "skip"
@@ -13398,7 +13280,6 @@
   suggest: "Pending: `kubectl describe pvc` events. Released PV: verify the data, then delete (EBS snapshot first). Unused PVC: back up, then delete."
   verify:
     - "kubectl get pvc -A | grep -v Bound; kubectl get pv | grep -E 'Released|Failed'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -13494,7 +13375,6 @@
   suggest: "Deployment spec.revisionHistoryLimit 3 (as a shared chart value)."
   verify:
     - "kubectl get rs -A | awk '$2==0' | wc -l"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -13558,7 +13438,7 @@
   suggest: "Split WebSocket and streaming ingresses into a separate ALB group and keep the rest at 60-120s. Set explicit timeouts in the app's HTTP clients and DB drivers."
   verify:
     - "kubectl get ingress -A -o json | jq -r '.items[] | .metadata.namespace+\"/\"+.metadata.name+\" \"+(.metadata.annotations[\"alb.ingress.kubernetes.io/load-balancer-attributes\"]//\"\")' | grep idle_timeout"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "warn"
@@ -13600,7 +13480,7 @@
   suggest: "Ingress annotation alb.ingress.kubernetes.io/target-type: ip (Service as ClusterIP). On the namespace, elbv2.k8s.aws/pod-readiness-gate-inject: enabled."
   verify:
     - "kubectl get targetgroupbindings -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,TYPE:.spec.targetType"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "warn"
@@ -13655,7 +13535,6 @@
   suggest: "Serving workloads: preStop sleep 5-10s + grace 30-60s. Batch and consumers (Kafka): extend to the unit of work, together with a PDB."
   verify:
     - "kubectl get deploy -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,GRACE:.spec.template.spec.terminationGracePeriodSeconds"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -13733,7 +13612,6 @@
   suggest: "revisionHistoryLimit 3-5. Even under Argo CD, rollout undo is the fastest emergency rollback."
   verify:
     - "kubectl get deploy,sts -A -o json | jq -r '.items[] | select(.spec.revisionHistoryLimit==0) | .metadata.namespace+\"/\"+.metadata.name'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -13762,7 +13640,6 @@
   suggest: "If the workload is really gone, delete the Service (in Git if Argo CD manages it). If it is a label mismatch, fix the selector."
   verify:
     - "kubectl get endpointslices -A -o json | jq -r '.items[] | select((.endpoints // []) | length == 0) | .metadata.namespace+\"/\"+.metadata.ownerReferences[0].name'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -13786,7 +13663,7 @@
   suggest: "As services grow, automate canary judgment with Argo Rollouts (same ecosystem as Argo CD) + AnalysisTemplate (ALB 5xx, p95 Prometheus queries)."
   verify:
     - "kubectl get crd rollouts.argoproj.io canaries.flagger.app 2>&1"
-  profiles: [prod]
+  scales: [large]
   test:
     cases:
       - expect: "fail"
@@ -13827,7 +13704,6 @@
   verify:
     - "node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes"
     - "On the node: free -m; cat /proc/meminfo | grep -E 'MemAvailable|Dirty'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -13876,7 +13752,6 @@
     - "increase(node_network_receive_errs_total{device=\"eth0\"}[1d])"
     - "On the node: ethtool -S eth0 | grep -iE 'err|drop|exceeded'"
   notes: A series of a node that inventory.json no longer lists is not judged; the node left within the 24-hour window and the check's result names it under gone_nodes, as summary.objects.nodes.gone_24h does with its last sample time. The same applies to every metric check whose series name a node.
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -13928,7 +13803,6 @@
   verify:
     - "node_sockstat_TCP_tw"
     - "On the node: ss -s; sysctl net.ipv4.ip_local_port_range"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -13979,7 +13853,6 @@
   verify:
     - "histogram_quantile(0.99, sum by (le, node) (rate(kubelet_pleg_relist_duration_seconds_bucket[1h])))"
     - "On the node: journalctl -u kubelet | grep -c 'PLEG is not healthy'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -14030,7 +13903,6 @@
   suggest: "Break apiserver_longrunning_requests down by resource and client (user-agent if audit logs exist) and fix controllers to share informers. Terminals left on kubectl get --watch count too."
   verify:
     - "sum by (resource) (apiserver_longrunning_requests{verb=\"WATCH\"})"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -14075,7 +13947,6 @@
   suggest: "Look at the sourceIP and user-agent of the 401s in the audit log (EKS CloudWatch authenticator and audit streams). Small k3s cluster: journalctl -u k3s | grep 'Unable to authenticate'."
   verify:
     - "sum(rate(apiserver_request_total{code=\"401\"}[1h]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -14123,7 +13994,6 @@
   verify:
     - "apiserver_storage_size_bytes"
     - "topk(10, apiserver_resource_objects) (apiserver_storage_objects before Kubernetes 1.34)"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -14167,7 +14037,6 @@
   verify:
     - "kubectl get configmap -n <ns> <name> -o json --show-managed-fields | jq '[.metadata.managedFields[] | {manager, time}]'"
     - "kubectl get pods -n <ns> -o jsonpath='{range .items[*]}{.metadata.name}{\"\\t\"}{.status.startTime}{\"\\n\"}{end}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -14216,7 +14085,6 @@
   suggest: "Do not pile dashboards and static files into one ConfigMap; split them or move to a PVC or object storage. CA bundles via trust-manager."
   verify:
     - "kubectl get configmaps -A -o json | jq -r '.items[] | .metadata.namespace+\"/\"+.metadata.name+\" \"+(.data|tostring|length|tostring)' | sort -k2 -n -r | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -14255,7 +14123,6 @@
   suggest: "Set -XX:MaxRAMPercentage=60-75 (standalone container without sidecars) and drop -Xmx so it follows limit changes. Heap dumps and GC logs go with an ephemeral-storage request."
   verify:
     - "kubectl get deploy,sts -A -o json | jq -r '.items[] | .metadata.namespace+\"/\"+.metadata.name+\" \"+([.spec.template.spec.containers[].env[]?.value // \"\"]|join(\" \"))' | grep -E 'Xmx|MaxRAMPercentage'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -14341,7 +14208,6 @@
   suggest: "Cut sidecar requests to the 7-day p95 (resources.p95), and see whether exporters can move from pod sidecars to a single Deployment per namespace."
   verify:
     - "kubectl get pods -A -o json | jq -r '.items[] | select((.spec.containers|length)>1) | .metadata.namespace+\"/\"+.metadata.name+\" \"+([.spec.containers[] | .name+\"=\"+(.resources.requests.memory//\"-\")]|join(\",\"))'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -14400,7 +14266,6 @@
   suggest: "Specify hosts explicitly; if a wildcard is needed (per-tenant subdomains), split that Ingress into a separate LB group."
   verify:
     - "kubectl get ingress -A -o json | jq -r '.items[] | .metadata.namespace+\"/\"+.metadata.name+\" \"+([.spec.rules[].host // \"<none>\"]|join(\",\"))' | grep -E '\\*\\.|<none>'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -14470,7 +14335,6 @@
   suggest: "Set kubeAPIQPS 50 and kubeAPIBurst 100 in the kubelet config (on EKS: kubelet-extra-args in the node group launch template, or EC2NodeClass.spec.kubelet)."
   verify:
     - "kubectl get --raw /api/v1/nodes/<node>/proxy/configz | jq '.kubeletconfig | {kubeAPIQPS, kubeAPIBurst, maxPods}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -14508,7 +14372,6 @@
   suggest: "If they overlap, pin down the change with kubectl rollout history or Argo CD history for that workload, roll it back and watch whether the metrics recover. If it recurs: canary (hygiene.no-progressive-delivery) and a GitOps diff gate."
   verify:
     - "kubectl rollout history deploy/<name>; kubectl get events -A --sort-by=.lastTimestamp | tail -50"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "llm"
@@ -14531,7 +14394,6 @@
   suggest: "If monitoring.coreos.com has zero ServiceMonitor/PodMonitor objects, kube-prometheus-stack only uses additional scrape configs — same root cause as the *-not-scraped findings (promtail, argocd, keda) in the observability section, so merge them into one item. If every CRD of a group has zero objects, consider removing that component. Otherwise leave it."
   verify:
     - "kubectl get crd -o name | while read c; do n=$(kubectl get ${c#*/} -A --no-headers 2>/dev/null | wc -l); echo \"$n $c\"; done | sort -n | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -14571,7 +14433,6 @@
   suggest: "Move the manifest (or chart) into a Git repo and apply it with an Argo CD Application. Manual changes then show up as OutOfSync."
   verify:
     - "kubectl get deploy -A -o json | jq -r '.items[] | select(.metadata.labels[\"app.kubernetes.io/managed-by\"]==null and .metadata.annotations[\"argocd.argoproj.io/tracking-id\"]==null) | .metadata.namespace+\"/\"+.metadata.name'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -14613,7 +14474,6 @@
   verify:
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].livenessProbe}'"
     - "kubectl get events -n <ns> --field-selector reason=Unhealthy"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -14769,7 +14629,6 @@
   suggest: "Use httpGet or tcpSocket. If exec is unavoidable, timeoutSeconds 3 or more and a lightweight command."
   verify:
     - "kubectl get deploy,sts -A -o json | jq -r '.items[] | select(.spec.template.spec.containers[].livenessProbe.exec or .spec.template.spec.containers[].readinessProbe.exec) | .metadata.namespace+\"/\"+.metadata.name'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -14853,7 +14712,6 @@
   suggest: "liveness periodSeconds 10-30, failureThreshold 3 or more (window 30s+); for slow startup add a startupProbe (failureThreshold 30, period 10)."
   verify:
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].livenessProbe}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -14943,7 +14801,6 @@
   suggest: "Set minAvailable to replicas−1 or less (or maxUnavailable 1). To put a PDB on a single-replica workload, raise replicas to 2 first."
   verify:
     - "kubectl get pdb -A"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -15048,7 +14905,6 @@
   suggest: "Use exec-form command (run the binary directly, no shell) or tini as ENTRYPOINT. As a stopgap, a preStop sleep and a longer grace period."
   verify:
     - "kubectl exec -n <ns> <pod> -- cat /proc/1/cmdline | tr '\\0' ' '"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -15119,7 +14975,6 @@
   suggest: "RollingUpdate (maxSurge 1, maxUnavailable 0). If the volume is the reason, move to a StatefulSet or RWX storage."
   verify:
     - "kubectl get deploy -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,STRATEGY:.spec.strategy.type | grep Recreate"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "pass"
@@ -15189,7 +15044,7 @@
     warn_expr: "item['all_same_node'] or (item['prod'] and not item['spread_declared'])"
   target: "item['workload']"
   evidence: "f\"replicas {item['replicas']} (Running {item['running']}), node distribution {item['nodes']}, AZ distribution {item['zones']}, topologySpread {item['topology_spread']}, podAntiAffinity {item['anti_affinity']}, nodes eligible under scheduling constraints {item['eligible_nodes']}{' — only one eligible node, so a spread declaration still lands on the same node' if item['single_eligible_node'] else ''}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: true
   why: >
     The point of 2 replicas is to survive one dying, but if both sit on the same node they vanish together the moment that node dies (Moonlight case). Without a spread declaration (topologySpreadConstraints, podAntiAffinity)
@@ -15203,7 +15058,6 @@
   suggest: "topologySpreadConstraints (topologyKey kubernetes.io/hostname, maxSkew 1, whenUnsatisfiable DoNotSchedule). On a 2-node small k3s cluster use ScheduleAnyway and accept the outage when one node is lost."
   verify:
     - "kubectl get pods -n <ns> -l app=<name> -o wide"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -15300,7 +15154,7 @@
     warn_expr: "item['nodes_total'] >= 2"
   target: "item['workload']"
   evidence: "f\"{item['workload']}: eligible nodes {item['eligible_nodes']} (of {item['nodes_total']} nodes), constraints {item['constraints']}, unavoidable pin reasons {item.get('pin_reasons')}, replicas {item['replicas']}, serves traffic {item['serves_traffic']}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: true
   why: >
     If there are two or more nodes but required nodeAffinity, nodeSelector or taints leave only one eligible node, every replica is on that node no matter the replica count or topologySpread declaration — and when that node dies the workload cannot come back anywhere.
@@ -15310,7 +15164,6 @@
   suggest: "Change required to preferred (weight 100): the node is preferred normally and pods move elsewhere when it dies. Keep genuinely necessary pins (local-path PV, GPU) and record the reason."
   verify:
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.affinity.nodeAffinity}' ; kubectl get nodes --show-labels"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -15355,7 +15208,7 @@
   suggest: "Add a second topologySpreadConstraint with topologyKey topology.kubernetes.io/zone (maxSkew 1, ScheduleAnyway)."
   verify:
     - "kubectl get pods -n <ns> -l app=<name> -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -15457,7 +15310,6 @@
   suggest: "Switch to a nodeSelector on node labels (role, GPU) and move data to storage not tied to a node (EBS, Longhorn, NFS). For a small k3s cluster, externalizing backups is the realistic answer."
   verify:
     - "kubectl get deploy,sts -A -o json | jq -r '.items[] | select(.spec.template.spec.nodeSelector[\"kubernetes.io/hostname\"] or .spec.template.spec.nodeName) | .metadata.namespace+\"/\"+.metadata.name'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -15499,7 +15351,7 @@
   verify:
     - "kubectl get pv -o custom-columns=NAME:.metadata.name,CLAIM:.spec.claimRef.name,ZONE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
     - "kubectl get nodes -L topology.kubernetes.io/zone"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -15565,7 +15417,7 @@
     warn_expr: "(not item['ok'] or item.get('tight'))"  # ok covers the cluster-wide sum and every pool of pods bound to a subset of nodes; tight = fits only inside the 2% margin
   target: "'cluster'"
   evidence: "_n_plus_one_text(item)"
-  severity_default: critical
+  severity_default: { small: medium, medium: high, large: critical }
   symptom_linked: true
   why: >
     If allocatable minus the largest node is smaller than the sum of all requests (excluding DaemonSets), some pods find no room when one node is lost. On a small k3s cluster without an autoscaler those pods never start again;
@@ -15577,7 +15429,6 @@
   verify:
     - "sum(kube_node_status_allocatable{resource=\"memory\"}) - max(kube_node_status_allocatable{resource=\"memory\"})"
     - "sum(kube_pod_container_resource_requests{resource=\"memory\"})"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -15675,7 +15526,6 @@
   verify:
     - "kubectl get pods -A --sort-by=.status.containerStatuses[0].restartCount | tail"
     - "kubectl logs -n <ns> <pod> --previous"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "pass"
@@ -15795,7 +15645,6 @@
   suggest: "`kubectl get jobs -n <ns> -l <cronjob label>` and the pod logs of the failed Job. Check whether a KubeJobFailed alert had been firing (observability.alert-firing-stale)."
   verify:
     - "kubectl get cronjobs -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,SCHEDULE:.spec.schedule,LAST:.status.lastScheduleTime,SUCCESS:.status.lastSuccessfulTime"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -15928,7 +15777,6 @@
   suggest: "concurrencyPolicy Forbid, activeDeadlineSeconds (normal run time × 3), startingDeadlineSeconds 300, and a podFailurePolicy that excludes eviction (DisruptionTarget) from the retry count."
   verify:
     - "kubectl get cronjobs -A -o json | jq -r '.items[] | select(.spec.concurrencyPolicy!=\"Forbid\") | .metadata.namespace+\"/\"+.metadata.name'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -16063,7 +15911,6 @@
   suggest: "ttlSecondsAfterFinished 3600 on Jobs; successfulJobsHistoryLimit 3 and failedJobsHistoryLimit 3 on CronJobs. Failed pods: `kubectl delete pod --field-selector status.phase=Failed -A` (suggestion only)."
   verify:
     - "kubectl get pods -A --field-selector status.phase=Succeeded | wc -l; kubectl get pods -A --field-selector status.phase=Failed | wc -l"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -16111,7 +15958,6 @@
   suggest: "Create two PriorityClasses (prod-critical 1000000, batch -10 or 100) and set priorityClassName on production Deployments. Batch and runners go low."
   verify:
     - "kubectl get priorityclasses; kubectl get pods -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,PRIO:.spec.priority | sort -k3 -n -r | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -16197,7 +16043,6 @@
   suggest: "Line up the backend's logs, restarts, OOM (resources.oomkilled) and readiness (traffic.pod-not-ready) over the same time window. Turn one 5xx-ratio alert into an SLO (observability.no-slo)."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name HTTPCode_Target_5XX_Count --dimensions Name=LoadBalancer,Value=<dim> Name=TargetGroup,Value=<dim> --statistics Sum --period 3600 --start-time <24h ago> --end-time <now>"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "skip"
@@ -16511,7 +16356,6 @@
   suggest: "Identify slow endpoints (app metrics, logs), check DB query and external call timeouts, and CPU limit throttling (resources.cpu-throttling)."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name TargetResponseTime --dimensions Name=LoadBalancer,Value=<dim> Name=TargetGroup,Value=<dim> --extended-statistics p95 --period 300 --start-time <1h ago> --end-time <now>"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "skip"
@@ -16797,7 +16641,7 @@
   suggest: "Overlay hourly ELB 5xx with deploy and node replacement times. For 502, align the preStop sleep with the deregistration delay; for 504, check the idle timeout against the app timeout."
   verify:
     - "aws cloudwatch get-metric-statistics --namespace AWS/ApplicationELB --metric-name HTTPCode_ELB_5XX_Count --dimensions Name=LoadBalancer,Value=<dim> --statistics Sum --period 3600 --start-time <24h ago> --end-time <now>"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -16928,7 +16772,7 @@
   verify:
     - "aws elbv2 describe-target-health --target-group-arn <arn>"
     - "kubectl get ingress -n <ns> <name> -o jsonpath='{.metadata.annotations}'"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -17032,7 +16876,7 @@
     - "aws elbv2 describe-target-group-attributes --target-group-arn <arn> | grep deregistration"
     - "kubectl get deploy -n <ns> <name> -o jsonpath='{.spec.template.spec.terminationGracePeriodSeconds} {.spec.template.spec.containers[*].lifecycle}'"
   notes: warn only. The fail comes from resilience.no-prestop on the same workload (do not count twice). This check adds the ALB-side number (deregistration delay) to the evidence
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "warn"
@@ -17153,7 +16997,7 @@
   suggest: "IngressClassParams or the annotation `alb.ingress.kubernetes.io/load-balancer-attributes: deletion_protection.enabled=true,access_logs.s3.enabled=true,access_logs.s3.bucket=<bucket>`."
   verify:
     - "aws elbv2 describe-load-balancer-attributes --load-balancer-arn <arn>"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "warn"
@@ -17219,7 +17063,7 @@
     warn_expr: "item.get('sg_exposure') == 'allow-list'"
   target: "item['target']"
   evidence: "f\"{item['type']} {item.get('namespace') or ''}/{item['name']}: ports {item.get('ports')}, exposure {item.get('scheme')}, addresses {item.get('hosts')}, sourceRanges {item.get('source_ranges')}, security group {_sg_text(item)}. {item.get('note') or ''}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: false
   why: >
     If ports like 5432, 3306, 6379, 27017 or 9092 are open on an internet-facing LB or a NodePort, which listens on every node interface, a single password is all that stands in the way.
@@ -17236,7 +17080,6 @@
     - "aws elbv2 describe-load-balancers --query 'LoadBalancers[?Scheme==`internet-facing`].[LoadBalancerName,Type,DNSName,SecurityGroups]'"
     - "aws ec2 describe-security-groups --group-ids <sg> --query 'SecurityGroups[].IpPermissions[].[FromPort,ToPort,IpRanges[].CidrIp]'"
     - "kubectl get svc -A --field-selector spec.type=NodePort"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "skip"
@@ -17425,7 +17268,6 @@
   verify:
     - "kubectl get deploy,ds -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{\" \"}{.spec.template.spec.containers[0].image}{\"\\n\"}{end}' | grep -E 'ingress-nginx/controller|nginx-ingress-controller'"
     - "kubectl get validatingwebhookconfigurations -o name | grep ingress-nginx"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -17502,7 +17344,6 @@
   verify:
     - "kubectl get deploy,ds -A -o jsonpath='{range .items[*]}{.metadata.namespace}/{.metadata.name}{\" \"}{.spec.template.spec.containers[0].image}{\"\\n\"}{end}' | grep -E 'ingress-nginx/controller|nginx-ingress-controller'"
     - "kubectl get gatewayclasses"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -17539,7 +17380,6 @@
   suggest: "Put admin consoles behind ALB OIDC auth (`alb.ingress.kubernetes.io/auth-type: oidc`) or IP restriction (`inbound-cidrs`, nginx `whitelist-source-range`), or behind Tailscale/VPN."
   verify:
     - "kubectl get ingress -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,HOSTS:.spec.rules[*].host,CLASS:.spec.ingressClassName"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -17649,7 +17489,6 @@
   suggest: "ALB target group algorithm least_outstanding_requests; for gRPC, client-side load balancing or a service mesh; for WebSockets, a connection cap and periodic reconnects."
   verify:
     - "sum by (pod) (rate(container_network_receive_bytes_total{namespace=\"<ns>\",pod=~\"<deploy>-.*\"}[1h]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -17713,7 +17552,6 @@
   verify:
     - "avg_over_time(kube_pod_status_ready{condition=\"true\",namespace=\"<ns>\"}[24h])"
     - "kubectl get events -n <ns> --field-selector reason=Unhealthy"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -17784,7 +17622,6 @@
   suggest: "CoreDNS logs `kubectl -n kube-system logs deploy/coredns | grep SERVFAIL`, upstream health (the VPC resolver in /etc/resolv.conf), replicas and CPU limit."
   verify:
     - "sum(rate(coredns_dns_responses_total{rcode=\"SERVFAIL\"}[5m])) / sum(rate(coredns_dns_responses_total[5m]))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -17834,7 +17671,6 @@
   suggest: "Remove the CoreDNS CPU limit and run 2 or more replicas, tune cache TTL, use FQDNs (trailing dot) or ndots 2 for external domains, NodeLocal DNSCache."
   verify:
     - "histogram_quantile(0.99, sum by (le) (rate(coredns_dns_request_duration_seconds_bucket[5m])))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "skip"
@@ -17874,7 +17710,6 @@
   suggest: "Use Cluster if IP preservation is not needed. If it is, keep a pod on every node (DaemonSet or topologySpread) and shorten the LB health check interval."
   verify:
     - "kubectl get svc -A --field-selector spec.type=LoadBalancer -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,POLICY:.spec.externalTrafficPolicy"
-  profiles: [prod, lab]
 
 # ---------- Scaling. Material is summary.scaling (lib/summaries/scaling.py) ----------
   test:
@@ -17940,7 +17775,6 @@
   verify:
     - "kubectl get apiservices | grep metrics"
     - "kubectl top pods -A | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -17968,7 +17802,6 @@
   suggest: "Conditions and Events in `kubectl describe hpa -n <ns> <name>`. Add requests if missing; for external metrics, look at the ScaledObject and TriggerAuthentication."
   verify:
     - "kubectl get hpa -A | grep -i unknown"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -18050,11 +17883,11 @@
   rule:
     expr: "value >= threshold"
     warn_expr: "value >= warn_threshold"
-    threshold: { prod: 0.5, lab: 0.5 }
-    warn_threshold: { prod: 0.2, lab: 0.2 }
+    threshold: 0.5
+    warn_threshold: 0.2
   target: "labels['namespace'] + '/hpa/' + labels['horizontalpodautoscaler']"
   evidence: "f\"Share of the last 15 days spent at max replicas {value:.2f}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: true
   why: >
     If it sits at max for long, the HPA cannot scale any further and is effectively off. Check whether latency and errors rose at those times (observability) together with node headroom.
@@ -18063,7 +17896,6 @@
   verify:
     - "kubectl get hpa -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas,CUR:.status.currentReplicas"
   notes: PromQL over the HPA status metrics
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -18116,7 +17948,6 @@
   suggest: "Lower requests toward p95 so utilization lands in a meaningful range (30-70%), or switch the target to a custom metric (RPS, queue). If traffic really is flat, deleting the HPA and fixing replicas is also an answer."
   verify:
     - "kubectl get hpa -n <ns> <name> -o jsonpath='{.status.currentMetrics}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "skip"
@@ -18274,8 +18105,8 @@
   rule:
     expr: "value >= threshold"
     warn_expr: "value >= warn_threshold"
-    threshold: { prod: 56, lab: 56 }  # 8 per day (a day/night cycle of 2 per day = 14 per week is normal)
-    warn_threshold: { prod: 28, lab: 28 }
+    threshold: 56  # 8 per day (a day/night cycle of 2 per day = 14 per week is normal)
+    warn_threshold: 28
   target: "labels['namespace'] + '/hpa/' + labels['horizontalpodautoscaler']"
   evidence: "f\"{value:.0f} desired changes over 7 days\""
   severity_default: medium
@@ -18287,7 +18118,6 @@
   verify:
     - "changes(kube_horizontalpodautoscaler_status_desired_replicas{namespace=\"<ns>\"}[7d])"
     - "kubectl get hpa -n <ns> <name> -o jsonpath='{.spec.behavior}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -18336,7 +18166,6 @@
   suggest: "If the pin is intentional, delete the HPA and use replicas. Otherwise raise max."
   verify:
     - "kubectl get hpa -A -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -18463,7 +18292,6 @@
   suggest: "For services whose peak signal is request latency or queue length, use a KEDA ScaledObject (prometheus/kafka trigger) or prometheus-adapter custom metrics."
   verify:
     - "kubectl get hpa -n <ns> <name> -o jsonpath='{.spec.metrics}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -18556,7 +18384,6 @@
   suggest: "behavior: scaleUp.policies [{type: Percent, value: 50, periodSeconds: 60}], scaleDown.stabilizationWindowSeconds 300."
   verify:
     - "kubectl get hpa -n <ns> <name> -o jsonpath='{.spec.behavior}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -18639,7 +18466,7 @@
     # warn-only (no expr): replicas 1 is already a fail in resilience single-replica, so no second fail here. Missing HPA alone is a low warn
     warn_expr: "prod and serves_traffic(obj) and not hpa_covers(obj) and not any(p.get('containerPort') in (5432, 3306, 6379, 27017, 9200, 5672, 9092, 11211, 7687, 2379) for c in containers(obj) for p in (c.get('ports') or []))"
   evidence: "f\"replicas {spec.get('replicas')}, has container ports and a Service, no HPA or ScaledObject\""
-  severity_default: low
+  severity_default: { small: info, medium: low, large: medium }
   symptom_linked: false
   why: >
     If other HPAs in the same namespace have sat at min for 15 days with CPU under half the target (summary.scaling.hpa.idle_namespaces), the answer is not "add an HPA" but that requests are oversized, so this is lowered to warn.
@@ -18649,7 +18476,6 @@
   suggest: "Start with one CPU HPA (min 2, max 4-6, target 60-70%). Requests must be p95-based for utilization to mean anything (together with resources.cpu-request-overprovisioned)."
   verify:
     - "kubectl get hpa,scaledobject -n <ns>"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"  # replicas 1 is also warn
@@ -18819,7 +18645,6 @@
   suggest: "Conditions and Events in `kubectl describe scaledobject -n <ns> <name>`, and `kubectl -n keda logs deploy/keda-operator | grep -iE 'error|auth'`."
   verify:
     - "kubectl get scaledobjects -A"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -18911,8 +18736,8 @@
   rule:
     expr: "value >= threshold"
     warn_expr: "value >= warn_threshold"
-    threshold: { prod: 600, lab: 600 }
-    warn_threshold: { prod: 120, lab: 120 }
+    threshold: 600
+    warn_threshold: 120
   target: "workload(labels)"
   evidence: "f\"Pod {labels['pod']}: Pending for {value/60:.0f} min\""
   severity_default: high
@@ -18928,7 +18753,6 @@
   suggest: "Events in `kubectl describe pod` (FailedScheduling reason) and the Karpenter logs (`failed`, `insufficient`). summary.scaling.karpenter.launch_failures_24h."
   verify:
     - "kubectl get pods -A --field-selector status.phase=Pending"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -18980,7 +18804,7 @@
   suggest: "Look for a pattern (instance family, AZ) in summary.scaling.karpenter.latency_24h.slowest and check the node boot log (SSM) for the slow stage."
   verify:
     - "kubectl get nodeclaims -o custom-columns=NAME:.metadata.name,CREATED:.metadata.creationTimestamp,READY:.status.conditions[?(@.type==\"Ready\")].lastTransitionTime"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -19086,7 +18910,7 @@
   suggest: "Resolve the cause in the DisruptionBlocked message (remove the annotation, relax the PDB). Spread that node's pods first (topologySpread) before replacing it."
   verify:
     - "kubectl get events -A --field-selector reason=DisruptionBlocked -o custom-columns=OBJ:.involvedObject.name,MSG:.message | sort | uniq -c"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -19132,7 +18956,7 @@
   suggest: "Karpenter Helm value `settings.interruptionQueue` and an EventBridge rule (EC2 Spot Instance Interruption Warning → SQS)."
   verify:
     - "kubectl -n karpenter get deploy karpenter -o jsonpath='{.spec.template.spec.containers[0].env}' | jq '.[] | select(.name==\"INTERRUPTION_QUEUE\")'"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -19174,7 +18998,7 @@
   suggest: "spec.limits: {cpu: <2-3x the current total>, memory: …}."
   verify:
     - "kubectl get nodepools -o jsonpath='{range .items[*]}{.metadata.name}{\" \"}{.spec.limits}{\"\\n\"}{end}'"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -19210,7 +19034,7 @@
   suggest: "Widen the NodePool requirements (instance-category and generation ranges, several AZs, an on-demand fallback pool with weight)."
   verify:
     - "kubectl -n karpenter logs deploy/karpenter --since=24h | grep -ciE 'insufficient|failed launching'"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -19251,7 +19075,7 @@
   area: cost
   type: object
   inputs: [objects/nodepools.karpenter.sh.json]
-  profiles: [prod]
+  platforms: [eks, other]
   rule:
     expr: "karpenter_pool_nodes(obj['metadata']['name']) > 0 and karpenter_budget_allowed(spec, karpenter_pool_nodes(obj['metadata']['name'])) == 0"
   evidence: "f\"budgets {((spec.get('disruption') or {}).get('budgets'))}, NodeClaims in the pool {karpenter_pool_nodes(obj['metadata']['name'])} → allowed disruptions {karpenter_budget_allowed(spec, karpenter_pool_nodes(obj['metadata']['name']))} (percentages are rounded up). expireAfter {(spec.get('disruption') or {}).get('expireAfter')}, consolidationPolicy {(spec.get('disruption') or {}).get('consolidationPolicy')}\""
@@ -19268,7 +19092,7 @@
     - "kubectl logs -n karpenter deploy/karpenter --since=24h | grep -c 'disrupting via'"
   notes: Fixed after a review of a real EKS run (floor → ceil, pool with 0 nodes passes). An earlier report that said "computed as 0, no disruption" was a floor-rounding bug in this check.
   test:
-    profile: "prod"
+    platform: "eks"
     cases:
       - expect: "fail"
         objects:
@@ -19337,7 +19161,6 @@
   suggest: "Give each tenant namespace a ResourceQuota (requests.cpu, requests.memory, limits.memory, count/pods) at 2-3x the 7-day p95. A quota rejects pods without requests, so pair it with LimitRange defaults (tenancy.quota-without-limitrange)."
   verify:
     - "kubectl get resourcequota -A ; kubectl describe quota -n <ns>"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -19591,7 +19414,6 @@
   suggest: "Raise the quota (2x actual p95) or clean up the resource at its limit. Add an alert at 80% quota usage (kube_resourcequota{type=\"used\"} / kube_resourcequota{type=\"hard\"})."
   verify:
     - "kubectl describe quota -n <ns> <name> ; kubectl get events -n <ns> --field-selector reason=FailedCreate"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -19714,7 +19536,7 @@
     warn_expr: "item['requires_requests'] and not item['limitrange_default_request']"
   target: "item['target']"
   evidence: "f\"{item['target']}: requests entries in hard {[k for k in item['hard'] if 'requests' in k or k in ('cpu', 'memory')]}, LimitRange {item['has_limitrange']} (default request {item['limitrange_default_request']}), containers without requests right now {item['containers_without_requests']}\""
-  severity_default: high
+  severity_default: { small: low, medium: medium, large: high }
   symptom_linked: true
   why: >
     In a namespace with requests.cpu / requests.memory quotas, a pod without requests is rejected by the API server with "must specify requests.cpu" (by design of ResourceQuota). A LimitRange defaultRequest closes that hole.
@@ -19722,7 +19544,6 @@
   suggest: "Add a LimitRange in the same namespace (type Container, defaultRequest cpu 50m / memory 64Mi, default limit memory 256Mi)."
   verify:
     - "kubectl get limitrange -n <ns> ; kubectl get events -n <ns> | grep -i 'must specify'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -19889,7 +19710,6 @@
   suggest: "Put one LimitRange (defaultRequest, default, max) into the tenant namespace template (Argo CD ApplicationSet, shared Helm chart)."
   verify:
     - "kubectl get limitrange -A ; kubectl get pods -n <ns> -o json | jq '[.items[].spec.containers[] | select(.resources.requests == null)] | length'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -20091,7 +19911,7 @@
     warn_expr: "item['shares_ci_prod']"
   target: "item['node']"
   evidence: "f\"Node {item['node']} (pool {item['pool']}): prod pods {item['prod_pods']} ({item['prod_namespaces']}) together with CI pods {item['ci_pods']} ({[c['pod'] for c in item['ci_pod_list']][:5]}). Heavy runners {item['ci_heavy']}, minutes above 90% node CPU in 7d {item['cpu_saturated_minutes_7d']}, memory limit total/allocatable {item['memory_limit_overcommit']}\""
-  severity_default: high
+  severity_default: { small: low, medium: medium, large: high }
   symptom_linked: true
   why: >
     CI runners use every core during a build and hammer disk and network (a tenant with large bursts). On the same node as production, production p99 spikes at build time, and under memory pressure BestEffort/Burstable production pods get evicted.
@@ -20101,7 +19921,6 @@
   suggest: "Taint (workload-type=build:NoSchedule) and label the runner pool, and add nodeSelector + toleration to the AutoscalingRunnerSet template. On a small k3s cluster, set explicit runner requests to avoid BestEffort."
   verify:
     - "kubectl get pods -A -o wide --field-selector status.phase=Running | grep -E 'runner|prod-'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -20422,7 +20241,6 @@
   suggest: "Put a ResourceQuota (limits.memory) on dev namespaces, or split Karpenter pools (workload-type=dev taint) and send dev to a spot pool."
   verify:
     - "kubectl get pods -A -o wide | awk '$1 ~ /^(dev|prod)-/ {print $8, $1}' | sort | uniq -c"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -20716,7 +20534,7 @@
     warn_expr: "item['ci_templates'] > 0 and item['prod_present'] and item['separation_possible'] and len(item['ci_without_dedicated_pool']) > 0"
   target: "'cluster'"
   evidence: "f\"Runner templates with placement constraints {item['ci_constrained']} of {item['ci_templates']}, matching a tainted dedicated pool {item['ci_dedicated_pool']} (pools {item['ci_pool_names']}). Unconstrained: {item['ci_unconstrained']}, no dedicated pool: {item['ci_without_dedicated_pool']}. Tainted pools {item['pools_tainted']} of {item['pools']}\""
-  severity_default: high
+  severity_default: { small: low, medium: medium, large: high }
   symptom_linked: false
   why: >
     If runner placement is unconstrained, the scheduler puts runners on whichever production node has room (the cause of tenancy.ci-shares-prod-nodes). With only a nodeSelector and no taint on the pool, production pods land on the build nodes instead.
@@ -20725,7 +20543,6 @@
   suggest: "Taint (NoSchedule) and label the runner pool; nodeSelector + toleration in the runner template. Give the runner pool spot capacity and limits so a build storm does not become a bill."
   verify:
     - "kubectl get autoscalingrunnersets -A -o jsonpath='{.items[*].spec.template.spec.nodeSelector}' ; kubectl get nodepools -o jsonpath='{.items[*].spec.template.spec.taints}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -20828,7 +20645,6 @@
   suggest: "Raise requests to 50% or more of limits (narrow the Burstable gap) to bring overcommit below 1.5x. Block containers without limits with LimitRange defaults."
   verify:
     - "kubectl describe node <node> | sed -n '/Allocated resources/,/Events/p'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -21132,7 +20948,6 @@
   suggest: "ResourceQuota (limits.cpu) or a dedicated pool for the dominant namespace. Keep production Guaranteed (request = limit) so CFS guarantees its share."
   verify:
     - "topk(5, sum by (namespace) (rate(container_cpu_usage_seconds_total{node=\"<node>\",container!=\"\"}[5m])))"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -21436,7 +21251,6 @@
   suggest: "Put a ResourceQuota (limits.cpu) and container CPU limits on that namespace, or for batch workloads a PriorityClass lower than production. To identify the peak (which pod, what time), look up the time of max_over_time in Prometheus."
   verify:
     - "max_over_time(sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"<ns>\",container!=\"\"}[5m]))[7d:15m])"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "skip"
@@ -21683,7 +21497,7 @@
     warn_expr: "len(item['namespaces']) >= 2"
   target: "item['target']"
   evidence: "f\"Subject {item['subject']} has admin/edit/cluster-admin RoleBindings in namespaces {item['namespaces']} (prod {item['prod_count']}: {item['prod_namespaces']})\""
-  severity_default: high
+  severity_default: { small: low, medium: medium, large: high }
   symptom_linked: false
   why: >
     A tenant boundary is drawn with four things: namespace, NetworkPolicy, RBAC and NodePool. If one person or one ServiceAccount has edit in two clients' production namespaces, a credential leak on one side becomes the other client's incident.
@@ -21691,7 +21505,6 @@
   suggest: "Bind per-client groups (IAM roles, OIDC groups) to their namespace only. Keep shared operator permissions as per-namespace RoleBindings rather than a ClusterRole so they stay auditable."
   verify:
     - "kubectl get rolebindings -A -o json | jq -r '.items[] | select(.roleRef.name==\"admin\" or .roleRef.name==\"edit\") | \"\\(.metadata.namespace) \\(.subjects[]?.name)\"' | sort"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -21736,7 +21549,6 @@
   suggest: "Create one tenant namespace template (ResourceQuota + LimitRange + default-deny NetworkPolicy + PSA restricted/baseline label) and apply it to every prod-* namespace through an Argo CD ApplicationSet."
   verify:
     - "kubectl get ns <ns> -o jsonpath='{.metadata.labels}' ; kubectl get netpol,quota,limitrange -n <ns>"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -21935,7 +21747,6 @@
   suggest: "If there is a candidate node, put per-namespace CPU on that node (sum by (namespace) rate(...) {node=...}) and production ingress p95 on the same time axis and look for overlap. If they overlap, a limits.cpu quota or a dedicated pool for the dominant tenant."
   verify:
     - "sum by (namespace) (rate(container_cpu_usage_seconds_total{container!=\"\"}[5m]) * on (namespace, pod) group_left(node) kube_pod_info{node=\"<node>\"})"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "llm"
@@ -21962,7 +21773,6 @@
   suggest: "Read the reasons with `kubectl get pods -A --field-selector status.phase=Failed` and delete them. If evictions recur, look at that node's DiskPressure/MemoryPressure first (node and events sections)."
   verify:
     - "kubectl get pods -A --field-selector status.phase=Failed -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,REASON:.status.reason,AGE:.metadata.creationTimestamp"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -22032,7 +21842,6 @@
   suggest: "Set an ephemeral-storage request (e.g. 1Gi) and limit on production containers and a sizeLimit on emptyDirs. Enforce per namespace with LimitRange defaults."
   verify:
     - "kubectl get pods -A -o json | jq '[.items[].spec.containers[] | select(.resources.requests[\"ephemeral-storage\"] == null)] | length'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -22070,7 +21879,7 @@
     warn_expr: "(item['share'] or 0) >= 0.4 and item['prod_total'] >= 10 and item['nodes_total'] >= 3"
   target: "item['node']"
   evidence: "f\"Node {item['node']} (pool {item['pool']}, {item['capacity_type']}) holds prod pods {item['prod_pods']}/{item['prod_total']} ({item['share']}), {item['workload_count']} workloads: {item['prod_workloads'][:10]}. Nodes {item['nodes_total']}, autoscaler {item['autoscaler']}\""
-  severity_default: high
+  severity_default: { small: medium, medium: high, large: high }
   symptom_linked: true
   why: >
     When most production pods sit on one node, losing that node stops several services at once; on spot, a single reclaim is enough.
@@ -22083,7 +21892,6 @@
   suggest: "Make topologySpreadConstraints (topologyKey hostname, maxSkew 1, ScheduleAnyway) the default in production namespaces, or steer the Karpenter pool toward several smaller instances (instance-size limits). On spot pools, together with PDBs."
   verify:
     - "kubectl get pods -A -o wide --field-selector status.phase=Running | awk '$1 ~ /prod/ {print $8}' | sort | uniq -c | sort -rn"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -22280,7 +22088,6 @@
   suggest: "Lengthen the interval or split the work. If Allow, switch to Forbid or Replace and set activeDeadlineSeconds."
   verify:
     - "kubectl get jobs -n <ns> -l <cronjob label> -o custom-columns=NAME:.metadata.name,START:.status.startTime,END:.status.completionTime"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -22490,7 +22297,6 @@
   suggest: "Give DB container liveness a generous timeoutSeconds 5-10 and failureThreshold 6, or drop liveness and keep only readiness. In Bitnami charts this is livenessProbe.timeoutSeconds."
   verify:
     - "kubectl get statefulset -n <ns> <name> -o jsonpath='{.spec.template.spec.containers[*].livenessProbe}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -22619,7 +22425,6 @@
   suggest: "After the dump, send a copy off the node (S3, B2, NAS) with `rclone copy`, `aws s3 cp` or restic. At minimum put the dump PVC on a different node (nodeSelector) and rehearse a restore once."
   verify:
     - "kubectl get cronjob -n <ns> <name> -o yaml | grep -A3 -E 'command|args|persistentVolumeClaim' ; kubectl get pv -o custom-columns=PV:.metadata.name,CLAIM:.spec.claimRef.name,NODE:.spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[0].values[0]"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -22800,7 +22605,6 @@
   suggest: "A dump CronJob (pg_dump, mysqldump) per DB plus an off-node copy. On EKS an EBS snapshot policy (DLM) or Velero can replace it — then suppress this warning."
   verify:
     - "kubectl get cronjobs -A | grep -iE 'backup|dump|snapshot'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -22882,7 +22686,6 @@
   suggest: "Move to a Secret and mount via envFrom secretRef or a volume. Pull hardcoded values out of scripts into env sourced from the Secret. Rotate anything already exposed."
   verify:
     - "kubectl get configmap -n <ns> <name> -o jsonpath='{.data}' | grep -oiE '(password|secret|token|api_key)[^,]{0,20}' | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -22938,7 +22741,7 @@
   suggest: "Split a production group from a dev/internal-tools group (2 ALBs). Within a group, set group.order explicitly and always put a host on dev ingresses."
   verify:
     - "kubectl get ingress -A -o json | jq -r '.items[] | \"\\(.metadata.annotations[\"alb.ingress.kubernetes.io/group.name\"]) \\(.metadata.namespace)/\\(.metadata.name)\"' | sort"
-  profiles: [prod]
+  platforms: [eks, other]
   test:
     cases:
       - expect: "fail"
@@ -23149,7 +22952,6 @@
   suggest: "Disable docker on the node (systemctl disable --now docker), or if it is really needed, put /var/lib/docker on a separate filesystem and turn off docker's iptables (\"iptables\": false)."
   verify:
     - "systemctl is-active docker containerd k3s k3s-agent ; du -sh /var/lib/docker"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -23230,7 +23032,6 @@
   suggest: "Move the paths that container writes to into an emptyDir (sizeLimit) or a PVC, and send logs to stdout. Enabling readOnlyRootFilesystem prevents it from now on."
   verify:
     - "crictl stats -a -o json | jq -r '.stats[] | [.writableLayer.usedBytes.value, .attributes.labels[\"io.kubernetes.pod.namespace\"], .attributes.labels[\"io.kubernetes.pod.name\"]] | @tsv' | sort -rn | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -23350,7 +23151,6 @@
   verify:
     - "ssh <node> sudo crictl images | sort -k4 -h -r | head"
     - "kubectl get events -A --field-selector reason=Pulled | grep -o 'in [0-9.]*[ms]*s' | sort -h | tail"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -23394,7 +23194,6 @@
   verify:
     - "kubectl get nodes -L <label key>"
     - "kubectl get nodepools -o jsonpath='{.items[*].spec.template.metadata.labels}'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -23469,7 +23268,6 @@
     - "curl -s -H 'Authorization: Bearer $TOKEN' $GRAFANA/api/search?type=dash-db | jq length"
     - "curl -s -H 'Authorization: Bearer $TOKEN' $GRAFANA/api/dashboards/uid/<uid> | jq '[.dashboard.panels[].targets[].expr]'"
   notes: Not yet verified on a real cluster (grafana_api_token was unset).
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -23514,7 +23312,6 @@
   verify:
     - "kubectl get servicemonitor,podmonitor -A | grep -i -E 'ingress|traefik'"
     - "PromQL: sum(rate(nginx_ingress_controller_requests[5m])) by (ingress)"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"

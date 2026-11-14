@@ -21,7 +21,6 @@
   suggest: "Raise the limit to 1GiB or more, lower querier.max_concurrent, and set limits_config.max_query_series and max_entries_limit. Narrow query ranges and move long ranges to recording rules (ruler)."
   verify:
     - "kubectl -n monitoring top pod loki-stack-0 --containers"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -139,7 +138,6 @@
   suggest: "Break loki_request_duration_seconds_count{status_code=~\"5..\"} down by route. 5xx on series/query_range points to memory (loki.memory-pressure) and limits_config."
   verify:
     - "kubectl -n monitoring port-forward svc/loki-stack 3100 & curl -s localhost:3100/metrics | grep -E 'loki_request_duration_seconds_count.*status_code=\"5|loki_panic_total'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -317,7 +315,6 @@
   suggest: "Migrate to the grafana/loki chart (SingleBinary mode) and set up 3.x, the tsdb index and retention in one go. Keep the existing boltdb-shipper data as a separate period in schema_config."
   verify:
     - "curl -s localhost:3100/loki/api/v1/status/buildinfo"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -401,7 +398,6 @@
   suggest: "Check the loki pod status and collect again. Enable a ServiceMonitor so Prometheus scrapes Loki."
   verify:
     - "kubectl -n monitoring port-forward svc/loki-stack 3100 & curl -s localhost:3100/metrics | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"

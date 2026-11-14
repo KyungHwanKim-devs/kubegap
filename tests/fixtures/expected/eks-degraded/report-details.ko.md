@@ -6,8 +6,8 @@
 |---|---|
 | kube context / 클러스터 | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
 | 실행 시각 / 모드 | 2026-11-07T10:33:37+09:00 / full (수집 300.7초, 모드 때문에 건너뛴 단계 0개, 실패 40개) |
-| 프로파일 | `prod` (detected) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.87 / 1.1.0 |
+| 운영 규모 | `medium` (묻지 못해 노드 수로 짐작) |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.88 / 1.1.0 |
 | 검증한 버전 범위 | Kubernetes v1.32.13-eks-577a51e (검증 범위 안 1.30 ~ 1.37) · Loki 2.6.1 (검증 범위 안 2.6 ~ 3.7) · Grafana 10.2.3 (검증 범위 안 10.2 ~ 13.3) |
 | 노드 / 네임스페이스 / 파드 / CRD | 9 (Ready 9) / 26 / 154 / 47 |
 | 컴포넌트 (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
@@ -20,13 +20,13 @@
 
 | 심각도(기본값) | fail | warn | 같은 모드의 지난 점검 대비 |
 |---|---|---|---|
-| critical | 1 | 3 | 같은 모드의 지난 점검 없음 |
-| high | 16 | 8 | 같은 모드의 지난 점검 없음 |
-| medium | 84 | 127 | 같은 모드의 지난 점검 없음 |
+| critical | 1 | 0 | 같은 모드의 지난 점검 없음 |
+| high | 15 | 11 | 같은 모드의 지난 점검 없음 |
+| medium | 85 | 127 | 같은 모드의 지난 점검 없음 |
 | low | 15 | 113 | 같은 모드의 지난 점검 없음 |
-| info | 2 | 0 | 같은 모드의 지난 점검 없음 |
+| info | 1 | 0 | 같은 모드의 지난 점검 없음 |
 
-점검 항목 367개 중 판정 231개, 프로파일에서 끈 것 2개, 건너뜀 132개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개예요. 숨긴 항목은 0개예요.
+점검 항목 367개 중 판정 230개, 이 플랫폼이나 규모에서는 안 보는 것 3개, 건너뜀 132개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개예요. 숨긴 항목은 0개예요.
 
 ### 1-1. 자동 판정과 최종 판정이 다른 곳
 
@@ -45,7 +45,6 @@
 | `karpenter.ec2nodeclass-al2.cluster` | high |  | EC2NodeClass 1 total, amiFamily AL2 ['default'], AMI families ['AL2'], AMI not pinned (auto-tracks latest) ['default'] |
 | `observability.failure-mode-uncovered.OOMKill` | high |  | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
 | `observability.loki-oomkilled.cluster` | high |  | Loki pods [('loki-stack-0', 1, 'OOMKilled', '2026-10-25T00:15:41Z')]. Storage {'tmp': 'emptyDir', 'config': 'secret', 'storage': 'emptyDir'}, memory RSS 289MB |
-| `observability.no-event-retention.cluster` | high |  | no component of family event-retention in inventory.components |
 | `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | high |  | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
 | `observability.stack-storage-emptydir.monitoring/loki-stack` | high |  | emptyDir volumes: tmp, storage, replicas 1 |
 | `platform.k8s-version-eol.cluster` | high |  | server v1.32.13-eks-577a51e: upstream end of life 2026-02-28, 252 days past |
@@ -77,12 +76,11 @@
 | 항목 | 상태 | 심각도 | 필요한 이유 | 제안 |
 |---|---|---|---|---|
 | `resilience.no-backup.cluster` | fail | critical | There is no way to recover cluster state (objects) and PV data. Deleting a namespace by mistake or a broken etcd or PV is the end. A CronJob dump without a tool is often "a backup kept on the same … | Velero (plus EBS snapshots or PV backup). On EKS at least a DLM snapshot policy. In a small k3s cluster, k3s etcd-snapshot or a state.db copy plus PV directory backup. Test a restore; a dump that was … |
-| `observability.no-slo.cluster` | warn | critical | Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first. | Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress. |
-| `observability.no-event-retention.cluster` | fail | high | Kubernetes events are kept for only one hour by default. FailedScheduling, OOMKilling and Unhealthy from the night are gone by morning. The most undervalued material is lost. | Ship events to Loki or Elasticsearch with kubernetes-event-exporter. Alternatively, the promtail/alloy event source if Loki exists, or `[INPUT] kubernetes_events` with fluent-bit (detection … |
+| `observability.no-slo.cluster` | warn | high | Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first. | Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress. |
+| `observability.no-event-retention.cluster` | fail | medium | Kubernetes events are kept for only one hour by default. FailedScheduling, OOMKilling and Unhealthy from the night are gone by morning. The most undervalued material is lost. | Ship events to Loki or Elasticsearch with kubernetes-event-exporter. Alternatively, the promtail/alloy event source if Loki exists, or `[INPUT] kubernetes_events` with fluent-bit (detection … |
 | `security.no-certificate-manager.cluster` | fail | medium | When TLS certificate renewal is manual, services keep going down from expiry. cert-manager (or ACM plus ALB on EKS) automates renewal. On EKS, ALBs using ACM certificates work without cert-manager … | Install cert-manager, or if ACM is in use, suppress this check in config.yaml with a reason. |
-| `hygiene.no-progressive-delivery.cluster` | fail | info | A rolling update is "replace everything", so a defect in the new version reaches all traffic immediately. Without a canary tool (some traffic -> check metrics -> expand), deployment verification … | As services grow, automate canary judgment with Argo Rollouts (same ecosystem as Argo CD) + AnalysisTemplate (ALB 5xx, p95 Prometheus queries). |
 
-있어야 하는데 없는 도구 종류: backup, event-retention, slo, certificates, progressive-delivery.
+있어야 하는데 없는 도구 종류: backup, certificates, event-retention, slo.
 
 ## 6. 숨긴 항목, 도구 없음, 수집 안 함
 
@@ -137,7 +135,7 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
 
 ### 7-2. 판정한 점검 항목
 
-점검 항목 367개: disabled 2, done 231, llm 2, skip 132. 불러오기 오류: 없음.
+점검 항목 367개: disabled 3, done 230, llm 2, skip 132. 불러오기 오류: 없음.
 
 ### 7-3. 로그 시그니처 일치와 분류 안 된 오류
 
@@ -169,14 +167,10 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
 | id | 상태 | 기본 심각도 | 근거 |
 |---|---|---|---|
 | `resilience.no-backup.cluster` | fail | critical | no backup tool (family backup). Alternative signals: etcd snapshots 0, backup-like CronJobs that ran in the last 7 days [], VolumeSnapshots 0. If signals exist, the LLM checks whether copies leave the node |
-| `observability.no-slo.cluster` | warn | critical | no SLO tool. Signals: sli/slo recording rules [], burn rate alerts [], slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'] known issue #15 |
-| `observability.no-symptom-alerts.cluster` | warn | critical | 157 alert rules: symptom 0, cause 130, app metrics (assumed symptom) 22. Symptom ratio 0.0. Symptom rules: [] |
-| `resilience.n-plus-one.cluster` | warn | critical | Allocatable without the largest node ip-10-0-1-139.ap-northeast-2.compute.internal (3.92 cores, 29.8GB): CPU 15.45 cores vs total requests 11.51 (OK), memory 46.3GB vs 45.7GB (OK). Pods on that node 34 (prod 23). Pods that fit on no other node []. Pools short of room: 32 pods limited to … |
 | `eks.public-endpoint-open.cluster` | fail | high | public True, private True, allowed CIDRs ['0.0.0.0/0'] |
 | `karpenter.ec2nodeclass-al2.cluster` | fail | high | EC2NodeClass 1 total, amiFamily AL2 ['default'], AMI families ['AL2'], AMI not pinned (auto-tracks latest) ['default'] |
 | `observability.failure-mode-uncovered.OOMKill` | fail | high | user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode |
 | `observability.loki-oomkilled.cluster` | fail | high | Loki pods [('loki-stack-0', 1, 'OOMKilled', '2026-10-25T00:15:41Z')]. Storage {'tmp': 'emptyDir', 'config': 'secret', 'storage': 'emptyDir'}, memory RSS 289MB |
-| `observability.no-event-retention.cluster` | fail | high | no component of family event-retention in inventory.components |
 | `observability.stack-storage-emptydir.monitoring/alertmanager-kube-prometheus-stack-alertmanager` | fail | high | emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1 |
 | `observability.stack-storage-emptydir.monitoring/loki-stack` | fail | high | emptyDir volumes: tmp, storage, replicas 1 |
 | `platform.k8s-version-eol.cluster` | fail | high | server v1.32.13-eks-577a51e: upstream end of life 2026-02-28, 252 days past |
@@ -193,7 +187,10 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
 | `logs.signatures.karpenter.version-unsupported` | warn | high | 1 occurrences (2026-11-06T08:49:38Z ~ 2026-11-06T08:49:38Z), thresholds warn 1/fail 10. Files: ['logs/pods/karpenter/karpenter_karpenter.log']. Samples: ['[pod/karpenter-9769889bd-pkxd2/controller] 2026-11-06T08:49:38.045274596Z … |
 | `observability.failure-mode-uncovered.Scheduling failure` | warn | high | user symptom: new pods do not start. No alert rule covers this failure mode |
 | `observability.failure-mode-uncovered.VPC CNI IP exhaustion` | warn | high | user symptom: pods Pending without network. No alert rule covers this failure mode |
+| `observability.no-slo.cluster` | warn | high | no SLO tool. Signals: sli/slo recording rules [], burn rate alerts [], slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'] known issue #15 |
+| `observability.no-symptom-alerts.cluster` | warn | high | 157 alert rules: symptom 0, cause 130, app metrics (assumed symptom) 22. Symptom ratio 0.0. Symptom rules: [] |
 | `prometheus.memory-pressure.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus` | warn | high | working set / limit None (limit 1536Mi), active series None, Prometheus container last terminated OOMKilled True (2026-11-05T08:21:29Z), restarts 2, OOMKilled containers in the monitoring namespace [], restarts over 7 days {} |
+| `resilience.n-plus-one.cluster` | warn | high | Allocatable without the largest node ip-10-0-1-139.ap-northeast-2.compute.internal (3.92 cores, 29.8GB): CPU 15.45 cores vs total requests 11.51 (OK), memory 46.3GB vs 45.7GB (OK). Pods on that node 34 (prod 23). Pods that fit on no other node []. Pools short of room: 32 pods limited to … |
 | `resilience.replicas-same-node.prod-app-x/deployment/app-x-api` | warn | high | replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-137.ap-northeast-2.compute.internal': 1}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
 | `resilience.restarts-crashloop.argocd/argocd-application-controller-0:application-controller` | warn | high | 42 restarts, state Running, last termination OOMKilled (exit 137) 2026-10-30T09:00:04Z, cause class OOM (memory limit), Unhealthy events 0, node reboot time None |
 | `argocd.default-project-wildcard.cluster` | fail | medium | AppProjects 1, projects whose sourceRepos and destinations are all * ['default'], apps bound to the default project 13/13 (prod 9) |
@@ -205,6 +202,7 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
 | `hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/tts-proxy` | fail | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'memoryLimitsMissing', 'memoryRequestsMissing']. Security-category danger ['dangerousCapabilities', 'privilegeEscalationAllowed' … |
 | `observability.log-coverage-gap.cluster` | fail | medium | Of 147 pods Running for over 1h, 83 are absent from Loki pod labels (ratio 0.565). Nodes with every pod missing: []. By namespace: {'kube-system': 23, 'monitoring': 22, 'prod-app-z-backend': 5, 'keda': 3, 'middleware': 3, 'prod-app-t': 3, 'prod-app-s': 3, 'argocd': 2, 'dev-app-s': 2, 'dev-app-y' … |
 | `observability.loki-retention-unbounded.cluster` | fail | medium | Loki 2.6.1, retention_period 31d, retention_enabled false |
+| `observability.no-event-retention.cluster` | fail | medium | no component of family event-retention in inventory.components |
 | `operators.unhealthy-condition.externalsecrets/database/mysql-app-v-secret` | fail | medium | Ready=False (SecretSyncedError) for 7795.6 hours: could not get secret data from provider |
 | `resilience.db-probe-timeout.prod-app-s/statefulset/app-s-backend-mysql:mysql` | fail | medium | prod-app-s/statefulset/app-s-backend-mysql container mysql: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe present |
 | `resilience.db-probe-timeout.prod-app-v/statefulset/app-v-backend-prod-mysql:mysql` | fail | medium | prod-app-v/statefulset/app-v-backend-prod-mysql container mysql: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe present |
@@ -536,77 +534,9 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-60.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-60.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): prod pods 2 (['prod-app-s', 'prod-app-v']) together with dev pods 2 (['dev-app-s', 'dev-app-v']). Memory limit total/allocatable 1.49, CPU limit total/allocatable 2.44, containers without a memory limit … |
 | `vpccni.metrics-unreadable.cluster` | warn | low | 9 of 9 nodes without readable ipamd metrics (localhost:61678): ['ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-1-137.ap-northeast-2.compute.internal', 'ip-10-0-1-139.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal' … |
 | `eks.audit-log-off.cluster` | fail | info | enabled logs ['api', 'authenticator', 'controllerManager', 'scheduler'], disabled logs ['audit'] |
-| `hygiene.no-progressive-delivery.cluster` | fail | info | No progressive-delivery component (Argo Rollouts, Flagger). All deployments are rolling updates (replace everything) -- ALB weighted target groups are not used either |
 
 표의 근거는 칸에 맞게 줄였어요. 판정에 쓴 자료 전체는 아래에 항목별로 접혀 있고, `findings-draft.json`의 `details`와 같아요.
 
-<details><summary><code>observability.no-symptom-alerts.cluster</code></summary>
-
-```json
-{
- "alerting": 157,
- "by_class": {
-  "app-cause": 5,
-  "app": 22,
-  "cause": 130
- },
- "symptom_ratio": 0.0,
- "symptom_rules": []
-}
-```
-
-</details>
-<details><summary><code>resilience.n-plus-one.cluster</code></summary>
-
-```json
-{
- "allocatable_cpu_without_largest": 15.45,
- "allocatable_memory_gb_without_largest": 46.3,
- "autoscaler": true,
- "autoscaler_name": "karpenter",
- "available": true,
- "cannot_fit_elsewhere": [],
- "cpu_ok": true,
- "karpenter": true,
- "largest_node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
- "largest_node_cpu": 3.92,
- "largest_node_memory_gb": 29.8,
- "memory_ok": true,
- "ok": false,
- "pods_on_largest_node": 34,
- "pools_short": [
-  {
-   "eligible_nodes": [
-    "ip-10-0-1-137.ap-northeast-2.compute.internal",
-    "ip-10-0-1-245.ap-northeast-2.compute.internal",
-    "ip-10-0-2-100.ap-northeast-2.compute.internal"
-   ],
-   "pods": 32,
-   "needed_cpu": 2.79,
-   "free_cpu": 2.62,
-   "needed_memory_gb": 14.81,
-   "free_memory_gb": 11.64
-  },
-  {
-   "eligible_nodes": [
-    "ip-10-0-1-137.ap-northeast-2.compute.internal",
-    "ip-10-0-1-245.ap-northeast-2.compute.internal"
-   ],
-   "pods": 1,
-   "needed_cpu": 0.5,
-   "free_cpu": 0.28,
-   "needed_memory_gb": 4.0,
-   "free_memory_gb": 8.39
-  }
- ],
- "prod_pods_on_largest_node": 23,
- "requests_cpu_total": 11.51,
- "requests_memory_gb_total": 45.7,
- "tight": false
-}
-```
-
-</details>
 <details><summary><code>karpenter.ec2nodeclass-al2.cluster</code></summary>
 
 ```json
@@ -957,6 +887,22 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
 ```
 
 </details>
+<details><summary><code>observability.no-symptom-alerts.cluster</code></summary>
+
+```json
+{
+ "alerting": 157,
+ "by_class": {
+  "app-cause": 5,
+  "app": 22,
+  "cause": 130
+ },
+ "symptom_ratio": 0.0,
+ "symptom_rules": []
+}
+```
+
+</details>
 <details><summary><code>prometheus.memory-pressure.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus</code></summary>
 
 ```json
@@ -971,6 +917,57 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
  "restarts": 2,
  "rss_vs_limit": null,
  "target": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus"
+}
+```
+
+</details>
+<details><summary><code>resilience.n-plus-one.cluster</code></summary>
+
+```json
+{
+ "allocatable_cpu_without_largest": 15.45,
+ "allocatable_memory_gb_without_largest": 46.3,
+ "autoscaler": true,
+ "autoscaler_name": "karpenter",
+ "available": true,
+ "cannot_fit_elsewhere": [],
+ "cpu_ok": true,
+ "karpenter": true,
+ "largest_node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+ "largest_node_cpu": 3.92,
+ "largest_node_memory_gb": 29.8,
+ "memory_ok": true,
+ "ok": false,
+ "pods_on_largest_node": 34,
+ "pools_short": [
+  {
+   "eligible_nodes": [
+    "ip-10-0-1-137.ap-northeast-2.compute.internal",
+    "ip-10-0-1-245.ap-northeast-2.compute.internal",
+    "ip-10-0-2-100.ap-northeast-2.compute.internal"
+   ],
+   "pods": 32,
+   "needed_cpu": 2.79,
+   "free_cpu": 2.62,
+   "needed_memory_gb": 14.81,
+   "free_memory_gb": 11.64
+  },
+  {
+   "eligible_nodes": [
+    "ip-10-0-1-137.ap-northeast-2.compute.internal",
+    "ip-10-0-1-245.ap-northeast-2.compute.internal"
+   ],
+   "pods": 1,
+   "needed_cpu": 0.5,
+   "free_cpu": 0.28,
+   "needed_memory_gb": 4.0,
+   "free_memory_gb": 8.39
+  }
+ ],
+ "prod_pods_on_largest_node": 23,
+ "requests_cpu_total": 11.51,
+ "requests_memory_gb_total": 45.7,
+ "tight": false
 }
 ```
 

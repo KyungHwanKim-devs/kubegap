@@ -36,7 +36,7 @@ def test_context_db_like_uses_statefulset_pvc(tmp_path):
         }
     ]
     (tmp_path / "objects" / "pods.json").write_text(json.dumps({"items": pods}))
-    cx = Context(tmp_path, {}, {}, {"name": "prod"})
+    cx = Context(tmp_path, {}, {}, "large")
     assert cx.db_like({"namespace": "p", "pod": "ledger-0", "container": "store"})
 
 
@@ -92,7 +92,7 @@ def test_backup_signals_count_only_live_cronjobs(tmp_path):
         {"metadata": {"namespace": "p", "name": "web"}, "spec": {}, "status": {}},
     ]
     _write(tmp_path, "cronjobs", crons)
-    cx = Context(tmp_path, {}, {}, {"name": "prod"})
+    cx = Context(tmp_path, {}, {}, "large")
     sig = cx.backup_signals()
     assert sig["backup_cronjobs"] == ["p/pg-backup", "p/new-backup"]
     assert sig["stale_backup_cronjobs"] == ["p/mysql-dump (suspended)", "p/neo-snapshot (last success 90 days ago)"]

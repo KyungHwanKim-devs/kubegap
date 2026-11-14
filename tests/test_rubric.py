@@ -1,4 +1,4 @@
-"""lib/foundations/rubric.py: threshold resolution, profile loading and check validation. Uses the real rubric/profiles folder (repo-local, no cluster)."""
+"""lib/foundations/rubric.py: severity, threshold and enablement by platform and scale, and check validation. Uses the real rubric folder (repo-local, no cluster)."""
 
 import pytest
 
@@ -6,7 +6,7 @@ from lib.foundations import rubric
 
 
 def check(**over):
-    base = {"id": "area.check", "name": "n", "area": "area", "type": "metric", "severity_default": "high", "why": "w", "profiles": ["eks"], "rule": {"expr": "v > t"}}
+    base = {"id": "area.check", "name": "n", "area": "area", "type": "metric", "severity_default": "high", "why": "w", "rule": {"expr": "v > t"}}
     base.update(over)
     return base
 
@@ -15,53 +15,61 @@ def check(**over):
 
 
 def test_threshold_scalar_is_used_as_is():
-    out = rubric.resolve_thresholds(check(rule={"expr": "x", "threshold": 0.8, "warn_threshold": 0.6}), {"name": "prod"}, {})
+    out = rubric.resolve_thresholds(check(rule={"expr": "x", "threshold": 0.8, "warn_threshold": 0.6}), "eks", "large", {})
     assert out == {"threshold": 0.8, "warn_threshold": 0.6}
 
 
-def test_threshold_per_profile_override():
-    c = check(rule={"expr": "x", "threshold": {"default": 5, "prod": 10, "lab": 2}})
-    assert rubric.resolve_thresholds(c, {"name": "lab"}, {})["threshold"] == 2
-    assert rubric.resolve_thresholds(c, {"name": "prod"}, {})["threshold"] == 10
-    assert rubric.resolve_thresholds(c, {"name": "dev"}, {})["threshold"] == 5  # not listed: default
+def test_threshold_per_platform_and_scale_with_scale_winning():
+    c = check(rule={"expr": "x", "threshold": {"default": 5, "k3s": 2, "large": 10}})
+    assert rubric.resolve_thresholds(c, "k3s", "small", {})["threshold"] == 2
+    assert rubric.resolve_thresholds(c, "rke2", "small", {})["threshold"] == 2  # RKE2 reads the k3s facts
+    assert rubric.resolve_thresholds(c, "eks", "medium", {})["threshold"] == 5  # neither listed: default
+    assert rubric.resolve_thresholds(c, "k3s", "large", {})["threshold"] == 10  # the scale's value wins over the platform's
 
 
-def test_threshold_falls_back_to_base_profile():
-    # small-prod declares base: eks, so a check that only knows eks and small k3s cluster resolves to the eks value.
-    c = check(rule={"expr": "x", "threshold": {"default": 1, "prod": 10, "lab": 2}})
-    prof = rubric.load_profile("small-prod")
-    assert prof.get("base") == "prod"
-    assert rubric.resolve_thresholds(c, prof, {})["threshold"] == 10
-
-
-def test_profile_file_thresholds_beat_rule_and_config_beats_profile():
-    c = check(rule={"expr": "x", "threshold": {"default": 1, "prod": 10}, "warn_threshold": 0.5})
-    prof = {"name": "prod", "thresholds": {"area.check": {"fail": 20, "warn": 0.7}}}
-    assert rubric.resolve_thresholds(c, prof, {}) == {"threshold": 20, "warn_threshold": 0.7}
-    cfg = {"area.check": {"threshold": 30}}
-    assert rubric.resolve_thresholds(c, prof, cfg) == {"threshold": 30, "warn_threshold": 0.7}
-    assert rubric.resolve_thresholds(c, prof, {"area.check": {"warn_threshold": 0.9}})["warn_threshold"] == 0.9
+def test_config_overrides_beat_the_rule():
+    c = check(rule={"expr": "x", "threshold": {"default": 1, "k3s": 10}, "warn_threshold": 0.5})
+    assert rubric.resolve_thresholds(c, "k3s", "small", {"area.check": {"threshold": 30}}) == {"threshold": 30, "warn_threshold": 0.5}
+    assert rubric.resolve_thresholds(c, "k3s", "small", {"area.check": {"warn_threshold": 0.9}})["warn_threshold"] == 0.9
 
 
 def test_missing_threshold_is_none():
-    assert rubric.resolve_thresholds(check(), {"name": "prod"}, None) == {"threshold": None, "warn_threshold": None}
+    assert rubric.resolve_thresholds(check(), "eks", "large", None) == {"threshold": None, "warn_threshold": None}
 
 
-# ---------- load_profile ----------
+# ---------- platform and scale ----------
 
 
-def test_load_profile_missing_returns_marker_with_empty_defaults():
-    p = rubric.load_profile("no-such-profile")
-    assert p["missing"] is True
-    assert p["name"] == "no-such-profile"
-    assert p["disabled_checks"] == [] and p["thresholds"] == {} and p["exclude"] == {}
+def test_platform_family_and_file():
+    assert [rubric.platform_family(p) for p in ("eks", "k3s", "rke2", "gke", "aks", "unknown", None)] == ["eks", "k3s", "k3s", "other", "other", "other", "other"]
+    for name in ("eks", "k3s", "gke"):
+        p = rubric.load_platform(name)
+        assert p["name"] == rubric.platform_family(name) and isinstance(p["exclude"], dict) and isinstance(p["families_not_expected"], list)
 
 
-def test_load_profile_existing_has_defaults_filled():
-    p = rubric.load_profile("prod")
-    assert p["name"] == "prod"
-    assert "missing" not in p
-    assert isinstance(p["disabled_checks"], list) and isinstance(p["thresholds"], dict) and isinstance(p["exclude"], dict)
+def test_expected_families_grow_with_scale_and_a_platform_takes_some_out():
+    k3s, eks = rubric.load_platform("k3s"), rubric.load_platform("eks")
+    small, medium, large = (set(rubric.expected_families(s, eks)) for s in rubric.SCALES)
+    assert small < medium < large
+    assert "slo" not in small and "slo" in medium and "progressive-delivery" in large - medium
+    assert "node-autoscaler" in medium and "node-autoscaler" not in rubric.expected_families("large", k3s)  # a fixed node count has nothing to scale
+
+
+def test_severity_and_gates_per_scale():
+    c = check(severity_default={"small": "low", "medium": "high", "large": "critical"})
+    assert [rubric.severity_for(c, s) for s in rubric.SCALES] == ["low", "high", "critical"]
+    assert rubric.severity_for(check(), "small") == "high"
+    assert rubric.applies(check(), "k3s", "small") is None
+    assert "platform k3s" in rubric.applies(check(platforms=["eks", "other"]), "k3s", "large")
+    assert rubric.applies(check(platforms=["k3s"]), "rke2", "small") is None
+    assert "scale small" in rubric.applies(check(scales=["medium", "large"]), "eks", "small")
+
+
+def test_every_check_of_the_catalog_has_a_level_at_every_scale():
+    for c in rubric.catalog():
+        for s in rubric.SCALES:
+            assert rubric.severity_for(c, s) in rubric.SEVERITIES, c["id"]
+        assert "profiles" not in c, c["id"]
 
 
 # ---------- validate ----------
@@ -74,11 +82,15 @@ def test_validate_accepts_a_complete_check():
 def test_validate_reports_missing_required_fields_and_bad_enums():
     errs = rubric.validate({"id": "nodots", "type": "bogus", "severity_default": "urgent"}, "src")
     joined = "\n".join(errs)
-    for k in ("name", "area", "why", "profiles"):
+    for k in ("name", "area", "why"):
         assert f"is missing {k}" in joined
     assert "type 'bogus'" in joined
     assert "severity_default 'urgent'" in joined
     assert "must have the form <area>.<check-id>" in joined
+    assert any("per scale" in e for e in rubric.validate(check(severity_default={"small": "low", "large": "high"}), "src"))
+    assert any("platforms must be" in e for e in rubric.validate(check(platforms=["lab"]), "src"))
+    assert any("scales must be" in e for e in rubric.validate(check(scales=[]), "src"))
+    assert any("`profiles`" in e for e in rubric.validate(check(profiles=["prod"]), "src"))
 
 
 def test_validate_requires_expr_for_metric_but_not_for_absence_or_llm():

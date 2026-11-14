@@ -8,11 +8,11 @@ import threading
 from pathlib import Path
 
 from lib.collection import prom
-from lib.foundations import metricnames, rubric
+from lib.foundations import metricnames
 from lib.judgement import evaluate
 
 ROOT = Path(__file__).resolve().parent.parent
-INV = {"cluster": {"platform": "k3s"}, "namespaces": {"prod_like": []}, "profile": {"name": "lab"}, "nodes": {"nodes": []}}
+INV = {"cluster": {"platform": "k3s"}, "namespaces": {"prod_like": []}, "scale": {"name": "small", "source": "guessed"}, "nodes": {"nodes": []}}
 
 
 def _snap(tmp_path, metric: dict | None, present: dict | None):
@@ -22,7 +22,7 @@ def _snap(tmp_path, metric: dict | None, present: dict | None):
         (tmp_path / "metrics" / "q.json").write_text(json.dumps(metric))
     if present is not None:
         (tmp_path / "metrics" / "series-present.json").write_text(json.dumps({"names": present}))
-    return evaluate.Context(tmp_path, INV, {}, rubric.load_profile("lab"))
+    return evaluate.Context(tmp_path, INV, {}, "small")
 
 
 def _check(**kw):
@@ -84,7 +84,7 @@ def test_a_joined_query_with_nothing_to_join_asks_the_same_question(tmp_path, mo
     for qid in ("q", "r"):
         (tmp_path / "metrics" / f"{qid}.json").write_text(json.dumps(EMPTY))
     (tmp_path / "metrics" / "series-present.json").write_text(json.dumps({"names": {"kube_pod_info": 0, "up": 3}}))
-    cx = evaluate.Context(tmp_path, INV, {}, rubric.load_profile("lab"))
+    cx = evaluate.Context(tmp_path, INV, {}, "small")
     r = evaluate.evaluate_check(_check(inputs=["q", "r"], join_on="pod", rule={"expr": "v.get('q', 0) > 0"}), cx, {})
     assert r["status"] == "skip" and "`kube_pod_info`" in r["reason"]
 

@@ -20,7 +20,7 @@
   suggest: "alertmanager.alertmanagerSpec.replicas: 3 (the operator configures cluster peers automatically) + storage.volumeClaimTemplate."
   verify:
     - "kubectl -n monitoring get alertmanager -o jsonpath='{.items[*].spec.replicas}'"
-  profiles: [prod]
+  scales: [medium, large]
   test:
     cases:
       - expect: "warn"
@@ -107,7 +107,6 @@
   suggest: "kubectl -n monitoring logs alertmanager-... -c alertmanager | grep -i 'error loading config'. Check the AlertmanagerConfig CR status and the operator logs."
   verify:
     - "curl -s localhost:9093/api/v2/status | jq '.config.original' | head"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"
@@ -224,7 +223,6 @@
   suggest: "Delete unused receivers or attach a route. Start inhibits with the severity hierarchy (critical → warning|info, same namespace and alertname)."
   verify:
     - "curl -s localhost:9093/api/v2/status | jq -r '.config.original' | grep -A2 'receiver:'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "warn"
@@ -374,7 +372,6 @@
   suggest: "Review the route tree and the default receiver (core observability.alertmanager-default-null). Use amtool config routes test --config.file=... to check where sample labels end up."
   verify:
     - "curl -s localhost:9093/api/v2/alerts | jq '[.[] | .receivers[].name] | group_by(.) | map({(.[0]): length}) | add'"
-  profiles: [prod, lab]
   test:
     cases:
       - expect: "fail"

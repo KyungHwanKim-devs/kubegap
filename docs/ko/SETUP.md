@@ -30,6 +30,7 @@ kubegap은 자격 증명을 따로 저장하지 않습니다. kubeconfig, AWS CL
 
 | 질문 | 묻는 때 | 선택지 |
 |---|---|---|
+| `scale` | 설정에 `scale`이 없고 이 클러스터에서 아직 답한 적이 없을 때 | 소형 · 중형 · 대형 |
 | `home-mode` | `~/.kubegap` 아래 폴더를 이 컴퓨터의 다른 사용자가 읽을 수 있을 때 (옛 kubegap이 만들었거나 직접 권한을 넓힌 경우) | 지금 고치기 (`kubegap protect-home`, chmod 700) · 그대로 두기 |
 | `tools` | 추가 도구가 설치되어 있지 않을 때 | 전부 설치 · 건너뛰기 · 도구 이름을 적어 그 도구만 설치 |
 | `ssm-document` | EKS에서 SSM 문서가 없거나 kubegap에 들어 있는 SSM 문서보다 오래됐을 때 | 올리기 · 건너뛰기 |
@@ -83,13 +84,13 @@ kubegap은 helm, krr, polaris, pluto, kubent를 `PATH`에서 찾습니다. EKS�
 <!-- tools-table:begin -->
 | 도구 | 하는 일 | 쓰는 점검 항목 | 모드 | 설치 방법과 위치 | 없으면 |
 |---|---|---|---|---|---|
-| aws | EKS, EC2, SSM, CloudWatch 조회(EKS 프로필에서만) | eks.* (11), ecr.* (8), cost.idle-compute-high, cost.request-waste, cost.on-demand-in-spot-pool, cost.unused-eip, cost.idle-load-balancer, cost.idle-node, controlplane.scheduler-unschedulable, controlplane.webhook-call-failures, controlplane.controller-error-repeat, controlplane.apiserver-slow-traces, controlplane.authenticator-failures, controlplane.etcd-slow, node.* (26, full mode) | daily, full(ECR·컨트롤플레인 로그·노드·가격과 비용 데이터는 full에서만) | Homebrew `awscli` → 실패하면 고정 버전 2.39.3을 awscli.amazonaws.com에서 받아 sha256 + OpenPGP 서명 확인 뒤 `.tools/bin/`, linux만 | EKS·ECR·비용 항목은 수집되지 않고, 컨트롤플레인 로그 항목과 노드 항목은 리포트에 그렇게 적힙니다 |
+| aws | EKS, EC2, SSM, CloudWatch 조회(EKS에서만) | eks.* (11), ecr.* (8), cost.idle-compute-high, cost.request-waste, cost.on-demand-in-spot-pool, cost.unused-eip, cost.idle-load-balancer, cost.idle-node, controlplane.scheduler-unschedulable, controlplane.webhook-call-failures, controlplane.controller-error-repeat, controlplane.apiserver-slow-traces, controlplane.authenticator-failures, controlplane.etcd-slow, node.* (26, full mode) | daily, full(ECR·컨트롤플레인 로그·노드·가격과 비용 데이터는 full에서만) | Homebrew `awscli` → 실패하면 고정 버전 2.39.3을 awscli.amazonaws.com에서 받아 sha256 + OpenPGP 서명 확인 뒤 `.tools/bin/`, linux만 | EKS·ECR·비용 항목은 수집되지 않고, 컨트롤플레인 로그 항목과 노드 항목은 리포트에 그렇게 적힙니다 |
 | helm | Helm 릴리스 상태와 나이(Helm이 Secret에 두는 릴리스 기록을 읽음) | hygiene.helm-release-not-deployed, hygiene.helm-release-stale | full | Homebrew `helm` → 실패하면 고정 버전 v4.3.1을 get.helm.sh에서 받아 sha256 확인 뒤 `.tools/bin/` | 그 항목은 '도구 없음'으로 적힙니다 |
 | krr | 리소스 requests 추천(Robusta KRR, Prometheus 기반) | resources.krr-recommendation | full | `.tools/krr-venv/` 전용 Python virtualenv, `deploy/krr-requirements.txt`(파일마다 sha256) → 실패하면 Homebrew `robusta-dev/krr/krr` (서드파티 tap) | 그 항목은 '도구 없음'으로 적힙니다 |
 | polaris | 매니페스트 정적 점검과 가벼운 보안 점검 | hygiene.polaris-reliability-danger, security.polaris-security-danger | full | 고정 버전 v10.2.6을 FairwindsOps/polaris에서 받아 sha256 확인 뒤 `.tools/bin/` → 실패하면 Homebrew `FairwindsOps/tap/polaris` (서드파티 tap) | 그 항목은 '도구 없음'으로 적힙니다 |
 | pluto | 지원이 끝난 API 탐지 | hygiene.deprecated-api | full | 고정 버전 v5.24.5을 FairwindsOps/pluto에서 받아 sha256 확인 뒤 `.tools/bin/` → 실패하면 Homebrew `FairwindsOps/tap/pluto` (서드파티 tap) | 그 항목은 입력을 읽지 못해 건너뜁니다(통과로 세지 않음) |
 | kubent | 지원이 끝난 API 탐지(Pluto 보완) | hygiene.deprecated-api | full | Homebrew `kubent` → 실패하면 고정 버전 0.7.3을 doitintl/kube-no-trouble에서 받아 sha256 확인 뒤 `.tools/bin/` | 그 항목은 입력을 읽지 못해 건너뜁니다(통과로 세지 않음) |
-| ssh | 작은 k3s 클러스터의 노드 접근(k3s 프로필) | node.* (26, full mode) | full | kubegap이 설치하지 않습니다. macOS와 대부분의 Linux에 기본으로 있고, 슬림 컨테이너 이미지에는 없을 수 있습니다(배포판 패키지 openssh-client) | 노드 항목은 '노드 접근 없음'으로 적힙니다 |
+| ssh | k3s와 RKE2의 노드 접근 | node.* (26, full mode) | full | kubegap이 설치하지 않습니다. macOS와 대부분의 Linux에 기본으로 있고, 슬림 컨테이너 이미지에는 없을 수 있습니다(배포판 패키지 openssh-client) | 노드 항목은 '노드 접근 없음'으로 적힙니다 |
 <!-- tools-table:end -->
 
 설치는 이렇게 합니다.
@@ -140,7 +141,7 @@ scripts/kubegap config set prometheus_url http://prometheus.example.internal:909
 | 키 | 쓰임 |
 |---|---|
 | `mode: full` | full 점검을 기본값으로 합니다 |
-| `profile`, `namespace_profiles` | kubegap이 클러스터나 네임스페이스에 적용하는 기준을 바꿉니다 |
+| `scale`, `dev_namespaces` | `scale`(small·medium·large)은 질문 없이 운영 규모를 정하고, `dev_namespaces`는 운영이 아닌 네임스페이스를 지정합니다 |
 | `suppress`, `overrides` | 점검 항목을 끄거나 기준값을 바꿉니다 |
 | `retention`, `snapshots_root` | 모은 데이터를 얼마나 남길지, 어디에 둘지 정합니다 |
 | `keep_component_logs` | 컴포넌트 파드 로그의 원본을 남깁니다. 어떤 뜻인지는 [DATA.md](DATA.md#읽는-것)에 있습니다 |

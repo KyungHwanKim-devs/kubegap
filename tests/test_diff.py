@@ -21,12 +21,12 @@ def write_snapshot(folder, deployments, pods, findings, taken_at, nodes=("n1",),
     (folder / "objects" / "pods.json").write_text(json.dumps({"items": pods}))
     if check_results is None:  # every findings-draft.json carries check_results; one row per check the findings name, evaluated under one rule hash
         check_results = [{"id": c, "status": "done", "rule_hash": "aaaaaaaaaaaa"} for c in sorted({f["check"] for f in findings})]
-    draft = {"rubric_version": rubric_version, "profile": {"name": "prod"}, "findings": findings, "check_results": check_results}
+    draft = {"rubric_version": rubric_version, "scale": {"name": "large", "source": "guessed"}, "findings": findings, "check_results": check_results}
     (folder / "findings-draft.json").write_text(json.dumps(draft))
     inv = {
         "taken_at": taken_at,
         "cluster": {"server_version": "v1.31.0-eks-abc"},
-        "profile": {"name": "prod"},
+        "scale": {"name": "large", "source": "guessed"},
         "nodes": {"count": len(nodes), "nodes": [{"name": n} for n in nodes], "kubelet_versions": ["v1.31.0"]},
         "namespaces": {"names": ["default", "kube-system"]},
         "components_present": ["coredns"],
@@ -83,7 +83,7 @@ def test_diff_findings(snapshots):
     assert out["summary"] == {"new": 1, "resolved": 1, "changed": 1, "criteria_changes": 0}
     assert out["counts_before"] == {"fail": {"high": 2}, "warn": {"low": 1}}
     assert out["counts_after"] == {"fail": {"high": 2, "low": 1}, "warn": {}}
-    assert out["profile"] == ["prod", "prod"] and out["rubric_version"] == ["0.1.0", "0.1.0"]
+    assert out["scale"] == ["large", "large"] and out["rubric_version"] == ["0.1.0", "0.1.0"]
     # default/gone disappeared and prod/new appeared for the same check, but in different namespaces: not a rename suspect
     assert out["rename_suspects"] == []
 
@@ -218,3 +218,14 @@ def test_thresholds_in_force_change_is_a_criteria_change(tmp_path):
     write_snapshot(b, [], [pod], findings=[finding("r.x", "a/b")], taken_at="2026-01-02T00:00:00+00:00", check_results=[{"id": "r.x", "status": "done", "rule_hash": "aaaaaaaaaaaa", "thresholds": {"threshold": 0.2}}])
     d = diffmod.diff_findings(a, b)
     assert d["new"] == [] and d["criteria_changes"]["thresholds_changed"][0]["thresholds"] == [{"threshold": 0.5}, {"threshold": 0.2}]
+
+
+def test_a_severity_that_changed_with_the_scale_is_a_criteria_change(tmp_path):
+    """Answering the scale question between two runs re-levels checks. The finding is the same finding: it must not read as a change in the cluster."""
+    a, b = tmp_path / "a", tmp_path / "b"
+    pod = {"kind": "Pod", "metadata": {"namespace": "default", "name": "p1"}}
+    cr = {"id": "observability.no-slo", "status": "done", "rule_hash": "aaaaaaaaaaaa"}
+    write_snapshot(a, [], [pod], findings=[finding("observability.no-slo", "cluster", sev="critical")], taken_at="2026-01-01T00:00:00+00:00", check_results=[{**cr, "severity_default": "critical"}])
+    write_snapshot(b, [], [pod], findings=[finding("observability.no-slo", "cluster", sev="low")], taken_at="2026-01-02T00:00:00+00:00", check_results=[{**cr, "severity_default": "low"}])
+    d = diffmod.diff_findings(a, b)
+    assert d["changed"] == [] and d["criteria_changes"]["severity_changed"][0]["severity_default"] == ["critical", "low"]
