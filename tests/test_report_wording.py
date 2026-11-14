@@ -11,7 +11,7 @@ from lib.judgement.evaluate import Context
 
 RULES = Path("references/report-writing-en.md")
 HANDA_RE = re.compile(r"(합니다|입니다|습니다|했다|한다)(?=$|[\s.!?\"')\]」])")  # a sentence or heading ending in the formal or plain form; headings carry no period
-MEASURED_EFFORT_RE = re.compile(r"\bTakes (?:\d|a day|an hour|half a day)|\d(?:분|시간|일) 걸려요\.|\d(?:분|시간|일) 걸립니다\.")  # "Takes 30 minutes." and "30분 걸려요." read as measured; "약 30분 걸려요." and "Expect about" do not
+MEASURED_EFFORT_RE = re.compile(r"\bTakes (?:\d|a day|an hour|half a day)|\d(?:분|시간|일) 걸려요\.|\d(?:분|시간|일) 걸립니다\.")  # "Takes 30 minutes." and "30분 걸립니다." read as measured; "약 30분 걸립니다." and "Expect about" do not
 
 
 def _prose_lines(path: str):
@@ -30,7 +30,7 @@ def test_rules_ask_for_no_time_estimates_and_no_fixed_sentences():
     """A time estimate has no source in the snapshot, and a fixed or example sentence is copied into every report instead of being written."""
     for f in (RULES, Path("templates/report.md"), Path("references/write-problem-ko.md"), Path("references/write-overview-ko.md")):
         text = f.read_text()
-        for phrase in ("Expect about", "30분쯤", "쯤 걸려요"):
+        for phrase in ("Expect about", "30분쯤", "쯤 걸립니다"):
             assert phrase not in text, f"{f}: {phrase}"
         assert "\n> " not in text, "an example paragraph is copied, not imitated"
 

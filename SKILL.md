@@ -5,7 +5,7 @@ compatibility: "Tested with Claude Code and Codex; usable in any Agent Skills ho
 metadata:
   version: "0.2.0"
   author: KyungHwanKim-devs
-  rubric_version: "0.1.88"
+  rubric_version: "0.1.89"
 ---
 
 # /kubegap — cluster operations gap audit
@@ -121,7 +121,7 @@ If the mask count is not 0, check where `<masked>` remains; a `control-chars` co
 
 The rules for the facts and for messages to the user are in `references/report-writing-<language>.md`; `report.md` follows `references/write-overview-<language>.md` and `references/write-problem-<language>.md`, and the terms of `references/glossary-<language>.yaml`.
 
-**Language (from section 0).** If Korean was chosen, write ALL messages to the user and both report files in Korean. The English check texts are facts to write from, not sentences to translate; check definitions stay English in the repository; keep check ids, file paths, commands, metric names and resource names untouched. In Korean, write in the polite conversational (haeyo) style, in connected paragraphs, with the terms practitioners use left as they are (scheduling, rollout, drain, eviction, rate limit): do not coin plain-word replacements for them. If English was chosen, write everything in English, in plain sentences addressed to the reader.
+**Language (from section 0).** If Korean was chosen, write ALL messages to the user and both report files in Korean. The English check texts are facts to write from, not sentences to translate; check definitions stay English in the repository; keep check ids, file paths, commands, metric names and resource names untouched. In Korean, write in the formal polite (hapnida) style, never the conversational haeyo style, in connected paragraphs, with the terms practitioners use left as they are (scheduling, rollout, drain, eviction, rate limit): do not coin plain-word replacements for them. If English was chosen, write everything in English, in plain sentences addressed to the reader.
 
 ## 9. What not to do
 

@@ -463,9 +463,9 @@ def test_every_question_is_written_in_korean_not_translated(tmp_path):
         assert [o["id"] for o in q["options"]] == [o["id"] for o in en[qid]["options"]]
         assert [o["run"] for o in q["options"]] == [o["run"] for o in en[qid]["options"]]
         assert len(q["header"]) <= 12 and all(len(o["label"]) <= 12 for o in q["options"]), qid
-    text = firstrun.render(list(ko.values()), "ctx", [{"id": "node-ssh", "header": "노드 점검", "gain": ["g"]}], ["loki: 묻지 않았어요"], language="ko")
+    text = firstrun.render(list(ko.values()), "ctx", [{"id": "node-ssh", "header": "노드 점검", "gain": ["g"]}], ["loki: 묻지 않았습니다"], language="ko")
     assert "  question: " in text and "  option skip: 건너뛰기 — " in text and "answer --context ctx node-ssh skip" in text
-    assert "skipped earlier [node-ssh] 노드 점검: g" in text and "note loki: 묻지 않았어요" in text and "이번 점검의 한계" in text
+    assert "skipped earlier [node-ssh] 노드 점검: g" in text and "note loki: 묻지 않았습니다" in text and "이번 점검의 한계" in text
     assert "none:" in firstrun.render([], "ctx", language="ko")
 
 
@@ -477,7 +477,7 @@ def test_grafana_token_is_asked_only_for_dashboards_that_are_not_in_configmaps()
     s["monitoring"]["grafana"]["provisioned"] = {"dashboards": 25, "datasources": 1, "total_dashboards": 25, "error": None}
     assert "grafana-token" not in [q["id"] for q in firstrun.questions(s, Config(), None)]
     assert firstrun.noted(s, Config(), None) == ["grafana: no token needed; 25 dashboards and 1 datasources are read from ConfigMaps. Grafana counts 25 dashboards too, so none is missing"]
-    assert firstrun.noted(s, Config(), None, language="ko") == ["grafana: 토큰 없이 ConfigMap에서 대시보드 25개와 데이터소스 1개를 읽어요. Grafana가 세는 대시보드도 25개라 빠진 게 없어요"]
+    assert firstrun.noted(s, Config(), None, language="ko") == ["grafana: 토큰 없이 ConfigMap에서 대시보드 25개와 데이터소스 1개를 읽습니다. Grafana가 세는 대시보드도 25개라 빠진 게 없습니다"]
     s["monitoring"]["grafana"]["provisioned"]["total_dashboards"] = None
     assert "grafana-token" not in [q["id"] for q in firstrun.questions(s, Config(), None)]
     assert "could not be read" in firstrun.noted(s, Config(), None)[0]

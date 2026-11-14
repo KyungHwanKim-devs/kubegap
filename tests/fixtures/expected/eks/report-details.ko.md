@@ -1,13 +1,13 @@
 # kubegap 상세 리포트 — arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (`app-u-cluster`), full 점검
 
-사람이 먼저 읽을 리포트는 옆의 `report.md`예요. 이 파일에는 판정 전체와 표가 있고, `scripts/kubegap render-details`가 수집 자료와 에이전트가 사실 파일에 쓴 분석 기록을 모아 만들어요. 다음 점검의 에이전트도 이 파일을 읽어요. 점검 항목 id와 근거 문장은 정의에서 그대로 가져와서 영어예요.
+사람이 먼저 읽을 리포트는 옆의 `report.md`입니다. 이 파일에는 판정 전체와 표가 있고, `scripts/kubegap render-details`가 수집 자료와 에이전트가 사실 파일에 쓴 분석 기록을 모아 만듭니다. 다음 점검의 에이전트도 이 파일을 읽습니다. 점검 항목 id와 근거 문장은 정의에서 그대로 가져와서 영어입니다.
 
 | 항목 | 값 |
 |---|---|
 | kube context / 클러스터 | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
 | 실행 시각 / 모드 | 2026-11-07T10:33:37+09:00 / full (수집 300.7초, 모드 때문에 건너뛴 단계 0개, 실패 6개) |
 | 운영 규모 | `medium` (묻지 못해 노드 수로 짐작) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.88 / 1.1.0 |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.89 / 1.1.0 |
 | 검증한 버전 범위 | Kubernetes v1.32.13-eks-577a51e (검증 범위 안 1.30 ~ 1.37) · Prometheus 2.49.1 (검증 범위 안 2.49 ~ 3.15) · Alertmanager 0.26.0 (검증 범위 안 0.26 ~ 0.34) · Loki 2.6.1 (검증 범위 안 2.6 ~ 3.7) · Grafana 10.2.3 (검증 범위 안 10.2 ~ 13.3) |
 | 노드 / 네임스페이스 / 파드 / CRD | 9 (Ready 9) / 26 / 154 / 47 |
 | 컴포넌트 (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
@@ -26,7 +26,7 @@
 | low | 17 | 145 | 같은 모드의 지난 점검 없음 |
 | info | 1 | 0 | 같은 모드의 지난 점검 없음 |
 
-점검 항목 367개 중 판정 359개, 이 플랫폼이나 규모에서는 안 보는 것 3개, 건너뜀 3개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개예요. 숨긴 항목은 0개예요.
+점검 항목 367개 중 판정 359개, 이 플랫폼이나 규모에서는 안 보는 것 3개, 건너뜀 3개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개입니다. 숨긴 항목은 0개입니다.
 
 ### 1-1. 자동 판정과 최종 판정이 다른 곳
 
@@ -77,11 +77,11 @@
 | `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | high |  | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com'], sourceRanges None … |
 | `vpccni.no-available-ip.ip-10-0-1-139.ap-northeast-2.compute.internal` | high |  | node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): ipamd answered 'no available IP' 4 times since it started; pod IPs 36/56 (0.643), ENI 4/4, max-pods 58 |
 
-(연속 횟수는 diff.json이 있어야 나와요. 이번 점검에는 없어요)
+(연속 횟수는 diff.json이 있어야 나옵니다. 이번 점검에는 없습니다)
 
 ## 3. 같은 모드의 지난 점검 이후 변화
 
-비교할 이전 full 점검이 없어요.
+비교할 이전 full 점검이 없습니다.
 
 ### 3-1. 왜 바뀌었나
 
@@ -109,8 +109,8 @@
 - 도구 없음 0: 없음
 - full 모드에서 수집 안 함 0: 없음
 - 건너뛰었거나 오류가 난 점검 항목 3: `observability.fluentbit-output-errors` (skip: summary.logs.agents.fluent-bit missing), `traffic.ingress-nginx-vulnerable-version` (skip: summary.traffic.nginx missing), `traffic.ingress-nginx-retired` (skip: summary.traffic.nginx missing)
-- 일부만 판정한 점검 항목 23 (판정에 필요한 자료가 없는 대상은 판정하지 않았고 통과로 세지 않았어요): `node.kernel-oom-node-level` (2 판정 안 함: node not read (2)), `node.kernel-lockup` (2 판정 안 함: node not read (2)), `node.kernel-io-fs-errors` (2 판정 안 함: node not read (2)), `node.kernel-nic-events` (2 판정 안 함: node not read (2)), `node.conntrack-table-full` (2 판정 안 함: node not read (2)), `node.kernel-net-mem-pressure` (2 판정 안 함: node not read (2)), `node.cgroup-v1` (2 판정 안 함: node not read (2)), `node.sysctl-tuning` (2 판정 안 함: node not read (2)), `node.cri-not-ready` (2 판정 안 함: node not read, or cri not read (2)), `node.cri-exited-containers` (2 판정 안 함: node not read (2)), `node.service-restarts` (2 판정 안 함: node not read (2)), `node.reboot-required` (2 판정 안 함: node not read (2)), `node.os-updates-pending` (2 판정 안 함: node not read (2)), `node.kubelet-reserved-missing` (2 판정 안 함: node not read, or kubelet not read (2)), `node.kubelet-eviction-memory-missing` (2 판정 안 함: node not read, or kubelet not read (2)), `node.clock-unsynced-os` (2 판정 안 함: node not read (2)), `node.zombie-processes` (2 판정 안 함: node not read (2)), `node.kubelet-api-qps-low` (2 판정 안 함: node not read, or kubelet not read (2)), `node.docker-and-containerd` (2 판정 안 함: node not read (2)), `node.container-writable-layer-large` (2 판정 안 함: node not read (2)), `node.large-images` (2 판정 안 함: node not read (2)), `vpccni.no-available-ip` (2 판정 안 함: VPC CNI metrics not read (awscni_no_available_ip_addresses) (2)), `vpccni.ec2-api-errors` (2 판정 안 함: metrics not read (2))
-- 질의 결과가 빈 항목 4 (질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻이에요. 이름 자체가 없으면 건너뜀으로 처리해요): `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `controlplane.apiserver-401-rate`, `scaling.pod-pending-long`
+- 일부만 판정한 점검 항목 23 (판정에 필요한 자료가 없는 대상은 판정하지 않았고 통과로 세지 않았습니다): `node.kernel-oom-node-level` (2 판정 안 함: node not read (2)), `node.kernel-lockup` (2 판정 안 함: node not read (2)), `node.kernel-io-fs-errors` (2 판정 안 함: node not read (2)), `node.kernel-nic-events` (2 판정 안 함: node not read (2)), `node.conntrack-table-full` (2 판정 안 함: node not read (2)), `node.kernel-net-mem-pressure` (2 판정 안 함: node not read (2)), `node.cgroup-v1` (2 판정 안 함: node not read (2)), `node.sysctl-tuning` (2 판정 안 함: node not read (2)), `node.cri-not-ready` (2 판정 안 함: node not read, or cri not read (2)), `node.cri-exited-containers` (2 판정 안 함: node not read (2)), `node.service-restarts` (2 판정 안 함: node not read (2)), `node.reboot-required` (2 판정 안 함: node not read (2)), `node.os-updates-pending` (2 판정 안 함: node not read (2)), `node.kubelet-reserved-missing` (2 판정 안 함: node not read, or kubelet not read (2)), `node.kubelet-eviction-memory-missing` (2 판정 안 함: node not read, or kubelet not read (2)), `node.clock-unsynced-os` (2 판정 안 함: node not read (2)), `node.zombie-processes` (2 판정 안 함: node not read (2)), `node.kubelet-api-qps-low` (2 판정 안 함: node not read, or kubelet not read (2)), `node.docker-and-containerd` (2 판정 안 함: node not read (2)), `node.container-writable-layer-large` (2 판정 안 함: node not read (2)), `node.large-images` (2 판정 안 함: node not read (2)), `vpccni.no-available-ip` (2 판정 안 함: VPC CNI metrics not read (awscni_no_available_ip_addresses) (2)), `vpccni.ec2-api-errors` (2 판정 안 함: metrics not read (2))
+- 질의 결과가 빈 항목 4 (질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻입니다. 이름 자체가 없으면 건너뜀으로 처리합니다): `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `controlplane.apiserver-401-rate`, `scaling.pod-pending-long`
 
 ## 7. 부록
 
@@ -143,7 +143,7 @@
 | victoria-metrics | 0 |  | no collect.yaml (collector not implemented) |
 | vpc-cni | 3 | ipamd-metrics, ipamd-log |  |
 
-이 클러스터가 제공하지 않는 종류 7개예요. 이 종류가 필요한 점검 항목은 통과가 아니라 건너뜀으로 처리해요: `certificates.cert-manager.io`, `clusterissuers.cert-manager.io`, `horizontalrunnerautoscalers.actions.summerwind.dev`, `issuers.cert-manager.io`, `runnerdeployments.actions.summerwind.dev`, `volumesnapshotclasses.snapshot.storage.k8s.io`, `volumesnapshots.snapshot.storage.k8s.io`
+이 클러스터가 제공하지 않는 종류 7개입니다. 이 종류가 필요한 점검 항목은 통과가 아니라 건너뜀으로 처리합니다: `certificates.cert-manager.io`, `clusterissuers.cert-manager.io`, `horizontalrunnerautoscalers.actions.summerwind.dev`, `issuers.cert-manager.io`, `runnerdeployments.actions.summerwind.dev`, `volumesnapshotclasses.snapshot.storage.k8s.io`, `volumesnapshots.snapshot.storage.k8s.io`
 
 명령 701개, 300.7초. 실패한 단계 6개: `core.node-os` ; `eks-platform.kubelet-journal` ; `eks-platform.containerd-journal` ; `kube-proxy.proxy-mode` ; `vpc-cni.ipamd-metrics` ; `vpc-cni.ipamd-log` 
 
@@ -157,7 +157,7 @@
 
 ### 7-3. 로그 시그니처 일치와 분류 안 된 오류
 
-로그 시그니처 1.1.0으로 파일 40개, 23879줄을 읽었어요 (컴포넌트: actions-runner-controller, alb-controller, argocd, ebs-csi, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, loki, metrics-server, prometheus, promtail, vpc-cni). 분류 안 된 오류는 145줄이에요.
+로그 시그니처 1.1.0으로 파일 40개, 23879줄을 읽었습니다 (컴포넌트: actions-runner-controller, alb-controller, argocd, ebs-csi, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, loki, metrics-server, prometheus, promtail, vpc-cni). 분류 안 된 오류는 145줄입니다.
 
 | 시그니처 | 컴포넌트 | 영역 | 심각도 | 상태 | 횟수 | 처음, 마지막 | 샘플 |
 |---|---|---|---|---|---|---|---|
@@ -733,7 +733,7 @@
 | `vpccni.metrics-unreadable.cluster` | warn | low | 2 of 9 nodes without readable ipamd metrics (localhost:61678): ['ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal'] |
 | `eks.audit-log-off.cluster` | fail | info | enabled logs ['api', 'authenticator', 'controllerManager', 'scheduler'], disabled logs ['audit'] |
 
-표의 근거는 칸에 맞게 줄였어요. 판정에 쓴 자료 전체는 아래에 항목별로 접혀 있고, `findings-draft.json`의 `details`와 같아요.
+표의 근거는 칸에 맞게 줄였습니다. 판정에 쓴 자료 전체는 아래에 항목별로 접혀 있고, `findings-draft.json`의 `details`와 같습니다.
 
 <details><summary><code>controlplane.scheduler-unschedulable.prod-app-x/app-x-api</code></summary>
 

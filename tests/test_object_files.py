@@ -206,7 +206,7 @@ def test_report_section_7_1_names_the_stems(tmp_path):
     assert "Kinds this cluster serves but the snapshot has no file for (1; kubegap looked for the wrong file name, a kubegap defect, and the checks that read them judged nothing): `cronjobs.batch`" in text
     assert "`pods`" not in text.split("### 7-1")[1].split("###")[0]
     ko = render.render_details(s, language="ko").read_text()
-    assert "이 클러스터가 제공하는데 수집 폴더에 파일이 없는 종류 1개예요" in ko and "`cronjobs.batch`" in ko
+    assert "이 클러스터가 제공하는데 수집 폴더에 파일이 없는 종류 1개입니다" in ko and "`cronjobs.batch`" in ko
 
 
 # ---------- every literal stem against two real clusters ----------

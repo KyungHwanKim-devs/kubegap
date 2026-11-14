@@ -89,6 +89,7 @@ def finding(check: dict, target: str, status: str, evidence, source: str, extra:
         "severity_default": check["severity_default"],
         "symptom_linked": bool(check.get("symptom_linked")),
         "nature": check.get("nature", "state"),
+        **({"overdue": True} if check.get("overdue") else {}),
         "target": target,
         "evidence": evidence,
         "source": source,

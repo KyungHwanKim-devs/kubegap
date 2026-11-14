@@ -141,9 +141,12 @@ def check(facts: dict, snap: Path, mode: str) -> list[str]:
                 out.append(f"problem {pid}: a solution without an approach")
         sev = problem_severity(p, final)
         if sev and picked.get("loss") in LOSSES:
-            rank.append((SEVERITIES.index(sev), LOSSES.index(picked["loss"])))
+            late = any(f.get("overdue") and f["status"] == "fail" and _matches(_ids(p), f["id"]) for f in findings)
+            rank.append((SEVERITIES.index(sev), max(LOSSES.index(picked["loss"]) - (1 if late else 0), 0)))
     if rank != sorted(rank):
-        out.append("problems are not in order: severity first (scale already applied), then what is lost (irreversible, outage, partial, degraded)")
+        out.append(
+            "problems are not in order: severity first (scale already applied), then what is lost (irreversible, outage, partial, degraded; a problem with an `overdue` failure, such as a version past its end of support, counts one step higher)"
+        )
 
     # nothing serious is left out: every critical or high failure is in one of the lists
     placed = [pat for e in problems + incidents + broken + rest for pat in _ids(e)]

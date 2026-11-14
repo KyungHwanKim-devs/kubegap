@@ -171,7 +171,7 @@ def test_numbers_show_what_went_away_and_what_is_new_against_one_baseline(tmp_pa
 
 def test_numbers_without_a_baseline_have_no_comparison_columns(tmp_path):
     text = S.numbers(_snap(tmp_path), "ko")
-    assert "비교할 이전 full 점검이 없어요." in text and "| critical | 1 | 0 |\n" in text + "\n"
+    assert "비교할 이전 full 점검이 없습니다." in text and "| critical | 1 | 0 |\n" in text + "\n"
 
 
 def test_what_was_decided_not_to_do_is_only_what_the_config_records(tmp_path):
@@ -183,9 +183,21 @@ def test_what_was_decided_not_to_do_is_only_what_the_config_records(tmp_path):
 
 def test_limits_come_in_three_groups_with_what_code_knows_added(tmp_path):
     snap = _snap(tmp_path)
-    f = {"limits": [{"kind": "no-data", "what": "인그레스 요청 메트릭이 없어요.", "weakens": "재부팅 동안 사용자가 받은 오류 수를 몰라요", "to_see": "ingress-nginx 컨트롤러 메트릭을 켜요"}]}
+    f = {"limits": [{"kind": "no-data", "what": "인그레스 요청 메트릭이 없습니다.", "weakens": "재부팅 동안 사용자가 받은 오류 수를 모릅니다", "to_see": "ingress-nginx 컨트롤러 메트릭을 켭니다"}]}
     text = S.limits(f, snap, "ko", skipped=[{"id": "grafana-token", "header": "Grafana 토큰", "gain": ["Grafana에서 직접 만든 대시보드 목록"]}])
     assert text.index("클러스터에 데이터가 없어서") < text.index("kubegap이 아직 읽지 못하는 것") < text.index("보지 않기로 고른 것")
-    assert "- 인그레스 요청 메트릭이 없어요.\n  - 약해지는 결론: 재부팅 동안 사용자가 받은 오류 수를 몰라요.\n  - 보려면: ingress-nginx 컨트롤러 메트릭을 켜요." in text
-    assert "컴포넌트 2개는 오브젝트와 메트릭으로만 읽었어요. kubegap에 전용 점검 항목이 없어요: istio, reloader." in text  # coredns has checks; k3s is the platform
+    assert "- 인그레스 요청 메트릭이 없습니다.\n  - 약해지는 결론: 재부팅 동안 사용자가 받은 오류 수를 모릅니다.\n  - 보려면: ingress-nginx 컨트롤러 메트릭을 켭니다." in text
+    assert "컴포넌트 2개는 오브젝트와 메트릭으로만 읽었습니다. kubegap에 전용 점검 항목이 없습니다: istio, reloader." in text  # coredns has checks; k3s is the platform
     assert "- Grafana 토큰.\n  - 약해지는 결론: Grafana에서 직접 만든 대시보드 목록.\n  - 보려면: `/kubegap setup`에서 다시 고르기." in text
+
+
+def test_a_version_past_its_end_of_support_is_weighed_one_step_higher(tmp_path):
+    """A date already passed grows while it waits (no patches, a longer upgrade path), so the problem is compared one step above what it loses today."""
+    findings = [_finding("resilience.no-backup", "cluster"), {**_finding("platform.k8s-version-eol", "cluster"), "overdue": True}, _finding("observability.prometheus-no-persistence", "monitoring")]
+    snap = _snap(tmp_path, findings)
+    eol, prom = _problem("1", ["platform.k8s-version-eol.cluster"], "partial"), _problem("2", ["observability.prometheus-no-persistence.monitoring"], "outage")
+    base = {"problems": [_problem("0", ["resilience.no-backup.cluster"], "irreversible")]}
+    order = lambda *ps: [e for e in F.check({**_facts(), **base, "problems": base["problems"] + list(ps)}, snap, "full") if "not in order" in e]  # noqa: E731
+    assert order(eol, prom) == []  # partial, one step up, ties with outage
+    behind = order(_problem("2", ["observability.prometheus-no-persistence.monitoring"], "partial"), eol)  # the same loss on paper, but the overdue one goes first
+    assert behind and "overdue" in behind[0]

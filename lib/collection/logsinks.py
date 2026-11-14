@@ -174,4 +174,4 @@ def explain(sinks: dict, language: str = "en") -> str | None:
         else:
             s = next((s for s in sinks["stores"] if s["kind"] == store), None)
             parts.append(f"{store} (service {s['namespace']}/{s['name']}:{s['port']})" if s else store)
-    return ("로그는 " + "; ".join(parts) + "로 가요") if ko else ("logs go to " + "; ".join(parts))
+    return ("로그는 " + "; ".join(parts) + "로 갑니다") if ko else ("logs go to " + "; ".join(parts))

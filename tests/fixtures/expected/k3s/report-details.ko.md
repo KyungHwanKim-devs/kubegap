@@ -1,18 +1,18 @@
 # kubegap 상세 리포트 — default (`default`), full 점검
 
-사람이 먼저 읽을 리포트는 옆의 `report.md`예요. 이 파일에는 판정 전체와 표가 있고, `scripts/kubegap render-details`가 수집 자료와 에이전트가 사실 파일에 쓴 분석 기록을 모아 만들어요. 다음 점검의 에이전트도 이 파일을 읽어요. 점검 항목 id와 근거 문장은 정의에서 그대로 가져와서 영어예요.
+사람이 먼저 읽을 리포트는 옆의 `report.md`입니다. 이 파일에는 판정 전체와 표가 있고, `scripts/kubegap render-details`가 수집 자료와 에이전트가 사실 파일에 쓴 분석 기록을 모아 만듭니다. 다음 점검의 에이전트도 이 파일을 읽습니다. 점검 항목 id와 근거 문장은 정의에서 그대로 가져와서 영어입니다.
 
 | 항목 | 값 |
 |---|---|
 | kube context / 클러스터 | `default` / default (k3s, v1.33.5+k3s1) |
 | 실행 시각 / 모드 | 2026-11-07T10:22:59+09:00 / full (수집 262.7초, 모드 때문에 건너뛴 단계 0개, 실패 0개) |
 | 운영 규모 | `small` (묻지 못해 노드 수로 짐작) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.88 / 1.1.0 |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.89 / 1.1.0 |
 | 검증한 버전 범위 | Kubernetes v1.33.5+k3s1 (검증 범위 안 1.30 ~ 1.37) · Prometheus 3.7.3 (검증 범위 안 2.49 ~ 3.15) · Alertmanager 0.29.0 (검증 범위 안 0.26 ~ 0.34) · Grafana 12.2.1 (검증 범위 안 10.2 ~ 13.3) |
 | 노드 / 네임스페이스 / 파드 / CRD | 2 (Ready 2) / 26 / 153 / 64 |
 | 컴포넌트 (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
 | 메트릭 저장소 | prometheus 3.7.3 retention 30d / size 0B via port-forward |
-| 로그 저장소 | 없음 (Loki를 찾지 못했어요) |
+| 로그 저장소 | 없음 (Loki를 찾지 못했습니다) |
 | 노드 접속 | ssh (k3s: SSH); SSM 미등록 0대 |
 | 수집 폴더 | `<snapshot>` |
 
@@ -26,7 +26,7 @@
 | low | 9 | 116 | 같은 모드의 지난 점검 없음 |
 | info | 0 | 11 | 같은 모드의 지난 점검 없음 |
 
-점검 항목 349개 중 판정 294개, 이 플랫폼이나 규모에서는 안 보는 것 44개, 건너뜀 9개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개예요. 숨긴 항목은 0개예요.
+점검 항목 349개 중 판정 294개, 이 플랫폼이나 규모에서는 안 보는 것 44개, 건너뜀 9개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개입니다. 숨긴 항목은 0개입니다.
 
 ### 1-1. 자동 판정과 최종 판정이 다른 곳
 
@@ -56,11 +56,11 @@
 | `storage.local-path-over-capacity.logging/data-elasticsearch-0` | high |  | node node-b uses 107797MB / capacity 20480MB (5.26x). workloads ['logging/elasticsearch-0'] |
 | `tenancy.quota-near-limit.app-l-prod/app-l-prod-quota` | high |  | app-l-prod/app-l-prod-quota: near limit ['persistentvolumeclaims'] (max ratio 1.0). hard {'limits.cpu': '4', 'limits.memory': '8Gi', 'persistentvolumeclaims': '2', 'requests.cpu': '2', 'requests.memory': '4Gi' … |
 
-(연속 횟수는 diff.json이 있어야 나와요. 이번 점검에는 없어요)
+(연속 횟수는 diff.json이 있어야 나옵니다. 이번 점검에는 없습니다)
 
 ## 3. 같은 모드의 지난 점검 이후 변화
 
-비교할 이전 full 점검이 없어요.
+비교할 이전 full 점검이 없습니다.
 
 ### 3-1. 왜 바뀌었나
 
@@ -85,8 +85,8 @@
 - 도구 없음 0: 없음
 - full 모드에서 수집 안 함 0: 없음
 - 건너뛰었거나 오류가 난 점검 항목 9: `observability.log-volume-change` (skip: summary.logs.loki.volume_change missing), `observability.log-coverage-gap` (skip: summary.logs.loki.coverage missing), `observability.loki-not-ready` (skip: nothing to judge: loki not present), `observability.loki-ingest-discarded` (skip: summary.logs.agents.loki_metrics missing), `observability.promtail-dropped` (skip: summary.logs.agents.promtail missing), `observability.log-error-ratio-high` (skip: summary.logs.loki.namespaces_1h missing), `observability.unstructured-logs` (skip: summary.logs.loki.namespaces_1h missing), `traffic.ingress-5xx-ratio` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)), `traffic.ingress-p95-latency` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29))
-- 일부만 판정한 점검 항목 0 (판정에 필요한 자료가 없는 대상은 판정하지 않았고 통과로 세지 않았어요): 없음
-- 질의 결과가 빈 항목 6 (질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻이에요. 이름 자체가 없으면 건너뜀으로 처리해요): `resources.oomkilled`, `resources.large-request-binpacking`, `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `node.network-errors`, `scaling.pod-pending-long`
+- 일부만 판정한 점검 항목 0 (판정에 필요한 자료가 없는 대상은 판정하지 않았고 통과로 세지 않았습니다): 없음
+- 질의 결과가 빈 항목 6 (질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻입니다. 이름 자체가 없으면 건너뜀으로 처리합니다): `resources.oomkilled`, `resources.large-request-binpacking`, `observability.alertmanager-notification-failed`, `observability.scrape-targets-down`, `node.network-errors`, `scaling.pod-pending-long`
 
 ## 7. 부록
 
@@ -119,7 +119,7 @@
 | prometheus-operator | 0 |  | no collect.yaml (collector not implemented) |
 | reloader | 0 |  | no collect.yaml (collector not implemented) |
 
-이 클러스터가 제공하지 않는 종류 8개예요. 이 종류가 필요한 점검 항목은 통과가 아니라 건너뜀으로 처리해요: `autoscalingrunnersets.actions.github.com`, `configurationstates.metallb.io`, `nodeclaims.karpenter.sh`, `nodepools.karpenter.sh`, `servicebgpstatuses.metallb.io`, `targetgroupbindings.elbv2.k8s.aws`, `volumesnapshotclasses.snapshot.storage.k8s.io`, `volumesnapshots.snapshot.storage.k8s.io`
+이 클러스터가 제공하지 않는 종류 8개입니다. 이 종류가 필요한 점검 항목은 통과가 아니라 건너뜀으로 처리합니다: `autoscalingrunnersets.actions.github.com`, `configurationstates.metallb.io`, `nodeclaims.karpenter.sh`, `nodepools.karpenter.sh`, `servicebgpstatuses.metallb.io`, `targetgroupbindings.elbv2.k8s.aws`, `volumesnapshotclasses.snapshot.storage.k8s.io`, `volumesnapshots.snapshot.storage.k8s.io`
 
 명령 374개, 262.7초. 실패한 단계 0개
 
@@ -133,7 +133,7 @@
 
 ### 7-3. 로그 시그니처 일치와 분류 안 된 오류
 
-로그 시그니처 1.1.0으로 파일 23개, 25969줄을 읽었어요 (컴포넌트: argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, fluent-bit, grafana, ingress-nginx, keda, metallb, prometheus). 분류 안 된 오류는 463줄이에요.
+로그 시그니처 1.1.0으로 파일 23개, 25969줄을 읽었습니다 (컴포넌트: argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, fluent-bit, grafana, ingress-nginx, keda, metallb, prometheus). 분류 안 된 오류는 463줄입니다.
 
 | 시그니처 | 컴포넌트 | 영역 | 심각도 | 상태 | 횟수 | 처음, 마지막 | 샘플 |
 |---|---|---|---|---|---|---|---|
@@ -631,7 +631,7 @@
 | `scaling.no-hpa-serving-prod.app-l-prod/app-l-api` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.app-l-prod/app-l-web` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 
-표의 근거는 칸에 맞게 줄였어요. 판정에 쓴 자료 전체는 아래에 항목별로 접혀 있고, `findings-draft.json`의 `details`와 같아요.
+표의 근거는 칸에 맞게 줄였습니다. 판정에 쓴 자료 전체는 아래에 항목별로 접혀 있고, `findings-draft.json`의 `details`와 같습니다.
 
 <details><summary><code>argocd.prune-manages-namespace-or-crd.cluster</code></summary>
 

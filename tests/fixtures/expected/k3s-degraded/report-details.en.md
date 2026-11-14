@@ -7,7 +7,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | kube context / cluster | `default` / default (k3s, v1.33.5+k3s1) |
 | Run time / mode | 2026-11-07T10:22:59+09:00 / full (collection 262.7 s, 0 steps skipped by mode, 7 failed) |
 | Scale | `small` (guessed) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.88 / 1.1.0 |
+| kubegap / rubric / signatures | <kubegap> / 0.1.89 / 1.1.0 |
 | Verified against | Kubernetes v1.33.5+k3s1 (verified 1.30 to 1.37) · Grafana 12.2.1 (verified 10.2 to 13.3) |
 | Nodes / namespaces / pods / CRDs | 2 (Ready 2) / 26 / 153 / 64 |
 | Components (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |

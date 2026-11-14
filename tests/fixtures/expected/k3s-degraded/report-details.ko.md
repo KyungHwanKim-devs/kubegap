@@ -1,18 +1,18 @@
 # kubegap 상세 리포트 — default (`default`), full 점검
 
-사람이 먼저 읽을 리포트는 옆의 `report.md`예요. 이 파일에는 판정 전체와 표가 있고, `scripts/kubegap render-details`가 수집 자료와 에이전트가 사실 파일에 쓴 분석 기록을 모아 만들어요. 다음 점검의 에이전트도 이 파일을 읽어요. 점검 항목 id와 근거 문장은 정의에서 그대로 가져와서 영어예요.
+사람이 먼저 읽을 리포트는 옆의 `report.md`입니다. 이 파일에는 판정 전체와 표가 있고, `scripts/kubegap render-details`가 수집 자료와 에이전트가 사실 파일에 쓴 분석 기록을 모아 만듭니다. 다음 점검의 에이전트도 이 파일을 읽습니다. 점검 항목 id와 근거 문장은 정의에서 그대로 가져와서 영어입니다.
 
 | 항목 | 값 |
 |---|---|
 | kube context / 클러스터 | `default` / default (k3s, v1.33.5+k3s1) |
 | 실행 시각 / 모드 | 2026-11-07T10:22:59+09:00 / full (수집 262.7초, 모드 때문에 건너뛴 단계 0개, 실패 7개) |
 | 운영 규모 | `small` (묻지 못해 노드 수로 짐작) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.88 / 1.1.0 |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.89 / 1.1.0 |
 | 검증한 버전 범위 | Kubernetes v1.33.5+k3s1 (검증 범위 안 1.30 ~ 1.37) · Grafana 12.2.1 (검증 범위 안 10.2 ~ 13.3) |
 | 노드 / 네임스페이스 / 파드 / CRD | 2 (Ready 2) / 26 / 153 / 64 |
 | 컴포넌트 (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
 | 메트릭 저장소 | 없음 |
-| 로그 저장소 | 없음 (Loki를 찾지 못했어요) |
+| 로그 저장소 | 없음 (Loki를 찾지 못했습니다) |
 | 노드 접속 | none (degraded fixture: no node access); SSM 미등록 0대 |
 | 수집 폴더 | `<snapshot>` |
 
@@ -26,7 +26,7 @@
 | low | 4 | 101 | 같은 모드의 지난 점검 없음 |
 | info | 0 | 11 | 같은 모드의 지난 점검 없음 |
 
-점검 항목 349개 중 판정 204개, 이 플랫폼이나 규모에서는 안 보는 것 44개, 건너뜀 99개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개예요. 숨긴 항목은 0개예요.
+점검 항목 349개 중 판정 204개, 이 플랫폼이나 규모에서는 안 보는 것 44개, 건너뜀 99개, 이 모드에서 수집 안 함 0개, 오류 0개, 도구 없음 0개, 에이전트 판정 2개입니다. 숨긴 항목은 0개입니다.
 
 ### 1-1. 자동 판정과 최종 판정이 다른 곳
 
@@ -51,11 +51,11 @@
 | `security.plaintext-configmap-secret.app-f-prod/configmap/app-f-marketing-scripts` | high |  | app-f-prod/configmap/app-f-marketing-scripts: keys ['app-f_ga4_digest.py:DISCORD_BOT_TOKEN', 'app-f_ga4_digest.py:token', 'app-f_policy_radar.py:OPENAI_API_KEY', 'app-f_policy_radar.py:DISCORD_BOT_TOKEN' … |
 | `tenancy.quota-near-limit.app-l-prod/app-l-prod-quota` | high |  | app-l-prod/app-l-prod-quota: near limit ['persistentvolumeclaims'] (max ratio 1.0). hard {'limits.cpu': '4', 'limits.memory': '8Gi', 'persistentvolumeclaims': '2', 'requests.cpu': '2', 'requests.memory': '4Gi' … |
 
-(연속 횟수는 diff.json이 있어야 나와요. 이번 점검에는 없어요)
+(연속 횟수는 diff.json이 있어야 나옵니다. 이번 점검에는 없습니다)
 
 ## 3. 같은 모드의 지난 점검 이후 변화
 
-비교할 이전 full 점검이 없어요.
+비교할 이전 full 점검이 없습니다.
 
 ### 3-1. 왜 바뀌었나
 
@@ -80,8 +80,8 @@
 - 도구 없음 0: 없음
 - full 모드에서 수집 안 함 0: 없음
 - 건너뛰었거나 오류가 난 점검 항목 99: `resources.cpu-throttling` (skip: metrics/cpu_throttle_ratio_24h,cpu_throttle_ratio_5m all missing or failed), `resources.oomkilled` (skip: metrics/oomkilled_last_terminated.json missing (not collected or no Prometheus)), `resources.oomkilled-repeated` (skip: summary.resilience.oom_7d.rows missing), `resources.node-memory-request-usage-gap` (skip: metrics/node_memory_request_ratio.json missing or failed), `resources.besteffort-in-prod` (skip: metrics/besteffort_pods.json missing (not collected or no Prometheus)), `resources.node-request-usage-gap` (skip: metrics/node_cpu_request_ratio.json missing or failed), `resources.cpu-request-overprovisioned` (skip: metrics/cpu_request_p95_ratio_7d.json missing or failed), `resources.cpu-limit-near-p95` (skip: metrics/cpu_limit_p95_ratio_7d.json missing (not collected or no Prometheus)), `resources.memory-request-overprovisioned` (skip: metrics/memory_request_p95_ratio_7d.json missing or failed), `resources.memory-limit-near-p95` (skip: metrics/memory_limit_p95_ratio_7d.json missing (not collected or no Prometheus)), `resources.large-request-binpacking` (skip: metrics/large_request_containers.json missing (not collected or no Prometheus)), `node.conntrack-usage` (skip: metrics/conntrack_ratio.json missing (not collected or no Prometheus)), `node.disk-usage` (skip: metrics/disk_usage_ratio.json missing (not collected or no Prometheus)), `node.inode-usage` (skip: metrics/inode_usage_ratio.json missing (not collected or no Prometheus)), `node.ntp-offset` (skip: metrics/ntp_offset_seconds.json missing (not collected or no Prometheus)), `node.ntp-unsynced` (skip: metrics/ntp_sync_status.json missing (not collected or no Prometheus)), `node.swap-enabled` (skip: metrics/node_swap_total_bytes.json missing (not collected or no Prometheus)), `observability.alerts-always-firing` (skip: alert firing samples not read (metrics/alerts_firing_samples_7d.json missing or failed)), `observability.alertmanager-default-null` (skip: nothing to judge: Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)), `observability.alertmanager-notification-failed` (skip: metrics/alertmanager_notifications_failed_1d.json missing (not collected or no Prometheus)), `observability.log-volume-change` (skip: summary.logs.loki.volume_change missing), `observability.severity-channels-not-separated` (skip: nothing to judge: Alertmanager configuration not read, or outside yamlite's YAML subset (config_error)), `observability.scrape-targets-down` (skip: metrics/scrape_targets_down_by_job.json missing (not collected or no Prometheus)), `security.networkpolicy-coverage` (skip: objects/networkpolicies.networking.k8s.io.json missing: the ClusterRole does not grant list on this kind), `events.tracked-warning-reasons` (skip: summary.events.history.tracked_hits missing), `controlplane.apiserver-429` (skip: metrics/apiserver_429_rate.json missing (not collected or no Prometheus)), `controlplane.apiserver-5xx` (skip: metrics/apiserver_5xx_rate.json missing (not collected or no Prometheus)), `controlplane.apiserver-latency` (skip: metrics/apiserver_p99_latency_by_verb.json missing (not collected or no Prometheus)), `controlplane.webhook-latency` (skip: metrics/apiserver_webhook_p99_by_name.json missing (not collected or no Prometheus)), `controlplane.etcd-slow` (skip: no k3s server journal read (logs/node/<node>/ missing: no node access)), `node.kernel-oom-node-level` (skip: nothing to judge: node not read (2)), `node.kernel-lockup` (skip: nothing to judge: node not read (2)), `node.kernel-io-fs-errors` (skip: nothing to judge: node not read (2)), `node.kernel-nic-events` (skip: nothing to judge: node not read (2)), `node.conntrack-table-full` (skip: nothing to judge: node not read (2)), `node.kernel-net-mem-pressure` (skip: nothing to judge: node not read (2)), `node.cgroup-v1` (skip: nothing to judge: node not read (2)), `node.sysctl-tuning` (skip: nothing to judge: node not read (2)), `node.cri-not-ready` (skip: nothing to judge: node not read, or cri not read (2)), `node.cri-exited-containers` (skip: nothing to judge: node not read (2)), `node.pod-logs-large` (skip: summary.nodeos.pod_logs missing), `node.pod-dir-large` (skip: summary.nodeos.pod_dirs missing), `node.service-restarts` (skip: nothing to judge: node not read (2)), `node.reboot-required` (skip: nothing to judge: node not read (2)), `node.os-updates-pending` (skip: nothing to judge: node not read (2)), `node.kubelet-reserved-missing` (skip: nothing to judge: node not read, or kubelet not read (2)), `node.kubelet-eviction-memory-missing` (skip: nothing to judge: node not read, or kubelet not read (2)), `node.clock-unsynced-os` (skip: nothing to judge: node not read (2)), `node.zombie-processes` (skip: nothing to judge: node not read (2)), `observability.log-coverage-gap` (skip: summary.logs.loki.coverage missing), `observability.loki-not-ready` (skip: nothing to judge: loki not present), `observability.loki-ingest-discarded` (skip: summary.logs.agents.loki_metrics missing), `observability.promtail-dropped` (skip: summary.logs.agents.promtail missing), `observability.log-error-ratio-high` (skip: summary.logs.loki.namespaces_1h missing), `observability.unstructured-logs` (skip: summary.logs.loki.namespaces_1h missing), `observability.alert-firing-stale` (skip: metrics/alerts_firing_stale_days.json missing (not collected or no Prometheus)), `cost.k3s-node-efficiency` (skip: nothing to judge: node CPU usage metrics not read (node_cpu_usage_ratio_p95_7d)), `security.networkpolicy-not-enforced` (skip: nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)), `security.no-default-deny` (skip: nothing to judge: NetworkPolicy objects not read (objects/networkpolicies.networking.k8s.io.json denied, failed or without a record)), `hygiene.orphan-secrets` (skip: nothing to judge: Secret names not read (kube_secret_info through Prometheus)), `node.memory-available-low` (skip: metrics/node_memory_available_ratio.json missing (not collected or no Prometheus)), `node.network-errors` (skip: metrics/node_network_errors_1d.json missing (not collected or no Prometheus)), `node.timewait-sockets-high` (skip: metrics/node_tcp_timewait.json missing (not collected or no Prometheus)), `node.kubelet-pleg-slow` (skip: metrics/kubelet_pleg_p99_1h.json missing (not collected or no Prometheus)), `controlplane.watch-count-high` (skip: metrics/apiserver_watch_per_node.json missing (not collected or no Prometheus)), `controlplane.apiserver-401-rate` (skip: metrics/apiserver_401_rate_1h.json missing (not collected or no Prometheus)), `controlplane.etcd-db-size` (skip: metrics/apiserver_storage_size_bytes.json missing (not collected or no Prometheus)), `node.kubelet-api-qps-low` (skip: nothing to judge: node not read, or kubelet not read (2)), `traffic.ingress-5xx-ratio` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)), `traffic.ingress-p95-latency` (skip: nothing to judge: ingress metrics not read (ALB CloudWatch metrics or the ingress controller's Prometheus series) (29)), `traffic.pod-not-ready` (skip: pod readiness ratio not read (metrics/pod_ready_ratio_24h.json missing or failed)), `traffic.coredns-latency` (skip: nothing to judge: CoreDNS metrics not read (coredns_dns_request_duration_seconds)), `scaling.hpa-at-max` (skip: metrics/hpa_at_max_ratio_15d.json missing (not collected or no Prometheus)), `scaling.hpa-never-scaled` (skip: nothing to judge: HPA metrics not read (hpa_at_min_ratio_15d) (11)), `scaling.hpa-flapping` (skip: metrics/hpa_desired_changes_7d.json missing (not collected or no Prometheus)), `scaling.pod-pending-long` (skip: metrics/pod_pending_seconds.json missing (not collected or no Prometheus)), `tenancy.burst-tenant-unbounded` (skip: nothing to judge: namespace CPU metrics not read (namespace_cpu_max_7d, namespace_cpu_median_7d) (26)), `node.docker-and-containerd` (skip: nothing to judge: node not read (2)), `node.container-writable-layer-large` (skip: nothing to judge: node not read (2)), `node.large-images` (skip: nothing to judge: node not read (2)), `platform.k3s-check-config-missing` (skip: nothing to judge: no k3s server's platform file read (logs/node/<node>/k3s-platform.txt)), `platform.k3s-apiserver-bind-all` (skip: nothing to judge: no k3s server's platform file read (logs/node/<node>/k3s-platform.txt)), `node.smartmontools-missing` (skip: nothing to judge: nodes not collected (2)), `platform.k3s-datastore-slow` (skip: nothing to judge: k3s datastore not read (no server node's k3s-platform.txt)), `alertmanager.receivers-unused-or-no-inhibit` (skip: nothing to judge: alertmanager not present, or its configuration could not be parsed (config_parse_error)), `alertmanager.notifications-silent` (skip: nothing to judge: alertmanager not present; metrics not read), `coredns.nxdomain-ratio-high` (skip: nothing to judge: metrics not read), `coredns.cache-hit-low` (skip: nothing to judge: metrics not read), `coredns.aaaa-noise` (skip: nothing to judge: metrics not read), `coredns.forward-upstream-errors` (skip: nothing to judge: metrics not read), `coredns.panic-or-reload-failed` (skip: nothing to judge: metrics not read), `coredns.pod-imbalance` (skip: nothing to judge: metrics not read), `traffic.flannel-drops-growing` (skip: nothing to judge: metrics not read), `kubeproxy.sync-slow` (skip: nothing to judge: metrics not read), `kubeproxy.rules-pending` (skip: nothing to judge: metrics not read), `kubeproxy.restore-failures` (skip: nothing to judge: metrics not read), `kubeproxy.conntrack-invalid-drops` (skip: nothing to judge: conntrack INVALID counter not served: kube-proxy 1.30, ipvs or nftables mode, no nfacct, or the proxy mode not read (summary ct_invalid_reason says which)), `storage.local-path-over-capacity` (skip: node directory sizes not read (the k3s-platform node step's du section: no node access)), `storage.local-path-fs-near-full` (skip: nothing to judge: metrics not read)
-- 일부만 판정한 점검 항목 2 (판정에 필요한 자료가 없는 대상은 판정하지 않았고 통과로 세지 않았어요): `platform.k3s-secrets-encryption-off` (1 판정 안 함: k3s server platform file not read (logs/node/<node>/k3s-platform.txt)), `platform.k3s-etcd-snapshot-local-only` (1 판정 안 함: k3s server platform file not read (logs/node/<node>/k3s-platform.txt))
-- 질의 결과가 빈 항목 0 (질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻이에요. 이름 자체가 없으면 건너뜀으로 처리해요): 없음
+- 일부만 판정한 점검 항목 2 (판정에 필요한 자료가 없는 대상은 판정하지 않았고 통과로 세지 않았습니다): `platform.k3s-secrets-encryption-off` (1 판정 안 함: k3s server platform file not read (logs/node/<node>/k3s-platform.txt)), `platform.k3s-etcd-snapshot-local-only` (1 판정 안 함: k3s server platform file not read (logs/node/<node>/k3s-platform.txt))
+- 질의 결과가 빈 항목 0 (질의가 읽는 메트릭 이름이 모두 있으므로 그런 일이 없었다는 뜻입니다. 이름 자체가 없으면 건너뜀으로 처리합니다): 없음
 
 ## 7. 부록
 
@@ -114,9 +114,9 @@
 | prometheus-operator | 0 |  | no collect.yaml (collector not implemented) |
 | reloader | 0 |  | no collect.yaml (collector not implemented) |
 
-ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목은 통과가 아니라 건너뜀으로 처리해요: `networkpolicies.networking.k8s.io`
+ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항목은 통과가 아니라 건너뜀으로 처리합니다: `networkpolicies.networking.k8s.io`
 
-이 클러스터가 제공하지 않는 종류 8개예요. 이 종류가 필요한 점검 항목은 통과가 아니라 건너뜀으로 처리해요: `autoscalingrunnersets.actions.github.com`, `configurationstates.metallb.io`, `nodeclaims.karpenter.sh`, `nodepools.karpenter.sh`, `servicebgpstatuses.metallb.io`, `targetgroupbindings.elbv2.k8s.aws`, `volumesnapshotclasses.snapshot.storage.k8s.io`, `volumesnapshots.snapshot.storage.k8s.io`
+이 클러스터가 제공하지 않는 종류 8개입니다. 이 종류가 필요한 점검 항목은 통과가 아니라 건너뜀으로 처리합니다: `autoscalingrunnersets.actions.github.com`, `configurationstates.metallb.io`, `nodeclaims.karpenter.sh`, `nodepools.karpenter.sh`, `servicebgpstatuses.metallb.io`, `targetgroupbindings.elbv2.k8s.aws`, `volumesnapshotclasses.snapshot.storage.k8s.io`, `volumesnapshots.snapshot.storage.k8s.io`
 
 명령 374개, 262.7초. 실패한 단계 7개: `core.events` Error from server (Forbidden): events is forbidden: User "kubegap" cannot list resource "events" in API group "" at the …; `core.metrics.core` no Prometheus connection; `coredns.metrics` no Prometheus connection; `flannel.metrics.flannel` no Prometheus connection; `kube-proxy.metrics` no Prometheus connection; `local-path-provisioner.metrics.local-path` no Prometheus connection; `prometheus.metrics.observability` no Prometheus connection
 
@@ -130,7 +130,7 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
 
 ### 7-3. 로그 시그니처 일치와 분류 안 된 오류
 
-로그 시그니처 1.1.0으로 파일 19개, 19941줄을 읽었어요 (컴포넌트: argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, fluent-bit, grafana, ingress-nginx, keda, metallb, prometheus). 분류 안 된 오류는 202줄이에요.
+로그 시그니처 1.1.0으로 파일 19개, 19941줄을 읽었습니다 (컴포넌트: argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, fluent-bit, grafana, ingress-nginx, keda, metallb, prometheus). 분류 안 된 오류는 202줄입니다.
 
 | 시그니처 | 컴포넌트 | 영역 | 심각도 | 상태 | 횟수 | 처음, 마지막 | 샘플 |
 |---|---|---|---|---|---|---|---|
@@ -525,7 +525,7 @@ ClusterRole에 없는 종류 1개예요. 이 종류가 필요한 점검 항목�
 | `scaling.no-hpa-serving-prod.app-l-prod/app-l-api` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.app-l-prod/app-l-web` | warn | info | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 
-표의 근거는 칸에 맞게 줄였어요. 판정에 쓴 자료 전체는 아래에 항목별로 접혀 있고, `findings-draft.json`의 `details`와 같아요.
+표의 근거는 칸에 맞게 줄였습니다. 판정에 쓴 자료 전체는 아래에 항목별로 접혀 있고, `findings-draft.json`의 `details`와 같습니다.
 
 <details><summary><code>argocd.prune-manages-namespace-or-crd.cluster</code></summary>
 

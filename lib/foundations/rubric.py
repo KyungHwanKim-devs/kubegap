@@ -183,6 +183,8 @@ def validate(check: dict, source: str) -> list[str]:
             errs.append(f"{source}: {check.get('id')} {key} must be a non-empty list of {allowed}")
     if check.get("nature", "state") not in NATURES:
         errs.append(f"{source}: {check.get('id')} nature must be one of {NATURES}")
+    if check.get("overdue") not in (None, True):
+        errs.append(f"{source}: {check.get('id')} overdue is `true` or absent: a failure of this check is a date already passed, and it grows while it waits")
     if "profiles" in check:
         errs.append(f"{source}: {check.get('id')} has `profiles`; a check names `platforms` and `scales` instead")
     rule = check.get("rule") or {}

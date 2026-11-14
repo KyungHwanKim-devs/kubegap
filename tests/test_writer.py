@@ -83,7 +83,7 @@ def _snap(tmp_path, facts=None, mode="full"):
 
 
 SECTIONS = "### 무슨 일인가\n\nx\n\n### 왜 생기나\n\ny\n\n### 추천 점검 방법\n\nz\n\n### 추천 해결 방안\n\n```yaml\nmaxUnavailable: 1\n```\n\n### 근거\n\n| a | b | c |\n|---|---|---|\n| 1 | 2 | 3 |\n\n### 더 읽을 것\n\n- r\n"
-OVERVIEW = "## 이미 일어난 일\n\n### nodes rebooted\n\n끝난 일이에요.\n\n## 그다음으로 큰 문제\n\n다섯 개 밖에 남은 critical·high 문제가 없어요.\n\n## 지난 리포트 이후\n\n| 지난 리포트의 권고 | 상태 | 근거 |\n|---|---|---|\n| move the dumps | 반영됨 | 7 CronJobs on n1 |\n\n**새로 생긴 것**\n\n- two nodes rebooted\n\n**없어진 것**\n\n- 없음\n"
+OVERVIEW = "## 이미 일어난 일\n\n### nodes rebooted\n\n끝난 일입니다.\n\n## 그다음으로 큰 문제\n\n다섯 개 밖에 남은 critical·high 문제가 없습니다.\n\n## 지난 리포트 이후\n\n| 지난 리포트의 권고 | 상태 | 근거 |\n|---|---|---|\n| move the dumps | 반영됨 | 7 CronJobs on n1 |\n\n**새로 생긴 것**\n\n- two nodes rebooted\n\n**없어진 것**\n\n- 없음\n"
 NOTHING = json.dumps({"cautions": [], "drop": [], "scope": []})
 
 
@@ -107,7 +107,7 @@ class Runner:
 
 def _run(s, r, **kw):
     said = []
-    writer.write_report(s, "ko", "claude", "0.1.88", "0.2.0", say=said.append, run=r, **kw)
+    writer.write_report(s, "ko", "claude", "0.1.89", "0.2.0", say=said.append, run=r, **kw)
     return said, (s / "report.md").read_text()
 
 
@@ -175,13 +175,13 @@ def test_the_report_is_assembled_in_its_order_with_what_code_writes(tmp_path):
     at = [text.index(x) for x in order]
     assert at == sorted(at)
     assert "가장 큰 문제 2개: ① title 1 ② title 2" in text and "이미 일어난 일: nodes rebooted" in text and "운영 규모: 소형" in text
-    assert "## 이미 일어난 일\n\n2026-11-11 14:08부터 2026-11-14 12:00까지 본 것이에요." in text
+    assert "## 이미 일어난 일\n\n2026-11-11 14:08부터 2026-11-14 12:00까지 본 것입니다." in text
     assert "## 지금 깨져 있는 것" not in text  # nothing broken: the section is not there, the first screen says so
     assert "| move the dumps | 반영됨 | 7 CronJobs on n1 |" in text and "**새로 생긴 것**\n\n- two nodes rebooted" in text and "**없어진 것**\n\n- 없음" in text
     assert "**두 점검 사이에 판정 규칙이 바뀐 항목**\n\n- `x.y` 2" in text  # counted per check; the ids are in report-details.md
     assert "| 2026-11-20 | certificate renews | summary.json |" in text and "| security | one plaintext token |" in text
-    assert "- Grafana 토큰.\n  - 약해지는 결론: 대시보드 목록." in text and "kubegap에 전용 점검 항목이 없어요: istio." in text
-    assert "비교 기준은 2026-11-11 14:08 full 점검이에요." in text and "| critical | 1 | 0 | 0 | 0 |" in text
+    assert "- Grafana 토큰.\n  - 약해지는 결론: 대시보드 목록." in text and "kubegap에 전용 점검 항목이 없습니다: istio." in text
+    assert "비교 기준은 2026-11-11 14:08 full 점검입니다." in text and "| critical | 1 | 0 | 0 | 0 |" in text
     assert "- 사건 A: `traffic.pod-not-ready.*`" in text and "- 문제 1: `resilience.no-backup.cluster`" in text
     assert text.rstrip().endswith(f"수집 자료 `{s}`")
 
@@ -213,7 +213,7 @@ def test_what_the_solution_check_found_goes_into_the_facts(tmp_path):
 
 def test_shape_terms_and_facts_are_fixed_in_one_replacement(tmp_path):
     s = _snap(tmp_path)
-    bad = "## 1. title 1\n\n**고른 이유.** r\n\n### 무슨 일인가\n\n파드를 놓는 순간에만 적용돼요. [m](https://memory.example/x)\n"
+    bad = "## 1. title 1\n\n**고른 이유.** r\n\n### 무슨 일인가\n\n파드를 놓는 순간에만 적용됩니다. [m](https://memory.example/x)\n"
     fixed = OVERVIEW + "\n## 1. title 1\n\n**고른 이유.** r\n\n" + SECTIONS + "\n## 2. title 2\n\n**고른 이유.** r\n\n" + SECTIONS
     r = Runner({"check-facts-ko.md": '- 인용: "x"\n  사실: y\n  출처: z', "replace-ko.md": fixed})
     r.replies["write-problem-ko.md"] = bad
@@ -293,7 +293,7 @@ def test_the_korean_prompts_are_written_as_statements_and_carry_whole_examples()
         text = (writer.REFERENCES / f"{name}-ko.md").read_text()
         assert not any(w in text for w in ("You are", "Do not")), name  # written in Korean, not carried over
         head = text.split("<example>")[0]
-        for ending in ("해요.", "써요.", "봐요.", "않아요."):  # the instructions are plain statements: an agent copies the voice of its instructions
+        for ending in ("해요.", "어요.", "아요.", "합니다.", "습니다."):  # the instructions are plain statements: an agent copies the voice of its instructions
             assert ending not in "\n".join(ln for ln in head.splitlines() if "`" not in ln and "“" not in ln and '"' not in ln), (name, ending)
     problem = (writer.REFERENCES / "write-problem-ko.md").read_text()
     assert problem.count("<example>") == 2 and all(f"### {x}" in problem for x in writer.HEADINGS["ko"]["sections"])
@@ -314,9 +314,9 @@ def test_an_english_report_says_its_guides_are_not_written_yet(tmp_path):
 def test_the_glossary_names_what_not_to_write_and_skips_code():
     terms = glossary.load("ko")
     assert terms and all(t["use"] and t["avoid"] for t in terms)
-    hits = glossary.find("스케줄러가 파드를 놓는 순간에만 적용돼요.\n\n```\n퇴거\n```\n`퇴거`는 그대로예요.", terms)
+    hits = glossary.find("스케줄러가 파드를 놓는 순간에만 적용됩니다.\n\n```\n퇴거\n```\n`퇴거`는 그대로입니다.", terms)
     assert len(hits) == 1 and "'파드를 놓'" in hits[0] and "스케줄링" in hits[0]
-    assert glossary.find("스케줄링할 때만 적용돼요.", terms) == []
+    assert glossary.find("스케줄링할 때만 적용됩니다.", terms) == []
     for example in ("write-problem-ko.md", "write-overview-ko.md"):  # the examples the writers imitate follow the glossary themselves
         assert glossary.find((writer.REFERENCES / example).read_text().split("<example>", 1)[1], terms) == [], example
 

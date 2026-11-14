@@ -4245,6 +4245,7 @@
     warn_expr: "days_until(k8s_eol(inv['cluster'].get('server_version'))) < 90"
   evidence: "f\"server {inv['cluster'].get('server_version')}: {eol_badge(inv['cluster'].get('server_version'))}\""
   severity_default: high
+  overdue: true
   symptom_linked: false
   why: >
     An unsupported minor version gets no security patches. On EKS extended support billing starts; on k3s and kubeadm the upgrade path gets longer (no skipping more than one minor).
