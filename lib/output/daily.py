@@ -246,7 +246,7 @@ def verify_numbers(snap: Path, facts: dict) -> list[str]:
     return out
 
 
-_NUMBER = re.compile(r"\d+(?:[.,]\d+)*")
+_NUMBER = re.compile(r"(?<![A-Za-z_\-])\d+(?:[.,]\d+)*")  # not the digit inside a name: k3s, v1, tempo-0
 
 
 def ungrounded_numbers(facts: dict, snap: Path) -> list[str]:

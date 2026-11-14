@@ -172,6 +172,8 @@ def test_a_number_in_a_sentence_has_to_stand_somewhere(tmp_path):
     f = _facts()
     f["top"][1]["facts"] = []
     assert any("the numbers 1.33 are in `what` or `why`" in e for e in daily.check(f, snap, "ko"))
+    f["top"][1]["what"] = "k3s 서버 tempo-0 의 v1 API 가 남아 있습니다."  # a digit inside a name is not a number
+    assert not any("are in `what` or `why`" in e for e in daily.check(f, snap, "ko"))
     f["top"][1]["what"] = "`1.33`의 지원이 끝났습니다."  # a name in backticks is not a number to ground
     assert not any("are in `what` or `why`" in e for e in daily.check(f, snap, "ko"))
     f = _facts()
