@@ -196,3 +196,12 @@ def test_db_like_guesses_a_gone_pod_from_its_name(tmp_path):
     cx = _cx_with_pods(tmp_path, [])
     assert cx.db_like({"namespace": "prod-a", "pod": "shop-postgresql-0", "container": "postgresql"})
     assert not cx.db_like({"namespace": "prod-a", "pod": "web-6d7ff4dcdb-abcde", "container": "app"})
+
+
+def test_a_name_of_the_environment_is_visible_inside_a_comprehension_on_every_python():
+    """Python 3.11 failed a check whose evidence called a helper inside a list comprehension; CI runs 3.11 to 3.14."""
+    from lib.judgement.evaluate.rules import eval_expr
+
+    env = {"rows": [{"x": [1, 2, 3]}, {"x": [4]}], "first": lambda xs, n: xs[:n], "n": 1}
+    assert eval_expr("[first(p['x'], n) for p in rows]", env) == [[1], [4]]
+    assert eval_expr("any(len(p['x']) > n for p in rows)", env) is True

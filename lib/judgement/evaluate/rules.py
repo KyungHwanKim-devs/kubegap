@@ -40,7 +40,10 @@ SAFE_BUILTINS = {
 
 
 def eval_expr(expr: str, env: dict):
-    return eval(expr, {"__builtins__": SAFE_BUILTINS}, env)
+    """Evaluate a check's expression with `env` as its names. The names are given as globals, not locals: up to Python 3.11 a comprehension is a
+    scope of its own and does not see the locals of `eval`, so `[shown(p["x"], 1) for p in rows]` raised NameError there while 3.12 and later
+    (PEP 709) evaluated it. As globals every name is visible in every nested scope on every version."""
+    return eval(expr, {"__builtins__": SAFE_BUILTINS, **env})
 
 
 def status(rule: dict, env: dict) -> str:
