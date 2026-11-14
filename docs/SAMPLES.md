@@ -10,7 +10,7 @@ The reports in `samples/` are real runs with names replaced. Numbers, findings a
    scripts/kubegap mask --ips report.md report-details.md
    ```
 
-4. Replace names with placeholders. The map file is yours and is not committed; the format is in the header of `scripts/scrub-sample.py`. Every hostname in the `hosts` list gets a placeholder of its own, so two hosts never end up with the same name. Two things are replaced whatever your map holds: load balancer DNS names (`*.elb.<region>.amazonaws.com`) and the path of the snapshot folder.
+4. Replace names with placeholders. The map file is yours and is not committed; the format is in the header of `scripts/scrub-sample.py`. Every hostname in the `hosts` list gets a placeholder of its own, so two hosts never end up with the same name. Three things are replaced whatever your map holds: load balancer DNS names (`*.elb.<region>.amazonaws.com`), the names the AWS Load Balancer Controller gives its load balancers and target groups (`k8s-<namespace>-<name>-<hash>`), and the path of the snapshot folder.
 
    ```bash
    scripts/scrub-sample.py --map ~/.kubegap/scrub-map.yaml report.md         samples/<lang>/<cluster>/<mode>/report.md

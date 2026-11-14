@@ -398,7 +398,7 @@ At a larger scale, upgrades happen three times a year as routine: release notes 
 
 ### What is the matter
 
-Four target groups of the shared production ALB `k8s-lab-kprodlb-b18a4555d7` have no healthy target at all. The ALB checks each target on the path `/` and expects the code 200, and each answers something else.
+Four target groups of the shared production ALB `k8s-lb-b18a4555d7` have no healthy target at all. The ALB checks each target on the path `/` and expects the code 200, and each answers something else.
 
 - `prod-app-t/app-t-backend`, port 3000: the one target answers 404. It served 6,089 requests in the last 24 hours.
 - `prod-app-z-backend/app-z-backend`, port 8000: both targets answer 404. It served 6 requests.

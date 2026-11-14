@@ -253,3 +253,6 @@ def test_a_sample_never_carries_a_load_balancer_address_or_the_snapshot_folder(t
     out = mod.scrub(text, mod.build({}))
     assert "31ecf1515b" not in out and "<load-balancer>.elb.amazonaws.com" in out
     assert "/Users/me" not in out and "`~/.kubegap/snapshots/<context>/2026-11-15T01-51-00`" in out
+    out = mod.scrub("target group k8s-prodshop-checkout-bb495c72c8 and ALB k8s-acmeprodlb-b18a4555d7 x", mod.build({}))
+    assert "prodshop" not in out and "checkout" not in out and "k8s-lb-bb495c72c8" in out
+    assert "acmeprodlb" not in out and "k8s-lb-b18a4555d7" in out

@@ -18,7 +18,8 @@ This script then applies the name map, which is yours and stays out of the repos
     rules_after:                             # applied last, same form as rules
       - [ '\\bsome-leftover\\b', 'placeholder' ]
 
-Two things are replaced whatever the map says (ALWAYS below): load balancer DNS names (`*.elb.<region>.amazonaws.com`) and the path of the
+Three things are replaced whatever the map says (ALWAYS below): load balancer DNS names (`*.elb.<region>.amazonaws.com`), the names the AWS Load
+Balancer Controller gives load balancers and target groups (`k8s-<namespace>-<name>-<hash>`, which carry cut real names), and the path of the
 snapshot folder, which holds the home directory.
 
 Numbers, findings and wording are left as they are. See docs/SAMPLES.md.
@@ -44,6 +45,9 @@ def app_placeholder(i: int) -> str:
 # open port names the very address it is open on) and the folder of the snapshot the report came from, which carries the user's home directory.
 ALWAYS: list[tuple[str, str]] = [
     (r"[A-Za-z0-9-]+\.elb\.[a-z0-9-]+\.amazonaws\.com", "<load-balancer>.elb.amazonaws.com"),
+    # what the AWS Load Balancer Controller names a load balancer or a target group: k8s-<first 8 of the namespace>-<first 8 of the name>-<10 hex>.
+    # The two cut names are real ones a word rule of the map cannot match (`prodshop`, `checkout`); the hash stays, so two resources stay apart.
+    (r"\bk8s-(?:[a-z0-9]+-){1,3}([0-9a-f]{10})\b", r"k8s-lb-\1"),  # one part when the load balancer was given a name, more when a namespace carries a hyphen
     (r"(?:/Users|/home)/[^/\s`]+/\.kubegap[A-Za-z0-9._-]*/snapshots/[^/\s`]+/", "~/.kubegap/snapshots/<context>/"),
 ]
 
