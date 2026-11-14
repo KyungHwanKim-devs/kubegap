@@ -16,8 +16,8 @@ from pathlib import Path
 
 from ..foundations.durations import go_duration_s
 from ..foundations.promtext import parse as _parse_prom
-from ..foundations.snapshot import load_json, objects, parse_ts, taken_at
-from ..foundations.versions import image_version
+from ..foundations.snapshot import dump_record, load_json, object_file_status, objects, parse_ts, taken_at
+from ..foundations.versions import image_version, major_minor
 
 
 def _dur_s(s) -> float | None:
@@ -44,6 +44,46 @@ def _non_empty(v) -> bool:
     if isinstance(v, dict):
         return bool(v.get("present")) if "present" in v else int(v.get("len") or 0) > 0
     return False
+
+
+# What stops Argo CD from deleting an object an Application tracks (#207). Two paths delete: automated prune, when the object leaves what the source
+# renders, and the cascade of the resources finalizer, when the Application itself is deleted. Each reads the live object and nothing else.
+#   prune:   `pruneObject` skips an object whose `argocd.argoproj.io/sync-options` holds `Prune=false`, and nothing else on the object
+#            (argoproj/gitops-engine pkg/sync/sync_context.go:1002@bd7681ae3f8b, :1224@b89b0871b414; argoproj/argo-cd gitops-engine/pkg/sync/sync_context.go:356,1511@v3.6.1)
+#   cascade: `shouldBeDeleted` skips every CRD, an object with `Delete=false` and an object with `helm.sh/resource-policy: keep`
+#            (argoproj/argo-cd controller/appcontroller.go:1101-1105@v2.13.0, :1166-1170@v3.2.0, :1321-1330@v3.6.1; util/helm/helm.go:21,22@v3.2.0)
+#   `Prune=confirm` and `Delete=confirm` wait for a person; the values exist from 2.14.0
+#            (argoproj/gitops-engine pkg/sync/common/types.go:42,44@c19f8cfa4d27, absent at :23-35@bd7681ae3f8b; pkg/sync/sync_context.go:1176@c19f8cfa4d27; argoproj/argo-cd controller/appcontroller.go:1230@v2.14.0)
+#   from 3.4.0 the Application's own `syncPolicy.syncOptions` is the default when the object has no `Prune=`/`Delete=` option of its own
+#            (argoproj/argo-cd controller/sync.go:350@v3.4.0, controller/appcontroller.go:1173@v3.4.0; neither line exists at v3.3.0)
+#   the annotation is a comma-separated list, each item trimmed (argoproj/gitops-engine pkg/sync/resource/annotations.go:16-31@bd7681ae3f8b, :16-31@b89b0871b414)
+#   the cascade runs when the Application carries a resources finalizer, plain or with a propagation policy
+#            (argoproj/argo-cd pkg/apis/application/v1alpha1/application_defaults.go:10,16,19@v3.2.0; pkg/apis/application/v1alpha1/types.go:3276-3283@v3.2.0)
+SYNC_OPTIONS = "argocd.argoproj.io/sync-options"
+HELM_RESOURCE_POLICY = "helm.sh/resource-policy"
+RESOURCES_FINALIZER = "resources-finalizer.argocd.argoproj.io"
+TRACKED_KINDS = {("", "Namespace"): "namespaces", ("apiextensions.k8s.io", "CustomResourceDefinition"): "customresourcedefinitions"}
+
+
+def _csv(v) -> list[str]:
+    return [x.strip() for x in str(v or "").split(",") if x.strip()]
+
+
+def _option(values: list[str], key: str) -> str | None:
+    """The value of `key=<value>` in a sync-options list, None when the list has no such option."""
+    return next((x.split("=", 1)[1] for x in values if x.startswith(key + "=")), None)
+
+
+def _guards(annotations: dict, app_options: list[str], ver: tuple[int, int] | None) -> tuple[bool, bool]:
+    """(automated prune leaves the object, the cascade on Application deletion leaves it), read from the object's annotations as Argo CD of this version reads them.
+    Without a version (no semver image tag) only what every version read honours counts: `Prune=false`, `Delete=false` and Helm's `keep`."""
+    own = _csv(annotations.get(SYNC_OPTIONS))
+    stops = {"false", "confirm"} if ver and ver >= (2, 14) else {"false"}
+    prune, delete = _option(own, "Prune"), _option(own, "Delete")
+    if ver and ver >= (3, 4):
+        prune = _option(app_options, "Prune") if prune is None else prune
+        delete = _option(app_options, "Delete") if delete is None else delete
+    return prune in stops, delete in stops or "keep" in _csv(annotations.get(HELM_RESOURCE_POLICY))
 
 
 def analyze(snap: Path, inv: dict | None) -> dict:
@@ -128,6 +168,11 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             }
         )
     # --- Application
+    ver = major_minor(version)
+    rec = dump_record(snap)
+    live = {stem: {o["metadata"]["name"]: (o["metadata"].get("annotations") or {}) for o in objects(snap, stem)} for stem in TRACKED_KINDS.values()}
+    unread = {stem for stem in TRACKED_KINDS.values() if object_file_status(snap, stem, rec) != "ok"}
+    tracked_unread: set[str] = set()
     rows = []
     for a in apps:
         sp, st = a.get("spec") or {}, a.get("status") or {}
@@ -139,6 +184,24 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         op = st.get("operationState") or {}
         dest_ns = (sp.get("destination") or {}).get("namespace")
         kinds = Counter(r.get("kind") for r in st.get("resources") or [])
+        prune = bool(automated and (auto or {}).get("prune"))
+        cascade = any(str(f).startswith(RESOURCES_FINALIZER) for f in a["metadata"].get("finalizers") or [])
+        prune_deletes, cascade_deletes = [], []
+        for r in st.get("resources") or []:
+            stem = TRACKED_KINDS.get((r.get("group") or "", r.get("kind")))
+            if not stem:
+                continue
+            if stem in unread:
+                tracked_unread.add(stem)
+                continue
+            # an object the Application lists and the cluster no longer has cannot be deleted again
+            if r.get("name") not in live[stem]:
+                continue
+            keeps_on_prune, keeps_on_delete = _guards(live[stem][r.get("name")], pol.get("syncOptions") or [], ver)
+            if prune and not keeps_on_prune:
+                prune_deletes.append(f"{r.get('kind')}/{r.get('name')}")
+            if cascade and stem == "namespaces" and not keeps_on_delete:
+                cascade_deletes.append(f"{r.get('kind')}/{r.get('name')}")
         fin = parse_ts(op.get("finishedAt"))
         rec = parse_ts(st.get("reconciledAt"))
         sync = (st.get("sync") or {}).get("status")
@@ -159,7 +222,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "target_revision": src.get("targetRevision"),
                 "tracks_moving_ref": str(src.get("targetRevision") or "HEAD") in ("HEAD", "main", "master", "develop", "dev") or not re.match(r"^v?\d", str(src.get("targetRevision") or "HEAD")),
                 "automated": automated,
-                "prune": bool(automated and (auto or {}).get("prune")),
+                "prune": prune,
+                "cascade": cascade,
                 "self_heal": bool(automated and (auto or {}).get("selfHeal")),
                 "sync_options": pol.get("syncOptions") or [],
                 "sync": sync,
@@ -172,6 +236,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "resources": len(st.get("resources") or []),
                 "manages_namespace": kinds.get("Namespace", 0),
                 "manages_crd": kinds.get("CustomResourceDefinition", 0),
+                "prune_deletes": sorted(prune_deletes),
+                "cascade_deletes": sorted(cascade_deletes),
                 "history": len(st.get("history") or []),
                 "ignore_differences": bool(sp.get("ignoreDifferences")),
                 "revision": (st.get("sync") or {}).get("revision", "")[:12],
@@ -286,7 +352,11 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         "apps_with_conditions": [r["target"] for r in rows if r["conditions"]],
         "prod_not_automated": [r["target"] for r in rows if r["prod"] and not r["automated"]],
         "prod_no_self_heal": [r["target"] for r in rows if r["prod"] and r["automated"] and not r["self_heal"]],
-        "prune_with_namespace_or_crd": [r["target"] for r in rows if r["prune"] and (r["manages_namespace"] or r["manages_crd"])],
+        "prune_deletes_namespace_or_crd": [r["target"] for r in rows if r["prune_deletes"]],
+        "prune_deletes_objects": [f"{r['name']} {o}" for r in rows for o in r["prune_deletes"]],
+        "cascade_deletes_namespace": [f"{r['name']} {o}" for r in rows for o in r["cascade_deletes"]],
+        "tracked_objects_read": not tracked_unread,
+        "tracked_objects_unread": sorted(tracked_unread),
         "prod_tracking_moving_ref": [r["target"] for r in rows if r["prod"] and r["tracks_moving_ref"]],
         "reconcile_stale": [r["target"] for r in rows if (r["reconciled_age_min"] or 0) * 60 > reconcile_s * 3],
         "reconcile_timeout_s": reconcile_s,
