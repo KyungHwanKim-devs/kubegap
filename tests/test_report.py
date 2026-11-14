@@ -261,3 +261,11 @@ def test_a_critical_warning_may_not_be_left_out_and_a_high_warning_may(tmp_path)
     assert not any("backup-same-node" in e for e in issues)
     o["problems"].insert(0, {"title": "백업이 클러스터 밖에 없음", "loss": "irreversible", "finding_ids": ["resilience.no-backup.cluster"]})
     assert F.check(o, snap) == []
+
+
+def test_the_repository_an_argo_cd_application_points_at_may_be_named(tmp_path):
+    snap = _snap(tmp_path)
+    (snap / "summary.json").write_text(json.dumps({"argocdctl": {"applications": {"rows": [{"name": "shop", "repo_url": "https://github.com/acme/deploy.git"}]}}}))
+    allowed = report.allowed_urls(snap)
+    assert "https://github.com/acme/deploy.git" in allowed and "https://github.com/acme/deploy" in allowed
+    assert "https://github.com/acme/other" not in allowed

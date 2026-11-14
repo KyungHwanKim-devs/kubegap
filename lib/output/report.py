@@ -54,8 +54,8 @@ def split_sections(text: str) -> dict[str, str]:
 
 
 def allowed_urls(snap: Path) -> set[str]:
-    """Every address a report of this run may carry: those of the learn topics of its findings and the public cases of its checks. Someone
-    opened each of them; an address that is not among them was written from memory."""
+    """Every address a report of this run may carry: those of the learn topics of its findings and the public cases of its checks, which someone
+    opened, and the repositories this cluster's Argo CD applications point at, which the snapshot holds. Any other was written from memory."""
     fd = load_json(snap / "findings-draft.json") or {}
     out: set[str] = set()
     for t in fd.get("learn") or []:
@@ -63,6 +63,13 @@ def allowed_urls(snap: Path) -> set[str]:
             out |= {str(x.get("url")).rstrip("/") for x in t.get(key) or [] if isinstance(x, dict) and x.get("url")}
     for f in fd.get("findings") or []:
         out |= {str(c.get("url")).rstrip("/") for c in f.get("cases") or [] if isinstance(c, dict) and c.get("url")}
+    # The repository an Argo CD application points at is this cluster's own data, read from the snapshot: the guide tells the writer to name it
+    # where a change has to be made (`declared in`), and the first English full report was refused for doing so.
+    apps = (((load_json(snap / "summary.json") or {}).get("argocdctl") or {}).get("applications") or {}).get("rows") or []
+    for a in apps:
+        u = str(a.get("repo_url") or "").rstrip("/") if isinstance(a, dict) else ""
+        if u:
+            out |= {u, u.removesuffix(".git")}
     return out
 
 
