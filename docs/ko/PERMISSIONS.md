@@ -42,7 +42,7 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 - 요약 데이터나 자원 목록으로 판정하는 점검 항목은 규칙의 `rule.needs`에 적힌 입력이 없으면 `skip`이 됩니다. `done`으로 끝날 때는 판정하지 못한 대상을 7-5절에 적습니다.
 - 입력이 비어 있다는 이유로 통과시키지 않습니다. 배경은 [#114](https://github.com/KyungHwanKim-devs/kubegap/issues/114)에 있습니다.
 
-영어 원본의 표는 `tests/test_permissions.py`가 검사합니다. Kubernetes 표는 ClusterRole의 그룹, 리소스, verb와 정확히 같아야 하고, AWS 표는 정책의 액션과 정확히 같아야 합니다. 표에 적은 수집 단계는 `collectors/*/collect.yaml`에 있어야 하고, 모드 칸은 그 단계의 `modes:`와 맞아야 합니다. 점검 항목 칸은 각 종류가 어느 요약 섹션에 들어가는지 보고 사람이 썼습니다. 같은 테스트는 코드가 역할에 없는 것을 읽지 않는지와, 역할에 코드가 읽지 않는 것이 없는지도 확인합니다.
+영어 원본의 표는 `tests/test_permissions.py`가 검사합니다. Kubernetes 표는 ClusterRole의 그룹, 리소스, verb와 정확히 같아야 하고, AWS 표는 정책의 액션과 정확히 같아야 합니다. 표에 적은 수집 단계는 `collectors/*/collect.yaml`에 있어야 하고, 모드 칸은 그 단계가 속한 수집 단위(`collectors/units.yaml`)의 모드와 맞아야 합니다. 점검 항목 칸은 각 종류가 어느 요약 섹션에 들어가는지 보고 사람이 썼습니다. 같은 테스트는 코드가 역할에 없는 것을 읽지 않는지와, 역할에 코드가 읽지 않는 것이 없는지도 확인합니다.
 
 이 문서에서 자주 나오는 이름은 이런 뜻입니다.
 
@@ -241,15 +241,15 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 
 **`ssm:DescribeDocument`.** `lib/commands/setup.py`와 `lib/collection/nodecommands.py`가 `kubegap-node-read`가 계정에 있고 최신인지 확인합니다. 쓰는 항목은 `ssm:SendCommand`와 같습니다. 없으면 kubegap이 SSM 문서가 저장소의 것과 같은지 확인할 수 없어서 노드 명령을 보내지 않습니다.
 
-**`ssm:SendCommand`.** `lib/collection/node.py`가 `type: node` 수집 단계와, API 서버 프록시가 막혔을 때 파드 메트릭을 대신 읽는 동작에 씁니다. 수집 단계는 full 전용이고, 메트릭을 대신 읽는 curl은 daily와 full 모두에서 돌아갑니다.
+**`ssm:SendCommand`.** `lib/collection/node.py`가 `type: node` 수집 단계와, API 서버 프록시가 막혔을 때 파드 메트릭을 대신 읽는 동작에 씁니다. 둘 다 full 점검에서만 돌아갑니다. daily 점검은 노드에 접속하지 않습니다.
 
-노드 스크립트와 kubelet configz를 읽는 `node.*` 항목 26개, `vpccni.*`의 ipamd 행, `vpc-cni.*` 로그 시그니처 셋(ipamd.log), `kubeproxy.*`의 모드 행, `*.metrics-unreadable`의 대체 경로가 씁니다. `node.*`의 나머지 10개는 Prometheus를 읽습니다. 없으면 이 노드 항목들은 daily에서 수집되지 않고, full에서는 읽지 못한 노드마다 `skip`이 됩니다. 파드 메트릭을 대신 읽을 수도 없어서 `metrics-unreadable`이 warn을 냅니다.
+노드 스크립트와 kubelet configz를 읽는 `node.*` 항목 26개, `vpccni.*`의 ipamd 행, `vpc-cni.*` 로그 시그니처 셋(ipamd.log), `kubeproxy.*`의 모드 행, `*.metrics-unreadable`의 대체 경로가 씁니다. `node.*`의 나머지 10개는 Prometheus를 읽습니다. daily에서는 이 노드 항목들을 수집하지 않습니다. 권한이 없으면 full에서는 읽지 못한 노드마다 `skip`이 됩니다. 파드 메트릭을 대신 읽을 수도 없어서 `metrics-unreadable`이 warn을 냅니다.
 
 **`ssm:GetCommandInvocation`.** `lib/collection/node.py`가 모든 SSM 명령의 결과를 읽습니다. 쓰는 항목은 `ssm:SendCommand`와 같습니다. 없으면 명령은 가지만 출력을 읽지 못해서 노드 단계가 실패합니다.
 
 ### 수집 단계 하나만 쓰는 권한
 
-아래 권한은 수집 단계 하나만 쓰고, 없으면 표의 항목이 `skip`이 됩니다. `acm:ListCertificates`는 daily와 full 모두에서 쓰고, 나머지는 full 전용입니다.
+아래 권한은 수집 단계 하나만 쓰고, 없으면 표의 항목이 `skip`이 됩니다. 전부 full 전용입니다. daily 점검은 AWS API를 부르지 않습니다.
 
 | 권한 | 수집 단계 | 쓰는 점검 항목 |
 |---|---|---|
@@ -265,7 +265,7 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 | `ce:GetCostAndUsage` | `eks-platform/ce-cost-30d` | `cost.*` 7개 |
 | `pricing:GetProducts` | `eks-platform/pricing-ondemand` | `cost.idle-compute-high`, `cost.request-waste`, `cost.on-demand-in-spot-pool`, `cost.idle-node` |
 
-**`ecr:DescribeRepositories`.** daily와 full 모두에서 `lib/collection/discover.py`가 저장소 이름을 읽고, ECR 수집기는 이 목록의 저장소마다 돌아갑니다. `ecr.*` 8개가 기대는 권한입니다. 없으면 ECR 수집기가 살펴볼 저장소가 없어서 ECR 항목이 `skip`이 됩니다.
+**`ecr:DescribeRepositories`.** full 점검에서 `lib/collection/discover.py`가 저장소 이름을 읽고, ECR 수집기는 이 목록의 저장소마다 돌아갑니다. `ecr.*` 8개가 기대는 권한입니다. 없으면 ECR 수집기가 살펴볼 저장소가 없어서 ECR 항목이 `skip`이 됩니다.
 
 ## IAM 권한이 하나도 없을 때 (#22)
 
@@ -302,7 +302,7 @@ EKS에서는 `ssm:SendCommand`로 노드에 들어갑니다. k3s와 베어메탈
 | EKS | `eks-platform/kubelet-journal`, `eks-platform/containerd-journal`, `vpc-cni/ipamd-metrics`, `vpc-cni/ipamd-log` |
 | k3s | `k3s-platform/k3s-journal-errors`, `k3s-platform/k3s-journal-stats`, `k3s-platform/k3s-scheduler-unschedulable`, `k3s-platform/k3s-webhook-failures`, `k3s-platform/k3s-etcd-slow`, `k3s-platform/kubelet-pleg`, `k3s-platform/k3s-node`, `k3s-platform/containerd-log` |
 
-파드 메트릭을 대신 읽는 curl은 daily와 full 모두에서 돌아갑니다. 접속 방식별 명령 전문은 [`deploy/node-access/COMMANDS.md`](../../deploy/node-access/COMMANDS.md)에 있습니다.
+파드 메트릭을 대신 읽는 curl도 full 점검에서만 돌아갑니다. 접속 방식별 명령 전문은 [`deploy/node-access/COMMANDS.md`](../../deploy/node-access/COMMANDS.md)에 있습니다.
 
 ## `ssm:SendCommand`를 제한하는 방법
 
