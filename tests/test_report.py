@@ -47,6 +47,8 @@ def test_who_declares_a_target_comes_from_the_snapshot_and_is_none_without_evide
     assert d["prod/deployment/api"] == {"managed_by": "argocd", "argocd_app": "shop", "repo_url": "https://example.com/org/manifests", "path": "prod/shop", "target_revision": "HEAD", "self_heal": True}
     assert d["prod/api"] == d["prod/deployment/api"] and d["monitoring/prom"] == {"managed_by": "helm", "helm_release": "kps"}
     assert d["kube-system/deployment/coredns"] is None
+    assert F.declared_in(owners, "monitoring/sts/prom:prometheus") == {"managed_by": "helm", "helm_release": "kps"}  # a container finding with the short kind
+    assert F.declared_in(owners, "prod/deploy/api") == d["prod/deployment/api"]
 
 
 def _with_diff(snap: Path, report: bool) -> None:

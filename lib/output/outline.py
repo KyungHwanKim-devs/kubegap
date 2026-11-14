@@ -35,6 +35,7 @@ LIMIT_KINDS = ("no-data", "unsupported")
 PROBLEMS_FULL = 5
 AREAS = ("resources", "scaling", "observability", "traffic", "resilience", "hygiene", "storage", "security", "cost", "tenancy", "node OS", "platform")
 PATH = Path("report") / "outline.json"
+SHORT_KINDS = {"deploy": "deployment", "sts": "statefulset", "ds": "daemonset", "cj": "cronjob", "rs": "replicaset"}
 
 
 def _ids(entry: dict) -> list[str]:
@@ -99,9 +100,12 @@ def owners(snap: Path) -> dict[str, dict]:
 def declared_in(owners_: dict[str, dict], target: str) -> dict | None:
     """Who declares `target` according to the cluster itself: an entry of `owners`, found by `<ns>/<kind>/<name>` or, when the kind is left
     out, by namespace and name. None when nothing in the snapshot says: the report then names the resource and does not guess a repository."""
+    target = str(target).split(":")[0]  # a finding of a container names it after the workload: `ns/sts/name:container`
+    parts = target.split("/")
+    if len(parts) == 3:  # findings shorten the kind where `kubectl` does
+        target = "/".join((parts[0], SHORT_KINDS.get(parts[1], parts[1]), parts[2]))
     if target in owners_:
         return owners_[target]
-    parts = str(target).split("/")
     if len(parts) == 2:
         return next((v for k, v in owners_.items() if k.split("/")[0] == parts[0] and k.split("/")[-1] == parts[1]), None)
     return None

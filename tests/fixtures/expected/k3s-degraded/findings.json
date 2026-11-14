@@ -3536,7 +3536,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Label role: 7 workloads (production 0) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. [, ', l, o, g, g, i, n, g, /, d, e, p, l, o, y, m, e, n, t, /, k, i, b, a, n, a, ', ,,  , ', m, o, n, i, t, o, r, i, n, g, /, d, e, p, l, o, y, m, e, n, t, /, k, u, b, e, -, p, r, o, m, e, t, h, e, u, s, -, s, t, a, c, k, -, g, r, a, f, a, n, a, ', ,,  , ', m, o, n, i, t, o, r, i, n, g, /, d, e, p, l, o, y, m, e, n, t, /, k, u, b, e, -, p, r, o, m, e, t, h, e, u, s, -, s, t, a, c, k, -, k, u, b, e, -, s, t, a, t, e, -, m, e, t, r, i, c, s, ', ],  , a, n, d,  , 4,  , m, o, r, e",
+   "evidence": "Label role: 7 workloads (production 0) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. ['logging/deployment/kibana', 'monitoring/deployment/kube-prometheus-stack-grafana', 'monitoring/deployment/kube-prometheus-stack-kube-state-metrics'] and 4 more",
    "source": "summary.json:hygiene.node_labels.rows"
   },
   {
@@ -3545,7 +3545,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Label storage: 10 workloads (production 7) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. [, ', a, p, p, -, a, -, p, r, o, d, /, s, t, a, t, e, f, u, l, s, e, t, /, a, p, p, -, a, -, p, o, s, t, g, r, e, s, ', ,,  , ', a, p, p, -, a, -, p, r, o, d, /, s, t, a, t, e, f, u, l, s, e, t, /, a, p, p, -, a, -, r, e, d, i, s, ', ,,  , ', a, p, p, -, f, -, p, r, o, d, /, s, t, a, t, e, f, u, l, s, e, t, /, a, p, p, -, f, -, p, o, s, t, g, r, e, s, ', ],  , a, n, d,  , 7,  , m, o, r, e",
+   "evidence": "Label storage: 10 workloads (production 7) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. ['app-a-prod/statefulset/app-a-postgres', 'app-a-prod/statefulset/app-a-redis', 'app-f-prod/statefulset/app-f-postgres'] and 7 more",
    "source": "summary.json:hygiene.node_labels.rows"
   },
   {
@@ -5021,7 +5021,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "25 dashboards (170 panel metrics) — 167 of 205 alert-rule metrics have no panel: [, ', H, A, ', ,,  , ', N, o, n, ', ,,  , ', S, k, i, p, ', ,,  , ', W, i, t, h, o, u, t, ', ,,  , ', a, g, g, r, e, g, a, t, o, r, _, u, n, a, v, a, i, l, a, b, l, e, _, a, p, i, s, e, r, v, i, c, e, ', ,,  , ', a, g, g, r, e, g, a, t, o, r, _, u, n, a, v, a, i, l, a, b, l, e, _, a, p, i, s, e, r, v, i, c, e, _, t, o, t, a, l, ', ],  , a, n, d,  , 1, 6, 1,  , m, o, r, e",
+   "evidence": "25 dashboards (170 panel metrics) — 167 of 205 alert-rule metrics have no panel: ['HA', 'Non', 'Skip', 'Without', 'aggregator_unavailable_apiservice', 'aggregator_unavailable_apiservice_total'] and 161 more",
    "source": "summary.json:observability.grafana.dashboards_json"
   },
   {

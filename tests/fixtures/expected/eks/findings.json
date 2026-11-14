@@ -4854,7 +4854,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Label app-u.ai/role: 34 workloads (production 9) depend on it via nodeSelector/affinity, present on 5/9 nodes — e.g. [, ', a, r, g, o, c, d, /, d, e, p, l, o, y, m, e, n, t, /, a, r, g, o, c, d, -, a, p, p, l, i, c, a, t, i, o, n, s, e, t, -, c, o, n, t, r, o, l, l, e, r, ', ,,  , ', a, r, g, o, c, d, /, d, e, p, l, o, y, m, e, n, t, /, a, r, g, o, c, d, -, d, e, x, -, s, e, r, v, e, r, ', ,,  , ', a, r, g, o, c, d, /, d, e, p, l, o, y, m, e, n, t, /, a, r, g, o, c, d, -, n, o, t, i, f, i, c, a, t, i, o, n, s, -, c, o, n, t, r, o, l, l, e, r, ', ],  , a, n, d,  , 3, 1,  , m, o, r, e",
+   "evidence": "Label app-u.ai/role: 34 workloads (production 9) depend on it via nodeSelector/affinity, present on 5/9 nodes — e.g. ['argocd/deployment/argocd-applicationset-controller', 'argocd/deployment/argocd-dex-server', 'argocd/deployment/argocd-notifications-controller'] and 31 more",
    "source": "summary.json:hygiene.node_labels.rows"
   },
   {
@@ -4863,7 +4863,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Label workload-type: 39 workloads (production 26) depend on it via nodeSelector/affinity, present on 4/9 nodes — e.g. [, ', d, e, v, -, a, p, p, -, s, /, d, e, p, l, o, y, m, e, n, t, /, a, p, p, -, s, -, a, d, m, i, n, ', ,,  , ', d, e, v, -, a, p, p, -, s, /, d, e, p, l, o, y, m, e, n, t, /, a, p, p, -, s, -, a, p, i, ', ,,  , ', d, e, v, -, a, p, p, -, s, /, d, e, p, l, o, y, m, e, n, t, /, a, p, p, -, s, -, b, a, c, k, e, n, d, ', ],  , a, n, d,  , 3, 6,  , m, o, r, e",
+   "evidence": "Label workload-type: 39 workloads (production 26) depend on it via nodeSelector/affinity, present on 4/9 nodes — e.g. ['dev-app-s/deployment/app-s-admin', 'dev-app-s/deployment/app-s-api', 'dev-app-s/deployment/app-s-backend'] and 36 more",
    "source": "summary.json:hygiene.node_labels.rows"
   },
   {
@@ -6703,7 +6703,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "28 dashboards (196 panel metrics) — 132 of 173 alert-rule metrics have no panel: [, ', a, g, g, r, e, g, a, t, o, r, _, u, n, a, v, a, i, l, a, b, l, e, _, a, p, i, s, e, r, v, i, c, e, ', ,,  , ', a, g, g, r, e, g, a, t, o, r, _, u, n, a, v, a, i, l, a, b, l, e, _, a, p, i, s, e, r, v, i, c, e, _, t, o, t, a, l, ', ,,  , ', a, l, e, r, t, m, a, n, a, g, e, r, _, c, l, u, s, t, e, r, _, m, e, m, b, e, r, s, ', ,,  , ', a, l, e, r, t, m, a, n, a, g, e, r, _, c, o, n, f, i, g, _, h, a, s, h, ', ,,  , ', a, l, e, r, t, m, a, n, a, g, e, r, _, c, o, n, f, i, g, _, l, a, s, t, _, r, e, l, o, a, d, _, s, u, c, c, e, s, s, f, u, l, ', ,,  , ', a, p, i, s, e, r, v, e, r, _, c, l, i, e, n, t, _, c, e, r, t, i, f, i, c, a, t, e, _, e, x, p, i, r, a, t, i, o, n, _, s, e, c, o, n, d, s, _, b, u, c, k, e, t, ', ],  , a, n, d,  , 1, 2, 6,  , m, o, r, e",
+   "evidence": "28 dashboards (196 panel metrics) — 132 of 173 alert-rule metrics have no panel: ['aggregator_unavailable_apiservice', 'aggregator_unavailable_apiservice_total', 'alertmanager_cluster_members', 'alertmanager_config_hash', 'alertmanager_config_last_reload_successful', 'apiserver_client_certificate_expiration_seconds_bucket'] and 126 more",
    "source": "summary.json:observability.grafana.dashboards_json"
   },
   {

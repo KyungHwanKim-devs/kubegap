@@ -84,6 +84,7 @@ def test_an_evidence_sentence_that_shows_part_of_a_list_says_how_many_more():
             if line.lstrip().startswith(("evidence:", "target:")):
                 left = [m.group(0) for m in re.finditer(r"\w+(?:\['\w+'\])?\[:\d+\]", line) if not m.group(0).startswith(("s[", "e['pattern']", "item['changed_at']"))]
                 assert left == [], f"{path}:{n}: {left} cuts a list in an evidence sentence; use shown(list, n)"
+                assert not re.search(r"(join|sorted|len|set|list)\(shown\(", line), f"{path}:{n}: shown() returns text; it is the last thing done to a list"
 
 
 def test_a_query_that_feeds_a_verdict_does_not_ask_for_the_top_n_only():
