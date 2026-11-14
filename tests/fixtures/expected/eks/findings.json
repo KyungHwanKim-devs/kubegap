@@ -3553,7 +3553,7 @@
    "status": "warn",
    "severity_default": "high",
    "nature": "occurrence",
-   "evidence": "kernel log: 1 kill in 24 h on 1 of 1 node read. Prometheus: 0 pods ended by OOM in 7 days, 0 restarts in those pods. cAdvisor counter 0. Running now: loki-stack-0 (created 2026-10-08T12:33:26Z, 1 restart of this container since)",
+   "evidence": "kernel log: 1 kill in 24 h on 1 of 1 node read. Prometheus: 0 pods ended by OOM in 7 days, 0 restarts in those pods. cAdvisor counter 0. Running now: loki-stack-0 (created 2026-10-08T12:33:26Z, 1 restart of this container since, its previous run ended 2026-10-25T00:15:41Z with reason OOMKilled, exit code 137)",
    "source": "summary.json:resilience.oom_7d.rows"
   },
   {
@@ -3562,7 +3562,7 @@
    "status": "warn",
    "severity_default": "high",
    "nature": "occurrence",
-   "evidence": "kernel log not read on its node, no node access there. Prometheus: 1 pod ended by OOM in 7 days, 1 restarts in those pods. cAdvisor counter 1. Running now: prometheus-kube-prometheus-stack-prometheus-0 (created 2026-09-08T12:47:49Z, 2 restarts of this container since)",
+   "evidence": "kernel log not read on its node, no node access there. Prometheus: 1 pod ended by OOM in 7 days, 1 restarts in those pods. cAdvisor counter 1. Running now: prometheus-kube-prometheus-stack-prometheus-0 (created 2026-09-08T12:47:49Z, 2 restarts of this container since, its previous run ended 2026-11-05T08:21:29Z with reason OOMKilled, exit code 137)",
    "source": "summary.json:resilience.oom_7d.rows"
   },
   {

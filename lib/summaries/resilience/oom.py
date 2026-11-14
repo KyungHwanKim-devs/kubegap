@@ -32,6 +32,21 @@ def node_boot_times(cx) -> dict[str, _dt.datetime]:
 _KIND_SHORT = {"Deployment": "deploy", "StatefulSet": "sts", "DaemonSet": "ds", "Job": "job", "CronJob": "cronjob", "ReplicaSet": "rs", "ReplicationController": "rc"}
 
 
+def _pod_now(p: dict, container: str | None) -> dict:
+    """What a running pod's own status says of one container: how often it restarted and how its previous run ended (when, why, with what exit
+    code). The reason tells an OOM kill from a container that ended with the node, which is what decides whether the restarts go on."""
+    st = next((c for c in (p.get("status") or {}).get("containerStatuses") or [] if c.get("name") == container), None) or {}
+    last = (st.get("lastState") or {}).get("terminated") or {}
+    return {
+        "pod": p["metadata"]["name"],
+        "created": p["metadata"].get("creationTimestamp"),
+        "restarts": int(st["restartCount"]) if "restartCount" in st else None,
+        "last_ended": last.get("finishedAt"),
+        "last_reason": last.get("reason"),
+        "last_exit_code": last.get("exitCode"),
+    }
+
+
 def owner_of_pod(cx, ns: str, pod: str, created_by: tuple[str | None, str | None] | None) -> str:
     """`deploy/<name>`, `sts/<name>`, `cronjob/<name>` … for a pod, the same shape lib.judgement.evaluate.Context.workload gives a metric series. A live pod is read from its ownerReferences;
     a pod that is already gone is read from kube_pod_info's created_by, and a ReplicaSet is resolved to its Deployment through the ReplicaSets still in the snapshot, else by stripping the hash with a `?` mark."""
@@ -188,11 +203,7 @@ def oom_7d(cx) -> dict:
         # ended are gone" goes on to say how the present pod is doing; without the number it was guessed ("no restarts") twice, for a pod that had one.
         r["pods_now"] = sorted(
             (
-                {
-                    "pod": p["metadata"]["name"],
-                    "created": p["metadata"].get("creationTimestamp"),
-                    "restarts": next((int(c.get("restartCount") or 0) for c in (p.get("status") or {}).get("containerStatuses") or [] if c.get("name") == r["container"]), None),
-                }
+                _pod_now(p, r["container"])
                 for p in cx.pods
                 if p["metadata"]["namespace"] == r["namespace"] and (p.get("status") or {}).get("phase") == "Running" and owner_of_pod(cx, r["namespace"], p["metadata"]["name"], None) == r["workload"]
             ),

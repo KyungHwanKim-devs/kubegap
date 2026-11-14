@@ -77,9 +77,14 @@ def oom_text(item: dict) -> str:
     now = item.get("pods_now")
     running = ""
     if now:
-        running = ". Running now: " + ", ".join(
-            f"{p['pod']} (created {p.get('created')}, {p['restarts']} restart{'s' if p['restarts'] != 1 else ''} of this container since)" if p.get("restarts") is not None else f"{p['pod']} (created {p.get('created')})" for p in now
-        )
+
+        def one(p: dict) -> str:
+            if p.get("restarts") is None:
+                return f"{p['pod']} (created {p.get('created')})"
+            last = f", its previous run ended {p['last_ended']} with reason {p.get('last_reason')}, exit code {p.get('last_exit_code')}" if p.get("last_ended") else ""
+            return f"{p['pod']} (created {p.get('created')}, {p['restarts']} restart{'s' if p['restarts'] != 1 else ''} of this container since{last})"
+
+        running = ". Running now: " + ", ".join(one(p) for p in now)
     return f"{kern}. {prom}. cAdvisor counter {item.get('cadvisor_oom_events_7d') or 0}{running}"
 
 

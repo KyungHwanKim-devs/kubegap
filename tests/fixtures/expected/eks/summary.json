@@ -61025,7 +61025,10 @@
       {
        "pod": "loki-stack-0",
        "created": "2026-10-08T12:33:26Z",
-       "restarts": 1
+       "restarts": 1,
+       "last_ended": "2026-10-25T00:15:41Z",
+       "last_reason": "OOMKilled",
+       "last_exit_code": 137
       }
      ]
     },
@@ -61077,7 +61080,10 @@
       {
        "pod": "app-t-ai-5469577cf8-7nwnb",
        "created": "2026-11-06T08:26:51Z",
-       "restarts": 0
+       "restarts": 0,
+       "last_ended": null,
+       "last_reason": null,
+       "last_exit_code": null
       }
      ]
     },
@@ -61116,7 +61122,10 @@
       {
        "pod": "prometheus-kube-prometheus-stack-prometheus-0",
        "created": "2026-09-08T12:47:49Z",
-       "restarts": 2
+       "restarts": 2,
+       "last_ended": "2026-11-05T08:21:29Z",
+       "last_reason": "OOMKilled",
+       "last_exit_code": 137
       }
      ]
     }

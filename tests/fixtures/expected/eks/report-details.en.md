@@ -269,8 +269,8 @@ Signature catalog 1.1.1, 40 files, 23879 lines scanned (components: actions-runn
 | `resources.cpu-throttling.dev-app-s/deploy/app-s-frontend:frontend` | warn | high | ["pod app-s-frontend-6578574c-qx5nj: throttling ratio now 0.00, 24 h or the pod's life 0.23: throttled through the day, below the fail line; no 5-minute value, under 0.01 now", "pod app-s-frontend-999976975-nf4rv: throttling ratio now 0.12, 24 h or the pod's life 0.11: throttled through the day … |
 | `resources.cpu-throttling.dev-app-v/deploy/app-v-frontend:frontend` | warn | high | ["pod app-v-frontend-f7b9d96d4-dn7qv: throttling ratio now 0.00, 24 h or the pod's life 0.23: throttled through the day, below the fail line; no 5-minute value, under 0.01 now", "pod app-v-frontend-f7b9d96d4-jl226: throttling ratio now 0.00, 24 h or the pod's life 0.21: throttled through the day … |
 | `resources.cpu-throttling.dev-app-y/deploy/app-y-frontend:frontend` | warn | high | pod app-y-frontend-7f6d6dc65b-lnmq4: throttling ratio now 0.16, 24 h or the pod's life 0.12: throttled through the day, below the fail line |
-| `resources.oomkilled-repeated.monitoring/sts/loki-stack:loki` | warn | high | kernel log: 1 kill in 24 h on 1 of 1 node read. Prometheus: 0 pods ended by OOM in 7 days, 0 restarts in those pods. cAdvisor counter 0. Running now: loki-stack-0 (created 2026-10-08T12:33:26Z, 1 restart of this container since) |
-| `resources.oomkilled-repeated.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | warn | high | kernel log not read on its node, no node access there. Prometheus: 1 pod ended by OOM in 7 days, 1 restarts in those pods. cAdvisor counter 1. Running now: prometheus-kube-prometheus-stack-prometheus-0 (created 2026-09-08T12:47:49Z, 2 restarts of this container since) |
+| `resources.oomkilled-repeated.monitoring/sts/loki-stack:loki` | warn | high | kernel log: 1 kill in 24 h on 1 of 1 node read. Prometheus: 0 pods ended by OOM in 7 days, 0 restarts in those pods. cAdvisor counter 0. Running now: loki-stack-0 (created 2026-10-08T12:33:26Z, 1 restart of this container since, its previous run ended 2026-10-25T00:15:41Z with reason OOMKilled … |
+| `resources.oomkilled-repeated.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | warn | high | kernel log not read on its node, no node access there. Prometheus: 1 pod ended by OOM in 7 days, 1 restarts in those pods. cAdvisor counter 1. Running now: prometheus-kube-prometheus-stack-prometheus-0 (created 2026-09-08T12:47:49Z, 2 restarts of this container since, its previous run ended … |
 | `resources.oomkilled.argocd/sts/argocd-application-controller:application-controller` | warn | high | pod argocd-application-controller-0: last termination reason OOMKilled, finished at 2026-10-30T09:00:04Z (7.7 days ago), 42 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
 | `resources.oomkilled.monitoring/sts/loki-stack:loki` | warn | high | pod loki-stack-0: last termination reason OOMKilled, finished at 2026-10-25T00:15:41Z (13.1 days ago), 1 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
 | `security.imds-hop-limit.cluster` | warn | high | Of 9 instances, 9 with IMDS hop limit > 1 or tokens optional: {'hop=2 tokens=required': 9}. Examples [('system_core', 'm5.large', 2, 'required'), ('system_core', 'm5.large', 2, 'required'), ('karpenter-node', 't8i.medium', 2, 'required'), ('karpenter-node', 'm7i-flex.large', 2, 'required')] and 5 … |
@@ -1122,7 +1122,10 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   {
    "pod": "app-t-ai-5469577cf8-7nwnb",
    "created": "2026-11-06T08:26:51Z",
-   "restarts": 0
+   "restarts": 0,
+   "last_ended": null,
+   "last_reason": null,
+   "last_exit_code": null
   }
  ],
  "pods_oomkilled": 3,
@@ -2033,7 +2036,10 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   {
    "pod": "loki-stack-0",
    "created": "2026-10-08T12:33:26Z",
-   "restarts": 1
+   "restarts": 1,
+   "last_ended": "2026-10-25T00:15:41Z",
+   "last_reason": "OOMKilled",
+   "last_exit_code": 137
   }
  ],
  "pods_oomkilled": 0,
@@ -2058,7 +2064,10 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   {
    "pod": "prometheus-kube-prometheus-stack-prometheus-0",
    "created": "2026-09-08T12:47:49Z",
-   "restarts": 2
+   "restarts": 2,
+   "last_ended": "2026-11-05T08:21:29Z",
+   "last_reason": "OOMKilled",
+   "last_exit_code": 137
   }
  ],
  "pods_oomkilled": 1,
