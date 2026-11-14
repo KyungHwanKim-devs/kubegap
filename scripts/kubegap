@@ -477,6 +477,38 @@ def cmd_write_report(args) -> int:
     return EXIT_OK
 
 
+def cmd_show(args) -> int:
+    """Print a bounded view of a snapshot for the agent that reads it: the findings, one finding, the summary tables, a raw object, a learn
+    topic (lib/output/show.py). Every view says how many there are before it shows some."""
+    from lib.output import show as _show
+
+    what, rest = args.what, args.args
+    need = {"finding": 1, "table": 1, "object": 2, "learn": 1}.get(what, 0)
+    if len(rest) != need:
+        print(f"kubegap show {what}: takes {need} argument{'s' if need != 1 else ''}, got {len(rest)} (see `kubegap show --help`)", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        if what == "learn":
+            text = _show.learn(None, rest[0])
+        else:
+            snap = _resolve_snapshot_arg(args, args.snapshot)
+            if what == "findings":
+                text = _show.findings(snap, severity=args.severity, status=args.status, area=args.area, check=args.check)
+            elif what == "finding":
+                text = _show.finding(snap, rest[0], all_=args.all)
+            elif what == "tables":
+                text = _show.tables(snap)
+            elif what == "table":
+                text = _show.table(snap, rest[0], where=args.where, field=args.field, offset=args.offset, limit=args.limit, all_=args.all)
+            else:
+                text = _show.object_(snap, rest[0], rest[1])
+    except _show.ShowError as e:
+        print(f"kubegap show {what}: {e}", file=sys.stderr)
+        return EXIT_ERROR
+    print(text)
+    return EXIT_OK
+
+
 def cmd_check_facts(args) -> int:
     """Check llm/facts.json against the contract (lib/output/facts.py) and print every rule it breaks. The analysis runs this until nothing is
     printed; the report is not written from facts that fail it."""
@@ -889,6 +921,22 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
     s.add_argument("--language", choices=["en", "ko"], default="en", help="language of the headings and fixed phrases; data inside tables stays English")
     s.set_defaults(func=cmd_render_details)
+
+    s = sub.add_parser("show", parents=[common], help="print a bounded view of a snapshot, always with the total first: findings | finding <id> | tables | table <path> | object <kind> <ns/name> | learn <topic>")
+    s.add_argument("what", choices=["findings", "finding", "tables", "table", "object", "learn"])
+    s.add_argument("args", nargs="*", help="finding: an id, a check id, or a prefix ending in *; table: a dotted path into the summary; object: kind and namespace/name; learn: a topic or a check id")
+    s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
+    s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
+    s.add_argument("--severity", choices=["critical", "high", "medium", "low", "info"], help="findings: only this severity")
+    s.add_argument("--status", choices=["fail", "warn"], help="findings: only this status")
+    s.add_argument("--area", help="findings: only this area")
+    s.add_argument("--check", help="findings: only this check")
+    s.add_argument("--where", action="append", help="table: keep the rows whose key has this value, as key=value (repeatable)")
+    s.add_argument("--field", help="table: print this one field of each kept row whole")
+    s.add_argument("--offset", type=int, default=0, help="table: start at this row")
+    s.add_argument("--limit", type=int, default=20, help="table: how many rows (default 20)")
+    s.add_argument("--all", action="store_true", help="table, finding: everything")
+    s.set_defaults(func=cmd_show)
 
     s = sub.add_parser("check-facts", parents=[common], help="check llm/facts.json against the contract: the order of the problems, nothing serious left out, sources inside the snapshot, the three kinds of limits")
     s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
