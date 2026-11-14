@@ -541,13 +541,13 @@ def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = Fa
 
 
 def skipped(setup: dict, cfg: Config, ctx_dir: Path | None, *, language: str = "en") -> list[dict]:
-    """Questions answered with "skip" whose gap is still there: the report names them in "what this run could not see"."""
+    """Questions answered with "skip" whose gap is still there: `write-report` lists them in the report's limits section, under "left out by choice"."""
     answers = load_answers(ctx_dir)
     return [{"id": q["id"], "header": q["header"], "gain": q["gain"], "at": answers[q["id"]].get("at")} for q in questions(setup, cfg, ctx_dir, all_=True, language=language) if (answers.get(q["id"]) or {}).get("choice") == SKIP]
 
 
 def noted(setup: dict, cfg: Config, ctx_dir: Path | None, *, language: str = "en") -> list[str]:
-    """Things decided without a question, for the report's "what this run could not see": today, Loki left out because the logs go elsewhere."""
+    """Things decided without a question, printed for the user and not written into the report (what they name was read another way or is not installed): today, Loki left out because the logs go elsewhere."""
     out = []
     why = loki_not_asked(setup, language)
     if why and not cfg.url("loki") and not ((setup.get("monitoring") or {}).get("loki") or {}).get("ok"):
@@ -570,9 +570,9 @@ _RENDER = {
         "config": "   (dry run, show the lines, write only after the user picks Write)",
         "typed": "  typed answer: ",
         "skipped": "skipped earlier",
-        "tail": "  -> name these in the report under what this run could not see, with: `/kubegap setup` asks again",
+        "tail": '  -> write-report lists these in the report under "Limits of this run"; do not write them into the facts',
         "note": "note",
-        "note_tail": "  -> name these in the report under what this run could not see",
+        "note_tail": "  -> not a limit of the run: do not write these into the report",
     },
     "ko": {
         "title": "== questions for the user ({n})",
@@ -580,9 +580,9 @@ _RENDER = {
         "config": "   (dry run으로 바뀔 줄을 먼저 보여 주고, 사용자가 '쓰기'를 고른 뒤에만 써요)",
         "typed": "  typed answer: ",
         "skipped": "skipped earlier",
-        "tail": "  -> 리포트의 '이번에 못 본 것'에 이 항목을 적고, `/kubegap setup`으로 다시 물을 수 있다고 써요",
+        "tail": "  -> write-report가 리포트의 '이번 점검의 한계'에 넣는다. 사실 파일에는 적지 않는다",
         "note": "note",
-        "note_tail": "  -> 리포트의 '이번에 못 본 것'에 이 항목을 적어요",
+        "note_tail": "  -> 점검의 한계가 아니다. 리포트에 적지 않는다",
     },
 }
 

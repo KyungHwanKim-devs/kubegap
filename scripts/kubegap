@@ -417,6 +417,23 @@ def cmd_keep_report(args) -> int:
     return EXIT_OK
 
 
+def _skipped_questions(args, snap: Path, language: str) -> list[dict]:
+    """The first-run questions the user skipped for this cluster, for the report's limits section. Empty when setup never ran here."""
+    import json as _json
+
+    from lib.commands import firstrun as _firstrun
+    from lib.foundations.config import load_config
+
+    sj = snap.parent / "setup.json"
+    if not sj.is_file():
+        return []
+    try:
+        setup = _json.loads(sj.read_text(encoding="utf-8"))
+    except ValueError:
+        return []
+    return _firstrun.skipped(setup, load_config(args.config), snap.parent, language=language)
+
+
 def cmd_write_report(args) -> int:
     """Write report.md from llm/facts.json with separate agents (lib/output/writer.py). Takes minutes; run it in the background and read its progress lines."""
     from lib.output import writer as _writer
@@ -425,14 +442,15 @@ def cmd_write_report(args) -> int:
     host = None if args.host == "auto" else args.host
     host = host or _writer.detect_host()
     if not host:
-        print("kubegap write-report: neither claude nor codex can be started here. Do the four steps in this session, each from a clean start: references/check-actions-<language>.md on the steps of the facts, references/writing-<language>.md to write, references/check-facts-<language>.md to check the text, references/replace-<language>.md to replace what it named.", file=sys.stderr)
+        print("kubegap write-report: neither claude nor codex can be started here. Do the steps in this session, each from a clean start: references/check-solutions-<language>.md on the solutions of the facts, references/write-overview-<language>.md and references/write-problem-<language>.md (once per problem) to write, references/check-facts-<language>.md to check the text, references/replace-<language>.md to replace what it named.", file=sys.stderr)
         return EXIT_ERROR
     try:
-        p = _writer.write_report(snap, args.language, host, paths.rubric_version(), __version__, say=lambda m: print(m, flush=True))
+        skipped = _skipped_questions(args, snap, args.language)
+        p = _writer.write_report(snap, args.language, host, paths.rubric_version(), __version__, skipped=skipped, say=lambda m: print(m, flush=True))
     except _writer.WriterError as e:
         print(f"kubegap write-report: {e}", file=sys.stderr)
         return EXIT_ERROR
-    print(f"saved: {p} (written with {host}; every agent's text is in llm/writing/, the facts before the step check in llm/facts-analysis.json)")
+    print(f"saved: {p} (written with {host}; every agent's text is in llm/writing/, the facts as the analysis wrote them in llm/facts-analysis.json)")
     return EXIT_OK
 
 
@@ -853,7 +871,7 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
     s.set_defaults(func=cmd_check_facts)
 
-    s = sub.add_parser("write-report", parents=[common], help="write report.md from llm/facts.json with separate agents: a step check on the objects, a writer, a fact check, a sentence replacer (claude -p or codex exec)")
+    s = sub.add_parser("write-report", parents=[common], help="write report.md from llm/facts.json with separate agents: a solution check on the objects, one writer for the overview and one per problem, a fact check, a sentence replacer (claude -p or codex exec)")
     s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
     s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
     s.add_argument("--language", choices=["en", "ko"], default="en")

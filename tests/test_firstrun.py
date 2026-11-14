@@ -266,7 +266,7 @@ def test_render_names_every_option_with_its_command(tmp_path):
     assert text.count("      then: ") == sum(len(q["options"]) for q in qs)
     assert "none" in firstrun.render([], "ctx")
     tail = firstrun.render([], "ctx", [{"id": "node-ssh", "header": "Node checks", "gain": ["g"]}]).splitlines()[-2:]
-    assert tail[0] == "skipped earlier [node-ssh] Node checks: g" and "/kubegap setup" in tail[1]
+    assert tail[0] == "skipped earlier [node-ssh] Node checks: g" and "Limits of this run" in tail[1]
 
 
 def test_node_check_count_is_the_catalog_s_and_is_worded_as_an_upper_bound():
@@ -465,7 +465,7 @@ def test_every_question_is_written_in_korean_not_translated(tmp_path):
         assert len(q["header"]) <= 12 and all(len(o["label"]) <= 12 for o in q["options"]), qid
     text = firstrun.render(list(ko.values()), "ctx", [{"id": "node-ssh", "header": "노드 점검", "gain": ["g"]}], ["loki: 묻지 않았어요"], language="ko")
     assert "  question: " in text and "  option skip: 건너뛰기 — " in text and "answer --context ctx node-ssh skip" in text
-    assert "skipped earlier [node-ssh] 노드 점검: g" in text and "note loki: 묻지 않았어요" in text and "이번에 못 본 것" in text
+    assert "skipped earlier [node-ssh] 노드 점검: g" in text and "note loki: 묻지 않았어요" in text and "이번 점검의 한계" in text
     assert "none:" in firstrun.render([], "ctx", language="ko")
 
 

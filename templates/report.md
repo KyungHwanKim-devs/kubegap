@@ -1,104 +1,68 @@
 <!--
-kubegap human report, saved as <snapshot>/report.md, in both modes (daily: 3 problems, full: 5).
-`scripts/kubegap write-report` writes it from llm/facts.json: a writer agent writes the body from the facts, in the language's guide
-(references/writing-<language>.md); code adds the title line, the numbers table, the check ids and the tail.
-The reference half (every table, every automatic verdict, the analysis record) is report-details.md, produced by `scripts/kubegap render-details`
-from the snapshot plus the `analysis` block of the facts. This file never repeats those tables; it links to them.
+kubegap human report, saved as <snapshot>/report.md.
+`scripts/kubegap write-report` assembles it (lib/output/writer.py `assemble`): agents write the sections marked "agent" from llm/facts.json
+in the language's guides (references/write-overview-<language>.md, references/write-problem-<language>.md); code writes every other section
+from the snapshot and the facts. The reference half (every table, every automatic verdict, the analysis record) is report-details.md.
 
-Shape. The reader is the person who runs the cluster. They read it in the morning, decide what to do today, and run it on production.
-So the first screen settles the decision, every problem ends in steps with a check and a way back, and nothing is said about an entity
-that was not looked at.
+What it is. A diagnosis the reader learns from: what already happened, the largest problems and why each comes about, how each is watched
+and how it is solved in practice at the scale the cluster is run at. It is not a list of commands to type; the reader acts through their
+own process. A daily report carries what happened and what changed and picks no problems (the rows marked "full").
 -->
-# {{cluster_name}} — {{mode_word}} audit, {{date}}
+# {{cluster_name}} — {{mode}} audit, {{date}}
 
-{{first_screen}}
-<!-- Five lines at most, no heading:
-     Urgent now: yes — <what is broken, in one sentence> / no
-     Today's problems: ① <title> ② <title> ③ <title>          ← the titles of the sections below, nothing more
-     Since the last {{mode_word}} run: <what the previous report asked for and whether it was done> <what appeared, what went away>, with the numbers.
-     With no earlier run of this mode: "No earlier {{mode_word}} run to compare with." -->
+<!-- code, from the titles in the facts -->
+Broken now: {{titles | none}}
+The N largest problems: ① {{title}} ② {{title}} …          <!-- daily: the titles of the last full report, with its date -->
+What already happened: {{titles | none}}
+Scale: {{small | medium | large}}
 
-<!-- Code writes the next two sections from the snapshot and the facts. -->
-## The cluster at a glance
-| What | Value |
-|---|---|
-| Nodes | {{ready}} of {{count}} Ready |
-| Pods | … running, … pending, … failed |
-| Namespaces | …, … production |
-| Components | … |
-| Metrics and log stores | … |
-| Kubernetes | … |
+## The cluster at a glance                                   <!-- code -->
 
-## Coming up
-| When | What | Source |
-|---|---|---|
-<!-- From `upcoming` in the facts: node expiries, certificate expiries, end of support, cleanup jobs, quotas about to fill. "none" when the facts carry nothing. -->
+## Broken now                                                <!-- agent; the section is absent when nothing is broken -->
+### {{title}}
 
-## 1. {{problem_1_title}}
-<!-- A noun phrase that names the thing that is wrong, e.g. "15 prod apps that can only run on one node". Never a sentence. -->
+## What already happened                                     <!-- agent; the first line (the period covered) is code -->
+This covers {{start}} to {{end}}.
+### {{incident title}}
+<!-- What happened and when, that it is over, why (with how sure), and the problem it exposed by number and title. -->
 
-**What is happening.** {{situation}}
-<!-- What is wrong, since when, and what the reader feels now. Numbers with unit, scope and period. If it is over, say so.
-     Then impact, by what was actually looked at: affected (each with its own evidence) · checked and healthy · changed in the window for another reason (and by what) · not checked. Nothing is affected by inference. -->
-
-**Why.** {{cause}}
-<!-- One sentence, then "confirmed", "likely" or "unknown". A likely cause gets its evidence in one line. Never stronger than the facts. -->
-
-**Suggested fix.**
-① {{step}} <!-- If a condition applies, it comes first: "If A, …". Then what to do in one sentence. -->
-```
-{{command}}
-```
-<!-- One command per block, exactly as in the facts, nothing to edit after copying. A manifest fragment is its own block.
-     Then, as sentences: what the cluster does when this runs, and the risk: what restarts, what goes down and for how long, who reverts a by-hand change, what can be lost. Only the ones that apply.
-     Check: how the reader sees it worked, a command or a value. -->
-② …
-③ …
-
-**Rollback.** {{rollback}}
-<!-- How to undo what the steps changed. When something cannot be undone, say so and which step backs up first. -->
-
-**Why this happens.** {{principle}} {{case}} {{reading}}
-<!-- Two or three sentences on the mechanism, from the check's why or a document that was read. One public case with the same mechanism if the facts carry one, what happened and what matches here; no case means no case line. One or two documents to read next, named. -->
-
-**Evidence.**
+## 1. {{problem title}}                                      <!-- agent, one per problem; full only -->
+<!-- A title is a subject and a short statement ("Backups stay inside the cluster"), never a long modifier in front of a noun. -->
+**Why it was picked.** {{what is lost when it happens, in one line}}
+### What is the matter
+### Why it comes about
+<!-- The cause in this cluster with how sure it is; then the mechanism at length; then public cases, each linked. This is where the reader learns. -->
+### How to watch it
+<!-- A metric, an alert rule or a dashboard first, saying whether the cluster has it; a command only as an example. -->
+### How it is solved
+<!-- What practitioners do, the option that fits this cluster's scale first, with what it costs; where it is declared, named only from the
+     snapshot's evidence; what to be careful about when applying it here. An example shows a shape. No numbered steps, no per-step check, no rollback procedure. -->
+### Evidence
 | What | Value | Source |
 |---|---|---|
-<!-- Six rows at most; the file name goes in this column and nowhere else in the problem. With two numbers or fewer, one sentence instead of a table. -->
+### Further reading
+<!-- Three to five, each linked, each with why it is worth reading. -->
 
-## 2. {{problem_2_title}}
-…
+## The next largest problems                                 <!-- agent; daily: "Serious and still there" -->
 
-## 3. {{problem_3_title}}
-…
-<!-- full mode: problems 4 and 5 in the same shape -->
+## Decided not to do                                         <!-- code: the suppressions of the config file, nothing else -->
 
-<!-- Code writes this section from `since_last` in the facts. -->
-## Since the previous {{mode_word}} run
-| Work the previous report asked for | State | Proof |
+## Since the previous report                                 <!-- code -->
+| What the previous report advised | State | Proof |
 |---|---|---|
-**Appeared.** / **Went away.** / **Changed because the checks changed, not the cluster.** as lists. With no earlier run: "No earlier {{mode_word}} run to compare with."
+**Appeared** / **Went away** / what changed because the checks or the scale changed, not the cluster
 
-## Serious, not today
-<!-- Every critical or high item that is not among today's problems, items with one cause as one line, fifteen lines at most by severity, then "N more are in section 2 of report-details.md." -->
+## Coming up                                                 <!-- code -->
 
-<!-- full mode only, written by code from `analysis.area_summary`: -->
-## Each area in one line
-| Area | What |
-|---|---|
+## Each area in one line                                     <!-- code; full only -->
 
-## What this run could not see
-<!-- One line per item: what was not seen, and what the reader does to see it (a full run, a token, a question `/kubegap setup` asks again). -->
+## Limits of this run                                        <!-- code -->
+**Not judged because the cluster does not hold the data** / **Not read by kubegap yet** / **Left out by choice**
+<!-- Each with the conclusion it weakens. -->
 
-<!-- From here on, code writes it. -->
-## Numbers
-| Severity | fail | warn | vs. previous {{mode_word}} run |
-|---|---|---|---|
-| critical | {{n_critical}} | {{w_critical}} | {{d_critical}} |
-| high | {{n_high}} | {{w_high}} | {{d_high}} |
-| medium | {{n_medium}} | {{w_medium}} | {{d_medium}} |
-| low | {{n_low}} | {{w_low}} | {{d_low}} |
+## Numbers                                                   <!-- code -->
+<!-- The scale the severities are for, the one baseline (the last run of this mode that has a report), then per severity: fail, warn, failures resolved since, failures new since. -->
 
-Checks behind each problem: 1 → `{{finding_ids}}` …
+Checks behind each entry: … <!-- code -->
 
-Details and every table: [`report-details.md`](report-details.md) · kubegap {{kubegap_version}}, rubric {{rubric_version}} · snapshot `{{snapshot_path}}`
+Details and every table: [`report-details.md`](report-details.md) · kubegap {{version}}, rubric {{rubric}} · snapshot `{{path}}`

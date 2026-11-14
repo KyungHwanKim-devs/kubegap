@@ -28,27 +28,27 @@ def _prose_lines(path: str):
 
 def test_rules_ask_for_no_time_estimates_and_no_fixed_sentences():
     """A time estimate has no source in the snapshot, and a fixed or example sentence is copied into every report instead of being written."""
-    for f in (RULES, Path("templates/report.md"), Path("references/writing-ko.md"), Path("references/writing-en.md")):
+    for f in (RULES, Path("templates/report.md"), Path("references/write-problem-ko.md"), Path("references/write-overview-ko.md")):
         text = f.read_text()
-        for phrase in ("Expect about", "30분쯤", "추정이에요"):
+        for phrase in ("Expect about", "30분쯤", "쯤 걸려요"):
             assert phrase not in text, f"{f}: {phrase}"
         assert "\n> " not in text, "an example paragraph is copied, not imitated"
 
 
 def test_korean_is_written_not_translated():
     assert "translating the template" not in Path("SKILL.md").read_text()
-    assert "번역하지 마세요" in Path("references/writing-ko.md").read_text()
+    assert "영어 문장을 옮긴 듯한 어순을 피한다" in Path("references/write-problem-ko.md").read_text()
 
 
 def test_a_report_is_checked_by_agents_that_did_not_write_it():
     skill = Path("SKILL.md").read_text()
     assert "write-report" in skill and "You do not write `report.md`" in skill
-    steps = Path("references/check-actions-en.md").read_text()
-    assert "harm" in steps and "bypasses PodDisruptionBudgets" in steps and "You do not get the report text" in steps
-    check = Path("references/check-facts-en.md").read_text()
-    assert "counts in one sentence" in check and "Do not write a corrected sentence" in check
-    facts = Path("references/facts-en.md").read_text()
-    assert "`plan`" in facts and "`check`" in facts and "`reads`" in facts and "`missing_risks`" in facts
+    solutions = Path("references/check-solutions-ko.md").read_text()
+    assert "PDB를 건너뛴다" in solutions and "리포트 본문이나 분석한 쪽의 설명은 일부러 주지 않는다" in solutions and "`drop`" in solutions
+    check = Path("references/check-facts-ko.md").read_text()
+    assert "합이 맞지 않는 숫자" in check and "고친 문장을 써 주지 않는다" in check
+    facts = Path("references/facts-ko.md").read_text()
+    assert '"check_methods"' in facts and '"solutions"' in facts and "`cautions`" in facts and "`declared_in`" in facts
 
 
 def test_a_case_is_read_before_it_is_written():
@@ -110,5 +110,5 @@ def test_the_analysis_stage_has_its_own_korean_guides():
         assert ko and en and ko != en, name
         assert not any(w in ko for w in ("You are", "Do not ", "The facts file")), name
         assert not Path(f"references/{name}.md").exists(), name
-    assert "한국어로" in Path("references/facts-ko.md").read_text()
+    assert "한국어 평서문으로" in Path("references/facts-ko.md").read_text()
     assert "<language>" in Path("SKILL.md").read_text()

@@ -151,7 +151,7 @@ def test_loki_is_not_asked_when_the_logs_go_elsewhere_and_the_report_is_told():
     assert firstrun.noted(_setup_with(es), Config(), None, language="ko") == ["loki: 묻지 않았어요. 로그는 elasticsearch (fluent-bit 출력 es → es:9200, configmap logging/fluent-bit-config:fluent-bit.conf)로 가요. Loki는 읽지 않아요"]
     assert firstrun.noted(_setup_with(es), Config({"loki_url": "http://l:3100"}), None) == []
     text = firstrun.render([], "ctx", None, notes)
-    assert text.splitlines()[-2].startswith("note loki: not asked") and "could not see" in text.splitlines()[-1]
+    assert text.splitlines()[-2].startswith("note loki: not asked") and "not a limit of the run" in text.splitlines()[-1]
 
 
 def test_loki_is_still_asked_without_a_shipper_or_with_a_loki_output():

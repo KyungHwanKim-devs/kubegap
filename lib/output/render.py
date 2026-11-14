@@ -370,7 +370,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
     analysis = analysis_block(snap)
     w(L("### 1-1. Final judgment vs. first pass (adjustments)"))
     w("")
-    w(_rows_table(analysis.get("severity_changes"), ["Finding", "First pass", "Final", "Reason"], ["finding", "first_pass", "final", "reason"], missing, table))
+    w(_rows_table(analysis.get("severity_changes"), ["Finding", "Final", "Reason"], ["finding_id", "final", "reason"], missing, table))
     w("")
     w(L("### 1-2. Aggregates the LLM recounted"))
     w("")

@@ -87,7 +87,7 @@ def _snap(tmp_path, with_fragments: bool):
     if with_fragments:
         (s / "llm").mkdir()
         analysis = {
-            "severity_changes": [{"finding": "a.b.ns/x", "first_pass": "fail/high", "final": "fail/medium", "reason": "lab | pipe"}],
+            "severity_changes": [{"finding_id": "a.b.ns/x", "final": "medium", "reason": "lab | pipe"}],
             "tool_notes": [{"n": 2, "text": "none <b>", "still_open_from": 1}],
             "commands_outside_snapshot": [{"command": "ssh node 'ls /etc/cron.d'", "saved_as": "extra/cron.txt"}],
         }
@@ -105,7 +105,7 @@ def test_render_with_fragments(tmp_path):
     assert "| high | 1 | 0 | fail +1 · warn +0 |" in text
     assert "`a.c.cluster` | critical | 2 |" in text  # consecutive runs from persisted rows
     assert "value 0.9 \\| pipe" in text  # pipes escaped in table cells
-    assert "| a.b.ns/x | fail/high | fail/medium | lab \\| pipe |" in text  # severity changes from the analysis block, cells escaped
+    assert "| a.b.ns/x | medium | lab \\| pipe |" in text  # severity changes from the analysis block, cells escaped
     assert "2. none < b> (still open from note 1)" in text  # tool notes numbered as written, tags broken
     assert "| `ssh node 'ls /etc/cron.d'` | `extra/cron.txt` |" in text  # read-only commands outside the snapshot
     assert "(daily mode: no per-area detail" in text

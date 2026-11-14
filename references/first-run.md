@@ -43,7 +43,7 @@ Both add a free-text entry to every question by themselves, and the user types i
 | `option <id>: <label> — <description>` | one option: label and description as printed |
 | `config:`, `run:`, `show:`, `then:` under an option | what to do after the user picked that option (section 3). They are not shown in the window |
 | `typed answer` | what the free-text entry means for this question. Mention it in the question text in a few words ("or type the addresses") |
-| `note …` (after the questions) | something decided without a question, with its reason: "loki: not asked. logs go to elasticsearch (…)", "grafana: no token needed; 25 dashboards and 1 datasources are read from ConfigMaps (…)". Not a question; it goes into the report under what this run could not see, as printed |
+| `note …` (after the questions) | something decided without a question, with its reason: "loki: not asked. logs go to elasticsearch (…)", "grafana: no token needed; 25 dashboards and 1 datasources are read from ConfigMaps (…)". Not a question and not a limit of the run: what it names was read another way or is not installed. It is not written into the report |
 
 Every explanation, count and option comes from the block. Do not invent a question, an option or a number of checks; if something you would like to ask is not in the block, it is not asked. The only questions outside the block are the two this file names: Write / Don't write before a config value is written (section 3) and Install / Stop for a missing required tool (section 5).
 
@@ -109,4 +109,4 @@ In a headless run (`claude -p`, `codex exec`, a schedule) there is no window and
 
 ## 8. In the report
 
-`setup` and `questions` end with `skipped earlier [...]` lines for the questions the user skipped while the gap is still there. Name each of them in "What this run could not see" with what it would add, and end that sentence with: `/kubegap setup` asks again.
+`setup` and `questions` end with `skipped earlier [...]` lines for the questions the user skipped while the gap is still there. `write-report` puts each of them into the report section "Limits of this run" under "Left out by choice", with what answering would add; you do not write them into the facts.
