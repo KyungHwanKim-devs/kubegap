@@ -60,7 +60,7 @@ def test_shell_run_writes_nothing_and_fails_when_the_transform_raises(tmp_path):
     out = tmp_path / "x.json"
     log = RunLog(tmp_path / "run.log")
 
-    def boom(t):
+    def boom(t, **_):
         raise scrub.ScrubFailed("scrub failed: RuntimeError: boom")
 
     r = shell.run([sys.executable, "-c", "print('{}')"], out_path=out, transform=boom, id="t", log=log)
@@ -94,7 +94,7 @@ def test_step_kubectl_scrubs_before_the_file_exists(tmp_path, fake_kubectl, monk
 
 
 def test_step_kubectl_writes_nothing_when_scrubbing_raises(tmp_path, fake_kubectl, monkeypatch):
-    def boom(obj):
+    def boom(obj, **_):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(scrub, "scrub_objects", boom)
@@ -128,7 +128,7 @@ def test_step_kubectl_text_output_is_written_as_is(tmp_path, fake_kubectl):
 def test_json_scrubber_wraps_any_parse_failure_as_scrub_failed(monkeypatch):
     fn, _ = scrub.json_scrubber()
 
-    def boom(text):
+    def boom(text, **_):
         raise RecursionError("maximum recursion depth exceeded")
 
     monkeypatch.setattr(scrub.json, "loads", boom)
@@ -137,7 +137,7 @@ def test_json_scrubber_wraps_any_parse_failure_as_scrub_failed(monkeypatch):
 
 
 def test_shell_run_names_the_type_of_an_unnamed_exception(tmp_path):
-    def boom(t):
+    def boom(t, **_):
         raise ValueError("odd")
 
     r = shell.run([sys.executable, "-c", "print('{}')"], out_path=tmp_path / "x", transform=boom)
@@ -189,7 +189,7 @@ def test_dump_all_scrubs_in_memory(tmp_path, fake_kubectl):
 
 
 def test_dump_all_records_a_scrub_failure_and_writes_nothing(tmp_path, fake_kubectl, monkeypatch):
-    def boom(obj):
+    def boom(obj, **_):
         raise RuntimeError("boom")
 
     monkeypatch.setattr(scrub, "scrub_objects", boom)
@@ -210,7 +210,7 @@ def test_discover_records_a_scrub_failure_per_kind_and_writes_the_others(tmp_pat
     objs = {"configmaps": json.loads(json.dumps(LIST)), "nodes": {"kind": "List", "items": []}}
     failures: dict = {}
 
-    def scrub_objects(obj):
+    def scrub_objects(obj, **_):
         if obj is objs["configmaps"]:
             raise RuntimeError("boom")
         return obj
@@ -230,4 +230,4 @@ def test_discover_records_a_scrub_failure_per_kind_and_writes_the_others(tmp_pat
 def test_discover_source_uses_scrub_or_error_before_every_object_write():
     src = (Path(discover.__file__)).read_text(encoding="utf-8")
     body = src[src.index("def write_objects()") : src.index("ctx_info = kube.context_info")]
-    assert "scrub.scrub_or_error(data)" in body and "failures[kind] = err" in body and "scrub_objects(" not in body
+    assert "scrub.scrub_or_error(data, light=daily)" in body and "failures[kind] = err" in body and "scrub_objects(" not in body

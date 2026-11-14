@@ -1,5 +1,6 @@
 # EKS platform checks. Reads cluster.eks in inventory.json and the aws/ folder.
 - id: eks.audit-log-off
+  modes: [full]  # reads AWS APIs, which a daily run does not call
   name: Control plane audit log disabled
   area: platform
   type: inventory
@@ -55,6 +56,7 @@
               addons: {}
 
 - id: eks.public-endpoint-open
+  modes: [full]  # reads AWS APIs, which a daily run does not call
   name: Cluster public endpoint open to the whole world
   area: security
   type: inventory
@@ -241,6 +243,7 @@
                       - defaultVersion: true
 
 - id: eks.node-os-skew
+  modes: [full]  # reads AWS APIs, which a daily run does not call
   name: Node OS, kernel and container runtime skew
   area: platform
   type: inventory
@@ -347,6 +350,7 @@
               - "containerd://2.1"
 
 - id: eks.ssm-unregistered
+  modes: [full]  # reads AWS APIs, which a daily run does not call
   name: Node not registered with SSM
   area: platform
   type: inventory
@@ -671,6 +675,7 @@
           present: false
 
 - id: eks.acm-certificate-expiring
+  modes: [full]  # reads AWS APIs, which a daily run does not call
   name: ACM certificate in use is expiring soon, expired, or cannot auto-renew
   area: security
   type: summary
@@ -853,6 +858,7 @@
           max_ratio: 0.6
           max_ratio_name: "VPC count"
 - id: storage.ebs-volume-io-saturated
+  modes: [full]  # reads AWS APIs, which a daily run does not call
   name: EBS volume I/O saturation (queue length, IOPS limit, burst balance) — root volumes included
   area: storage
   type: summary
@@ -934,6 +940,7 @@
           max_queue: 0.26
           max_iops_ratio: 0.05
 - id: eks.security-group-open-to-world
+  modes: [full]  # reads AWS APIs, which a daily run does not call
   name: Cluster security group inbound open to 0.0.0.0/0 (other than 443)
   area: security
   type: summary
@@ -1002,6 +1009,7 @@
           public_cidrs:
             - "0.0.0.0/0"
 - id: eks.nodegroup-ami-old
+  modes: [full]  # reads AWS APIs, which a daily run does not call
   name: Managed node group AMI is old (kernel and containerd patches not applied)
   area: platform
   type: summary

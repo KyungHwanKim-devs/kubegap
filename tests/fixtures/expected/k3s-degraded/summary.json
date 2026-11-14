@@ -4139,6 +4139,7 @@
    "logs/pods/metallb/metallb-system_speaker.log",
    "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log"
   ],
+  "lines_kept": true,
   "files_scanned": [
    "logs/pods/argocd/argocd_argocd-application-controller.log",
    "logs/pods/argocd/argocd_argocd-applicationset-controller.log",

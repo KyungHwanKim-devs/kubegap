@@ -96,7 +96,7 @@ DISCOVERY_RESOURCES = {
 }  # discover.OBJECT_KINDS as `kubectl api-resources` names them
 
 
-def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: list[str], timeout: float, log: RunLog, collector: str, echo=None) -> dict:
+def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: list[str], timeout: float, log: RunLog, collector: str, echo=None, *, light: bool = False) -> dict:
     resources, discovery_error = api_resources(context, kubeconfig, log)
     done = {p.stem for p in (snap / "objects").glob("*.json")}
     # `served` is every kind the API listed and `written` every file stem this step wrote; with `fetched_by_discovery` (the kinds lib/collection/discover.py had saved, by full
@@ -128,7 +128,7 @@ def dump_all(context: str | None, kubeconfig: str | None, snap: Path, exclude: l
             else:
                 summary["failed"][full] = r.error or r.stderr.strip()[-200:]
             continue
-        err = scrub.scrub_or_error(data)
+        err = scrub.scrub_or_error(data, light=light)
         if err:  # the kind is not written; run.log and the step record carry the failure so report section 7-1 shows it
             summary["failed"][full] = err
             summary["ok"] = False
@@ -224,7 +224,7 @@ def metrics_filter(keep: str | None):
 
 
 def step_kubectl_dump_all(ctx: StepContext, st: dict) -> dict:
-    ctx.state.objects_dump = dump_all(ctx.context, ctx.kubeconfig, ctx.snap, st.get("exclude", []), float(st.get("timeout", 60)), ctx.log, ctx.name, ctx.echo)
+    ctx.state.objects_dump = dump_all(ctx.context, ctx.kubeconfig, ctx.snap, st.get("exclude", []), float(st.get("timeout", 60)), ctx.log, ctx.name, ctx.echo, light=ctx.light)
     return ctx.state.objects_dump
 
 
@@ -235,7 +235,7 @@ def step_kubectl(ctx: StepContext, st: dict) -> dict:
         runs = {}
         for node in [n["name"] for n in (ctx.inv.get("nodes") or {}).get("nodes", [])]:
             out = ctx.snap / str(st["out"]).format(item=node, node=node)
-            tf = scrub.json_scrubber()[0] if out.suffix == ".json" else None
+            tf = scrub.json_scrubber(light=ctx.light)[0] if out.suffix == ".json" else None
             r = kube.kubectl(
                 [str(a).format(item=node, node=node) for a in st["args"]], context=ctx.context, timeout=timeout, id=f"{ctx.name}.{sid}.{node}", log=ctx.log, out_path=out, kubeconfig=ctx.kubeconfig, collector=ctx.name, transform=tf
             )
@@ -245,7 +245,7 @@ def step_kubectl(ctx: StepContext, st: dict) -> dict:
         return {"ok": any(x["ok"] for x in runs.values()), "nodes": runs}
     out = ctx.snap / st["out"]
     # JSON output is scrubbed inside shell.run before the file exists (lib/foundations/scrub.py json_scrubber); if scrubbing raises, nothing is written and the step fails
-    tf, info = scrub.json_scrubber() if out.suffix == ".json" else (None, {"items": None})
+    tf, info = scrub.json_scrubber(light=ctx.light) if out.suffix == ".json" else (None, {"items": None})
     r = kube.kubectl(list(st["args"]), context=ctx.context, timeout=timeout, id=f"{ctx.name}.{sid}", log=ctx.log, out_path=out, kubeconfig=ctx.kubeconfig, collector=ctx.name, transform=tf)
     n = info["items"] if r.ok else None
     res = {"ok": r.ok, "items": n, "error": None if r.ok else (r.error or r.stderr.strip()[-200:])}

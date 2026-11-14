@@ -18,7 +18,7 @@ from ..foundations.snapshot import dump_record, load_json, metric_rows, object_f
 from ..foundations.workload import key as wl_key
 
 DANGEROUS_CAPS = {"SYS_ADMIN", "NET_ADMIN", "SYS_PTRACE", "SYS_MODULE", "ALL", "NET_RAW", "SYS_RAWIO", "DAC_READ_SEARCH"}
-SYSTEM_NS_PREFIX = ("kube-", "karpenter", "monitoring", "cert-manager", "external-secrets", "ingress-nginx", "metallb-system", "keda", "argocd", "arc-system", "arc-systems", "logging", "reloader")
+SYSTEM_NS_PREFIX = scrub.SYSTEM_NS_PREFIX
 SYSTEM_SUBJECTS = {("Group", "system:masters"), ("User", "eks:addon-manager"), ("Group", "system:nodes"), ("User", "system:kube-controller-manager"), ("User", "system:kube-scheduler")}
 
 

@@ -163,7 +163,7 @@ def normalize_unclassified(line: str) -> str:
     return msg if len(msg) <= 140 else msg[:140].rsplit(" ", 1)[0] + " …"  # the table shows this, so a cut is visible and ends at a word
 
 
-def scan(snap: Path, sigs: list[Signature]) -> dict:
+def scan(snap: Path, sigs: list[Signature], *, keep_lines: bool = True) -> dict:
     """Scan the text logs under logs/ once and produce signature matches and unclassified errors."""
     ldir = snap / "logs"
     files = sorted(p for p in ldir.rglob("*") if p.is_file() and p.suffix in (".log", ".txt") and p.stat().st_size > 0 and p.name != "os.txt") if ldir.is_dir() else []
@@ -249,14 +249,17 @@ def scan(snap: Path, sigs: list[Signature]) -> dict:
                 "last": h["last"],
                 "files": dict(h["files"].most_common(6)),
                 "targets": targets,
-                "samples": h["samples"],
+                "samples": h["samples"] if keep_lines else [],
                 "status": "fail" if (h["count"] >= s.fail_at and targets >= 2) else ("warn" if h["count"] >= s.warn_at else "info"),
             }
         )
     order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     sig_rows.sort(key=lambda r: (order.get(r["severity"], 9), -r["count"]))
     uncl_rows = [{"pattern": k, "count": c, "files": dict(uncl_files[k].most_common(3)), "sample": uncl_sample.get(k)} for k, c in unclassified.most_common(30)]
+    if not keep_lines:  # a daily run counts and keeps no log text: neither a sample line nor a pattern cut from one
+        uncl_rows = []
     return {
+        "lines_kept": keep_lines,
         "files_scanned": scanned,
         "lines_scanned": lines_total,
         "error_lines_unclassified": error_lines,
@@ -446,12 +449,12 @@ def analyze_agents(snap: Path, inv: dict) -> dict:
 
 
 # The keys of the logs section that come from scanning the raw log files. summarize saves exactly these to logs/pods/AGGREGATED.json before deleting the component logs, and analyze() reads them back on a rerun.
-LOG_SCAN_KEYS = ("files_scanned", "lines_scanned", "error_lines_unclassified", "signatures", "unclassified_errors", "boot_window_skipped", "boot_window_seconds", "components_with_logs", "files", "scan_signatures_version")
+LOG_SCAN_KEYS = ("files_scanned", "lines_scanned", "lines_kept", "error_lines_unclassified", "signatures", "unclassified_errors", "boot_window_skipped", "boot_window_seconds", "components_with_logs", "files", "scan_signatures_version")
 
 
 def scan_section(snap: Path, sigs: list[Signature]) -> dict:
     """Everything in the logs section that needs the raw files: the signature scan plus the file and component lists."""
-    res = scan(snap, sigs)
+    res = scan(snap, sigs, keep_lines=paths.snapshot_mode(snap) != "daily")
     ldir = snap / "logs"
     files = [str(f.relative_to(snap)) for f in sorted(ldir.rglob("*")) if f.is_file()] if ldir.is_dir() else []
     pods_dir = snap / COMPONENT_LOGS_DIR

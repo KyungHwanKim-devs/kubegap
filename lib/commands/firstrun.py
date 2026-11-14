@@ -43,6 +43,7 @@ NODE_ACCESS_FILE = "node-access.json"
 STORES = ("prometheus", "alertmanager", "loki", "grafana")
 SKIP = "skip"
 PARTIAL = "partial"  # node-ssh: go on with the nodes that answer
+DAILY_QUESTIONS = ("scale", "home-mode")  # what a daily run asks: the scale the severities are for, and who can read the folder the snapshots go to
 
 
 # ---------- counts taken from the check catalog ----------
@@ -510,9 +511,10 @@ def _q_stores(setup: dict, cfg: Config, L: str) -> dict | None:
     }
 
 
-def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = False, language: str = "en") -> list[dict]:
+def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = False, language: str = "en", mode: str = "full") -> list[dict]:
     """The open questions for this context, in the order they are asked, with their texts in `language`. `setup` is the dict `run_setup`
-    wrote to setup.json."""
+    wrote to setup.json. A daily run asks only what it needs (DAILY_QUESTIONS): it reads no node, calls no AWS API and runs no extra tool, so
+    the questions about those wait for the first full run."""
     if not (setup.get("cluster") or {}).get("reachable"):
         return []
     L = language if language in LANGUAGES else "en"
@@ -529,7 +531,7 @@ def questions(setup: dict, cfg: Config, ctx_dir: Path | None, *, all_: bool = Fa
         _q_stores(setup, cfg, L),
     )
     for q in builders:
-        if q is None:
+        if q is None or (mode == "daily" and q["id"] not in DAILY_QUESTIONS):
             continue
         a = answers.get(q["id"])
         if a:

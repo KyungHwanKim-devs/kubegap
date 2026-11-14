@@ -7,7 +7,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | kube context / cluster | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
 | Run time / mode | 2026-11-07T10:33:37+09:00 / full (collection 300.7 s, 0 steps skipped by mode, 40 failed) |
 | Scale | `medium` (guessed) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.90 / 1.1.0 |
+| kubegap / rubric / signatures | <kubegap> / 0.1.91 / 1.1.0 |
 | Verified against | Kubernetes v1.32.13-eks-577a51e (verified 1.30 to 1.37) · Loki 2.6.1 (verified 2.6 to 3.7) · Grafana 10.2.3 (verified 10.2 to 13.3) |
 | Nodes / namespaces / pods / CRDs | 9 (Ready 9) / 26 / 154 / 47 |
 | Components (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
@@ -22,7 +22,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 |---|---|---|---|
 | critical | 1 | 0 | no previous run of this mode |
 | high | 15 | 11 | no previous run of this mode |
-| medium | 85 | 127 | no previous run of this mode |
+| medium | 84 | 87 | no previous run of this mode |
 | low | 15 | 113 | no previous run of this mode |
 | info | 1 | 0 | no previous run of this mode |
 
@@ -78,7 +78,7 @@ No earlier full snapshot to compare with.
 | `resilience.no-backup.cluster` | fail | critical | There is no way to recover cluster state (objects) and PV data. Deleting a namespace by mistake or a broken etcd or PV is the end. A CronJob dump without a tool is often "a backup kept on the same … | Velero (plus EBS snapshots or PV backup). On EKS at least a DLM snapshot policy. In a small k3s cluster, k3s etcd-snapshot or a state.db copy plus PV directory backup. Test a restore; a dump that was … |
 | `observability.no-slo.cluster` | warn | high | Without an SLO there is no definition of "normal", and no basis for deciding which alerts matter or which finding comes first. | Define per-service availability and latency SLOs as recording rules with Sloth or Pyrra. Start with one service that has an Ingress. |
 | `observability.no-event-retention.cluster` | fail | medium | Kubernetes events are kept for only one hour by default. FailedScheduling, OOMKilling and Unhealthy from the night are gone by morning. The most undervalued material is lost. | Ship events to Loki or Elasticsearch with kubernetes-event-exporter. Alternatively, the promtail/alloy event source if Loki exists, or `[INPUT] kubernetes_events` with fluent-bit (detection … |
-| `security.no-certificate-manager.cluster` | fail | medium | When TLS certificate renewal is manual, services keep going down from expiry. cert-manager (or ACM plus ALB on EKS) automates renewal. On EKS, ALBs using ACM certificates work without cert-manager … | Install cert-manager, or if ACM is in use, suppress this check in config.yaml with a reason. |
+| `security.no-certificate-manager.cluster` | warn | medium | When TLS certificate renewal is manual, services keep going down from expiry. cert-manager (or ACM plus ALB on EKS) automates renewal. On EKS, ALBs using ACM certificates work without cert-manager … | Install cert-manager, or if ACM is in use, suppress this check in config.yaml with a reason. |
 
 Expected families missing (inventory): backup, certificates, event-retention, slo.
 
@@ -262,7 +262,6 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `resources.no-memory-limit.prod-app-z-backend/tts-proxy` | fail | medium | containers without a limit: tailscale, forwarder |
 | `scaling.karpenter-expired-not-replaced.default-n44bh` | fail | medium | NodeClaim default-n44bh → node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge spot): age 1056.5h, 336.5h past expireAfter 720.0h. Blocking reason (DisruptionBlocked): {}. do-not-disrupt pods on this node 2: prod-app-s/app-s-admin-57f5fcc58d-khsh5, prod-app-x/app-x-api-5755745bc7-2sjvd |
 | `security.externalsecret-not-ready.database/mysql-app-v-secret` | fail | medium | Ready False (SecretSyncedError): could not get secret data from provider |
-| `security.no-certificate-manager.cluster` | fail | medium | no component of family certificates in inventory.components |
 | `security.polaris-security-danger.cluster` | fail | medium | Polaris score 79. Security danger workloads 74 (prod 29): per check {'dangerousCapabilities': 2, 'hostNetworkSet': 2, 'privilegeEscalationAllowed': 59, 'runAsPrivileged': 2, 'runAsRootAllowed': 58, 'hostPIDSet': 1, 'rolebindingClusterAdminRole': 2, 'rolebindingRolePodExecAttach': 2 … |
 | `storage.csi-snapshot-unavailable.cluster` | fail | medium | VolumeSnapshot CRD False, VolumeSnapshots 0 (0 in 7 days), VolumeSnapshotClasses 0, EBS snapshots in 30 days None None, prod PVCs 8 |
 | `storage.no-volume-expansion.gp3` | fail | medium | allowVolumeExpansion False, provisioner ebs.csi.aws.com |
@@ -298,47 +297,6 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `logs.signatures.metrics-server.scrape-failed` | warn | medium | 31 occurrences (2026-11-06T01:43:11Z ~ 2026-11-06T10:09:11Z), thresholds warn 5/fail 100. Files: ['logs/pods/metrics-server/kube-system_metrics-server.log']. Samples: ['[pod/metrics-server-65d4b7df64-xxfjs/metrics-server] 2026-11-06T01:43:11.055572813Z E1106 01:43:11.055448       1 scraper.go:149] … |
 | `loki.memory-pressure.monitoring/statefulset/loki-stack` | warn | medium | RSS 289MiB / limit 512Mi = 0.565, in-memory streams 54, last termination OOMKilled True(2026-10-25T00:15:41Z), restarts 1, storage emptyDir |
 | `loki.request-errors.monitoring/statefulset/loki-stack` | warn | medium | 1 5xx out of 6899928 requests since start (by route {'loki_api_v1_series': 1}, excluding /ready 503 during startup), panics 0, WAL disk full 0, error log lines 11783, rejected {} |
-| `observability.golden-signals-missing.app-ab-prod/app-ab-backend` | warn | medium | hosts ['app-ab-tp-api.lab-k.example'], backends ['app-ab-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.app-ab-prod/app-ab-frontend` | warn | medium | hosts ['app-ab-tp-prod.lab-k.example'], backends ['app-ab-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.argocd/argocd-server` | warn | medium | hosts ['deploy.lab-k.example'], backends ['argocd-server'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-aa/app-aa-backend` | warn | medium | hosts ['demo-api.lab-m.example'], backends ['app-aa-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-aa/app-aa-frontend` | warn | medium | hosts ['demo.lab-m.example'], backends ['app-aa-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-s/app-s-admin` | warn | medium | hosts ['admin-dev.lab-l.example'], backends ['app-s-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-s/app-s-api` | warn | medium | hosts ['api-dev.v1.lab-l.example'], backends ['app-s-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-s/app-s-backend` | warn | medium | hosts ['api-dev.lab-l.example'], backends ['app-s-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-s/app-s-frontend` | warn | medium | hosts ['dev.lab-l.example'], backends ['app-s-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-v/app-v-admin-frontend` | warn | medium | hosts ['admin-dev.lab-n.example'], backends ['app-v-admin-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-v/app-v-backend` | warn | medium | hosts ['api-dev.lab-n.example'], backends ['app-v-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-v/app-v-frontend` | warn | medium | hosts ['dev.lab-n.example'], backends ['app-v-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-y/app-y-admin` | warn | medium | hosts ['admin-dev.lab-m.example'], backends ['app-y-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-y/app-y-ai` | warn | medium | hosts ['ai-dev.lab-m.example'], backends ['app-y-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-y/app-y-backend` | warn | medium | hosts ['app-y-api-dev.lab-k.example'], backends ['app-y-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.dev-app-y/app-y-frontend` | warn | medium | hosts ['app-y-dev.lab-k.example'], backends ['app-y-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.middleware/kafka-ui` | warn | medium | hosts ['kafka.lab-k.example'], backends ['kafka-ui'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.middleware/redis-insight` | warn | medium | hosts ['redis.lab-k.example'], backends ['redis-insight'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.monitoring/kube-prometheus-stack-grafana` | warn | medium | hosts ['monitor.lab-k.example'], backends ['kube-prometheus-stack-grafana'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.monitoring/vmauth` | warn | medium | hosts ['metrics-write.lab-k.example'], backends ['vmauth'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-r/app-r-backend` | warn | medium | hosts ['app-r-api.lab-k.example'], backends ['app-r-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-r/app-r-web` | warn | medium | hosts ['app-r.lab-k.example'], backends ['app-r-web'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-s/app-s-admin` | warn | medium | hosts ['canary-admin.lab-l.example', 'admin.lab-l.example'], backends ['app-s-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-s/app-s-api` | warn | medium | hosts ['canary-api-v1.lab-l.example', 'api.v1.lab-l.example'], backends ['app-s-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-s/app-s-backend` | warn | medium | hosts ['canary-api.lab-l.example', 'api.lab-l.example'], backends ['app-s-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-s/app-s-frontend` | warn | medium | hosts ['canary.lab-l.example', 'www.lab-l.example', 'lab-l.example'], backends ['app-s-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-t/app-t-ai` | warn | medium | hosts ['app-t-ai.lab-k.example'], backends ['app-t-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-t/app-t-backend` | warn | medium | hosts ['app-t-api.lab-k.example'], backends ['app-t-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-t/app-t-studio` | warn | medium | hosts ['app-t-studio.lab-k.example'], backends ['app-t-studio'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-t/app-t-web` | warn | medium | hosts ['app-t.lab-k.example'], backends ['app-t-web'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-v/app-v-admin-frontend` | warn | medium | hosts ['admin.lab-n.example'], backends ['app-v-admin-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-v/app-v-backend` | warn | medium | hosts ['api.lab-n.example'], backends ['app-v-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-v/app-v-frontend` | warn | medium | hosts ['lab-n.example', 'www.lab-n.example'], backends ['app-v-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-w/app-w` | warn | medium | hosts ['app-w.lab-k.example'], backends ['app-w'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-x/app-x-api` | warn | medium | hosts ['app-x-api.lab-k.example'], backends ['app-x-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-y/app-y-admin` | warn | medium | hosts ['admin.lab-m.example'], backends ['app-y-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-y/app-y-ai` | warn | medium | hosts ['ai.lab-m.example'], backends ['app-y-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-y/app-y-backend` | warn | medium | hosts ['api.lab-m.example'], backends ['app-y-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-y/app-y-frontend` | warn | medium | hosts ['lab-m.example', 'www.lab-m.example'], backends ['app-y-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-z-backend/app-z-backend` | warn | medium | hosts ['app-z-api.lab-k.example'], backends ['app-z-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
-| `observability.golden-signals-missing.prod-app-z-backend/app-z-frontend` | warn | medium | hosts ['app-z.lab-k.example'], backends ['app-z-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected) |
 | `observability.page-severity-cause-alerts.cluster` | warn | medium | of 157 alert rules, 36 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerClusterDown', 'AlertmanagerClusterCrashlooping', 'etcdMembersDown' … |
 | `observability.promtail-dropped.cluster` | warn | medium | Lines dropped in 1h None, non-2xx sends None, active targets total None -- promtail metrics are not in Prometheus (no ServiceMonitor). The numbers above were not measured |
 | `observability.slo-without-burn-rate.cluster` | warn | medium | SLO tools [], 0 sli/slo recording rules, slo-labelled rules ['ImageInferenceE2ESuccessRateDrop', 'ImageInferenceEntitlementFailureSpike', 'LoraTrainingSuccessRateDrop', 'LoraTrainingDurationP95High', 'LoraTrainingCallbackTimeout'], 0 burn rate alerts |
@@ -376,6 +334,7 @@ Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runn
 | `resources.krr-recommendation.prod-app-y/statefulset/app-y-backend-mysql:mysql` | warn | medium | CPU request over by 0.19 cores: CPU request 0.2 → 0.01 cores, CPU limit 1.0 → none, memory request 768 → 740 MB, memory limit 1536 → 740 MB. KRR severity CRITICAL (CPU req OK, CPU limit WARNING, memory req GOOD, memory limit CRITICAL) |
 | `resources.krr-recommendation.prod-app-z-backend/deployment/app-z-backend:backend` | warn | medium | memory request over by 410 MB: CPU HPA detected, memory request 1024 → 614 MB, memory limit 2048 → 614 MB. KRR severity CRITICAL (CPU req UNKNOWN, CPU limit UNKNOWN, memory req WARNING, memory limit CRITICAL). cpu: HPA detected |
 | `resources.krr-recommendation.prod-app-z-backend/deployment/app-z-pg-proxy:forwarder` | warn | medium | memory request under by 68 MB: CPU request 0.02 → 0.01 cores, CPU limit 0.2 → none, memory request 32 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD) |
+| `security.no-certificate-manager.cluster` | warn | medium | no component of family certificates in inventory.components |
 | `security.psa-not-enforced.cluster` | warn | medium | Namespaces with an enforce label [], prod without one ['app-ab-prod', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend']. Share of containers allowing root 0.61 (29 prod workloads) |
 | `security.rbac-wildcard.argocd-application-controller` | warn | medium | ClusterRole argocd-application-controller: * in verbs and resources, bound subjects [('ServiceAccount', 'argocd', 'argocd-application-controller')] |
 | `security.sa-token-mounted-without-rbac.cluster` | warn | medium | Workloads with token mounted 86/92, of which 30 prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: ['prod-app-w/deployment/app-w', 'prod-app-t/deployment/app-t-ai', 'prod-app-t/deployment/app-t-backend', 'prod-app-t/deployment/app-t-studio', 'prod-app-t/deployment/app-t-web' … |
@@ -2938,710 +2897,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "requests_total": 6899928,
  "target": "monitoring/statefulset/loki-stack",
  "wal_disk_full_failures": 0
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.app-ab-prod/app-ab-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-ab-tp-api.lab-k.example"
- ],
- "ingress": "app-ab-backend",
- "namespace": "app-ab-prod",
- "services": [
-  "app-ab-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.app-ab-prod/app-ab-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-ab-tp-prod.lab-k.example"
- ],
- "ingress": "app-ab-frontend",
- "namespace": "app-ab-prod",
- "services": [
-  "app-ab-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.argocd/argocd-server</code></summary>
-
-```json
-{
- "hosts": [
-  "deploy.lab-k.example"
- ],
- "ingress": "argocd-server",
- "namespace": "argocd",
- "services": [
-  "argocd-server"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-aa/app-aa-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "demo-api.lab-m.example"
- ],
- "ingress": "app-aa-backend",
- "namespace": "dev-app-aa",
- "services": [
-  "app-aa-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-aa/app-aa-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "demo.lab-m.example"
- ],
- "ingress": "app-aa-frontend",
- "namespace": "dev-app-aa",
- "services": [
-  "app-aa-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-admin</code></summary>
-
-```json
-{
- "hosts": [
-  "admin-dev.lab-l.example"
- ],
- "ingress": "app-s-admin",
- "namespace": "dev-app-s",
- "services": [
-  "app-s-admin"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-api</code></summary>
-
-```json
-{
- "hosts": [
-  "api-dev.v1.lab-l.example"
- ],
- "ingress": "app-s-api",
- "namespace": "dev-app-s",
- "services": [
-  "app-s-api"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "api-dev.lab-l.example"
- ],
- "ingress": "app-s-backend",
- "namespace": "dev-app-s",
- "services": [
-  "app-s-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-s/app-s-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "dev.lab-l.example"
- ],
- "ingress": "app-s-frontend",
- "namespace": "dev-app-s",
- "services": [
-  "app-s-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-v/app-v-admin-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "admin-dev.lab-n.example"
- ],
- "ingress": "app-v-admin-frontend",
- "namespace": "dev-app-v",
- "services": [
-  "app-v-admin-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-v/app-v-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "api-dev.lab-n.example"
- ],
- "ingress": "app-v-backend",
- "namespace": "dev-app-v",
- "services": [
-  "app-v-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-v/app-v-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "dev.lab-n.example"
- ],
- "ingress": "app-v-frontend",
- "namespace": "dev-app-v",
- "services": [
-  "app-v-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-admin</code></summary>
-
-```json
-{
- "hosts": [
-  "admin-dev.lab-m.example"
- ],
- "ingress": "app-y-admin",
- "namespace": "dev-app-y",
- "services": [
-  "app-y-admin"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-ai</code></summary>
-
-```json
-{
- "hosts": [
-  "ai-dev.lab-m.example"
- ],
- "ingress": "app-y-ai",
- "namespace": "dev-app-y",
- "services": [
-  "app-y-ai"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-y-api-dev.lab-k.example"
- ],
- "ingress": "app-y-backend",
- "namespace": "dev-app-y",
- "services": [
-  "app-y-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.dev-app-y/app-y-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-y-dev.lab-k.example"
- ],
- "ingress": "app-y-frontend",
- "namespace": "dev-app-y",
- "services": [
-  "app-y-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.middleware/kafka-ui</code></summary>
-
-```json
-{
- "hosts": [
-  "kafka.lab-k.example"
- ],
- "ingress": "kafka-ui",
- "namespace": "middleware",
- "services": [
-  "kafka-ui"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.middleware/redis-insight</code></summary>
-
-```json
-{
- "hosts": [
-  "redis.lab-k.example"
- ],
- "ingress": "redis-insight",
- "namespace": "middleware",
- "services": [
-  "redis-insight"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.monitoring/kube-prometheus-stack-grafana</code></summary>
-
-```json
-{
- "hosts": [
-  "monitor.lab-k.example"
- ],
- "ingress": "kube-prometheus-stack-grafana",
- "namespace": "monitoring",
- "services": [
-  "kube-prometheus-stack-grafana"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.monitoring/vmauth</code></summary>
-
-```json
-{
- "hosts": [
-  "metrics-write.lab-k.example"
- ],
- "ingress": "vmauth",
- "namespace": "monitoring",
- "services": [
-  "vmauth"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-r/app-r-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-r-api.lab-k.example"
- ],
- "ingress": "app-r-backend",
- "namespace": "prod-app-r",
- "services": [
-  "app-r-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-r/app-r-web</code></summary>
-
-```json
-{
- "hosts": [
-  "app-r.lab-k.example"
- ],
- "ingress": "app-r-web",
- "namespace": "prod-app-r",
- "services": [
-  "app-r-web"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-admin</code></summary>
-
-```json
-{
- "hosts": [
-  "canary-admin.lab-l.example",
-  "admin.lab-l.example"
- ],
- "ingress": "app-s-admin",
- "namespace": "prod-app-s",
- "services": [
-  "app-s-admin"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-api</code></summary>
-
-```json
-{
- "hosts": [
-  "canary-api-v1.lab-l.example",
-  "api.v1.lab-l.example"
- ],
- "ingress": "app-s-api",
- "namespace": "prod-app-s",
- "services": [
-  "app-s-api"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "canary-api.lab-l.example",
-  "api.lab-l.example"
- ],
- "ingress": "app-s-backend",
- "namespace": "prod-app-s",
- "services": [
-  "app-s-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-s/app-s-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "canary.lab-l.example",
-  "www.lab-l.example",
-  "lab-l.example"
- ],
- "ingress": "app-s-frontend",
- "namespace": "prod-app-s",
- "services": [
-  "app-s-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-ai</code></summary>
-
-```json
-{
- "hosts": [
-  "app-t-ai.lab-k.example"
- ],
- "ingress": "app-t-ai",
- "namespace": "prod-app-t",
- "services": [
-  "app-t-ai"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-t-api.lab-k.example"
- ],
- "ingress": "app-t-backend",
- "namespace": "prod-app-t",
- "services": [
-  "app-t-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-studio</code></summary>
-
-```json
-{
- "hosts": [
-  "app-t-studio.lab-k.example"
- ],
- "ingress": "app-t-studio",
- "namespace": "prod-app-t",
- "services": [
-  "app-t-studio"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-t/app-t-web</code></summary>
-
-```json
-{
- "hosts": [
-  "app-t.lab-k.example"
- ],
- "ingress": "app-t-web",
- "namespace": "prod-app-t",
- "services": [
-  "app-t-web"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-v/app-v-admin-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "admin.lab-n.example"
- ],
- "ingress": "app-v-admin-frontend",
- "namespace": "prod-app-v",
- "services": [
-  "app-v-admin-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-v/app-v-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "api.lab-n.example"
- ],
- "ingress": "app-v-backend",
- "namespace": "prod-app-v",
- "services": [
-  "app-v-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-v/app-v-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "lab-n.example",
-  "www.lab-n.example"
- ],
- "ingress": "app-v-frontend",
- "namespace": "prod-app-v",
- "services": [
-  "app-v-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-w/app-w</code></summary>
-
-```json
-{
- "hosts": [
-  "app-w.lab-k.example"
- ],
- "ingress": "app-w",
- "namespace": "prod-app-w",
- "services": [
-  "app-w"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-x/app-x-api</code></summary>
-
-```json
-{
- "hosts": [
-  "app-x-api.lab-k.example"
- ],
- "ingress": "app-x-api",
- "namespace": "prod-app-x",
- "services": [
-  "app-x-api"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-admin</code></summary>
-
-```json
-{
- "hosts": [
-  "admin.lab-m.example"
- ],
- "ingress": "app-y-admin",
- "namespace": "prod-app-y",
- "services": [
-  "app-y-admin"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-ai</code></summary>
-
-```json
-{
- "hosts": [
-  "ai.lab-m.example"
- ],
- "ingress": "app-y-ai",
- "namespace": "prod-app-y",
- "services": [
-  "app-y-ai"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "api.lab-m.example"
- ],
- "ingress": "app-y-backend",
- "namespace": "prod-app-y",
- "services": [
-  "app-y-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-y/app-y-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "lab-m.example",
-  "www.lab-m.example"
- ],
- "ingress": "app-y-frontend",
- "namespace": "prod-app-y",
- "services": [
-  "app-y-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-z-backend/app-z-backend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-z-api.lab-k.example"
- ],
- "ingress": "app-z-backend",
- "namespace": "prod-app-z-backend",
- "services": [
-  "app-z-backend"
- ],
- "source": "alb-cloudwatch (not collected)"
-}
-```
-
-</details>
-<details><summary><code>observability.golden-signals-missing.prod-app-z-backend/app-z-frontend</code></summary>
-
-```json
-{
- "hosts": [
-  "app-z.lab-k.example"
- ],
- "ingress": "app-z-frontend",
- "namespace": "prod-app-z-backend",
- "services": [
-  "app-z-frontend"
- ],
- "source": "alb-cloudwatch (not collected)"
 }
 ```
 
@@ -6578,7 +5833,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6596,7 +5851,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6614,7 +5869,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6632,7 +5887,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6650,7 +5905,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6668,7 +5923,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6686,7 +5941,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6704,7 +5959,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6722,7 +5977,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6740,7 +5995,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6758,7 +6013,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6776,7 +6031,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6794,7 +6049,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6812,7 +6067,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6830,7 +6085,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6848,7 +6103,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6866,7 +6121,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6884,7 +6139,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6902,7 +6157,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6920,7 +6175,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6938,7 +6193,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6956,7 +6211,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6974,7 +6229,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -6992,7 +6247,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7011,7 +6266,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7030,7 +6285,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7049,7 +6304,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7069,7 +6324,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7087,7 +6342,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7105,7 +6360,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7123,7 +6378,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7142,7 +6397,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7160,7 +6415,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7178,7 +6433,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7196,7 +6451,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7214,7 +6469,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7232,7 +6487,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7250,7 +6505,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7269,7 +6524,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7287,7 +6542,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   },
   {
@@ -7305,7 +6560,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "errors": false,
    "saturation": false,
    "source": "alb-cloudwatch (not collected)",
-   "missing_all_lte": true,
+   "missing_all_lte": false,
    "cluster_ic_metrics": false
   }
  ],

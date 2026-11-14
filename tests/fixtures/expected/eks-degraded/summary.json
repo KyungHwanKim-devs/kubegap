@@ -1327,7 +1327,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1345,7 +1345,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1363,7 +1363,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1381,7 +1381,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1399,7 +1399,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1417,7 +1417,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1435,7 +1435,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1453,7 +1453,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1471,7 +1471,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1489,7 +1489,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1507,7 +1507,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1525,7 +1525,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1543,7 +1543,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1561,7 +1561,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1579,7 +1579,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1597,7 +1597,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1615,7 +1615,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1633,7 +1633,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1651,7 +1651,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1669,7 +1669,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1687,7 +1687,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1705,7 +1705,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1723,7 +1723,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1741,7 +1741,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1760,7 +1760,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1779,7 +1779,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1798,7 +1798,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1818,7 +1818,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1836,7 +1836,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1854,7 +1854,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1872,7 +1872,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1891,7 +1891,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1909,7 +1909,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1927,7 +1927,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1945,7 +1945,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1963,7 +1963,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1981,7 +1981,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -1999,7 +1999,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2018,7 +2018,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2036,7 +2036,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2054,7 +2054,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     }
    ],
@@ -2063,753 +2063,7 @@
    "ingress_controller_metric_series": 0,
    "alb_cloudwatch_available": true,
    "alb_cloudwatch_collected": false,
-   "missing_lte": [
-    {
-     "namespace": "argocd",
-     "ingress": "argocd-server",
-     "class": "alb",
-     "hosts": [
-      "deploy.lab-k.example"
-     ],
-     "services": [
-      "argocd-server"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-s",
-     "ingress": "app-s-admin",
-     "class": "alb",
-     "hosts": [
-      "admin-dev.lab-l.example"
-     ],
-     "services": [
-      "app-s-admin"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-s",
-     "ingress": "app-s-api",
-     "class": "alb",
-     "hosts": [
-      "api-dev.v1.lab-l.example"
-     ],
-     "services": [
-      "app-s-api"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-s",
-     "ingress": "app-s-backend",
-     "class": "alb",
-     "hosts": [
-      "api-dev.lab-l.example"
-     ],
-     "services": [
-      "app-s-backend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-s",
-     "ingress": "app-s-frontend",
-     "class": "alb",
-     "hosts": [
-      "dev.lab-l.example"
-     ],
-     "services": [
-      "app-s-frontend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-y",
-     "ingress": "app-y-admin",
-     "class": "alb",
-     "hosts": [
-      "admin-dev.lab-m.example"
-     ],
-     "services": [
-      "app-y-admin"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-y",
-     "ingress": "app-y-ai",
-     "class": "alb",
-     "hosts": [
-      "ai-dev.lab-m.example"
-     ],
-     "services": [
-      "app-y-ai"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-y",
-     "ingress": "app-y-backend",
-     "class": "alb",
-     "hosts": [
-      "app-y-api-dev.lab-k.example"
-     ],
-     "services": [
-      "app-y-backend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-y",
-     "ingress": "app-y-frontend",
-     "class": "alb",
-     "hosts": [
-      "app-y-dev.lab-k.example"
-     ],
-     "services": [
-      "app-y-frontend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-v",
-     "ingress": "app-v-admin-frontend",
-     "class": "alb",
-     "hosts": [
-      "admin-dev.lab-n.example"
-     ],
-     "services": [
-      "app-v-admin-frontend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-v",
-     "ingress": "app-v-backend",
-     "class": "alb",
-     "hosts": [
-      "api-dev.lab-n.example"
-     ],
-     "services": [
-      "app-v-backend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-v",
-     "ingress": "app-v-frontend",
-     "class": "alb",
-     "hosts": [
-      "dev.lab-n.example"
-     ],
-     "services": [
-      "app-v-frontend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-aa",
-     "ingress": "app-aa-backend",
-     "class": "alb",
-     "hosts": [
-      "demo-api.lab-m.example"
-     ],
-     "services": [
-      "app-aa-backend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "dev-app-aa",
-     "ingress": "app-aa-frontend",
-     "class": "alb",
-     "hosts": [
-      "demo.lab-m.example"
-     ],
-     "services": [
-      "app-aa-frontend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "middleware",
-     "ingress": "kafka-ui",
-     "class": "alb",
-     "hosts": [
-      "kafka.lab-k.example"
-     ],
-     "services": [
-      "kafka-ui"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "middleware",
-     "ingress": "redis-insight",
-     "class": "alb",
-     "hosts": [
-      "redis.lab-k.example"
-     ],
-     "services": [
-      "redis-insight"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "monitoring",
-     "ingress": "kube-prometheus-stack-grafana",
-     "class": "alb",
-     "hosts": [
-      "monitor.lab-k.example"
-     ],
-     "services": [
-      "kube-prometheus-stack-grafana"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "monitoring",
-     "ingress": "vmauth",
-     "class": "alb",
-     "hosts": [
-      "metrics-write.lab-k.example"
-     ],
-     "services": [
-      "vmauth"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-w",
-     "ingress": "app-w",
-     "class": "alb",
-     "hosts": [
-      "app-w.lab-k.example"
-     ],
-     "services": [
-      "app-w"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-t",
-     "ingress": "app-t-ai",
-     "class": "alb",
-     "hosts": [
-      "app-t-ai.lab-k.example"
-     ],
-     "services": [
-      "app-t-ai"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-t",
-     "ingress": "app-t-backend",
-     "class": "alb",
-     "hosts": [
-      "app-t-api.lab-k.example"
-     ],
-     "services": [
-      "app-t-backend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-t",
-     "ingress": "app-t-studio",
-     "class": "alb",
-     "hosts": [
-      "app-t-studio.lab-k.example"
-     ],
-     "services": [
-      "app-t-studio"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-t",
-     "ingress": "app-t-web",
-     "class": "alb",
-     "hosts": [
-      "app-t.lab-k.example"
-     ],
-     "services": [
-      "app-t-web"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-x",
-     "ingress": "app-x-api",
-     "class": "alb",
-     "hosts": [
-      "app-x-api.lab-k.example"
-     ],
-     "services": [
-      "app-x-api"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-s",
-     "ingress": "app-s-admin",
-     "class": "alb",
-     "hosts": [
-      "canary-admin.lab-l.example",
-      "admin.lab-l.example"
-     ],
-     "services": [
-      "app-s-admin"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-s",
-     "ingress": "app-s-api",
-     "class": "alb",
-     "hosts": [
-      "canary-api-v1.lab-l.example",
-      "api.v1.lab-l.example"
-     ],
-     "services": [
-      "app-s-api"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-s",
-     "ingress": "app-s-backend",
-     "class": "alb",
-     "hosts": [
-      "canary-api.lab-l.example",
-      "api.lab-l.example"
-     ],
-     "services": [
-      "app-s-backend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-s",
-     "ingress": "app-s-frontend",
-     "class": "alb",
-     "hosts": [
-      "canary.lab-l.example",
-      "www.lab-l.example",
-      "lab-l.example"
-     ],
-     "services": [
-      "app-s-frontend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-y",
-     "ingress": "app-y-admin",
-     "class": "alb",
-     "hosts": [
-      "admin.lab-m.example"
-     ],
-     "services": [
-      "app-y-admin"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-y",
-     "ingress": "app-y-ai",
-     "class": "alb",
-     "hosts": [
-      "ai.lab-m.example"
-     ],
-     "services": [
-      "app-y-ai"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-y",
-     "ingress": "app-y-backend",
-     "class": "alb",
-     "hosts": [
-      "api.lab-m.example"
-     ],
-     "services": [
-      "app-y-backend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-y",
-     "ingress": "app-y-frontend",
-     "class": "alb",
-     "hosts": [
-      "lab-m.example",
-      "www.lab-m.example"
-     ],
-     "services": [
-      "app-y-frontend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-z-backend",
-     "ingress": "app-z-backend",
-     "class": "alb",
-     "hosts": [
-      "app-z-api.lab-k.example"
-     ],
-     "services": [
-      "app-z-backend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-z-backend",
-     "ingress": "app-z-frontend",
-     "class": "alb",
-     "hosts": [
-      "app-z.lab-k.example"
-     ],
-     "services": [
-      "app-z-frontend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-r",
-     "ingress": "app-r-backend",
-     "class": "alb",
-     "hosts": [
-      "app-r-api.lab-k.example"
-     ],
-     "services": [
-      "app-r-backend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-r",
-     "ingress": "app-r-web",
-     "class": "alb",
-     "hosts": [
-      "app-r.lab-k.example"
-     ],
-     "services": [
-      "app-r-web"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-v",
-     "ingress": "app-v-admin-frontend",
-     "class": "alb",
-     "hosts": [
-      "admin.lab-n.example"
-     ],
-     "services": [
-      "app-v-admin-frontend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-v",
-     "ingress": "app-v-backend",
-     "class": "alb",
-     "hosts": [
-      "api.lab-n.example"
-     ],
-     "services": [
-      "app-v-backend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "prod-app-v",
-     "ingress": "app-v-frontend",
-     "class": "alb",
-     "hosts": [
-      "lab-n.example",
-      "www.lab-n.example"
-     ],
-     "services": [
-      "app-v-frontend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "app-ab-prod",
-     "ingress": "app-ab-backend",
-     "class": "alb",
-     "hosts": [
-      "app-ab-tp-api.lab-k.example"
-     ],
-     "services": [
-      "app-ab-backend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    },
-    {
-     "namespace": "app-ab-prod",
-     "ingress": "app-ab-frontend",
-     "class": "alb",
-     "hosts": [
-      "app-ab-tp-prod.lab-k.example"
-     ],
-     "services": [
-      "app-ab-frontend"
-     ],
-     "latency": false,
-     "traffic": false,
-     "errors": false,
-     "saturation": false,
-     "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
-     "cluster_ic_metrics": false
-    }
-   ],
+   "missing_lte": [],
    "missing_saturation": [
     {
      "namespace": "argocd",
@@ -2826,7 +2080,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2844,7 +2098,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2862,7 +2116,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2880,7 +2134,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2898,7 +2152,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2916,7 +2170,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2934,7 +2188,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2952,7 +2206,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2970,7 +2224,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -2988,7 +2242,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3006,7 +2260,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3024,7 +2278,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3042,7 +2296,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3060,7 +2314,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3078,7 +2332,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3096,7 +2350,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3114,7 +2368,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3132,7 +2386,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3150,7 +2404,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3168,7 +2422,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3186,7 +2440,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3204,7 +2458,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3222,7 +2476,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3240,7 +2494,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3259,7 +2513,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3278,7 +2532,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3297,7 +2551,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3317,7 +2571,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3335,7 +2589,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3353,7 +2607,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3371,7 +2625,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3390,7 +2644,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3408,7 +2662,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3426,7 +2680,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3444,7 +2698,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3462,7 +2716,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3480,7 +2734,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3498,7 +2752,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3517,7 +2771,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3535,7 +2789,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     },
     {
@@ -3553,7 +2807,7 @@
      "errors": false,
      "saturation": false,
      "source": "alb-cloudwatch (not collected)",
-     "missing_all_lte": true,
+     "missing_all_lte": false,
      "cluster_ic_metrics": false
     }
    ]
@@ -4263,6 +3517,7 @@
    "logs/pods/promtail/monitoring_loki-stack-promtail.log",
    "logs/pods/vpc-cni/kube-system_aws-node.log"
   ],
+  "lines_kept": true,
   "files_scanned": [
    "logs/pods/actions-runner-controller/arc-system_arc-gha-rs-controller.log",
    "logs/pods/alb-controller/kube-system_aws-load-balancer-controller.log",

@@ -415,6 +415,9 @@ def _golden_signals(snap: Path, comps: set, platform: str | None, alb: dict | No
     covered = (alb or {}).get("covered_services")  # summary.traffic.alb, built before this section: (ns, service) pairs that have RequestCount in aws/alb-metrics.json
     alb_covered = {tuple(x) for x in covered} if covered else set()
     alb_error = (alb or {}).get("covered_services_error")
+    # On EKS with the AWS Load Balancer Controller the three signals are in CloudWatch. When that was not read (a daily run makes no AWS call), an
+    # ingress without app or controller metrics is unknown, not missing.
+    alb_unread = alb_cloudwatch and not (snap / "aws" / "alb-metrics.json").is_file()
     rows = []
     for ing in items(load_json(snap / "objects" / "ingresses.networking.k8s.io.json")):
         ns, name = ing["metadata"]["namespace"], ing["metadata"]["name"]
@@ -437,7 +440,7 @@ def _golden_signals(snap: Path, comps: set, platform: str | None, alb: dict | No
                 "errors": lte,
                 "saturation": ns in sat_ns,
                 "source": "app" if app_metrics else ("ingress-controller" if ic_metrics else ("alb-cloudwatch" if alb_metrics else ("alb-cloudwatch (not collected)" if alb_cloudwatch else None))),
-                "missing_all_lte": not lte,
+                "missing_all_lte": not lte and not alb_unread,
                 "cluster_ic_metrics": bool(ic_rows),  # whether the cluster has any ingress controller metrics at all (if none, the cause is a single one — ingress-controller-metrics-missing)
             }
         )

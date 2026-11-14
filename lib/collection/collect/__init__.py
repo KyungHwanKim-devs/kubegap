@@ -84,7 +84,7 @@ def run_collector(
         log.skip(id=f"collector.{name}", reason=result["skipped"], collector=name)
         return result
     steps = yamlite.load_file(spec_path) or []
-    ctx = StepContext(name, folder, context, cfg, inv, snap, log, kubeconfig, prom, stores, node_access, echo, state if state is not None else CollectState())
+    ctx = StepContext(name, folder, context, cfg, inv, snap, log, kubeconfig, prom, stores, node_access, echo, state if state is not None else CollectState(), mode)
     for st in steps:
         sid, typ = st["id"], st["type"]
         if echo:

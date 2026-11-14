@@ -22148,6 +22148,7 @@
    "logs/pods/promtail/monitoring_loki-stack-promtail.log",
    "logs/pods/vpc-cni/kube-system_aws-node.log"
   ],
+  "lines_kept": true,
   "files_scanned": [
    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/containerd-24h.log",
    "logs/node/ip-10-0-1-137.ap-northeast-2.compute.internal/ipamd-24h.log",

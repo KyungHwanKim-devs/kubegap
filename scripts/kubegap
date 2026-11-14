@@ -67,7 +67,9 @@ def cmd_setup(args) -> int:
         install = cfg.install_policy == "always"
     # SSM document policy (EKS only): the flag wins; otherwise config ssm_document (always = upload, ask/never = report only). SKILL.md asks the user when setup reports it missing
     install_doc = bool(args.install_ssm_document) or cfg.ssm_document_policy == "always"
-    code, _ = _setup.run_setup(ctx, cfg, kubeconfig=args.kubeconfig, install=install, install_ssm_document=install_doc, snapshots_root=_root(args), verbose=args.verbose, ask_again=args.ask_again, language=_language(args, cfg))
+    # `/kubegap setup` (--ask-again) asks everything, so it is a full check; otherwise the mode of the run that follows decides what is checked and asked
+    mode = "full" if args.ask_again else _mode(args, cfg)
+    code, _ = _setup.run_setup(ctx, cfg, kubeconfig=args.kubeconfig, install=install, install_ssm_document=install_doc, snapshots_root=_root(args), verbose=args.verbose, ask_again=args.ask_again, language=_language(args, cfg), mode=mode)
     return code
 
 
@@ -288,12 +290,12 @@ def cmd_collect(args) -> int:
     log = RunLog(snap / "run.log", echo=args.verbose)
     log.meta(kubegap=__version__, context=ctx, command="collect", args={k: v for k, v in vars(args).items() if k != "func"})  # the handler object printed as `<function … at 0x…>`, a memory address in run.log
     print(f"context {ctx} -> {snap}\n== discover")
-    inv = _discover.discover(ctx, cfg, snap, ssh_state=_firstrun.ssh_decision(snap.parent, cfg), kubeconfig=args.kubeconfig, log=log, scale_answer=_firstrun.scale_decision(snap.parent))
+    mode = _mode(args, cfg)
+    inv = _discover.discover(ctx, cfg, snap, ssh_state=_firstrun.ssh_decision(snap.parent, cfg), kubeconfig=args.kubeconfig, log=log, scale_answer=_firstrun.scale_decision(snap.parent), mode=mode)
     print(f"  platform {inv['cluster']['platform']}, scale {inv['scale']['name']} [{inv['scale']['source']}], components {len(inv['components_present'])}, collectors to run {len(inv['collectors_enabled'])}")
     print("== collect")
     only = [n.strip() for n in args.only.split(",")] if args.only else None
-    mode = _mode(args, cfg)
-    print(f"mode {mode}" + (" (daily skips slow tools, per-node scripts, CloudWatch and cost data; `--mode full` collects everything)" if mode == "daily" else ""))
+    print(f"mode {mode}" + (" (daily reads the Kubernetes API and the metric and log stores only: no node, no AWS API, no slow tools; `--mode full` collects everything)" if mode == "daily" else ""))
     results = _collect.collect(ctx, cfg, inv, snap, log, kubeconfig=args.kubeconfig, only=only, mode=mode)
     ran = [n for n, r in results.items() if not r.get("skipped")]
     unimpl = [n for n, r in results.items() if r.get("skipped")]
@@ -806,6 +808,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="EKS: upload or update the kubegap-node-read SSM document in the account (needs ssm:CreateDocument, ssm:UpdateDocument, ssm:UpdateDocumentDefaultVersion and ssm:ListDocumentVersions on the current credentials; not part of the read-only policy)",
     )
     s.add_argument("--ask-again", action="store_true", help="list every first-run question again, including the ones answered before (the `/kubegap setup` mode)")
+    s.add_argument("--mode", choices=list(paths.MODES), help="the mode of the run that follows (default: `mode:` in config.yaml, else daily). A daily run checks no AWS permission and asks only the scale and the folder permissions")
     s.add_argument("--language", choices=["en", "ko"], help="language of the first-run question block (default: `language:` in config.yaml, else en); the agent copies it as printed")
     s.set_defaults(func=cmd_setup)
 

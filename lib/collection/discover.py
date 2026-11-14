@@ -269,6 +269,10 @@ def _node_access(platform: str, nodes: dict, cfg: Config, eks: dict | None, log:
     return out
 
 
+DAILY_NO_AWS = "not read in a daily run (a daily run makes no AWS API call; a full run does)"
+DAILY_NO_NODES = "a daily run contacts no node; a full run reads the nodes when node access was chosen"
+
+
 def _eks_facts(eks: dict, cfg: Config, snap: Path, log: RunLog) -> dict:
     prof = cfg.get("aws_profile") or eks.get("profile")
     region = cfg.get("aws_region") or eks.get("region")
@@ -319,12 +323,15 @@ def _eks_facts(eks: dict, cfg: Config, snap: Path, log: RunLog) -> dict:
     return out
 
 
-def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfig: str | None = None, log: RunLog | None = None, scale_answer: str | None = None, echo=print) -> dict:
+def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfig: str | None = None, log: RunLog | None = None, scale_answer: str | None = None, mode: str = "full", echo=print) -> dict:
     """`scale_answer` is the scale the user chose for this cluster in the first-run question (`lib/commands/firstrun.scale_decision`), None when it was
     never answered; config.yaml `scale` wins over it and the node count stands in when both are absent. `ssh_state` is the user's decision about reading nodes over SSH (\"yes\", \"skipped\" or \"open\"), made by `lib/commands/firstrun.ssh_decision` and passed in by the
     command: discovery is a collection module and does not read first-run answers itself; it has no default because nothing may contact a node by omission."""
     log = log or RunLog(snap / "run.log")
     log.stage("discover", "start", context=context)
+    # A daily run reads the Kubernetes API and the stores only: it calls no AWS API, contacts no node, and keeps no literal environment value outside
+    # the system namespaces. What it leaves unread is said in the inventory, so that the checks that need it are skipped with the reason and never pass.
+    daily = mode == "daily"
     taken = _dt.datetime.now().astimezone()
     objs: dict = {}
     failures: dict = {}
@@ -340,7 +347,7 @@ def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfi
         for kind, data in objs.items():
             if data is None:
                 continue
-            err = scrub.scrub_or_error(data)
+            err = scrub.scrub_or_error(data, light=daily)
             if err:  # the kind is not written at all; inventory.json records why under fetch_failures and run.log carries the failure
                 failures[kind] = err
                 log.command(id=f"discover.scrub-{kind}", cmd=["scrub", kind], code=0, seconds=0.0, error=err)
@@ -354,14 +361,20 @@ def discover(context: str, cfg: Config, snap: Path, *, ssh_state: str, kubeconfi
     nodes = _node_summary(items(objs.get("nodes")))
     eks_facts = None
     aws_addons = None
-    if ctx_info.get("is_eks"):
+    if ctx_info.get("is_eks") and daily:
+        e = ctx_info.get("eks") or {}
+        eks_facts = {"name": e.get("name"), "region": cfg.get("aws_region") or e.get("region"), "account": e.get("account"), "profile": cfg.get("aws_profile") or e.get("profile"), "error": DAILY_NO_AWS}
+    elif ctx_info.get("is_eks"):
         eks_facts = _eks_facts(ctx_info.get("eks") or {}, cfg, snap, log)
         aws_addons = list((eks_facts.get("addons") or {}).keys())
     comps = detect_components(objs, aws_addons)
     platform, platform_reasons = detect_platform(ctx_info, nodes, comps, objs)
     write_objects()
     scale = _rubric.resolve_scale(cfg, scale_answer, nodes["count"])
-    node_access = _node_access(platform, nodes, cfg, ctx_info.get("eks") if ctx_info.get("is_eks") else None, log, context=context, kubeconfig=kubeconfig, ssh_state=ssh_state)
+    if daily:
+        node_access = {"method": "none", "source": "mode", "reasons": [DAILY_NO_NODES], "ssm_registered": [], "ssm_unregistered": None}
+    else:
+        node_access = _node_access(platform, nodes, cfg, ctx_info.get("eks") if ctx_info.get("is_eks") else None, log, context=context, kubeconfig=kubeconfig, ssh_state=ssh_state)
 
     # Stores: service discovery + connect and read retention (same code as setup)
     svcs, _err = monitoring.find_services(context, kubeconfig, log=log)

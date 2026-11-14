@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ...foundations import paths
 from ...foundations.config import Config
 from ...foundations.runlog import RunLog
 from ..portfwd import PortForward
@@ -119,6 +120,12 @@ class StepContext:
     node_access: NodeRunner | None
     echo: Callable | None
     state: CollectState
+    mode: str = paths.DEFAULT_MODE
+
+    @property
+    def light(self) -> bool:
+        """A daily run keeps less: literal environment values outside the system namespaces are not written (lib/foundations/scrub.py)."""
+        return self.mode == "daily"
 
     @property
     def eks(self) -> dict:

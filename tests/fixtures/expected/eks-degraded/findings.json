@@ -5,7 +5,7 @@
   "source": "guessed",
   "nodes": 9
  },
- "rubric_version": "0.1.90",
+ "rubric_version": "0.1.91",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -235,9 +235,7 @@
    "id": "observability.golden-signals-missing",
    "status": "done",
    "reason": null,
-   "counts": {
-    "warn": 41
-   }
+   "counts": {}
   },
   {
    "id": "observability.log-volume-change",
@@ -338,7 +336,7 @@
    "status": "done",
    "reason": null,
    "counts": {
-    "fail": 1
+    "warn": 1
    }
   },
   {
@@ -3669,15 +3667,6 @@
    "source": "summary.json:security.secrets.externalsecrets_not_ready"
   },
   {
-   "check": "security.no-certificate-manager",
-   "target": "cluster",
-   "status": "fail",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "no component of family certificates in inventory.components",
-   "source": "inventory.json"
-  },
-  {
    "check": "security.polaris-security-danger",
    "target": "cluster",
    "status": "fail",
@@ -4000,375 +3989,6 @@
    "nature": "occurrence",
    "evidence": "1 5xx out of 6899928 requests since start (by route {'loki_api_v1_series': 1}, excluding /ready 503 during startup), panics 0, WAL disk full 0, error log lines 11783, rejected {}",
    "source": "summary.json:stackhealth.loki"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "app-ab-prod/app-ab-backend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-ab-tp-api.lab-k.example'], backends ['app-ab-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "app-ab-prod/app-ab-frontend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-ab-tp-prod.lab-k.example'], backends ['app-ab-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "argocd/argocd-server",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['deploy.lab-k.example'], backends ['argocd-server'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-aa/app-aa-backend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['demo-api.lab-m.example'], backends ['app-aa-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-aa/app-aa-frontend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['demo.lab-m.example'], backends ['app-aa-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-s/app-s-admin",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['admin-dev.lab-l.example'], backends ['app-s-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-s/app-s-api",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['api-dev.v1.lab-l.example'], backends ['app-s-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-s/app-s-backend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['api-dev.lab-l.example'], backends ['app-s-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-s/app-s-frontend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['dev.lab-l.example'], backends ['app-s-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-v/app-v-admin-frontend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['admin-dev.lab-n.example'], backends ['app-v-admin-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-v/app-v-backend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['api-dev.lab-n.example'], backends ['app-v-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-v/app-v-frontend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['dev.lab-n.example'], backends ['app-v-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-y/app-y-admin",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['admin-dev.lab-m.example'], backends ['app-y-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-y/app-y-ai",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['ai-dev.lab-m.example'], backends ['app-y-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-y/app-y-backend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-y-api-dev.lab-k.example'], backends ['app-y-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "dev-app-y/app-y-frontend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-y-dev.lab-k.example'], backends ['app-y-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "middleware/kafka-ui",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['kafka.lab-k.example'], backends ['kafka-ui'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "middleware/redis-insight",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['redis.lab-k.example'], backends ['redis-insight'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "monitoring/kube-prometheus-stack-grafana",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['monitor.lab-k.example'], backends ['kube-prometheus-stack-grafana'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "monitoring/vmauth",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['metrics-write.lab-k.example'], backends ['vmauth'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-r/app-r-backend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-r-api.lab-k.example'], backends ['app-r-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-r/app-r-web",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-r.lab-k.example'], backends ['app-r-web'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-s/app-s-admin",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['canary-admin.lab-l.example', 'admin.lab-l.example'], backends ['app-s-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-s/app-s-api",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['canary-api-v1.lab-l.example', 'api.v1.lab-l.example'], backends ['app-s-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-s/app-s-backend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['canary-api.lab-l.example', 'api.lab-l.example'], backends ['app-s-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-s/app-s-frontend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['canary.lab-l.example', 'www.lab-l.example', 'lab-l.example'], backends ['app-s-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-t/app-t-ai",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-t-ai.lab-k.example'], backends ['app-t-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-t/app-t-backend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-t-api.lab-k.example'], backends ['app-t-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-t/app-t-studio",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-t-studio.lab-k.example'], backends ['app-t-studio'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-t/app-t-web",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-t.lab-k.example'], backends ['app-t-web'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-v/app-v-admin-frontend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['admin.lab-n.example'], backends ['app-v-admin-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-v/app-v-backend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['api.lab-n.example'], backends ['app-v-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-v/app-v-frontend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['lab-n.example', 'www.lab-n.example'], backends ['app-v-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-w/app-w",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-w.lab-k.example'], backends ['app-w'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-x/app-x-api",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-x-api.lab-k.example'], backends ['app-x-api'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-y/app-y-admin",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['admin.lab-m.example'], backends ['app-y-admin'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-y/app-y-ai",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['ai.lab-m.example'], backends ['app-y-ai'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-y/app-y-backend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['api.lab-m.example'], backends ['app-y-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-y/app-y-frontend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['lab-m.example', 'www.lab-m.example'], backends ['app-y-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-z-backend/app-z-backend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-z-api.lab-k.example'], backends ['app-z-backend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
-  },
-  {
-   "check": "observability.golden-signals-missing",
-   "target": "prod-app-z-backend/app-z-frontend",
-   "status": "warn",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "hosts ['app-z.lab-k.example'], backends ['app-z-frontend'], no app http_* metrics, no ingress controller metrics, source alb-cloudwatch (not collected)",
-   "source": "summary.json:observability.golden_signals.missing_lte"
   },
   {
    "check": "observability.page-severity-cause-alerts",
@@ -4702,6 +4322,15 @@
    "nature": "state",
    "evidence": "memory request under by 68 MB: CPU request 0.02 → 0.01 cores, CPU limit 0.2 → none, memory request 32 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
+  },
+  {
+   "check": "security.no-certificate-manager",
+   "target": "cluster",
+   "status": "warn",
+   "severity_default": "medium",
+   "nature": "state",
+   "evidence": "no component of family certificates in inventory.components",
+   "source": "inventory.json"
   },
   {
    "check": "security.psa-not-enforced",

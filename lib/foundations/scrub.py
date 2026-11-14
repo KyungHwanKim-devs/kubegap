@@ -116,10 +116,20 @@ def env_secret_like(name: str, value) -> bool:
     return env_name_secret_like(name)
 
 
-def scrub_env(env: list) -> None:
-    """Drop the value of each credential-like variable of one `env` list, keeping its length, shape and verdict under MARK."""
+# Namespaces of the platform and its add-ons. A daily run keeps literal environment values only here: the checks that read a value read it from a
+# component (Karpenter feature gates, VPC CNI warm targets, MetalLB speaker settings), and an application's configuration is the user's own.
+SYSTEM_NS_PREFIX = ("kube-", "karpenter", "monitoring", "cert-manager", "external-secrets", "ingress-nginx", "metallb-system", "keda", "argocd", "arc-system", "arc-systems", "logging", "reloader")
+
+
+def system_namespace(ns) -> bool:
+    return isinstance(ns, str) and ns.startswith(SYSTEM_NS_PREFIX)
+
+
+def scrub_env(env: list, *, every: bool = False) -> None:
+    """Drop the value of each credential-like variable of one `env` list, keeping its length, shape and verdict under MARK. With `every` (a daily
+    run, outside the system namespaces) every literal value is dropped, whatever the name."""
     for e in env:
-        if isinstance(e, dict) and "value" in e and isinstance(e.get("name"), str) and env_name_secret_like(e["name"]):
+        if isinstance(e, dict) and "value" in e and isinstance(e.get("name"), str) and (every or env_name_secret_like(e["name"])):
             v = e.pop("value")
             e[MARK] = {"len": len(str(v)), "shape": shape(v), "secret_like": env_secret_like(e["name"], v)}
 
@@ -254,16 +264,16 @@ class ScrubFailed(shell._NamedError):
     """Scrubbing raised, so the text must not be written. The message starts with "scrub failed:"."""
 
 
-def scrub_or_error(obj) -> str | None:
+def scrub_or_error(obj, *, light: bool = False) -> str | None:
     """Scrub `obj` in place. None on success; on any exception the message "scrub failed: <type>: <text>" and the caller writes nothing."""
     try:
-        scrub_objects(obj)
+        scrub_objects(obj, light=light)
     except Exception as e:
         return f"scrub failed: {type(e).__name__}: {e}"
     return None
 
 
-def json_scrubber():
+def json_scrubber(*, light: bool = False):
     """A `shell.run` transform for kubectl JSON output plus the item count it saw.
 
     Returns (fn, info). `fn(text)` parses the JSON, scrubs it and returns the scrubbed JSON text; text that is not JSON is returned unchanged,
@@ -279,7 +289,7 @@ def json_scrubber():
             return text
         except Exception as e:
             raise ScrubFailed(f"scrub failed: {type(e).__name__}: {e}") from e
-        err = scrub_or_error(data)
+        err = scrub_or_error(data, light=light)
         if err:
             raise ScrubFailed(err)
         try:
@@ -291,10 +301,13 @@ def json_scrubber():
     return fn, info
 
 
-def scrub_objects(obj):
-    """Walk kubectl JSON (a single object or a List) and apply the Secret and ConfigMap rules in place. Returns the same object."""
+def scrub_objects(obj, *, light: bool = False, _ns=None):
+    """Walk kubectl JSON (a single object or a List) and apply the Secret and ConfigMap rules in place. Returns the same object. `light` is the
+    daily run: outside the system namespaces every literal environment value is dropped, not only the credential-like ones."""
     if isinstance(obj, dict):
         kind = obj.get("kind")
+        if isinstance(kind, str) and isinstance(obj.get("metadata"), dict):
+            _ns = obj["metadata"].get("namespace") or _ns
         if isinstance(kind, str) and kind in SECRET_KINDS:
             obj.pop("data", None)
             obj.pop("stringData", None)
@@ -310,12 +323,12 @@ def scrub_objects(obj):
             _reduce_applied(meta["annotations"])
         env = obj.get("env")
         if isinstance(env, list):
-            scrub_env(env)
+            scrub_env(env, every=light and not system_namespace(_ns))
         for v in obj.values():
-            scrub_objects(v)
+            scrub_objects(v, light=light, _ns=_ns)
     elif isinstance(obj, list):
         for v in obj:
-            scrub_objects(v)
+            scrub_objects(v, light=light, _ns=_ns)
     return obj
 
 

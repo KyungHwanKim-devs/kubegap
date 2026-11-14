@@ -17736,6 +17736,7 @@
    "logs/pods/metallb/metallb-system_speaker.log",
    "logs/pods/prometheus/monitoring_prometheus-kube-prometheus-stack-prometheus.log"
   ],
+  "lines_kept": true,
   "files_scanned": [
    "logs/node/node-a/containerd-24h.log",
    "logs/node/node-a/k3s-errors-24h.log",

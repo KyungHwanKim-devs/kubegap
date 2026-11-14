@@ -71,6 +71,7 @@ def run_setup(
     verbose: bool = False,
     ask_again: bool = False,
     language: str = "en",
+    mode: str = "full",
 ) -> tuple[int, dict]:
     """ask_again=True lists every first-run question again, including the ones answered before (`/kubegap setup`).
     install=False: check only (default). True: install everything missing. List of names: install only those. install_ssm_document=True uploads the kubegap-node-read SSM document when it is missing or outdated (EKS). Both policies are decided by the caller (scripts/kubegap) from config and arguments."""
@@ -224,7 +225,10 @@ def run_setup(
 
     # 4. AWS ------------------------------------------------------------------------------------------------
     _p("\n== 4/4 AWS permissions (EKS only)")
-    if cluster.get("is_eks"):
+    if cluster.get("is_eks") and mode == "daily":
+        result["aws"] = {"usable": None, "why": "not checked: a daily run calls no AWS API", "checks": {}}
+        _p("  not checked: a daily run calls no AWS API (a full run checks the permissions it needs)")
+    elif cluster.get("is_eks"):
         if "aws" in [t["name"] for t in status if not t["present"]]:
             result["aws"] = {"usable": False, "why": "aws CLI missing"}
             _p("  aws CLI missing; cannot verify. eks-platform, control plane log and SSM checks will be marked 'tool missing'")
@@ -266,7 +270,8 @@ def run_setup(
     result["ready"] = ok
     result["finished"] = _dt.datetime.now().astimezone().isoformat(timespec="seconds")
     # What is missing becomes questions for the user, each with an explanation, choices and a way to skip (lib/commands/firstrun.py). SKILL.md asks them.
-    open_questions = firstrun.questions(result, cfg, ctx_dir, all_=ask_again, language=language) if ok else []
+    open_questions = firstrun.questions(result, cfg, ctx_dir, all_=ask_again, language=language, mode=mode) if ok else []
+    result["mode"] = mode
     result["questions"] = [q["id"] for q in open_questions]
     if ctx_dir:
         write_private(ctx_dir / "setup.json", json.dumps(result, ensure_ascii=False, indent=2, default=str))
@@ -274,7 +279,8 @@ def run_setup(
     log.stage("setup", "end", ready=ok)
     _p("")
     if ok:
-        _p(firstrun.render(open_questions, context, firstrun.skipped(result, cfg, ctx_dir, language=language), firstrun.noted(result, cfg, ctx_dir, language=language), language=language))
+        daily = mode == "daily"  # what a daily run never asked is not a question the user skipped
+        _p(firstrun.render(open_questions, context, [] if daily else firstrun.skipped(result, cfg, ctx_dir, language=language), [] if daily else firstrun.noted(result, cfg, ctx_dir, language=language), language=language))
         _p("")
         _p(f"Ready. Collection can proceed. Result: {result.get('path')}")
     else:

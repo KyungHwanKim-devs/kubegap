@@ -60,12 +60,13 @@ kubegap은 `collectors/*/collect.yaml`에 정의한 수집 단계를 돌려 데�
 - 컴포넌트 로그를 읽는 `pods/log`
 - Prometheus, Alertmanager, Loki, Grafana 포트포워드
 - `grafana_api_token`이 설정되어 있을 때 Grafana API
-- EKS에서 탐지와 setup에 쓰는 AWS Describe, List 호출: `eks`, `ecr:DescribeRepositories`, `ssm:DescribeInstanceInformation`, `ssm:DescribeDocument`, `sts`, `logs:DescribeLogGroups`
-- EKS의 daily AWS 수집 단계 11개: `nodegroup`, `subnets`, `ssm-instances`, `cluster-security-groups`, `alb-metrics`, `ec2-volumes`, `ec2-volumes-available`, `ec2-addresses`, `ec2-nat-gateways`, `acm-certificates`, `instance-type-network`. 이 가운데 `alb-metrics`는 `elasticloadbalancing:Describe*`, `ec2:DescribeSecurityGroups`, `cloudwatch:GetMetricData`를 씁니다.
-- 노드 접속 방법이 있을 때, 파드 메트릭을 노드 안에서 curl로 대신 읽는 동작. EKS에서는 고정된 문서의 SSM `send-command`와, 그 출력을 읽는 `ssm:GetCommandInvocation`을 씁니다.
+- AWS API는 부르지 않고 노드에도 접속하지 않습니다. 남는 AWS 호출은 EKS 클러스터의 kubeconfig가 스스로 하는 `aws eks get-token` 하나입니다.
 
 **full 점검.** daily 점검이 쓰는 것 전부에 아래를 더합니다.
 
+- EKS에서 탐지와 setup에 쓰는 AWS Describe, List 호출: `eks`, `ecr:DescribeRepositories`, `ssm:DescribeInstanceInformation`, `ssm:DescribeDocument`, `sts`, `logs:DescribeLogGroups`
+- EKS의 AWS 수집 단계 전부. 이 가운데 `alb-metrics`는 `elasticloadbalancing:Describe*`, `ec2:DescribeSecurityGroups`, `cloudwatch:GetMetricData`를 씁니다.
+- 파드 메트릭을 노드 안에서 curl로 대신 읽는 동작. EKS에서는 고정된 문서의 SSM `send-command`와, 그 출력을 읽는 `ssm:GetCommandInvocation`을 씁니다.
 - 노드 스크립트: SSM 또는 SSH로 실행합니다.
 - kubelet 설정을 읽는 `nodes/proxy`
 - CloudWatch Logs Insights: `logs:StartQuery`, `GetQueryResults`, `StopQuery`
@@ -272,8 +273,10 @@ EKS에서만 씁니다. 정책의 와일드카드와 코드가 실제로 부르�
 
 | 모드 | 점검 항목 | 판정함 | IAM 권한이 없어서 건너뜀 | 다른 이유로 건너뜀 | 이 모드에서 수집하지 않음 |
 |---|---|---|---|---|---|
-| daily | 365 | 280 | 20 | 5 (그중 4개는 권한이 다 있어도 건너뜁니다. ingress-nginx 점검 항목 2개, `observability.fluentbit-output-errors`, `observability.alert-metric-without-dashboard`는 이 클러스터에 설치되거나 설정된 것이 없어서입니다. `hygiene.deprecated-api`는 pluto와 kubent가 full 전용 단계라서 건너뜁니다) | 56 (full 전용 입력) |
+| daily | — | — | 0 | — | — |
 | full | 365 | 295 | 57 | 6 (같은 4개에 Helm 점검 항목 2개가 더해집니다. 기본 ClusterRole이 Secret을 막아서 `helm list`가 돌지 못합니다) | 0 |
+
+daily 줄은 daily 점검이 AWS를 부르던 때에 잰 값이었습니다. 지금 daily 점검은 Kubernetes API와 저장소만 읽고 AWS를 부르지 않으므로, IAM 정책이 없어도 달라지는 것이 없습니다. AWS가 필요한 점검 항목은 "이 모드에서 수집하지 않음"으로 적힙니다.
 
 각 줄에서 남는 4개는 이 플랫폼에서 돌지 않는 2개와 LLM 점검 항목 2개입니다. 시험한 컴퓨터에 없던 도구(krr, polaris)의 항목은 뺐습니다.
 

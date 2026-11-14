@@ -466,6 +466,10 @@ def test_permissions_doc_steps_and_modes_match_the_collectors():
             has_lib = any(
                 f"`lib/{m}.py`" in cells[by_col] for m in ("collection/discover", "commands/setup", "collection/aws", "collection/monitoring", "collection/portfwd", "collection/node", "collection/nodecommands", "collection/albmetrics")
             )  # library code that runs in both modes; lib/collection/cwlogs.py is bound to its full-only step
+            if header == "Action":  # a daily run calls no AWS API: every action is a full run's, whatever code makes the call
+                assert mode_cell == "full", (cells[0], mode_cell)
+                checked += 1
+                continue
             if not named:
                 assert mode_cell.startswith("both"), (cells[0], mode_cell)
                 continue
