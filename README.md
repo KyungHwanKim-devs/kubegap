@@ -7,7 +7,7 @@
 kubegap is a skill for AI agents that audits a Kubernetes cluster read-only and writes a report of the problems that need attention now, each with its evidence. You run it with one command inside an agent such as Claude Code or Codex.
 
 ```
-/kubegap          # daily audit: about 3 minutes, a report of one or two screens
+/kubegap          # daily audit: 3 to 5 minutes, a report of one or two screens
 /kubegap full     # full audit: reads the whole cluster in depth and writes the long report
 ```
 
@@ -33,7 +33,7 @@ In no step does the agent send a command to the cluster. Only the scripts of ste
 | | Daily audit | Full audit |
 |---|---|---|
 | Command | `/kubegap` | `/kubegap full` |
-| Takes | about 3 minutes (3 min 12 s on a two-node k3s cluster) | about 30 minutes (34 on the same cluster) |
+| Takes | 3 to 5 minutes (2 min 30 s on a two-node k3s cluster, 4 min on a nine-node EKS cluster) | around 15 minutes (14 and 15 on the same two clusters); longer when the inside of the nodes is read |
 | When | every day | taking over a cluster, before an upgrade, a quarterly review, after an incident |
 | Report | one or two screens: what is broken now, what happened since the last audit, the three things that matter most | the long report: up to five of the largest problems, each explained with how it comes about, how to watch it, how it is solved at each scale, and the evidence |
 | Reads | Kubernetes objects and events, metrics, counts of known failure patterns in the logs of platform components | everything the daily audit reads, plus the inside of the nodes, control-plane logs, the cloud account, application settings and the results of extra tools |
