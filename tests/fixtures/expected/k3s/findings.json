@@ -5,7 +5,7 @@
   "source": "guessed",
   "nodes": 2
  },
- "rubric_version": "0.1.94",
+ "rubric_version": "0.1.95",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -2690,7 +2690,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "apps with prune enabled that manage a Namespace or CRD as a resource ['argocd/application/app-a-prod', 'argocd/application/app-b-prod', 'argocd/application/app-d', 'argocd/application/app-g-api', 'argocd/application/app-k', 'argocd/application/app-n', 'argocd/application/app-l-prod'] (namespaces created by the CreateNamespace option are not managed resources and are not counted here)",
+   "evidence": "automated prune would delete ['app-a-prod Namespace/app-a-prod', 'app-b-prod Namespace/app-b-prod', 'app-d Namespace/app-d', 'app-g-api Namespace/app-g-api', 'app-k Namespace/app-k', 'app-n Namespace/app-n', 'app-l-prod Namespace/app-l-prod'] when the manifest leaves what the Application renders; deleting the Application would delete ['app-a-prod Namespace/app-a-prod', 'app-b-prod Namespace/app-b-prod', 'app-d Namespace/app-d', 'app-g-api Namespace/app-g-api', 'app-k Namespace/app-k', 'app-n Namespace/app-n', 'app-l-prod Namespace/app-l-prod'] (each '<application> <Kind>/<name>'; an object whose sync-options annotation stops that path is not listed, nor is a Namespace made by CreateNamespace, which is not tracked)",
    "source": "summary.json:argocdctl.summary"
   },
   {

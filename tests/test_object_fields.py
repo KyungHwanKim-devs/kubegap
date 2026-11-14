@@ -317,6 +317,71 @@ def test_argocd_2x_keeps_180s_and_reads_compound_durations(tmp_path):
     assert argocdctl.analyze(tmp_path, INV)["config"]["timeout_reconciliation_s"] == 180
 
 
+def _tracking_app(name, tracked, prune=True, finalizer=True, sync_options=None):
+    """An Application that lists `tracked` ((group, kind, name) triples) among its resources."""
+    a = _app(name, {"prune": prune})
+    a["metadata"]["finalizers"] = ["resources-finalizer.argocd.argoproj.io"] if finalizer else []
+    a["spec"]["syncPolicy"]["syncOptions"] = sync_options or []
+    a["status"]["resources"] = [{"group": g, "kind": k, "name": n, "status": "Synced"} for g, k, n in tracked]
+    return a
+
+
+def _tracked(tmp_path, version, namespaces, crds, apps):
+    _argo_snapshot(tmp_path, version, {}, apps)
+    _write(tmp_path, "namespaces", [{"metadata": {"name": n, "annotations": a}} for n, a in namespaces.items()])
+    _write(tmp_path, "customresourcedefinitions", [{"metadata": {"name": n, "annotations": a}} for n, a in crds.items()])
+    return argocdctl.analyze(tmp_path, INV)["summary"]
+
+
+NS, CRD, OPT = ("", "Namespace"), ("apiextensions.k8s.io", "CustomResourceDefinition"), "argocd.argoproj.io/sync-options"
+
+
+def test_argocd_lists_a_tracked_namespace_or_crd_only_when_nothing_on_it_stops_the_path(tmp_path):
+    """#207. What stops each path is read from the live object as Argo CD reads it: prune by `Prune=false` only, the cascade by `Delete=false` or Helm's
+    `keep`, and the cascade never takes a CRD (argoproj/gitops-engine pkg/sync/sync_context.go:1224@b89b0871b414; argoproj/argo-cd controller/appcontroller.go:1166-1170@v3.2.0)."""
+    namespaces = {"bare": {}, "both": {OPT: " Prune=false , Delete=false"}, "prune-only": {OPT: "Prune=false"}, "helm-keep": {"helm.sh/resource-policy": "keep"}, "untracked": {}}
+    crds = {"bare.example.com": {}, "kept.example.com": {"helm.sh/resource-policy": "keep"}, "guarded.example.com": {OPT: "Prune=false"}}
+    apps = [_tracking_app(n, [(*NS, n)]) for n in ("bare", "both", "prune-only", "helm-keep")]
+    apps.append(_tracking_app("crds", [(*CRD, n) for n in crds]))
+    apps.append(_tracking_app("gone", [(*NS, "deleted-already")]))
+    apps.append(_tracking_app("other-group", [("example.com", "Namespace", "bare")]))
+    out = _tracked(tmp_path, "3.2.0", namespaces, crds, apps)
+    assert out["prune_deletes_objects"] == ["bare Namespace/bare", "helm-keep Namespace/helm-keep", "crds CustomResourceDefinition/bare.example.com", "crds CustomResourceDefinition/kept.example.com"]
+    assert out["prune_deletes_namespace_or_crd"] == ["argocd/application/bare", "argocd/application/helm-keep", "argocd/application/crds"]
+    assert out["cascade_deletes_namespace"] == ["bare Namespace/bare", "prune-only Namespace/prune-only"], "Helm's keep stops the cascade; no CRD is ever listed here"
+    assert out["tracked_objects_read"] is True and out["tracked_objects_unread"] == []
+
+
+def test_argocd_prune_and_cascade_are_judged_apart(tmp_path):
+    apps = [_tracking_app("no-prune", [(*NS, "a")], prune=False), _tracking_app("no-finalizer", [(*NS, "b")], finalizer=False)]
+    apps[1]["metadata"]["finalizers"] = []
+    apps.append(_tracking_app("background", [(*NS, "c")], prune=False))
+    apps[2]["metadata"]["finalizers"] = ["resources-finalizer.argocd.argoproj.io/background"]
+    out = _tracked(tmp_path, "3.2.0", {"a": {}, "b": {}, "c": {}}, {}, apps)
+    assert out["prune_deletes_objects"] == ["no-finalizer Namespace/b"]
+    assert out["cascade_deletes_namespace"] == ["no-prune Namespace/a", "background Namespace/c"]
+
+
+def test_argocd_confirm_values_count_from_2_14_and_application_options_from_3_4(tmp_path):
+    """`Prune=confirm` and `Delete=confirm` exist from 2.14.0 (argoproj/gitops-engine pkg/sync/common/types.go:42,44@c19f8cfa4d27); the Application's
+    own syncOptions are the default for an object without the option from 3.4.0 (argoproj/argo-cd controller/sync.go:350@v3.4.0, controller/appcontroller.go:1173@v3.4.0)."""
+    confirm = {"ns": {OPT: "Prune=confirm,Delete=confirm"}}
+    for version, listed in (("2.13.0", True), ("2.14.0", False), ("3.2.0", False)):
+        out = _tracked(tmp_path, version, confirm, {}, [_tracking_app("app", [(*NS, "ns")])])
+        assert bool(out["prune_deletes_objects"]) is listed and bool(out["cascade_deletes_namespace"]) is listed, version
+    app_level = [_tracking_app("app", [(*NS, "ns"), (*NS, "own")], sync_options=["Prune=false", "Delete=false"])]
+    for version, listed in (("3.3.0", ["app Namespace/ns", "app Namespace/own"]), ("3.4.0", ["app Namespace/own"])):
+        out = _tracked(tmp_path, version, {"ns": {}, "own": {OPT: "Prune=true,Delete=true"}}, {}, app_level)
+        assert out["prune_deletes_objects"] == listed and out["cascade_deletes_namespace"] == listed, version
+
+
+def test_argocd_tracked_objects_not_read_are_not_judged(tmp_path):
+    _argo_snapshot(tmp_path, "3.2.0", {}, [_tracking_app("app", [(*NS, "ns")])])
+    out = argocdctl.analyze(tmp_path, INV)["summary"]
+    assert out["tracked_objects_read"] is False and out["tracked_objects_unread"] == ["namespaces"]
+    assert out["prune_deletes_objects"] == [] and out["cascade_deletes_namespace"] == [], "nothing is listed for a kind that was not read; the check skips on the flag"
+
+
 def test_eso_refresh_interval_reads_go_durations_and_zero_means_disabled():
     assert esoctl._interval_h("1h30m") == 1.5
     assert esoctl._interval_h("90m0s") == 1.5

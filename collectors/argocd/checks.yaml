@@ -51,7 +51,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -134,7 +134,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -219,7 +219,7 @@
             - "argocd/application/app-p"
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -301,7 +301,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -382,7 +382,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -487,7 +487,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -568,7 +568,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -650,7 +650,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -731,7 +731,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -835,7 +835,7 @@
           prod_not_automated:
             - "argocd/application/x-prod"
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -917,7 +917,7 @@
           prod_not_automated: []
           prod_no_self_heal:
             - "argocd/application/x-prod"
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -998,7 +998,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -1053,30 +1053,32 @@
             - "server"
           exec_enabled_flag: false
 - id: argocd.prune-manages-namespace-or-crd
-  name: Application with prune enabled manages a Namespace or CRD (removed from Git = deleted wholesale)
+  name: Automated prune or Application deletion would delete a Namespace or CRD the Application tracks
   area: resilience
   type: summary
   each: argocdctl.summary
   cluster_level: true
   rule:
-    expr: "len(item['prune_with_namespace_or_crd']) > 0 and item['applications_prod'] > 0"
-    warn_expr: "len(item['prune_with_namespace_or_crd']) > 0"
+    needs: "item['tracked_objects_read']"
+    needs_reason: "namespaces or customresourcedefinitions not read"
+    expr: "len(item['prune_deletes_namespace_or_crd']) > 0 and item['applications_prod'] > 0"
+    warn_expr: "len(item['prune_deletes_namespace_or_crd']) > 0 or len(item['cascade_deletes_namespace']) > 0"
   target: "'cluster'"
-  evidence: "f\"apps with prune enabled that manage a Namespace or CRD as a resource {item['prune_with_namespace_or_crd']} (namespaces created by the CreateNamespace option are not managed resources and are not counted here)\""
+  evidence: "f\"automated prune would delete {item['prune_deletes_objects']} when the manifest leaves what the Application renders; deleting the Application would delete {item['cascade_deletes_namespace']} (each '<application> <Kind>/<name>'; an object whose sync-options annotation stops that path is not listed, nor is a Namespace made by CreateNamespace, which is not tracked)\""
   severity_default: high
   symptom_linked: false
   why: >
-    prune: true means "resources that disappear from Git are deleted from the cluster too". If a Namespace is among the managed resources, the moment its manifest leaves Git (directory move, rename, ApplicationSet generator change) Argo CD deletes the Namespace and everything inside it, PVCs included. The same applies to CRDs — deleting a CRD deletes all of its CRs.
-    The Skyscanner 2021 incident had this shape (ApplicationSet generator change → apps removed → prune deleted everything).
+    Two paths delete an object an Application tracks. Automated sync with prune: true deletes it when its manifest is no longer among what the source renders (a removed file, a renamed resource, a template that renders another name). Deleting the Application deletes it through the resources finalizer, and an ApplicationSet deletes an Application when its generator stops producing it (a directory removed, renamed or moved under a git directory generator). A Namespace takes everything in it along, PVCs and objects Argo CD never tracked included; a CRD takes every object of its kind.
+    Argo CD reads the protection from the live object: Prune=false in the sync-options annotation stops the prune, Delete=false or helm.sh/resource-policy keep stops the cascade, and the cascade skips CRDs. The check lists a tracked Namespace or CRD only when nothing on it stops the path.
   measured: >
-    Measured on a real k3s cluster: 7 apps managed a Namespace as a resource. The EKS cluster used CreateNamespace=true and did not manage Namespaces.
+    Measured on a real k3s cluster with Argo CD 3.2.0 (2026-11-14): 8 Applications each tracked their Namespace and one tracked 23 CRDs, 31 objects listed. After Prune=false,Delete=false on the 8 Namespaces and prune off for the CRD Application, none listed. Test Applications on that cluster: the unannotated Namespace was pruned 2 min 48 s after the manifest left Git and the annotated one was skipped (ignored (no prune)); after the directory was removed only the Namespace with Delete=false remained. The EKS cluster used CreateNamespace=true and did not manage Namespaces.
   cases:
     - { who: Skyscanner 2021, url: https://medium.com/@SkyscannerEng/how-a-couple-of-characters-brought-down-our-site-356ccaf1fbc3 }
     - { who: InfluxData 2023, url: https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/ }
     - { who: Argo CD issue 28630 2026, url: https://github.com/argoproj/argo-cd/issues/28630 }
-  suggest: "Annotate Namespaces with argocd.argoproj.io/sync-options: Prune=false, or create namespaces via syncOptions CreateNamespace=true and remove them from the manifests. Prune=false guards the prune path only: a sync with force replaces the object and can still delete and recreate a Namespace another Application shares (argo-cd issue 28630, closed as a duplicate of 29739). Move CRDs into a separate Application with prune off. Also review the Application finalizer in Argo CD 2.6+ and preservedResourcesOnDeletion on ApplicationSets."
+  suggest: "Annotate each listed Namespace with argocd.argoproj.io/sync-options: Prune=false,Delete=false (Prune=false stops the prune, Delete=false stops the deletion with its Application), or create namespaces via syncOptions CreateNamespace=true and remove them from the manifests. For CRDs, annotate them with Prune=false, or move them into an Application with prune off when the chart cannot annotate them. Neither option stops a sync with force, which replaces the object and can delete and recreate a Namespace another Application shares (argo-cd issue 28630, closed as a duplicate of 29739). Also review preserveResourcesOnDeletion on ApplicationSets: without it a generated Application carries the resources finalizer."
   verify:
-    - "kubectl get applications.argoproj.io -A -o json | jq -r '.items[] | select(.spec.syncPolicy.automated.prune==true) | .metadata.name as $n | .status.resources[]? | select(.kind==\"Namespace\" or .kind==\"CustomResourceDefinition\") | $n+\" \"+.kind+\"/\"+.name'"
+    - "kubectl get applications.argoproj.io -A -o json | jq -r '.items[] | select(.spec.syncPolicy.automated.prune==true) | .metadata.name as $n | .status.resources[]? | select(.kind==\"Namespace\" or .kind==\"CustomResourceDefinition\") | $n+\" \"+.kind+\"/\"+.name' | while read a o; do echo \"$a $o $(kubectl get ${o%%/*} ${o#*/} -o jsonpath='{.metadata.annotations.argocd\\.argoproj\\.io/sync-options}')\"; done"
   test:
     cases:
       - expect: "fail"
@@ -1106,8 +1108,14 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd:
+          prune_deletes_namespace_or_crd:
             - "argocd/application/app-m-prod"
+          prune_deletes_objects:
+            - "app-m-prod Namespace/app-m-prod"
+          cascade_deletes_namespace:
+            - "app-m-prod Namespace/app-m-prod"
+          tracked_objects_read: true
+          tracked_objects_unread: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -1188,8 +1196,99 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd:
-            - "argocd/application/dev-x"
+          prune_deletes_namespace_or_crd:
+            - "argocd/application/app-m-prod"
+          prune_deletes_objects:
+            - "app-m-prod CustomResourceDefinition/widgets.example.com"
+          cascade_deletes_namespace: []
+          tracked_objects_read: true
+          tracked_objects_unread: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "warn"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_deletes_namespace_or_crd: []
+          prune_deletes_objects: []
+          cascade_deletes_namespace:
+            - "app-m-prod Namespace/app-m-prod"
+          tracked_objects_read: true
+          tracked_objects_unread: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -1270,7 +1369,97 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
+          prune_deletes_objects: []
+          cascade_deletes_namespace: []
+          tracked_objects_read: true
+          tracked_objects_unread: []
+          prod_tracking_moving_ref:
+            - "argocd/application/app-f-prod"
+            - "argocd/application/app-e-prod"
+            - "argocd/application/app-b-prod"
+            - "argocd/application/app-d-prod"
+            - "argocd/application/app-h-prod"
+            - "argocd/application/app-a-backend-prod"
+            - "argocd/application/app-g-prod"
+            - "argocd/application/app-c-prod"
+          reconcile_stale: []
+          reconcile_timeout_s: 180
+          ignore_differences_apps: 3
+          projects: 1
+          default_project_apps: 12
+          wildcard_projects:
+            - "default"
+          admin_enabled: true
+          sso_configured: false
+          exec_enabled: false
+          anonymous_enabled: false
+          server_insecure: false
+          rbac_policy_default: ""
+          rbac_policy_csv_lines: 0
+          url: "https://deploy.example.com"
+          ingress_hosts:
+            - "deploy.example.com"
+          ingress_tls: true
+          notifications_configured: false
+          notifications_triggers: 0
+          metrics_available: true
+          sync_failed: 10
+          sync_total: 1304
+          sync_failure_ratio: 0.0077
+          k8s_api_errors: 0
+          k8s_api_4xx: 3
+          cluster_cache_age_s: 12518.0
+          cluster_connection_ok: true
+          git_requests: 7958
+          git_failures: 25
+          git_failure_ratio: 0.0031
+          redis_failed: 32
+          redis_total: 16516026
+          redis_failure_ratio: 0.0
+          grpc_errors: 0
+          grpc_unauthenticated: 21
+          grpc_permission_denied: 945
+          grpc_total: 1943
+          repo_pending_requests: null
+          version_major: 2
+          components_single_replica:
+            - "repo-server"
+            - "server"
+          exec_enabled_flag: false
+      - expect: "skip"
+        item:
+          present: true
+          version: "2.13.0"
+          components:
+            applicationset-controller: "1/1"
+            dex-server: "1/1"
+            notifications-controller: "1/1"
+            redis: "1/1"
+            repo-server: "1/1"
+            server: "1/1"
+            application-controller: "1/1"
+          components_not_ready: []
+          applications: 12
+          applications_prod: 8
+          applicationsets: 12
+          out_of_sync: []
+          out_of_sync_prod: []
+          unhealthy: []
+          unhealthy_prod: []
+          progressing: []
+          degraded: []
+          last_op_failed: []
+          conditions: []
+          apps_with_conditions: []
+          prod_not_automated: []
+          prod_no_self_heal: []
+          prune_deletes_namespace_or_crd: []
+          prune_deletes_objects: []
+          cascade_deletes_namespace: []
+          tracked_objects_read: false
+          tracked_objects_unread:
+            - "namespaces"
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -1374,7 +1563,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -1455,7 +1644,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -1536,7 +1725,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -1616,7 +1805,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -1721,7 +1910,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -1802,7 +1991,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -1883,7 +2072,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -1964,7 +2153,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2045,7 +2234,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2148,7 +2337,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2229,7 +2418,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2309,7 +2498,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2390,7 +2579,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2496,7 +2685,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2577,7 +2766,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2658,7 +2847,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2737,7 +2926,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2840,7 +3029,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2921,7 +3110,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -2997,7 +3186,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref: []
           reconcile_stale: []
           reconcile_timeout_s: 180
@@ -3091,7 +3280,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -3172,7 +3361,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -3253,7 +3442,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -3359,7 +3548,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -3440,7 +3629,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -3521,7 +3710,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -3602,7 +3791,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -3683,7 +3872,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -3764,7 +3953,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -3868,7 +4057,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -3949,7 +4138,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -4030,7 +4219,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -4132,7 +4321,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -4213,7 +4402,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"
@@ -4294,7 +4483,7 @@
           apps_with_conditions: []
           prod_not_automated: []
           prod_no_self_heal: []
-          prune_with_namespace_or_crd: []
+          prune_deletes_namespace_or_crd: []
           prod_tracking_moving_ref:
             - "argocd/application/app-f-prod"
             - "argocd/application/app-e-prod"

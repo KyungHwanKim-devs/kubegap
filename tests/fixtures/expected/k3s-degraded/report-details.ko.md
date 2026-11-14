@@ -7,7 +7,7 @@
 | kube context / 클러스터 | `default` / default (k3s, v1.33.5+k3s1) |
 | 실행 시각 / 모드 | 2026-11-07T10:22:59+09:00 / full (수집 262.7초, 모드 때문에 건너뛴 단계 0개, 실패 7개) |
 | 운영 규모 | `small` (묻지 못해 노드 수로 짐작) |
-| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.94 / 1.1.0 |
+| kubegap / 점검 항목 버전 / 로그 시그니처 버전 | <kubegap> / 0.1.95 / 1.1.0 |
 | 검증한 버전 범위 | Kubernetes v1.33.5+k3s1 (검증 범위 안 1.30 ~ 1.37) · Grafana 12.2.1 (검증 범위 안 10.2 ~ 13.3) |
 | 노드 / 네임스페이스 / 파드 / CRD | 2 (Ready 2) / 26 / 153 / 64 |
 | 컴포넌트 (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
@@ -40,7 +40,7 @@
 
 | 항목 | 심각도 | 연속 횟수 | 근거 |
 |---|---|---|---|
-| `argocd.prune-manages-namespace-or-crd.cluster` | high |  | apps with prune enabled that manage a Namespace or CRD as a resource ['argocd/application/app-a-prod', 'argocd/application/app-b-prod', 'argocd/application/app-d', 'argocd/application/app-g-api' … |
+| `argocd.prune-manages-namespace-or-crd.cluster` | high |  | automated prune would delete ['app-a-prod Namespace/app-a-prod', 'app-b-prod Namespace/app-b-prod', 'app-d Namespace/app-d', 'app-g-api Namespace/app-g-api', 'app-k Namespace/app-k', 'app-n Namespace/app-n', 'app-l-prod … |
 | `platform.k8s-version-eol.cluster` | high |  | server v1.33.5+k3s1: upstream end of life 2026-06-28, 132 days past |
 | `resilience.backup-same-node.app-f-prod/app-f-postgres-backup` | high |  | app-f-prod/app-f-postgres-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b')], off-node copy hint (s3 … |
 | `resilience.backup-same-node.app-f-prod/app-f-postgres-vn-backup` | high |  | app-f-prod/app-f-postgres-vn-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-vn-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres-vn', 'node-b')], off-node copy … |
@@ -170,7 +170,7 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
 | id | 상태 | 기본 심각도 | 근거 |
 |---|---|---|---|
 | `resilience.no-backup.cluster` | warn | critical | no backup tool (family backup). Alternative signals: etcd snapshots 5, backup-like CronJobs that ran in the last 7 days ['app-a-prod/app-a-postgres-backup', 'app-f-prod/app-f-postgres-backup', 'app-f-prod/app-f-postgres-mx-backup', 'app-f-prod/app-f-postgres-vn-backup' … |
-| `argocd.prune-manages-namespace-or-crd.cluster` | fail | high | apps with prune enabled that manage a Namespace or CRD as a resource ['argocd/application/app-a-prod', 'argocd/application/app-b-prod', 'argocd/application/app-d', 'argocd/application/app-g-api', 'argocd/application/app-k', 'argocd/application/app-n', 'argocd/application/app-l-prod'] (namespaces … |
+| `argocd.prune-manages-namespace-or-crd.cluster` | fail | high | automated prune would delete ['app-a-prod Namespace/app-a-prod', 'app-b-prod Namespace/app-b-prod', 'app-d Namespace/app-d', 'app-g-api Namespace/app-g-api', 'app-k Namespace/app-k', 'app-n Namespace/app-n', 'app-l-prod Namespace/app-l-prod'] when the manifest leaves what the Application renders … |
 | `platform.k8s-version-eol.cluster` | fail | high | server v1.33.5+k3s1: upstream end of life 2026-06-28, 132 days past |
 | `resilience.backup-same-node.app-f-prod/app-f-postgres-backup` | fail | high | app-f-prod/app-f-postgres-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False |
 | `resilience.backup-same-node.app-f-prod/app-f-postgres-vn-backup` | fail | high | app-f-prod/app-f-postgres-vn-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-vn-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres-vn', 'node-b')], off-node copy hint (s3, rclone, restic) False |
@@ -532,7 +532,16 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
 ```json
 {
  "applications_prod": 10,
- "prune_with_namespace_or_crd": [
+ "cascade_deletes_namespace": [
+  "app-a-prod Namespace/app-a-prod",
+  "app-b-prod Namespace/app-b-prod",
+  "app-d Namespace/app-d",
+  "app-g-api Namespace/app-g-api",
+  "app-k Namespace/app-k",
+  "app-n Namespace/app-n",
+  "app-l-prod Namespace/app-l-prod"
+ ],
+ "prune_deletes_namespace_or_crd": [
   "argocd/application/app-a-prod",
   "argocd/application/app-b-prod",
   "argocd/application/app-d",
@@ -540,7 +549,17 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   "argocd/application/app-k",
   "argocd/application/app-n",
   "argocd/application/app-l-prod"
- ]
+ ],
+ "prune_deletes_objects": [
+  "app-a-prod Namespace/app-a-prod",
+  "app-b-prod Namespace/app-b-prod",
+  "app-d Namespace/app-d",
+  "app-g-api Namespace/app-g-api",
+  "app-k Namespace/app-k",
+  "app-n Namespace/app-n",
+  "app-l-prod Namespace/app-l-prod"
+ ],
+ "tracked_objects_read": true
 }
 ```
 
