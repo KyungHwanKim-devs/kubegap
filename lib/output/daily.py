@@ -431,7 +431,7 @@ def assemble(snap: Path, facts: dict, language: str, rubric: str, version: str) 
     top = [x for x in facts.get("top") or [] if isinstance(x, dict)][:TOP]
     rest = [r for r in facts.get("rest") or [] if isinstance(r, dict)]
     scale = (fd.get("scale") or {}).get("name")
-    out = [t["title"].format(cluster=(inv.get("cluster") or {}).get("cluster_name") or inv.get("context") or snap.parent.name, when=_writer._when(inv.get("taken_at")))]
+    out = [t["title"].format(cluster=_writer.cluster_title(inv, snap.parent.name), when=_writer._when(inv.get("taken_at")))]
     first = [
         t["verdict"].format(broken=len(broken), happened=len(incidents), top=len(top)),
         "",

@@ -307,7 +307,7 @@ def render_details(snap: Path, language: str = "en") -> Path:
 
     # ---- header
     title = lab.get("title") or "# kubegap report details — {cluster} (`{context}`), {mode} mode"
-    w(title.format(cluster=cluster.get("cluster_name") or inv.get("context"), context=inv.get("context"), mode=mode))
+    w(title.format(cluster=str(cluster.get("cluster_name") or inv.get("context")).rsplit(":cluster/", 1)[-1], context=inv.get("context"), mode=mode))
     w("")
     w(
         lab.get("intro")

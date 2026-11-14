@@ -10,7 +10,6 @@ from lib.foundations import paths, rubric
 from lib.judgement.evaluate import Context
 
 GUIDES = (Path("references/full-ko.md"), Path("references/daily-ko.md"))
-HANDA_RE = re.compile(r"(합니다|입니다|습니다|했다|한다)(?=$|[\s.!?\"')\]」])")  # a sentence or heading ending in the formal or plain form; headings carry no period
 MEASURED_EFFORT_RE = re.compile(r"\bTakes (?:\d|a day|an hour|half a day)|\d(?:분|시간|일) 걸려요\.|\d(?:분|시간|일) 걸립니다\.")  # "Takes 30 minutes." and "30분 걸립니다." read as measured; "약 30분 걸립니다." and "Expect about" do not
 
 
@@ -65,10 +64,13 @@ def test_sample_reports_have_no_measured_sounding_effort():
             assert not MEASURED_EFFORT_RE.search(ln), f"{f}: {ln[:100]}"
 
 
-def test_korean_sample_reports_are_haeyo_in_prose_and_headings():
+def test_korean_sample_reports_are_in_the_formal_polite_style():
+    """The Korean report is written in 합니다체; `assemble` refuses a sentence that ends in 해요체, and the committed samples are reports it assembled."""
+    from lib.output.report import HAEYO
+
     for f in glob.glob("samples/ko/*/*/report.md"):
         for ln in _prose_lines(f):
-            assert not HANDA_RE.search(ln), f"{f}: {ln[:100]}"
+            assert not HAEYO.search(re.sub(r"`[^`]*`", "", ln)), f"{f}: {ln[:100]}"
 
 
 def test_sre_book_citation_names_the_change_management_chapter():

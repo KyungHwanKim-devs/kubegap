@@ -1,4 +1,4 @@
-# kubegap 상세 리포트 — arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (`app-u-cluster`), daily 점검
+# kubegap 상세 리포트 — app-u-cluster-eks (`app-u-cluster`), daily 점검
 
 사람이 먼저 읽을 리포트는 옆의 `report.md`입니다. 이 파일에는 판정 전체와 표가 있고, `scripts/kubegap render-details`가 수집 자료와 에이전트가 사실 파일에 쓴 분석 기록을 모아 만듭니다. 다음 점검의 에이전트도 이 파일을 읽습니다. 점검 항목 id와 근거 문장은 정의에서 그대로 가져와서 영어입니다.
 

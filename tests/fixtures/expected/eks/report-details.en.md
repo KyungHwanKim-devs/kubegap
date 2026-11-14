@@ -1,4 +1,4 @@
-# kubegap report details — arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (`app-u-cluster`), full mode
+# kubegap report details — app-u-cluster-eks (`app-u-cluster`), full mode
 
 Reference half of the report, assembled by `scripts/kubegap render-details` from the snapshot files plus the analysis block of `report/outline.json`. The human report is `report.md` next to this file. Headings follow the report language; data inside tables is English.
 

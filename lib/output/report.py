@@ -160,10 +160,9 @@ def assemble(snap: Path, language: str, rubric: str, version: str, skipped: list
     out_ = _outline.load(snap)
     inv = load_json(snap / "inventory.json") or {}
     secs = split_sections(_read(snap, "overview.md") or "")
-    cluster = inv.get("cluster") or {}
     period, has_base = _period(snap, h)
     parts_: list[str] = [
-        f"# {cluster.get('cluster_name') or inv.get('context') or snap.parent.name} — full {h['audit']}, {_parts._when(inv.get('taken_at')) or snap.name}",
+        f"# {_parts.cluster_title(inv, snap.parent.name)} — full {h['audit']}, {_parts._when(inv.get('taken_at')) or snap.name}",
         first_screen(out_, snap, language),
         _parts.glance(snap, h),
     ]

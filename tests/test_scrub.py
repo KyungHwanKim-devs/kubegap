@@ -239,3 +239,17 @@ def test_gzip_applied_copy_under_the_cap_is_inspected():
     doc = json.dumps({"kind": "ConfigMap", "data": {"API_TOKEN": "tok-0123456789abcdef"}}).encode()
     packed = base64.b64encode(gzip.compress(doc)).decode()
     assert scrub._secret_like_in_applied(packed) == ["API_TOKEN"]
+
+
+def test_a_sample_never_carries_a_load_balancer_address_or_the_snapshot_folder(tmp_path):
+    """scripts/scrub-sample.py replaces these whatever the map holds: a report about an open port names the address it is open on."""
+    import importlib.util
+    from pathlib import Path
+
+    spec = importlib.util.spec_from_file_location("scrub_sample", Path(__file__).resolve().parent.parent / "scripts" / "scrub-sample.py")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    text = "open on k8s-mw-kafka-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com, snapshot `/Users/me/.kubegap-x/snapshots/prod/2026-11-15T01-51-00`"
+    out = mod.scrub(text, mod.build({}))
+    assert "31ecf1515b" not in out and "<load-balancer>.elb.amazonaws.com" in out
+    assert "/Users/me" not in out and "`~/.kubegap/snapshots/<context>/2026-11-15T01-51-00`" in out

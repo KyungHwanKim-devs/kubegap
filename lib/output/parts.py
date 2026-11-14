@@ -149,6 +149,14 @@ def _when(ts: str | None) -> str:
     return str(ts or "")[:16].replace("T", " ")
 
 
+def cluster_title(inv: dict, fallback: str) -> str:
+    """The name a report's title gives the cluster. The kubeconfig of an EKS cluster names it by its ARN (`arn:aws:eks:<region>:<account>:cluster/<name>`);
+    a reader knows it by the last part."""
+    cluster = inv.get("cluster") or {}
+    name = (cluster.get("eks") or {}).get("name") or cluster.get("cluster_name") or inv.get("context") or fallback
+    return str(name).rsplit(":cluster/", 1)[-1]
+
+
 def glance(snap: Path, h: dict, *, names: bool = True) -> str:
     """The cluster at a glance, from the snapshot files: nodes, pods, namespaces, components, stores, version. A reader sees the size of the
     cluster before the problems, and nothing here is written by an agent."""

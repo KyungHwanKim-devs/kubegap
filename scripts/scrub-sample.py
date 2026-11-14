@@ -18,6 +18,9 @@ This script then applies the name map, which is yours and stays out of the repos
     rules_after:                             # applied last, same form as rules
       - [ '\\bsome-leftover\\b', 'placeholder' ]
 
+Two things are replaced whatever the map says (ALWAYS below): load balancer DNS names (`*.elb.<region>.amazonaws.com`) and the path of the
+snapshot folder, which holds the home directory.
+
 Numbers, findings and wording are left as they are. See docs/SAMPLES.md.
 """
 
@@ -37,8 +40,16 @@ def app_placeholder(i: int) -> str:
     return f"app-{name}"
 
 
+# Applied to every sample before the map, because no map should have to remember them: the public DNS name of a load balancer (a report about an
+# open port names the very address it is open on) and the folder of the snapshot the report came from, which carries the user's home directory.
+ALWAYS: list[tuple[str, str]] = [
+    (r"[A-Za-z0-9-]+\.elb\.[a-z0-9-]+\.amazonaws\.com", "<load-balancer>.elb.amazonaws.com"),
+    (r"(?:/Users|/home)/[^/\s`]+/\.kubegap[A-Za-z0-9._-]*/snapshots/[^/\s`]+/", "~/.kubegap/snapshots/<context>/"),
+]
+
+
 def build(spec: dict) -> list[tuple[str, str]]:
-    rules: list[tuple[str, str]] = [(p, r) for p, r in spec.get("rules") or []]
+    rules: list[tuple[str, str]] = ALWAYS + [(p, r) for p, r in spec.get("rules") or []]
     domains = spec.get("domains") or {}
     for d in sorted(domains, key=len, reverse=True):
         rules.append((rf"(?<![A-Za-z0-9-]){re.escape(d)}(?![A-Za-z0-9-])", domains[d]))
