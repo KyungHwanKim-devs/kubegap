@@ -67,7 +67,7 @@ def _ctx(inv: dict) -> Context:
 
 
 def test_days_until():
-    today = dt.date.today()
+    today = dt.datetime.now(dt.UTC).date()  # the clock a snapshot without taken_at falls back to is UTC; the local date differs from it for part of every day
     c = _ctx({})
     assert c.today == today
     assert c.days_until((today + dt.timedelta(days=10)).isoformat()) == 10
