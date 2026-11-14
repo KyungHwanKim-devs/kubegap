@@ -48604,6 +48604,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -48618,6 +48619,12 @@
      "resources": 65,
      "manages_namespace": 1,
      "manages_crd": 0,
+     "prune_deletes": [
+      "Namespace/app-a-prod"
+     ],
+     "cascade_deletes": [
+      "Namespace/app-a-prod"
+     ],
      "history": 10,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48637,6 +48644,7 @@
      "tracks_moving_ref": true,
      "automated": false,
      "prune": false,
+     "cascade": true,
      "self_heal": false,
      "sync_options": [],
      "sync": "Synced",
@@ -48649,6 +48657,8 @@
      "resources": 2,
      "manages_namespace": 0,
      "manages_crd": 0,
+     "prune_deletes": [],
+     "cascade_deletes": [],
      "history": 2,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48668,6 +48678,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -48682,6 +48693,12 @@
      "resources": 11,
      "manages_namespace": 1,
      "manages_crd": 0,
+     "prune_deletes": [
+      "Namespace/app-b-prod"
+     ],
+     "cascade_deletes": [
+      "Namespace/app-b-prod"
+     ],
      "history": 2,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48701,6 +48718,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -48715,6 +48733,8 @@
      "resources": 13,
      "manages_namespace": 0,
      "manages_crd": 0,
+     "prune_deletes": [],
+     "cascade_deletes": [],
      "history": 10,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48734,6 +48754,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -48748,6 +48769,12 @@
      "resources": 5,
      "manages_namespace": 1,
      "manages_crd": 0,
+     "prune_deletes": [
+      "Namespace/app-d"
+     ],
+     "cascade_deletes": [
+      "Namespace/app-d"
+     ],
      "history": 4,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48767,6 +48794,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -48781,6 +48809,8 @@
      "resources": 22,
      "manages_namespace": 0,
      "manages_crd": 0,
+     "prune_deletes": [],
+     "cascade_deletes": [],
      "history": 10,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48800,6 +48830,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -48814,6 +48845,8 @@
      "resources": 13,
      "manages_namespace": 0,
      "manages_crd": 0,
+     "prune_deletes": [],
+     "cascade_deletes": [],
      "history": 10,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48833,6 +48866,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -48847,6 +48881,8 @@
      "resources": 8,
      "manages_namespace": 0,
      "manages_crd": 0,
+     "prune_deletes": [],
+     "cascade_deletes": [],
      "history": 10,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48866,6 +48902,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -48880,6 +48917,8 @@
      "resources": 13,
      "manages_namespace": 0,
      "manages_crd": 0,
+     "prune_deletes": [],
+     "cascade_deletes": [],
      "history": 10,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48899,6 +48938,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -48913,6 +48953,12 @@
      "resources": 14,
      "manages_namespace": 1,
      "manages_crd": 0,
+     "prune_deletes": [
+      "Namespace/app-g-api"
+     ],
+     "cascade_deletes": [
+      "Namespace/app-g-api"
+     ],
      "history": 10,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48932,6 +48978,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -48946,6 +48993,8 @@
      "resources": 32,
      "manages_namespace": 0,
      "manages_crd": 0,
+     "prune_deletes": [],
+     "cascade_deletes": [],
      "history": 10,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48965,6 +49014,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -48979,6 +49029,8 @@
      "resources": 13,
      "manages_namespace": 0,
      "manages_crd": 0,
+     "prune_deletes": [],
+     "cascade_deletes": [],
      "history": 10,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -48998,6 +49050,7 @@
      "tracks_moving_ref": false,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "ServerSideApply=true",
@@ -49013,6 +49066,8 @@
      "resources": 105,
      "manages_namespace": 0,
      "manages_crd": 0,
+     "prune_deletes": [],
+     "cascade_deletes": [],
      "history": 1,
      "ignore_differences": true,
      "revision": ""
@@ -49032,6 +49087,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [],
      "sync": "Synced",
@@ -49044,6 +49100,8 @@
      "resources": 2,
      "manages_namespace": 0,
      "manages_crd": 0,
+     "prune_deletes": [],
+     "cascade_deletes": [],
      "history": 1,
      "ignore_differences": false,
      "revision": "d4c7f59358fc"
@@ -49063,6 +49121,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -49077,6 +49136,12 @@
      "resources": 9,
      "manages_namespace": 1,
      "manages_crd": 0,
+     "prune_deletes": [
+      "Namespace/app-k"
+     ],
+     "cascade_deletes": [
+      "Namespace/app-k"
+     ],
      "history": 10,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -49096,6 +49161,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": false,
      "self_heal": true,
      "sync_options": [],
      "sync": "OutOfSync",
@@ -49108,6 +49174,8 @@
      "resources": 7,
      "manages_namespace": 0,
      "manages_crd": 0,
+     "prune_deletes": [],
+     "cascade_deletes": [],
      "history": 10,
      "ignore_differences": false,
      "revision": "d4c7f59358fc"
@@ -49127,6 +49195,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -49143,6 +49212,12 @@
      "resources": 4,
      "manages_namespace": 1,
      "manages_crd": 0,
+     "prune_deletes": [
+      "Namespace/app-n"
+     ],
+     "cascade_deletes": [
+      "Namespace/app-n"
+     ],
      "history": 1,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -49162,6 +49237,7 @@
      "tracks_moving_ref": true,
      "automated": true,
      "prune": true,
+     "cascade": true,
      "self_heal": true,
      "sync_options": [
       "CreateNamespace=true"
@@ -49176,6 +49252,12 @@
      "resources": 14,
      "manages_namespace": 1,
      "manages_crd": 0,
+     "prune_deletes": [
+      "Namespace/app-l-prod"
+     ],
+     "cascade_deletes": [
+      "Namespace/app-l-prod"
+     ],
      "history": 10,
      "ignore_differences": true,
      "revision": "d4c7f59358fc"
@@ -49258,7 +49340,7 @@
    ],
    "prod_not_automated": [],
    "prod_no_self_heal": [],
-   "prune_with_namespace_or_crd": [
+   "prune_deletes_namespace_or_crd": [
     "argocd/application/app-a-prod",
     "argocd/application/app-b-prod",
     "argocd/application/app-d",
@@ -49267,6 +49349,26 @@
     "argocd/application/app-n",
     "argocd/application/app-l-prod"
    ],
+   "prune_deletes_objects": [
+    "app-a-prod Namespace/app-a-prod",
+    "app-b-prod Namespace/app-b-prod",
+    "app-d Namespace/app-d",
+    "app-g-api Namespace/app-g-api",
+    "app-k Namespace/app-k",
+    "app-n Namespace/app-n",
+    "app-l-prod Namespace/app-l-prod"
+   ],
+   "cascade_deletes_namespace": [
+    "app-a-prod Namespace/app-a-prod",
+    "app-b-prod Namespace/app-b-prod",
+    "app-d Namespace/app-d",
+    "app-g-api Namespace/app-g-api",
+    "app-k Namespace/app-k",
+    "app-n Namespace/app-n",
+    "app-l-prod Namespace/app-l-prod"
+   ],
+   "tracked_objects_read": true,
+   "tracked_objects_unread": [],
    "prod_tracking_moving_ref": [
     "argocd/application/app-a-prod",
     "argocd/application/app-b-prod",

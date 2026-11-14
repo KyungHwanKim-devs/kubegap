@@ -5,7 +5,7 @@
   "source": "guessed",
   "nodes": 9
  },
- "rubric_version": "0.1.94",
+ "rubric_version": "0.1.95",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
