@@ -392,7 +392,10 @@ def test_readme_numbers_and_question_names_match_the_code():
     n = firstrun.node_script_checks()
     en, ko = (ROOT / "README.md").read_text(encoding="utf-8"), (ROOT / "README.ko.md").read_text(encoding="utf-8")
     node_area = sum(1 for c in firstrun._checks() if c["area"] == "node")
-    assert f"That is up to {n} more checks in a full audit" in en and "409 of the 411" in en and f"Of the {node_area} Node OS checks, {n} can be seen only by reaching the nodes" in en
+    assert f"That is up to {n} more checks in a full audit" in en and f"Of the {node_area} Node OS checks, {n} can be seen only by reaching the nodes" in en
+    total, not_daily = len(firstrun._checks()), sum(1 for c in firstrun._checks() if units.missing(c.get("needs"), "daily"))
+    assert f"There are {total} checks in 12 areas" in en and f"A daily audit covers at most {total - not_daily}, leaving out the {not_daily}" in en
+    assert f"점검 항목 {total}개" in ko and f"필요한 {not_daily}개를 뺀 최대 {total - not_daily}개" in ko
     assert f"full 점검의 항목이 최대 {n}개 늘고" in ko and f"노드 OS {node_area}개 중 {n}개는 노드에 들어가야 볼 수 있습니다" in ko
     # the names the README gives for `focus` are the catalog's area names, and the counts next to them are the catalog's
     import collections
