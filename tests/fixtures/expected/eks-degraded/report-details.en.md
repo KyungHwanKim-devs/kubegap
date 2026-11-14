@@ -139,7 +139,7 @@ Deprecated-API tools: kubent 28 of 41 Lists answered (13 refused or not served);
 
 ### 7-3. Signature matches and unclassified errors
 
-Signature catalog 1.1.0, 23 files, 23380 lines scanned (components: actions-runner-controller, alb-controller, argocd, ebs-csi, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, loki, metrics-server, prometheus, promtail, vpc-cni). Unclassified error lines: 24.
+Signature catalog 1.1.1, 23 files, 23380 lines scanned (components: actions-runner-controller, alb-controller, argocd, ebs-csi, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, loki, metrics-server, prometheus, promtail, vpc-cni). Unclassified error lines: 24.
 
 | Signature | Component | Area | Severity | Status | Count | First, last | Sample |
 |---|---|---|---|---|---|---|---|

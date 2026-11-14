@@ -962,7 +962,8 @@
   area: observability
   severity: critical
   sources: ["logs/pods/elasticsearch-opensearch/*.log"]
-  pattern: 'OutOfMemoryError|java\.lang\.OutOfMemory'
+  # the start-up line "JVM arguments [...]" lists -XX:+HeapDumpOnOutOfMemoryError, -XX:+ExitOnOutOfMemoryError and the like: option names, not an error (seen on a k3s cluster, 2026-11-14)
+  pattern: 'java\.lang\.OutOfMemory|(?<!HeapDumpOn)(?<!ExitOn)(?<!CrashOn)(?<!XX:On)OutOfMemoryError'
   meaning: The JVM heap blew up and the node died. The uncaught-exception handler logs "fatal error in thread [...], exiting" with the java.lang.OutOfMemoryError stack trace.
   cause: Heap settings not matching the container limit (ES_JAVA_OPTS), too many shards.
   verify: "kubectl get pods -n <ns> -l app=elasticsearch -o jsonpath='{.items[*].status.containerStatuses[*].lastState}'"

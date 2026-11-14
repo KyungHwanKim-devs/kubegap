@@ -133,7 +133,7 @@ Deprecated-API tools: kubent 28 of 41 Lists answered (13 refused or not served);
 
 ### 7-3. Signature matches and unclassified errors
 
-Signature catalog 1.1.0, 23 files, 25969 lines scanned (components: argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, fluent-bit, grafana, ingress-nginx, keda, metallb, prometheus). Unclassified error lines: 463.
+Signature catalog 1.1.1, 23 files, 25969 lines scanned (components: argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, fluent-bit, grafana, ingress-nginx, keda, metallb, prometheus). Unclassified error lines: 463.
 
 | Signature | Component | Area | Severity | Status | Count | First, last | Sample |
 |---|---|---|---|---|---|---|---|

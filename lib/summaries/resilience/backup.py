@@ -23,7 +23,12 @@ BACKUP_NAME_RE = re.compile(r"(backup|dump|snapshot|archive|bak)", re.IGNORECASE
 BACKUP_TARGET_RE = re.compile(r"(postgres|pgsql|mysql|mariadb|mongo|elastic|opensearch|clickhouse|qdrant|milvus|cassandra|neo4j|influx|timescale|solr|couch|cockroach|tidb|scylla|weaviate|meili|typesense)", re.IGNORECASE)
 
 
-OFFSITE_RE = re.compile(r"(s3://|s3\.|aws s3|rclone|restic|gs://|gsutil|b2 |backblaze|minio|mc cp|azcopy|rsync .*@|scp |sftp|wal-g|pgbackrest|borg|kopia)", re.IGNORECASE)
+OFFSITE_RE = re.compile(r"(s3://|s3\.|aws s3|rclone|restic|gs://|gsutil|b2 |backblaze|minio|mc cp|azcopy|rsync .*@|scp .*@|sftp|wal-g|pgbackrest|borg|kopia)", re.IGNORECASE)
+
+
+def _without_copies_to_nodes(text: str, node_addrs: set) -> str:
+    """`text` with every `user@host` whose host is a node of this cluster removed, so that an rsync or scp between two nodes is not read as a copy off the cluster."""
+    return re.sub(r"\S+@([A-Za-z0-9_.-]+)", lambda m: "" if m.group(1) in node_addrs else m.group(0), text)
 
 
 def pv_node(pv: dict) -> str | None:
@@ -91,6 +96,8 @@ def backup_locality(cx) -> dict:
                 "other_backup_cronjobs_in_namespace": [],
             }
         )
+    # a node of this cluster, by name or address: a dump sent there by rsync or scp has not left the cluster
+    node_addrs = {a.get("address") for n in objects(cx.snap, "nodes") for a in (n.get("status") or {}).get("addresses") or [] if a.get("address")} | {n["metadata"]["name"] for n in objects(cx.snap, "nodes")}
     rows = []
     for cj in objects(cx.snap, "cronjobs"):
         md, sp = cj["metadata"], cj.get("spec") or {}
@@ -103,7 +110,7 @@ def backup_locality(cx) -> dict:
         claims = [v["persistentVolumeClaim"]["claimName"] for v in pod.get("volumes") or [] if v.get("persistentVolumeClaim")]
         host_paths = [v["hostPath"].get("path") for v in pod.get("volumes") or [] if v.get("hostPath")]
         dest_nodes = {pvc_node.get((ns, c)) for c in claims}
-        offsite = bool(OFFSITE_RE.search(text))
+        offsite = bool(OFFSITE_RE.search(_without_copies_to_nodes(text, node_addrs)))
         src = db_pvcs.get(ns, [])
         src_nodes = {n for _, _, n in src if n}
         same_node = bool(dest_nodes & src_nodes) or (bool(host_paths) and bool(pod.get("nodeSelector") or pod.get("nodeName")))

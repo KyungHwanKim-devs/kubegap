@@ -17680,7 +17680,7 @@
  },
  "logs": {
   "source": "logs/ (signature matches) + loki/ + metrics/ + objects/pods.json",
-  "signatures_version": "1.1.0",
+  "signatures_version": "1.1.1",
   "catalog_size": 80,
   "catalog_errors": [],
   "components_with_logs": [
@@ -18380,7 +18380,7 @@
   ],
   "boot_window_skipped": {},
   "boot_window_seconds": 300,
-  "scan_signatures_version": "1.1.0",
+  "scan_signatures_version": "1.1.1",
   "loki": {
    "present": false,
    "ok": false,

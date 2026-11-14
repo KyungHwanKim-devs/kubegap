@@ -45,8 +45,8 @@
 - id: oom_pods_7d
   why: Every container that ended with OOMKilled at any time in 7 days and restarted in the window, including pods a rollout has since replaced, with the 7-day restart increase of that pod; a pod whose last OOM is older than the window keeps the reason label but has no restart in it and is left out. resources.oomkilled-repeated counts a workload's OOM history from this, not from the pods alive at collection time
   query: >
-    (sum by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total[7d])) > 0.5)
-      and on (namespace, pod, container) (max_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[7d]) == 1)
+    (sum by (namespace, pod, uid, container) (increase(kube_pod_container_status_restarts_total[7d])) > 0.5)
+      and on (namespace, pod, uid, container) (max_over_time(kube_pod_container_status_last_terminated_reason{reason="OOMKilled"}[7d]) == 1)
   source:
     - "kube_pod_container_status_restarts_total: kubernetes/kube-state-metrics internal/store/pod.go:403@v2.10.1, :432@v2.17.0, :441@v2.20.0 (label container :412@v2.10.1, :441@v2.17.0, :450@v2.20.0; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"
     - "kube_pod_container_status_last_terminated_reason: kubernetes/kube-state-metrics internal/store/pod.go:327@v2.10.1, :330@v2.17.0, :339@v2.20.0 (labels container, reason :337@v2.10.1, :340@v2.17.0, :349@v2.20.0, a series only while the container has a last terminated state; default labels namespace, pod, uid internal/store/pod.go:39@v2.10.1, :39@v2.17.0, :41@v2.20.0)"

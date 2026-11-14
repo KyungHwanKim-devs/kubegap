@@ -1,0 +1,43 @@
+"""Verdicts that a first run on a real cluster showed to be wrong (2026-11-14). A daily run cannot open the raw material to doubt a verdict,
+so each of these has to be right in the check itself."""
+
+from __future__ import annotations
+
+import re
+
+from lib.foundations import scrub
+from lib.foundations.signatures import load as load_signatures
+from lib.judgement.evaluate import evidence
+from lib.summaries.resilience import backup
+
+
+def test_jvm_option_names_are_not_an_out_of_memory_error():
+    sig = next(s for s in load_signatures(["core"])[0] if s.id == "elasticsearch.oom")
+    pat = re.compile(sig.pattern)
+    startup = "[2026-11-14T01:13:20,101][INFO ][o.o.n.Node] JVM arguments [-Xms512m, -XX:+HeapDumpOnOutOfMemoryError, -XX:+ExitOnOutOfMemoryError, -XX:OnOutOfMemoryError=kill]"
+    assert not pat.search(startup)
+    assert pat.search("fatal error in thread [elasticsearch[n][search][T#3]], exiting java.lang.OutOfMemoryError: Java heap space")
+    assert pat.search("Caused by: OutOfMemoryError: unable to create native thread")
+
+
+def test_a_reference_to_another_variable_is_not_a_literal_password():
+    assert scrub.env_secret_like("REDISCLI_AUTH", "$(REDIS_PASSWORD)") is False  # expanded by Kubernetes from a variable that may come from a Secret
+    assert scrub.env_secret_like("REDISCLI_AUTH", "correct-horse-battery") is True
+
+
+def test_a_field_that_names_where_a_secret_is_is_not_a_secret():
+    template = "volumes:\n  - secret:\n      secretName: istio-ca-root-cert\n  tokenPath: /var/run/secrets/tokens\npassword: s3cr3t-value-here\n"
+    assert scrub.secret_like_keys({"config": template}) == ["config:password"]
+
+
+def test_a_copy_to_another_node_of_the_cluster_is_not_off_the_cluster():
+    nodes = {"kkh", "192.168.0.101"}
+    for text in ("rsync -a /snapshots/ root@kkh:/backup/", "scp dump.sql backup@192.168.0.101:/data"):
+        assert not backup.OFFSITE_RE.search(backup._without_copies_to_nodes(text, nodes)), text
+    assert backup.OFFSITE_RE.search(backup._without_copies_to_nodes("rsync -a /snapshots/ backup@vault.example.com:/k3s/", nodes))
+    assert backup.OFFSITE_RE.search(backup._without_copies_to_nodes("restic backup /dumps", nodes))
+
+
+def test_oom_evidence_tells_the_history_of_replaced_pods_from_the_pod_running_now():
+    item = {"kernel_any_node_read": False, "pods_oomkilled": 1, "pods_replaced": 1, "restarts_of_those_pods": 163, "live_pod_restarts_max": 1}
+    assert "1 already replaced, 163 restarts in those pods (the pods running now: 1 at most)" in evidence.oom_text(item)

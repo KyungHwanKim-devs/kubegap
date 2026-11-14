@@ -16,7 +16,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from ..foundations import versions as _versions  # `versions` is a local name in this module
-from ..foundations.snapshot import event_count, load_json, metric_doc, metric_rows, objects
+from ..foundations.snapshot import event_count, load_json, metric_doc, metric_rows, objects, parse_ts, taken_at
 from ..foundations.workload import workload_of
 
 ADMIN_HOST_RE = re.compile(r"(^|[.-])(admin|grafana|argocd|argo|deploy|kibana|prometheus|alertmanager|minio|registry|pgadmin|phpmyadmin|console|dashboard|jenkins|vault|keycloak|portainer|longhorn|traefik)([.-]|$)", re.IGNORECASE)
@@ -596,6 +596,12 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
             io = e.get("involvedObject") or {}
             if io.get("kind") == "Pod":
                 unhealthy[workload_of(f"{io.get('namespace', '')}/{io.get('name', '')}")] += event_count(e)
+    taken = taken_at(load_json(snap / "inventory.json") or {})
+    age_min: dict[tuple, float] = {}
+    for p in objects(snap, "pods"):
+        born = parse_ts((p.get("metadata") or {}).get("creationTimestamp"))
+        if born and taken:
+            age_min[(p["metadata"].get("namespace"), p["metadata"].get("name"))] = max((taken - born).total_seconds() / 60, 0.0)
     by_wl: dict[str, list] = defaultdict(list)
     for lab, v in metric_rows(snap, "pod_ready_ratio_24h"):
         ns, pod = lab.get("namespace"), lab.get("pod")
@@ -611,7 +617,8 @@ def _readiness(snap: Path, objs: _Objects) -> dict:
                 "pods_below_99": len(pods),
                 "min_ready_ratio_24h": round(worst[1], 4),
                 "worst_pod": worst[0],
-                "not_ready_minutes_24h": round((1 - worst[1]) * 1440),
+                # the ratio is an average over the samples the pod has: a pod younger than 24 hours is measured over its own life, not over 1440 minutes
+                "not_ready_minutes_24h": round((1 - worst[1]) * min(1440.0, age_min.get((wl.split("/")[0], worst[0]), 1440.0))),
                 "unhealthy_events": unhealthy.get(wl, 0),
                 "prod": wl.split("/")[0] in objs.prod,
             }

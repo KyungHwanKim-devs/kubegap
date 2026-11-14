@@ -139,7 +139,7 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
 
 ### 7-3. 로그 시그니처 일치와 분류 안 된 오류
 
-로그 시그니처 1.1.0으로 파일 23개, 23380줄을 읽었습니다 (컴포넌트: actions-runner-controller, alb-controller, argocd, ebs-csi, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, loki, metrics-server, prometheus, promtail, vpc-cni). 분류 안 된 오류는 24줄입니다.
+로그 시그니처 1.1.1으로 파일 23개, 23380줄을 읽었습니다 (컴포넌트: actions-runner-controller, alb-controller, argocd, ebs-csi, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, loki, metrics-server, prometheus, promtail, vpc-cni). 분류 안 된 오류는 24줄입니다.
 
 | 시그니처 | 컴포넌트 | 영역 | 심각도 | 상태 | 횟수 | 처음, 마지막 | 샘플 |
 |---|---|---|---|---|---|---|---|

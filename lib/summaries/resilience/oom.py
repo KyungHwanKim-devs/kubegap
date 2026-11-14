@@ -128,10 +128,13 @@ def oom_7d(cx) -> dict:
         if rc < 1:
             continue  # the OOMKilled reason label outlives the window; a kill inside 7 days always leaves a restart in it
         r = row_for(ns, pod, c)
-        r["pods"].append({"pod": pod, "restarts_7d": rc, "live": (ns, pod) in live, "node": pod_nodes.get((ns, pod))})
+        # a StatefulSet pod keeps its name when it is recreated: the series of the earlier pod differs in `uid`, and its restarts are history, not what the pod there now does
+        now = cx.pod_by_name.get((ns, pod))
+        is_live = (ns, pod) in live and (not lab.get("uid") or not now or lab["uid"] == (now.get("metadata") or {}).get("uid"))
+        r["pods"].append({"pod": pod, "restarts_7d": rc, "live": is_live, "node": pod_nodes.get((ns, pod))})
         r["pods_oomkilled"] += 1
         r["restarts_of_those_pods"] += rc
-        if (ns, pod) in live:
+        if is_live:
             r["live_pod_restarts_max"] = max(r["live_pod_restarts_max"], rc)
         else:
             r["pods_replaced"] += 1

@@ -70,6 +70,7 @@ ENV_SKIP_RE = re.compile(r"(_FILE|_PATH|_DIR|_NAME|_KEY_ID|_REF|_ENABLED|_URL|_H
 # A line inside a config file such as `HTTP_Passwd xxx`, `password: xxx`, `DB_PASSWORD=xxx`. The key may start with the secret word itself (the earlier form required one leading character and missed a bare `password = ...`).
 _LINE_RE = re.compile(r"(?im)^\s*([A-Za-z0-9_.-]*(?:passw(?:or)?d|secret|token|api[_-]?key)[A-Za-z0-9_.-]*)\s*[:= ]\s*(\S{8,})\s*$")
 _URL_RE = re.compile(r"^[a-z][a-z0-9+.-]*://", re.IGNORECASE)
+_ENV_REF_RE = re.compile(r"\$\([A-Za-z_][A-Za-z0-9_]*\)")  # dependent environment variable syntax: the value is another variable's
 
 
 def _keys_for(table: list[tuple[str, str, tuple[str, ...]]], ns: str, name: str) -> set[str]:
@@ -92,6 +93,8 @@ def secret_like_keys(data: dict, limit: int = 8) -> list[str]:
                 val = m.group(2).strip("\"'")
                 if val.startswith(("${", "$(", "/", "<", "{{")) or val.lower() in ("changeme", "password", "null", "none") or "secretkeyref" in val.lower():
                     continue
+                if ENV_SKIP_RE.search(m.group(1)) or m.group(1).lower().endswith(("name", "ref", "path", "file")):  # secretName, tokenPath: where a secret is, not the secret (istio-sidecar-injector's template)
+                    continue
                 keys.append(f"{k}:{m.group(1)}")
                 if len(keys) >= limit:
                     break
@@ -112,6 +115,8 @@ def env_secret_like(name: str, value) -> bool:
     if not v or v == "None" or v.startswith("/") or v.isdigit() or v.lower() in ("true", "false", "yes", "no", "on", "off") or len(v) < 8:
         return False
     if name.startswith("STAKATER_"):
+        return False
+    if _ENV_REF_RE.fullmatch(v):  # `$(REDIS_PASSWORD)`: Kubernetes expands it from another variable of the container, which may come from a Secret
         return False
     return env_name_secret_like(name)
 

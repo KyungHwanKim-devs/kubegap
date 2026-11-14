@@ -57,7 +57,12 @@ def oom_text(item: dict) -> str:
         kern = "kernel log not read on its node, no node access there"
     pods = item.get("pods_oomkilled") or 0
     rep = item.get("pods_replaced") or 0
-    prom = f"Prometheus: {pods} pod{'s' if pods != 1 else ''} ended by OOM in 7 days" + (f", {rep} already replaced" if rep else "") + f", {item.get('restarts_of_those_pods') or 0} restarts in those pods"
+    prom = (
+        f"Prometheus: {pods} pod{'s' if pods != 1 else ''} ended by OOM in 7 days"
+        + (f", {rep} already replaced" if rep else "")
+        + f", {item.get('restarts_of_those_pods') or 0} restarts in those pods"
+        + (f" (the pods running now: {item.get('live_pod_restarts_max') or 0} at most)" if rep else "")
+    )
     return f"{kern}. {prom}. cAdvisor counter {item.get('cadvisor_oom_events_7d') or 0}"
 
 
