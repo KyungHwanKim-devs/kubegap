@@ -15,6 +15,10 @@ kubegap is a skill for AI agents that audits a Kubernetes cluster read-only and 
 - **What you get.** A Markdown report. It says what is broken now, what happened in the meantime and which few problems matter most, and for each of those what it is, why it matters and what to do, in the names and numbers of your cluster.
 - **What it does not do.** It changes nothing in the cluster: it only reads. It runs no server and installs nothing in the cluster. It is not a monitoring or alerting tool, and it does not fix problems for you.
 
+![kubegap in a terminal: it evaluates a snapshot, lists the serious findings check by check, and opens one finding with its evidence](docs/media/kubegap-run.gif)
+
+*The evaluate and read steps. The snapshot on screen is the test fixture committed in this repository, and every name in it is a placeholder.*
+
 ## How it works
 
 kubegap is a skill in the [Agent Skills](https://agentskills.io) format: a folder with a procedure for the agent to follow (`SKILL.md`) and the Python scripts that procedure calls. A command runs these four steps in order.
@@ -58,6 +62,14 @@ What the daily audit could not judge for lack of reading is counted neither as a
 **The full report** explains up to five of the largest problems in six sections each: what is the matter, why it comes about, how to watch it, how it is solved (by scale), evidence, further reading. Around them come what is broken now, what already happened, the next largest problems, what changed since the previous report, what is coming up (certificates expiring, end of support), each area in one line, and the limits of the run. It is a diagnosis with explanations, not a list of commands to type. Every verdict is in a second file, `report-details.md`, as tables.
 
 In both reports a number in the text has to match the value in the snapshot and a link has to be one of a page someone opened and read, or the report is not assembled. A check that has public incident reports behind it carries them ([`docs/CHECKS.md`](docs/CHECKS.md)).
+
+Below is the top of the sample full report of an EKS cluster. Click it to open the whole report.
+
+[![The top of the EKS sample full report: the first screen, the cluster at a glance, what already happened, and the first problem, "The production databases have no backup"](docs/media/report-full.png)](samples/en/eks/full/report.md)
+
+A daily report is this long: the k3s sample, scrolled from top to bottom.
+
+[![Scrolling through the daily report of the k3s sample](docs/media/report-daily.gif)](samples/en/k3s/daily/report.md)
 
 Reports from real clusters with the names replaced are in [`samples/`](samples/README.md). You choose the report language (English or Korean) when you run it.
 

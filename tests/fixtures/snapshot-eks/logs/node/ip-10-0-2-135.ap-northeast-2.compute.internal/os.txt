@@ -92,8 +92,8 @@ sandbox_image=602401143452.dkr.ecr.ap-northeast-2.amazonaws.com/eks/pause:3.5
 cni_error=OK
 writable_layers:
 354	prod-app-z-backend/app-z-neo4j-0/neo4j
-0	prod-app-z-backend/tts-proxy-7b6db97b69-4bbjf/tailscale
-0	prod-app-z-backend/tts-proxy-7b6db97b69-4bbjf/forwarder
+0	prod-app-z-backend/app-ad-7b6db97b69-4bbjf/tailscale
+0	prod-app-z-backend/app-ad-7b6db97b69-4bbjf/forwarder
 0	prod-app-z-backend/app-z-pg-proxy-5ff994445f-qsklv/forwarder
 0	monitoring/loki-stack-promtail-rr6mb/promtail
 0	monitoring/kube-prometheus-stack-prometheus-node-exporter-655q4/node-exporter
@@ -129,7 +129,7 @@ pod_logs_mb:
 12	/var/log/pods/argocd_argocd-repo-server-d487895cc-bth22_b3a47366-ff53-4de1-8fc1-42428bac9a23
 5	/var/log/pods/middleware_kafka-controller-0_0db2898f-8c38-4e18-bbaf-75565c5f647d
 3	/var/log/pods/kube-system_kube-proxy-77wxc_6a5527a1-7e10-4e1b-825d-ddedfe7c2b4c
-1	/var/log/pods/prod-app-z-backend_tts-proxy-7b6db97b69-4bbjf_99b58936-3d63-43b5-8ffe-c9ceb4353c71
+1	/var/log/pods/prod-app-z-backend_app-ad-7b6db97b69-4bbjf_99b58936-3d63-43b5-8ffe-c9ceb4353c71
 1	/var/log/pods/prod-app-z-backend_app-z-pg-proxy-5ff994445f-qsklv_4c687978-7f44-4eb1-b52f-4fbae96372bc
 1	/var/log/pods/prod-app-z-backend_app-z-neo4j-0_75094165-87bd-40b0-8f12-a57fee309ac9
 1	/var/log/pods/monitoring_loki-stack-promtail-rr6mb_66a0a1fe-02d3-46cf-b5ce-043779b6ff2d

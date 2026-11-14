@@ -256,7 +256,7 @@ Signature catalog 1.1.1, 19 files, 19941 lines scanned (components: argocd, cert
 | `hygiene.mutable-image-tag.registry/cronjob/registry-tag-cleanup:tag-cleanup` | warn | medium | image curlimages/curl:latest (tag latest, imagePullPolicy Always, registry docker.io) |
 | `hygiene.node-label-dependency.role` | warn | medium | Label role: 7 workloads (production 0) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. ['logging/deployment/kibana', 'monitoring/deployment/kube-prometheus-stack-grafana', 'monitoring/deployment/kube-prometheus-stack-kube-state-metrics'] and 4 more |
 | `hygiene.node-label-dependency.storage` | warn | medium | Label storage: 10 workloads (production 7) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. ['app-a-prod/statefulset/app-a-postgres', 'app-a-prod/statefulset/app-a-redis', 'app-f-prod/statefulset/app-f-postgres'] and 7 more |
-| `hygiene.pvc-unbound-or-unused.cluster` | warn | medium | Non-Bound PVCs [], Released/Failed PVs [], Bound PVCs used by no pod [('default', 'data-k-quiz-db-0')] |
+| `hygiene.pvc-unbound-or-unused.cluster` | warn | medium | Non-Bound PVCs [], Released/Failed PVs [], Bound PVCs used by no pod [('default', 'data-app-ah-db-0')] |
 | `logs.signatures.cert-manager.challenge-failed` | warn | medium | 7 occurrences (2026-11-06T02:40:26Z ~ 2026-11-06T02:40:27Z), thresholds warn 5/fail 100. Files: ['logs/pods/cert-manager/cert-manager_cert-manager.log']. Samples: [] |
 | `logs.signatures.fluent-bit.flush-failed` | warn | medium | 16 occurrences (2026-11-07T00:56:41Z ~ 2026-11-07T01:23:41Z), thresholds warn 10/fail 500. Files: ['logs/pods/fluent-bit/logging_fluent-bit.log']. Samples: [] |
 | `logs.signatures.fluent-bit.upstream-down` | warn | medium | 8 occurrences (2026-11-07T00:58:52Z ~ 2026-11-07T01:19:57Z), thresholds warn 5/fail 200. Files: ['logs/pods/fluent-bit/logging_fluent-bit.log']. Samples: [] |
@@ -413,7 +413,7 @@ Signature catalog 1.1.1, 19 files, 19941 lines scanned (components: argocd, cert
 | `hygiene.failed-pods-lingering.cluster` | warn | low | Failed pods 4 (prod 4), reasons {'Failed': 2, 'UnexpectedAdmissionError': 2}, namespaces {'app-a-prod': 2, 'app-h-prod': 2}, oldest 3881.6h. Example: ['app-a-prod/codex-bench', 'app-a-prod/app-a-experiment', 'app-h-prod/app-h-embed-67f6f74f6c-rlm8m', 'app-h-prod/app-h-embed-67f6f74f6c-b6kdt'] |
 | `hygiene.no-ephemeral-storage-requests.cluster` | warn | low | Containers with an ephemeral-storage request 0 of 126 (0.0), without one in prod 63. emptyDirs without sizeLimit 11 (prod: []) |
 | `hygiene.old-replicasets.cluster` | warn | low | Of 292 ReplicaSets, 235 have 0 replicas. Deployment revisionHistoryLimit distribution {'10': 54, '0': 3, '3': 1, '2': 1} |
-| `hygiene.orphan-secrets.cluster` | warn | low | Of 139 Secrets (metric kube_secret_info), 9 unreferenced candidates: [('app-f-prod', 'app-f-prod-tls', 'kubernetes.io/tls'), ('app-h-prod', 'app-h-poca-store-prod-tls', 'kubernetes.io/tls'), ('argocd', 'ghcr-auth-secret', 'kubernetes.io/dockerconfigjson'), ('argocd', 'ghcr-pull-secret' … |
+| `hygiene.orphan-secrets.cluster` | warn | low | Of 139 Secrets (metric kube_secret_info), 9 unreferenced candidates: [('app-f-prod', 'app-f-prod-tls', 'kubernetes.io/tls'), ('app-h-prod', 'app-h-app-aj-prod-tls', 'kubernetes.io/tls'), ('argocd', 'ghcr-auth-secret', 'kubernetes.io/dockerconfigjson'), ('argocd', 'ghcr-pull-secret' … |
 | `hygiene.unused-crds.cluster` | warn | low | 42 of 64 CRDs have zero objects (by group {'generators.external-secrets.io': 17, 'monitoring.coreos.com': 6, 'metallb.io': 5, 'acme.cert-manager.io': 1, 'eventing.keda.sh': 2, 'external-secrets.io': 4, 'keda.sh': 4, 'helm.cattle.io': 2, 'actions.summerwind.dev': 1}), 28 webhooks |
 | `keda.unused.cluster` | warn | low | KEDA v2.19.0 operator 1/1, metrics-apiserver 1/1, webhooks 1/1 — ScaledObject 0, ScaledJob 0 |
 | `logs.signatures.cert-manager.orphan-tls-secret` | warn | low | 96 occurrences (2026-11-06T05:52:26Z ~ 2026-11-07T01:09:11Z), thresholds warn 1/fail 1000. Files: ['logs/pods/cert-manager/cert-manager_cert-manager-cainjector.log']. Samples: [] |
@@ -3209,7 +3209,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "pvc_unused": [
   {
    "namespace": "default",
-   "name": "data-k-quiz-db-0",
+   "name": "data-app-ah-db-0",
    "prod": false
   }
  ]
@@ -5595,15 +5595,15 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "app-a-prod/daemonset/app-a-sandbox-prepull",
   "app-a-prod/cronjob/app-a-postgres-backup",
   "app-a-prod/cronjob/app-a-sandbox-watchdog",
-  "app-a-prod/cronjob/marketing-autopost-en",
-  "app-a-prod/cronjob/marketing-autopost-ja",
-  "app-a-prod/cronjob/marketing-digest-day",
-  "app-a-prod/cronjob/marketing-digest-month",
-  "app-a-prod/cronjob/marketing-digest-week",
-  "app-a-prod/cronjob/marketing-radar-global",
-  "app-a-prod/cronjob/marketing-radar-global-eu",
-  "app-a-prod/cronjob/marketing-radar-japan",
-  "app-a-prod/cronjob/marketing-radar-japan-noon",
+  "app-a-prod/cronjob/app-ae-en",
+  "app-a-prod/cronjob/app-ae-ja",
+  "app-a-prod/cronjob/app-af-day",
+  "app-a-prod/cronjob/app-af-month",
+  "app-a-prod/cronjob/app-af-week",
+  "app-a-prod/cronjob/app-ag-global",
+  "app-a-prod/cronjob/app-ag-global-eu",
+  "app-a-prod/cronjob/app-ag-japan",
+  "app-a-prod/cronjob/app-ag-japan-noon",
   "app-a-prod/cronjob/umami-report-day",
   "app-a-prod/cronjob/umami-report-month",
   "app-a-prod/cronjob/umami-report-week",
@@ -5901,8 +5901,8 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   },
   {
    "namespace": "default",
-   "name": "data-k-quiz-db-0",
-   "target": "default/data-k-quiz-db-0",
+   "name": "data-app-ah-db-0",
+   "target": "default/data-app-ah-db-0",
    "prod": false,
    "phase": "Bound",
    "storage_class": "local-path",
@@ -7017,55 +7017,55 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-autopost-en",
+   "workload": "app-a-prod/cronjob/app-ae-en",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-autopost-ja",
+   "workload": "app-a-prod/cronjob/app-ae-ja",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-digest-day",
+   "workload": "app-a-prod/cronjob/app-af-day",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-digest-month",
+   "workload": "app-a-prod/cronjob/app-af-month",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-digest-week",
+   "workload": "app-a-prod/cronjob/app-af-week",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-global",
+   "workload": "app-a-prod/cronjob/app-ag-global",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-global-eu",
+   "workload": "app-a-prod/cronjob/app-ag-global-eu",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-japan",
+   "workload": "app-a-prod/cronjob/app-ag-japan",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-japan-noon",
+   "workload": "app-a-prod/cronjob/app-ag-japan-noon",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
@@ -7709,7 +7709,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   },
   {
    "namespace": "app-h-prod",
-   "name": "app-h-poca-store-prod-tls",
+   "name": "app-h-app-aj-prod-tls",
    "type": "kubernetes.io/tls",
    "prod": true
   },
@@ -7727,31 +7727,31 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   },
   {
    "namespace": "default",
-   "name": "app-f-prod-tls",
+   "name": "app-ah-auth-secret",
+   "type": "Opaque",
+   "prod": false
+  },
+  {
+   "namespace": "default",
+   "name": "app-ah-aws-secret",
+   "type": "Opaque",
+   "prod": false
+  },
+  {
+   "namespace": "default",
+   "name": "app-ah-db-secret",
+   "type": "Opaque",
+   "prod": false
+  },
+  {
+   "namespace": "default",
+   "name": "app-ah-tls",
    "type": "kubernetes.io/tls",
    "prod": false
   },
   {
    "namespace": "default",
-   "name": "k-quiz-auth-secret",
-   "type": "Opaque",
-   "prod": false
-  },
-  {
-   "namespace": "default",
-   "name": "k-quiz-aws-secret",
-   "type": "Opaque",
-   "prod": false
-  },
-  {
-   "namespace": "default",
-   "name": "k-quiz-db-secret",
-   "type": "Opaque",
-   "prod": false
-  },
-  {
-   "namespace": "default",
-   "name": "k-quiz-tls",
+   "name": "app-f-prod-tls",
    "type": "kubernetes.io/tls",
    "prod": false
   }

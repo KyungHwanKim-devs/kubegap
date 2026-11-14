@@ -91,10 +91,10 @@ sandbox_image=
 cni_error=OK
 writable_layers:
 2235	logging/elasticsearch-0/elasticsearch
-989	app-a-prod/marketing-radar-japan-noon-29744817-s6d97/radar
-968	app-a-prod/marketing-radar-global-eu-29743617-lmbkc/radar
-965	app-a-prod/marketing-radar-japan-29743827-l4hhn/radar
-965	app-a-prod/marketing-radar-global-29743947-k89fp/radar
+989	app-a-prod/app-ag-japan-noon-29744817-s6d97/radar
+968	app-a-prod/app-ag-global-eu-29743617-lmbkc/radar
+965	app-a-prod/app-ag-japan-29743827-l4hhn/radar
+965	app-a-prod/app-ag-global-29743947-k89fp/radar
 102	app-a-prod/app-a-phoenix-56ddc584cf-znjvs/phoenix
 102	app-a-prod/app-a-phoenix-56ddc584cf-znjvs/phoenix
 42	app-f-prod/app-f-ga4-digest-week-29892965-xbwhg/digest

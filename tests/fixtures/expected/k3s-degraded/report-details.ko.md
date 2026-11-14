@@ -177,7 +177,7 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
 | `resilience.backup-same-node.app-h-prod/app-h-mysql-backup` | fail | high | app-h-prod/app-h-mysql-backup: schedule '50 2 * * *', dump PVCs ['mysql-backup-app-h-mysql-0'] → nodes ['node-b'], hostPath [], source DB [('app-h-prod/statefulset/app-h-mysql', 'node-b'), ('app-h-prod/statefulset/app-h-mysql', 'node-b')], off-node copy hint (s3, rclone, restic) False |
 | `resilience.backup-same-node.app-i-prod/app-i-postgres-backup` | fail | high | app-i-prod/app-i-postgres-backup: schedule '0 3 * * *', dump PVCs ['app-i-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-i-prod/statefulset/app-i-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False |
 | `resilience.restarts-crashloop.app-c-prod/app-c-coturn-549854dfcb-jgp4h:coturn` | fail | high | 11193 restarts, state CrashLoopBackOff, last termination Error (exit 255) 2026-11-07T01:18:42Z, cause class crash (exit 255), Unhealthy events 0, node reboot time None |
-| `security.plaintext-configmap-secret.app-a-prod/configmap/marketing-scripts` | fail | high | app-a-prod/configmap/marketing-scripts: keys ['discord_sales_bot.py:TOKEN', 'discord_sales_bot.py:OPENAI_API_KEY', 'marketing_autopost.py:client_secret', 'marketing_autopost.py:resource_owner_secret'], mounted/referenced by ['app-a-prod/cronjob/marketing-autopost-en' … |
+| `security.plaintext-configmap-secret.app-a-prod/configmap/marketing-scripts` | fail | high | app-a-prod/configmap/marketing-scripts: keys ['discord_sales_bot.py:TOKEN', 'discord_sales_bot.py:OPENAI_API_KEY', 'marketing_autopost.py:client_secret', 'marketing_autopost.py:resource_owner_secret'], mounted/referenced by ['app-a-prod/cronjob/app-ae-en', 'app-a-prod/cronjob/app-ae-ja' … |
 | `security.plaintext-configmap-secret.app-f-prod/configmap/app-f-marketing-scripts` | fail | high | app-f-prod/configmap/app-f-marketing-scripts: keys ['app-f_ga4_digest.py:DISCORD_BOT_TOKEN', 'app-f_ga4_digest.py:token', 'app-f_policy_radar.py:OPENAI_API_KEY', 'app-f_policy_radar.py:DISCORD_BOT_TOKEN', 'app-f_sales_bot.py:TOKEN', 'app-f_sales_bot.py:OPENAI_API_KEY'], mounted/referenced by … |
 | `tenancy.quota-near-limit.app-l-prod/app-l-prod-quota` | fail | high | app-l-prod/app-l-prod-quota: near limit ['persistentvolumeclaims'] (max ratio 1.0). hard {'limits.cpu': '4', 'limits.memory': '8Gi', 'persistentvolumeclaims': '2', 'requests.cpu': '2', 'requests.memory': '4Gi', 'requests.storage': '30Gi'}, used {'limits.cpu': '1800m', 'limits.memory': '2Gi' … |
 | `prometheus.storage-risk.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus` | warn | high | storage emptyDir (PVC None), PVC usage None, TSDB 0.0GiB, retention None (size cap None), actual oldest sample None days, failed compactions over 7 days 0, WAL corruptions 0, corruptions at startup None |
@@ -189,7 +189,7 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
 | `resilience.restarts-crashloop.cert-manager/cert-manager-7c4b5b58df-4v7td:cert-manager-controller` | warn | high | 12 restarts, state Running, last termination Unknown (exit 255) 2026-10-28T19:25:01Z, cause class Unknown, Unhealthy events 0, node reboot time None |
 | `resilience.restarts-crashloop.cert-manager/cert-manager-cainjector-7bf5c557bb-kbtv7:cert-manager-cainjector` | warn | high | 14 restarts, state Running, last termination Unknown (exit 255) 2026-10-28T19:25:01Z, cause class Unknown, Unhealthy events 0, node reboot time None |
 | `resilience.restarts-crashloop.keda/keda-operator-85ff5bb446-lwkl6:keda-operator` | warn | high | 10 restarts, state Running, last termination Unknown (exit 255) 2026-10-28T19:25:01Z, cause class Unknown, Unhealthy events 0, node reboot time None |
-| `security.plaintext-configmap-secret.default/configmap/poca-finder-backend-config` | warn | high | default/configmap/poca-finder-backend-config: keys ['JWT_RELAY_SECRET', 'JWT_SECRET', 'TWITTER_CLIENT_SECRET', 'TWITTER_CLIENT_SECRET_RELAY'], mounted/referenced by [] |
+| `security.plaintext-configmap-secret.default/configmap/app-ak-finder-backend-config` | warn | high | default/configmap/app-ak-finder-backend-config: keys ['JWT_RELAY_SECRET', 'JWT_SECRET', 'TWITTER_CLIENT_SECRET', 'TWITTER_CLIENT_SECRET_RELAY'], mounted/referenced by [] |
 | `security.plaintext-secret-env.logging/cronjob/es-index-retention:retention` | warn | high | Container retention env ['ELASTIC_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.plaintext-secret-env.logging/deployment/kibana:kibana` | warn | high | Container kibana env ['ELASTICSEARCH_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.plaintext-secret-env.logging/statefulset/elasticsearch:elasticsearch` | warn | high | Container elasticsearch env ['ELASTIC_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded) |
@@ -277,7 +277,7 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
 | `hygiene.node-label-dependency.role` | warn | medium | Label role: 7 workloads (production 0) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. ['logging/deployment/kibana', 'monitoring/deployment/kube-prometheus-stack-grafana', 'monitoring/deployment/kube-prometheus-stack-kube-state-metrics'] and 4 more |
 | `hygiene.node-label-dependency.storage` | warn | medium | Label storage: 10 workloads (production 7) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. ['app-a-prod/statefulset/app-a-postgres', 'app-a-prod/statefulset/app-a-redis', 'app-f-prod/statefulset/app-f-postgres'] and 7 more |
 | `hygiene.polaris-reliability-danger.registry/cronjob/registry-tag-cleanup` | warn | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'memoryLimitsMissing', 'memoryRequestsMissing', 'metadataAndInstanceMismatched', 'priorityClassNotSet']. Security-category danger ['privilegeEscalationAllowed', 'runAsRootAllowed'] is in … |
-| `hygiene.pvc-unbound-or-unused.cluster` | warn | medium | Non-Bound PVCs [], Released/Failed PVs [], Bound PVCs used by no pod [('default', 'data-k-quiz-db-0')] |
+| `hygiene.pvc-unbound-or-unused.cluster` | warn | medium | Non-Bound PVCs [], Released/Failed PVs [], Bound PVCs used by no pod [('default', 'data-app-ah-db-0')] |
 | `logs.signatures.cert-manager.challenge-failed` | warn | medium | 7 occurrences (2026-11-06T02:40:26Z ~ 2026-11-06T02:40:27Z), thresholds warn 5/fail 100. Files: ['logs/pods/cert-manager/cert-manager_cert-manager.log']. Samples: ['[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:26.398191039Z E1106 02:40:26.398160       1 sync.go:190] … |
 | `logs.signatures.fluent-bit.flush-failed` | warn | medium | 16 occurrences (2026-11-07T00:56:41Z ~ 2026-11-07T01:23:41Z), thresholds warn 10/fail 500. Files: ['logs/pods/fluent-bit/logging_fluent-bit.log']. Samples: ["[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T09:56:41.226336618+09:00 [2026/11/07 00:56:41] [ warn] [engine] failed to flush chunk … |
 | `logs.signatures.fluent-bit.upstream-down` | warn | medium | 8 occurrences (2026-11-07T00:58:52Z ~ 2026-11-07T01:19:57Z), thresholds warn 5/fail 200. Files: ['logs/pods/fluent-bit/logging_fluent-bit.log']. Samples: ['[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T09:58:52.226252855+09:00 [2026/11/07 00:58:52] [error] … |
@@ -694,15 +694,15 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   "marketing_autopost.py:resource_owner_secret"
  ],
  "mounted_by": [
-  "app-a-prod/cronjob/marketing-autopost-en",
-  "app-a-prod/cronjob/marketing-autopost-ja",
-  "app-a-prod/cronjob/marketing-digest-day",
-  "app-a-prod/cronjob/marketing-digest-month",
-  "app-a-prod/cronjob/marketing-digest-week",
-  "app-a-prod/cronjob/marketing-radar-global",
-  "app-a-prod/cronjob/marketing-radar-global-eu",
-  "app-a-prod/cronjob/marketing-radar-japan",
-  "app-a-prod/cronjob/marketing-radar-japan-noon",
+  "app-a-prod/cronjob/app-ae-en",
+  "app-a-prod/cronjob/app-ae-ja",
+  "app-a-prod/cronjob/app-af-day",
+  "app-a-prod/cronjob/app-af-month",
+  "app-a-prod/cronjob/app-af-week",
+  "app-a-prod/cronjob/app-ag-global",
+  "app-a-prod/cronjob/app-ag-global-eu",
+  "app-a-prod/cronjob/app-ag-japan",
+  "app-a-prod/cronjob/app-ag-japan-noon",
   "app-a-prod/deployment/app-m"
  ],
  "prod": true,
@@ -977,7 +977,7 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
 ```
 
 </details>
-<details><summary><code>security.plaintext-configmap-secret.default/configmap/poca-finder-backend-config</code></summary>
+<details><summary><code>security.plaintext-configmap-secret.default/configmap/app-ak-finder-backend-config</code></summary>
 
 ```json
 {
@@ -989,7 +989,7 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
  ],
  "mounted_by": [],
  "prod": false,
- "target": "default/configmap/poca-finder-backend-config"
+ "target": "default/configmap/app-ak-finder-backend-config"
 }
 ```
 
@@ -2904,24 +2904,24 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   "registry/statefulset/registry",
   "app-a-prod/statefulset/app-a-postgres",
   "app-a-prod/cronjob/app-a-postgres-backup",
-  "app-a-prod/cronjob/marketing-radar-japan-noon",
+  "app-a-prod/cronjob/app-ag-japan-noon",
   "app-f-prod/cronjob/app-f-postgres-mx-backup",
   "app-h-prod/cronjob/app-h-mysql-backup",
-  "app-a-prod/cronjob/marketing-digest-month",
-  "app-a-prod/cronjob/marketing-radar-global-eu",
+  "app-a-prod/cronjob/app-af-month",
+  "app-a-prod/cronjob/app-ag-global-eu",
   "app-f-prod/cronjob/app-f-postgres-backup",
-  "app-a-prod/cronjob/marketing-radar-japan",
+  "app-a-prod/cronjob/app-ag-japan",
   "app-f-prod/cronjob/app-f-ga4-digest-month",
   "app-a-prod/cronjob/umami-report-week",
   "app-f-prod/cronjob/app-f-ga4-digest-week",
   "app-f-prod/cronjob/app-f-postgres-vn-backup",
-  "app-a-prod/cronjob/marketing-autopost-en",
-  "app-a-prod/cronjob/marketing-radar-global",
-  "app-a-prod/cronjob/marketing-digest-day",
+  "app-a-prod/cronjob/app-ae-en",
+  "app-a-prod/cronjob/app-ag-global",
+  "app-a-prod/cronjob/app-af-day",
   "app-f-prod/cronjob/app-f-ga4-digest-day",
-  "app-a-prod/cronjob/marketing-autopost-ja",
+  "app-a-prod/cronjob/app-ae-ja",
   "app-a-prod/cronjob/app-a-sandbox-watchdog",
-  "app-a-prod/cronjob/marketing-digest-week",
+  "app-a-prod/cronjob/app-af-week",
   "app-i-prod/cronjob/app-i-postgres-backup",
   "app-f-prod/cronjob/app-f-policy-radar",
   "app-a-prod/cronjob/umami-report-day",
@@ -2938,7 +2938,7 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   "kube-system/deployment/coredns",
   "/clusterrolebinding/argocd-server",
   "/clusterrolebinding/keda-operator",
-  "default/configmap/poca-finder-backend-config",
+  "default/configmap/app-ak-finder-backend-config",
   "app-a-prod/rolebinding/app-a-sandbox-manager",
   "app-a-prod/role/app-a-sandbox-manager",
   "monitoring/role/kube-prometheus-stack-grafana",
@@ -2987,24 +2987,24 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   "app-f-prod/statefulset/app-f-postgres",
   "app-a-prod/statefulset/app-a-postgres",
   "app-a-prod/cronjob/app-a-postgres-backup",
-  "app-a-prod/cronjob/marketing-radar-japan-noon",
+  "app-a-prod/cronjob/app-ag-japan-noon",
   "app-f-prod/cronjob/app-f-postgres-mx-backup",
   "app-h-prod/cronjob/app-h-mysql-backup",
-  "app-a-prod/cronjob/marketing-digest-month",
-  "app-a-prod/cronjob/marketing-radar-global-eu",
+  "app-a-prod/cronjob/app-af-month",
+  "app-a-prod/cronjob/app-ag-global-eu",
   "app-f-prod/cronjob/app-f-postgres-backup",
-  "app-a-prod/cronjob/marketing-radar-japan",
+  "app-a-prod/cronjob/app-ag-japan",
   "app-f-prod/cronjob/app-f-ga4-digest-month",
   "app-a-prod/cronjob/umami-report-week",
   "app-f-prod/cronjob/app-f-ga4-digest-week",
   "app-f-prod/cronjob/app-f-postgres-vn-backup",
-  "app-a-prod/cronjob/marketing-autopost-en",
-  "app-a-prod/cronjob/marketing-radar-global",
-  "app-a-prod/cronjob/marketing-digest-day",
+  "app-a-prod/cronjob/app-ae-en",
+  "app-a-prod/cronjob/app-ag-global",
+  "app-a-prod/cronjob/app-af-day",
   "app-f-prod/cronjob/app-f-ga4-digest-day",
-  "app-a-prod/cronjob/marketing-autopost-ja",
+  "app-a-prod/cronjob/app-ae-ja",
   "app-a-prod/cronjob/app-a-sandbox-watchdog",
-  "app-a-prod/cronjob/marketing-digest-week",
+  "app-a-prod/cronjob/app-af-week",
   "app-i-prod/cronjob/app-i-postgres-backup",
   "app-f-prod/cronjob/app-f-policy-radar",
   "app-a-prod/cronjob/umami-report-day",
@@ -3562,7 +3562,7 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
  "pvc_unused": [
   {
    "namespace": "default",
-   "name": "data-k-quiz-db-0",
+   "name": "data-app-ah-db-0",
    "prod": false
   }
  ]
@@ -6033,15 +6033,15 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   "app-a-prod/daemonset/app-a-sandbox-prepull",
   "app-a-prod/cronjob/app-a-postgres-backup",
   "app-a-prod/cronjob/app-a-sandbox-watchdog",
-  "app-a-prod/cronjob/marketing-autopost-en",
-  "app-a-prod/cronjob/marketing-autopost-ja",
-  "app-a-prod/cronjob/marketing-digest-day",
-  "app-a-prod/cronjob/marketing-digest-month",
-  "app-a-prod/cronjob/marketing-digest-week",
-  "app-a-prod/cronjob/marketing-radar-global",
-  "app-a-prod/cronjob/marketing-radar-global-eu",
-  "app-a-prod/cronjob/marketing-radar-japan",
-  "app-a-prod/cronjob/marketing-radar-japan-noon",
+  "app-a-prod/cronjob/app-ae-en",
+  "app-a-prod/cronjob/app-ae-ja",
+  "app-a-prod/cronjob/app-af-day",
+  "app-a-prod/cronjob/app-af-month",
+  "app-a-prod/cronjob/app-af-week",
+  "app-a-prod/cronjob/app-ag-global",
+  "app-a-prod/cronjob/app-ag-global-eu",
+  "app-a-prod/cronjob/app-ag-japan",
+  "app-a-prod/cronjob/app-ag-japan-noon",
   "app-a-prod/cronjob/umami-report-day",
   "app-a-prod/cronjob/umami-report-month",
   "app-a-prod/cronjob/umami-report-week",
@@ -6287,8 +6287,8 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   },
   {
    "namespace": "default",
-   "name": "data-k-quiz-db-0",
-   "target": "default/data-k-quiz-db-0",
+   "name": "data-app-ah-db-0",
+   "target": "default/data-app-ah-db-0",
    "prod": false,
    "phase": "Bound",
    "storage_class": "local-path",
@@ -7440,55 +7440,55 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-autopost-en",
+   "workload": "app-a-prod/cronjob/app-ae-en",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-autopost-ja",
+   "workload": "app-a-prod/cronjob/app-ae-ja",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-digest-day",
+   "workload": "app-a-prod/cronjob/app-af-day",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-digest-month",
+   "workload": "app-a-prod/cronjob/app-af-month",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-digest-week",
+   "workload": "app-a-prod/cronjob/app-af-week",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-global",
+   "workload": "app-a-prod/cronjob/app-ag-global",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-global-eu",
+   "workload": "app-a-prod/cronjob/app-ag-global-eu",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-japan",
+   "workload": "app-a-prod/cronjob/app-ag-japan",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-japan-noon",
+   "workload": "app-a-prod/cronjob/app-ag-japan-noon",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
@@ -10951,7 +10951,7 @@ ClusterRole에 없는 종류 1개입니다. 이 종류가 필요한 점검 항�
   {
    "pv": "pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c",
    "namespace": "default",
-   "pvc": "data-k-quiz-db-0",
+   "pvc": "data-app-ah-db-0",
    "node": "node-b",
    "storage_class": "local-path",
    "capacity_mb": 10240,

@@ -55,7 +55,7 @@ Checks 367: evaluated 230, not run on this platform or at this scale 3, skipped 
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | high |  | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes … |
 | `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | high |  | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred … |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | high |  | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
-| `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
+| `security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 
 (consecutive-run counts need diff.json; none for this snapshot)
 
@@ -181,7 +181,7 @@ Signature catalog 1.1.1, 23 files, 23380 lines scanned (components: actions-runn
 | `resilience.replicas-same-node.prod-app-y/deployment/app-y-backend` | fail | high | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 4 |
 | `resilience.replicas-same-node.prod-app-z-backend/deployment/app-z-frontend` | fail | high | every replica is on one node now. replicas 2 (Running 2), node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 2}, AZ distribution {'ap-northeast-2a': 2}, topologySpread [], podAntiAffinity preferred, nodes eligible under scheduling constraints 4 |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | high | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
-| `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
+| `security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 | `karpenter.ec2nodeclass-hardening.cluster` | warn | high | IMDS hop limit 2 or more ['default'], tokens optional [], root volume encrypted not set ['default'] (size {'default': 50.0}GB) |
 | `logs.signatures.external-secrets.provider-error` | warn | high | 62 occurrences (2026-11-06T17:31:20Z ~ 2026-11-07T01:34:43Z), thresholds warn 1/fail 10. Files: ['logs/pods/external-secrets/external-secrets_external-secrets.log']. Samples: ['[pod/external-secrets-7859bcd5c-g8z4q/external-secrets] 2026-11-06T17:31:20.550454017Z … |
 | `logs.signatures.karpenter.version-unsupported` | warn | high | 1 occurrences (2026-11-06T08:49:38Z ~ 2026-11-06T08:49:38Z), thresholds warn 1/fail 10. Files: ['logs/pods/karpenter/karpenter_karpenter.log']. Samples: ['[pod/karpenter-9769889bd-pkxd2/controller] 2026-11-06T08:49:38.045274596Z … |
@@ -198,8 +198,8 @@ Signature catalog 1.1.1, 23 files, 23380 lines scanned (components: actions-runn
 | `eks.node-os-skew.cluster` | fail | medium | OS ['Amazon Linux 2', 'Amazon Linux 2023.9.20251208'], kernels ['5.10.245-245.983.amzn2.aarch64', '5.10.245-245.983.amzn2.x86_64', '6.1.158-180.294.amzn2023.x86_64'], runtimes ['containerd://1.7.29', 'containerd://2.1.5'], cgroup: AL2 may be v1, AL2023 is v2 |
 | `eso.provider-api-errors.cluster` | fail | medium | provider API calls since controller start: success 31963 / errors 2711 (ratio 0.0782), sync failures 2711/73134, reconcile errors 2711, ExternalSecrets not Ready ['database/externalsecret/mysql-app-v-secret'] (oldest refresh 7796.6 hours ago) |
 | `grafana.datasource-errors.monitoring/deployment/kube-prometheus-stack-grafana` | fail | medium | responses per datasource (cumulative since start) [('Loki(loki)', 2614, {'101': 4, '200': 2275, '400': 6, '429': 329}), ('Prometheus(prometheus)', 1535, {'200': 1349, '301': 186}), ('VictoriaMetrics_onprem(prometheus)', 142, {'200': 142})], error rate 1% or more ['Loki(loki)'] (max 0.1259), Grafana … |
-| `hygiene.mutable-image-tag.prod-app-z-backend/deployment/tts-proxy:tailscale` | fail | medium | image tailscale/tailscale:latest (tag latest, imagePullPolicy IfNotPresent, registry docker.io) |
-| `hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/tts-proxy` | fail | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'memoryLimitsMissing', 'memoryRequestsMissing'] and 6 more. Security-category danger ['dangerousCapabilities' … |
+| `hygiene.mutable-image-tag.prod-app-z-backend/deployment/app-ad:tailscale` | fail | medium | image tailscale/tailscale:latest (tag latest, imagePullPolicy IfNotPresent, registry docker.io) |
+| `hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/app-ad` | fail | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'deploymentMissingReplicas', 'livenessProbeMissing', 'memoryLimitsMissing', 'memoryRequestsMissing'] and 6 more. Security-category danger ['dangerousCapabilities' … |
 | `observability.log-coverage-gap.cluster` | fail | medium | Of 147 pods Running for over 1h, 83 are absent from Loki pod labels (ratio 0.565). Nodes with every pod missing: []. By namespace: {'kube-system': 23, 'monitoring': 22, 'prod-app-z-backend': 5, 'keda': 3, 'middleware': 3, 'prod-app-t': 3, 'prod-app-s': 3, 'argocd': 2, 'dev-app-s': 2, 'dev-app-y' … |
 | `observability.loki-retention-unbounded.cluster` | fail | medium | Loki 2.6.1, retention_period 31d, retention_enabled false |
 | `observability.no-event-retention.cluster` | fail | medium | no component of family event-retention in inventory.components |
@@ -220,11 +220,11 @@ Signature catalog 1.1.1, 23 files, 23380 lines scanned (components: actions-runn
 | `resilience.no-readiness-probe.prod-app-y/app-y-ai` | fail | medium | containers without a readinessProbe: ai |
 | `resilience.no-readiness-probe.prod-app-y/app-y-backend` | fail | medium | containers without a readinessProbe: backend |
 | `resilience.no-readiness-probe.prod-app-y/app-y-frontend` | fail | medium | containers without a readinessProbe: frontend |
-| `resilience.no-readiness-probe.prod-app-z-backend/tts-proxy` | fail | medium | containers without a readinessProbe: tailscale, forwarder |
+| `resilience.no-readiness-probe.prod-app-z-backend/app-ad` | fail | medium | containers without a readinessProbe: tailscale, forwarder |
 | `resilience.recreate-strategy-serving.prod-app-r/deployment/app-r-backend` | fail | medium | strategy Recreate (justification none), replicas 1, preStop False, grace 30s |
 | `resilience.replicas-same-zone.prod-app-x/deployment/app-x-api` | fail | medium | replicas 2, AZ distribution {'ap-northeast-2a': 2}, node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-137.ap-northeast-2.compute.internal': 1}, topologySpread [] |
 | `resilience.replicas-same-zone.prod-app-z-backend/deployment/app-z-embedding-server` | fail | medium | replicas 2, AZ distribution {'ap-northeast-2a': 2}, node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-245.ap-northeast-2.compute.internal': 1}, topologySpread [] |
-| `resilience.single-node-dependency.prod-app-z-backend/deployment/tts-proxy` | fail | medium | ["hostPath volume ['dev-net-tun']"], replicas 1 |
+| `resilience.single-node-dependency.prod-app-z-backend/deployment/app-ad` | fail | medium | ["hostPath volume ['dev-net-tun']"], replicas 1 |
 | `resilience.single-replica-in-prod.app-ab-prod/app-ab-backend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.app-ab-prod/app-ab-frontend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-r/app-r-backend` | fail | medium | replicas 1, no HPA |
@@ -239,8 +239,8 @@ Signature catalog 1.1.1, 23 files, 23380 lines scanned (components: actions-runn
 | `resilience.single-replica-in-prod.prod-app-v/app-v-frontend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-y/app-y-admin` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-y/app-y-frontend` | fail | medium | replicas 1, no HPA |
+| `resilience.single-replica-in-prod.prod-app-z-backend/app-ad` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-z-backend/app-z-pg-proxy` | fail | medium | replicas 1, no HPA |
-| `resilience.single-replica-in-prod.prod-app-z-backend/tts-proxy` | fail | medium | replicas 1, no HPA |
 | `resources.jvm-heap-vs-limit.middleware/statefulset/kafka-controller:jmx-exporter` | fail | medium | middleware/statefulset/kafka-controller container jmx-exporter (jmx-exporter:0.20.0-debian-11-r4): -Xmx NoneMiB, MaxRAMPercentage 100.0, memory limit 128.0MiB -> heap/limit 1.0 (heap unset False) |
 | `resources.krr-recommendation.argocd/statefulset/argocd-application-controller:application-controller` | fail | medium | memory request under by 373 MB, CPU request over by 0.143 cores: CPU request 0.2 → 0.057 cores, CPU limit 0.5 → none, memory request 384 → 757 MB. KRR severity WARNING (CPU req OK, CPU limit WARNING, memory req WARNING, memory limit GOOD) |
 | `resources.krr-recommendation.dev-app-v/statefulset/app-v-backend-dev-mysql:mysql` | fail | medium | memory request under by 281 MB: CPU request 0.1 → 0.012 cores, CPU limit 0.5 → none, memory request 512 → 793 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req WARNING, memory limit OK) |
@@ -259,7 +259,7 @@ Signature catalog 1.1.1, 23 files, 23380 lines scanned (components: actions-runn
 | `resources.krr-recommendation.prod-app-z-backend/deployment/app-z-file-worker:file-worker` | fail | medium | CPU request over by 0.703 cores, memory request over by 337 MB: CPU request 1.0 → 0.297 cores, CPU limit 2.0 → none, memory request 2048 → 1711 MB, memory limit 4096 → 1711 MB. KRR severity CRITICAL (CPU req CRITICAL, CPU limit WARNING, memory req WARNING, memory limit CRITICAL) |
 | `resources.krr-recommendation.prod-app-z-backend/deployment/app-z-graph-worker:graph-worker` | fail | medium | CPU request over by 0.458 cores, memory request over by 670 MB: CPU request 1.0 → 0.542 cores, CPU limit 2.0 → none, memory request 2048 → 1378 MB, memory limit 6144 → 1378 MB. KRR severity CRITICAL (CPU req WARNING, CPU limit WARNING, memory req CRITICAL, memory limit CRITICAL) |
 | `resources.krr-recommendation.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | medium | CPU request over by 0.49 cores, memory request over by 2417 MB: CPU request 0.5 → 0.01 cores, CPU limit 2.0 → none, memory request 4096 → 1679 MB, memory limit 5120 → 1679 MB. KRR severity CRITICAL (CPU req WARNING, CPU limit WARNING, memory req CRITICAL, memory limit CRITICAL) |
-| `resources.no-memory-limit.prod-app-z-backend/tts-proxy` | fail | medium | containers without a limit: tailscale, forwarder |
+| `resources.no-memory-limit.prod-app-z-backend/app-ad` | fail | medium | containers without a limit: tailscale, forwarder |
 | `scaling.karpenter-expired-not-replaced.default-n44bh` | fail | medium | NodeClaim default-n44bh → node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge spot): age 1056.5h, 336.5h past expireAfter 720.0h. Blocking reason (DisruptionBlocked): {}. do-not-disrupt pods on this node 2: prod-app-s/app-s-admin-57f5fcc58d-khsh5, prod-app-x/app-x-api-5755745bc7-2sjvd |
 | `security.externalsecret-not-ready.database/mysql-app-v-secret` | fail | medium | Ready False (SecretSyncedError): could not get secret data from provider |
 | `security.polaris-security-danger.cluster` | fail | medium | Polaris score 79. Security danger workloads 74 (prod 29): per check {'dangerousCapabilities': 2, 'hostNetworkSet': 2, 'privilegeEscalationAllowed': 59, 'runAsPrivileged': 2, 'runAsRootAllowed': 58, 'hostPIDSet': 1, 'rolebindingClusterAdminRole': 2, 'rolebindingRolePodExecAttach': 2 … |
@@ -457,11 +457,11 @@ Signature catalog 1.1.1, 23 files, 23380 lines scanned (components: actions-runn
 | `resilience.no-prestop.prod-app-y/app-y-ai` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-y/app-y-backend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-y/app-y-frontend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
+| `resilience.no-prestop.prod-app-z-backend/app-ad` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-backend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-embedding-server` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-frontend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-pg-proxy` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
-| `resilience.no-prestop.prod-app-z-backend/tts-proxy` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `scaling.hpa-cpu-only-prod.prod-app-z-backend/deployment/app-z-backend` | warn | low | HPA prod-app-z-backend/app-z-backend: metrics ['cpu'], current CPU 0% / target 70% |
 | `scaling.hpa-cpu-only-prod.prod-app-z-backend/deployment/app-z-frontend` | warn | low | HPA prod-app-z-backend/app-z-frontend: metrics ['cpu'], current CPU 1% / target 70% |
 | `scaling.hpa-no-behavior-prod.prod-app-z-backend/deployment/app-z-backend` | warn | low | HPA prod-app-z-backend/app-z-backend: no behavior (defaults: scaleDown 300s, scaleUp immediate), None desired changes over 7 days |
@@ -486,8 +486,8 @@ Signature catalog 1.1.1, 23 files, 23380 lines scanned (components: actions-runn
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-admin` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-backend` | warn | low | replicas 2, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-frontend` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.prod-app-z-backend/app-ad` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-z-backend/app-z-embedding-server` | warn | low | replicas 2, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.prod-app-z-backend/tts-proxy` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-1-245.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-1-245.ap-northeast-2.compute.internal (pool default): prod pods 2 (['prod-app-t', 'prod-app-z-backend']) together with dev pods 1 (['dev-app-s']). Memory limit total/allocatable 0.94, CPU limit total/allocatable 2.98, containers without a memory limit 0 |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-100.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-100.ap-northeast-2.compute.internal (pool default): prod pods 9 (['prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-z-backend']) together with dev pods 2 (['dev-app-aa', 'dev-app-v']). Memory limit total/allocatable 1.1, CPU limit total/allocatable 1.96, containers without a memory … |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-60.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-60.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): prod pods 2 (['prod-app-s', 'prod-app-v']) together with dev pods 2 (['dev-app-s', 'dev-app-v']). Memory limit total/allocatable 1.49, CPU limit total/allocatable 2.44, containers without a memory limit … |
@@ -745,7 +745,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy</code></summary>
+<details><summary><code>security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad</code></summary>
 
 ```json
 {
@@ -759,7 +759,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  ],
  "severe": true,
  "system": false,
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -1085,7 +1085,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>hygiene.mutable-image-tag.prod-app-z-backend/deployment/tts-proxy:tailscale</code></summary>
+<details><summary><code>hygiene.mutable-image-tag.prod-app-z-backend/deployment/app-ad:tailscale</code></summary>
 
 ```json
 {
@@ -1097,12 +1097,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "pull_policy": "IfNotPresent",
  "registry": "docker.io",
  "tag_kind": "latest",
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
 </details>
-<details><summary><code>hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/tts-proxy</code></summary>
+<details><summary><code>hygiene.polaris-reliability-danger.prod-app-z-backend/deployment/app-ad</code></summary>
 
 ```json
 {
@@ -1129,7 +1129,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "privilegeEscalationAllowed",
   "runAsRootAllowed"
  ],
- "target": "prod-app-z-backend/deployment/tts-proxy"
+ "target": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -1464,12 +1464,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resilience.no-readiness-probe.prod-app-z-backend/tts-proxy</code></summary>
+<details><summary><code>resilience.no-readiness-probe.prod-app-z-backend/app-ad</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
+ "name": "app-ad",
  "kind": "Deployment"
 }
 ```
@@ -1533,7 +1533,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resilience.single-node-dependency.prod-app-z-backend/deployment/tts-proxy</code></summary>
+<details><summary><code>resilience.single-node-dependency.prod-app-z-backend/deployment/app-ad</code></summary>
 
 ```json
 {
@@ -1542,7 +1542,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "hostPath volume ['dev-net-tun']"
  ],
  "replicas": 1,
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -1701,23 +1701,23 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/app-z-pg-proxy</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
  "name": "app-z-pg-proxy",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
  "kind": "Deployment"
 }
 ```
@@ -2079,12 +2079,12 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
-<details><summary><code>resources.no-memory-limit.prod-app-z-backend/tts-proxy</code></summary>
+<details><summary><code>resources.no-memory-limit.prod-app-z-backend/app-ad</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
+ "name": "app-ad",
  "kind": "Deployment"
 }
 ```
@@ -2144,7 +2144,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  },
  "danger_workloads": [
   "kube-system/daemonset/aws-node",
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "kube-system/daemonset/ebs-csi-node-windows",
   "kube-system/daemonset/ebs-csi-node",
   "middleware/deployment/redis-insight",
@@ -2219,7 +2219,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "/clusterrolebinding/keda-operator"
  ],
  "danger_workloads_prod": [
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "prod-app-v/deployment/app-v-admin-frontend",
   "prod-app-y/deployment/app-y-admin",
   "prod-app-y/deployment/app-y-frontend",
@@ -2497,7 +2497,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod"
  ],
  "lb": [
-  "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+  "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
  ],
  "mixed_prod_nonprod": true,
  "namespace_count": 16,
@@ -3873,7 +3873,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod-app-z-backend/deployment/app-z-frontend",
   "prod-app-z-backend/deployment/app-z-graph-worker",
   "prod-app-z-backend/deployment/app-z-pg-proxy",
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "prod-app-r/deployment/app-r-backend",
   "prod-app-r/deployment/app-r-web",
   "prod-app-v/deployment/app-v-admin-frontend",
@@ -3935,7 +3935,7 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod-app-z-backend/deployment/app-z-frontend",
   "prod-app-z-backend/statefulset/app-z-neo4j",
   "prod-app-z-backend/deployment/app-z-pg-proxy",
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "prod-app-r/deployment/app-r-backend",
   "prod-app-r/deployment/app-r-web",
   "prod-app-v/deployment/app-v-admin-frontend",
@@ -5000,8 +5000,8 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "prod-app-r/statefulset/app-r-postgresql",
   "prod-app-t/statefulset/app-t-backend-postgresql",
   "prod-app-x/statefulset/app-x-postgresql",
-  "prod-app-z-backend/deployment/app-z-embedding-server",
-  "prod-app-z-backend/deployment/tts-proxy"
+  "prod-app-z-backend/deployment/app-ad",
+  "prod-app-z-backend/deployment/app-z-embedding-server"
  ],
  "prod_without_request": 35,
  "request_ratio": 0.009,
@@ -8304,6 +8304,17 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>resilience.no-prestop.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>resilience.no-prestop.prod-app-z-backend/app-z-backend</code></summary>
 
 ```json
@@ -8343,17 +8354,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 {
  "namespace": "prod-app-z-backend",
  "name": "app-z-pg-proxy",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>resilience.no-prestop.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
  "kind": "Deployment"
 }
 ```
@@ -8649,23 +8649,23 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
 ```
 
 </details>
+<details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/app-z-embedding-server</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
  "name": "app-z-embedding-server",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
  "kind": "Deployment"
 }
 ```

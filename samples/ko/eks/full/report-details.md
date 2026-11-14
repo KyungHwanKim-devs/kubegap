@@ -64,7 +64,7 @@
 | `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | high |  | Target group k8s-lb-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0 … |
 | `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | high |  | Target group k8s-lb-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0 … |
 | `traffic.alb-unhealthy-targets.prod-app-v/app-v-frontend` | high |  | Target group k8s-lb-36f816b829 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0 … |
-| `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | high |  | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['<load-balancer>.elb.amazonaws.com'], sourceRanges None … |
+| `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | high |  | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['lb-151c379572.elb.example.com'], sourceRanges None … |
 | `vpccni.no-available-ip.node-1-116` | high |  | node node-1-116 (t8i.small, pool system-ondemand): ipamd answered 'no available IP' 1 times since it started; pod IPs 6/9 (0.667), ENI 3/3, max-pods 11 |
 
 (연속 횟수는 diff.json이 있어야 나옵니다. 이번 점검에는 없습니다)
@@ -212,7 +212,7 @@
 | `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | fail | high | Target group k8s-lb-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-y-frontend'] |
 | `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | fail | high | Target group k8s-lb-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0, health check / expected codes 200, backends ['deployment/app-z-backend'] |
 | `traffic.alb-unhealthy-targets.prod-app-v/app-v-frontend` | fail | high | Target group k8s-lb-36f816b829 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-v-frontend'] |
-| `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | fail | high | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['<load-balancer>.elb.amazonaws.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to the internet by the … |
+| `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | fail | high | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['lb-151c379572.elb.example.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to the internet by the … |
 | `vpccni.no-available-ip.node-1-116` | fail | high | node node-1-116 (t8i.small, pool system-ondemand): ipamd answered 'no available IP' 1 times since it started; pod IPs 6/9 (0.667), ENI 3/3, max-pods 11 |
 | `controlplane.apiserver-5xx.cluster` | warn | high | 5xx per second 0.026 (code 503) |
 | `eks.service-quota-near-limit.aws-account` | warn | high | quotas with a usage metric 25/65, at 80% or more [], at 60% or more ['VPCs 0.6'], top operational quotas [['VPCs', 3.0, 5.0, 0.6], ['listener rules per ALB', 37.0, 100.0, 0.37], ['certificates per ALB', 9.0, 25.0, 0.36], ['target groups per ALB', 30.0, 100.0, 0.3], ['NLBs', 2.0, 50.0, 0.04] … |
@@ -236,7 +236,7 @@
 | `resources.oomkilled-repeated.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | warn | high | kernel log not read on its node, no node access there. Prometheus: 1 pod ended by OOM in 7 days, 1 restarts in those pods. cAdvisor counter 1. Running now: prometheus-kube-prometheus-stack-prometheus-0 (created 2026-09-08T12:47:49Z, 3 restarts of this container since, its previous run ended … |
 | `resources.oomkilled.argocd/sts/argocd-application-controller:application-controller` | warn | high | pod argocd-application-controller-0: last termination reason OOMKilled, finished at 2026-10-30T09:00:04Z (15.3 days ago), 42 restarts. An OOM older than 7 days is warn, older than 30 days is excluded |
 | `security.imds-hop-limit.cluster` | warn | high | Of 9 instances, 9 with IMDS hop limit > 1 or tokens optional: {'hop=2 tokens=required': 9}. Examples [('system_core', 'm5.large', 2, 'required'), ('system_core', 'm5.large', 2, 'required'), ('karpenter-node', 't8i.medium', 2, 'required'), ('karpenter-node', 'm7i-flex.large', 2, 'required')] and 5 … |
-| `traffic.db-exposed.nlb/app-u-db-shared` | warn | high | nlb (defined outside the cluster) /app-u-db-shared: ports [3307, 3308, 3309, 3311, 5432, 5433, 6379, 7687], exposure internet-facing, addresses ['<load-balancer>.elb.amazonaws.com'], sourceRanges None, security group allow-list, at most 4 sources per port, widest … |
+| `traffic.db-exposed.nlb/app-u-db-shared` | warn | high | nlb (defined outside the cluster) /app-u-db-shared: ports [3307, 3308, 3309, 3311, 5432, 5433, 6379, 7687], exposure internet-facing, addresses ['lb-a6720509f0.elb.example.com'], sourceRanges None, security group allow-list, at most 4 sources per port, widest … |
 | `vpccni.node-ip-exhaustion.node-1-116` | warn | high | node node-1-116 (t8i.small, pool system-ondemand): pod IPs 6/9 (0.667), ENI 3/3 (at limit True), 'no available IP' events 1, max-pods 11, prod pods 1. prefix delegation False |
 | `vpccni.node-ip-exhaustion.node-1-21` | warn | high | node node-1-21 (r8gd.large, pool default): pod IPs 23/27 (0.852), ENI 3/3 (at limit True), 'no available IP' events 0, max-pods 29, prod pods 16. prefix delegation False |
 | `vpccni.node-ip-exhaustion.node-1-224` | warn | high | node node-1-224 (r8gd.medium, pool default): pod IPs 3/6 (0.5), ENI 2/2 (at limit True), 'no available IP' events 0, max-pods 8, prod pods 1. prefix delegation False |
@@ -1017,7 +1017,7 @@
   "9094": 1
  },
  "hosts": [
-  "<load-balancer>.elb.amazonaws.com"
+  "lb-151c379572.elb.example.com"
  ],
  "name": "kafka-controller-0-external",
  "namespace": "middleware",
@@ -1624,7 +1624,7 @@
   "7687": 4
  },
  "hosts": [
-  "<load-balancer>.elb.amazonaws.com"
+  "lb-a6720509f0.elb.example.com"
  ],
  "name": "app-u-db-shared",
  "namespace": null,

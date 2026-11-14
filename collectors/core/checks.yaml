@@ -13497,21 +13497,21 @@
     cases:
       - expect: "warn"
         item:
-          name: "k8s-middlewa-kafkacon-31ecf1515b"
+          name: "k8s-mw-kafka-0a1b2c3d4e"
           type: "application"
           scheme: "internet-facing"
           idle_timeout_s: 3600
           target_groups: 2
       - expect: "pass"
         item:
-          name: "k8s-middlewa-kafkacon-31ecf1515b"
+          name: "k8s-mw-kafka-0a1b2c3d4e"
           type: "application"
           scheme: "internet-facing"
           idle_timeout_s: 300
           target_groups: 2
       - expect: "pass"
         item:
-          name: "k8s-middlewa-kafkacon-31ecf1515b"
+          name: "k8s-mw-kafka-0a1b2c3d4e"
           type: "network"
           scheme: "internet-facing"
           idle_timeout_s: null
@@ -13540,8 +13540,8 @@
     cases:
       - expect: "warn"
         item:
-          name: "k8s-middlewa-kafkacon-f50452776f"
-          lb: "k8s-middlewa-kafkacon-31ecf1515b"
+          name: "k8s-mw-kafka-5f6e7d8c9b"
+          lb: "k8s-mw-kafka-0a1b2c3d4e"
           lb_type: "application"
           target_type: "instance"
           namespace: "prod-a"
@@ -13550,8 +13550,8 @@
         prod: true
       - expect: "pass"
         item:
-          name: "k8s-middlewa-kafkacon-f50452776f"
-          lb: "k8s-middlewa-kafkacon-31ecf1515b"
+          name: "k8s-mw-kafka-5f6e7d8c9b"
+          lb: "k8s-mw-kafka-0a1b2c3d4e"
           lb_type: "application"
           target_type: "ip"
           namespace: "prod-a"
@@ -13560,8 +13560,8 @@
         prod: true
       - expect: "pass"
         item:
-          name: "k8s-middlewa-kafkacon-f50452776f"
-          lb: "k8s-middlewa-kafkacon-31ecf1515b"
+          name: "k8s-mw-kafka-5f6e7d8c9b"
+          lb: "k8s-mw-kafka-0a1b2c3d4e"
           lb_type: "application"
           target_type: "instance"
           namespace: "dev-a"

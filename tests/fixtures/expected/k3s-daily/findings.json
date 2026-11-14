@@ -3495,7 +3495,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Non-Bound PVCs [], Released/Failed PVs [], Bound PVCs used by no pod [('default', 'data-k-quiz-db-0')]",
+   "evidence": "Non-Bound PVCs [], Released/Failed PVs [], Bound PVCs used by no pod [('default', 'data-app-ah-db-0')]",
    "source": "summary.json:hygiene.orphans"
   },
   {
@@ -4933,7 +4933,7 @@
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "Of 139 Secrets (metric kube_secret_info), 9 unreferenced candidates: [('app-f-prod', 'app-f-prod-tls', 'kubernetes.io/tls'), ('app-h-prod', 'app-h-poca-store-prod-tls', 'kubernetes.io/tls'), ('argocd', 'ghcr-auth-secret', 'kubernetes.io/dockerconfigjson'), ('argocd', 'ghcr-pull-secret', 'kubernetes.io/dockerconfigjson'), ('default', 'app-f-prod-tls', 'kubernetes.io/tls'), ('default', 'k-quiz-auth-secret', 'Opaque'), ('default', 'k-quiz-aws-secret', 'Opaque'), ('default', 'k-quiz-db-secret', 'Opaque'), ('default', 'k-quiz-tls', 'kubernetes.io/tls')]",
+   "evidence": "Of 139 Secrets (metric kube_secret_info), 9 unreferenced candidates: [('app-f-prod', 'app-f-prod-tls', 'kubernetes.io/tls'), ('app-h-prod', 'app-h-app-aj-prod-tls', 'kubernetes.io/tls'), ('argocd', 'ghcr-auth-secret', 'kubernetes.io/dockerconfigjson'), ('argocd', 'ghcr-pull-secret', 'kubernetes.io/dockerconfigjson'), ('default', 'app-ah-auth-secret', 'Opaque'), ('default', 'app-ah-aws-secret', 'Opaque'), ('default', 'app-ah-db-secret', 'Opaque'), ('default', 'app-ah-tls', 'kubernetes.io/tls'), ('default', 'app-f-prod-tls', 'kubernetes.io/tls')]",
    "source": "summary.json:hygiene.orphans"
   },
   {

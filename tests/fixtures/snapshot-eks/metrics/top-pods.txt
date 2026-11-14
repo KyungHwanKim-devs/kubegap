@@ -177,8 +177,8 @@ prod-app-z-backend   app-z-frontend-6d58bbfcfc-2qgs6                            
 prod-app-z-backend   app-z-frontend-6d58bbfcfc-nfk9x                             frontend                          1m     76Mi     
 prod-app-z-backend   app-z-neo4j-0                                               neo4j                             5m     972Mi    
 prod-app-z-backend   app-z-pg-proxy-5ff994445f-qsklv                             forwarder                         1m     0Mi      
-prod-app-z-backend   tts-proxy-7b6db97b69-4bbjf                                  forwarder                         0m     0Mi      
-prod-app-z-backend   tts-proxy-7b6db97b69-4bbjf                                  tailscale                         1m     22Mi     
+prod-app-z-backend   app-ad-7b6db97b69-4bbjf                                  forwarder                         0m     0Mi      
+prod-app-z-backend   app-ad-7b6db97b69-4bbjf                                  tailscale                         1m     22Mi     
 prod-app-r          app-r-backend-76f5f87fc8-xhgwr                             backend                           2m     243Mi    
 prod-app-r          app-r-postgresql-0                                         postgresql                        5m     123Mi    
 prod-app-r          app-r-web-cc4989d9-x46dr                                   web                               1m     4Mi      

@@ -61,7 +61,7 @@
 | `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | high |  | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago). The container has restarted 2 times since the pod was created, for any reason and … |
 | `security.networkpolicy-not-enforced.cluster` | high |  | 4 NetworkPolicies (['app-ab-prod', 'prod-app-r', 'prod-app-t', 'prod-app-x']), enforced False: aws-eks-nodeagent --enable-network-policy=false, 0 PolicyEndpoints |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | high |  | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
-| `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
+| `security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad` | high |  | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 | `storage.pvc-usage-high.dev-app-aa/data-app-aa-mysql-0` | high |  | Usage 0.902 (capacity 9.7GB, inodes 0.0), growth 0.0GB/day, None days to full, workloads ['statefulset/app-aa-mysql'], StorageClass gp3 |
 
 (연속 횟수는 diff.json이 있어야 나옵니다. 이번 점검에는 없습니다)
@@ -185,7 +185,7 @@
 | `resources.oomkilled.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | fail | high | pod prometheus-kube-prometheus-stack-prometheus-0: last termination reason OOMKilled, finished at 2026-11-05T08:21:29Z (1.7 days ago). The container has restarted 2 times since the pod was created, for any reason and not only in the last 7 days. An OOM older than 7 days is warn, older than 30 days … |
 | `security.networkpolicy-not-enforced.cluster` | fail | high | 4 NetworkPolicies (['app-ab-prod', 'prod-app-r', 'prod-app-t', 'prod-app-x']), enforced False: aws-eks-nodeagent --enable-network-policy=false, 0 PolicyEndpoints |
 | `security.plaintext-secret-env.prod-app-z-backend/statefulset/app-z-neo4j:neo4j` | fail | high | Container neo4j env ['NEO4J_AUTH'] is a literal value rather than a secretKeyRef (value not recorded) |
-| `security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
+| `security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad` | fail | high | ["hostPath ['dev-net-tun']", 'capabilities ["tailscale:[\'NET_ADMIN\']"]'], containers allowing root ['tailscale', 'forwarder'] |
 | `storage.pvc-usage-high.dev-app-aa/data-app-aa-mysql-0` | fail | high | Usage 0.902 (capacity 9.7GB, inodes 0.0), growth 0.0GB/day, None days to full, workloads ['statefulset/app-aa-mysql'], StorageClass gp3 |
 | `controlplane.apiserver-5xx.cluster` | warn | high | 5xx per second 0.004 (code 503) |
 | `events.tracked-warning-reasons.Unhealthy` | warn | high | Probe failure. Readiness removes it from traffic, liveness restarts it. 1 occurrences total (1 events, trend over 1 snapshots [1], flat), first 2026-11-07T00:48:24Z last 2026-11-07T00:48:24Z. Top objects: ['Pod/prod-app-s/app-s-backend-7c46f75bf6-ljlnl'] |
@@ -212,7 +212,7 @@
 | `ebscsi.storageclass-unencrypted.cluster` | fail | medium | ebs.csi.aws.com StorageClasses 4, without encrypted ['gp3', 'gp3-2a', 'gp3-2c'] (default class gp3), in-tree leftovers ['gp2'], without allowVolumeExpansion ['gp2', 'gp3', 'gp3-2a', 'gp3-2c'] |
 | `eso.provider-api-errors.cluster` | fail | medium | provider API calls since controller start: success 31963 / errors 2711 (ratio 0.0782), sync failures 2711/73134, reconcile errors 2711, ExternalSecrets not Ready ['database/externalsecret/mysql-app-v-secret'] (oldest refresh 7796.6 hours ago) |
 | `grafana.datasource-errors.monitoring/deployment/kube-prometheus-stack-grafana` | fail | medium | responses per datasource (cumulative since start) [('Loki(loki)', 2614, {'101': 4, '200': 2275, '400': 6, '429': 329}), ('Prometheus(prometheus)', 1535, {'200': 1349, '301': 186}), ('VictoriaMetrics_onprem(prometheus)', 142, {'200': 142})], error rate 1% or more ['Loki(loki)'] (max 0.1259), Grafana … |
-| `hygiene.mutable-image-tag.prod-app-z-backend/deployment/tts-proxy:tailscale` | fail | medium | image tailscale/tailscale:latest (tag latest, imagePullPolicy IfNotPresent, registry docker.io) |
+| `hygiene.mutable-image-tag.prod-app-z-backend/deployment/app-ad:tailscale` | fail | medium | image tailscale/tailscale:latest (tag latest, imagePullPolicy IfNotPresent, registry docker.io) |
 | `observability.alert-firing-stale.KubeControllerManagerDown` | fail | medium | Firing for 59.5 days (ALERTS_FOR_STATE). Labels {'severity': 'critical'} |
 | `observability.alert-firing-stale.KubeSchedulerDown` | fail | medium | Firing for 59.5 days (ALERTS_FOR_STATE). Labels {'severity': 'critical'} |
 | `observability.alerts-always-firing.KubeControllerManagerDown` | fail | medium | 7d firing samples 20157 (same level as Watchdog = never stops firing) |
@@ -237,11 +237,11 @@
 | `resilience.no-readiness-probe.prod-app-y/app-y-ai` | fail | medium | containers without a readinessProbe: ai |
 | `resilience.no-readiness-probe.prod-app-y/app-y-backend` | fail | medium | containers without a readinessProbe: backend |
 | `resilience.no-readiness-probe.prod-app-y/app-y-frontend` | fail | medium | containers without a readinessProbe: frontend |
-| `resilience.no-readiness-probe.prod-app-z-backend/tts-proxy` | fail | medium | containers without a readinessProbe: tailscale, forwarder |
+| `resilience.no-readiness-probe.prod-app-z-backend/app-ad` | fail | medium | containers without a readinessProbe: tailscale, forwarder |
 | `resilience.recreate-strategy-serving.prod-app-r/deployment/app-r-backend` | fail | medium | strategy Recreate (justification none), replicas 1, preStop False, grace 30s |
 | `resilience.replicas-same-zone.prod-app-x/deployment/app-x-api` | fail | medium | replicas 2, AZ distribution {'ap-northeast-2a': 2}, node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-137.ap-northeast-2.compute.internal': 1}, topologySpread [] |
 | `resilience.replicas-same-zone.prod-app-z-backend/deployment/app-z-embedding-server` | fail | medium | replicas 2, AZ distribution {'ap-northeast-2a': 2}, node distribution {'ip-10-0-1-139.ap-northeast-2.compute.internal': 1, 'ip-10-0-1-245.ap-northeast-2.compute.internal': 1}, topologySpread [] |
-| `resilience.single-node-dependency.prod-app-z-backend/deployment/tts-proxy` | fail | medium | ["hostPath volume ['dev-net-tun']"], replicas 1 |
+| `resilience.single-node-dependency.prod-app-z-backend/deployment/app-ad` | fail | medium | ["hostPath volume ['dev-net-tun']"], replicas 1 |
 | `resilience.single-replica-in-prod.app-ab-prod/app-ab-backend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.app-ab-prod/app-ab-frontend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-r/app-r-backend` | fail | medium | replicas 1, no HPA |
@@ -256,13 +256,13 @@
 | `resilience.single-replica-in-prod.prod-app-v/app-v-frontend` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-y/app-y-admin` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-y/app-y-frontend` | fail | medium | replicas 1, no HPA |
+| `resilience.single-replica-in-prod.prod-app-z-backend/app-ad` | fail | medium | replicas 1, no HPA |
 | `resilience.single-replica-in-prod.prod-app-z-backend/app-z-pg-proxy` | fail | medium | replicas 1, no HPA |
-| `resilience.single-replica-in-prod.prod-app-z-backend/tts-proxy` | fail | medium | replicas 1, no HPA |
-| `resources.besteffort-in-prod.prod-app-z-backend/deploy/tts-proxy` | fail | medium | pod tts-proxy-7b6db97b69-4bbjf: QoS BestEffort (neither request nor limit) |
+| `resources.besteffort-in-prod.prod-app-z-backend/deploy/app-ad` | fail | medium | pod app-ad-7b6db97b69-4bbjf: QoS BestEffort (neither request nor limit) |
 | `resources.cpu-request-overprovisioned.prod-app-z-backend/deploy/app-z-backend:backend` | fail | medium | pod app-z-backend-78679bf4b-lhhg4: 7d CPU p95 0.003 cores / request 0.50 cores = 0.01 |
 | `resources.large-request-binpacking.prod-app-z-backend/deploy/app-z-embedding-server:embedding` | fail | medium | ['pod app-z-embedding-server-8445d87f5-dwqrx: request is 58% of the median node allocatable', 'pod app-z-embedding-server-8445d87f5-sbzpj: request is 58% of the median node allocatable'] |
 | `resources.large-request-binpacking.prod-app-z-backend/sts/app-z-neo4j:neo4j` | fail | medium | pod app-z-neo4j-0: request is 58% of the median node allocatable |
-| `resources.no-memory-limit.prod-app-z-backend/tts-proxy` | fail | medium | containers without a limit: tailscale, forwarder |
+| `resources.no-memory-limit.prod-app-z-backend/app-ad` | fail | medium | containers without a limit: tailscale, forwarder |
 | `resources.node-request-usage-gap.ip-10-0-1-117.ap-northeast-2.compute.internal` | fail | medium | CPU requests/allocatable 0.96, usage/allocatable 7d p95 0.09 (5m instant 0.09) |
 | `resources.node-request-usage-gap.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | medium | CPU requests/allocatable 0.92, usage/allocatable 7d p95 0.09 (5m instant 0.05) |
 | `resources.node-request-usage-gap.ip-10-0-1-245.ap-northeast-2.compute.internal` | fail | medium | CPU requests/allocatable 0.90, usage/allocatable 7d p95 0.08 (5m instant 0.01) |
@@ -476,11 +476,11 @@
 | `resilience.no-prestop.prod-app-y/app-y-ai` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-y/app-y-backend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-y/app-y-frontend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
+| `resilience.no-prestop.prod-app-z-backend/app-ad` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-backend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-embedding-server` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-frontend` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resilience.no-prestop.prod-app-z-backend/app-z-pg-proxy` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
-| `resilience.no-prestop.prod-app-z-backend/tts-proxy` | warn | low | no preStop, terminationGracePeriodSeconds 30 |
 | `resources.memory-request-overprovisioned.app-ab-prod/sts/app-ab-backend-postgresql:postgresql` | warn | low | pod app-ab-backend-postgresql-0: 7d memory working set p95 55 MB / request 256 MB = 0.22; database-like: keep the request |
 | `resources.memory-request-overprovisioned.argocd/deploy/argocd-repo-server:repo-server` | warn | low | pod argocd-repo-server-d487895cc-bth22: 7d memory working set p95 93 MB / request 512 MB = 0.18 |
 | `resources.memory-request-overprovisioned.dev-app-aa/sts/app-aa-postgres:postgres` | warn | low | pod app-aa-postgres-0: 7d memory working set p95 28 MB / request 256 MB = 0.11; database-like: keep the request |
@@ -529,8 +529,8 @@
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-admin` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-backend` | warn | low | replicas 2, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-y/app-y-frontend` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
+| `scaling.no-hpa-serving-prod.prod-app-z-backend/app-ad` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `scaling.no-hpa-serving-prod.prod-app-z-backend/app-z-embedding-server` | warn | low | replicas 2, has container ports and a Service, no HPA or ScaledObject |
-| `scaling.no-hpa-serving-prod.prod-app-z-backend/tts-proxy` | warn | low | replicas 1, has container ports and a Service, no HPA or ScaledObject |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-1-245.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-1-245.ap-northeast-2.compute.internal (pool default): prod pods 2 (['prod-app-t', 'prod-app-z-backend']) together with dev pods 1 (['dev-app-s']). Memory limit total/allocatable 0.94, CPU limit total/allocatable 2.98, containers without a memory limit 0 |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-100.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-100.ap-northeast-2.compute.internal (pool default): prod pods 9 (['prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-z-backend']) together with dev pods 2 (['dev-app-aa', 'dev-app-v']). Memory limit total/allocatable 1.1, CPU limit total/allocatable 1.96, containers without a memory … |
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-60.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-60.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): prod pods 2 (['prod-app-s', 'prod-app-v']) together with dev pods 2 (['dev-app-s', 'dev-app-v']). Memory limit total/allocatable 1.49, CPU limit total/allocatable 2.44, containers without a memory limit … |
@@ -960,7 +960,7 @@
 ```
 
 </details>
-<details><summary><code>security.privileged-or-host-access.prod-app-z-backend/deployment/tts-proxy</code></summary>
+<details><summary><code>security.privileged-or-host-access.prod-app-z-backend/deployment/app-ad</code></summary>
 
 ```json
 {
@@ -974,7 +974,7 @@
  ],
  "severe": true,
  "system": false,
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -1548,7 +1548,7 @@
 ```
 
 </details>
-<details><summary><code>hygiene.mutable-image-tag.prod-app-z-backend/deployment/tts-proxy:tailscale</code></summary>
+<details><summary><code>hygiene.mutable-image-tag.prod-app-z-backend/deployment/app-ad:tailscale</code></summary>
 
 ```json
 {
@@ -1560,7 +1560,7 @@
  "pull_policy": "IfNotPresent",
  "registry": "docker.io",
  "tag_kind": "latest",
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -1941,12 +1941,12 @@
 ```
 
 </details>
-<details><summary><code>resilience.no-readiness-probe.prod-app-z-backend/tts-proxy</code></summary>
+<details><summary><code>resilience.no-readiness-probe.prod-app-z-backend/app-ad</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
+ "name": "app-ad",
  "kind": "Deployment"
 }
 ```
@@ -2010,7 +2010,7 @@
 ```
 
 </details>
-<details><summary><code>resilience.single-node-dependency.prod-app-z-backend/deployment/tts-proxy</code></summary>
+<details><summary><code>resilience.single-node-dependency.prod-app-z-backend/deployment/app-ad</code></summary>
 
 ```json
 {
@@ -2019,7 +2019,7 @@
   "hostPath volume ['dev-net-tun']"
  ],
  "replicas": 1,
- "workload": "prod-app-z-backend/deployment/tts-proxy"
+ "workload": "prod-app-z-backend/deployment/app-ad"
 }
 ```
 
@@ -2178,6 +2178,17 @@
 ```
 
 </details>
+<details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/app-z-pg-proxy</code></summary>
 
 ```json
@@ -2189,18 +2200,7 @@
 ```
 
 </details>
-<details><summary><code>resilience.single-replica-in-prod.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>resources.besteffort-in-prod.prod-app-z-backend/deploy/tts-proxy</code></summary>
+<details><summary><code>resources.besteffort-in-prod.prod-app-z-backend/deploy/app-ad</code></summary>
 
 ```json
 {
@@ -2211,7 +2211,7 @@
   "instance": "10.0.2.210:8080",
   "job": "kube-state-metrics",
   "namespace": "prod-app-z-backend",
-  "pod": "tts-proxy-7b6db97b69-4bbjf",
+  "pod": "app-ad-7b6db97b69-4bbjf",
   "qos_class": "BestEffort",
   "service": "kube-prometheus-stack-kube-state-metrics",
   "uid": "99b58936-3d63-43b5-8ffe-c9ceb4353c71"
@@ -2277,12 +2277,12 @@
 ```
 
 </details>
-<details><summary><code>resources.no-memory-limit.prod-app-z-backend/tts-proxy</code></summary>
+<details><summary><code>resources.no-memory-limit.prod-app-z-backend/app-ad</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
+ "name": "app-ad",
  "kind": "Deployment"
 }
 ```
@@ -2823,7 +2823,7 @@
   "prod"
  ],
  "lb": [
-  "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+  "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
  ],
  "mixed_prod_nonprod": true,
  "namespace_count": 16,
@@ -4550,7 +4550,7 @@
   "prod-app-z-backend/deployment/app-z-frontend",
   "prod-app-z-backend/deployment/app-z-graph-worker",
   "prod-app-z-backend/deployment/app-z-pg-proxy",
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "prod-app-r/deployment/app-r-backend",
   "prod-app-r/deployment/app-r-web",
   "prod-app-v/deployment/app-v-admin-frontend",
@@ -4612,7 +4612,7 @@
   "prod-app-z-backend/deployment/app-z-frontend",
   "prod-app-z-backend/statefulset/app-z-neo4j",
   "prod-app-z-backend/deployment/app-z-pg-proxy",
-  "prod-app-z-backend/deployment/tts-proxy",
+  "prod-app-z-backend/deployment/app-ad",
   "prod-app-r/deployment/app-r-backend",
   "prod-app-r/deployment/app-r-web",
   "prod-app-v/deployment/app-v-admin-frontend",
@@ -5527,8 +5527,8 @@
   "prod-app-r/statefulset/app-r-postgresql",
   "prod-app-t/statefulset/app-t-backend-postgresql",
   "prod-app-x/statefulset/app-x-postgresql",
-  "prod-app-z-backend/deployment/app-z-embedding-server",
-  "prod-app-z-backend/deployment/tts-proxy"
+  "prod-app-z-backend/deployment/app-ad",
+  "prod-app-z-backend/deployment/app-z-embedding-server"
  ],
  "prod_without_request": 35,
  "request_ratio": 0.009,
@@ -8670,6 +8670,17 @@
 ```
 
 </details>
+<details><summary><code>resilience.no-prestop.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>resilience.no-prestop.prod-app-z-backend/app-z-backend</code></summary>
 
 ```json
@@ -8709,17 +8720,6 @@
 {
  "namespace": "prod-app-z-backend",
  "name": "app-z-pg-proxy",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>resilience.no-prestop.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
  "kind": "Deployment"
 }
 ```
@@ -9530,23 +9530,23 @@
 ```
 
 </details>
+<details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/app-ad</code></summary>
+
+```json
+{
+ "namespace": "prod-app-z-backend",
+ "name": "app-ad",
+ "kind": "Deployment"
+}
+```
+
+</details>
 <details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/app-z-embedding-server</code></summary>
 
 ```json
 {
  "namespace": "prod-app-z-backend",
  "name": "app-z-embedding-server",
- "kind": "Deployment"
-}
-```
-
-</details>
-<details><summary><code>scaling.no-hpa-serving-prod.prod-app-z-backend/tts-proxy</code></summary>
-
-```json
-{
- "namespace": "prod-app-z-backend",
- "name": "tts-proxy",
  "kind": "Deployment"
 }
 ```

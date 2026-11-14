@@ -1879,7 +1879,7 @@
       "instance": "10.0.2.210:8080",
       "job": "kube-state-metrics",
       "namespace": "prod-app-z-backend",
-      "pod": "tts-proxy-7b6db97b69-4bbjf",
+      "pod": "app-ad-7b6db97b69-4bbjf",
       "qos_class": "BestEffort",
       "service": "kube-prometheus-stack-kube-state-metrics",
       "uid": "99b58936-3d63-43b5-8ffe-c9ceb4353c71"
@@ -9540,7 +9540,7 @@
     },
     {
      "labels": {
-      "endpoint": "tts-proxy",
+      "endpoint": "app-ad",
       "namespace": "prod-app-z-backend"
      },
      "value": 1.0
@@ -26141,7 +26141,7 @@
       "job": "kube-state-metrics",
       "namespace": "prod-app-z-backend",
       "pod": "kube-prometheus-stack-kube-state-metrics-8655798c4c-cqc8g",
-      "secret": "tts-proxy-tsauth",
+      "secret": "app-ad-tsauth",
       "service": "kube-prometheus-stack-kube-state-metrics",
       "type": "Opaque"
      },
@@ -28195,7 +28195,7 @@
       "job": "kube-state-metrics",
       "namespace": "prod-app-z-backend",
       "pod": "kube-prometheus-stack-kube-state-metrics-8655798c4c-cqc8g",
-      "secret": "tts-proxy-tsauth",
+      "secret": "app-ad-tsauth",
       "service": "kube-prometheus-stack-kube-state-metrics"
      },
      "value": 1.0
@@ -28690,8 +28690,8 @@
     "prod-app-z-backend   app-z-frontend-6d58bbfcfc-nfk9x                             frontend                          1m     76Mi     ",
     "prod-app-z-backend   app-z-neo4j-0                                               neo4j                             5m     972Mi    ",
     "prod-app-z-backend   app-z-pg-proxy-5ff994445f-qsklv                             forwarder                         1m     0Mi      ",
-    "prod-app-z-backend   tts-proxy-7b6db97b69-4bbjf                                  forwarder                         0m     0Mi      ",
-    "prod-app-z-backend   tts-proxy-7b6db97b69-4bbjf                                  tailscale                         1m     22Mi     ",
+    "prod-app-z-backend   app-ad-7b6db97b69-4bbjf                                  forwarder                         0m     0Mi      ",
+    "prod-app-z-backend   app-ad-7b6db97b69-4bbjf                                  tailscale                         1m     22Mi     ",
     "prod-app-r          app-r-backend-76f5f87fc8-xhgwr                             backend                           2m     243Mi    ",
     "prod-app-r          app-r-postgresql-0                                         postgresql                        5m     123Mi    ",
     "prod-app-r          app-r-web-cc4989d9-x46dr                                   web                               1m     4Mi      ",
@@ -34780,16 +34780,16 @@
       },
       {
        "namespace": "prod-app-z-backend",
-       "pod": "tts-proxy-7b6db97b69-4bbjf",
+       "pod": "app-ad-7b6db97b69-4bbjf",
        "container": "tailscale",
-       "workload": "prod-app-z-backend/tts-proxy",
+       "workload": "prod-app-z-backend/app-ad",
        "mb": 0
       },
       {
        "namespace": "prod-app-z-backend",
-       "pod": "tts-proxy-7b6db97b69-4bbjf",
+       "pod": "app-ad-7b6db97b69-4bbjf",
        "container": "forwarder",
-       "workload": "prod-app-z-backend/tts-proxy",
+       "workload": "prod-app-z-backend/app-ad",
        "mb": 0
       },
       {
@@ -34930,16 +34930,16 @@
      },
      {
       "namespace": "prod-app-z-backend",
-      "pod": "tts-proxy-7b6db97b69-4bbjf",
+      "pod": "app-ad-7b6db97b69-4bbjf",
       "container": "tailscale",
-      "workload": "prod-app-z-backend/tts-proxy",
+      "workload": "prod-app-z-backend/app-ad",
       "mb": 0
      },
      {
       "namespace": "prod-app-z-backend",
-      "pod": "tts-proxy-7b6db97b69-4bbjf",
+      "pod": "app-ad-7b6db97b69-4bbjf",
       "container": "forwarder",
-      "workload": "prod-app-z-backend/tts-proxy",
+      "workload": "prod-app-z-backend/app-ad",
       "mb": 0
      },
      {
@@ -35971,9 +35971,9 @@
    {
     "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
     "namespace": "prod-app-z-backend",
-    "pod": "tts-proxy-7b6db97b69-4bbjf",
+    "pod": "app-ad-7b6db97b69-4bbjf",
     "uid": "99b58936-3d63-43b5-8ffe-c9ceb4353c71",
-    "workload": "prod-app-z-backend/tts-proxy",
+    "workload": "prod-app-z-backend/app-ad",
     "mb": 1,
     "log_cap_mb": 50
    },
@@ -36156,8 +36156,8 @@
     "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
     "uid": "99b58936-3d63-43b5-8ffe-c9ceb4353c71",
     "namespace": "prod-app-z-backend",
-    "pod": "tts-proxy-7b6db97b69-4bbjf",
-    "workload": "prod-app-z-backend/tts-proxy",
+    "pod": "app-ad-7b6db97b69-4bbjf",
+    "workload": "prod-app-z-backend/app-ad",
     "mb": 1
    },
    {
@@ -38756,6 +38756,13 @@
      },
      {
       "namespace": "prod-app-z-backend",
+      "pod": "app-ad-7b6db97b69-4bbjf",
+      "workload": "prod-app-z-backend/app-ad",
+      "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
+      "age_h": 691.1
+     },
+     {
+      "namespace": "prod-app-z-backend",
       "pod": "app-z-frontend-6d58bbfcfc-2qgs6",
       "workload": "prod-app-z-backend/app-z-frontend",
       "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
@@ -38779,13 +38786,6 @@
       "namespace": "prod-app-z-backend",
       "pod": "app-z-pg-proxy-5ff994445f-qsklv",
       "workload": "prod-app-z-backend/app-z-pg-proxy",
-      "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
-      "age_h": 691.1
-     },
-     {
-      "namespace": "prod-app-z-backend",
-      "pod": "tts-proxy-7b6db97b69-4bbjf",
-      "workload": "prod-app-z-backend/tts-proxy",
       "node": "ip-10-0-2-135.ap-northeast-2.compute.internal",
       "age_h": 691.1
      }
@@ -41218,10 +41218,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "prod-app-z-backend/deployment/tts-proxy:tailscale",
+     "target": "prod-app-z-backend/deployment/app-ad:tailscale",
      "kind": "Deployment",
      "namespace": "prod-app-z-backend",
-     "name": "tts-proxy",
+     "name": "app-ad",
      "container": "tailscale",
      "severity": "WARNING",
      "cpu_request": null,
@@ -41245,10 +41245,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "prod-app-z-backend/deployment/tts-proxy:forwarder",
+     "target": "prod-app-z-backend/deployment/app-ad:forwarder",
      "kind": "Deployment",
      "namespace": "prod-app-z-backend",
-     "name": "tts-proxy",
+     "name": "app-ad",
      "container": "forwarder",
      "severity": "WARNING",
      "cpu_request": null,
@@ -43866,7 +43866,7 @@
      "sidecar_like_names": false
     },
     {
-     "workload": "prod-app-z-backend/deployment/tts-proxy",
+     "workload": "prod-app-z-backend/deployment/app-ad",
      "namespace": "prod-app-z-backend",
      "prod": true,
      "main": "tailscale",
@@ -45733,7 +45733,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -45766,7 +45766,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodillu-appi-2bcc150443"
+      "k8s-lb-2bcc150443"
      ]
     },
     "metrics_read": true
@@ -45790,7 +45790,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -45823,7 +45823,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodillu-appi-d65740e6d5"
+      "k8s-lb-d65740e6d5"
      ]
     },
     "metrics_read": true
@@ -45847,7 +45847,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -45880,7 +45880,7 @@
      "unhealthy_max_24h": 1.0,
      "unhealthy_now": 1,
      "target_groups": [
-      "k8s-prodtoot-appkf-36f816b829"
+      "k8s-lb-36f816b829"
      ]
     },
     "metrics_read": true
@@ -45905,7 +45905,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -45938,7 +45938,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodillu-appi-e87721a9c3"
+      "k8s-lb-e87721a9c3"
      ]
     },
     "metrics_read": true
@@ -45961,7 +45961,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -45994,7 +45994,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-monitori-vmauth-e07e5153ee"
+      "k8s-lb-e07e5153ee"
      ]
     },
     "metrics_read": true
@@ -46017,7 +46017,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46050,7 +46050,7 @@
      "unhealthy_max_24h": 1.0,
      "unhealthy_now": 1,
      "target_groups": [
-      "k8s-prodcurt-curtainc-bb495c72c8"
+      "k8s-lb-bb495c72c8"
      ]
     },
     "metrics_read": true
@@ -46073,7 +46073,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46106,7 +46106,7 @@
      "unhealthy_max_24h": 3.0,
      "unhealthy_now": 1,
      "target_groups": [
-      "k8s-devtooto-appkf-133751726c"
+      "k8s-lb-133751726c"
      ]
     },
     "metrics_read": true
@@ -46129,7 +46129,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46162,7 +46162,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodsoro-appmba-f68effe430"
+      "k8s-lb-f68effe430"
      ]
     },
     "metrics_read": true
@@ -46185,7 +46185,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46218,7 +46218,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-devillus-appi-1a33cd027e"
+      "k8s-lb-1a33cd027e"
      ]
     },
     "metrics_read": true
@@ -46241,7 +46241,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46274,7 +46274,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodrhem-appnfro-9726e5b1d3"
+      "k8s-lb-9726e5b1d3"
      ]
     },
     "metrics_read": true
@@ -46297,7 +46297,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46330,7 +46330,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodcurt-curtainc-022a51fc31"
+      "k8s-lb-022a51fc31"
      ]
     },
     "metrics_read": true
@@ -46353,7 +46353,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46386,7 +46386,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodtoot-appkb-7df87a92cc"
+      "k8s-lb-7df87a92cc"
      ]
     },
     "metrics_read": true
@@ -46410,7 +46410,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46443,7 +46443,7 @@
      "unhealthy_max_24h": 1.0,
      "unhealthy_now": 1,
      "target_groups": [
-      "k8s-prodinse-insertoo-032c25d752"
+      "k8s-lb-032c25d752"
      ]
     },
     "metrics_read": true
@@ -46466,7 +46466,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46499,7 +46499,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-devillus-appi-785b0c249b"
+      "k8s-lb-785b0c249b"
      ]
     },
     "metrics_read": true
@@ -46522,7 +46522,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46555,7 +46555,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodcurt-curtainc-57e5adf3bf"
+      "k8s-lb-57e5adf3bf"
      ]
     },
     "metrics_read": true
@@ -46579,7 +46579,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46612,7 +46612,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodillu-appi-c50edbe2df"
+      "k8s-lb-c50edbe2df"
      ]
     },
     "metrics_read": true
@@ -46635,7 +46635,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46668,7 +46668,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-devillus-appi-75eb881035"
+      "k8s-lb-75eb881035"
      ]
     },
     "metrics_read": true
@@ -46691,7 +46691,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46724,7 +46724,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-monitori-kubeprom-af0f3aa6c7"
+      "k8s-lb-af0f3aa6c7"
      ]
     },
     "metrics_read": true
@@ -46747,7 +46747,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46780,7 +46780,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodinse-insertoo-89a3732998"
+      "k8s-lb-89a3732998"
      ]
     },
     "metrics_read": true
@@ -46803,7 +46803,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46836,7 +46836,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodfand-apppa-754a9b50b2"
+      "k8s-lb-754a9b50b2"
      ]
     },
     "metrics_read": true
@@ -46859,7 +46859,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46892,7 +46892,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-argocd-argocdse-74c4dcbda2"
+      "k8s-lb-74c4dcbda2"
      ]
     },
     "metrics_read": true
@@ -46915,7 +46915,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -46948,7 +46948,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodcurt-curtainc-fc2d368787"
+      "k8s-lb-fc2d368787"
      ]
     },
     "metrics_read": true
@@ -46971,7 +46971,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47004,7 +47004,7 @@
      "unhealthy_max_24h": 2.0,
      "unhealthy_now": 2,
      "target_groups": [
-      "k8s-prodrhem-appnbac-8c88bb317a"
+      "k8s-lb-8c88bb317a"
      ]
     },
     "metrics_read": true
@@ -47027,7 +47027,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47060,7 +47060,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodsoro-appmwe-194ae69849"
+      "k8s-lb-194ae69849"
      ]
     },
     "metrics_read": true
@@ -47083,7 +47083,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47116,7 +47116,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodtoot-appka-d0c066d282"
+      "k8s-lb-d0c066d282"
      ]
     },
     "metrics_read": true
@@ -47139,7 +47139,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47172,7 +47172,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-devtooto-appkb-0987e78003"
+      "k8s-lb-0987e78003"
      ]
     },
     "metrics_read": true
@@ -47195,7 +47195,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47228,7 +47228,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-devvxtch-vxtchatb-e9834ca5fe"
+      "k8s-lb-e9834ca5fe"
      ]
     },
     "metrics_read": true
@@ -47251,7 +47251,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47284,7 +47284,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-devillus-appi-9224ee28d5"
+      "k8s-lb-9224ee28d5"
      ]
     },
     "metrics_read": true
@@ -47307,7 +47307,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47340,7 +47340,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-devinser-insertoo-e2123e6d2b"
+      "k8s-lb-e2123e6d2b"
      ]
     },
     "metrics_read": true
@@ -47363,7 +47363,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47396,7 +47396,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-devinser-insertoo-1b001aa84b"
+      "k8s-lb-1b001aa84b"
      ]
     },
     "metrics_read": true
@@ -47419,7 +47419,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47452,7 +47452,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-devinser-insertoo-bf57c25c47"
+      "k8s-lb-bf57c25c47"
      ]
     },
     "metrics_read": true
@@ -47475,7 +47475,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47508,7 +47508,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-devinser-insertoo-5ae87eece7"
+      "k8s-lb-5ae87eece7"
      ]
     },
     "metrics_read": true
@@ -47531,7 +47531,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47564,7 +47564,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-devtooto-appka-ae7a7a06ff"
+      "k8s-lb-ae7a7a06ff"
      ]
     },
     "metrics_read": true
@@ -47587,7 +47587,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47620,7 +47620,7 @@
      "unhealthy_max_24h": 1.0,
      "unhealthy_now": 1,
      "target_groups": [
-      "k8s-devvxtch-vxtchatb-b347218b4f"
+      "k8s-lb-b347218b4f"
      ]
     },
     "metrics_read": true
@@ -47643,7 +47643,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47676,7 +47676,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-middlewa-kafkaui-0a6256c8b2"
+      "k8s-lb-0a6256c8b2"
      ]
     },
     "metrics_read": true
@@ -47699,7 +47699,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47732,7 +47732,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-middlewa-redisins-e7e7fd218a"
+      "k8s-lb-e7e7fd218a"
      ]
     },
     "metrics_read": true
@@ -47755,7 +47755,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47788,7 +47788,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodcarp-carpenst-e238817282"
+      "k8s-lb-e238817282"
      ]
     },
     "metrics_read": true
@@ -47811,7 +47811,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47844,7 +47844,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodinse-insertoo-37417ab44f"
+      "k8s-lb-37417ab44f"
      ]
     },
     "metrics_read": true
@@ -47867,7 +47867,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47900,7 +47900,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-prodinse-insertoo-b22674073c"
+      "k8s-lb-b22674073c"
      ]
     },
     "metrics_read": true
@@ -47923,7 +47923,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -47956,7 +47956,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-pwcprod-pwcbacke-bea446d347"
+      "k8s-lb-bea446d347"
      ]
     },
     "metrics_read": true
@@ -47979,7 +47979,7 @@
     "tls": true,
     "scheme": "internet-facing",
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ],
     "auth_hint": {},
     "has_auth_hint": false,
@@ -48012,7 +48012,7 @@
      "unhealthy_max_24h": 0,
      "unhealthy_now": 0,
      "target_groups": [
-      "k8s-pwcprod-pwcfront-e72ef00971"
+      "k8s-lb-e72ef00971"
      ]
     },
     "metrics_read": true
@@ -48095,7 +48095,7 @@
     "hosts": 48,
     "prod": true,
     "lb": [
-     "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com"
+     "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com"
     ]
    }
   ],
@@ -48108,8 +48108,8 @@
    "window_hours": 24,
    "lbs": [
     {
-     "name": "k8s-middlewa-kafkacon-31ecf1515b",
-     "dns": "k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com",
+     "name": "k8s-lb-31ecf1515b",
+     "dns": "lb-151c379572.elb.example.com",
      "type": "network",
      "scheme": "internet-facing",
      "idle_timeout_s": null,
@@ -48131,14 +48131,14 @@
        "port": 9094,
        "protocol": "TCP",
        "target_groups": [
-        "k8s-middlewa-kafkacon-f50452776f"
+        "k8s-lb-f50452776f"
        ]
       },
       {
        "port": 443,
        "protocol": "TCP",
        "target_groups": [
-        "k8s-middlewa-kafkacon-ff9559afa5"
+        "k8s-lb-ff9559afa5"
        ]
       }
      ],
@@ -48174,7 +48174,7 @@
     },
     {
      "name": "app-u-db-shared",
-     "dns": "app-u-db-shared-d7d643f6896a3b2b.elb.ap-northeast-2.amazonaws.com",
+     "dns": "lb-fd242d81b4.elb.example.com",
      "type": "network",
      "scheme": "internet-facing",
      "idle_timeout_s": null,
@@ -48338,8 +48338,8 @@
      "tcp_target_resets_24h": 80.0
     },
     {
-     "name": "k8s-lab-kprodlb-b18a4555d7",
-     "dns": "k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com",
+     "name": "k8s-lb-b18a4555d7",
+     "dns": "k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com",
      "type": "application",
      "scheme": "internet-facing",
      "idle_timeout_s": 300,
@@ -48415,8 +48415,8 @@
    ],
    "target_groups": [
     {
-     "name": "k8s-middlewa-kafkacon-f50452776f",
-     "lb": "k8s-middlewa-kafkacon-31ecf1515b",
+     "name": "k8s-lb-f50452776f",
+     "lb": "k8s-lb-31ecf1515b",
      "lb_type": "network",
      "port": 1,
      "protocol": "TCP",
@@ -48460,8 +48460,8 @@
      "prod": false
     },
     {
-     "name": "k8s-middlewa-kafkacon-ff9559afa5",
-     "lb": "k8s-middlewa-kafkacon-31ecf1515b",
+     "name": "k8s-lb-ff9559afa5",
+     "lb": "k8s-lb-31ecf1515b",
      "lb_type": "network",
      "port": 1,
      "protocol": "TCP",
@@ -48973,8 +48973,8 @@
      "prod": true
     },
     {
-     "name": "k8s-argocd-argocdse-74c4dcbda2",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-74c4dcbda2",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 8080,
      "protocol": "HTTPS",
@@ -49021,8 +49021,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devillus-appi-1a33cd027e",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-1a33cd027e",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -49069,8 +49069,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devillus-appi-75eb881035",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-75eb881035",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -49117,8 +49117,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devillus-appi-785b0c249b",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-785b0c249b",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -49165,8 +49165,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devillus-appi-9224ee28d5",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-9224ee28d5",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -49213,8 +49213,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devinser-insertoo-1b001aa84b",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-1b001aa84b",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 8000,
      "protocol": "HTTP",
@@ -49261,8 +49261,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devinser-insertoo-5ae87eece7",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-5ae87eece7",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3003,
      "protocol": "HTTP",
@@ -49309,8 +49309,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devinser-insertoo-bf57c25c47",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-bf57c25c47",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -49357,8 +49357,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devinser-insertoo-e2123e6d2b",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-e2123e6d2b",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3004,
      "protocol": "HTTP",
@@ -49405,8 +49405,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devtooto-appka-ae7a7a06ff",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-ae7a7a06ff",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -49453,8 +49453,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devtooto-appkb-0987e78003",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-0987e78003",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -49501,8 +49501,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devtooto-appkf-133751726c",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-133751726c",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -49559,8 +49559,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devvxtch-vxtchatb-b347218b4f",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-b347218b4f",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 8000,
      "protocol": "HTTP",
@@ -49617,8 +49617,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devvxtch-vxtchatb-e9834ca5fe",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-e9834ca5fe",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 80,
      "protocol": "HTTP",
@@ -49665,8 +49665,8 @@
      "prod": false
     },
     {
-     "name": "k8s-middlewa-kafkaui-0a6256c8b2",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-0a6256c8b2",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 1,
      "protocol": "HTTP",
@@ -49713,8 +49713,8 @@
      "prod": false
     },
     {
-     "name": "k8s-middlewa-redisins-e7e7fd218a",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-e7e7fd218a",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 5540,
      "protocol": "HTTP",
@@ -49761,8 +49761,8 @@
      "prod": false
     },
     {
-     "name": "k8s-monitori-kubeprom-af0f3aa6c7",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-af0f3aa6c7",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -49809,8 +49809,8 @@
      "prod": false
     },
     {
-     "name": "k8s-monitori-vmauth-e07e5153ee",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-e07e5153ee",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 1,
      "protocol": "HTTP",
@@ -49857,8 +49857,8 @@
      "prod": false
     },
     {
-     "name": "k8s-prodcarp-carpenst-e238817282",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-e238817282",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 8000,
      "protocol": "HTTP",
@@ -49905,8 +49905,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodcurt-curtainc-022a51fc31",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-022a51fc31",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 80,
      "protocol": "HTTP",
@@ -49953,8 +49953,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodcurt-curtainc-57e5adf3bf",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-57e5adf3bf",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -50001,8 +50001,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodcurt-curtainc-bb495c72c8",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-bb495c72c8",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -50059,8 +50059,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodcurt-curtainc-fc2d368787",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-fc2d368787",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 8000,
      "protocol": "HTTP",
@@ -50107,8 +50107,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodfand-apppa-754a9b50b2",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-754a9b50b2",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 8000,
      "protocol": "HTTP",
@@ -50155,8 +50155,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodillu-appi-2bcc150443",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-2bcc150443",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -50203,8 +50203,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodillu-appi-c50edbe2df",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-c50edbe2df",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -50251,8 +50251,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodillu-appi-d65740e6d5",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-d65740e6d5",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -50299,8 +50299,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodillu-appi-e87721a9c3",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-e87721a9c3",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -50347,8 +50347,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodinse-insertoo-032c25d752",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-032c25d752",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3003,
      "protocol": "HTTP",
@@ -50405,8 +50405,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodinse-insertoo-37417ab44f",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-37417ab44f",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3004,
      "protocol": "HTTP",
@@ -50453,8 +50453,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodinse-insertoo-89a3732998",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-89a3732998",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -50501,8 +50501,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodinse-insertoo-b22674073c",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-b22674073c",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 8000,
      "protocol": "HTTP",
@@ -50549,8 +50549,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodrhem-appnbac-8c88bb317a",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-8c88bb317a",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 8000,
      "protocol": "HTTP",
@@ -50614,8 +50614,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodrhem-appnfro-9726e5b1d3",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-9726e5b1d3",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -50662,8 +50662,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodsoro-appmba-f68effe430",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-f68effe430",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 7860,
      "protocol": "HTTP",
@@ -50710,8 +50710,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodsoro-appmwe-194ae69849",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-194ae69849",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 80,
      "protocol": "HTTP",
@@ -50758,8 +50758,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodtoot-appka-d0c066d282",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-d0c066d282",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -50806,8 +50806,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodtoot-appkb-7df87a92cc",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-7df87a92cc",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -50854,8 +50854,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodtoot-appkf-36f816b829",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-36f816b829",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -50912,8 +50912,8 @@
      "prod": true
     },
     {
-     "name": "k8s-pwcprod-pwcbacke-bea446d347",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-bea446d347",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 8000,
      "protocol": "HTTP",
@@ -50960,8 +50960,8 @@
      "prod": true
     },
     {
-     "name": "k8s-pwcprod-pwcfront-e72ef00971",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-e72ef00971",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -51011,8 +51011,8 @@
    "errors": [],
    "unhealthy_target_groups": [
     {
-     "name": "k8s-devtooto-appkf-133751726c",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-133751726c",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -51069,8 +51069,8 @@
      "prod": false
     },
     {
-     "name": "k8s-devvxtch-vxtchatb-b347218b4f",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-b347218b4f",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 8000,
      "protocol": "HTTP",
@@ -51127,8 +51127,8 @@
      "prod": false
     },
     {
-     "name": "k8s-prodcurt-curtainc-bb495c72c8",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-bb495c72c8",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -51185,8 +51185,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodinse-insertoo-032c25d752",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-032c25d752",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3003,
      "protocol": "HTTP",
@@ -51243,8 +51243,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodrhem-appnbac-8c88bb317a",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-8c88bb317a",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 8000,
      "protocol": "HTTP",
@@ -51308,8 +51308,8 @@
      "prod": true
     },
     {
-     "name": "k8s-prodtoot-appkf-36f816b829",
-     "lb": "k8s-lab-kprodlb-b18a4555d7",
+     "name": "k8s-lb-36f816b829",
+     "lb": "k8s-lb-b18a4555d7",
      "lb_type": "application",
      "port": 3000,
      "protocol": "HTTP",
@@ -51386,7 +51386,7 @@
     "app-ab-prod/app-ab-frontend"
    ],
    "internet_facing_nlbs": [
-    "k8s-middlewa-kafkacon-31ecf1515b",
+    "k8s-lb-31ecf1515b",
     "app-u-db-shared"
    ],
    "covered_services": [
@@ -52391,7 +52391,7 @@
     "name": "kafka-controller-0-external",
     "target": "loadbalancer/middleware/kafka-controller-0-external",
     "hosts": [
-     "k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com"
+     "lb-151c379572.elb.example.com"
     ],
     "ports": [
      9094,
@@ -52428,7 +52428,7 @@
     "name": "app-u-db-shared",
     "target": "nlb/app-u-db-shared",
     "hosts": [
-     "app-u-db-shared-d7d643f6896a3b2b.elb.ap-northeast-2.amazonaws.com"
+     "lb-fd242d81b4.elb.example.com"
     ],
     "ports": [
      3306,
@@ -52507,7 +52507,7 @@
     "name": "kafka-controller-0-external",
     "target": "loadbalancer/middleware/kafka-controller-0-external",
     "hosts": [
-     "k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com"
+     "lb-151c379572.elb.example.com"
     ],
     "ports": [
      9094,
@@ -52544,7 +52544,7 @@
     "name": "app-u-db-shared",
     "target": "nlb/app-u-db-shared",
     "hosts": [
-     "app-u-db-shared-d7d643f6896a3b2b.elb.ap-northeast-2.amazonaws.com"
+     "lb-fd242d81b4.elb.example.com"
     ],
     "ports": [
      3306,
@@ -52627,7 +52627,7 @@
     "name": "kafka-controller-0-external",
     "target": "loadbalancer/middleware/kafka-controller-0-external",
     "hosts": [
-     "k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com"
+     "lb-151c379572.elb.example.com"
     ],
     "ports": [
      9094,
@@ -56960,10 +56960,10 @@
      "db_probe_timeout_1s": false
     },
     {
-     "workload": "prod-app-z-backend/deployment/tts-proxy",
+     "workload": "prod-app-z-backend/deployment/app-ad",
      "kind": "Deployment",
      "namespace": "prod-app-z-backend",
-     "name": "tts-proxy",
+     "name": "app-ad",
      "container": "tailscale",
      "prod": true,
      "serves_traffic": true,
@@ -56980,10 +56980,10 @@
      "db_probe_timeout_1s": false
     },
     {
-     "workload": "prod-app-z-backend/deployment/tts-proxy",
+     "workload": "prod-app-z-backend/deployment/app-ad",
      "kind": "Deployment",
      "namespace": "prod-app-z-backend",
-     "name": "tts-proxy",
+     "name": "app-ad",
      "container": "forwarder",
      "prod": true,
      "serves_traffic": true,
@@ -59574,7 +59574,7 @@
      "max_unavailable": "25%"
     },
     {
-     "workload": "prod-app-z-backend/deployment/tts-proxy",
+     "workload": "prod-app-z-backend/deployment/app-ad",
      "namespace": "prod-app-z-backend",
      "prod": true,
      "recreate_justified": false,
@@ -60350,9 +60350,9 @@
      "prod_pods": 3,
      "share": 0.07,
      "prod_workloads": [
+      "prod-app-z-backend/app-ad",
       "prod-app-z-backend/app-z-neo4j-0",
-      "prod-app-z-backend/app-z-pg-proxy",
-      "prod-app-z-backend/tts-proxy"
+      "prod-app-z-backend/app-z-pg-proxy"
      ],
      "workload_count": 3,
      "capacity_type": "on-demand",
@@ -60487,7 +60487,7 @@
   "single_node": {
    "rows": [
     {
-     "workload": "prod-app-z-backend/deployment/tts-proxy",
+     "workload": "prod-app-z-backend/deployment/app-ad",
      "namespace": "prod-app-z-backend",
      "prod": true,
      "reasons": [
@@ -63030,9 +63030,9 @@
     },
     {
      "namespace": "prod-app-z-backend",
-     "name": "tts-proxy",
+     "name": "app-ad",
      "kind": "Deployment",
-     "target": "prod-app-z-backend/deployment/tts-proxy",
+     "target": "prod-app-z-backend/deployment/app-ad",
      "prod": true,
      "danger": 6,
      "warning": 28,
@@ -75256,14 +75256,14 @@
     }
    ],
    "non_security_danger_workloads": [
-    "prod-app-z-backend/deployment/tts-proxy",
+    "prod-app-z-backend/deployment/app-ad",
     "middleware/deployment/redis-insight",
     "arc-runners/cronjob/arc-warm-up",
     "arc-runners/cronjob/arc-cool-down"
    ],
    "security_danger_workloads": [
     "kube-system/daemonset/aws-node",
-    "prod-app-z-backend/deployment/tts-proxy",
+    "prod-app-z-backend/deployment/app-ad",
     "kube-system/daemonset/ebs-csi-node-windows",
     "kube-system/daemonset/ebs-csi-node",
     "middleware/deployment/redis-insight",
@@ -75733,7 +75733,7 @@
      "always_pull_with_tag": false
     },
     {
-     "workload": "prod-app-z-backend/deployment/tts-proxy",
+     "workload": "prod-app-z-backend/deployment/app-ad",
      "namespace": "prod-app-z-backend",
      "prod": true,
      "container": "tailscale",
@@ -75800,7 +75800,7 @@
    ],
    "mutable": [
     "middleware/deployment/redis-insight:redis-insight",
-    "prod-app-z-backend/deployment/tts-proxy:tailscale",
+    "prod-app-z-backend/deployment/app-ad:tailscale",
     "arc-runners/cronjob/arc-cool-down:kubectl",
     "arc-runners/cronjob/arc-warm-up:kubectl"
    ],
@@ -75860,11 +75860,11 @@
      }
     },
     {
-     "workload": "prod-app-z-backend/deployment/tts-proxy",
+     "workload": "prod-app-z-backend/deployment/app-ad",
      "namespace": "prod-app-z-backend",
      "prod": true,
      "labels": {
-      "app": "tts-proxy",
+      "app": "app-ad",
       "argocd.argoproj.io/instance": "app-z-backend-prod"
      }
     },
@@ -76496,7 +76496,7 @@
      "argocd_app": "app-z-backend-prod"
     },
     {
-     "workload": "prod-app-z-backend/deployment/tts-proxy",
+     "workload": "prod-app-z-backend/deployment/app-ad",
      "managed_by": "argocd",
      "argocd_app": "app-z-backend-prod"
     },
@@ -76829,12 +76829,12 @@
     "prod-app-y/deployment/app-y-backend",
     "prod-app-y/deployment/app-y-frontend",
     "prod-app-y/statefulset/app-y-backend-mysql",
+    "prod-app-z-backend/deployment/app-ad",
     "prod-app-z-backend/deployment/app-z-backend",
     "prod-app-z-backend/deployment/app-z-embedding-server",
     "prod-app-z-backend/deployment/app-z-frontend",
     "prod-app-z-backend/deployment/app-z-graph-worker",
     "prod-app-z-backend/deployment/app-z-pg-proxy",
-    "prod-app-z-backend/deployment/tts-proxy",
     "prod-app-z-backend/statefulset/app-z-neo4j"
    ],
    "emptydir_without_sizelimit": [
@@ -76858,8 +76858,8 @@
     "prod-app-r/statefulset/app-r-postgresql",
     "prod-app-t/statefulset/app-t-backend-postgresql",
     "prod-app-x/statefulset/app-x-postgresql",
-    "prod-app-z-backend/deployment/app-z-embedding-server",
-    "prod-app-z-backend/deployment/tts-proxy"
+    "prod-app-z-backend/deployment/app-ad",
+    "prod-app-z-backend/deployment/app-z-embedding-server"
    ],
    "emptydir_without_sizelimit_prod": [
     "app-ab-prod/statefulset/app-ab-backend-postgresql",
@@ -76867,8 +76867,8 @@
     "prod-app-r/statefulset/app-r-postgresql",
     "prod-app-t/statefulset/app-t-backend-postgresql",
     "prod-app-x/statefulset/app-x-postgresql",
-    "prod-app-z-backend/deployment/app-z-embedding-server",
-    "prod-app-z-backend/deployment/tts-proxy"
+    "prod-app-z-backend/deployment/app-ad",
+    "prod-app-z-backend/deployment/app-z-embedding-server"
    ],
    "summary": {
     "containers": 113,
@@ -76882,8 +76882,8 @@
      "prod-app-r/statefulset/app-r-postgresql",
      "prod-app-t/statefulset/app-t-backend-postgresql",
      "prod-app-x/statefulset/app-x-postgresql",
-     "prod-app-z-backend/deployment/app-z-embedding-server",
-     "prod-app-z-backend/deployment/tts-proxy"
+     "prod-app-z-backend/deployment/app-ad",
+     "prod-app-z-backend/deployment/app-z-embedding-server"
     ]
    }
   },
@@ -77501,7 +77501,7 @@
      "irsa": false
     },
     {
-     "workload": "prod-app-z-backend/deployment/tts-proxy",
+     "workload": "prod-app-z-backend/deployment/app-ad",
      "namespace": "prod-app-z-backend",
      "prod": true,
      "service_account": "default",
@@ -77604,7 +77604,7 @@
     "prod-app-z-backend/deployment/app-z-frontend",
     "prod-app-z-backend/statefulset/app-z-neo4j",
     "prod-app-z-backend/deployment/app-z-pg-proxy",
-    "prod-app-z-backend/deployment/tts-proxy",
+    "prod-app-z-backend/deployment/app-ad",
     "prod-app-r/deployment/app-r-backend",
     "prod-app-r/deployment/app-r-web",
     "prod-app-v/deployment/app-v-admin-frontend",
@@ -78147,7 +78147,7 @@
      "host_access": false
     },
     {
-     "workload": "prod-app-z-backend/deployment/tts-proxy",
+     "workload": "prod-app-z-backend/deployment/app-ad",
      "kind": "Deployment",
      "namespace": "prod-app-z-backend",
      "prod": true,
@@ -78437,7 +78437,7 @@
     }
    ],
    "severe": [
-    "prod-app-z-backend/deployment/tts-proxy"
+    "prod-app-z-backend/deployment/app-ad"
    ],
    "severe_system": [
     "kube-system/daemonset/aws-node",
@@ -78446,7 +78446,7 @@
     "monitoring/daemonset/kube-prometheus-stack-prometheus-node-exporter"
    ],
    "host_access_non_system": [
-    "prod-app-z-backend/deployment/tts-proxy"
+    "prod-app-z-backend/deployment/app-ad"
    ],
    "root_allowed_prod": [
     "prod-app-w/deployment/app-w",
@@ -78469,7 +78469,7 @@
     "prod-app-z-backend/deployment/app-z-frontend",
     "prod-app-z-backend/deployment/app-z-graph-worker",
     "prod-app-z-backend/deployment/app-z-pg-proxy",
-    "prod-app-z-backend/deployment/tts-proxy",
+    "prod-app-z-backend/deployment/app-ad",
     "prod-app-r/deployment/app-r-backend",
     "prod-app-r/deployment/app-r-web",
     "prod-app-v/deployment/app-v-admin-frontend",
@@ -78934,7 +78934,7 @@
      ]
     },
     {
-     "target": "prod-app-z-backend/deployment/tts-proxy",
+     "target": "prod-app-z-backend/deployment/app-ad",
      "namespace": "prod-app-z-backend",
      "prod": true,
      "security_danger": [
@@ -80661,7 +80661,7 @@
     }
    ],
    "danger_workloads_prod": [
-    "prod-app-z-backend/deployment/tts-proxy",
+    "prod-app-z-backend/deployment/app-ad",
     "prod-app-v/deployment/app-v-admin-frontend",
     "prod-app-y/deployment/app-y-admin",
     "prod-app-y/deployment/app-y-frontend",
@@ -80693,7 +80693,7 @@
    ],
    "danger_workloads": [
     "kube-system/daemonset/aws-node",
-    "prod-app-z-backend/deployment/tts-proxy",
+    "prod-app-z-backend/deployment/app-ad",
     "kube-system/daemonset/ebs-csi-node-windows",
     "kube-system/daemonset/ebs-csi-node",
     "middleware/deployment/redis-insight",
@@ -85405,7 +85405,7 @@
    "rows": [
     {
      "namespace": "argocd",
-     "name": "k8s-argocd-argocdse-74c4dcbda2",
+     "name": "k8s-lb-74c4dcbda2",
      "target_type": "ip",
      "service": "argocd-server",
      "port": 443,
@@ -85431,7 +85431,7 @@
     },
     {
      "namespace": "dev-app-s",
-     "name": "k8s-devillus-appi-1a33cd027e",
+     "name": "k8s-lb-1a33cd027e",
      "target_type": "ip",
      "service": "app-s-backend",
      "port": 80,
@@ -85444,7 +85444,7 @@
     },
     {
      "namespace": "dev-app-s",
-     "name": "k8s-devillus-appi-75eb881035",
+     "name": "k8s-lb-75eb881035",
      "target_type": "ip",
      "service": "app-s-api",
      "port": 80,
@@ -85457,7 +85457,7 @@
     },
     {
      "namespace": "dev-app-s",
-     "name": "k8s-devillus-appi-785b0c249b",
+     "name": "k8s-lb-785b0c249b",
      "target_type": "ip",
      "service": "app-s-frontend",
      "port": 80,
@@ -85470,7 +85470,7 @@
     },
     {
      "namespace": "dev-app-s",
-     "name": "k8s-devillus-appi-9224ee28d5",
+     "name": "k8s-lb-9224ee28d5",
      "target_type": "ip",
      "service": "app-s-admin",
      "port": 80,
@@ -85496,7 +85496,7 @@
     },
     {
      "namespace": "dev-app-y",
-     "name": "k8s-devinser-insertoo-1b001aa84b",
+     "name": "k8s-lb-1b001aa84b",
      "target_type": "ip",
      "service": "app-y-ai",
      "port": 80,
@@ -85509,7 +85509,7 @@
     },
     {
      "namespace": "dev-app-y",
-     "name": "k8s-devinser-insertoo-5ae87eece7",
+     "name": "k8s-lb-5ae87eece7",
      "target_type": "ip",
      "service": "app-y-frontend",
      "port": 80,
@@ -85522,7 +85522,7 @@
     },
     {
      "namespace": "dev-app-y",
-     "name": "k8s-devinser-insertoo-bf57c25c47",
+     "name": "k8s-lb-bf57c25c47",
      "target_type": "ip",
      "service": "app-y-backend",
      "port": 80,
@@ -85535,7 +85535,7 @@
     },
     {
      "namespace": "dev-app-y",
-     "name": "k8s-devinser-insertoo-e2123e6d2b",
+     "name": "k8s-lb-e2123e6d2b",
      "target_type": "ip",
      "service": "app-y-admin",
      "port": 80,
@@ -85548,7 +85548,7 @@
     },
     {
      "namespace": "dev-app-v",
-     "name": "k8s-devtooto-appka-ae7a7a06ff",
+     "name": "k8s-lb-ae7a7a06ff",
      "target_type": "ip",
      "service": "app-v-admin-frontend",
      "port": 80,
@@ -85561,7 +85561,7 @@
     },
     {
      "namespace": "dev-app-v",
-     "name": "k8s-devtooto-appkb-0987e78003",
+     "name": "k8s-lb-0987e78003",
      "target_type": "ip",
      "service": "app-v-backend",
      "port": 80,
@@ -85574,7 +85574,7 @@
     },
     {
      "namespace": "dev-app-v",
-     "name": "k8s-devtooto-appkf-133751726c",
+     "name": "k8s-lb-133751726c",
      "target_type": "ip",
      "service": "app-v-frontend",
      "port": 80,
@@ -85600,7 +85600,7 @@
     },
     {
      "namespace": "dev-app-aa",
-     "name": "k8s-devvxtch-vxtchatb-b347218b4f",
+     "name": "k8s-lb-b347218b4f",
      "target_type": "ip",
      "service": "app-aa-backend",
      "port": 80,
@@ -85613,7 +85613,7 @@
     },
     {
      "namespace": "dev-app-aa",
-     "name": "k8s-devvxtch-vxtchatb-e9834ca5fe",
+     "name": "k8s-lb-e9834ca5fe",
      "target_type": "ip",
      "service": "app-aa-frontend",
      "port": 80,
@@ -85626,7 +85626,7 @@
     },
     {
      "namespace": "middleware",
-     "name": "k8s-middlewa-kafkacon-f50452776f",
+     "name": "k8s-lb-f50452776f",
      "target_type": "ip",
      "service": "kafka-controller-0-external",
      "port": 9094,
@@ -85639,7 +85639,7 @@
     },
     {
      "namespace": "middleware",
-     "name": "k8s-middlewa-kafkacon-ff9559afa5",
+     "name": "k8s-lb-ff9559afa5",
      "target_type": "ip",
      "service": "kafka-controller-0-external",
      "port": 443,
@@ -85652,7 +85652,7 @@
     },
     {
      "namespace": "middleware",
-     "name": "k8s-middlewa-kafkaui-0a6256c8b2",
+     "name": "k8s-lb-0a6256c8b2",
      "target_type": "ip",
      "service": "kafka-ui",
      "port": 80,
@@ -85665,7 +85665,7 @@
     },
     {
      "namespace": "middleware",
-     "name": "k8s-middlewa-redisins-e7e7fd218a",
+     "name": "k8s-lb-e7e7fd218a",
      "target_type": "ip",
      "service": "redis-insight",
      "port": 80,
@@ -85678,7 +85678,7 @@
     },
     {
      "namespace": "monitoring",
-     "name": "k8s-monitori-kubeprom-af0f3aa6c7",
+     "name": "k8s-lb-af0f3aa6c7",
      "target_type": "ip",
      "service": "kube-prometheus-stack-grafana",
      "port": 80,
@@ -85691,7 +85691,7 @@
     },
     {
      "namespace": "monitoring",
-     "name": "k8s-monitori-vmauth-e07e5153ee",
+     "name": "k8s-lb-e07e5153ee",
      "target_type": "ip",
      "service": "vmauth",
      "port": "http",
@@ -85704,7 +85704,7 @@
     },
     {
      "namespace": "prod-app-w",
-     "name": "k8s-prodcarp-carpenst-e238817282",
+     "name": "k8s-lb-e238817282",
      "target_type": "ip",
      "service": "app-w",
      "port": 80,
@@ -85730,7 +85730,7 @@
     },
     {
      "namespace": "prod-app-t",
-     "name": "k8s-prodcurt-curtainc-022a51fc31",
+     "name": "k8s-lb-022a51fc31",
      "target_type": "ip",
      "service": "app-t-web",
      "port": 80,
@@ -85743,7 +85743,7 @@
     },
     {
      "namespace": "prod-app-t",
-     "name": "k8s-prodcurt-curtainc-57e5adf3bf",
+     "name": "k8s-lb-57e5adf3bf",
      "target_type": "ip",
      "service": "app-t-studio",
      "port": 80,
@@ -85756,7 +85756,7 @@
     },
     {
      "namespace": "prod-app-t",
-     "name": "k8s-prodcurt-curtainc-bb495c72c8",
+     "name": "k8s-lb-bb495c72c8",
      "target_type": "ip",
      "service": "app-t-backend",
      "port": 80,
@@ -85769,7 +85769,7 @@
     },
     {
      "namespace": "prod-app-t",
-     "name": "k8s-prodcurt-curtainc-fc2d368787",
+     "name": "k8s-lb-fc2d368787",
      "target_type": "ip",
      "service": "app-t-ai",
      "port": 80,
@@ -85782,7 +85782,7 @@
     },
     {
      "namespace": "prod-app-x",
-     "name": "k8s-prodfand-apppa-754a9b50b2",
+     "name": "k8s-lb-754a9b50b2",
      "target_type": "ip",
      "service": "app-x-api",
      "port": 80,
@@ -85808,7 +85808,7 @@
     },
     {
      "namespace": "prod-app-s",
-     "name": "k8s-prodillu-appi-2bcc150443",
+     "name": "k8s-lb-2bcc150443",
      "target_type": "ip",
      "service": "app-s-admin",
      "port": 80,
@@ -85821,7 +85821,7 @@
     },
     {
      "namespace": "prod-app-s",
-     "name": "k8s-prodillu-appi-c50edbe2df",
+     "name": "k8s-lb-c50edbe2df",
      "target_type": "ip",
      "service": "app-s-api",
      "port": 80,
@@ -85834,7 +85834,7 @@
     },
     {
      "namespace": "prod-app-s",
-     "name": "k8s-prodillu-appi-d65740e6d5",
+     "name": "k8s-lb-d65740e6d5",
      "target_type": "ip",
      "service": "app-s-backend",
      "port": 80,
@@ -85847,7 +85847,7 @@
     },
     {
      "namespace": "prod-app-s",
-     "name": "k8s-prodillu-appi-e87721a9c3",
+     "name": "k8s-lb-e87721a9c3",
      "target_type": "ip",
      "service": "app-s-frontend",
      "port": 80,
@@ -85873,7 +85873,7 @@
     },
     {
      "namespace": "prod-app-y",
-     "name": "k8s-prodinse-insertoo-032c25d752",
+     "name": "k8s-lb-032c25d752",
      "target_type": "ip",
      "service": "app-y-frontend",
      "port": 80,
@@ -85886,7 +85886,7 @@
     },
     {
      "namespace": "prod-app-y",
-     "name": "k8s-prodinse-insertoo-37417ab44f",
+     "name": "k8s-lb-37417ab44f",
      "target_type": "ip",
      "service": "app-y-admin",
      "port": 80,
@@ -85899,7 +85899,7 @@
     },
     {
      "namespace": "prod-app-y",
-     "name": "k8s-prodinse-insertoo-89a3732998",
+     "name": "k8s-lb-89a3732998",
      "target_type": "ip",
      "service": "app-y-backend",
      "port": 80,
@@ -85912,7 +85912,7 @@
     },
     {
      "namespace": "prod-app-y",
-     "name": "k8s-prodinse-insertoo-b22674073c",
+     "name": "k8s-lb-b22674073c",
      "target_type": "ip",
      "service": "app-y-ai",
      "port": 80,
@@ -85925,7 +85925,7 @@
     },
     {
      "namespace": "prod-app-z-backend",
-     "name": "k8s-prodrhem-appnbac-8c88bb317a",
+     "name": "k8s-lb-8c88bb317a",
      "target_type": "ip",
      "service": "app-z-backend",
      "port": 80,
@@ -85938,7 +85938,7 @@
     },
     {
      "namespace": "prod-app-z-backend",
-     "name": "k8s-prodrhem-appnfro-9726e5b1d3",
+     "name": "k8s-lb-9726e5b1d3",
      "target_type": "ip",
      "service": "app-z-frontend",
      "port": 80,
@@ -85977,7 +85977,7 @@
     },
     {
      "namespace": "prod-app-r",
-     "name": "k8s-prodsoro-appmba-f68effe430",
+     "name": "k8s-lb-f68effe430",
      "target_type": "ip",
      "service": "app-r-backend",
      "port": 80,
@@ -85990,7 +85990,7 @@
     },
     {
      "namespace": "prod-app-r",
-     "name": "k8s-prodsoro-appmwe-194ae69849",
+     "name": "k8s-lb-194ae69849",
      "target_type": "ip",
      "service": "app-r-web",
      "port": 80,
@@ -86003,7 +86003,7 @@
     },
     {
      "namespace": "prod-app-v",
-     "name": "k8s-prodtoot-appka-d0c066d282",
+     "name": "k8s-lb-d0c066d282",
      "target_type": "ip",
      "service": "app-v-admin-frontend",
      "port": 80,
@@ -86016,7 +86016,7 @@
     },
     {
      "namespace": "prod-app-v",
-     "name": "k8s-prodtoot-appkb-7df87a92cc",
+     "name": "k8s-lb-7df87a92cc",
      "target_type": "ip",
      "service": "app-v-backend",
      "port": 80,
@@ -86029,7 +86029,7 @@
     },
     {
      "namespace": "prod-app-v",
-     "name": "k8s-prodtoot-appkf-36f816b829",
+     "name": "k8s-lb-36f816b829",
      "target_type": "ip",
      "service": "app-v-frontend",
      "port": 80,
@@ -86055,7 +86055,7 @@
     },
     {
      "namespace": "app-ab-prod",
-     "name": "k8s-pwcprod-pwcbacke-bea446d347",
+     "name": "k8s-lb-bea446d347",
      "target_type": "ip",
      "service": "app-ab-backend",
      "port": 80,
@@ -86068,7 +86068,7 @@
     },
     {
      "namespace": "app-ab-prod",
-     "name": "k8s-pwcprod-pwcfront-e72ef00971",
+     "name": "k8s-lb-e72ef00971",
      "target_type": "ip",
      "service": "app-ab-frontend",
      "port": 80,

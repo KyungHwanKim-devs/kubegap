@@ -4333,7 +4333,7 @@
      {
       "pv": "pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c",
       "namespace": "default",
-      "pvc": "data-k-quiz-db-0",
+      "pvc": "data-app-ah-db-0",
       "node": "node-b",
       "storage_class": "local-path",
       "capacity_mb": 10240,
@@ -7941,10 +7941,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-autopost-en:autopost",
+     "target": "app-a-prod/cronjob/app-ae-en:autopost",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-en",
+     "name": "app-ae-en",
      "container": "autopost",
      "severity": "UNKNOWN",
      "cpu_request": 0.05,
@@ -7974,10 +7974,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-autopost-ja:autopost",
+     "target": "app-a-prod/cronjob/app-ae-ja:autopost",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-ja",
+     "name": "app-ae-ja",
      "container": "autopost",
      "severity": "UNKNOWN",
      "cpu_request": 0.05,
@@ -8007,10 +8007,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-day:digest",
+     "target": "app-a-prod/cronjob/app-af-day:digest",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-digest-day",
+     "name": "app-af-day",
      "container": "digest",
      "severity": "UNKNOWN",
      "cpu_request": 0.05,
@@ -8040,10 +8040,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-month:digest",
+     "target": "app-a-prod/cronjob/app-af-month:digest",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-digest-month",
+     "name": "app-af-month",
      "container": "digest",
      "severity": "UNKNOWN",
      "cpu_request": 0.05,
@@ -8073,10 +8073,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-week:digest",
+     "target": "app-a-prod/cronjob/app-af-week:digest",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-digest-week",
+     "name": "app-af-week",
      "container": "digest",
      "severity": "UNKNOWN",
      "cpu_request": 0.05,
@@ -8106,10 +8106,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-global:radar",
+     "target": "app-a-prod/cronjob/app-ag-global:radar",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global",
+     "name": "app-ag-global",
      "container": "radar",
      "severity": "UNKNOWN",
      "cpu_request": 0.25,
@@ -8139,10 +8139,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-global-eu:radar",
+     "target": "app-a-prod/cronjob/app-ag-global-eu:radar",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global-eu",
+     "name": "app-ag-global-eu",
      "container": "radar",
      "severity": "UNKNOWN",
      "cpu_request": 0.25,
@@ -8172,10 +8172,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-japan:radar",
+     "target": "app-a-prod/cronjob/app-ag-japan:radar",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan",
+     "name": "app-ag-japan",
      "container": "radar",
      "severity": "UNKNOWN",
      "cpu_request": 0.25,
@@ -8205,10 +8205,10 @@
      "kubegap_reason": ""
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-japan-noon:radar",
+     "target": "app-a-prod/cronjob/app-ag-japan-noon:radar",
      "kind": "CronJob",
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan-noon",
+     "name": "app-ag-japan-noon",
      "container": "radar",
      "severity": "UNKNOWN",
      "cpu_request": 0.25,
@@ -21267,8 +21267,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-en",
-     "target": "app-a-prod/marketing-autopost-en",
+     "name": "app-ae-en",
+     "target": "app-a-prod/app-ae-en",
      "schedule": "*/15 7-15 * * *",
      "interval_h": 0.25,
      "suspend": true,
@@ -21298,8 +21298,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-ja",
-     "target": "app-a-prod/marketing-autopost-ja",
+     "name": "app-ae-ja",
+     "target": "app-a-prod/app-ae-ja",
      "schedule": "*/15 3-12 * * *",
      "interval_h": 0.25,
      "suspend": true,
@@ -21329,8 +21329,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-day",
-     "target": "app-a-prod/marketing-digest-day",
+     "name": "app-af-day",
+     "target": "app-a-prod/app-af-day",
      "schedule": "0 0 * * *",
      "interval_h": 24.0,
      "suspend": true,
@@ -21360,8 +21360,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-month",
-     "target": "app-a-prod/marketing-digest-month",
+     "name": "app-af-month",
+     "target": "app-a-prod/app-af-month",
      "schedule": "0 0 1 * *",
      "interval_h": 720.0,
      "suspend": true,
@@ -21391,8 +21391,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-week",
-     "target": "app-a-prod/marketing-digest-week",
+     "name": "app-af-week",
+     "target": "app-a-prod/app-af-week",
      "schedule": "0 0 * * 1",
      "interval_h": 168.0,
      "suspend": true,
@@ -21422,8 +21422,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global",
-     "target": "app-a-prod/marketing-radar-global",
+     "name": "app-ag-global",
+     "target": "app-a-prod/app-ag-global",
      "schedule": "27 12 * * *",
      "interval_h": 24.0,
      "suspend": true,
@@ -21453,8 +21453,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global-eu",
-     "target": "app-a-prod/marketing-radar-global-eu",
+     "name": "app-ag-global-eu",
+     "target": "app-a-prod/app-ag-global-eu",
      "schedule": "57 6 * * *",
      "interval_h": 24.0,
      "suspend": true,
@@ -21484,8 +21484,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan",
-     "target": "app-a-prod/marketing-radar-japan",
+     "name": "app-ag-japan",
+     "target": "app-a-prod/app-ag-japan",
      "schedule": "27 10 * * *",
      "interval_h": 24.0,
      "suspend": true,
@@ -21515,8 +21515,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan-noon",
-     "target": "app-a-prod/marketing-radar-japan-noon",
+     "name": "app-ag-japan-noon",
+     "target": "app-a-prod/app-ag-japan-noon",
      "schedule": "57 2 * * *",
      "interval_h": 24.0,
      "suspend": true,
@@ -22942,8 +22942,8 @@
     },
     {
      "namespace": "default",
-     "name": "data-k-quiz-db-0",
-     "target": "default/data-k-quiz-db-0",
+     "name": "data-app-ah-db-0",
+     "target": "default/data-app-ah-db-0",
      "prod": false,
      "phase": "Bound",
      "storage_class": "local-path",
@@ -32562,9 +32562,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan-noon",
+     "name": "app-ag-japan-noon",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-radar-japan-noon",
+     "target": "app-a-prod/cronjob/app-ag-japan-noon",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -32868,9 +32868,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-month",
+     "name": "app-af-month",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-digest-month",
+     "target": "app-a-prod/cronjob/app-af-month",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -32970,9 +32970,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global-eu",
+     "name": "app-ag-global-eu",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-radar-global-eu",
+     "target": "app-a-prod/cronjob/app-ag-global-eu",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -33174,9 +33174,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-japan",
+     "name": "app-ag-japan",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-radar-japan",
+     "target": "app-a-prod/cronjob/app-ag-japan",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -33684,9 +33684,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-en",
+     "name": "app-ae-en",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-autopost-en",
+     "target": "app-a-prod/cronjob/app-ae-en",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -33786,9 +33786,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-radar-global",
+     "name": "app-ag-global",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-radar-global",
+     "target": "app-a-prod/cronjob/app-ag-global",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -33888,9 +33888,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-day",
+     "name": "app-af-day",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-digest-day",
+     "target": "app-a-prod/cronjob/app-af-day",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -34092,9 +34092,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-autopost-ja",
+     "name": "app-ae-ja",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-autopost-ja",
+     "target": "app-a-prod/cronjob/app-ae-ja",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -34296,9 +34296,9 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "marketing-digest-week",
+     "name": "app-af-week",
      "kind": "CronJob",
-     "target": "app-a-prod/cronjob/marketing-digest-week",
+     "target": "app-a-prod/cronjob/app-af-week",
      "prod": true,
      "danger": 2,
      "warning": 8,
@@ -35844,9 +35844,9 @@
     },
     {
      "namespace": "default",
-     "name": "poca-finder-backend-config",
+     "name": "app-ak-finder-backend-config",
      "kind": "ConfigMap",
-     "target": "default/configmap/poca-finder-backend-config",
+     "target": "default/configmap/app-ak-finder-backend-config",
      "prod": false,
      "danger": 1,
      "warning": 0,
@@ -38506,24 +38506,24 @@
     "registry/statefulset/registry",
     "app-a-prod/statefulset/app-a-postgres",
     "app-a-prod/cronjob/app-a-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan-noon",
+    "app-a-prod/cronjob/app-ag-japan-noon",
     "app-f-prod/cronjob/app-f-postgres-mx-backup",
     "app-h-prod/cronjob/app-h-mysql-backup",
-    "app-a-prod/cronjob/marketing-digest-month",
-    "app-a-prod/cronjob/marketing-radar-global-eu",
+    "app-a-prod/cronjob/app-af-month",
+    "app-a-prod/cronjob/app-ag-global-eu",
     "app-f-prod/cronjob/app-f-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan",
+    "app-a-prod/cronjob/app-ag-japan",
     "app-f-prod/cronjob/app-f-ga4-digest-month",
     "app-a-prod/cronjob/umami-report-week",
     "app-f-prod/cronjob/app-f-ga4-digest-week",
     "app-f-prod/cronjob/app-f-postgres-vn-backup",
-    "app-a-prod/cronjob/marketing-autopost-en",
-    "app-a-prod/cronjob/marketing-radar-global",
-    "app-a-prod/cronjob/marketing-digest-day",
+    "app-a-prod/cronjob/app-ae-en",
+    "app-a-prod/cronjob/app-ag-global",
+    "app-a-prod/cronjob/app-af-day",
     "app-f-prod/cronjob/app-f-ga4-digest-day",
-    "app-a-prod/cronjob/marketing-autopost-ja",
+    "app-a-prod/cronjob/app-ae-ja",
     "app-a-prod/cronjob/app-a-sandbox-watchdog",
-    "app-a-prod/cronjob/marketing-digest-week",
+    "app-a-prod/cronjob/app-af-week",
     "app-i-prod/cronjob/app-i-postgres-backup",
     "app-f-prod/cronjob/app-f-policy-radar",
     "app-a-prod/cronjob/umami-report-day",
@@ -38540,7 +38540,7 @@
     "kube-system/deployment/coredns",
     "/clusterrolebinding/argocd-server",
     "/clusterrolebinding/keda-operator",
-    "default/configmap/poca-finder-backend-config",
+    "default/configmap/app-ak-finder-backend-config",
     "app-a-prod/rolebinding/app-a-sandbox-manager",
     "app-a-prod/role/app-a-sandbox-manager",
     "monitoring/role/kube-prometheus-stack-grafana",
@@ -39460,55 +39460,55 @@
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-autopost-en",
+     "workload": "app-a-prod/cronjob/app-ae-en",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-autopost-ja",
+     "workload": "app-a-prod/cronjob/app-ae-ja",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-day",
+     "workload": "app-a-prod/cronjob/app-af-day",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-month",
+     "workload": "app-a-prod/cronjob/app-af-month",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-week",
+     "workload": "app-a-prod/cronjob/app-af-week",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-global",
+     "workload": "app-a-prod/cronjob/app-ag-global",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-global-eu",
+     "workload": "app-a-prod/cronjob/app-ag-global-eu",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-japan",
+     "workload": "app-a-prod/cronjob/app-ag-japan",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-japan-noon",
+     "workload": "app-a-prod/cronjob/app-ag-japan-noon",
      "namespace": "app-a-prod",
      "prod": true,
      "labels": {}
@@ -39785,7 +39785,7 @@
     },
     {
      "namespace": "default",
-     "name": "poca-finder-backend-config",
+     "name": "app-ak-finder-backend-config",
      "prod": false,
      "keys": [
       "AWS_REGION",
@@ -39839,7 +39839,7 @@
    "pvc_unused": [
     {
      "namespace": "default",
-     "name": "data-k-quiz-db-0",
+     "name": "data-app-ah-db-0",
      "prod": false
     }
    ],
@@ -40412,47 +40412,47 @@
      "argocd_app": "app-a-prod"
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-autopost-en",
+     "workload": "app-a-prod/cronjob/app-ae-en",
      "managed_by": "argocd",
      "argocd_app": "app-a-prod"
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-autopost-ja",
+     "workload": "app-a-prod/cronjob/app-ae-ja",
      "managed_by": "argocd",
      "argocd_app": "app-a-prod"
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-day",
+     "workload": "app-a-prod/cronjob/app-af-day",
      "managed_by": "argocd",
      "argocd_app": "app-a-prod"
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-month",
+     "workload": "app-a-prod/cronjob/app-af-month",
      "managed_by": "argocd",
      "argocd_app": "app-a-prod"
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-week",
+     "workload": "app-a-prod/cronjob/app-af-week",
      "managed_by": "argocd",
      "argocd_app": "app-a-prod"
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-global",
+     "workload": "app-a-prod/cronjob/app-ag-global",
      "managed_by": "argocd",
      "argocd_app": "app-a-prod"
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-global-eu",
+     "workload": "app-a-prod/cronjob/app-ag-global-eu",
      "managed_by": "argocd",
      "argocd_app": "app-a-prod"
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-japan",
+     "workload": "app-a-prod/cronjob/app-ag-japan",
      "managed_by": "argocd",
      "argocd_app": "app-a-prod"
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-japan-noon",
+     "workload": "app-a-prod/cronjob/app-ag-japan-noon",
      "managed_by": "argocd",
      "argocd_app": "app-a-prod"
     },
@@ -40752,15 +40752,15 @@
    "prod_without_request": [
     "app-a-prod/cronjob/app-a-postgres-backup",
     "app-a-prod/cronjob/app-a-sandbox-watchdog",
-    "app-a-prod/cronjob/marketing-autopost-en",
-    "app-a-prod/cronjob/marketing-autopost-ja",
-    "app-a-prod/cronjob/marketing-digest-day",
-    "app-a-prod/cronjob/marketing-digest-month",
-    "app-a-prod/cronjob/marketing-digest-week",
-    "app-a-prod/cronjob/marketing-radar-global",
-    "app-a-prod/cronjob/marketing-radar-global-eu",
-    "app-a-prod/cronjob/marketing-radar-japan",
-    "app-a-prod/cronjob/marketing-radar-japan-noon",
+    "app-a-prod/cronjob/app-ae-en",
+    "app-a-prod/cronjob/app-ae-ja",
+    "app-a-prod/cronjob/app-af-day",
+    "app-a-prod/cronjob/app-af-month",
+    "app-a-prod/cronjob/app-af-week",
+    "app-a-prod/cronjob/app-ag-global",
+    "app-a-prod/cronjob/app-ag-global-eu",
+    "app-a-prod/cronjob/app-ag-japan",
+    "app-a-prod/cronjob/app-ag-japan-noon",
     "app-a-prod/cronjob/umami-report-day",
     "app-a-prod/cronjob/umami-report-month",
     "app-a-prod/cronjob/umami-report-week",
@@ -42211,7 +42211,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-autopost-en",
+     "workload": "app-a-prod/cronjob/app-ae-en",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -42224,7 +42224,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-autopost-ja",
+     "workload": "app-a-prod/cronjob/app-ae-ja",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -42237,7 +42237,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-day",
+     "workload": "app-a-prod/cronjob/app-af-day",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -42250,7 +42250,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-month",
+     "workload": "app-a-prod/cronjob/app-af-month",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -42263,7 +42263,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-digest-week",
+     "workload": "app-a-prod/cronjob/app-af-week",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -42276,7 +42276,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-global",
+     "workload": "app-a-prod/cronjob/app-ag-global",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -42289,7 +42289,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-global-eu",
+     "workload": "app-a-prod/cronjob/app-ag-global-eu",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -42302,7 +42302,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-japan",
+     "workload": "app-a-prod/cronjob/app-ag-japan",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -42315,7 +42315,7 @@
      "host_access": false
     },
     {
-     "workload": "app-a-prod/cronjob/marketing-radar-japan-noon",
+     "workload": "app-a-prod/cronjob/app-ag-japan-noon",
      "kind": "CronJob",
      "namespace": "app-a-prod",
      "prod": true,
@@ -42616,15 +42616,15 @@
     "app-a-prod/daemonset/app-a-sandbox-prepull",
     "app-a-prod/cronjob/app-a-postgres-backup",
     "app-a-prod/cronjob/app-a-sandbox-watchdog",
-    "app-a-prod/cronjob/marketing-autopost-en",
-    "app-a-prod/cronjob/marketing-autopost-ja",
-    "app-a-prod/cronjob/marketing-digest-day",
-    "app-a-prod/cronjob/marketing-digest-month",
-    "app-a-prod/cronjob/marketing-digest-week",
-    "app-a-prod/cronjob/marketing-radar-global",
-    "app-a-prod/cronjob/marketing-radar-global-eu",
-    "app-a-prod/cronjob/marketing-radar-japan",
-    "app-a-prod/cronjob/marketing-radar-japan-noon",
+    "app-a-prod/cronjob/app-ae-en",
+    "app-a-prod/cronjob/app-ae-ja",
+    "app-a-prod/cronjob/app-af-day",
+    "app-a-prod/cronjob/app-af-month",
+    "app-a-prod/cronjob/app-af-week",
+    "app-a-prod/cronjob/app-ag-global",
+    "app-a-prod/cronjob/app-ag-global-eu",
+    "app-a-prod/cronjob/app-ag-japan",
+    "app-a-prod/cronjob/app-ag-japan-noon",
     "app-a-prod/cronjob/umami-report-day",
     "app-a-prod/cronjob/umami-report-month",
     "app-a-prod/cronjob/umami-report-week",
@@ -42828,22 +42828,22 @@
       "marketing_autopost.py:resource_owner_secret"
      ],
      "mounted_by": [
-      "app-a-prod/cronjob/marketing-autopost-en",
-      "app-a-prod/cronjob/marketing-autopost-ja",
-      "app-a-prod/cronjob/marketing-digest-day",
-      "app-a-prod/cronjob/marketing-digest-month",
-      "app-a-prod/cronjob/marketing-digest-week",
-      "app-a-prod/cronjob/marketing-radar-global",
-      "app-a-prod/cronjob/marketing-radar-global-eu",
-      "app-a-prod/cronjob/marketing-radar-japan",
-      "app-a-prod/cronjob/marketing-radar-japan-noon",
+      "app-a-prod/cronjob/app-ae-en",
+      "app-a-prod/cronjob/app-ae-ja",
+      "app-a-prod/cronjob/app-af-day",
+      "app-a-prod/cronjob/app-af-month",
+      "app-a-prod/cronjob/app-af-week",
+      "app-a-prod/cronjob/app-ag-global",
+      "app-a-prod/cronjob/app-ag-global-eu",
+      "app-a-prod/cronjob/app-ag-japan",
+      "app-a-prod/cronjob/app-ag-japan-noon",
       "app-a-prod/deployment/app-m"
      ]
     },
     {
      "namespace": "default",
-     "name": "poca-finder-backend-config",
-     "target": "default/configmap/poca-finder-backend-config",
+     "name": "app-ak-finder-backend-config",
+     "target": "default/configmap/app-ak-finder-backend-config",
      "prod": false,
      "keys": [
       "JWT_RELAY_SECRET",
@@ -44022,7 +44022,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-japan-noon",
+     "target": "app-a-prod/cronjob/app-ag-japan-noon",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -44070,7 +44070,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-month",
+     "target": "app-a-prod/cronjob/app-af-month",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -44086,7 +44086,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-global-eu",
+     "target": "app-a-prod/cronjob/app-ag-global-eu",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -44118,7 +44118,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-japan",
+     "target": "app-a-prod/cronjob/app-ag-japan",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -44198,7 +44198,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-autopost-en",
+     "target": "app-a-prod/cronjob/app-ae-en",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -44214,7 +44214,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-radar-global",
+     "target": "app-a-prod/cronjob/app-ag-global",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -44230,7 +44230,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-day",
+     "target": "app-a-prod/cronjob/app-af-day",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -44262,7 +44262,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-autopost-ja",
+     "target": "app-a-prod/cronjob/app-ae-ja",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -44294,7 +44294,7 @@
      ]
     },
     {
-     "target": "app-a-prod/cronjob/marketing-digest-week",
+     "target": "app-a-prod/cronjob/app-af-week",
      "namespace": "app-a-prod",
      "prod": true,
      "security_danger": [
@@ -44522,7 +44522,7 @@
      "security_warning": []
     },
     {
-     "target": "default/configmap/poca-finder-backend-config",
+     "target": "default/configmap/app-ak-finder-backend-config",
      "namespace": "default",
      "prod": false,
      "security_danger": [
@@ -44816,24 +44816,24 @@
     "app-f-prod/statefulset/app-f-postgres",
     "app-a-prod/statefulset/app-a-postgres",
     "app-a-prod/cronjob/app-a-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan-noon",
+    "app-a-prod/cronjob/app-ag-japan-noon",
     "app-f-prod/cronjob/app-f-postgres-mx-backup",
     "app-h-prod/cronjob/app-h-mysql-backup",
-    "app-a-prod/cronjob/marketing-digest-month",
-    "app-a-prod/cronjob/marketing-radar-global-eu",
+    "app-a-prod/cronjob/app-af-month",
+    "app-a-prod/cronjob/app-ag-global-eu",
     "app-f-prod/cronjob/app-f-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan",
+    "app-a-prod/cronjob/app-ag-japan",
     "app-f-prod/cronjob/app-f-ga4-digest-month",
     "app-a-prod/cronjob/umami-report-week",
     "app-f-prod/cronjob/app-f-ga4-digest-week",
     "app-f-prod/cronjob/app-f-postgres-vn-backup",
-    "app-a-prod/cronjob/marketing-autopost-en",
-    "app-a-prod/cronjob/marketing-radar-global",
-    "app-a-prod/cronjob/marketing-digest-day",
+    "app-a-prod/cronjob/app-ae-en",
+    "app-a-prod/cronjob/app-ag-global",
+    "app-a-prod/cronjob/app-af-day",
     "app-f-prod/cronjob/app-f-ga4-digest-day",
-    "app-a-prod/cronjob/marketing-autopost-ja",
+    "app-a-prod/cronjob/app-ae-ja",
     "app-a-prod/cronjob/app-a-sandbox-watchdog",
-    "app-a-prod/cronjob/marketing-digest-week",
+    "app-a-prod/cronjob/app-af-week",
     "app-i-prod/cronjob/app-i-postgres-backup",
     "app-f-prod/cronjob/app-f-policy-radar",
     "app-a-prod/cronjob/umami-report-day",
@@ -44907,24 +44907,24 @@
     "registry/statefulset/registry",
     "app-a-prod/statefulset/app-a-postgres",
     "app-a-prod/cronjob/app-a-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan-noon",
+    "app-a-prod/cronjob/app-ag-japan-noon",
     "app-f-prod/cronjob/app-f-postgres-mx-backup",
     "app-h-prod/cronjob/app-h-mysql-backup",
-    "app-a-prod/cronjob/marketing-digest-month",
-    "app-a-prod/cronjob/marketing-radar-global-eu",
+    "app-a-prod/cronjob/app-af-month",
+    "app-a-prod/cronjob/app-ag-global-eu",
     "app-f-prod/cronjob/app-f-postgres-backup",
-    "app-a-prod/cronjob/marketing-radar-japan",
+    "app-a-prod/cronjob/app-ag-japan",
     "app-f-prod/cronjob/app-f-ga4-digest-month",
     "app-a-prod/cronjob/umami-report-week",
     "app-f-prod/cronjob/app-f-ga4-digest-week",
     "app-f-prod/cronjob/app-f-postgres-vn-backup",
-    "app-a-prod/cronjob/marketing-autopost-en",
-    "app-a-prod/cronjob/marketing-radar-global",
-    "app-a-prod/cronjob/marketing-digest-day",
+    "app-a-prod/cronjob/app-ae-en",
+    "app-a-prod/cronjob/app-ag-global",
+    "app-a-prod/cronjob/app-af-day",
     "app-f-prod/cronjob/app-f-ga4-digest-day",
-    "app-a-prod/cronjob/marketing-autopost-ja",
+    "app-a-prod/cronjob/app-ae-ja",
     "app-a-prod/cronjob/app-a-sandbox-watchdog",
-    "app-a-prod/cronjob/marketing-digest-week",
+    "app-a-prod/cronjob/app-af-week",
     "app-i-prod/cronjob/app-i-postgres-backup",
     "app-f-prod/cronjob/app-f-policy-radar",
     "app-a-prod/cronjob/umami-report-day",
@@ -44941,7 +44941,7 @@
     "kube-system/deployment/coredns",
     "/clusterrolebinding/argocd-server",
     "/clusterrolebinding/keda-operator",
-    "default/configmap/poca-finder-backend-config",
+    "default/configmap/app-ak-finder-backend-config",
     "app-a-prod/rolebinding/app-a-sandbox-manager",
     "app-a-prod/role/app-a-sandbox-manager",
     "monitoring/role/kube-prometheus-stack-grafana",
@@ -47626,8 +47626,8 @@
     },
     {
      "namespace": "app-a-prod",
-     "name": "app-a-marketing-radar-git",
-     "target": "app-a-prod/externalsecret/app-a-marketing-radar-git",
+     "name": "app-a-app-ag-git",
+     "target": "app-a-prod/externalsecret/app-a-app-ag-git",
      "prod": true,
      "store": "aws-secret-store",
      "store_kind": "ClusterSecretStore",
@@ -49631,9 +49631,9 @@
    {
     "pv": "pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c",
     "namespace": "default",
-    "pvc": "data-k-quiz-db-0",
+    "pvc": "data-app-ah-db-0",
     "node": "node-b",
-    "path": "/var/lib/rancher/k3s/storage/pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c_default_data-k-quiz-db-0",
+    "path": "/var/lib/rancher/k3s/storage/pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c_default_data-app-ah-db-0",
     "reclaim": "Delete",
     "phase": "Bound",
     "capacity": "10Gi",
@@ -49998,7 +49998,7 @@
     {
      "pv": "pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c",
      "namespace": "default",
-     "pvc": "data-k-quiz-db-0",
+     "pvc": "data-app-ah-db-0",
      "node": "node-b",
      "storage_class": "local-path",
      "capacity_mb": 10240,

@@ -19,5 +19,6 @@ The reports in `samples/` are real runs with names replaced. Numbers, findings a
 
 5. Look for what the map missed. Reading is not enough for a file of ten thousand lines: list the names the snapshot holds (namespaces, nodes, workloads, CronJobs, ConfigMaps, PVCs, Ingress hosts) and search the scrubbed files for each. Anything found goes into the map, not into a hand edit, so the next refresh gets it too. Node names that carry a private IP (`ip-10-0-1-23.<region>.compute.internal`) need a rule of their own; the script's header shows one.
 6. Add the row to `samples/README.md`.
+7. When a sample README shows changed (`samples/<lang>/eks/full`, `samples/<lang>/k3s/daily`), make the pictures again: `uvx --with playwright --with markdown python scripts/make-media.py`. The terminal recording is made with `vhs` from `docs/media/src/` (its `env.sh` says how).
 
 Folder rule: `samples/<lang>/<cluster>/<mode>/` with `lang` in `en`, `ko`; `cluster` in `eks`, `k3s`; `mode` in `daily`, `full`.

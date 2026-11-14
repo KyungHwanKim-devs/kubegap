@@ -3254,7 +3254,7 @@
   },
   {
    "check": "security.privileged-or-host-access",
-   "target": "prod-app-z-backend/deployment/tts-proxy",
+   "target": "prod-app-z-backend/deployment/app-ad",
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
@@ -3276,7 +3276,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "Target group k8s-devvxtch-vxtchatb-b347218b4f (application, port 8000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-aa-backend']",
+   "evidence": "Target group k8s-lb-b347218b4f (application, port 8000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-aa-backend']",
    "source": "summary.json:traffic.alb.unhealthy_target_groups"
   },
   {
@@ -3285,7 +3285,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "Target group k8s-devtooto-appkf-133751726c (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 3.0, health check / expected codes 200, backends ['deployment/app-v-frontend']",
+   "evidence": "Target group k8s-lb-133751726c (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 3.0, health check / expected codes 200, backends ['deployment/app-v-frontend']",
    "source": "summary.json:traffic.alb.unhealthy_target_groups"
   },
   {
@@ -3294,7 +3294,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "Target group k8s-prodcurt-curtainc-bb495c72c8 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-t-backend']",
+   "evidence": "Target group k8s-lb-bb495c72c8 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-t-backend']",
    "source": "summary.json:traffic.alb.unhealthy_target_groups"
   },
   {
@@ -3303,7 +3303,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "Target group k8s-prodtoot-appkf-36f816b829 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-v-frontend']",
+   "evidence": "Target group k8s-lb-36f816b829 (application, port 3000): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-v-frontend']",
    "source": "summary.json:traffic.alb.unhealthy_target_groups"
   },
   {
@@ -3312,7 +3312,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "Target group k8s-prodinse-insertoo-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-y-frontend']",
+   "evidence": "Target group k8s-lb-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-y-frontend']",
    "source": "summary.json:traffic.alb.unhealthy_target_groups"
   },
   {
@@ -3321,7 +3321,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "Target group k8s-prodrhem-appnbac-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0, health check / expected codes 200, backends ['deployment/app-z-backend']",
+   "evidence": "Target group k8s-lb-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0, health check / expected codes 200, backends ['deployment/app-z-backend']",
    "source": "summary.json:traffic.alb.unhealthy_target_groups"
   },
   {
@@ -3330,7 +3330,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['k8s-middlewa-kafkacon-31ecf1515b-96449818f244837f.elb.ap-northeast-2.amazonaws.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to the internet by the security group",
+   "evidence": "loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['lb-151c379572.elb.example.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to the internet by the security group",
    "source": "summary.json:traffic.db_exposed"
   },
   {
@@ -3598,7 +3598,7 @@
    "status": "warn",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "nlb (defined outside the cluster) /app-u-db-shared: ports [3306, 3307, 3308, 3309, 3310, 3311, 5432, 5433, 6379, 7687], exposure internet-facing, addresses ['app-u-db-shared-d7d643f6896a3b2b.elb.ap-northeast-2.amazonaws.com'], sourceRanges None, security group allow-list, at most 4 sources per port, widest /32. NLB created outside Kubernetes; 9 TargetGroupBindings bind it to dev-app-s/app-s-backend-mysql, dev-app-v/app-v-backend-dev-mysql, dev-app-y/app-y-backend-mysql, prod-app-s/app-s-backend-mysql, prod-app-t/app-t-backend-postgresql, prod-app-v/app-v-backend-prod-mysql and 3 more. DB port on an external address, limited by the security group to listed addresses",
+   "evidence": "nlb (defined outside the cluster) /app-u-db-shared: ports [3306, 3307, 3308, 3309, 3310, 3311, 5432, 5433, 6379, 7687], exposure internet-facing, addresses ['lb-fd242d81b4.elb.example.com'], sourceRanges None, security group allow-list, at most 4 sources per port, widest /32. NLB created outside Kubernetes; 9 TargetGroupBindings bind it to dev-app-s/app-s-backend-mysql, dev-app-v/app-v-backend-dev-mysql, dev-app-y/app-y-backend-mysql, prod-app-s/app-s-backend-mysql, prod-app-t/app-t-backend-postgresql, prod-app-v/app-v-backend-prod-mysql and 3 more. DB port on an external address, limited by the security group to listed addresses",
    "source": "summary.json:traffic.db_exposed"
   },
   {
@@ -3774,7 +3774,7 @@
   },
   {
    "check": "hygiene.mutable-image-tag",
-   "target": "prod-app-z-backend/deployment/tts-proxy:tailscale",
+   "target": "prod-app-z-backend/deployment/app-ad:tailscale",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -3783,7 +3783,7 @@
   },
   {
    "check": "hygiene.polaris-reliability-danger",
-   "target": "prod-app-z-backend/deployment/tts-proxy",
+   "target": "prod-app-z-backend/deployment/app-ad",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -4008,7 +4008,7 @@
   },
   {
    "check": "resilience.no-readiness-probe",
-   "target": "prod-app-z-backend/tts-proxy",
+   "target": "prod-app-z-backend/app-ad",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -4044,7 +4044,7 @@
   },
   {
    "check": "resilience.single-node-dependency",
-   "target": "prod-app-z-backend/deployment/tts-proxy",
+   "target": "prod-app-z-backend/deployment/app-ad",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -4179,7 +4179,7 @@
   },
   {
    "check": "resilience.single-replica-in-prod",
-   "target": "prod-app-z-backend/app-z-pg-proxy",
+   "target": "prod-app-z-backend/app-ad",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -4188,7 +4188,7 @@
   },
   {
    "check": "resilience.single-replica-in-prod",
-   "target": "prod-app-z-backend/tts-proxy",
+   "target": "prod-app-z-backend/app-z-pg-proxy",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -4197,11 +4197,11 @@
   },
   {
    "check": "resources.besteffort-in-prod",
-   "target": "prod-app-z-backend/deploy/tts-proxy",
+   "target": "prod-app-z-backend/deploy/app-ad",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "pod tts-proxy-7b6db97b69-4bbjf: QoS BestEffort (neither request nor limit)",
+   "evidence": "pod app-ad-7b6db97b69-4bbjf: QoS BestEffort (neither request nor limit)",
    "source": "metrics/besteffort_pods.json"
   },
   {
@@ -4398,7 +4398,7 @@
   },
   {
    "check": "resources.no-memory-limit",
-   "target": "prod-app-z-backend/tts-proxy",
+   "target": "prod-app-z-backend/app-ad",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -4483,7 +4483,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Polaris score 79. Security danger workloads 74 (prod 29): per check {'dangerousCapabilities': 2, 'hostNetworkSet': 2, 'privilegeEscalationAllowed': 59, 'runAsPrivileged': 2, 'runAsRootAllowed': 58, 'hostPIDSet': 1, 'rolebindingClusterAdminRole': 2, 'rolebindingRolePodExecAttach': 2, 'clusterrolebindingClusterAdmin': 2, 'clusterrolebindingPodExecAttach': 4, 'sensitiveContainerEnvVar': 1, 'rolePodExecAttach': 2, 'clusterrolePodExecAttach': 4}. prod list ['prod-app-z-backend/deployment/tts-proxy', 'prod-app-v/deployment/app-v-admin-frontend', 'prod-app-y/deployment/app-y-admin', 'prod-app-y/deployment/app-y-frontend', 'prod-app-v/deployment/app-v-backend', 'prod-app-v/deployment/app-v-frontend', 'prod-app-y/deployment/app-y-ai', 'prod-app-y/deployment/app-y-backend', 'prod-app-z-backend/deployment/app-z-pg-proxy', 'prod-app-z-backend/deployment/app-z-graph-worker', 'app-ab-prod/deployment/app-ab-frontend', 'prod-app-z-backend/deployment/app-z-file-worker'] and 17 more",
+   "evidence": "Polaris score 79. Security danger workloads 74 (prod 29): per check {'dangerousCapabilities': 2, 'hostNetworkSet': 2, 'privilegeEscalationAllowed': 59, 'runAsPrivileged': 2, 'runAsRootAllowed': 58, 'hostPIDSet': 1, 'rolebindingClusterAdminRole': 2, 'rolebindingRolePodExecAttach': 2, 'clusterrolebindingClusterAdmin': 2, 'clusterrolebindingPodExecAttach': 4, 'sensitiveContainerEnvVar': 1, 'rolePodExecAttach': 2, 'clusterrolePodExecAttach': 4}. prod list ['prod-app-z-backend/deployment/app-ad', 'prod-app-v/deployment/app-v-admin-frontend', 'prod-app-y/deployment/app-y-admin', 'prod-app-y/deployment/app-y-frontend', 'prod-app-v/deployment/app-v-backend', 'prod-app-v/deployment/app-v-frontend', 'prod-app-y/deployment/app-y-ai', 'prod-app-y/deployment/app-y-backend', 'prod-app-z-backend/deployment/app-z-pg-proxy', 'prod-app-z-backend/deployment/app-z-graph-worker', 'app-ab-prod/deployment/app-ab-frontend', 'prod-app-z-backend/deployment/app-z-file-worker'] and 17 more",
    "source": "summary.json:security.polaris"
   },
   {
@@ -4668,11 +4668,11 @@
   },
   {
    "check": "traffic.alb-elb-5xx",
-   "target": "k8s-lab-kprodlb-b18a4555d7",
+   "target": "k8s-lb-b18a4555d7",
    "status": "fail",
    "severity_default": "medium",
    "nature": "occurrence",
-   "evidence": "ALB k8s-lab-kprodlb-b18a4555d7 (internet-facing): 24h requests 162172.0, ELB 5xx 145.0, target 5xx 152.0, rejected connections 0, idle timeout 300s, target groups 41",
+   "evidence": "ALB k8s-lb-b18a4555d7 (internet-facing): 24h requests 162172.0, ELB 5xx 145.0, target 5xx 152.0, rejected connections 0, idle timeout 300s, target groups 41",
    "source": "summary.json:traffic.alb.lbs"
   },
   {
@@ -4690,7 +4690,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "ALB group app-u-prod-lb: 41 ingresses, 48 hosts, 16 namespaces ['app-ab-prod', 'argocd', 'dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y', 'middleware', 'monitoring', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend'], kinds ['dev', 'other', 'prod'], LB ['k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com']",
+   "evidence": "ALB group app-u-prod-lb: 41 ingresses, 48 hosts, 16 namespaces ['app-ab-prod', 'argocd', 'dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y', 'middleware', 'monitoring', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend'], kinds ['dev', 'other', 'prod'], LB ['k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com']",
    "source": "summary.json:traffic.alb_groups"
   },
   {
@@ -5927,7 +5927,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-pwcprod-pwcbacke-bea446d347: deregistration_delay 300s, backends ['deployment/app-ab-backend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-bea446d347: deregistration_delay 300s, backends ['deployment/app-ab-backend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -5936,7 +5936,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-pwcprod-pwcfront-e72ef00971: deregistration_delay 300s, backends ['deployment/app-ab-frontend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-e72ef00971: deregistration_delay 300s, backends ['deployment/app-ab-frontend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -5945,7 +5945,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-argocd-argocdse-74c4dcbda2: deregistration_delay 300s, backends ['deployment/argocd-server'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-74c4dcbda2: deregistration_delay 300s, backends ['deployment/argocd-server'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -5954,7 +5954,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-devvxtch-vxtchatb-b347218b4f: deregistration_delay 300s, backends ['deployment/app-aa-backend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-b347218b4f: deregistration_delay 300s, backends ['deployment/app-aa-backend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -5963,7 +5963,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-devvxtch-vxtchatb-e9834ca5fe: deregistration_delay 300s, backends ['deployment/app-aa-frontend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-e9834ca5fe: deregistration_delay 300s, backends ['deployment/app-aa-frontend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -5972,7 +5972,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-devtooto-appka-ae7a7a06ff: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-ae7a7a06ff: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -5981,7 +5981,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-devtooto-appkb-0987e78003: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-0987e78003: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -5990,7 +5990,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-devtooto-appkf-133751726c: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-133751726c: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -5999,7 +5999,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-middlewa-kafkaui-0a6256c8b2: deregistration_delay 300s, backends ['deployment/kafka-ui'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-0a6256c8b2: deregistration_delay 300s, backends ['deployment/kafka-ui'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6008,7 +6008,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-middlewa-redisins-e7e7fd218a: deregistration_delay 300s, backends ['deployment/redis-insight'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-e7e7fd218a: deregistration_delay 300s, backends ['deployment/redis-insight'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6017,7 +6017,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-monitori-kubeprom-af0f3aa6c7: deregistration_delay 300s, backends ['deployment/kube-prometheus-stack-grafana'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-af0f3aa6c7: deregistration_delay 300s, backends ['deployment/kube-prometheus-stack-grafana'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6026,7 +6026,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-monitori-vmauth-e07e5153ee: deregistration_delay 300s, backends ['deployment/vmauth'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-e07e5153ee: deregistration_delay 300s, backends ['deployment/vmauth'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6035,7 +6035,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodsoro-appmba-f68effe430: deregistration_delay 300s, backends ['deployment/app-r-backend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-f68effe430: deregistration_delay 300s, backends ['deployment/app-r-backend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6044,7 +6044,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodsoro-appmwe-194ae69849: deregistration_delay 300s, backends ['deployment/app-r-web'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-194ae69849: deregistration_delay 300s, backends ['deployment/app-r-web'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6053,7 +6053,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodcurt-curtainc-fc2d368787: deregistration_delay 300s, backends ['deployment/app-t-ai'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-fc2d368787: deregistration_delay 300s, backends ['deployment/app-t-ai'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6062,7 +6062,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodcurt-curtainc-bb495c72c8: deregistration_delay 300s, backends ['deployment/app-t-backend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-bb495c72c8: deregistration_delay 300s, backends ['deployment/app-t-backend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6071,7 +6071,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodcurt-curtainc-57e5adf3bf: deregistration_delay 300s, backends ['deployment/app-t-studio'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-57e5adf3bf: deregistration_delay 300s, backends ['deployment/app-t-studio'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6080,7 +6080,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodcurt-curtainc-022a51fc31: deregistration_delay 300s, backends ['deployment/app-t-web'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-022a51fc31: deregistration_delay 300s, backends ['deployment/app-t-web'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6089,7 +6089,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodtoot-appka-d0c066d282: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-d0c066d282: deregistration_delay 300s, backends ['deployment/app-v-admin-frontend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6098,7 +6098,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodtoot-appkb-7df87a92cc: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-7df87a92cc: deregistration_delay 300s, backends ['deployment/app-v-backend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6107,7 +6107,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodtoot-appkf-36f816b829: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-36f816b829: deregistration_delay 300s, backends ['deployment/app-v-frontend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6116,7 +6116,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodcarp-carpenst-e238817282: deregistration_delay 300s, backends ['deployment/app-w'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-e238817282: deregistration_delay 300s, backends ['deployment/app-w'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6125,7 +6125,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodfand-apppa-754a9b50b2: deregistration_delay 300s, backends ['deployment/app-x-api'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-754a9b50b2: deregistration_delay 300s, backends ['deployment/app-x-api'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6134,7 +6134,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodinse-insertoo-37417ab44f: deregistration_delay 300s, backends ['deployment/app-y-admin'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-37417ab44f: deregistration_delay 300s, backends ['deployment/app-y-admin'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6143,7 +6143,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodinse-insertoo-b22674073c: deregistration_delay 300s, backends ['deployment/app-y-ai'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-b22674073c: deregistration_delay 300s, backends ['deployment/app-y-ai'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6152,7 +6152,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodinse-insertoo-89a3732998: deregistration_delay 300s, backends ['deployment/app-y-backend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-89a3732998: deregistration_delay 300s, backends ['deployment/app-y-backend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6161,7 +6161,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodinse-insertoo-032c25d752: deregistration_delay 300s, backends ['deployment/app-y-frontend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-032c25d752: deregistration_delay 300s, backends ['deployment/app-y-frontend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6170,7 +6170,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodrhem-appnbac-8c88bb317a: deregistration_delay 300s, backends ['deployment/app-z-backend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-8c88bb317a: deregistration_delay 300s, backends ['deployment/app-z-backend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6179,7 +6179,7 @@
    "status": "warn",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "Target group k8s-prodrhem-appnfro-9726e5b1d3: deregistration_delay 300s, backends ['deployment/app-z-frontend'] terminationGracePeriod 30s, no preStop",
+   "evidence": "Target group k8s-lb-9726e5b1d3: deregistration_delay 300s, backends ['deployment/app-z-frontend'] terminationGracePeriod 30s, no preStop",
    "source": "summary.json:traffic.alb.target_groups"
   },
   {
@@ -6296,7 +6296,7 @@
    "status": "fail",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "Containers with an ephemeral-storage request 1 of 113 (0.009), without one in prod 35. emptyDirs without sizeLimit 22 (prod: ['app-ab-prod/statefulset/app-ab-backend-postgresql', 'prod-app-r/deployment/app-r-backend', 'prod-app-r/statefulset/app-r-postgresql', 'prod-app-t/statefulset/app-t-backend-postgresql', 'prod-app-x/statefulset/app-x-postgresql', 'prod-app-z-backend/deployment/app-z-embedding-server', 'prod-app-z-backend/deployment/tts-proxy'])",
+   "evidence": "Containers with an ephemeral-storage request 1 of 113 (0.009), without one in prod 35. emptyDirs without sizeLimit 22 (prod: ['app-ab-prod/statefulset/app-ab-backend-postgresql', 'prod-app-r/deployment/app-r-backend', 'prod-app-r/statefulset/app-r-postgresql', 'prod-app-t/statefulset/app-t-backend-postgresql', 'prod-app-x/statefulset/app-x-postgresql', 'prod-app-z-backend/deployment/app-ad', 'prod-app-z-backend/deployment/app-z-embedding-server'])",
    "source": "summary.json:hygiene.ephemeral.summary"
   },
   {
@@ -7210,6 +7210,15 @@
   },
   {
    "check": "resilience.no-prestop",
+   "target": "prod-app-z-backend/app-ad",
+   "status": "warn",
+   "severity_default": "low",
+   "nature": "state",
+   "evidence": "no preStop, terminationGracePeriodSeconds 30",
+   "source": "objects/deployments.json"
+  },
+  {
+   "check": "resilience.no-prestop",
    "target": "prod-app-z-backend/app-z-backend",
    "status": "warn",
    "severity_default": "low",
@@ -7238,15 +7247,6 @@
   {
    "check": "resilience.no-prestop",
    "target": "prod-app-z-backend/app-z-pg-proxy",
-   "status": "warn",
-   "severity_default": "low",
-   "nature": "state",
-   "evidence": "no preStop, terminationGracePeriodSeconds 30",
-   "source": "objects/deployments.json"
-  },
-  {
-   "check": "resilience.no-prestop",
-   "target": "prod-app-z-backend/tts-proxy",
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
@@ -7693,20 +7693,20 @@
   },
   {
    "check": "scaling.no-hpa-serving-prod",
+   "target": "prod-app-z-backend/app-ad",
+   "status": "warn",
+   "severity_default": "low",
+   "nature": "state",
+   "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
+   "source": "objects/deployments.json"
+  },
+  {
+   "check": "scaling.no-hpa-serving-prod",
    "target": "prod-app-z-backend/app-z-embedding-server",
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
    "evidence": "replicas 2, has container ports and a Service, no HPA or ScaledObject",
-   "source": "objects/deployments.json"
-  },
-  {
-   "check": "scaling.no-hpa-serving-prod",
-   "target": "prod-app-z-backend/tts-proxy",
-   "status": "warn",
-   "severity_default": "low",
-   "nature": "state",
-   "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
   {
@@ -7738,11 +7738,11 @@
   },
   {
    "check": "traffic.alb-protection-off",
-   "target": "k8s-lab-kprodlb-b18a4555d7",
+   "target": "k8s-lb-b18a4555d7",
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "ALB k8s-lab-kprodlb-b18a4555d7: deletion_protection False, access_logs False, target groups in the ingress group 41",
+   "evidence": "ALB k8s-lb-b18a4555d7: deletion_protection False, access_logs False, target groups in the ingress group 41",
    "source": "summary.json:traffic.alb.lbs"
   },
   {

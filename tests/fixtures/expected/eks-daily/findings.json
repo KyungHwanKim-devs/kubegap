@@ -2893,7 +2893,7 @@
   },
   {
    "check": "security.privileged-or-host-access",
-   "target": "prod-app-z-backend/deployment/tts-proxy",
+   "target": "prod-app-z-backend/deployment/app-ad",
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
@@ -3143,7 +3143,7 @@
   },
   {
    "check": "hygiene.mutable-image-tag",
-   "target": "prod-app-z-backend/deployment/tts-proxy:tailscale",
+   "target": "prod-app-z-backend/deployment/app-ad:tailscale",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -3368,7 +3368,7 @@
   },
   {
    "check": "resilience.no-readiness-probe",
-   "target": "prod-app-z-backend/tts-proxy",
+   "target": "prod-app-z-backend/app-ad",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -3404,7 +3404,7 @@
   },
   {
    "check": "resilience.single-node-dependency",
-   "target": "prod-app-z-backend/deployment/tts-proxy",
+   "target": "prod-app-z-backend/deployment/app-ad",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -3539,7 +3539,7 @@
   },
   {
    "check": "resilience.single-replica-in-prod",
-   "target": "prod-app-z-backend/app-z-pg-proxy",
+   "target": "prod-app-z-backend/app-ad",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -3548,7 +3548,7 @@
   },
   {
    "check": "resilience.single-replica-in-prod",
-   "target": "prod-app-z-backend/tts-proxy",
+   "target": "prod-app-z-backend/app-z-pg-proxy",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -3557,11 +3557,11 @@
   },
   {
    "check": "resources.besteffort-in-prod",
-   "target": "prod-app-z-backend/deploy/tts-proxy",
+   "target": "prod-app-z-backend/deploy/app-ad",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "pod tts-proxy-7b6db97b69-4bbjf: QoS BestEffort (neither request nor limit)",
+   "evidence": "pod app-ad-7b6db97b69-4bbjf: QoS BestEffort (neither request nor limit)",
    "source": "metrics/besteffort_pods.json"
   },
   {
@@ -3596,7 +3596,7 @@
   },
   {
    "check": "resources.no-memory-limit",
-   "target": "prod-app-z-backend/tts-proxy",
+   "target": "prod-app-z-backend/app-ad",
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
@@ -3861,7 +3861,7 @@
    "status": "fail",
    "severity_default": "medium",
    "nature": "state",
-   "evidence": "ALB group app-u-prod-lb: 41 ingresses, 48 hosts, 16 namespaces ['app-ab-prod', 'argocd', 'dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y', 'middleware', 'monitoring', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend'], kinds ['dev', 'other', 'prod'], LB ['k8s-lab-kprodlb-b18a4555d7-2062640887.ap-northeast-2.elb.amazonaws.com']",
+   "evidence": "ALB group app-u-prod-lb: 41 ingresses, 48 hosts, 16 namespaces ['app-ab-prod', 'argocd', 'dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y', 'middleware', 'monitoring', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend'], kinds ['dev', 'other', 'prod'], LB ['k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com']",
    "source": "summary.json:traffic.alb_groups"
   },
   {
@@ -4792,7 +4792,7 @@
    "status": "fail",
    "severity_default": "low",
    "nature": "state",
-   "evidence": "Containers with an ephemeral-storage request 1 of 113 (0.009), without one in prod 35. emptyDirs without sizeLimit 22 (prod: ['app-ab-prod/statefulset/app-ab-backend-postgresql', 'prod-app-r/deployment/app-r-backend', 'prod-app-r/statefulset/app-r-postgresql', 'prod-app-t/statefulset/app-t-backend-postgresql', 'prod-app-x/statefulset/app-x-postgresql', 'prod-app-z-backend/deployment/app-z-embedding-server', 'prod-app-z-backend/deployment/tts-proxy'])",
+   "evidence": "Containers with an ephemeral-storage request 1 of 113 (0.009), without one in prod 35. emptyDirs without sizeLimit 22 (prod: ['app-ab-prod/statefulset/app-ab-backend-postgresql', 'prod-app-r/deployment/app-r-backend', 'prod-app-r/statefulset/app-r-postgresql', 'prod-app-t/statefulset/app-t-backend-postgresql', 'prod-app-x/statefulset/app-x-postgresql', 'prod-app-z-backend/deployment/app-ad', 'prod-app-z-backend/deployment/app-z-embedding-server'])",
    "source": "summary.json:hygiene.ephemeral.summary"
   },
   {
@@ -5562,6 +5562,15 @@
   },
   {
    "check": "resilience.no-prestop",
+   "target": "prod-app-z-backend/app-ad",
+   "status": "warn",
+   "severity_default": "low",
+   "nature": "state",
+   "evidence": "no preStop, terminationGracePeriodSeconds 30",
+   "source": "objects/deployments.json"
+  },
+  {
+   "check": "resilience.no-prestop",
    "target": "prod-app-z-backend/app-z-backend",
    "status": "warn",
    "severity_default": "low",
@@ -5590,15 +5599,6 @@
   {
    "check": "resilience.no-prestop",
    "target": "prod-app-z-backend/app-z-pg-proxy",
-   "status": "warn",
-   "severity_default": "low",
-   "nature": "state",
-   "evidence": "no preStop, terminationGracePeriodSeconds 30",
-   "source": "objects/deployments.json"
-  },
-  {
-   "check": "resilience.no-prestop",
-   "target": "prod-app-z-backend/tts-proxy",
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
@@ -6045,20 +6045,20 @@
   },
   {
    "check": "scaling.no-hpa-serving-prod",
+   "target": "prod-app-z-backend/app-ad",
+   "status": "warn",
+   "severity_default": "low",
+   "nature": "state",
+   "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
+   "source": "objects/deployments.json"
+  },
+  {
+   "check": "scaling.no-hpa-serving-prod",
    "target": "prod-app-z-backend/app-z-embedding-server",
    "status": "warn",
    "severity_default": "low",
    "nature": "state",
    "evidence": "replicas 2, has container ports and a Service, no HPA or ScaledObject",
-   "source": "objects/deployments.json"
-  },
-  {
-   "check": "scaling.no-hpa-serving-prod",
-   "target": "prod-app-z-backend/tts-proxy",
-   "status": "warn",
-   "severity_default": "low",
-   "nature": "state",
-   "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
   {

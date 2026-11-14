@@ -201,7 +201,7 @@
 | `resilience.backup-same-node.app-i-prod/app-i-postgres-backup` | fail | high | app-i-prod/app-i-postgres-backup: schedule '0 3 * * *', dump PVCs ['app-i-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-i-prod/statefulset/app-i-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False |
 | `resilience.restarts-crashloop.app-c-prod/app-c-coturn-549854dfcb-jgp4h:coturn` | fail | high | 11193 restarts, state CrashLoopBackOff, last termination Error (exit 255) 2026-11-07T01:18:42Z, cause class crash (exit 255), Unhealthy events 0, node reboot time None |
 | `resources.memory-limit-near-p95.app-g-api/sts/app-g-minio:minio` | fail | high | pod app-g-minio-0: 7d memory working set p95 / limit = 0.98 |
-| `security.plaintext-configmap-secret.app-a-prod/configmap/marketing-scripts` | fail | high | app-a-prod/configmap/marketing-scripts: keys ['discord_sales_bot.py:TOKEN', 'discord_sales_bot.py:OPENAI_API_KEY', 'marketing_autopost.py:client_secret', 'marketing_autopost.py:resource_owner_secret'], mounted/referenced by ['app-a-prod/cronjob/marketing-autopost-en' … |
+| `security.plaintext-configmap-secret.app-a-prod/configmap/marketing-scripts` | fail | high | app-a-prod/configmap/marketing-scripts: keys ['discord_sales_bot.py:TOKEN', 'discord_sales_bot.py:OPENAI_API_KEY', 'marketing_autopost.py:client_secret', 'marketing_autopost.py:resource_owner_secret'], mounted/referenced by ['app-a-prod/cronjob/app-ae-en', 'app-a-prod/cronjob/app-ae-ja' … |
 | `security.plaintext-configmap-secret.app-f-prod/configmap/app-f-marketing-scripts` | fail | high | app-f-prod/configmap/app-f-marketing-scripts: keys ['app-f_ga4_digest.py:DISCORD_BOT_TOKEN', 'app-f_ga4_digest.py:token', 'app-f_policy_radar.py:OPENAI_API_KEY', 'app-f_policy_radar.py:DISCORD_BOT_TOKEN', 'app-f_sales_bot.py:TOKEN', 'app-f_sales_bot.py:OPENAI_API_KEY'], mounted/referenced by … |
 | `storage.local-path-over-capacity.app-a-prod/app-a-postgres-backup-pvc` | fail | high | node node-a uses 5862MB / capacity 5120MB (1.14x). workloads ['app-a-prod/app-a-postgres-backup'] |
 | `storage.local-path-over-capacity.logging/data-elasticsearch-0` | fail | high | node node-b uses 107797MB / capacity 20480MB (5.26x). workloads ['logging/elasticsearch-0'] |
@@ -221,7 +221,7 @@
 | `resources.cpu-throttling.monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus` | warn | high | pod prometheus-kube-prometheus-stack-prometheus-0: throttling ratio now 0.54, no 24-hour value: under 0.001 through the day or the query was not collected, so this is a spike this moment at most |
 | `resources.memory-limit-near-p95.app-a-prod/sts/app-a-postgres:postgres` | warn | high | pod app-a-postgres-0: 7d memory working set p95 / limit = 0.81 |
 | `resources.memory-limit-near-p95.logging/ds/fluent-bit:fluent-bit` | warn | high | ['pod fluent-bit-nnsb5: 7d memory working set p95 / limit = 0.85', 'pod fluent-bit-c7fr8: 7d memory working set p95 / limit = 0.84'] |
-| `security.plaintext-configmap-secret.default/configmap/poca-finder-backend-config` | warn | high | default/configmap/poca-finder-backend-config: keys ['JWT_RELAY_SECRET', 'JWT_SECRET', 'TWITTER_CLIENT_SECRET', 'TWITTER_CLIENT_SECRET_RELAY'], mounted/referenced by [] |
+| `security.plaintext-configmap-secret.default/configmap/app-ak-finder-backend-config` | warn | high | default/configmap/app-ak-finder-backend-config: keys ['JWT_RELAY_SECRET', 'JWT_SECRET', 'TWITTER_CLIENT_SECRET', 'TWITTER_CLIENT_SECRET_RELAY'], mounted/referenced by [] |
 | `security.plaintext-secret-env.logging/cronjob/es-index-retention:retention` | warn | high | Container retention env ['ELASTIC_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.plaintext-secret-env.logging/deployment/kibana:kibana` | warn | high | Container kibana env ['ELASTICSEARCH_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded) |
 | `security.plaintext-secret-env.logging/statefulset/elasticsearch:elasticsearch` | warn | high | Container elasticsearch env ['ELASTIC_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded) |
@@ -333,12 +333,12 @@
 | `hygiene.node-label-dependency.role` | warn | medium | Label role: 7 workloads (production 0) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. ['logging/deployment/kibana', 'monitoring/deployment/kube-prometheus-stack-grafana', 'monitoring/deployment/kube-prometheus-stack-kube-state-metrics'] and 4 more |
 | `hygiene.node-label-dependency.storage` | warn | medium | Label storage: 10 workloads (production 7) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. ['app-a-prod/statefulset/app-a-postgres', 'app-a-prod/statefulset/app-a-redis', 'app-f-prod/statefulset/app-f-postgres'] and 7 more |
 | `hygiene.polaris-reliability-danger.registry/cronjob/registry-tag-cleanup` | warn | medium | Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'memoryLimitsMissing', 'memoryRequestsMissing', 'metadataAndInstanceMismatched', 'priorityClassNotSet']. Security-category danger ['privilegeEscalationAllowed', 'runAsRootAllowed'] is in … |
-| `hygiene.pvc-unbound-or-unused.cluster` | warn | medium | Non-Bound PVCs [], Released/Failed PVs [], Bound PVCs used by no pod [('default', 'data-k-quiz-db-0')] |
+| `hygiene.pvc-unbound-or-unused.cluster` | warn | medium | Non-Bound PVCs [], Released/Failed PVs [], Bound PVCs used by no pod [('default', 'data-app-ah-db-0')] |
 | `logs.signatures.cert-manager.challenge-failed` | warn | medium | 7 occurrences (2026-11-06T02:40:26Z ~ 2026-11-06T02:40:27Z), thresholds warn 5/fail 100. Files: ['logs/pods/cert-manager/cert-manager_cert-manager.log']. Samples: ['[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:26.398191039Z E1106 02:40:26.398160       1 sync.go:190] … |
 | `logs.signatures.fluent-bit.flush-failed` | warn | medium | 16 occurrences (2026-11-07T00:56:41Z ~ 2026-11-07T01:23:41Z), thresholds warn 10/fail 500. Files: ['logs/pods/fluent-bit/logging_fluent-bit.log']. Samples: ["[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T09:56:41.226336618+09:00 [2026/11/07 00:56:41] [ warn] [engine] failed to flush chunk … |
 | `logs.signatures.fluent-bit.upstream-down` | warn | medium | 8 occurrences (2026-11-07T00:58:52Z ~ 2026-11-07T01:19:57Z), thresholds warn 5/fail 200. Files: ['logs/pods/fluent-bit/logging_fluent-bit.log']. Samples: ['[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T09:58:52.226252855+09:00 [2026/11/07 00:58:52] [error] … |
 | `logs.signatures.metallb.speaker-error` | warn | medium | 42 occurrences (2026-11-07T01:10:09Z ~ 2026-11-07T01:23:59Z), thresholds warn 5/fail 200. Files: ['logs/pods/metallb/metallb-system_speaker.log']. Samples: ['[pod/speaker-xfxlv/speaker] 2026-11-07T10:10:09.141164882+09:00 … |
-| `node.container-writable-layer-large.node-b` | warn | medium | Node node-b: top writable layers [('logging/elasticsearch-0', 'elasticsearch', 2235), ('app-a-prod/marketing-radar-japan-noon', 'radar', 989), ('app-a-prod/marketing-radar-global-eu', 'radar', 968), ('app-a-prod/marketing-radar-japan', 'radar', 965), ('app-a-prod/marketing-radar-global', 'radar' … |
+| `node.container-writable-layer-large.node-b` | warn | medium | Node node-b: top writable layers [('logging/elasticsearch-0', 'elasticsearch', 2235), ('app-a-prod/app-ag-japan-noon', 'radar', 989), ('app-a-prod/app-ag-global-eu', 'radar', 968), ('app-a-prod/app-ag-japan', 'radar', 965), ('app-a-prod/app-ag-global', 'radar', 965)] and 5 more MB (max 2235MB) |
 | `node.cri-exited-containers.node-a` | warn | medium | crictl ps -a: Running 55, Exited 66, Unknown 0. 53 images, 29.4 GiB |
 | `node.cri-exited-containers.node-b` | warn | medium | crictl ps -a: Running 69, Exited 96, Unknown 0. 62 images, 25.5 GiB |
 | `node.kubelet-eviction-memory-missing.node-a` | warn | medium | configz evictionHard {'imagefs.available': '5%', 'nodefs.available': '5%'}, evictionSoft {}, imageGC 80~85% |
@@ -524,7 +524,7 @@
 | `hygiene.failed-pods-lingering.cluster` | warn | low | Failed pods 4 (prod 4), reasons {'Failed': 2, 'UnexpectedAdmissionError': 2}, namespaces {'app-a-prod': 2, 'app-h-prod': 2}, oldest 3881.6h. Example: ['app-a-prod/codex-bench', 'app-a-prod/app-a-experiment', 'app-h-prod/app-h-embed-67f6f74f6c-rlm8m', 'app-h-prod/app-h-embed-67f6f74f6c-b6kdt'] |
 | `hygiene.no-ephemeral-storage-requests.cluster` | warn | low | Containers with an ephemeral-storage request 0 of 126 (0.0), without one in prod 63. emptyDirs without sizeLimit 11 (prod: []) |
 | `hygiene.old-replicasets.cluster` | warn | low | Of 292 ReplicaSets, 235 have 0 replicas. Deployment revisionHistoryLimit distribution {'10': 54, '0': 3, '3': 1, '2': 1} |
-| `hygiene.orphan-secrets.cluster` | warn | low | Of 139 Secrets (metric kube_secret_info), 9 unreferenced candidates: [('app-f-prod', 'app-f-prod-tls', 'kubernetes.io/tls'), ('app-h-prod', 'app-h-poca-store-prod-tls', 'kubernetes.io/tls'), ('argocd', 'ghcr-auth-secret', 'kubernetes.io/dockerconfigjson'), ('argocd', 'ghcr-pull-secret' … |
+| `hygiene.orphan-secrets.cluster` | warn | low | Of 139 Secrets (metric kube_secret_info), 9 unreferenced candidates: [('app-f-prod', 'app-f-prod-tls', 'kubernetes.io/tls'), ('app-h-prod', 'app-h-app-aj-prod-tls', 'kubernetes.io/tls'), ('argocd', 'ghcr-auth-secret', 'kubernetes.io/dockerconfigjson'), ('argocd', 'ghcr-pull-secret' … |
 | `hygiene.unused-crds.cluster` | warn | low | 42 of 64 CRDs have zero objects (by group {'generators.external-secrets.io': 17, 'monitoring.coreos.com': 6, 'metallb.io': 5, 'acme.cert-manager.io': 1, 'eventing.keda.sh': 2, 'external-secrets.io': 4, 'keda.sh': 4, 'helm.cattle.io': 2, 'actions.summerwind.dev': 1}), 28 webhooks |
 | `keda.unused.cluster` | warn | low | KEDA v2.19.0 operator 1/1, metrics-apiserver 1/1, webhooks 1/1 — ScaledObject 0, ScaledJob 0 |
 | `logs.signatures.cert-manager.orphan-tls-secret` | warn | low | 96 occurrences (2026-11-06T05:52:26Z ~ 2026-11-07T01:09:11Z), thresholds warn 1/fail 1000. Files: ['logs/pods/cert-manager/cert-manager_cert-manager-cainjector.log']. Samples: ['[pod/cert-manager-cainjector-7bf5c557bb-kbtv7/cert-manager-cainjector] 2026-11-06T05:52:26.666496146Z E1106 … |
@@ -861,15 +861,15 @@
   "marketing_autopost.py:resource_owner_secret"
  ],
  "mounted_by": [
-  "app-a-prod/cronjob/marketing-autopost-en",
-  "app-a-prod/cronjob/marketing-autopost-ja",
-  "app-a-prod/cronjob/marketing-digest-day",
-  "app-a-prod/cronjob/marketing-digest-month",
-  "app-a-prod/cronjob/marketing-digest-week",
-  "app-a-prod/cronjob/marketing-radar-global",
-  "app-a-prod/cronjob/marketing-radar-global-eu",
-  "app-a-prod/cronjob/marketing-radar-japan",
-  "app-a-prod/cronjob/marketing-radar-japan-noon",
+  "app-a-prod/cronjob/app-ae-en",
+  "app-a-prod/cronjob/app-ae-ja",
+  "app-a-prod/cronjob/app-af-day",
+  "app-a-prod/cronjob/app-af-month",
+  "app-a-prod/cronjob/app-af-week",
+  "app-a-prod/cronjob/app-ag-global",
+  "app-a-prod/cronjob/app-ag-global-eu",
+  "app-a-prod/cronjob/app-ag-japan",
+  "app-a-prod/cronjob/app-ag-japan-noon",
   "app-a-prod/deployment/app-m"
  ],
  "prod": true,
@@ -1285,7 +1285,7 @@
 ```
 
 </details>
-<details><summary><code>security.plaintext-configmap-secret.default/configmap/poca-finder-backend-config</code></summary>
+<details><summary><code>security.plaintext-configmap-secret.default/configmap/app-ak-finder-backend-config</code></summary>
 
 ```json
 {
@@ -1297,7 +1297,7 @@
  ],
  "mounted_by": [],
  "prod": false,
- "target": "default/configmap/poca-finder-backend-config"
+ "target": "default/configmap/app-ak-finder-backend-config"
 }
 ```
 
@@ -4286,24 +4286,24 @@
   "registry/statefulset/registry",
   "app-a-prod/statefulset/app-a-postgres",
   "app-a-prod/cronjob/app-a-postgres-backup",
-  "app-a-prod/cronjob/marketing-radar-japan-noon",
+  "app-a-prod/cronjob/app-ag-japan-noon",
   "app-f-prod/cronjob/app-f-postgres-mx-backup",
   "app-h-prod/cronjob/app-h-mysql-backup",
-  "app-a-prod/cronjob/marketing-digest-month",
-  "app-a-prod/cronjob/marketing-radar-global-eu",
+  "app-a-prod/cronjob/app-af-month",
+  "app-a-prod/cronjob/app-ag-global-eu",
   "app-f-prod/cronjob/app-f-postgres-backup",
-  "app-a-prod/cronjob/marketing-radar-japan",
+  "app-a-prod/cronjob/app-ag-japan",
   "app-f-prod/cronjob/app-f-ga4-digest-month",
   "app-a-prod/cronjob/umami-report-week",
   "app-f-prod/cronjob/app-f-ga4-digest-week",
   "app-f-prod/cronjob/app-f-postgres-vn-backup",
-  "app-a-prod/cronjob/marketing-autopost-en",
-  "app-a-prod/cronjob/marketing-radar-global",
-  "app-a-prod/cronjob/marketing-digest-day",
+  "app-a-prod/cronjob/app-ae-en",
+  "app-a-prod/cronjob/app-ag-global",
+  "app-a-prod/cronjob/app-af-day",
   "app-f-prod/cronjob/app-f-ga4-digest-day",
-  "app-a-prod/cronjob/marketing-autopost-ja",
+  "app-a-prod/cronjob/app-ae-ja",
   "app-a-prod/cronjob/app-a-sandbox-watchdog",
-  "app-a-prod/cronjob/marketing-digest-week",
+  "app-a-prod/cronjob/app-af-week",
   "app-i-prod/cronjob/app-i-postgres-backup",
   "app-f-prod/cronjob/app-f-policy-radar",
   "app-a-prod/cronjob/umami-report-day",
@@ -4320,7 +4320,7 @@
   "kube-system/deployment/coredns",
   "/clusterrolebinding/argocd-server",
   "/clusterrolebinding/keda-operator",
-  "default/configmap/poca-finder-backend-config",
+  "default/configmap/app-ak-finder-backend-config",
   "app-a-prod/rolebinding/app-a-sandbox-manager",
   "app-a-prod/role/app-a-sandbox-manager",
   "monitoring/role/kube-prometheus-stack-grafana",
@@ -4369,24 +4369,24 @@
   "app-f-prod/statefulset/app-f-postgres",
   "app-a-prod/statefulset/app-a-postgres",
   "app-a-prod/cronjob/app-a-postgres-backup",
-  "app-a-prod/cronjob/marketing-radar-japan-noon",
+  "app-a-prod/cronjob/app-ag-japan-noon",
   "app-f-prod/cronjob/app-f-postgres-mx-backup",
   "app-h-prod/cronjob/app-h-mysql-backup",
-  "app-a-prod/cronjob/marketing-digest-month",
-  "app-a-prod/cronjob/marketing-radar-global-eu",
+  "app-a-prod/cronjob/app-af-month",
+  "app-a-prod/cronjob/app-ag-global-eu",
   "app-f-prod/cronjob/app-f-postgres-backup",
-  "app-a-prod/cronjob/marketing-radar-japan",
+  "app-a-prod/cronjob/app-ag-japan",
   "app-f-prod/cronjob/app-f-ga4-digest-month",
   "app-a-prod/cronjob/umami-report-week",
   "app-f-prod/cronjob/app-f-ga4-digest-week",
   "app-f-prod/cronjob/app-f-postgres-vn-backup",
-  "app-a-prod/cronjob/marketing-autopost-en",
-  "app-a-prod/cronjob/marketing-radar-global",
-  "app-a-prod/cronjob/marketing-digest-day",
+  "app-a-prod/cronjob/app-ae-en",
+  "app-a-prod/cronjob/app-ag-global",
+  "app-a-prod/cronjob/app-af-day",
   "app-f-prod/cronjob/app-f-ga4-digest-day",
-  "app-a-prod/cronjob/marketing-autopost-ja",
+  "app-a-prod/cronjob/app-ae-ja",
   "app-a-prod/cronjob/app-a-sandbox-watchdog",
-  "app-a-prod/cronjob/marketing-digest-week",
+  "app-a-prod/cronjob/app-af-week",
   "app-i-prod/cronjob/app-i-postgres-backup",
   "app-f-prod/cronjob/app-f-policy-radar",
   "app-a-prod/cronjob/umami-report-day",
@@ -4971,7 +4971,7 @@
  "pvc_unused": [
   {
    "namespace": "default",
-   "name": "data-k-quiz-db-0",
+   "name": "data-app-ah-db-0",
    "prod": false
   }
  ]
@@ -5088,30 +5088,30 @@
   },
   {
    "namespace": "app-a-prod",
-   "pod": "marketing-radar-japan-noon-29744817-s6d97",
+   "pod": "app-ag-japan-noon-29744817-s6d97",
    "container": "radar",
-   "workload": "app-a-prod/marketing-radar-japan-noon",
+   "workload": "app-a-prod/app-ag-japan-noon",
    "mb": 989
   },
   {
    "namespace": "app-a-prod",
-   "pod": "marketing-radar-global-eu-29743617-lmbkc",
+   "pod": "app-ag-global-eu-29743617-lmbkc",
    "container": "radar",
-   "workload": "app-a-prod/marketing-radar-global-eu",
+   "workload": "app-a-prod/app-ag-global-eu",
    "mb": 968
   },
   {
    "namespace": "app-a-prod",
-   "pod": "marketing-radar-japan-29743827-l4hhn",
+   "pod": "app-ag-japan-29743827-l4hhn",
    "container": "radar",
-   "workload": "app-a-prod/marketing-radar-japan",
+   "workload": "app-a-prod/app-ag-japan",
    "mb": 965
   },
   {
    "namespace": "app-a-prod",
-   "pod": "marketing-radar-global-29743947-k89fp",
+   "pod": "app-ag-global-29743947-k89fp",
    "container": "radar",
-   "workload": "app-a-prod/marketing-radar-global",
+   "workload": "app-a-prod/app-ag-global",
    "mb": 965
   },
   {
@@ -5434,30 +5434,30 @@
    },
    {
     "namespace": "app-a-prod",
-    "pod": "marketing-radar-japan-noon-29744817-s6d97",
+    "pod": "app-ag-japan-noon-29744817-s6d97",
     "container": "radar",
-    "workload": "app-a-prod/marketing-radar-japan-noon",
+    "workload": "app-a-prod/app-ag-japan-noon",
     "mb": 989
    },
    {
     "namespace": "app-a-prod",
-    "pod": "marketing-radar-global-eu-29743617-lmbkc",
+    "pod": "app-ag-global-eu-29743617-lmbkc",
     "container": "radar",
-    "workload": "app-a-prod/marketing-radar-global-eu",
+    "workload": "app-a-prod/app-ag-global-eu",
     "mb": 968
    },
    {
     "namespace": "app-a-prod",
-    "pod": "marketing-radar-japan-29743827-l4hhn",
+    "pod": "app-ag-japan-29743827-l4hhn",
     "container": "radar",
-    "workload": "app-a-prod/marketing-radar-japan",
+    "workload": "app-a-prod/app-ag-japan",
     "mb": 965
    },
    {
     "namespace": "app-a-prod",
-    "pod": "marketing-radar-global-29743947-k89fp",
+    "pod": "app-ag-global-29743947-k89fp",
     "container": "radar",
-    "workload": "app-a-prod/marketing-radar-global",
+    "workload": "app-a-prod/app-ag-global",
     "mb": 965
    },
    {
@@ -8567,15 +8567,15 @@
   "app-a-prod/daemonset/app-a-sandbox-prepull",
   "app-a-prod/cronjob/app-a-postgres-backup",
   "app-a-prod/cronjob/app-a-sandbox-watchdog",
-  "app-a-prod/cronjob/marketing-autopost-en",
-  "app-a-prod/cronjob/marketing-autopost-ja",
-  "app-a-prod/cronjob/marketing-digest-day",
-  "app-a-prod/cronjob/marketing-digest-month",
-  "app-a-prod/cronjob/marketing-digest-week",
-  "app-a-prod/cronjob/marketing-radar-global",
-  "app-a-prod/cronjob/marketing-radar-global-eu",
-  "app-a-prod/cronjob/marketing-radar-japan",
-  "app-a-prod/cronjob/marketing-radar-japan-noon",
+  "app-a-prod/cronjob/app-ae-en",
+  "app-a-prod/cronjob/app-ae-ja",
+  "app-a-prod/cronjob/app-af-day",
+  "app-a-prod/cronjob/app-af-month",
+  "app-a-prod/cronjob/app-af-week",
+  "app-a-prod/cronjob/app-ag-global",
+  "app-a-prod/cronjob/app-ag-global-eu",
+  "app-a-prod/cronjob/app-ag-japan",
+  "app-a-prod/cronjob/app-ag-japan-noon",
   "app-a-prod/cronjob/umami-report-day",
   "app-a-prod/cronjob/umami-report-month",
   "app-a-prod/cronjob/umami-report-week",
@@ -8873,8 +8873,8 @@
   },
   {
    "namespace": "default",
-   "name": "data-k-quiz-db-0",
-   "target": "default/data-k-quiz-db-0",
+   "name": "data-app-ah-db-0",
+   "target": "default/data-app-ah-db-0",
    "prod": false,
    "phase": "Bound",
    "storage_class": "local-path",
@@ -9989,55 +9989,55 @@
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-autopost-en",
+   "workload": "app-a-prod/cronjob/app-ae-en",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-autopost-ja",
+   "workload": "app-a-prod/cronjob/app-ae-ja",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-digest-day",
+   "workload": "app-a-prod/cronjob/app-af-day",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-digest-month",
+   "workload": "app-a-prod/cronjob/app-af-month",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-digest-week",
+   "workload": "app-a-prod/cronjob/app-af-week",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-global",
+   "workload": "app-a-prod/cronjob/app-ag-global",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-global-eu",
+   "workload": "app-a-prod/cronjob/app-ag-global-eu",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-japan",
+   "workload": "app-a-prod/cronjob/app-ag-japan",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
   },
   {
-   "workload": "app-a-prod/cronjob/marketing-radar-japan-noon",
+   "workload": "app-a-prod/cronjob/app-ag-japan-noon",
    "namespace": "app-a-prod",
    "prod": true,
    "labels": {}
@@ -10681,7 +10681,7 @@
   },
   {
    "namespace": "app-h-prod",
-   "name": "app-h-poca-store-prod-tls",
+   "name": "app-h-app-aj-prod-tls",
    "type": "kubernetes.io/tls",
    "prod": true
   },
@@ -10699,31 +10699,31 @@
   },
   {
    "namespace": "default",
-   "name": "app-f-prod-tls",
+   "name": "app-ah-auth-secret",
+   "type": "Opaque",
+   "prod": false
+  },
+  {
+   "namespace": "default",
+   "name": "app-ah-aws-secret",
+   "type": "Opaque",
+   "prod": false
+  },
+  {
+   "namespace": "default",
+   "name": "app-ah-db-secret",
+   "type": "Opaque",
+   "prod": false
+  },
+  {
+   "namespace": "default",
+   "name": "app-ah-tls",
    "type": "kubernetes.io/tls",
    "prod": false
   },
   {
    "namespace": "default",
-   "name": "k-quiz-auth-secret",
-   "type": "Opaque",
-   "prod": false
-  },
-  {
-   "namespace": "default",
-   "name": "k-quiz-aws-secret",
-   "type": "Opaque",
-   "prod": false
-  },
-  {
-   "namespace": "default",
-   "name": "k-quiz-db-secret",
-   "type": "Opaque",
-   "prod": false
-  },
-  {
-   "namespace": "default",
-   "name": "k-quiz-tls",
+   "name": "app-f-prod-tls",
    "type": "kubernetes.io/tls",
    "prod": false
   }
@@ -14365,7 +14365,7 @@
   {
    "pv": "pvc-8548aa25-05f2-4388-8c7e-872d080f2a0c",
    "namespace": "default",
-   "pvc": "data-k-quiz-db-0",
+   "pvc": "data-app-ah-db-0",
    "node": "node-b",
    "storage_class": "local-path",
    "capacity_mb": 10240,
