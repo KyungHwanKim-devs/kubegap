@@ -160,7 +160,7 @@ TOOLS: list[Tool] = [
             "controlplane.etcd-slow",
             "node.*@full",
         ],
-        modes="daily and full; ECR, the control-plane logs, the nodes and the pricing and cost data in full only",
+        modes="full. A daily audit calls no AWS API; on EKS kubectl itself still runs `aws eks get-token` to log in",
         without="the EKS, ECR and cost checks are not collected; the control-plane log checks and the node checks say so in the report",
         note="On macOS without brew, install https://awscli.amazonaws.com/AWSCLIV2.pkg directly. The Linux zip is checked against its pinned sha256 and, when gpg is installed, against the AWS CLI Team's signature (#108)",
     ),
@@ -918,7 +918,7 @@ _ROLE_KO = {
 _MODES_KO = {
     "full": "full",
     "daily and full": "daily, full",
-    "daily and full; ECR, the control-plane logs, the nodes and the pricing and cost data in full only": "daily, full(ECR·컨트롤플레인 로그·노드·가격과 비용 데이터는 full에서만)",
+    "full. A daily audit calls no AWS API; on EKS kubectl itself still runs `aws eks get-token` to log in": "full. daily 점검은 AWS API를 부르지 않습니다. EKS에서는 kubectl이 로그인하려고 `aws eks get-token`을 실행합니다",
 }
 _NOTE_KO = {
     "ssh": "kubegap이 설치하지 않습니다. macOS와 대부분의 Linux에 기본으로 있고, 슬림 컨테이너 이미지에는 없을 수 있습니다(배포판 패키지 openssh-client)",
