@@ -248,6 +248,7 @@
   target: "'cluster'"
   evidence: "f\"sync p99 cluster-wide {item['sync_p99_s']}s, slowest node {item['sync_p99_max_node']} {item['sync_p99_max_s']}s, nat rules max {item['nat_rules_max']}, Services {item['services']}, endpoints {item['endpoints']}, mode {item['mode']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     One sync = rewriting the whole (or part of the) rule set via iptables-restore. When it is slow, a new pod is Ready but node routing only reflects it seconds later, causing 5xx and connection refused during rolling deployments. It scales with the rule count (services × endpoints) and node CPU.
@@ -613,6 +614,7 @@
   target: "'cluster'"
   evidence: "f\"iptables-restore failures over 24 hours (full+partial) {item['restore_failures_24h']}, nodes {item['restore_failure_nodes']}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     When iptables-restore fails, that sync's rules are not applied. Causes: another process (docker, CNI, firewall) holding the iptables lock, rule syntax conflicts, or a missing kernel module. This is the same event as the log signature kube-proxy.iptables-restore-failed.
@@ -1158,6 +1160,7 @@
   target: "'cluster'"
   evidence: "f\"conntrack INVALID drops over 1 hour {item['ct_invalid_dropped_1h']} packets (sum over nodes), services with externalTrafficPolicy Local {item['external_traffic_local']}, Services with a Local traffic policy and no endpoint on the node (max over nodes) {item['no_local_endpoint_services']}\""
   severity_default: low
+  nature: occurrence
   symptom_linked: false
   why: >
     kube-proxy drops packets that conntrack judges INVALID (default since 1.29). The counter exists since kube-proxy 1.31 and only in iptables mode with nfacct (pkg/proxy/metrics/metrics.go:302-303@v1.31.14, :417@v1.37.2; absent at v1.30.14), so without it the check is skipped with the reason, never passed. A high count points to asymmetric routing (the reply leaves via another node), conntrack expiry of long-lived connections (tcpEstablishedTimeout), or NAT overlapping with the CNI. Apps see it as intermittent connection resets.

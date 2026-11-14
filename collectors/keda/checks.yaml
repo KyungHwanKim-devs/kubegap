@@ -789,6 +789,7 @@
   target: "'cluster'"
   evidence: "f\"request codes since metrics-apiserver start {item['api_requests_by_code']}, non-2xx/3xx responses {item['api_requests_non_2xx']}, operator gRPC GetMetrics failures {item['api_grpc_non_ok']}, scaler errors in logs (24h) {item['scaler_errors_24h_logs']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     For every external metric request from the HPA controller, metrics-apiserver fetches the value from the operator over gRPC and answers. A 500 or gRPC Unknown means the HPA got no value at that moment. The counters are cumulative since process start, so they are judged as a ratio.

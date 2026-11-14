@@ -138,7 +138,7 @@ def run(snap: Path) -> dict[str, str]:
         "scale": fd.get("scale"),
         "rubric_version": fd.get("rubric_version"),
         "check_results": [{k: r.get(k) for k in ("id", "status", "reason", "counts", "skipped_reason") if k in r} for r in fd.get("check_results") or []],
-        "findings": [{k: f.get(k) for k in ("check", "target", "status", "severity_default", "evidence", "source") if k in f} for f in fd.get("findings") or []],
+        "findings": [{k: f.get(k) for k in ("check", "target", "status", "severity_default", "nature", "evidence", "source") if k in f} for f in fd.get("findings") or []],
     }
     out["findings.json"] = json.dumps(kept, ensure_ascii=False, indent=1) + "\n"
     return {k: normalise(v, snap) for k, v in out.items()}

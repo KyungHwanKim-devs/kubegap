@@ -53262,6 +53262,459 @@
      "last_applied": true
     }
    ],
+   "owners": [
+    {
+     "workload": "app-a-prod/deployment/app-a-backend",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/deployment/app-a-frontend",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/deployment/app-a-gateway",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/deployment/app-a-phoenix",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/deployment/app-a-umami",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/deployment/app-m",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "arc-systems/deployment/arc-actions-runner-controller",
+     "managed_by": "helm",
+     "helm_release": "arc"
+    },
+    {
+     "workload": "cert-manager/deployment/cert-manager",
+     "managed_by": "helm",
+     "helm_release": "cert-manager"
+    },
+    {
+     "workload": "cert-manager/deployment/cert-manager-cainjector",
+     "managed_by": "helm",
+     "helm_release": "cert-manager"
+    },
+    {
+     "workload": "cert-manager/deployment/cert-manager-webhook",
+     "managed_by": "helm",
+     "helm_release": "cert-manager"
+    },
+    {
+     "workload": "app-b-prod/deployment/app-b-backend",
+     "managed_by": "argocd",
+     "argocd_app": "app-b-prod"
+    },
+    {
+     "workload": "app-b-prod/deployment/app-b-frontend",
+     "managed_by": "argocd",
+     "argocd_app": "app-b-prod"
+    },
+    {
+     "workload": "app-c-prod/deployment/app-c-coturn",
+     "managed_by": "argocd",
+     "argocd_app": "app-c"
+    },
+    {
+     "workload": "app-c-prod/deployment/app-c-signaling",
+     "managed_by": "argocd",
+     "argocd_app": "app-c"
+    },
+    {
+     "workload": "app-c-prod/deployment/app-c-web",
+     "managed_by": "argocd",
+     "argocd_app": "app-c"
+    },
+    {
+     "workload": "app-d/deployment/app-d",
+     "managed_by": "argocd",
+     "argocd_app": "app-d"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-admin",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-shared"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-mx",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-mx"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-mx-worker",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-mx"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-sales-bot",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-vn",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-vn"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-vn-worker",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-vn"
+    },
+    {
+     "workload": "app-f-prod/deployment/app-f-worker",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "external-secrets/deployment/external-secrets",
+     "managed_by": "helm",
+     "helm_release": "external-secrets"
+    },
+    {
+     "workload": "external-secrets/deployment/external-secrets-cert-controller",
+     "managed_by": "helm",
+     "helm_release": "external-secrets"
+    },
+    {
+     "workload": "external-secrets/deployment/external-secrets-webhook",
+     "managed_by": "helm",
+     "helm_release": "external-secrets"
+    },
+    {
+     "workload": "app-g-api/deployment/app-g-api",
+     "managed_by": "argocd",
+     "argocd_app": "app-g-api"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-admin",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-api-server",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-app-q-client",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-embed",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-excel-agent",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/deployment/app-h-app-p",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller",
+     "managed_by": "helm",
+     "helm_release": "nginx-ingress"
+    },
+    {
+     "workload": "keda/deployment/keda-admission-webhooks",
+     "managed_by": "helm",
+     "helm_release": "keda"
+    },
+    {
+     "workload": "keda/deployment/keda-operator",
+     "managed_by": "helm",
+     "helm_release": "keda"
+    },
+    {
+     "workload": "keda/deployment/keda-operator-metrics-apiserver",
+     "managed_by": "helm",
+     "helm_release": "keda"
+    },
+    {
+     "workload": "app-i-prod/deployment/app-i",
+     "managed_by": "argocd",
+     "argocd_app": "app-i"
+    },
+    {
+     "workload": "monitoring/deployment/kube-prometheus-stack-grafana",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "monitoring/deployment/kube-prometheus-stack-kube-state-metrics",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "monitoring/deployment/kube-prometheus-stack-operator",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "app-k/deployment/app-k",
+     "managed_by": "argocd",
+     "argocd_app": "app-k"
+    },
+    {
+     "workload": "app-k/deployment/app-k-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-k"
+    },
+    {
+     "workload": "reloader/deployment/reloader-reloader",
+     "managed_by": "helm",
+     "helm_release": "reloader"
+    },
+    {
+     "workload": "app-l-prod/deployment/app-l-api",
+     "managed_by": "argocd",
+     "argocd_app": "app-l-prod"
+    },
+    {
+     "workload": "app-l-prod/deployment/app-l-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-l-prod"
+    },
+    {
+     "workload": "app-l-prod/deployment/app-l-web",
+     "managed_by": "argocd",
+     "argocd_app": "app-l-prod"
+    },
+    {
+     "workload": "app-a-prod/statefulset/app-a-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/statefulset/app-a-redis",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-c-prod/statefulset/app-c-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-c"
+    },
+    {
+     "workload": "app-f-prod/statefulset/app-f-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/statefulset/app-f-postgres-mx",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-mx"
+    },
+    {
+     "workload": "app-f-prod/statefulset/app-f-postgres-vn",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-vn"
+    },
+    {
+     "workload": "app-f-prod/statefulset/app-f-redis",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-shared"
+    },
+    {
+     "workload": "app-g-api/statefulset/app-g-minio",
+     "managed_by": "argocd",
+     "argocd_app": "app-g-api"
+    },
+    {
+     "workload": "app-g-api/statefulset/app-g-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-g-api"
+    },
+    {
+     "workload": "app-h-prod/statefulset/app-h-mysql",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-h-prod/statefulset/app-h-qdrant",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-i-prod/statefulset/app-i-postgres",
+     "managed_by": "argocd",
+     "argocd_app": "app-i"
+    },
+    {
+     "workload": "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "app-a-prod/daemonset/app-a-sandbox-prepull",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "kube-system/daemonset/nvidia-device-plugin",
+     "managed_by": "argocd",
+     "argocd_app": "nvidia"
+    },
+    {
+     "workload": "monitoring/daemonset/kube-prometheus-stack-prometheus-node-exporter",
+     "managed_by": "argocd+helm",
+     "argocd_app": "monitoring",
+     "helm_release": "kube-prometheus-stack"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-a-postgres-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/app-a-sandbox-watchdog",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/marketing-autopost-en",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/marketing-autopost-ja",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/marketing-digest-day",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/marketing-digest-month",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/marketing-digest-week",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/marketing-radar-global",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/marketing-radar-global-eu",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/marketing-radar-japan",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/marketing-radar-japan-noon",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/umami-report-day",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/umami-report-month",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-a-prod/cronjob/umami-report-week",
+     "managed_by": "argocd",
+     "argocd_app": "app-a-prod"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-ga4-digest-day",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-ga4-digest-month",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-ga4-digest-week",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-policy-radar",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-postgres-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-kr"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-postgres-mx-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-mx"
+    },
+    {
+     "workload": "app-f-prod/cronjob/app-f-postgres-vn-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-f-vn"
+    },
+    {
+     "workload": "app-g-api/cronjob/app-g-postgres-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-g-api"
+    },
+    {
+     "workload": "app-h-prod/cronjob/app-h-mysql-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-h"
+    },
+    {
+     "workload": "app-i-prod/cronjob/app-i-postgres-backup",
+     "managed_by": "argocd",
+     "argocd_app": "app-i"
+    }
+   ],
    "unmanaged_prod": [],
    "argocd_applications": 18,
    "argocd_apps": [
@@ -61324,6 +61777,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-a-prod",
      "chart": null,
      "target_revision": "HEAD",
@@ -61356,6 +61810,7 @@
      "dest_namespace": "arc-systems",
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "infra/arc-runners",
      "chart": null,
      "target_revision": "main",
@@ -61386,6 +61841,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-b-prod",
      "chart": null,
      "target_revision": "HEAD",
@@ -61418,6 +61874,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-c",
      "chart": null,
      "target_revision": "HEAD",
@@ -61450,6 +61907,7 @@
      "dest_namespace": null,
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-d",
      "chart": null,
      "target_revision": "HEAD",
@@ -61482,6 +61940,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-f-kr",
      "chart": null,
      "target_revision": "HEAD",
@@ -61514,6 +61973,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-f-mx",
      "chart": null,
      "target_revision": "HEAD",
@@ -61546,6 +62006,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-f-shared",
      "chart": null,
      "target_revision": "HEAD",
@@ -61578,6 +62039,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-f-vn",
      "chart": null,
      "target_revision": "HEAD",
@@ -61610,6 +62072,7 @@
      "dest_namespace": null,
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-g-api",
      "chart": null,
      "target_revision": "HEAD",
@@ -61642,6 +62105,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-h",
      "chart": null,
      "target_revision": "HEAD",
@@ -61674,6 +62138,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-i",
      "chart": null,
      "target_revision": "HEAD",
@@ -61706,6 +62171,7 @@
      "dest_namespace": "monitoring",
      "prod": false,
      "repo": "https://prometheus-community.github.io/helm-charts",
+     "repo_url": "https://prometheus-community.github.io/helm-charts",
      "path": null,
      "chart": "kube-prometheus-stack",
      "target_revision": "79.5.0",
@@ -61739,6 +62205,7 @@
      "dest_namespace": "kube-system",
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "infra/nvidia",
      "chart": null,
      "target_revision": "main",
@@ -61769,6 +62236,7 @@
      "dest_namespace": null,
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-k",
      "chart": null,
      "target_revision": "HEAD",
@@ -61801,6 +62269,7 @@
      "dest_namespace": "argocd",
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "argocd-apps",
      "chart": null,
      "target_revision": "HEAD",
@@ -61831,6 +62300,7 @@
      "dest_namespace": null,
      "prod": false,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-n",
      "chart": null,
      "target_revision": "HEAD",
@@ -61865,6 +62335,7 @@
      "dest_namespace": null,
      "prod": true,
      "repo": "https://github.com/example-org/k8s-manifests",
+     "repo_url": "https://github.com/example-org/k8s-manifests",
      "path": "prod/app-l-prod",
      "chart": null,
      "target_revision": "HEAD",

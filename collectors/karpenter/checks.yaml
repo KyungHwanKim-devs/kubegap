@@ -1728,6 +1728,7 @@
   target: "'cluster'"
   evidence: "f\"cluster state synced {item['cluster_state_synced']}, consistency errors {item['consistency_errors']}, reconcile errors {item['reconcile_errors']}, pod startup average {item['pods_startup_avg_s']}s ({item['pods_startup_count']} pods), node termination average {item['node_termination_avg_s']}s\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: >
     With cluster_state_synced 0 Karpenter has not read the full node and pod state and stops making scheduling decisions (normal briefly after startup). Consistency errors (check=Termination etc.) mean a NodeClaim and the real instance disagree — a node whose termination never finished may be left behind.

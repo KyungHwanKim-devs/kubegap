@@ -12,6 +12,9 @@ TYPES = ("metric", "object", "summary", "inventory", "absence", "aws", "llm", "s
 SEVERITIES = ("critical", "high", "medium", "low", "info")
 REQUIRED = ("id", "name", "area", "type", "severity_default", "why")
 SCALES = ("small", "medium", "large")
+# What a finding of the check is: a `state` the cluster is in now (a setting, a missing piece, a placement), or an `occurrence` counted over a
+# window (events, log lines, restarts, failed deliveries), which may already be over. The report keeps what happened apart from what is wrong.
+NATURES = ("state", "occurrence")
 PLATFORM_FAMILIES = ("eks", "k3s", "other")
 
 
@@ -178,6 +181,8 @@ def validate(check: dict, source: str) -> list[str]:
         v = check.get(key)
         if v is not None and (not isinstance(v, list) or not v or any(x not in allowed for x in v)):
             errs.append(f"{source}: {check.get('id')} {key} must be a non-empty list of {allowed}")
+    if check.get("nature", "state") not in NATURES:
+        errs.append(f"{source}: {check.get('id')} nature must be one of {NATURES}")
     if "profiles" in check:
         errs.append(f"{source}: {check.get('id')} has `profiles`; a check names `platforms` and `scales` instead")
     rule = check.get("rule") or {}

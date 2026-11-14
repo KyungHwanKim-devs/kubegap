@@ -1580,6 +1580,7 @@
   target: "'cluster'"
   evidence: "f\"sync calls since controller start {item['sync_calls']} / errors {item['sync_errors']}, ACME requests {item['acme_requests']} by status {item['acme_by_status']} (4xx/5xx {item['acme_errors']}, ratio {item['acme_error_ratio']}), Ready False metric {item['not_ready_metric']}\""
   severity_default: low
+  nature: occurrence
   symptom_linked: false
   why: >
     Sync errors count how often the controller failed while reconciling some object (permissions, webhook, transient errors included), so a high number is not an outage by itself, but a steady climb means some Certificate is not progressing. ACME 4xx is rate limiting (429), bad requests (400) or account problems (403); 5xx is on the Let's Encrypt side.

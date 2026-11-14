@@ -1469,6 +1469,7 @@
   target: "item['target']"
   evidence: "f\"jobs exceeding half their own scrape interval {item['slow_scrape_jobs']} (most common interval {round(item['scrape_interval_s'] or 0)}s), slowest {item['scrape_top']}, scrapes dropped for exceeding sampleLimit in the last hour {item['sample_limit_exceeded_1h']}, targets failing on it now {item['sample_limit_targets']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: >
     A scrape that exceeds sampleLimit drops all metrics of that target (not a partial store) — alerts for that job go silent. A scrape that takes more than half the interval means the target is overloaded or the response is too large, and it will soon hit the timeout (10s by default).
@@ -2265,6 +2266,7 @@
   target: "item['target']"
   evidence: "f\"notifications dropped over 24 hours {item['notifications_dropped_1d']}, send errors per Alertmanager address {item['notifications_errors_1d']}, last config reload successful {item['reload_success']} (config time {item['last_config_time']})\""
   severity_default: high
+  nature: occurrence
   symptom_linked: false
   why: >
     If a firing rule cannot reach Alertmanager, nobody finds out. dropped means the send queue overflowed (Alertmanager was down for a long time); errors means failures to a specific Alertmanager address (an Alertmanager restart, the network, or one of the configured addresses is dead). A reload failure means a new PrometheusRule has a syntax error and the old rules keep running.

@@ -662,6 +662,7 @@
   target: "item['node']"
   evidence: "f\"node {item['node']}: EC2 API failures {item['ec2_api_errors']} (by API {item['metrics'].get('ec2_api_errors_by_api')}), force-removed ENIs {item['metrics'].get('force_removed_enis')} / IPs {item['metrics'].get('force_removed_ips')} (cumulative since ipamd start, IMDS 404 excluded)\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: >
     ipamd creates and attaches ENIs and allocates IPs through the EC2 API. As failures pile up, the warm pool cannot be refilled, so pods start slowly or get no IP. Causes are a missing AmazonEKS_CNI_Policy on the node role, API throttling (RequestLimitExceeded), and subnet or security group configuration. Read together with the log signatures vpc-cni.ec2-throttled and ipamd-error.

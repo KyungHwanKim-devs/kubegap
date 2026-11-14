@@ -746,6 +746,7 @@
   target: "'cluster'"
   evidence: "f\"CSI gRPC failures in 24h {item['node_ops_errors_24h']} ({item['node_ops_errors_detail']}), kubelet volume operation failures {item['storage_ops_failures_24h']}, volume-related Warning events {item['events_24h']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     kubelet sends NodeStageVolume (mount the device on the node) and NodePublishVolume (bind into the pod path) to the CSI node plugin; on failure the pod stays in ContainerCreating with FailedMount events. The non-OK codes of csi_operations_seconds and the fail-unknown of storage_operation_duration_seconds are those counts.
@@ -984,6 +985,7 @@
   target: "'cluster'"
   evidence: "f\"24h p99: NodeStageVolume {item['stage_p99_s']}s, NodePublishVolume {item['publish_p99_s']}s (no value means no attach happened in that window)\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     After node replacement or a spot reclaim, the time for a StatefulSet pod to come up on a new node is "EBS detach + attach + Stage (mount)". A Stage p99 above 30 seconds delays DB recovery by tens of seconds per node; above 2 minutes the attach itself is being retried.

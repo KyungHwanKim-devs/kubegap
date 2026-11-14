@@ -1103,6 +1103,7 @@
   target: "'cluster'"
   evidence: "f\"upstreams {item['upstreams']}: SERVFAIL in 1h {item['forward_servfail_1h']} ({item['forward_servfail_ratio']}), health check failures {item['forward_healthcheck_failures_1h']}, max_concurrent rejections {item['max_concurrent_rejects_1h']}, overall SERVFAIL ratio {item['servfail_ratio']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     If the forward target (the VPC resolver on EKS, public resolvers such as 1.1.1.1 or 8.8.8.8 on a small k3s cluster) fails, external name resolution returns SERVFAIL and apps see "connection failed". Health check failures are intermittent disconnects; max_concurrent rejections are CoreDNS itself being overloaded. Core traffic.coredns-servfail looks at the overall ratio; this check isolates the upstream side.
@@ -1368,6 +1369,7 @@
   target: "'cluster'"
   evidence: "f\"panics in 1h {item['panics_1h']}, reload failures {item['reload_failed_1h']}, restarts total {item['restarts_total']}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     A panic is a plugin defect that failed a request; a reload failure means the ConfigMap was edited incorrectly and CoreDNS keeps running on the old Corefile (you think it is fixed, but it is not applied). Read together with the log signature coredns.reload-failed.

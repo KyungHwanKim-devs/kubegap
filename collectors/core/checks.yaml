@@ -28,6 +28,7 @@
   target: "workload(labels) + ':' + labels['container']"
   evidence: "_throttling_text(labels, v, threshold, warn_threshold)"
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     The kernel CFS interprets a limit as "N ms per 100 ms period". A multi-threaded app that spends its quota early in the period stalls for the rest of it.
@@ -128,6 +129,7 @@
   target: "workload(labels) + ':' + labels['container']"
   evidence: "_oom_last_text(summary, labels)"
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     An OOM today and an OOM five months ago are different: fail if the last termination is within 7 days, warn if older.
@@ -220,6 +222,7 @@
   target: "item['target']"
   evidence: "_oom_text(item)"
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     resources.oomkilled only asks whether the last death of a pod that is alive now was an OOM. A workload that is rolled out several times a day loses that history with every rollout: the new pod has one death, the old pods are gone.
@@ -2321,6 +2324,7 @@
   target: "labels.get('integration', 'unknown')"
   evidence: "f\"{value:.0f} delivery failures in 24h (integration {labels.get('integration')})\""
   severity_default: high
+  nature: occurrence
   symptom_linked: false
   why: Alerts that fired but never reached Slack or PagerDuty. Expired webhook URLs, rotated tokens or network policies are the usual causes. Everyone believes alerting exists while nobody actually receives anything.
   suggest: Check the Alertmanager log for per-integration errors and fix the receiver configuration.
@@ -3616,6 +3620,7 @@
   target: "item['reason']"
   evidence: "f\"{item['meaning']}. {item['occurrences']} occurrences total ({item['events']} events, trend over {len(item['per_snapshot'])} snapshots {item['per_snapshot']}, {item['trend']}), first {item['first']} last {item['last']}. Top objects: {[o['object'] for o in item['objects_top'][:3]]}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     Events last only an hour and are not in Grafana. Reasons such as FailedScheduling, BackOff, Evicted, OOMKilling and FailedCreatePodSandBox are the first signals of blocked scaling, crash loops, node pressure,
@@ -3807,6 +3812,7 @@
   target: "item['workload']"
   evidence: "f\"24h 'Unable to schedule pod; no fit' {item['count']} times (control plane log). Top reason from summary.controlplane.scheduler.reasons: {(((summary.get('controlplane') or {}).get('scheduler') or {}).get('reasons') or [{}])[0].get('reason', '?')[:140]}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     The scheduler found no node to place the pod (insufficient resources, taints, affinity, PVC node pinning). FailedScheduling events vanish after an hour, but the control plane log keeps them.
@@ -3889,6 +3895,7 @@
   target: "'cluster'"
   evidence: "f\"5xx per second {value:.3f} (code {labels.get('code')})\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: Errors from the apiserver itself. etcd latency, webhook timeouts (shown as 500 Internal Error) or overload. Every controller and kubectl is affected.
   cases:
@@ -3937,6 +3944,7 @@
   target: "labels.get('verb', '?')"
   evidence: "f\"{labels.get('verb')} p99 {value:.3f}s\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: A per-verb p99 above one second makes kubectl and controllers visibly slow. A slow LIST means large resources have piled up (completed Jobs, events); if everything is slow, it is etcd.
   cases:
@@ -3985,6 +3993,7 @@
   target: "labels.get('name', '?')"
   evidence: "f\"webhook {labels.get('name')} p99 {value:.3f}s\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: A slow webhook slows every create and update request by that much. Near the timeout (default 10s), a failurePolicy=Fail webhook starts rejecting requests.
   cases:
@@ -4031,6 +4040,7 @@
   target: "item['webhook'] or 'unknown'"
   evidence: "f\"24h 'failed calling webhook' {item['count']} times (CloudWatch kube-apiserver stream)\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: The webhook service is dead or timing out. With failurePolicy=Fail every create and update of that resource is rejected and deployments stall (Jetstack 2019).
   cases:
@@ -4063,6 +4073,7 @@
   target: "item['source']"
   evidence: "f\"24h {item['level']} lines {item['count']} times ({item['source']}). Samples: summary.controlplane.controller_manager.top_errors\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: >
     A controller fails to reconcile and keeps requeuing (for example disruption.go = PDB sync failure, usually a selector matching no pods or overlapping PDBs).
@@ -4108,6 +4119,7 @@
   target: "'cluster'"
   evidence: "f\"24h Traces (requests over 500ms) {item.get('slow_traces_total')}: {item.get('slow_traces')}\""
   severity_default: low
+  nature: occurrence
   symptom_linked: false
   why: The apiserver writes a Trace with per-step timings for requests over 500ms. Mostly List means large LISTs (clients without a cache, piled-up resources); 'Call conversion webhook' means a slow CRD conversion webhook.
   cases:
@@ -4147,6 +4159,7 @@
   target: "'cluster'"
   evidence: "f\"24h authentication failures {item.get('failures_total')}: {item.get('failures')[:5]}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: Expired tokens or wrong IAM mappings mean CI or a person is locked out; many unknown sources mean attempts arriving through the public endpoint (eks.public-endpoint-open).
   suggest: Check the source (ARN) per message and fix the mapping or close the endpoint.
@@ -4184,6 +4197,7 @@
   target: "'cluster'"
   evidence: "f\"24h 'apply request took too long' {item.get('apply_took_too_long')} times, slow request stats {item.get('request_stats_slow')}, ReadIndex delays {item.get('readindex_slow')}, leader changes {item.get('leader_changed')}, max {item.get('max_ms', 0):.0f}ms (if the 200-line log cap was hit, the real count is higher)\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: >
     When etcd takes over 100ms for disk fsync or apply, every write slows down, and in bad cases the leader changes and the apiserver pauses. Typical in a small k3s cluster where PVs, logs and etcd share one SSD.
@@ -4278,6 +4292,7 @@
   target: "item['node']"
   evidence: "f\"kernel log ({item['kernel']['window']}) 'Out of memory: Kill' {item['kernel']['counts'].get('oom_node')} times, system process victims (kubelet, containerd, k3s) {item['kernel']['counts'].get('oom_system_victim', 0)}, cgroup OOM (container) {item['kernel']['counts'].get('oom_cgroup', 0)}. Samples: {[s[:120] for s in item['kernel']['samples'] if 'Out of memory' in s][:3]}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     A container OOMKilled dies within its own limit; a node-level OOM means the whole node ran out of memory and the kernel picked any process.
@@ -4506,6 +4521,7 @@
   target: "item['node']"
   evidence: "f\"kernel log ({item['kernel']['window']}) lockup/hung task/rcu stall {item['kernel']['counts'].get('lockup')} times. Samples: {[s[:140] for s in item['kernel']['samples'] if any(k in s for k in ('lockup','hung_task','blocked for','rcu'))][:3]}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     When a CPU is stuck inside the kernel for over 20 seconds (soft lockup) or a task waiting on I/O stalls for over 120 seconds (hung task), the node's network and disk stall with it.
@@ -4728,6 +4744,7 @@
   target: "item['node']"
   evidence: "f\"kernel log ({item['kernel']['window']}) I/O errors {item['kernel']['counts'].get('io_error')}, filesystem errors {item['kernel']['counts'].get('fs_error')}. Samples: {[s[:140] for s in item['kernel']['samples'] if any(k in s for k in ('I/O error','EXT4','XFS','nvme','read-only','Read-only'))][:3]}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: A sign of a dying disk. Next comes a read-only filesystem remount, and then etcd, container writes and logs all fail. In a small k3s cluster where etcd and PVs share one SSD, the whole cluster stops.
   suggest: "Check `smartctl -H` or the cloud volume status, back up the data (etcd, PVs) first, then replace the disk. On EKS, check the EBS volume status and replace the node."
@@ -4950,6 +4967,7 @@
   target: "item['node']"
   evidence: "f\"kernel log ({item['kernel']['window']}) NIC events {item['kernel']['counts'].get('nic')}. Samples: {[s[:140] for s in item['kernel']['samples'] if any(k in s for k in ('Link','link','Tx','ena','WATCHDOG','eth','ens'))][:3]}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: A flapping link drops every connection on the node and spreads as readiness failures and reconnect storms. On EKS, an ENA driver reset (keep alive watchdog) is a precursor of instance hardware trouble.
   suggest: If it recurs, drain and replace the node (on EKS replace the instance; in a small k3s cluster check the cable, NIC and driver).
@@ -5493,6 +5511,7 @@
   target: "item['node']"
   evidence: "f\"kernel log ({item['kernel']['window']}) BUG/Oops/Call Trace {item['kernel']['counts'].get('bug')}, network pressure (TCP memory, SYN flooding, ARP table) {item['kernel']['counts'].get('net_pressure')}, memory pressure (page allocation failure) {item['kernel']['counts'].get('mem_pressure')}, unstable clocksource {item['kernel']['counts'].get('clock')}. Samples: {item['kernel']['samples'][-3:]}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: Each is a precursor of a different resource running out. If the Call Trace count does not exceed the cgroup OOM count, they are the OOM killer's stack dumps, the same event as resources.oomkilled, and not counted as fail. SYN flooding is a too-small somaxconn or an attack, ARP table overflow is a too-small gc_thresh (nodes with many pods), page allocation failure is memory fragmentation, and a Call Trace is a kernel defect.
   cases:
@@ -6987,6 +7006,7 @@
   target: "item['node']"
   evidence: "f\"systemd NRestarts {item['service_restarts']} (uptime {item['meta']['uptime_days']} days, automatic restarts only. Unit states {[(s['unit'], s['active'], s['since']) for s in item['services']]})\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: NRestarts counts how often systemd revived the unit via Restart=, so manual restarts are not counted. That is how many times kubelet/k3s died. Each death makes the node briefly NotReady, and on a k3s server the apiserver stops too.
   cases:
@@ -9347,6 +9367,7 @@
   rule:
     expr: "True"
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: Each finding carries the signature's area, severity, meaning and usual cause. The value of this check itself is a placeholder.
   notes: Finding id is logs.signatures.<signature id>. count >= fail_at means fail, >= warn_at means warn.
@@ -9437,6 +9458,7 @@
   target: "'cluster'"
   evidence: "f\"{item.get('error_lines_unclassified')} unclassified error lines ({item.get('lines_scanned')} lines scanned, {len(item.get('files_scanned') or [])} files). Top: {[(e['pattern'][:100], e['count']) for e in (item.get('unclassified_errors') or [])[:6]]}\""
   severity_default: low
+  nature: occurrence
   symptom_linked: false
   why: Errors the signature catalog does not know. The LLM reads the top patterns and decides whether they are a problem or noise. Recurring real problems should be added to the catalog as signatures.
   suggest: Look at sample and files in summary.logs.unclassified_errors and open the raw logs (logs/pods/).
@@ -9596,6 +9618,7 @@
   target: "'cluster'"
   evidence: "f\"Loki pods {[(p['pod'], p['restarts'], p['last_reason'], p['last_finished']) for p in item.get('pods') or []]}. Storage {(item.get('storage') or {}).get('volumes')}, memory RSS {(item.get('self_metrics') or {}).get('rss_mb')}MB\""
   severity_default: high
+  nature: occurrence
   symptom_linked: false
   why: >
     Single-binary Loki dies from a memory spike on one big query (count_over_time over a wide time range, many streams). Logs still in memory (chunks not yet flushed) are lost at that moment, and if the storage is emptyDir everything is lost.
@@ -9688,6 +9711,7 @@
   target: "'cluster'"
   evidence: "f\"Lines dropped in 1h {item.get('dropped_entries_1h')}, non-2xx sends {item.get('request_errors_1h')}, active targets total {item.get('targets_active')}\" + ('' if item.get('metrics_scraped') is not False else ' -- promtail metrics are not in Prometheus (no ServiceMonitor). The numbers above were not measured')"
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: promtail retries when Loki rejects or is unreachable, then drops. Dropped lines exist nowhere.
   suggest: Look at the Loki-side rejection reasons (observability.loki-ingest-discarded) together with the promtail log signatures (promtail.*).
@@ -9730,6 +9754,7 @@
   target: "'cluster'"
   evidence: "f\"Output errors in 1h {item.get('output_errors_1h')}, failed retries (dropped) {item.get('retries_failed_1h')}, dropped records {item.get('dropped_records_1h')}, input records {item.get('records_in_1h')}\" + ('' if item.get('metrics_scraped') is not False else ' -- fluent-bit metrics are not in Prometheus (no ServiceMonitor). The numbers above were not measured, so they are not really 0')"
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: When fluent-bit cannot write to Elasticsearch etc. it retries and then drops. Zero input means the collector itself has stalled.
   cases:
@@ -9785,6 +9810,7 @@
   target: "item['namespace']"
   evidence: "f\"Of {item['lines_1h']} log lines in 1h, {item['error_lines_1h']} contain error|exception|fatal ({item.get('error_ratio')})\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: If more than one in five log lines is an error, the apps in that namespace are failing continuously or are logging normal behavior at error level. Either way, logs cannot be used to find an incident.
   suggest: "Use LogQL `{namespace=\"<ns>\"} |~ \"(?i)error\"` to see the top messages; fix app bugs, lower the log level for noise."
@@ -11838,6 +11864,7 @@
   target: "'cluster'"
   evidence: "f\"Events {item.get('events')}, samples {item.get('event_samples')}, VolumeAttachment errors {item.get('errors')}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: FailedAttachVolume means the volume is still attached to the old node (6-minute detach wait after a node dies), an AZ mismatch or the attach limit; FailedMount is filesystem or permissions; ProvisioningFailed is StorageClass, quota or AZ. All of them show up as pods stuck in ContainerCreating.
   suggest: "Event messages in `kubectl describe pod`, `kubectl get volumeattachments`, EBS CSI controller logs."
@@ -13742,6 +13769,7 @@
   target: "(labels.get('node') or labels.get('instance')) + ':' + labels.get('device', '?')"
   evidence: "f\"Node {labels.get('node') or labels.get('instance')} device {labels.get('device')}: {value:.0f} RX+TX errors in 24h\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     NIC errors are corrupted packets being retransmitted, which apps only see as intermittent timeouts and slow responses. ENA driver errors and link flaps on EKS, cable and driver problems on bare metal are caught here. Virtual interfaces (veth, cni, flannel, tailscale) are excluded -- flannel is covered by traffic.flannel-*.
@@ -13841,6 +13869,7 @@
   target: "labels.get('node') or labels.get('instance')"
   evidence: "f\"Node {labels.get('node') or labels.get('instance')}: PLEG relist p99 {value:.2f}s (1h; over 3s means PLEG is not healthy)\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     kubelet periodically asks the container runtime for the status of all pods again (PLEG relist). With many containers or a slow runtime or disk this takes longer, and if it exceeds 3s for 3 minutes kubelet marks the node NotReady with "PLEG is not healthy" -- every pod on that node is evicted. The log signature kubelet.pleg-not-healthy looks after the event; this metric looks before it.
@@ -15515,6 +15544,7 @@
   target: "item['namespace'] + '/' + item['pod'] + ':' + item['container']"
   evidence: "f\"{item['restarts']} restarts, state {item['waiting'] or 'Running'}, last termination {item['last_reason']} (exit {item['exit_code']}) {item['last_finished']}, cause class {item['cause']}, Unhealthy events {item['unhealthy_events']}, node reboot time {item['node_rebooted_at']}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     A restart has one of three causes: OOMKilled (memory limit), probe failure (liveness killed it — Unhealthy events accompany it), or a crash (exit code 1, 2, 255 etc.; the app itself). The action differs by cause (raise the limit / fix the probe / read logs).
@@ -16035,6 +16065,7 @@
   target: "item['target']"
   evidence: "_ingress_5xx_text(item)"
   severity_default: medium  # lowered because warns (0.1-1%) all landed as high. Fails above 1% are raised by the LLM based on traffic volume
+  nature: occurrence
   symptom_linked: true
   why: >
     5xx is the user-facing symptom itself (page on symptoms). Above 1% a 99% SLO is already broken, and even 0.1% is dozens of failures a day at a few thousand requests.
@@ -16347,6 +16378,7 @@
   target: "item['target']"
   evidence: "_ingress_latency_text(item)"
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     p95 response time is the latency signal of the four golden signals. ALB TargetResponseTime runs from the LB sending the request to the target until the first byte back, so it is app time without the network. An API above 1s feels slow to users; at 2s timeouts and retries begin.
@@ -16634,6 +16666,7 @@
   target: "item['name']"
   evidence: "f\"ALB {item['name']} ({item['scheme']}): 24h requests {item.get('requests_24h')}, ELB 5xx {item.get('elb_5xx_24h')}, target 5xx {item.get('target_5xx_24h')}, rejected connections {item.get('rejected_connections_24h')}, idle timeout {item.get('idle_timeout_s')}s, target groups {item.get('target_groups')}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     HTTPCode_ELB_5XX_Count is a response produced by the ALB, not the target. 502 means the target closed the connection (routing to a terminating pod, keep-alive mismatch), 503 means no healthy target, 504 means no response within the idle timeout.
@@ -17542,6 +17575,7 @@
   target: "item['workload']"
   evidence: "(f\"24h minimum Ready ratio {item.get('min_ready_ratio_24h')} (pod {item.get('worst_pod')}, about {item.get('not_ready_minutes_24h')} min not ready), pods below 0.99 {item['pods_below_99']}, \" if item.get('min_ready_ratio_24h') is not None else 'no Ready ratio metric (kube_pod_status_ready not collected), ') + f\"Unhealthy events {item['unhealthy_events']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     When readiness fails the pod stays alive but is removed from the Service endpoints. If one of 2 replicas drops out the other takes double; if there is only one, it is a 503. A 24h Ready ratio of 0.9 means 2.4 hours out of service that day.
@@ -17617,6 +17651,7 @@
   target: "'cluster'"
   evidence: "f\"1h SERVFAIL ratio {item.get('servfail_ratio_1h')}, p99 {item.get('p99_s_1h')}s\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: SERVFAIL means upstream DNS failure, a plugin error or a loop. Apps experience it as connection failures or 5-second retries. It is a shared dependency that affects every external and internal call in the cluster.
   suggest: "CoreDNS logs `kubectl -n kube-system logs deploy/coredns | grep SERVFAIL`, upstream health (the VPC resolver in /etc/resolv.conf), replicas and CPU limit."
@@ -17659,6 +17694,7 @@
   target: "'cluster'"
   evidence: "f\"1h DNS request p99 {item.get('p99_s_1h')}s, SERVFAIL ratio {item.get('servfail_ratio_1h')}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     DNS sits in front of every service call. If p99 exceeds 50ms, a pod with ndots:5 that issues 4-5 queries per external domain loses hundreds of ms. A spike near 5s is the UDP conntrack race.
@@ -18110,6 +18146,7 @@
   target: "labels['namespace'] + '/hpa/' + labels['horizontalpodautoscaler']"
   evidence: "f\"{value:.0f} desired changes over 7 days\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     If desired goes up and down several times a day, pods start and die repeatedly. Each cycle brings a cold start (connection pools, caches) and rolling disruption.
@@ -18796,6 +18833,7 @@
   target: "item['name']"
   evidence: "f\"NodeClaim {item['name']} ({item['instance_type']} {item['capacity_type']} {item['zone']}): created → Launched {item['launched_s']}s, Registered {item['registered_s']}s, Initialized {item['initialized_s']}s\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     Creation to Initialized is how long pending pods wait. Normally 60-90s. Over 3 minutes means a large AMI (mixed AL2 and AL2023 during a transition), slow bootstrap scripts or CNI init, or a large image pull delaying Initialized.
@@ -19029,6 +19067,7 @@
   target: "'cluster'"
   evidence: "f\"24h launch failures {item.get('launch_failures_24h')}, launched {item.get('nodeclaims_launched_24h')}, disruptions executed {item.get('disruptions_24h')}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: InsufficientInstanceCapacity and MaxSpotInstanceCountExceeded mean there is no spot capacity for that AZ and instance type. With narrow NodePool requirements (one or two types) it repeats. Meanwhile pods stay Pending.
   suggest: "Widen the NodePool requirements (instance-category and generation ranges, several AZs, an on-demand fallback pool with weight)."

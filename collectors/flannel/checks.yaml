@@ -225,6 +225,7 @@
   target: "item['node']"
   evidence: "f\"flannel.1 rx errors {item['flannel'].get('rx_errors')} dropped {item['flannel'].get('rx_dropped')}, tx errors {item['flannel'].get('tx_errors')} dropped {item['flannel'].get('tx_dropped')} (cumulative since boot)\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: Errors on the overlay interface signal that pod-to-pod traffic between nodes is silently breaking. A few drops are normal (right after boot); thousands point at the underlay network or MTU.
   suggest: Compare with the errors on the underlay interface (br0, eth0) and check MTU, switch and cabling.
@@ -694,6 +695,7 @@
   target: "'cluster'"
   evidence: "f\"errors in 24h {item['errors_1d_total']} / drops {item['drops_1d_total']} (by node and device {item['drops_1d_by_node']}), cumulative since boot errors {item['errors_boot_total']} / drops {item['drops_boot_total']}, overlay traffic (GiB/day) {item['overlay_gib_1d']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     The node script counters are cumulative since boot, so they cannot separate "old" from "now" (traffic.flannel-errors). If node-exporter's 24-hour increase is non-zero, overlay packets are being corrupted or dropped right now — causes are MTU mismatch (only large packets fail), the underlay NIC driver or conntrack saturation, and the symptoms are intermittent timeouts and slow DB queries. vxlan devices report operstate UNKNOWN, so node_network_up reads 0 and is not used.

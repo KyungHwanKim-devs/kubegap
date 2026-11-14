@@ -47,6 +47,20 @@ def test_previous_snapshot_stays_within_mode(tmp_path):
     assert paths.previous_snapshot(d1) is None  # first daily run: nothing to compare with
 
 
+def test_the_baseline_is_the_latest_earlier_run_that_has_a_report(tmp_path):
+    """2026-11-14: the work list of a report came from the report of 11-11 and its numbers from an unreported run of 11-13, so four fixes showed as no decrease."""
+    ctx = tmp_path / "c"
+    ctx.mkdir()
+    f1 = _snap(ctx, "2026-11-11T00-00-00", "full")
+    f2 = _snap(ctx, "2026-11-13T00-00-00", "full")  # collected and evaluated, never reported
+    f3 = _snap(ctx, "2026-11-14T00-00-00", "full")
+    assert paths.previous_snapshot(f3) == f2  # no report anywhere: the run before
+    (f1 / "report.md").write_text("r")
+    assert paths.previous_snapshot(f3) == f1
+    (f2 / "report.md").write_text("r")
+    assert paths.previous_snapshot(f3) == f2
+
+
 def test_latest_snapshot_by_mode(tmp_path):
     ctx = tmp_path / "c"
     ctx.mkdir()

@@ -74,7 +74,8 @@ class Ctx:
         self.pods = objects(snap, "pods")
         self.argo_apps = objects(snap, "applications.argoproj.io")
         # what Argo CD manages, whatever its tracking method: Application status.resources (argoproj/argo-cd pkg/apis/application/v1alpha1/types.go:1018@v2.13.0, :1151@v3.6.1) (#124 K2-5)
-        self.argo_managed = {((r.get("kind") or "").lower(), r.get("namespace"), r.get("name")) for a in self.argo_apps for r in (a.get("status") or {}).get("resources") or []}
+        self.argo_app_of = {((r.get("kind") or "").lower(), r.get("namespace"), r.get("name")): a["metadata"]["name"] for a in self.argo_apps for r in (a.get("status") or {}).get("resources") or []}
+        self.argo_managed = set(self.argo_app_of)
 
     @staticmethod
     def tpl(kind, o) -> dict:
@@ -444,23 +445,39 @@ def _templating(cx: Ctx) -> dict:
         labels = md.get("labels") or {}
         ann = md.get("annotations") or {}
         managed = None
+        # Who declares the workload, by name, from what the snapshot holds: the report says "change it where it is declared" and names that place only with this evidence
+        argocd_app = helm_release = None
         if labels.get("app.kubernetes.io/managed-by") == "Helm" or any(k.startswith("meta.helm.sh/") for k in ann):
             managed = "helm"
+            helm_release = ann.get("meta.helm.sh/release-name")
         # Argo CD's default tracking is the label `app.kubernetes.io/instance` = application name (argoproj/argo-cd common/common.go:161@v2.13.0, :190@v3.6.1), which Helm releases also set, so a
         # workload counts as Argo-managed when an Application lists it in status.resources; the configured `argocd.argoproj.io/instance` label and the tracking annotation are exact on their own (#124 K2-5)
         if "argocd.argoproj.io/tracking-id" in ann or "argocd.argoproj.io/instance" in labels or (kind.lower(), md["namespace"], md["name"]) in cx.argo_managed:
             managed = "argocd" + ("+helm" if managed == "helm" else "")
+            # the tracking annotation is `<application>:<group>/<kind>:<namespace>/<name>` (argoproj/argo-cd util/argo/resource_tracking.go:199@v2.13.0, :234@v3.6.1); status.resources names the application whatever the tracking method
+            argocd_app = cx.argo_app_of.get((kind.lower(), md["namespace"], md["name"])) or (ann.get("argocd.argoproj.io/tracking-id") or "").split(":", 1)[0] or None
         if any(k.startswith(("kustomize.toolkit.fluxcd.io/", "helm.toolkit.fluxcd.io/")) for k in labels):
             managed = "flux"
         # EKS add-ons carry the labels `app.kubernetes.io/managed-by: EKS` and `eks.amazonaws.com/component` (observed on the add-on workloads; no public manifest, #124 K2-4)
         if labels.get("app.kubernetes.io/managed-by") in ("eks", "EKS") or "eks.amazonaws.com/component" in labels or md["namespace"] == "kube-system":
             managed = managed or "platform"
-        rows.append({"workload": wl_key(kind, o), "namespace": md["namespace"], "prod": md["namespace"] in cx.prod, "managed_by": managed, "last_applied": "kubectl.kubernetes.io/last-applied-configuration" in ann})
+        rows.append(
+            {
+                "workload": wl_key(kind, o),
+                "namespace": md["namespace"],
+                "prod": md["namespace"] in cx.prod,
+                "managed_by": managed,
+                "argocd_app": argocd_app,
+                "helm_release": helm_release,
+                "last_applied": "kubectl.kubernetes.io/last-applied-configuration" in ann,
+            }
+        )
     apps = cx.argo_apps
     return {
         "workloads": len(rows),
         "by_manager": dict(Counter(r["managed_by"] or "none" for r in rows)),
-        "unmanaged": [r for r in rows if not r["managed_by"]],
+        "unmanaged": [{k: v for k, v in r.items() if k not in ("argocd_app", "helm_release")} for r in rows if not r["managed_by"]],
+        "owners": [{k: r[k] for k in ("workload", "managed_by", "argocd_app", "helm_release") if r[k]} for r in rows if r["managed_by"] and r["managed_by"] != "platform"],
         "unmanaged_prod": [r["workload"] for r in rows if not r["managed_by"] and r["prod"]],
         "argocd_applications": len(apps),
         "argocd_apps": [

@@ -153,6 +153,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "dest_namespace": dest_ns,
                 "prod": (dest_ns in prod) or any(r.get("namespace") in prod for r in st.get("resources") or []),
                 "repo": (src.get("repoURL") or "")[-60:],
+                "repo_url": re.sub(r"//[^/@]*@", "//", src.get("repoURL") or ""),  # whole, for the report to name where a workload is declared; a login written into the URL is left out
                 "path": src.get("path"),
                 "chart": src.get("chart"),
                 "target_revision": src.get("targetRevision"),

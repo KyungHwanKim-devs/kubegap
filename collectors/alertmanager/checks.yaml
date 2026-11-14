@@ -99,6 +99,7 @@
   target: "item['target']"
   evidence: "f\"last config reload succeeded {item['reload_success']}, invalid alerts rejected in 24h {item['invalid_alerts_1d']}, version {item['version']}\""
   severity_default: high
+  nature: occurrence
   symptom_linked: false
   why: >
     If the configuration in an AlertmanagerConfig CR or the secret is invalid, Alertmanager keeps running on the old config — you believe the new receivers and routes are active but they are not. Invalid alerts are alerts with bad labels (rule label template errors) that get dropped.

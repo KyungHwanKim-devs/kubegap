@@ -191,17 +191,18 @@ def latest_snapshot(context: str, root: Path | None = None, *, allow_incomplete:
 
 
 def previous_snapshot(current: Path) -> Path | None:
-    """The snapshot just before `current` in the same context folder **and the same mode**. A daily run is compared with the previous daily run, a full run with the previous full run: a daily snapshot lacks the inputs of a full one, so comparing across modes would report every full-only finding as "resolved"."""
+    """The baseline `current` is compared with: the latest earlier snapshot of the same context **and the same mode** that has a report, else the latest earlier one of that mode. A daily run is compared with the previous daily run, a full run with the previous full run: a daily snapshot lacks the inputs of a full one, so comparing across modes would report every full-only finding as "resolved"."""
     mode = snapshot_mode(current)
     siblings = sorted(p for p in current.parent.iterdir() if p.is_dir() and not p.name.startswith("."))
     try:
         i = siblings.index(current)
     except ValueError:
         return None
-    for prev in reversed(siblings[:i]):
-        if not is_incomplete(prev) and snapshot_mode(prev) == mode:  # an incomplete collection cannot serve as a comparison baseline
-            return prev
-    return None
+    earlier = [p for p in reversed(siblings[:i]) if not is_incomplete(p) and snapshot_mode(p) == mode]  # an incomplete collection cannot serve as a comparison baseline
+    # A report has one baseline. What the previous report asked for is read from the last run that has a report, so the numbers are compared with
+    # that same run: a run that was collected and never reported in between (a stopped session, a scheduled collect) would otherwise be the baseline
+    # of the numbers while the work list came from the report before it, and the two would not add up.
+    return next((p for p in earlier if (p / "report.md").is_file()), earlier[0] if earlier else None)
 
 
 def resolve_snapshot(spec: str, context: str | None, root: Path | None = None, mode: str | None = None) -> Path:

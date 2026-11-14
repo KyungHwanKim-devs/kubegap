@@ -13,6 +13,7 @@
   target: "item['target']"
   evidence: "f\"responses per datasource (cumulative since start) {[(d['datasource'], d['requests'], d['by_code']) for d in (item['datasources'] or [])]}, error rate 1% or more {item['datasources_with_errors']} (max {item['datasource_error_max_ratio']}), Grafana API 5xx {item['api_5xx']}/{item['api_requests']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     A datasource 429 means the store rate-limited Grafana's queries (Loki's per-tenant query limit, Prometheus query.max-concurrency) — dashboard panels go empty with "too many outstanding requests" and people read it as "there are no logs". 5xx means the store died while processing the query (Loki OOM, Prometheus timeout).
@@ -449,6 +450,7 @@
   target: "item['target']"
   evidence: "f\"Grafana alert rules {(item['stats'] or {}).get('totals_alert_rules')}, evaluation failures {item['alert_rule_eval_failures']}, notification failures {item['alert_notification_failures']}\""
   severity_default: low
+  nature: occurrence
   symptom_linked: false
   why: >
     If Grafana alerting (a system separate from Prometheus rules) is in use, evaluation failures (datasource errors) and notification failures (contact point configuration) accumulate here. With 0 rules Grafana alerting is not in use and Alertmanager is the only path.

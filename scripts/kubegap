@@ -349,6 +349,9 @@ def cmd_evaluate(args) -> int:
         except (ValueError, KeyError):
             tools_present = None
     _evaluate.evaluate(snap, cfg, scale_answer=_firstrun.scale_decision(snap.parent), tools_present=tools_present)
+    from lib.output import diff as _diff
+
+    _diff.append_history(snap)  # the row is written as soon as the verdicts exist: a run that stops before `diff` used to leave no line in history.csv
     return EXIT_OK
 
 
@@ -431,6 +434,30 @@ def cmd_write_report(args) -> int:
         return EXIT_ERROR
     print(f"saved: {p} (written with {host}; every agent's text is in llm/writing/, the facts before the step check in llm/facts-analysis.json)")
     return EXIT_OK
+
+
+def cmd_check_facts(args) -> int:
+    """Check llm/facts.json against the contract (lib/output/facts.py) and print every rule it breaks. The analysis runs this until nothing is
+    printed; the report is not written from facts that fail it."""
+    import json as _json
+
+    from lib.output import facts as _facts
+
+    snap = _resolve_snapshot_arg(args, args.snapshot)
+    path = snap / "llm" / "facts.json"
+    if not path.is_file():
+        print(f"kubegap check-facts: {path} does not exist. The analysis writes it first (references/facts-<language>.md)", file=sys.stderr)
+        return EXIT_ERROR
+    try:
+        facts = _json.loads(path.read_text(encoding="utf-8"))
+    except ValueError as e:
+        print(f"kubegap check-facts: {path} is not JSON: {e}", file=sys.stderr)
+        return EXIT_ERROR
+    problems = _facts.check(facts, snap, paths.snapshot_mode(snap))
+    for line in problems:
+        print(f"- {line}")
+    print(f"facts: {len(problems)} to fix" if problems else "facts: nothing to fix")
+    return EXIT_ERROR if problems else EXIT_OK
 
 
 def cmd_checks(args) -> int:
@@ -820,6 +847,11 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
     s.add_argument("--language", choices=["en", "ko"], default="en", help="language of the headings and fixed phrases; data inside tables stays English")
     s.set_defaults(func=cmd_render_details)
+
+    s = sub.add_parser("check-facts", parents=[common], help="check llm/facts.json against the contract: the order of the problems, nothing serious left out, sources inside the snapshot, the three kinds of limits")
+    s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")
+    s.add_argument("--mode", choices=list(paths.MODES), help="with --snapshot latest: the latest snapshot of this mode")
+    s.set_defaults(func=cmd_check_facts)
 
     s = sub.add_parser("write-report", parents=[common], help="write report.md from llm/facts.json with separate agents: a step check on the objects, a writer, a fact check, a sentence replacer (claude -p or codex exec)")
     s.add_argument("--snapshot", default="latest", help="snapshot folder path, folder name, date prefix, or latest (default)")

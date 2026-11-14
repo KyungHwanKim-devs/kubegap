@@ -2682,6 +2682,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "critical",
+   "nature": "state",
    "evidence": "no backup tool (family backup). Alternative signals: etcd snapshots 5, backup-like CronJobs that ran in the last 7 days ['app-a-prod/app-a-postgres-backup', 'app-f-prod/app-f-postgres-backup', 'app-f-prod/app-f-postgres-mx-backup', 'app-f-prod/app-f-postgres-vn-backup', 'app-g-api/app-g-postgres-backup', 'app-h-prod/app-h-mysql-backup', 'app-i-prod/app-i-postgres-backup'], VolumeSnapshots 0. If signals exist, the LLM checks whether copies leave the node",
    "source": "inventory.json"
   },
@@ -2690,6 +2691,7 @@
    "target": "cluster",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "apps with prune enabled that manage a Namespace or CRD as a resource ['argocd/application/app-a-prod', 'argocd/application/app-b-prod', 'argocd/application/app-d', 'argocd/application/app-g-api', 'argocd/application/app-k', 'argocd/application/app-n', 'argocd/application/app-l-prod'] (namespaces created by the CreateNamespace option are not managed resources and are not counted here)",
    "source": "summary.json:argocdctl.summary"
   },
@@ -2698,6 +2700,7 @@
    "target": "BackOff",
    "status": "fail",
    "severity_default": "high",
+   "nature": "occurrence",
    "evidence": "Container keeps dying and the restart interval grows (CrashLoopBackOff). 60363 occurrences total (1 events, trend over 1 snapshots [60363], flat), first 2026-10-28T22:06:36Z last 2026-11-07T01:21:42Z. Top objects: ['Pod/app-c-prod/app-c-coturn-549854dfcb-jgp4h']",
    "source": "summary.json:events.history.tracked_hits"
   },
@@ -2706,6 +2709,7 @@
    "target": "cluster",
    "status": "fail",
    "severity_default": "high",
+   "nature": "occurrence",
    "evidence": "datastore etcd (servers ['node-b']), warn lines in 24h 375 (hit the 200-line cap - there were more): slow apply 169 (max 1432.2ms, over 1s 2), slow fdatasync 3, leader changes 0, request stats 192, DB 595MB",
    "source": "summary.json:k3s.cluster.datastore"
   },
@@ -2714,6 +2718,7 @@
    "target": "cluster",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "server v1.33.5+k3s1: upstream end of life 2026-06-28, 132 days past",
    "source": "inventory.json"
   },
@@ -2722,6 +2727,7 @@
    "target": "app-f-prod/app-f-postgres-backup",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "app-f-prod/app-f-postgres-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-vn', 'node-b'), ('app-f-prod/statefulset/app-f-redis', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
@@ -2730,6 +2736,7 @@
    "target": "app-f-prod/app-f-postgres-vn-backup",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "app-f-prod/app-f-postgres-vn-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-vn-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-vn', 'node-b'), ('app-f-prod/statefulset/app-f-redis', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
@@ -2738,6 +2745,7 @@
    "target": "app-h-prod/app-h-mysql-backup",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "app-h-prod/app-h-mysql-backup: schedule '50 2 * * *', dump PVCs ['mysql-backup-app-h-mysql-0'] → nodes ['node-b'], hostPath [], source DB [('app-h-prod/statefulset/app-h-mysql', 'node-b'), ('app-h-prod/statefulset/app-h-mysql', 'node-b'), ('app-h-prod/statefulset/app-h-qdrant', 'node-a')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
@@ -2746,6 +2754,7 @@
    "target": "app-i-prod/app-i-postgres-backup",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "app-i-prod/app-i-postgres-backup: schedule '0 3 * * *', dump PVCs ['app-i-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-i-prod/statefulset/app-i-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
@@ -2754,6 +2763,7 @@
    "target": "app-c-prod/app-c-coturn-549854dfcb-jgp4h:coturn",
    "status": "fail",
    "severity_default": "high",
+   "nature": "occurrence",
    "evidence": "11193 restarts, state CrashLoopBackOff, last termination Error (exit 255) 2026-11-07T01:18:42Z, cause class crash (exit 255), Unhealthy events 0, node reboot time None",
    "source": "summary.json:resilience.restarts.rows"
   },
@@ -2762,6 +2772,7 @@
    "target": "app-g-api/sts/app-g-minio:minio",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "pod app-g-minio-0: 7d memory working set p95 / limit = 0.98",
    "source": "metrics/memory_limit_p95_ratio_7d.json"
   },
@@ -2770,6 +2781,7 @@
    "target": "app-a-prod/configmap/marketing-scripts",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "app-a-prod/configmap/marketing-scripts: keys ['discord_sales_bot.py:TOKEN', 'discord_sales_bot.py:OPENAI_API_KEY', 'marketing_autopost.py:client_secret', 'marketing_autopost.py:resource_owner_secret'], mounted/referenced by ['app-a-prod/cronjob/marketing-autopost-en', 'app-a-prod/cronjob/marketing-autopost-ja', 'app-a-prod/cronjob/marketing-digest-day', 'app-a-prod/cronjob/marketing-digest-month', 'app-a-prod/cronjob/marketing-digest-week', 'app-a-prod/cronjob/marketing-radar-global']",
    "source": "summary.json:security.secrets.plaintext_configmap"
   },
@@ -2778,6 +2790,7 @@
    "target": "app-f-prod/configmap/app-f-marketing-scripts",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "app-f-prod/configmap/app-f-marketing-scripts: keys ['app-f_ga4_digest.py:DISCORD_BOT_TOKEN', 'app-f_ga4_digest.py:token', 'app-f_policy_radar.py:OPENAI_API_KEY', 'app-f_policy_radar.py:DISCORD_BOT_TOKEN', 'app-f_sales_bot.py:TOKEN', 'app-f_sales_bot.py:OPENAI_API_KEY'], mounted/referenced by ['app-f-prod/cronjob/app-f-ga4-digest-day', 'app-f-prod/cronjob/app-f-ga4-digest-month', 'app-f-prod/cronjob/app-f-ga4-digest-week', 'app-f-prod/cronjob/app-f-policy-radar', 'app-f-prod/deployment/app-f-sales-bot']",
    "source": "summary.json:security.secrets.plaintext_configmap"
   },
@@ -2786,6 +2799,7 @@
    "target": "app-a-prod/app-a-postgres-backup-pvc",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "node node-a uses 5862MB / capacity 5120MB (1.14x). workloads ['app-a-prod/app-a-postgres-backup']",
    "source": "summary.json:local_path.over_capacity"
   },
@@ -2794,6 +2808,7 @@
    "target": "logging/data-elasticsearch-0",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "node node-b uses 107797MB / capacity 20480MB (5.26x). workloads ['logging/elasticsearch-0']",
    "source": "summary.json:local_path.over_capacity"
   },
@@ -2802,6 +2817,7 @@
    "target": "app-l-prod/app-l-prod-quota",
    "status": "fail",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "app-l-prod/app-l-prod-quota: near limit ['persistentvolumeclaims'] (max ratio 1.0). hard {'limits.cpu': '4', 'limits.memory': '8Gi', 'persistentvolumeclaims': '2', 'requests.cpu': '2', 'requests.memory': '4Gi', 'requests.storage': '30Gi'}, used {'limits.cpu': '1800m', 'limits.memory': '2Gi', 'persistentvolumeclaims': '2', 'requests.cpu': '200m', 'requests.memory': '512Mi', 'requests.storage': '20Gi'}",
    "source": "summary.json:tenancy.quotas.rows"
   },
@@ -2810,6 +2826,7 @@
    "target": "common.too-many-open-files",
    "status": "warn",
    "severity_default": "high",
+   "nature": "occurrence",
    "evidence": "20 occurrences (2026-11-06T11:56:00Z ~ 2026-11-07T00:00:00Z), thresholds warn 1/fail 10. Files: ['logs/node/node-b/containerd-24h.log']. Samples: ['time=\"2026-11-06T11:56:00.627384264Z\" level=warning msg=\"error from *cgroupsv2.Manager.EventChan\" error=\"failed to create inotify fd: too many open files\"', 'time=\"2026-11-06T11:56:00.733358558Z\" level=warning msg=\"error from *cgroupsv2.Manager.EventChan\" error=\"failed to create inotify fd: too many open files\"']",
    "source": "summary.json:logs.signatures"
   },
@@ -2818,6 +2835,7 @@
    "target": "192.168.90.101:9100:/",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "usage 0.77",
    "source": "metrics/disk_usage_ratio.json"
   },
@@ -2826,6 +2844,7 @@
    "target": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "storage emptyDir (PVC None), PVC usage None, TSDB 20.9GiB, retention 30d (size cap 0B), actual oldest sample 30.3 days, failed compactions over 7 days 0, WAL corruptions 0, corruptions at startup 0",
    "source": "summary.json:stackhealth.prometheus"
   },
@@ -2834,6 +2853,7 @@
    "target": "app-a-prod/app-a-postgres-backup",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "app-a-prod/app-a-postgres-backup: schedule '15 3 * * *', dump PVCs ['app-a-postgres-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-a-prod/statefulset/app-a-postgres', 'node-b'), ('app-a-prod/statefulset/app-a-redis', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
@@ -2842,6 +2862,7 @@
    "target": "app-f-prod/app-f-postgres-mx-backup",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "app-f-prod/app-f-postgres-mx-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-mx-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-vn', 'node-b'), ('app-f-prod/statefulset/app-f-redis', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
@@ -2850,6 +2871,7 @@
    "target": "app-g-api/app-g-postgres-backup",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "app-g-api/app-g-postgres-backup: schedule '50 3 * * *', dump PVCs ['app-g-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-g-api/statefulset/app-g-minio', 'node-b'), ('app-g-api/statefulset/app-g-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
@@ -2858,6 +2880,7 @@
    "target": "cert-manager/cert-manager-7c4b5b58df-4v7td:cert-manager-controller",
    "status": "warn",
    "severity_default": "high",
+   "nature": "occurrence",
    "evidence": "12 restarts, state Running, last termination Unknown (exit 255) 2026-10-28T19:25:01Z, cause class Unknown, Unhealthy events 0, node reboot time None",
    "source": "summary.json:resilience.restarts.rows"
   },
@@ -2866,6 +2889,7 @@
    "target": "cert-manager/cert-manager-cainjector-7bf5c557bb-kbtv7:cert-manager-cainjector",
    "status": "warn",
    "severity_default": "high",
+   "nature": "occurrence",
    "evidence": "14 restarts, state Running, last termination Unknown (exit 255) 2026-10-28T19:25:01Z, cause class Unknown, Unhealthy events 0, node reboot time None",
    "source": "summary.json:resilience.restarts.rows"
   },
@@ -2874,6 +2898,7 @@
    "target": "keda/keda-operator-85ff5bb446-lwkl6:keda-operator",
    "status": "warn",
    "severity_default": "high",
+   "nature": "occurrence",
    "evidence": "10 restarts, state Running, last termination Unknown (exit 255) 2026-10-28T19:25:01Z, cause class Unknown, Unhealthy events 0, node reboot time None",
    "source": "summary.json:resilience.restarts.rows"
   },
@@ -2882,6 +2907,7 @@
    "target": "app-g-api/sts/app-g-postgres:postgres",
    "status": "warn",
    "severity_default": "high",
+   "nature": "occurrence",
    "evidence": "pod app-g-postgres-0: throttling ratio now 0.47, no 24-hour value: under 0.001 through the day or the query was not collected, so this is a spike this moment at most",
    "source": "metrics/cpu_throttle_ratio_24h,cpu_throttle_ratio_5m"
   },
@@ -2890,6 +2916,7 @@
    "target": "logging/ds/fluent-bit:fluent-bit",
    "status": "warn",
    "severity_default": "high",
+   "nature": "occurrence",
    "evidence": [
     "pod fluent-bit-nnsb5: throttling ratio now 0.30, no 24-hour value: under 0.001 through the day or the query was not collected, so this is a spike this moment at most",
     "pod fluent-bit-c7fr8: throttling ratio now 0.27, no 24-hour value: under 0.001 through the day or the query was not collected, so this is a spike this moment at most"
@@ -2901,6 +2928,7 @@
    "target": "logging/sts/elasticsearch:elasticsearch",
    "status": "warn",
    "severity_default": "high",
+   "nature": "occurrence",
    "evidence": "pod elasticsearch-0: throttling ratio now 0.45, no 24-hour value: under 0.001 through the day or the query was not collected, so this is a spike this moment at most",
    "source": "metrics/cpu_throttle_ratio_24h,cpu_throttle_ratio_5m"
   },
@@ -2909,6 +2937,7 @@
    "target": "monitoring/sts/prometheus-kube-prometheus-stack-prometheus:prometheus",
    "status": "warn",
    "severity_default": "high",
+   "nature": "occurrence",
    "evidence": "pod prometheus-kube-prometheus-stack-prometheus-0: throttling ratio now 0.54, no 24-hour value: under 0.001 through the day or the query was not collected, so this is a spike this moment at most",
    "source": "metrics/cpu_throttle_ratio_24h,cpu_throttle_ratio_5m"
   },
@@ -2917,6 +2946,7 @@
    "target": "app-a-prod/sts/app-a-postgres:postgres",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "pod app-a-postgres-0: 7d memory working set p95 / limit = 0.81",
    "source": "metrics/memory_limit_p95_ratio_7d.json"
   },
@@ -2925,6 +2955,7 @@
    "target": "logging/ds/fluent-bit:fluent-bit",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": [
     "pod fluent-bit-nnsb5: 7d memory working set p95 / limit = 0.85",
     "pod fluent-bit-c7fr8: 7d memory working set p95 / limit = 0.84"
@@ -2936,6 +2967,7 @@
    "target": "default/configmap/poca-finder-backend-config",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "default/configmap/poca-finder-backend-config: keys ['JWT_RELAY_SECRET', 'JWT_SECRET', 'TWITTER_CLIENT_SECRET', 'TWITTER_CLIENT_SECRET_RELAY'], mounted/referenced by []",
    "source": "summary.json:security.secrets.plaintext_configmap"
   },
@@ -2944,6 +2976,7 @@
    "target": "logging/cronjob/es-index-retention:retention",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "Container retention env ['ELASTIC_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded)",
    "source": "summary.json:security.secrets.plaintext_env"
   },
@@ -2952,6 +2985,7 @@
    "target": "logging/deployment/kibana:kibana",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "Container kibana env ['ELASTICSEARCH_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded)",
    "source": "summary.json:security.secrets.plaintext_env"
   },
@@ -2960,6 +2994,7 @@
    "target": "logging/statefulset/elasticsearch:elasticsearch",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "Container elasticsearch env ['ELASTIC_PASSWORD'] is a literal value rather than a secretKeyRef (value not recorded)",
    "source": "summary.json:security.secrets.plaintext_env"
   },
@@ -2968,6 +3003,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "high",
+   "nature": "state",
    "evidence": "root filesystem per node {'node-a': {'avail_ratio': 0.231, 'size_gib': 106.7, 'growth_gib_per_day': -0.48, 'avail_gib': 24.6, 'days_to_full': None, 'volumes_gib': 6.0}, 'node-b': {'avail_ratio': 0.491, 'size_gib': 454.9, 'growth_gib_per_day': 0.54, 'avail_gib': 223.4, 'days_to_full': 414, 'volumes_gib': 141.4}} (avail_ratio = free ratio, volumes_gib = sum of local-path directories, days_to_full = day it fills at the 7-day trend), over-capacity PVCs 2, PVs 26 by node {'node-a': 7, 'node-b': 19}",
    "source": "summary.json:local_path.summary"
   },
@@ -2976,6 +3012,7 @@
    "target": "cluster",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "occurrence",
    "evidence": "24h 'apply request took too long' 169 times, slow request stats 192, ReadIndex delays 11, leader changes 0, max 1472ms (if the 200-line log cap was hit, the real count is higher)",
    "source": "summary.json:controlplane.etcd"
   },
@@ -2984,6 +3021,7 @@
    "target": "cluster",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, nodes with pods 1 of 2 ({'node-b': 1}), PDB [], spread declared (antiAffinity/topologySpread) True, restarts total 1",
    "source": "summary.json:coredns.summary"
   },
@@ -2992,6 +3030,7 @@
    "target": "cluster",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "NXDOMAIN share of responses in 1h 0.701, queries per second 32.29, NXDOMAIN share of queries forwarded upstream 0.818 (upstreams ['1.1.1.1:53', '8.8.8.8:53']), pods with default ndots (5) 153, autopath False, cache hit ratio 0.8443",
    "source": "summary.json:coredns.summary"
   },
@@ -3000,6 +3039,7 @@
    "target": "cluster",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "stores with static key auth ['ClusterSecretStore/aws-secret-store'] (all auth methods {'ClusterSecretStore/aws-secret-store': 'static-key(Secret)'}), providers ['aws'], ExternalSecrets 39 (prod 33)",
    "source": "summary.json:esoctl.summary"
   },
@@ -3008,6 +3048,7 @@
    "target": "app-a-prod/deployment/app-a-phoenix:phoenix",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image arizephoenix/phoenix:latest (tag latest, imagePullPolicy IfNotPresent, registry docker.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3016,6 +3057,7 @@
    "target": "app-c-prod/deployment/app-c-coturn:coturn",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image coturn/coturn:latest (tag latest, imagePullPolicy Always, registry docker.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3024,6 +3066,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['livenessProbeMissing', 'metadataAndInstanceMismatched', 'priorityClassNotSet', 'readinessProbeMissing', 'topologySpreadConstraint']. Security-category danger ['privilegeEscalationAllowed', 'runAsRootAllowed'] is in the security section",
    "source": "summary.json:hygiene.polaris.workloads"
   },
@@ -3032,6 +3075,7 @@
    "target": "app-a-prod/deployment/app-a-phoenix",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['deploymentMissingReplicas', 'metadataAndInstanceMismatched', 'missingPodDisruptionBudget', 'priorityClassNotSet', 'pullPolicyNotAlways', 'topologySpreadConstraint']. Security-category danger ['privilegeEscalationAllowed', 'runAsRootAllowed'] is in the security section",
    "source": "summary.json:hygiene.polaris.workloads"
   },
@@ -3040,6 +3084,7 @@
    "target": "app-c-prod/deployment/app-c-coturn",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['deploymentMissingReplicas', 'livenessProbeMissing', 'metadataAndInstanceMismatched', 'missingPodDisruptionBudget', 'priorityClassNotSet', 'readinessProbeMissing']. Security-category danger ['hostNetworkSet', 'privilegeEscalationAllowed', 'runAsRootAllowed'] is in the security section",
    "source": "summary.json:hygiene.polaris.workloads"
   },
@@ -3048,6 +3093,7 @@
    "target": "node-a",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "configz kubeReserved {}, systemReserved {}, enforceNodeAllocatable ['pods'], maxPods 110. Node memory 31.3GB",
    "source": "summary.json:nodeos.nodes"
   },
@@ -3056,6 +3102,7 @@
    "target": "node-b",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "configz kubeReserved {}, systemReserved {}, enforceNodeAllocatable ['pods'], maxPods 110. Node memory 30.7GB",
    "source": "summary.json:nodeos.nodes"
   },
@@ -3064,6 +3111,7 @@
    "target": "monitoring/prometheus-kube-prometheus-stack-prometheus-0",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "node node-b /var/lib/kubelet/pods/2575bb27-9b7a-46a3-883d-62e65510c895/volumes/kubernetes.io~empty-dir 21454MB (prometheus-kube-prometheus-stack-prometheus-0)",
    "source": "summary.json:nodeos.pod_dirs"
   },
@@ -3072,6 +3120,7 @@
    "target": "CPUThrottlingHigh/monitoring",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Firing for 74.8 days (ALERTS_FOR_STATE). Labels {'namespace': 'monitoring', 'pod': 'prometheus-kube-prometheus-stack-prometheus-0', 'severity': 'info'}",
    "source": "metrics/alerts_firing_stale_days.json"
   },
@@ -3080,6 +3129,7 @@
    "target": "KubeCPUOvercommit",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Firing for 32.3 days (ALERTS_FOR_STATE). Labels {'severity': 'warning'}",
    "source": "metrics/alerts_firing_stale_days.json"
   },
@@ -3088,6 +3138,7 @@
    "target": "KubeJobFailed/app-a-prod",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": [
     "Firing for 12.9 days (ALERTS_FOR_STATE). Labels {'job': 'kube-state-metrics', 'namespace': 'app-a-prod', 'pod': 'kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2', 'severity': 'warning'}",
     "Firing for 9.1 days (ALERTS_FOR_STATE). Labels {'job': 'kube-state-metrics', 'namespace': 'app-a-prod', 'pod': 'kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2', 'severity': 'warning'}"
@@ -3099,6 +3150,7 @@
    "target": "KubePodCrashLooping/app-c-prod",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Firing for 39.9 days (ALERTS_FOR_STATE). Labels {'job': 'kube-state-metrics', 'namespace': 'app-c-prod', 'pod': 'app-c-coturn-549854dfcb-jgp4h', 'severity': 'warning'}",
    "source": "metrics/alerts_firing_stale_days.json"
   },
@@ -3107,6 +3159,7 @@
    "target": "KubeQuotaFullyUsed/app-l-prod",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Firing for 129.1 days (ALERTS_FOR_STATE). Labels {'namespace': 'app-l-prod', 'pod': 'kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2', 'severity': 'info'}",
    "source": "metrics/alerts_firing_stale_days.json"
   },
@@ -3115,6 +3168,7 @@
    "target": "CPUThrottlingHigh",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "7d firing samples 86762 (same level as Watchdog = never stops firing)",
    "source": "summary.json:observability.alerts.always_firing_7d"
   },
@@ -3123,6 +3177,7 @@
    "target": "KubeCPUOvercommit",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "7d firing samples 20160 (same level as Watchdog = never stops firing)",
    "source": "summary.json:observability.alerts.always_firing_7d"
   },
@@ -3131,6 +3186,7 @@
    "target": "KubeDeploymentReplicasMismatch",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "7d firing samples 20129 (same level as Watchdog = never stops firing)",
    "source": "summary.json:observability.alerts.always_firing_7d"
   },
@@ -3139,6 +3195,7 @@
    "target": "KubeJobFailed",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "7d firing samples 40320 (same level as Watchdog = never stops firing)",
    "source": "summary.json:observability.alerts.always_firing_7d"
   },
@@ -3147,6 +3204,7 @@
    "target": "KubePodCrashLooping",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "7d firing samples 20160 (same level as Watchdog = never stops firing)",
    "source": "summary.json:observability.alerts.always_firing_7d"
   },
@@ -3155,6 +3213,7 @@
    "target": "KubeQuotaFullyUsed",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "7d firing samples 20160 (same level as Watchdog = never stops firing)",
    "source": "summary.json:observability.alerts.always_firing_7d"
   },
@@ -3163,6 +3222,7 @@
    "target": "OOMKill",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "user symptom: pods die and requests fail or slow down. No alert rule covers this failure mode",
    "source": "summary.json:observability.failure_modes.uncovered"
   },
@@ -3171,6 +3231,7 @@
    "target": "ingress-controller",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "29 ingresses, 0 ingress-controller request metric series, namespaces with app http_* metrics [], ALB CloudWatch False — per-backend gaps are the 29 golden-signals-missing (warn) findings",
    "source": "summary.json:observability.golden_signals"
   },
@@ -3179,6 +3240,7 @@
    "target": "monitoring/alertmanager-kube-prometheus-stack-alertmanager",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "emptyDir volumes: config-out, alertmanager-kube-prometheus-stack-alertmanager-db, replicas 1",
    "source": "objects/statefulsets.json"
   },
@@ -3187,6 +3249,7 @@
    "target": "monitoring/kube-prometheus-stack-grafana",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "emptyDir volumes: storage, sc-dashboard-volume, sc-datasources-volume, replicas 1",
    "source": "objects/deployments.json"
   },
@@ -3195,6 +3258,7 @@
    "target": "monitoring/prometheus-kube-prometheus-stack-prometheus",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "emptyDir volumes: config-out, prometheus-kube-prometheus-stack-prometheus-db, replicas 1",
    "source": "objects/statefulsets.json"
   },
@@ -3203,6 +3267,7 @@
    "target": "node-b",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "all 5 snapshots at file:///var/lib/rancher/k3s/server/db/snapshots (same node, same disk). No S3 config (--etcd-s3)",
    "source": "summary.json:k3s.nodes"
   },
@@ -3211,6 +3276,7 @@
    "target": "node-b",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "k3s secrets-encrypt status: Disabled, no configuration file found. Datastore etcd 595MB",
    "source": "summary.json:k3s.nodes"
   },
@@ -3219,6 +3285,7 @@
    "target": "app-a-prod/statefulset/app-a-postgres:postgres",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-a-prod/statefulset/app-a-postgres container postgres: liveness exec timeout 1s, period 15s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -3227,6 +3294,7 @@
    "target": "app-a-prod/statefulset/app-a-redis:redis",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-a-prod/statefulset/app-a-redis container redis: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -3235,6 +3303,7 @@
    "target": "app-c-prod/statefulset/app-c-postgres:postgres",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-c-prod/statefulset/app-c-postgres container postgres: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -3243,6 +3312,7 @@
    "target": "app-f-prod/statefulset/app-f-postgres-mx:postgres",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/statefulset/app-f-postgres-mx container postgres: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -3251,6 +3321,7 @@
    "target": "app-f-prod/statefulset/app-f-postgres-vn:postgres",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/statefulset/app-f-postgres-vn container postgres: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -3259,6 +3330,7 @@
    "target": "app-f-prod/statefulset/app-f-postgres:postgres",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/statefulset/app-f-postgres container postgres: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -3267,6 +3339,7 @@
    "target": "app-f-prod/statefulset/app-f-redis:redis",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/statefulset/app-f-redis container redis: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -3275,6 +3348,7 @@
    "target": "app-h-prod/statefulset/app-h-mysql:mysql",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod/statefulset/app-h-mysql container mysql: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -3283,6 +3357,7 @@
    "target": "app-h-prod/statefulset/app-h-qdrant:qdrant",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod/statefulset/app-h-qdrant container qdrant: liveness httpGet timeout 1s, period 10s, failureThreshold 3, readiness httpGet timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -3291,6 +3366,7 @@
    "target": "app-i-prod/statefulset/app-i-postgres:postgres",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-i-prod/statefulset/app-i-postgres container postgres: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -3299,6 +3375,7 @@
    "target": "app-l-prod/deployment/app-l-postgres:postgres",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-l-prod/deployment/app-l-postgres container postgres: liveness exec timeout 1s, period 20s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -3307,6 +3384,7 @@
    "target": "cluster",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Allocatable without the largest node node-b (12.0 cores, 30.7GB): CPU 6.0 cores vs total requests 6.12 (OK), memory 30.7GB vs 23.8GB (OK). Pods on that node 48 (prod 15). Pods that fit on no other node [{'namespace': 'app-a-prod', 'pod': 'app-a-postgres-0', 'node': 'node-b', 'cpu': 0.2, 'memory_gb': 0.5, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'app-a-prod', 'pod': 'app-a-redis-0', 'node': 'node-b', 'cpu': 0.02, 'memory_gb': 0.03, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'app-c-prod', 'pod': 'app-c-postgres-0', 'node': 'node-b', 'cpu': 0.05, 'memory_gb': 0.25, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'app-f-prod', 'pod': 'app-f-postgres-0', 'node': 'node-b', 'cpu': 0.05, 'memory_gb': 0.12, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'app-f-prod', 'pod': 'app-f-postgres-mx-0', 'node': 'node-b', 'cpu': 0.05, 'memory_gb': 0.12, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'app-f-prod', 'pod': 'app-f-postgres-vn-0', 'node': 'node-b', 'cpu': 0.05, 'memory_gb': 0.12, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'app-f-prod', 'pod': 'app-f-redis-0', 'node': 'node-b', 'cpu': 0.02, 'memory_gb': 0.03, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'app-g-api', 'pod': 'app-g-minio-0', 'node': 'node-b', 'cpu': 0.05, 'memory_gb': 0.12, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'app-g-api', 'pod': 'app-g-postgres-0', 'node': 'node-b', 'cpu': 0.05, 'memory_gb': 0.12, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'app-h-prod', 'pod': 'app-h-mysql-0', 'node': 'node-b', 'cpu': 0.2, 'memory_gb': 1.56, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'logging', 'pod': 'elasticsearch-0', 'node': 'node-b', 'cpu': 0.2, 'memory_gb': 2.0, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'logging', 'pod': 'kibana-59c97cdf75-ht2zf', 'node': 'node-b', 'cpu': 0.2, 'memory_gb': 0.5, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'app-i-prod', 'pod': 'app-i-postgres-0', 'node': 'node-b', 'cpu': 0.05, 'memory_gb': 0.09, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'monitoring', 'pod': 'alertmanager-kube-prometheus-stack-alertmanager-0', 'node': 'node-b', 'cpu': 0.0, 'memory_gb': 0.2, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'monitoring', 'pod': 'kube-prometheus-stack-grafana-74c84c99-g4grd', 'node': 'node-b', 'cpu': 0.05, 'memory_gb': 0.5, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'monitoring', 'pod': 'kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2', 'node': 'node-b', 'cpu': 0.0, 'memory_gb': 0.0, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'monitoring', 'pod': 'kube-prometheus-stack-operator-74656dd4f5-5fmv5', 'node': 'node-b', 'cpu': 0.0, 'memory_gb': 0.0, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'monitoring', 'pod': 'prometheus-kube-prometheus-stack-prometheus-0', 'node': 'node-b', 'cpu': 0.2, 'memory_gb': 1.0, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}, {'namespace': 'registry', 'pod': 'registry-0', 'node': 'node-b', 'cpu': 0.05, 'memory_gb': 0.12, 'reason': 'scheduling constraints (nodeSelector, nodeAffinity, taints) prevent moving to another node', 'eligible_nodes': []}]. Pools short of room: 19 pods limited to no other node need 1.49 cores and 7.41 GB, free there 0 cores and 0.0 GB. Node autoscaler absent (permanent)",
    "source": "summary.json:resilience.n_plus_one"
   },
@@ -3315,6 +3393,7 @@
    "target": "app-f-prod/deployment/app-f",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
    "source": "summary.json:resilience.placement.rows"
   },
@@ -3323,6 +3402,7 @@
    "target": "app-h-prod/deployment/app-h-admin",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
    "source": "summary.json:resilience.placement.rows"
   },
@@ -3331,6 +3411,7 @@
    "target": "app-h-prod/deployment/app-h-api-server",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 3 (Running 3), node distribution {'node-a': 3}, AZ distribution {'null': 3}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
    "source": "summary.json:resilience.placement.rows"
   },
@@ -3339,6 +3420,7 @@
    "target": "app-h-prod/deployment/app-h-app-q-client",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 2 (Running 2), node distribution {'node-a': 2}, AZ distribution {'null': 2}, topologySpread [{'key': 'kubernetes.io/hostname', 'max_skew': 1, 'when': 'DoNotSchedule'}], podAntiAffinity None, nodes eligible under scheduling constraints 1 — only one eligible node, so a spread declaration still lands on the same node",
    "source": "summary.json:resilience.placement.rows"
   },
@@ -3347,6 +3429,7 @@
    "target": "app-c-prod/deployment/app-c-coturn",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "['nodeSelector kubernetes.io/hostname=node-a'], replicas 1",
    "source": "summary.json:resilience.single_node.rows"
   },
@@ -3355,6 +3438,7 @@
    "target": "app-c-prod/statefulset/app-c-postgres",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "['nodeSelector kubernetes.io/hostname=node-b'], replicas 1",
    "source": "summary.json:resilience.single_node.rows"
   },
@@ -3363,6 +3447,7 @@
    "target": "app-h-prod/deployment/app-h-embed",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "['nodeSelector kubernetes.io/hostname=node-a'], replicas 1",
    "source": "summary.json:resilience.single_node.rows"
   },
@@ -3371,6 +3456,7 @@
    "target": "app-h-prod/statefulset/app-h-mysql",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "['nodeSelector kubernetes.io/hostname=node-b'], replicas 1",
    "source": "summary.json:resilience.single_node.rows"
   },
@@ -3379,6 +3465,7 @@
    "target": "app-h-prod/statefulset/app-h-qdrant",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "['nodeSelector kubernetes.io/hostname=node-a'], replicas 1",
    "source": "summary.json:resilience.single_node.rows"
   },
@@ -3387,6 +3474,7 @@
    "target": "app-a-prod/app-a-phoenix",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3395,6 +3483,7 @@
    "target": "app-a-prod/app-a-umami",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3403,6 +3492,7 @@
    "target": "app-b-prod/app-b-backend",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3411,6 +3501,7 @@
    "target": "app-b-prod/app-b-frontend",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3419,6 +3510,7 @@
    "target": "app-c-prod/app-c-coturn",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3427,6 +3519,7 @@
    "target": "app-c-prod/app-c-signaling",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3435,6 +3528,7 @@
    "target": "app-c-prod/app-c-web",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3443,6 +3537,7 @@
    "target": "app-f-prod/app-f-mx-worker",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3451,6 +3546,7 @@
    "target": "app-f-prod/app-f-vn-worker",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3459,6 +3555,7 @@
    "target": "app-f-prod/app-f-worker",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3467,6 +3564,7 @@
    "target": "app-h-prod/app-h-embed",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3475,6 +3573,7 @@
    "target": "app-h-prod/app-h-excel-agent",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3483,6 +3582,7 @@
    "target": "app-l-prod/app-l-api",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3491,6 +3591,7 @@
    "target": "app-l-prod/app-l-postgres",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3499,6 +3600,7 @@
    "target": "app-l-prod/app-l-web",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 1, no HPA",
    "source": "objects/deployments.json"
   },
@@ -3507,6 +3609,7 @@
    "target": "app-h-prod/deploy/app-h-embed:app",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod app-h-embed-67f6f74f6c-lb7lj: 7d CPU p95 0.001 cores / request 0.50 cores = 0.00",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -3515,6 +3618,7 @@
    "target": "app-a-prod/deployment/app-a-backend:backend",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 890 MB: CPU HPA detected, memory request 256 → 1146 MB. KRR severity CRITICAL (CPU req UNKNOWN, CPU limit UNKNOWN, memory req CRITICAL, memory limit OK). cpu: HPA detected",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -3523,6 +3627,7 @@
    "target": "app-a-prod/deployment/app-a-umami:umami",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 369 MB: CPU request 0.05 → 0.01 cores, CPU limit 0.3 → none, memory request 128 → 497 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req WARNING, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -3531,6 +3636,7 @@
    "target": "app-a-prod/statefulset/app-a-postgres:postgres",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 1546 MB, CPU request over by 0.139 cores: CPU request 0.2 → 0.061 cores, CPU limit 1.0 → none, memory request 512 → 2058 MB. KRR severity CRITICAL (CPU req OK, CPU limit WARNING, memory req CRITICAL, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -3539,6 +3645,7 @@
    "target": "app-g-api/statefulset/app-g-minio:minio",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 454 MB: CPU request 0.05 → 0.01 cores, CPU limit 0.3 → none, memory request 128 → 582 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req WARNING, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -3547,6 +3654,7 @@
    "target": "app-h-prod/deployment/app-h-embed:app",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "CPU request over by 0.49 cores, memory request over by 1301 MB: CPU request 0.5 → 0.01 cores, CPU limit 2.0 → none, memory request 2048 → 747 MB, memory limit 4096 → 747 MB. KRR severity CRITICAL (CPU req WARNING, CPU limit WARNING, memory req CRITICAL, memory limit CRITICAL)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -3555,6 +3663,7 @@
    "target": "logging/statefulset/elasticsearch:elasticsearch",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 773 MB: CPU request 0.2 → 0.3 cores, CPU limit 0.6 → none, memory request 2048 → 2821 MB, memory limit 3072 → 2821 MB. KRR severity CRITICAL (CPU req GOOD, CPU limit WARNING, memory req CRITICAL, memory limit WARNING)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -3563,6 +3672,7 @@
    "target": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus:prometheus",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 520 MB: CPU request 0.2 → 0.114 cores, CPU limit 0.3 → none, memory request 1024 → 1544 MB. KRR severity CRITICAL (CPU req GOOD, CPU limit WARNING, memory req CRITICAL, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -3571,6 +3681,7 @@
    "target": "app-h-prod/hpa/app-h-api-server",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "occurrence",
    "evidence": "76 desired changes over 7 days",
    "source": "metrics/hpa_desired_changes_7d.json"
   },
@@ -3579,6 +3690,7 @@
    "target": "cluster",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "20 of 22 user namespaces have no NetworkPolicy, of which production ['app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']; with: ['app-a-prod', 'argocd']",
    "source": "objects/networkpolicies.networking.k8s.io.json, objects/namespaces.json"
   },
@@ -3587,6 +3699,7 @@
    "target": "cluster",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Polaris score 75. Security danger workloads 102 (prod 68): per check {'privilegeEscalationAllowed': 87, 'runAsRootAllowed': 82, 'sensitiveContainerEnvVar': 12, 'hostNetworkSet': 3, 'hostPIDSet': 3, 'runAsPrivileged': 2, 'clusterrolebindingClusterAdmin': 1, 'clusterrolebindingPodExecAttach': 3, 'rolebindingClusterAdminRole': 1, 'rolebindingRolePodExecAttach': 2, 'sensitiveConfigmapContent': 1, 'rolePodExecAttach': 2, 'clusterrolePodExecAttach': 3}. prod list ['app-a-prod/daemonset/app-a-sandbox-prepull', 'app-f-prod/deployment/app-f', 'app-f-prod/deployment/app-f-mx', 'app-c-prod/deployment/app-c-coturn', 'app-f-prod/deployment/app-f-vn', 'app-a-prod/deployment/app-a-phoenix', 'app-a-prod/pod/app-a-experiment', 'app-i-prod/deployment/app-i', 'app-a-prod/deployment/app-a-backend', 'app-a-prod/deployment/app-m', 'app-f-prod/deployment/app-f-sales-bot', 'app-i-prod/job/app-i-postgres-manual-backup']",
    "source": "summary.json:security.polaris"
   },
@@ -3595,6 +3708,7 @@
    "target": "app-c-prod",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-c-prod: ResourceQuota False, NetworkPolicies 0 (enforced by the cluster True), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 12",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -3603,6 +3717,7 @@
    "target": "app-f-prod",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod: ResourceQuota False, NetworkPolicies 0 (enforced by the cluster True), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 12",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -3611,6 +3726,7 @@
    "target": "app-h-prod",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod: ResourceQuota False, NetworkPolicies 0 (enforced by the cluster True), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 12",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -3619,6 +3735,7 @@
    "target": "app-i-prod",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-i-prod: ResourceQuota False, NetworkPolicies 0 (enforced by the cluster True), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 12",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -3627,6 +3744,7 @@
    "target": "nodeport/app-f-prod/app-f-postgres-external",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "nodeport app-f-prod/app-f-postgres-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address",
    "source": "summary.json:traffic.db_exposed"
   },
@@ -3635,6 +3753,7 @@
    "target": "nodeport/app-f-prod/app-f-postgres-mx-external",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "nodeport app-f-prod/app-f-postgres-mx-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address",
    "source": "summary.json:traffic.db_exposed"
   },
@@ -3643,6 +3762,7 @@
    "target": "nodeport/app-f-prod/app-f-postgres-vn-external",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "nodeport app-f-prod/app-f-postgres-vn-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address",
    "source": "summary.json:traffic.db_exposed"
   },
@@ -3651,6 +3771,7 @@
    "target": "nodeport/app-i-prod/app-i-postgres-external",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "nodeport app-i-prod/app-i-postgres-external: ports [5432], exposure node-ip (all node interfaces), addresses [], sourceRanges None, security group not applicable. DB port open on an external address",
    "source": "summary.json:traffic.db_exposed"
   },
@@ -3659,6 +3780,7 @@
    "target": "app-c-prod/app-c-coturn",
    "status": "fail",
    "severity_default": "medium",
+   "nature": "occurrence",
    "evidence": "24h minimum Ready ratio 0.0 (pod app-c-coturn-549854dfcb-jgp4h, about 1440 min not ready), pods below 0.99 1, Unhealthy events 0",
    "source": "summary.json:traffic.readiness.rows"
   },
@@ -3667,6 +3789,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "admin.enabled True, SSO (dex/oidc) False, anonymous False, RBAC policy.default '' / policy.csv 0 lines, exec.enabled False, URL None",
    "source": "summary.json:argocdctl.summary"
   },
@@ -3675,6 +3798,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Applications 18 (prod 10), OutOfSync ['argocd/application/root'] (prod []), Degraded/Missing/Unknown [] (prod []), Progressing (rolling out, not abnormal) ['argocd/application/app-c'], apps with conditions ['ExcludedResourceWarning']: ['argocd/application/app-n'], last operation failed []",
    "source": "summary.json:argocdctl.summary"
   },
@@ -3683,6 +3807,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "AppProjects 2, projects whose sourceRepos and destinations are all * ['default'], apps bound to the default project 4/18 (prod 10)",
    "source": "summary.json:argocdctl.summary"
   },
@@ -3691,6 +3816,7 @@
    "target": "LIST",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "occurrence",
    "evidence": "LIST p99 0.807s",
    "source": "metrics/apiserver_p99_latency_by_verb.json"
   },
@@ -3699,6 +3825,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "controller 1/1, webhook 1/1 (Fail policy ['validate.externalsecret.external-secrets.io', 'validate.secretstore.external-secrets.io', 'validate.clustersecretstore.external-secrets.io']), cert-controller 1/1, --concurrent 1",
    "source": "summary.json:esoctl.summary"
   },
@@ -3707,6 +3834,7 @@
    "target": "cluster",
    "status": "llm",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Most outages are triggered by a change (Google SRE Book ch. 1, Change Management; Cloudflare incident reports in general). The code only gathers the material: workloads and namespaces changed within 24 hours (recent_changes), objects changed and new findings versus the previous snapshot (diff), last termination times of restarts and OOMs, ingress 5xx and p95, first and last times of Warning events. The LLM asks whether restarts, 5xx or Unhealthy began on that workload (or that ingress) within ±30 minutes of a change. If they overlap, write \"Y started after change X — rollback candidate\"; if the material is instant values and times cannot be matched, write \"correlation not verifiable (range query needed)\". If nothing overlaps, finish in one line. Do not assert.\n",
    "source": "summary.json recent_changes (workloads, namespaces, event_targets; 24h) · diff.json (objects.changed, findings.new, metrics.top_delta) · resilience.restarts.rows[].last_finished · traffic.ingresses[].metrics · events.reasons[].first/last"
   },
@@ -3715,6 +3843,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-adk",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-adk:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3723,6 +3852,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-c",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-c:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3731,6 +3861,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-express",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-express:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3739,6 +3870,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-go",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-go:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3747,6 +3879,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-nestjs",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-nestjs:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3755,6 +3888,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-network",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-network:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3763,6 +3897,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-nextjs",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-nextjs:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3771,6 +3906,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-python",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-python:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3779,6 +3915,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-python-ml",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-python-ml:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3787,6 +3924,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-spring",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-spring:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3795,6 +3933,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-sql",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-sql:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3803,6 +3942,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-todo",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-a-sandbox-todo:latest (tag latest, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3811,6 +3951,7 @@
    "target": "registry/cronjob/registry-tag-cleanup:tag-cleanup",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "image curlimages/curl:latest (tag latest, imagePullPolicy Always, registry docker.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -3819,6 +3960,7 @@
    "target": "role",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Label role: 7 workloads (production 0) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. logging/deployment/kibana, monitoring/deployment/kube-prometheus-stack-grafana, monitoring/deployment/kube-prometheus-stack-kube-state-metrics",
    "source": "summary.json:hygiene.node_labels.rows"
   },
@@ -3827,6 +3969,7 @@
    "target": "storage",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Label storage: 10 workloads (production 7) depend on it via nodeSelector/affinity, present on 1/2 nodes — e.g. app-a-prod/statefulset/app-a-postgres, app-a-prod/statefulset/app-a-redis, app-f-prod/statefulset/app-f-postgres",
    "source": "summary.json:hygiene.node_labels.rows"
   },
@@ -3835,6 +3978,7 @@
    "target": "registry/cronjob/registry-tag-cleanup",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Polaris danger (Reliability, Efficiency) ['tagNotSpecified'], warning ['cpuLimitsMissing', 'cpuRequestsMissing', 'memoryLimitsMissing', 'memoryRequestsMissing', 'metadataAndInstanceMismatched', 'priorityClassNotSet']. Security-category danger ['privilegeEscalationAllowed', 'runAsRootAllowed'] is in the security section",
    "source": "summary.json:hygiene.polaris.workloads"
   },
@@ -3843,6 +3987,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Non-Bound PVCs [], Released/Failed PVs [], Bound PVCs used by no pod [('default', 'data-k-quiz-db-0')]",
    "source": "summary.json:hygiene.orphans"
   },
@@ -3851,6 +3996,7 @@
    "target": "cert-manager.challenge-failed",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "occurrence",
    "evidence": "7 occurrences (2026-11-06T02:40:26Z ~ 2026-11-06T02:40:27Z), thresholds warn 5/fail 100. Files: ['logs/pods/cert-manager/cert-manager_cert-manager.log']. Samples: ['[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:26.398191039Z E1106 02:40:26.398160       1 sync.go:190] \"propagation check failed\"', '[pod/cert-manager-7c4b5b58df-4v7td/cert-manager-controller] 2026-11-06T02:40:26.658827619Z E1106 02:40:26.658696       1 sync.go:190] \"propagation check failed\"']",
    "source": "summary.json:logs.signatures"
   },
@@ -3859,6 +4005,7 @@
    "target": "fluent-bit.flush-failed",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "occurrence",
    "evidence": "16 occurrences (2026-11-07T00:56:41Z ~ 2026-11-07T01:23:41Z), thresholds warn 10/fail 500. Files: ['logs/pods/fluent-bit/logging_fluent-bit.log']. Samples: [\"[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T09:56:41.226336618+09:00 [2026/11/07 00:56:41] [ warn] [engine] failed to flush chunk '1-1794012988.188476469.flb',\", \"[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T09:56:46.227840341+09:00 [2026/11/07 00:56:46] [ warn] [engine] failed to flush chunk '1-1794012995.954604939.flb',\"]",
    "source": "summary.json:logs.signatures"
   },
@@ -3867,6 +4014,7 @@
    "target": "fluent-bit.upstream-down",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "occurrence",
    "evidence": "8 occurrences (2026-11-07T00:58:52Z ~ 2026-11-07T01:19:57Z), thresholds warn 5/fail 200. Files: ['logs/pods/fluent-bit/logging_fluent-bit.log']. Samples: ['[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T09:58:52.226252855+09:00 [2026/11/07 00:58:52] [error] [input:kubernetes_events:kubernetes_events.1] upstream conne', '[pod/fluent-bit-nnsb5/fluent-bit] 2026-11-07T10:01:36.226118934+09:00 [2026/11/07 01:01:36] [error] [input:kubernetes_events:kubernetes_events.1] upstream conne']",
    "source": "summary.json:logs.signatures"
   },
@@ -3875,6 +4023,7 @@
    "target": "metallb.speaker-error",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "occurrence",
    "evidence": "42 occurrences (2026-11-07T01:10:09Z ~ 2026-11-07T01:23:59Z), thresholds warn 5/fail 200. Files: ['logs/pods/metallb/metallb-system_speaker.log']. Samples: ['[pod/speaker-xfxlv/speaker] 2026-11-07T10:10:09.141164882+09:00 {\"caller\":\"state.go:668\",\"component\":\"Memberlist\",\"level\":\"error\",\"msg\":\"memberlist: Push/Pull w', '[pod/speaker-xfxlv/speaker] 2026-11-07T10:10:49.142209582+09:00 {\"caller\":\"state.go:668\",\"component\":\"Memberlist\",\"level\":\"error\",\"msg\":\"memberlist: Push/Pull w']",
    "source": "summary.json:logs.signatures"
   },
@@ -3883,6 +4032,7 @@
    "target": "node-b",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Node node-b: top writable layers [('logging/elasticsearch-0', 'elasticsearch', 2235), ('app-a-prod/marketing-radar-japan-noon', 'radar', 989), ('app-a-prod/marketing-radar-global-eu', 'radar', 968), ('app-a-prod/marketing-radar-japan', 'radar', 965), ('app-a-prod/marketing-radar-global', 'radar', 965)] MB (max 2235MB)",
    "source": "summary.json:nodeos.nodes"
   },
@@ -3891,6 +4041,7 @@
    "target": "node-a",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "crictl ps -a: Running 55, Exited 66, Unknown 0. 53 images, 29.4 GiB",
    "source": "summary.json:nodeos.nodes"
   },
@@ -3899,6 +4050,7 @@
    "target": "node-b",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "crictl ps -a: Running 69, Exited 96, Unknown 0. 62 images, 25.5 GiB",
    "source": "summary.json:nodeos.nodes"
   },
@@ -3907,6 +4059,7 @@
    "target": "node-a",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "configz evictionHard {'imagefs.available': '5%', 'nodefs.available': '5%'}, evictionSoft {}, imageGC 80~85%",
    "source": "summary.json:nodeos.nodes"
   },
@@ -3915,6 +4068,7 @@
    "target": "node-b",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "configz evictionHard {'imagefs.available': '5%', 'nodefs.available': '5%'}, evictionSoft {}, imageGC 80~85%",
    "source": "summary.json:nodeos.nodes"
   },
@@ -3923,6 +4077,7 @@
    "target": "node-b",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "occurrence",
    "evidence": "systemd NRestarts {'kubelet': 0, 'containerd': 0, 'k3s': 5} (uptime 119.0 days, automatic restarts only. Unit states [('kubelet', 'inactive', None), ('containerd', 'inactive', None), ('k3s', 'active', 'Wed 2026-10-28 19:25:12 UTC')])",
    "source": "summary.json:nodeos.nodes"
   },
@@ -3931,6 +4086,7 @@
    "target": "node-a",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "[\"fs.inotify.max_user_instances=128 (recommended ≥ 512, k3s docs 8192; nodes with many pods/log collectors hit 'too many open files')\", 'fs.inotify.max_user_watches=247744 (recommended ≥ 524288)']",
    "source": "summary.json:nodeos.nodes"
   },
@@ -3939,6 +4095,7 @@
    "target": "node-b",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "[\"fs.inotify.max_user_instances=128 (recommended ≥ 512, k3s docs 8192; nodes with many pods/log collectors hit 'too many open files')\", 'fs.inotify.max_user_watches=244476 (recommended ≥ 524288)', 'vm.max_map_count=65530 (Elasticsearch/OpenSearch runs in this cluster; requires 262144. Without an init container raising it, bootstrap checks fail or it falls back to single-node mode)']",
    "source": "summary.json:nodeos.nodes"
   },
@@ -3947,6 +4104,7 @@
    "target": "CPUThrottlingHigh/app-g-api",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Firing for 3.2 days (ALERTS_FOR_STATE). Labels {'namespace': 'app-g-api', 'pod': 'app-g-postgres-0', 'severity': 'info'}",
    "source": "metrics/alerts_firing_stale_days.json"
   },
@@ -3955,6 +4113,7 @@
    "target": "CPUThrottlingHigh/logging",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Firing for 4.9 days (ALERTS_FOR_STATE). Labels {'namespace': 'logging', 'pod': 'elasticsearch-0', 'severity': 'info'}",
    "source": "metrics/alerts_firing_stale_days.json"
   },
@@ -3963,6 +4122,7 @@
    "target": "KubeDeploymentReplicasMismatch/app-c-prod",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Firing for 3.1 days (ALERTS_FOR_STATE). Labels {'job': 'kube-state-metrics', 'namespace': 'app-c-prod', 'pod': 'kube-prometheus-stack-kube-state-metrics-74b875c9c-vwtq2', 'severity': 'warning'}",
    "source": "metrics/alerts_firing_stale_days.json"
   },
@@ -3971,6 +4131,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "occurrence",
    "evidence": "Output errors in 1h None, failed retries (dropped) None, dropped records None, input records None -- fluent-bit metrics are not in Prometheus (no ServiceMonitor). The numbers above were not measured, so they are not really 0",
    "source": "summary.json:logs.agents.fluent-bit"
   },
@@ -3979,6 +4140,7 @@
    "target": "app-a-prod/app-a-backend",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['api.app-a.lab-a.example', 'api.lab-b.example'], backends ['app-a-backend'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -3987,6 +4149,7 @@
    "target": "app-a-prod/app-a-frontend",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-a.lab-a.example', 'lab-b.example', 'www.lab-b.example'], backends ['app-a-frontend'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -3995,6 +4158,7 @@
    "target": "app-a-prod/app-a-phoenix",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['obs.lab-b.example'], backends ['app-a-phoenix'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4003,6 +4167,7 @@
    "target": "app-a-prod/app-a-umami",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['umami.lab-b.example', 'umami.lab-j.example'], backends ['app-a-umami'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4011,6 +4176,7 @@
    "target": "app-b-prod/app-b-backend",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['observe-api.lab-a.example'], backends ['app-b-backend'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4019,6 +4185,7 @@
    "target": "app-b-prod/app-b-frontend",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['observe.lab-a.example'], backends ['app-b-frontend'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4027,6 +4194,7 @@
    "target": "app-c-prod/app-c-signaling-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-c.lab-a.example', 'lab-i.example', 'www.lab-i.example'], backends ['app-c-signaling-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4035,6 +4203,7 @@
    "target": "app-c-prod/app-c-web-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-c.lab-a.example', 'lab-i.example', 'www.lab-i.example'], backends ['app-c-web-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4043,6 +4212,7 @@
    "target": "app-d/app-d",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['lab-a.example'], backends ['app-d'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4051,6 +4221,7 @@
    "target": "app-f-prod/app-f-admin-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['admin.lab-c.example'], backends ['app-f-admin-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4059,6 +4230,7 @@
    "target": "app-f-prod/app-f-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['k-esg.lab-c.example'], backends ['app-f-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4067,6 +4239,7 @@
    "target": "app-f-prod/app-f-mx-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['mx.lab-c.example'], backends ['app-f-mx-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4075,6 +4248,7 @@
    "target": "app-f-prod/app-f-vn-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['vn.lab-c.example'], backends ['app-f-vn-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4083,6 +4257,7 @@
    "target": "app-g-api/app-g-api",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-g-api.lab-a.example', 'app-g-cdn.lab-a.example'], backends ['app-g-api', 'app-g-minio'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4091,6 +4266,7 @@
    "target": "app-h-prod/app-h-admin-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-h-admin-prod.lab-a.example', 'lab-h.example', 'www.lab-h.example'], backends ['app-h-admin-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4099,6 +4275,7 @@
    "target": "app-h-prod/app-h-api-server-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-h-api-prod.lab-a.example'], backends ['app-h-api-server-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4107,6 +4284,7 @@
    "target": "app-h-prod/app-h-api-server-oauth-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['lab-d.example', 'www.lab-d.example'], backends ['app-h-api-server-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4115,6 +4293,7 @@
    "target": "app-h-prod/app-h-app-p-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-h-app-p-prod.lab-a.example', 'lab-g.example', 'www.lab-g.example'], backends ['app-h-app-p-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4123,6 +4302,7 @@
    "target": "app-h-prod/app-h-app-q-client-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-h-app-q-client-prod.lab-a.example', 'lab-d.example', 'www.lab-d.example'], backends ['app-h-app-q-client-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4131,6 +4311,7 @@
    "target": "app-i-prod/app-i-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-j.lab-a.example', 'lab-e.example', 'www.lab-e.example'], backends ['app-i-svc'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4139,6 +4320,7 @@
    "target": "app-k/app-k",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-k.lab-a.example'], backends ['app-k'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4147,6 +4329,7 @@
    "target": "app-l-prod/app-l-api",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['api.lab-f.example'], backends ['app-l-api'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4155,6 +4338,7 @@
    "target": "app-l-prod/app-l-web",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['lab-f.example'], backends ['app-l-web'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4163,6 +4347,7 @@
    "target": "app-n/app-n",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-o.lab-a.example'], backends ['app-n-workstation'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4171,6 +4356,7 @@
    "target": "app-n/app-n-auth",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['app-o.lab-a.example'], backends ['app-n-workstation'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4179,6 +4365,7 @@
    "target": "argocd/argocd-server-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['argocd.lab-a.example'], backends ['argocd-server'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4187,6 +4374,7 @@
    "target": "logging/kibana",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['kibana.lab-a.example'], backends ['kibana'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4195,6 +4383,7 @@
    "target": "monitoring/monitoring-grafana-ingress",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['grafana.lab-a.example'], backends ['kube-prometheus-stack-grafana'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4203,6 +4392,7 @@
    "target": "registry/registry",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "hosts ['registry.lab-a.example'], backends ['registry'], no app http_* metrics, no ingress controller metrics, source none",
    "source": "summary.json:observability.golden_signals.missing_lte"
   },
@@ -4211,6 +4401,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "161 alert rules: symptom 0, cause 153, app metrics (assumed symptom) 7. Symptom ratio 0.0. Symptom rules: []",
    "source": "summary.json:observability.rules"
   },
@@ -4219,6 +4410,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "of 161 alert rules, 40 are critical/page severity yet look only at cause metrics (container_*, node_*, kube_*) (e.g. ['AppQClusterCPU80', 'AppQClusterMem80', 'AppQBackendDown', 'AppQFrontendDown', 'AppQPostgresDown', 'AppQGatewayDown']), classes {'cause': 153, 'app-cause': 1, 'app': 7}, severity distribution {'warning': 106, 'critical': 46, 'none': 2, 'info': 7}",
    "source": "summary.json:observability.rules"
   },
@@ -4227,6 +4419,7 @@
    "target": "deployments/app-c-prod/app-c-coturn",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Available=False (MinimumReplicasUnavailable) for 0.6 hours: Deployment does not have minimum availability.",
    "source": "summary.json:conditions.unhealthy"
   },
@@ -4235,6 +4428,7 @@
    "target": "app-f-prod/app-f-postgres-backup",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "schedule '30 3 * * *', concurrencyPolicy Allow, activeDeadlineSeconds None, backoffLimit None, podFailurePolicy False, startingDeadlineSeconds None, ttl None, active Jobs 0. Gaps: ['concurrencyPolicy Allow (overlap allowed)', 'activeDeadlineSeconds missing (a stuck Job runs forever)', 'backoffLimit default 6 and no podFailurePolicy', 'startingDeadlineSeconds missing (the controller stops after 100 missed schedules)']",
    "source": "summary.json:resilience.cronjobs.rows"
   },
@@ -4243,6 +4437,7 @@
    "target": "app-f-prod/app-f-postgres-mx-backup",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "schedule '30 3 * * *', concurrencyPolicy Allow, activeDeadlineSeconds None, backoffLimit None, podFailurePolicy False, startingDeadlineSeconds None, ttl None, active Jobs 0. Gaps: ['concurrencyPolicy Allow (overlap allowed)', 'activeDeadlineSeconds missing (a stuck Job runs forever)', 'backoffLimit default 6 and no podFailurePolicy', 'startingDeadlineSeconds missing (the controller stops after 100 missed schedules)']",
    "source": "summary.json:resilience.cronjobs.rows"
   },
@@ -4251,6 +4446,7 @@
    "target": "app-f-prod/app-f-postgres-vn-backup",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "schedule '30 3 * * *', concurrencyPolicy Allow, activeDeadlineSeconds None, backoffLimit None, podFailurePolicy False, startingDeadlineSeconds None, ttl None, active Jobs 0. Gaps: ['concurrencyPolicy Allow (overlap allowed)', 'activeDeadlineSeconds missing (a stuck Job runs forever)', 'backoffLimit default 6 and no podFailurePolicy', 'startingDeadlineSeconds missing (the controller stops after 100 missed schedules)']",
    "source": "summary.json:resilience.cronjobs.rows"
   },
@@ -4259,6 +4455,7 @@
    "target": "app-h-prod/app-h-mysql-backup",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "schedule '50 2 * * *', concurrencyPolicy Allow, activeDeadlineSeconds None, backoffLimit None, podFailurePolicy False, startingDeadlineSeconds None, ttl None, active Jobs 0. Gaps: ['concurrencyPolicy Allow (overlap allowed)', 'activeDeadlineSeconds missing (a stuck Job runs forever)', 'backoffLimit default 6 and no podFailurePolicy', 'startingDeadlineSeconds missing (the controller stops after 100 missed schedules)']",
    "source": "summary.json:resilience.cronjobs.rows"
   },
@@ -4267,6 +4464,7 @@
    "target": "app-i-prod/app-i-postgres-backup",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "schedule '0 3 * * *', concurrencyPolicy Allow, activeDeadlineSeconds None, backoffLimit None, podFailurePolicy False, startingDeadlineSeconds None, ttl None, active Jobs 0. Gaps: ['concurrencyPolicy Allow (overlap allowed)', 'activeDeadlineSeconds missing (a stuck Job runs forever)', 'backoffLimit default 6 and no podFailurePolicy', 'startingDeadlineSeconds missing (the controller stops after 100 missed schedules)']",
    "source": "summary.json:resilience.cronjobs.rows"
   },
@@ -4275,6 +4473,7 @@
    "target": "app-a-prod/app-a-sandbox-watchdog",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-a-prod/app-a-sandbox-watchdog: schedule '* * * * *' (about 0.016666666666666666h), recent Job max 50s / median 50s = 0.83x the interval (1 measured), concurrencyPolicy Forbid, active Jobs 1",
    "source": "summary.json:resilience.cronjobs.rows"
   },
@@ -4283,6 +4482,7 @@
    "target": "app-a-prod/app-a-sandbox-watchdog",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "schedule '* * * * *' (about every 0.016666666666666666h), last success 2026-11-07T01:22:50Z (0.0h ago), last schedule 2026-11-07T01:23:00Z, active Jobs 1, failed Jobs ['app-a-sandbox-watchdog-29881700', 'app-a-sandbox-watchdog-29887083'], suspend False",
    "source": "summary.json:resilience.cronjobs.rows"
   },
@@ -4291,6 +4491,7 @@
    "target": "app-g-api/statefulset/app-g-postgres:postgres",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-g-api/statefulset/app-g-postgres container postgres: liveness exec timeout 1s, period 10s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -4299,6 +4500,7 @@
    "target": "app-k/deployment/app-k-postgres:postgres",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-k/deployment/app-k-postgres container postgres: liveness exec timeout 1s, period 20s, failureThreshold 3, readiness exec timeout 1s, startupProbe absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -4307,6 +4509,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "User-defined PriorityClasses [], pod distribution {'(none, 0)': 91, 'system-cluster-critical': 1, 'system-node-critical': 3}, prod pods without a class 48 of 48, prod max priority 0, non-prod max 0, inversions [], Preempted events 0",
    "source": "summary.json:resilience.priority"
   },
@@ -4315,6 +4518,7 @@
    "target": "app-c-prod/statefulset/app-c-postgres",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "statefulset app-c-postgres (Service app-c-postgres, PVC postgres-data-app-c-postgres-0): no backup CronJob names it; the namespace has no backup CronJob",
    "source": "summary.json:resilience.backup.databases"
   },
@@ -4323,6 +4527,7 @@
    "target": "app-h-prod/statefulset/app-h-qdrant",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "statefulset app-h-qdrant (Service app-h-qdrant, PVC app-h-qdrant-data-app-h-qdrant-0): no backup CronJob names it; the namespace's backup CronJobs dump other databases: app-h-mysql-backup -> app-h-mysql",
    "source": "summary.json:resilience.backup.databases"
   },
@@ -4331,6 +4536,7 @@
    "target": "app-l-prod/deployment/app-l-postgres",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "deployment app-l-postgres (Service app-l-postgres, PVC app-l-postgres-data): no backup CronJob names it; the namespace has no backup CronJob",
    "source": "summary.json:resilience.backup.databases"
   },
@@ -4339,6 +4545,7 @@
    "target": "app-a-prod/deployment/app-a-backend",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 2 (Running 2), node distribution {'node-b': 1, 'node-a': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
    "source": "summary.json:resilience.placement.rows"
   },
@@ -4347,6 +4554,7 @@
    "target": "app-a-prod/deployment/app-a-frontend",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 2 (Running 2), node distribution {'node-b': 1, 'node-a': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
    "source": "summary.json:resilience.placement.rows"
   },
@@ -4355,6 +4563,7 @@
    "target": "app-a-prod/deployment/app-a-gateway",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 2 (Running 2), node distribution {'node-a': 1, 'node-b': 1}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
    "source": "summary.json:resilience.placement.rows"
   },
@@ -4363,6 +4572,7 @@
    "target": "ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "replicas 2 (Running 2), node distribution {'node-b': 2}, AZ distribution {'null': 2}, topologySpread [], podAntiAffinity None, nodes eligible under scheduling constraints 2",
    "source": "summary.json:resilience.placement.rows"
   },
@@ -4371,6 +4581,7 @@
    "target": "app-a-prod/statefulset/app-a-postgres",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-a-prod/statefulset/app-a-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'storage': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4379,6 +4590,7 @@
    "target": "app-a-prod/statefulset/app-a-redis",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-a-prod/statefulset/app-a-redis: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'storage': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4387,6 +4599,7 @@
    "target": "app-c-prod/deployment/app-c-coturn",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-c-prod/deployment/app-c-coturn: eligible nodes ['node-a'] (of 2 nodes), constraints [\"nodeSelector {'kubernetes.io/hostname': 'node-a'}\"], unavoidable pin reasons ['hostNetwork'], replicas 1, serves traffic False",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4395,6 +4608,7 @@
    "target": "app-c-prod/deployment/app-c-signaling",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-c-prod/deployment/app-c-signaling: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4403,6 +4617,7 @@
    "target": "app-c-prod/deployment/app-c-web",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-c-prod/deployment/app-c-web: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4411,6 +4626,7 @@
    "target": "app-c-prod/statefulset/app-c-postgres",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-c-prod/statefulset/app-c-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'kubernetes.io/hostname': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate postgres-data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4419,6 +4635,7 @@
    "target": "app-f-prod/deployment/app-f",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/deployment/app-f: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 2, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4427,6 +4644,7 @@
    "target": "app-f-prod/deployment/app-f-admin",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/deployment/app-f-admin: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4435,6 +4653,7 @@
    "target": "app-f-prod/deployment/app-f-mx",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/deployment/app-f-mx: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4443,6 +4662,7 @@
    "target": "app-f-prod/deployment/app-f-mx-worker",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/deployment/app-f-mx-worker: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic False",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4451,6 +4671,7 @@
    "target": "app-f-prod/deployment/app-f-vn",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/deployment/app-f-vn: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4459,6 +4680,7 @@
    "target": "app-f-prod/deployment/app-f-vn-worker",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/deployment/app-f-vn-worker: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic False",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4467,6 +4689,7 @@
    "target": "app-f-prod/deployment/app-f-worker",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/deployment/app-f-worker: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic False",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4475,6 +4698,7 @@
    "target": "app-f-prod/statefulset/app-f-postgres",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/statefulset/app-f-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'storage': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-postgres-data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4483,6 +4707,7 @@
    "target": "app-f-prod/statefulset/app-f-postgres-mx",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/statefulset/app-f-postgres-mx: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'storage': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-postgres-mx-data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4491,6 +4716,7 @@
    "target": "app-f-prod/statefulset/app-f-postgres-vn",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/statefulset/app-f-postgres-vn: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'storage': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-postgres-vn-data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4499,6 +4725,7 @@
    "target": "app-f-prod/statefulset/app-f-redis",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod/statefulset/app-f-redis: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'storage': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate app-f-redis-data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4507,6 +4734,7 @@
    "target": "app-g-api/statefulset/app-g-minio",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-g-api/statefulset/app-g-minio: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'storage': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate app-g-minio-data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4515,6 +4743,7 @@
    "target": "app-g-api/statefulset/app-g-postgres",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-g-api/statefulset/app-g-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'storage': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate app-g-postgres-data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4523,6 +4752,7 @@
    "target": "app-h-prod/deployment/app-h-admin",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod/deployment/app-h-admin: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 3, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4531,6 +4761,7 @@
    "target": "app-h-prod/deployment/app-h-api-server",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod/deployment/app-h-api-server: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 3, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4539,6 +4770,7 @@
    "target": "app-h-prod/deployment/app-h-app-p",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod/deployment/app-h-app-p: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4547,6 +4779,7 @@
    "target": "app-h-prod/deployment/app-h-app-q-client",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod/deployment/app-h-app-q-client: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 2, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4555,6 +4788,7 @@
    "target": "app-h-prod/deployment/app-h-embed",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod/deployment/app-h-embed: eligible nodes ['node-a'] (of 2 nodes), constraints [\"nodeSelector {'kubernetes.io/hostname': 'node-a'}\"], unavoidable pin reasons ['extended resource nvidia.com/gpu'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4563,6 +4797,7 @@
    "target": "app-h-prod/deployment/app-h-excel-agent",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod/deployment/app-h-excel-agent: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4571,6 +4806,7 @@
    "target": "app-h-prod/statefulset/app-h-mysql",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod/statefulset/app-h-mysql: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'kubernetes.io/hostname': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate mysql-backup', 'local-path volumeClaimTemplate mysql-data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4579,6 +4815,7 @@
    "target": "app-h-prod/statefulset/app-h-qdrant",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod/statefulset/app-h-qdrant: eligible nodes ['node-a'] (of 2 nodes), constraints [\"nodeSelector {'kubernetes.io/hostname': 'node-a'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate app-h-qdrant-data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4587,6 +4824,7 @@
    "target": "app-i-prod/deployment/app-i",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-i-prod/deployment/app-i: eligible nodes ['node-a'] (of 2 nodes), constraints ['required nodeAffinity [{\"matchExpressions\": [{\"key\": \"role\", \"operator\": \"NotIn\", \"values\": [\"observability\"]}]}]'], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4595,6 +4833,7 @@
    "target": "app-i-prod/statefulset/app-i-postgres",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-i-prod/statefulset/app-i-postgres: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'storage': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate app-i-postgres-data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4603,6 +4842,7 @@
    "target": "logging/deployment/kibana",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "logging/deployment/kibana: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'role': 'observability'}\"], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4611,6 +4851,7 @@
    "target": "logging/statefulset/elasticsearch",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "logging/statefulset/elasticsearch: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'role': 'observability'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4619,6 +4860,7 @@
    "target": "monitoring/deployment/kube-prometheus-stack-grafana",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "monitoring/deployment/kube-prometheus-stack-grafana: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'role': 'observability'}\"], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4627,6 +4869,7 @@
    "target": "monitoring/deployment/kube-prometheus-stack-kube-state-metrics",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "monitoring/deployment/kube-prometheus-stack-kube-state-metrics: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'role': 'observability'}\"], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4635,6 +4878,7 @@
    "target": "monitoring/deployment/kube-prometheus-stack-operator",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "monitoring/deployment/kube-prometheus-stack-operator: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'role': 'observability'}\"], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4643,6 +4887,7 @@
    "target": "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "monitoring/statefulset/alertmanager-kube-prometheus-stack-alertmanager: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'role': 'observability'}\"], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4651,6 +4896,7 @@
    "target": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'role': 'observability'}\"], unavoidable pin reasons [], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4659,6 +4905,7 @@
    "target": "registry/statefulset/registry",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "registry/statefulset/registry: eligible nodes ['node-b'] (of 2 nodes), constraints [\"nodeSelector {'kubernetes.io/hostname': 'node-b'}\"], unavoidable pin reasons ['local-path volumeClaimTemplate registry-data'], replicas 1, serves traffic True",
    "source": "summary.json:resilience.placement.single_eligible_node"
   },
@@ -4667,6 +4914,7 @@
    "target": "registry/statefulset/registry",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "['nodeSelector kubernetes.io/hostname=node-b'], replicas 1",
    "source": "summary.json:resilience.single_node.rows"
   },
@@ -4675,6 +4923,7 @@
    "target": "app-a-prod/deploy/app-a-backend:backend",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": [
     "pod app-a-backend-79c97cbbd6-kkc2d: 7d CPU p95 0.003 cores / request 0.10 cores = 0.03",
     "pod app-a-backend-79c97cbbd6-ztv7h: 7d CPU p95 0.002 cores / request 0.10 cores = 0.02"
@@ -4686,6 +4935,7 @@
    "target": "app-a-prod/deploy/app-a-frontend:frontend",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": [
     "pod app-a-frontend-574ff75654-6sqcp: 7d CPU p95 0.006 cores / request 0.10 cores = 0.06",
     "pod app-a-frontend-574ff75654-rjbzg: 7d CPU p95 0.006 cores / request 0.10 cores = 0.06"
@@ -4697,6 +4947,7 @@
    "target": "app-a-prod/deploy/app-a-gateway:gateway",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": [
     "pod app-a-gateway-6d898d5f68-rqgsj: 7d CPU p95 0.000 cores / request 0.10 cores = 0.00",
     "pod app-a-gateway-6d898d5f68-5sd56: 7d CPU p95 0.000 cores / request 0.10 cores = 0.00"
@@ -4708,6 +4959,7 @@
    "target": "app-a-prod/deploy/app-a-phoenix:phoenix",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod app-a-phoenix-56ddc584cf-znjvs: 7d CPU p95 0.007 cores / request 0.10 cores = 0.07",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4716,6 +4968,7 @@
    "target": "app-a-prod/sts/app-a-postgres:postgres",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod app-a-postgres-0: 7d CPU p95 0.055 cores / request 0.20 cores = 0.28; database-like: keep the request",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4724,6 +4977,7 @@
    "target": "app-g-api/deploy/app-g-api:api",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod app-g-api-7cb685d8cf-zxqt7: 7d CPU p95 0.001 cores / request 0.10 cores = 0.01",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4732,6 +4986,7 @@
    "target": "app-h-prod/deploy/app-h-api-server:app",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": [
     "pod app-h-api-server-5d6b56f78b-xxzbl: 7d CPU p95 0.025 cores / request 0.10 cores = 0.25",
     "pod app-h-api-server-5d6b56f78b-srwnk: 7d CPU p95 0.018 cores / request 0.10 cores = 0.18",
@@ -4744,6 +4999,7 @@
    "target": "app-h-prod/sts/app-h-mysql:mysql",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod app-h-mysql-0: 7d CPU p95 0.018 cores / request 0.20 cores = 0.09; database-like: keep the request",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4752,6 +5008,7 @@
    "target": "app-k/deploy/app-k:web",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod app-k-54c94979b5-b65b5: 7d CPU p95 0.001 cores / request 0.10 cores = 0.01",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4760,6 +5017,7 @@
    "target": "app-l-prod/deploy/app-l-postgres:postgres",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod app-l-postgres-76b69b654d-lzf4d: 7d CPU p95 0.001 cores / request 0.10 cores = 0.01; database-like: keep the request",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4768,6 +5026,7 @@
    "target": "ingress-nginx/deploy/nginx-ingress-ingress-nginx-controller:controller",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": [
     "pod nginx-ingress-ingress-nginx-controller-86f8b99dfd-lkdwm: 7d CPU p95 0.004 cores / request 0.10 cores = 0.04",
     "pod nginx-ingress-ingress-nginx-controller-86f8b99dfd-6kgsq: 7d CPU p95 0.004 cores / request 0.10 cores = 0.04"
@@ -4779,6 +5038,7 @@
    "target": "keda/deploy/keda-admission-webhooks:keda-admission-webhooks",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod keda-admission-webhooks-5d67c9bcfb-8fcdl: 7d CPU p95 0.000 cores / request 0.10 cores = 0.00",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4787,6 +5047,7 @@
    "target": "keda/deploy/keda-operator-metrics-apiserver:keda-operator-metrics-apiserver",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod keda-operator-metrics-apiserver-7ff5758fd7-gq7g7: 7d CPU p95 0.003 cores / request 0.10 cores = 0.03",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4795,6 +5056,7 @@
    "target": "keda/deploy/keda-operator:keda-operator",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod keda-operator-85ff5bb446-lwkl6: 7d CPU p95 0.002 cores / request 0.10 cores = 0.02",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4803,6 +5065,7 @@
    "target": "kube-system/deploy/coredns:coredns",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod coredns-59d4d457d-qjng8: 7d CPU p95 0.010 cores / request 0.10 cores = 0.10",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4811,6 +5074,7 @@
    "target": "kube-system/deploy/metrics-server:metrics-server",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod metrics-server-7bfffcd44-fkpfm: 7d CPU p95 0.008 cores / request 0.10 cores = 0.08",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4819,6 +5083,7 @@
    "target": "logging/deploy/kibana:kibana",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "pod kibana-59c97cdf75-ht2zf: 7d CPU p95 0.004 cores / request 0.20 cores = 0.02",
    "source": "metrics/cpu_request_p95_ratio_7d,cpu_p95_7d_cores,container_cpu_request_cores"
   },
@@ -4827,6 +5092,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-adk",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4835,6 +5101,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-c",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4843,6 +5110,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-express",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4851,6 +5119,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-go",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4859,6 +5128,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-nestjs",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4867,6 +5137,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-network",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4875,6 +5146,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-nextjs",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4883,6 +5155,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-python",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4891,6 +5164,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-python-ml",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4899,6 +5173,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-spring",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4907,6 +5182,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-sql",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4915,6 +5191,7 @@
    "target": "app-a-prod/daemonset/app-a-sandbox-prepull:hold-todo",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.05 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4923,6 +5200,7 @@
    "target": "app-a-prod/deployment/app-a-frontend:frontend",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 182 MB: CPU HPA detected, memory request 128 → 310 MB. KRR severity OK (CPU req UNKNOWN, CPU limit UNKNOWN, memory req OK, memory limit OK). cpu: HPA detected",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4931,6 +5209,7 @@
    "target": "app-a-prod/statefulset/app-a-redis:redis",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 68 MB: CPU request 0.02 → 0.01 cores, CPU limit 0.1 → none, memory request 32 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4939,6 +5218,7 @@
    "target": "app-d/deployment/app-d:nginx",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 84 MB: CPU request 0.01 → 0.01 cores, CPU limit 0.1 → none, memory request 16 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4947,6 +5227,7 @@
    "target": "app-f-prod/statefulset/app-f-redis:redis",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 68 MB: CPU request 0.02 → 0.01 cores, CPU limit 0.1 → none, memory request 32 → 100 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4955,6 +5236,7 @@
    "target": "app-h-prod/deployment/app-h-excel-agent:app",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 250 MB: CPU request 0.05 → 0.01 cores, CPU limit 1.0 → none, memory request 256 → 506 MB, memory limit 1024 → 506 MB. KRR severity CRITICAL (CPU req GOOD, CPU limit WARNING, memory req WARNING, memory limit CRITICAL)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4963,6 +5245,7 @@
    "target": "app-h-prod/statefulset/app-h-mysql:mysql",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "CPU request over by 0.174 cores: CPU request 0.2 → 0.026 cores, CPU limit 1.5 → none, memory request 1600 → 1376 MB, memory limit 3200 → 1376 MB. KRR severity CRITICAL (CPU req OK, CPU limit WARNING, memory req OK, memory limit CRITICAL)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4971,6 +5254,7 @@
    "target": "app-l-prod/deployment/app-l-web:web",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 76 MB: CPU request 0.05 → 0.01 cores, CPU limit 0.3 → none, memory request 128 → 204 MB, memory limit 512 → 204 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit WARNING)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4979,6 +5263,7 @@
    "target": "ingress-nginx/deployment/nginx-ingress-ingress-nginx-controller:controller",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 228 MB: CPU request 0.1 → 0.01 cores, memory request 90 → 318 MB, memory limit None → 318 MB. KRR severity WARNING (CPU req GOOD, CPU limit GOOD, memory req OK, memory limit WARNING)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4987,6 +5272,7 @@
    "target": "logging/daemonset/fluent-bit:fluent-bit",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 86 MB: CPU request 0.05 → 0.063 cores, CPU limit 0.1 → none, memory request 50 → 136 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req GOOD, memory limit GOOD)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -4995,6 +5281,7 @@
    "target": "logging/deployment/kibana:kibana",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "CPU request over by 0.19 cores: CPU request 0.2 → 0.01 cores, CPU limit 0.5 → none, memory request 512 → 446 MB, memory limit 1024 → 446 MB. KRR severity CRITICAL (CPU req OK, CPU limit WARNING, memory req GOOD, memory limit CRITICAL)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -5003,6 +5290,7 @@
    "target": "registry/statefulset/registry:registry",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "memory request under by 155 MB: CPU request 0.05 → 0.01 cores, CPU limit 0.5 → none, memory request 128 → 283 MB. KRR severity WARNING (CPU req GOOD, CPU limit WARNING, memory req OK, memory limit OK)",
    "source": "summary.json:resources.krr.workloads"
   },
@@ -5011,6 +5299,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Namespaces with default-deny (ingress, empty podSelector) [], prod without one ['app-a-prod', 'app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']. Enforced True",
    "source": "summary.json:security.networkpolicy"
   },
@@ -5019,6 +5308,7 @@
    "target": "app-c-prod/deployment/app-c-coturn",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "['hostNetwork'], containers allowing root ['coturn']",
    "source": "summary.json:security.pod_security.rows"
   },
@@ -5027,6 +5317,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Namespaces with an enforce label ['metallb-system'], prod without one ['app-a-prod', 'app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']. Share of containers allowing root 0.71 (58 prod workloads)",
    "source": "summary.json:security.pod_security"
   },
@@ -5035,6 +5326,7 @@
    "target": "argocd-application-controller",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "ClusterRole argocd-application-controller: * in verbs and resources, bound subjects [('ServiceAccount', 'argocd', 'argocd-application-controller')]",
    "source": "summary.json:security.rbac.wildcard_roles"
   },
@@ -5043,6 +5335,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "Workloads with token mounted 79/81, of which 37 prod workloads whose SA has no RoleBinding or ClusterRoleBinding at all: ['app-a-prod/deployment/app-a-frontend', 'app-a-prod/deployment/app-a-gateway', 'app-a-prod/deployment/app-a-phoenix', 'app-a-prod/statefulset/app-a-postgres', 'app-a-prod/statefulset/app-a-redis', 'app-a-prod/daemonset/app-a-sandbox-prepull', 'app-a-prod/deployment/app-a-umami', 'app-b-prod/deployment/app-b-backend', 'app-b-prod/deployment/app-b-frontend', 'app-c-prod/deployment/app-c-coturn', 'app-c-prod/statefulset/app-c-postgres', 'app-c-prod/deployment/app-c-signaling']. SAs with automount false 1/91",
    "source": "summary.json:security.service_accounts"
   },
@@ -5051,6 +5344,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "DB-like prod PVCs whose PV reclaimPolicy is Delete: ['app-h-prod/app-h-qdrant-data-app-h-qdrant-0', 'app-a-prod/app-a-postgres-backup-pvc', 'app-a-prod/data-app-a-postgres-0', 'app-a-prod/data-app-a-redis-0', 'app-c-prod/postgres-data-app-c-postgres-0', 'app-f-prod/app-f-postgres-backup-pvc', 'app-f-prod/app-f-postgres-data-app-f-postgres-0', 'app-f-prod/app-f-postgres-mx-backup-pvc', 'app-f-prod/app-f-postgres-mx-data-app-f-postgres-mx-0', 'app-f-prod/app-f-postgres-vn-backup-pvc', 'app-f-prod/app-f-postgres-vn-data-app-f-postgres-vn-0', 'app-f-prod/app-f-redis-data-app-f-redis-0'] (17 in total / 19 prod PVCs)",
    "source": "summary.json:storage.pvcs"
   },
@@ -5059,6 +5353,7 @@
    "target": "app-h-prod",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod (prod): 7d CPU median 0.028 cores, p95 0.102 cores, max 0.589 cores = 21.3x the median. No quota, shares nodes with prod True, nodes {'node-a': 12, 'node-b': 1}, CPU limit total 8.2 cores",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -5067,6 +5362,7 @@
    "target": "cluster",
    "status": "llm",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "A noisy neighbor cannot be caught by one rule. The code gathers the material: (1) minutes a node spent above 90% CPU (7 days), (2) the namespace that dominates that node and its share, (3) bursty tenants (7-day max/median), (4) CPU throttle ratio of production namespaces, (5) the tenant mix on each node. If (1) is 0, the LLM writes \"no room for neighbor damage in this window\" and stops. If (1) > 0, it notes whether the dominant namespace (2) and the throttling (4) or ingress p95 (traffic section) of production on that node overlap on the same node, and because the material is instant values it writes \"insufficient evidence — a range query at that time is needed\" for time correlation. It does not assert. Throttling inside one production namespace is more likely caused by its own limit (resources section) than by a neighbor — write it that way.\n",
    "source": "summary.json tenancy.noisy (nodes_saturated_7d, dominated_shared_nodes, burst_tenants, throttled_prod, top_cpu_share) · tenancy.isolation.nodes · traffic.ingresses[].metrics(p95) · resources.p95 · metrics/namespace_node_cpu_share_p95_7d.json · metrics/node_cpu_saturated_minutes_7d.json · metrics/namespace_cpu_throttled_ratio_7d.json"
   },
@@ -5075,6 +5371,7 @@
    "target": "app-b-prod",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-b-prod: ResourceQuota True, NetworkPolicies 0 (enforced by the cluster True), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 12",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -5083,6 +5380,7 @@
    "target": "app-l-prod",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-l-prod: ResourceQuota True, NetworkPolicies 0 (enforced by the cluster True), PSA enforce None, LimitRange False, RoleBinding subjects 0. Other tenants on the same nodes: True, tenants 12",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -5091,6 +5389,7 @@
    "target": "app-c-prod",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-c-prod (prod): no ResourceQuota. Pods 4, CPU requests total 0.17 cores, memory requests total 0.66GB, 7d CPU p95 0.01 cores (cluster share 0.009), memory p95 0.23GB, 7d max/median Nonex. Tenants in this cluster 12, shares nodes with prod True",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -5099,6 +5398,7 @@
    "target": "app-f-prod",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-f-prod (prod): no ResourceQuota. Pods 12, CPU requests total 0.49 cores, memory requests total 3.91GB, 7d CPU p95 0.027 cores (cluster share 0.024), memory p95 1.66GB, 7d max/median 1.6x. Tenants in this cluster 12, shares nodes with prod True",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -5107,6 +5407,7 @@
    "target": "app-h-prod",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-h-prod (prod): no ResourceQuota. Pods 13, CPU requests total 1.28 cores, memory requests total 8.12GB, 7d CPU p95 0.102 cores (cluster share 0.089), memory p95 5.21GB, 7d max/median 21.3x. Tenants in this cluster 12, shares nodes with prod True",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -5115,6 +5416,7 @@
    "target": "app-i-prod",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "app-i-prod (prod): no ResourceQuota. Pods 2, CPU requests total 0.1 cores, memory requests total 0.28GB, 7d CPU p95 0.006 cores (cluster share 0.005), memory p95 0.14GB, 7d max/median Nonex. Tenants in this cluster 12, shares nodes with prod True",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -5123,6 +5425,7 @@
    "target": "arc-systems",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "arc-systems (ci): no ResourceQuota. Pods 3, CPU requests total 1.0 cores, memory requests total 2.0GB, 7d CPU p95 0.004 cores (cluster share 0.003), memory p95 0.36GB, 7d max/median Nonex. Tenants in this cluster 12, shares nodes with prod True",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -5131,6 +5434,7 @@
    "target": "arc-systems",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "arc-systems (ci): no LimitRange, containers without requests 4 / without a memory limit 4 (pods 3). 7d CPU p95 0.004 cores, memory p95 0.36GB",
    "source": "summary.json:tenancy.namespaces.rows"
   },
@@ -5139,6 +5443,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "occurrence",
    "evidence": "1h DNS request p99 0.1457s, SERVFAIL ratio 0.0",
    "source": "summary.json:traffic.coredns"
   },
@@ -5147,6 +5452,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "medium",
+   "nature": "state",
    "evidence": "ingress-nginx 1.14.0 (Deployment ingress-nginx/nginx-ingress-ingress-nginx-controller); ingress-nginx: best-effort maintenance ended March 2026, repository archived 2026-03-24, no further security fixes; admission webhook on",
    "source": "summary.json:traffic.nginx"
   },
@@ -5155,6 +5461,7 @@
    "target": "cluster",
    "status": "fail",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "Of 110 workloads, share with standard labels 0.23. prod workloads without: ['app-a-prod/deployment/app-a-backend', 'app-a-prod/deployment/app-a-frontend', 'app-a-prod/deployment/app-a-gateway', 'app-a-prod/deployment/app-a-phoenix', 'app-a-prod/deployment/app-a-umami', 'app-a-prod/deployment/app-m', 'app-b-prod/deployment/app-b-backend', 'app-b-prod/deployment/app-b-frontend', 'app-c-prod/deployment/app-c-coturn', 'app-c-prod/deployment/app-c-signaling', 'app-c-prod/deployment/app-c-web', 'app-f-prod/deployment/app-f'] (85 in total)",
    "source": "summary.json:hygiene.labels"
   },
@@ -5163,6 +5470,7 @@
    "target": "192.168.90.102:9100",
    "status": "fail",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "swap 8.0 GiB",
    "source": "metrics/node_swap_total_bytes.json"
   },
@@ -5171,6 +5479,7 @@
    "target": "node-b",
    "status": "fail",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "host 192.168.90.160 of --server https://192.168.90.160:6443 is not among current node IPs or names",
    "source": "summary.json:k3s.cluster.server_url_stale"
   },
@@ -5179,6 +5488,7 @@
    "target": "app-a-prod/deployment/app-a-backend",
    "status": "fail",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "HPA app-a-prod/app-a-backend: share of 15 days at min 1.00, min 2 max 6, current CPU utilization 2% / target 70%, metrics ['cpu'], last scale 4.8 days ago",
    "source": "summary.json:scaling.hpa.rows"
   },
@@ -5187,6 +5497,7 @@
    "target": "app-a-prod/deployment/app-a-frontend",
    "status": "fail",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "HPA app-a-prod/app-a-frontend: share of 15 days at min 1.00, min 2 max 4, current CPU utilization 3% / target 70%, metrics ['cpu'], last scale 2.6 days ago",
    "source": "summary.json:scaling.hpa.rows"
   },
@@ -5195,6 +5506,7 @@
    "target": "app-f-prod/deployment/app-f",
    "status": "fail",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "HPA app-f-prod/app-f: share of 15 days at min 1.00, min 2 max 5, current CPU utilization 4% / target 60%, metrics ['cpu', 'memory'], last scale 9.1 days ago",
    "source": "summary.json:scaling.hpa.rows"
   },
@@ -5203,6 +5515,7 @@
    "target": "app-f-prod/deployment/app-f-mx",
    "status": "fail",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "HPA app-f-prod/app-f-mx: share of 15 days at min 1.00, min 1 max 4, current CPU utilization 4% / target 60%, metrics ['cpu', 'memory'], last scale 9.1 days ago",
    "source": "summary.json:scaling.hpa.rows"
   },
@@ -5211,6 +5524,7 @@
    "target": "app-f-prod/deployment/app-f-vn",
    "status": "fail",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "HPA app-f-prod/app-f-vn: share of 15 days at min 1.00, min 1 max 4, current CPU utilization 2% / target 60%, metrics ['cpu', 'memory'], last scale 9.1 days ago",
    "source": "summary.json:scaling.hpa.rows"
   },
@@ -5219,6 +5533,7 @@
    "target": "app-i-prod/deployment/app-i",
    "status": "fail",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "HPA app-i-prod/app-i: share of 15 days at min 1.00, min 1 max 3, current CPU utilization 4% / target 60%, metrics ['cpu', 'memory'], last scale 9.1 days ago",
    "source": "summary.json:scaling.hpa.rows"
   },
@@ -5227,6 +5542,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "service.* in argocd-notifications-cm False (triggers 0), prod apps 10, and no Argo CD metrics flow to Alertmanager either (no ServiceMonitor)",
    "source": "summary.json:argocdctl.summary"
   },
@@ -5235,6 +5551,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "prod apps 10, apps whose targetRevision is a branch or HEAD 10 ['argocd/application/app-a-prod', 'argocd/application/app-b-prod', 'argocd/application/app-c', 'argocd/application/app-f-kr', 'argocd/application/app-f-mx', 'argocd/application/app-f-shared', 'argocd/application/app-f-vn', 'argocd/application/app-h'], apps using ignoreDifferences 16",
    "source": "summary.json:argocdctl.summary"
   },
@@ -5243,6 +5560,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "occurrence",
    "evidence": "sync calls since controller start 2654 / errors 233, ACME requests 148 by status {'200': 133, '403': 1, '201': 8, '400': 6} (4xx/5xx 7, ratio 0.0473), Ready False metric 0",
    "source": "summary.json:certmanager.summary"
   },
@@ -5251,6 +5569,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "cert-manager 1.14.4 (components {'controller': '1/1', 'cainjector': '1/1', 'webhook': '1/1'}), webhooks with Fail 2 / webhook replicas 1",
    "source": "summary.json:certmanager.summary"
   },
@@ -5259,6 +5578,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "AAAA share of request types 0.487, cluster IPv6 False, queries per second 32.29. The glibc resolver always asks A and AAAA as a pair",
    "source": "summary.json:coredns.summary"
   },
@@ -5267,6 +5587,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "2 nodes, allocatable 18.0 cores, 7-day p95 actual use 0.92 cores (0.051), request total 6.51 cores (7.1x actual use). Would requests still fit without the largest node: False",
    "source": "summary.json:cost.efficiency"
   },
@@ -5275,6 +5596,7 @@
    "target": "app-f-prod/deployment/app-f-vn:db-migrate",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image registry.lab-a.example/app-f-vietnam:prod-af6a0983909b58cd53a1c2dbf3aadb3062aec673 (tag tag, imagePullPolicy Always, registry registry.lab-a.example)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5283,6 +5605,7 @@
    "target": "argocd/deployment/argocd-applicationset-controller:argocd-applicationset-controller",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image quay.io/argoproj/argocd:v3.2.0 (tag tag, imagePullPolicy Always, registry quay.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5291,6 +5614,7 @@
    "target": "argocd/deployment/argocd-dex-server:copyutil",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image quay.io/argoproj/argocd:v3.2.0 (tag tag, imagePullPolicy Always, registry quay.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5299,6 +5623,7 @@
    "target": "argocd/deployment/argocd-dex-server:dex",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image ghcr.io/dexidp/dex:v2.43.0 (tag tag, imagePullPolicy Always, registry ghcr.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5307,6 +5632,7 @@
    "target": "argocd/deployment/argocd-notifications-controller:argocd-notifications-controller",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image quay.io/argoproj/argocd:v3.2.0 (tag tag, imagePullPolicy Always, registry quay.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5315,6 +5641,7 @@
    "target": "argocd/deployment/argocd-redis:redis",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image public.ecr.aws/docker/library/redis:8.2.2-alpine (tag tag, imagePullPolicy Always, registry public.ecr.aws)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5323,6 +5650,7 @@
    "target": "argocd/deployment/argocd-repo-server:argocd-repo-server",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image quay.io/argoproj/argocd:v3.2.0 (tag tag, imagePullPolicy Always, registry quay.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5331,6 +5659,7 @@
    "target": "argocd/deployment/argocd-server:argocd-server",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image quay.io/argoproj/argocd:v3.2.0 (tag tag, imagePullPolicy Always, registry quay.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5339,6 +5668,7 @@
    "target": "argocd/statefulset/argocd-application-controller:argocd-application-controller",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image quay.io/argoproj/argocd:v3.2.0 (tag tag, imagePullPolicy Always, registry quay.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5347,6 +5677,7 @@
    "target": "keda/deployment/keda-admission-webhooks:keda-admission-webhooks",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image ghcr.io/kedacore/keda-admission-webhooks:2.19.0 (tag tag, imagePullPolicy Always, registry ghcr.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5355,6 +5686,7 @@
    "target": "keda/deployment/keda-operator-metrics-apiserver:keda-operator-metrics-apiserver",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image ghcr.io/kedacore/keda-metrics-apiserver:2.19.0 (tag tag, imagePullPolicy Always, registry ghcr.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5363,6 +5695,7 @@
    "target": "keda/deployment/keda-operator:keda-operator",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "image ghcr.io/kedacore/keda:2.19.0 (tag tag, imagePullPolicy Always, registry ghcr.io)",
    "source": "summary.json:hygiene.images.rows"
   },
@@ -5371,6 +5704,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "Failed pods 4 (prod 4), reasons {'Failed': 2, 'UnexpectedAdmissionError': 2}, namespaces {'app-a-prod': 2, 'app-h-prod': 2}, oldest 3881.6h. Example: ['app-a-prod/codex-bench', 'app-a-prod/app-a-experiment', 'app-h-prod/app-h-embed-67f6f74f6c-rlm8m', 'app-h-prod/app-h-embed-67f6f74f6c-b6kdt']",
    "source": "summary.json:hygiene.failed_pods.summary"
   },
@@ -5379,6 +5713,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "Containers with an ephemeral-storage request 0 of 126 (0.0), without one in prod 63. emptyDirs without sizeLimit 11 (prod: [])",
    "source": "summary.json:hygiene.ephemeral.summary"
   },
@@ -5387,6 +5722,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "Of 292 ReplicaSets, 235 have 0 replicas. Deployment revisionHistoryLimit distribution {'10': 54, '0': 3, '3': 1, '2': 1}",
    "source": "summary.json:hygiene.orphans"
   },
@@ -5395,6 +5731,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "Of 139 Secrets (metric kube_secret_info), 9 unreferenced candidates: [('app-f-prod', 'app-f-prod-tls', 'kubernetes.io/tls'), ('app-h-prod', 'app-h-poca-store-prod-tls', 'kubernetes.io/tls'), ('argocd', 'ghcr-auth-secret', 'kubernetes.io/dockerconfigjson'), ('argocd', 'ghcr-pull-secret', 'kubernetes.io/dockerconfigjson'), ('default', 'app-f-prod-tls', 'kubernetes.io/tls'), ('default', 'k-quiz-auth-secret', 'Opaque'), ('default', 'k-quiz-aws-secret', 'Opaque'), ('default', 'k-quiz-db-secret', 'Opaque'), ('default', 'k-quiz-tls', 'kubernetes.io/tls')]",
    "source": "summary.json:hygiene.orphans"
   },
@@ -5403,6 +5740,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "42 of 64 CRDs have zero objects (by group {'generators.external-secrets.io': 17, 'monitoring.coreos.com': 6, 'metallb.io': 5, 'acme.cert-manager.io': 1, 'eventing.keda.sh': 2, 'external-secrets.io': 4, 'keda.sh': 4, 'helm.cattle.io': 2, 'actions.summerwind.dev': 1}), 28 webhooks",
    "source": "summary.json:hygiene.crds"
   },
@@ -5411,6 +5749,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "KEDA v2.19.0 operator 1/1, metrics-apiserver 1/1, webhooks 1/1 — ScaledObject 0, ScaledJob 0",
    "source": "summary.json:kedactl.summary"
   },
@@ -5419,6 +5758,7 @@
    "target": "cert-manager.orphan-tls-secret",
    "status": "warn",
    "severity_default": "low",
+   "nature": "occurrence",
    "evidence": "96 occurrences (2026-11-06T05:52:26Z ~ 2026-11-07T01:09:11Z), thresholds warn 1/fail 1000. Files: ['logs/pods/cert-manager/cert-manager_cert-manager-cainjector.log']. Samples: ['[pod/cert-manager-cainjector-7bf5c557bb-kbtv7/cert-manager-cainjector] 2026-11-06T05:52:26.666496146Z E1106 05:52:26.666384       1 indexers.go:61] \"unable to f', '[pod/cert-manager-cainjector-7bf5c557bb-kbtv7/cert-manager-cainjector] 2026-11-06T05:52:26.666539338Z E1106 05:52:26.666390       1 indexers.go:61] \"unable to f']",
    "source": "summary.json:logs.signatures"
   },
@@ -5427,6 +5767,7 @@
    "target": "kubelet.pod-sync-error",
    "status": "warn",
    "severity_default": "low",
+   "nature": "occurrence",
    "evidence": "2994 occurrences (2026-11-06T14:28:44Z ~ 2026-11-07T01:23:00Z), thresholds warn 50/fail 1000. Files: ['logs/node/node-a/k3s-errors-24h.log']. Samples: ['E1106 23:28:44.752358    1316 pod_workers.go:1301] \"Error syncing pod, skipping\" err=\"failed to \\\\\"StartContainer\\\\\" for \\\\\"coturn\\\\\" with CrashLoopBackOff: \\\\\"back-', 'E1106 23:28:58.752130    1316 pod_workers.go:1301] \"Error syncing pod, skipping\" err=\"failed to \\\\\"StartContainer\\\\\" for \\\\\"coturn\\\\\" with CrashLoopBackOff: \\\\\"back-']",
    "source": "summary.json:logs.signatures"
   },
@@ -5435,6 +5776,7 @@
    "target": "metallb.speaker-peer-unreachable",
    "status": "warn",
    "severity_default": "low",
+   "nature": "occurrence",
    "evidence": "421 occurrences (2026-11-06T22:06:16Z ~ 2026-11-07T01:09:40Z), thresholds warn 60/fail 2000. Files: ['logs/pods/metallb/metallb-system_speaker.log']. Samples: ['[pod/speaker-xfxlv/speaker] 2026-11-07T07:53:35.218933159+09:00 {\"caller\":\"speakerlist.go:259\",\"error\":\"1 error occurred:\\\\n\\\\t* Failed to join 192.168.90.102:794', '[pod/speaker-xfxlv/speaker] 2026-11-07T07:54:35.219597022+09:00 {\"caller\":\"speakerlist.go:259\",\"error\":\"1 error occurred:\\\\n\\\\t* Failed to join 192.168.90.102:794']",
    "source": "summary.json:logs.signatures"
   },
@@ -5443,6 +5785,7 @@
    "target": "node-a",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "Node node-a: active runtimes ['containerd', 'k3s-agent', 'docker'], kubelet runtime containerd, /var/lib/docker 1MB",
    "source": "summary.json:nodeos.nodes"
   },
@@ -5451,6 +5794,7 @@
    "target": "node-a",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "Node node-a: images of 3 GiB or more 1 — registry.lab-a.example/app-h-embed:prod-67527dae60678e93822bf8eb71d8448f586fa0fe (largest 3977 MiB)",
    "source": "summary.json:nodeos.nodes"
   },
@@ -5459,6 +5803,7 @@
    "target": "node-a",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "52 updates pending, 1 of them security (per Ubuntu update-notifier). OS Ubuntu 22.04.5 LTS",
    "source": "summary.json:nodeos.nodes"
   },
@@ -5467,6 +5812,7 @@
    "target": "node-b",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "56 updates pending, 3 of them security (per Ubuntu update-notifier). OS Ubuntu 22.04.5 LTS",
    "source": "summary.json:nodeos.nodes"
   },
@@ -5475,6 +5821,7 @@
    "target": "node-a",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "reboot-required True, uptime 9.1 days, running kernel 5.15.0-198-generic, pending updates 52 (security 1)",
    "source": "summary.json:nodeos.nodes"
   },
@@ -5483,6 +5830,7 @@
    "target": "node-b",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "reboot-required True, uptime 119.0 days, running kernel 5.15.0-185-generic, pending updates 56 (security 3)",
    "source": "summary.json:nodeos.nodes"
   },
@@ -5491,6 +5839,7 @@
    "target": "node-a",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "smartctl missing. Disks ['sda disk 111.8G 0 WDC WDS120G2G0A-']",
    "source": "summary.json:k3s.nodes"
   },
@@ -5499,6 +5848,7 @@
    "target": "node-b",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "smartctl missing. Disks ['sda disk 465.8G 0 Samsung SSD 870']",
    "source": "summary.json:k3s.nodes"
   },
@@ -5507,6 +5857,7 @@
    "target": "grafana",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "25 dashboards (170 panel metrics) — 137 of 175 alert-rule metrics have no panel: aggregator_unavailable_apiservice, aggregator_unavailable_apiservice_total, alertmanager_cluster_members, alertmanager_config_hash, alertmanager_config_last_reload_successful, apiserver_client_certificate_expiration_seconds_bucket",
    "source": "summary.json:observability.grafana.dashboards_json"
   },
@@ -5515,6 +5866,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "135 of 145 rules did not fire in 15 days (['AlertmanagerClusterCrashlooping', 'AlertmanagerClusterDown', 'AlertmanagerClusterFailedToSendAlerts', 'AlertmanagerConfigInconsistent', 'AlertmanagerFailedReload', 'AlertmanagerFailedToSendAlerts', 'AlertmanagerMembersInconsistent', 'AppQClusterCPU50', 'AppQClusterCPU80', 'AppQClusterMem50', 'AppQClusterMem80', 'AppQFrontendDown']…). Fired: ['AppQBackendDown', 'CPUThrottlingHigh', 'InfoInhibitor', 'KubeCPUOvercommit', 'KubeDeploymentReplicasMismatch', 'KubeHpaMaxedOut', 'KubeJobFailed', 'KubePodCrashLooping', 'KubeQuotaFullyUsed', 'Watchdog']",
    "source": "summary.json:observability.alerts"
   },
@@ -5523,6 +5875,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "28 of 29 ingress backends have no saturation metric (e.g. [('app-a-prod', 'app-a-backend'), ('app-a-prod', 'app-a-frontend'), ('app-a-prod', 'app-a-phoenix'), ('app-a-prod', 'app-a-umami'), ('argocd', 'argocd-server-ingress'), ('app-b-prod', 'app-b-backend')]), namespaces with saturation metrics ['default', 'kube-system', 'monitoring']",
    "source": "summary.json:observability.golden_signals"
   },
@@ -5531,6 +5884,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "routes [('discord', None), ('null', ['severity=~\"info|none\"'])], receivers ['null', 'discord'], default receiver discord",
    "source": "summary.json:observability.alertmanager"
   },
@@ -5539,6 +5893,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "occurrence",
    "evidence": "463 unclassified error lines (25969 lines scanned, 23 files). Top: [('node:node-b | \"Unhandled Error\" err=\"error syncing CronJobController app-a-prod/app-a-sandbox-watchd', 243), ('grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Failed to get settings\" err', 62), ('grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Request error\" error=\"Conte', 62), ('grafana | logger=context userId=0 orgId=0 uname= t=<ts> level=error msg=\"Request Completed\" method=G', 62), ('node:node-b | \"ContainerStatus from runtime service failed\" err=\"rpc error: code = NotFound desc = a', 4), ('cert-manager | \"challenge in work queue no longer exists\" err=\"challenge.acme.cert-manager.io \\\\\"app-', 3)]",
    "source": "summary.json:logs"
   },
@@ -5547,6 +5902,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "servers binding 6443 to *: ['node-b'], --tls-san ['100.100.1.2', '192.168.90.102'], node-external-ip ['192.168.90.101', '192.168.90.102']",
    "source": "summary.json:k3s.cluster"
   },
@@ -5555,6 +5911,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "missing: ['CONFIG_INET_XFRM_MODE_TRANSPORT', 'CONFIG_RT_GROUP_SCHED']",
    "source": "summary.json:k3s.cluster"
   },
@@ -5563,6 +5920,7 @@
    "target": "app-a-prod/statefulset/app-a-postgres:postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': 'pg_isready -U app-a', 'port': None, 'timeout_s': 1, 'period_s': 15, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'exec', 'path': 'pg_isready -U app-a', 'port': None, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 10}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5571,6 +5929,7 @@
    "target": "app-a-prod/statefulset/app-a-redis:redis",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': 'redis-cli ping', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 10}, readiness {'type': 'exec', 'path': 'redis-cli ping', 'port': None, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 5}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5579,6 +5938,7 @@
    "target": "app-c-prod/statefulset/app-c-postgres:postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': 'pg_isready -U damta', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'exec', 'path': 'pg_isready -U damta', 'port': None, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 15}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5587,6 +5947,7 @@
    "target": "app-f-prod/statefulset/app-f-postgres-mx:postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': '/bin/sh -c pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'exec', 'path': '/bin/sh -c pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"', 'port': None, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 15}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5595,6 +5956,7 @@
    "target": "app-f-prod/statefulset/app-f-postgres-vn:postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': '/bin/sh -c pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'exec', 'path': '/bin/sh -c pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"', 'port': None, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 15}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5603,6 +5965,7 @@
    "target": "app-f-prod/statefulset/app-f-postgres:postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': '/bin/sh -c pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'exec', 'path': '/bin/sh -c pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"', 'port': None, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 15}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5611,6 +5974,7 @@
    "target": "app-f-prod/statefulset/app-f-redis:redis",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': 'redis-cli ping', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 10}, readiness {'type': 'exec', 'path': 'redis-cli ping', 'port': None, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 5}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5619,6 +5983,7 @@
    "target": "app-g-api/statefulset/app-g-postgres:postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': '/bin/sh -c pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'exec', 'path': '/bin/sh -c pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"', 'port': None, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 15}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5627,6 +5992,7 @@
    "target": "app-h-prod/statefulset/app-h-mysql:mysql",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': 'mysqladmin ping -h localhost', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'exec', 'path': 'mysqladmin ping -h localhost', 'port': None, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 15}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5635,6 +6001,7 @@
    "target": "app-i-prod/statefulset/app-i-postgres:postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': '/bin/sh -c pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'exec', 'path': '/bin/sh -c pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"', 'port': None, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 15}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5643,6 +6010,7 @@
    "target": "app-k/deployment/app-k-postgres:postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': 'pg_isready -U platform_admin -d platform_admin', 'port': None, 'timeout_s': 1, 'period_s': 20, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'exec', 'path': 'pg_isready -U platform_admin -d platform_admin', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 10}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5651,6 +6019,7 @@
    "target": "app-l-prod/deployment/app-l-postgres:postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'liveness exec timeout 1s (false failures when the node is busy)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': 'pg_isready -U app-l -d app-l', 'port': None, 'timeout_s': 1, 'period_s': 20, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'exec', 'path': 'pg_isready -U app-l -d app-l', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 10}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5659,6 +6028,7 @@
    "target": "logging/statefulset/elasticsearch:elasticsearch",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness exec (forks a process)', 'readiness exec (forks a process every period, node load)', 'readiness exec timeout 1s (false failures when the node is busy)']. liveness {'type': 'exec', 'path': 'sh -c curl -s -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health?local=true | grep -q \\'\"status\":\"green\"\\\\|\"status\":\"yellow\"\\'\\n', 'port': None, 'timeout_s': 10, 'period_s': 30, 'failure_threshold': 10, 'initial_delay_s': 90}, readiness {'type': 'exec', 'path': 'sh -c curl -s -u elastic:${ELASTIC_PASSWORD} http://localhost:9200/_cluster/health?local=true | grep -q \\'\"status\":\"green\"\\\\|\"status\":\"yellow\"\\'\\n', 'port': None, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5667,6 +6037,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "58 Jobs (3 failed), 56 finished Jobs without ttl, 53 Succeeded pods, 4 Failed pods",
    "source": "summary.json:resilience.cronjobs.jobs"
   },
@@ -5675,6 +6046,7 @@
    "target": "app-a-prod/deployment/app-a-frontend:frontend",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 15, 'failure_threshold': 3, 'initial_delay_s': 15}, readiness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 5}, startup absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5683,6 +6055,7 @@
    "target": "app-a-prod/deployment/app-a-gateway:gateway",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/healthz) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/healthz', 'port': 8080, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 5}, readiness {'type': 'httpGet', 'path': '/healthz', 'port': 8080, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 2}, startup absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5691,6 +6064,7 @@
    "target": "app-a-prod/deployment/app-a-phoenix:phoenix",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/healthz) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/healthz', 'port': 6006, 'timeout_s': 1, 'period_s': 30, 'failure_threshold': 3, 'initial_delay_s': 40}, readiness {'type': 'httpGet', 'path': '/healthz', 'port': 6006, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 20}, startup absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5699,6 +6073,7 @@
    "target": "app-a-prod/deployment/app-a-umami:umami",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/api/heartbeat) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/api/heartbeat', 'port': 3000, 'timeout_s': 1, 'period_s': 30, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'httpGet', 'path': '/api/heartbeat', 'port': 3000, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 15}, startup absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5707,6 +6082,7 @@
    "target": "app-b-prod/deployment/app-b-backend:backend",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/healthz) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/healthz', 'port': 8000, 'timeout_s': 1, 'period_s': 15, 'failure_threshold': 3, 'initial_delay_s': 20}, readiness {'type': 'httpGet', 'path': '/healthz', 'port': 8000, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 5}, startup absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5715,6 +6091,7 @@
    "target": "app-b-prod/deployment/app-b-frontend:frontend",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 15, 'failure_threshold': 3, 'initial_delay_s': 20}, readiness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 5}, startup absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5723,6 +6100,7 @@
    "target": "app-c-prod/deployment/app-c-signaling:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/ws/socket.io/?EIO=4&transport=polling) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/ws/socket.io/?EIO=4&transport=polling', 'port': 3001, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 15}, readiness {'type': 'httpGet', 'path': '/ws/socket.io/?EIO=4&transport=polling', 'port': 3001, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 0}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5731,6 +6109,7 @@
    "target": "app-c-prod/deployment/app-c-web:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 10}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5739,6 +6118,7 @@
    "target": "app-f-prod/deployment/app-f-admin:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/login) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/login', 'port': 3000, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 15}, readiness {'type': 'httpGet', 'path': '/login', 'port': 3000, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 5}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5747,6 +6127,7 @@
    "target": "app-f-prod/deployment/app-f-mx:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 10}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5755,6 +6136,7 @@
    "target": "app-f-prod/deployment/app-f-vn:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 10}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5763,6 +6145,7 @@
    "target": "app-f-prod/deployment/app-f:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 10}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5771,6 +6154,7 @@
    "target": "app-h-prod/deployment/app-h-admin:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 20, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 10}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5779,6 +6163,7 @@
    "target": "app-h-prod/deployment/app-h-api-server:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/healthcheck) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/healthcheck', 'port': 8080, 'timeout_s': 1, 'period_s': 20, 'failure_threshold': 5, 'initial_delay_s': 60}, readiness {'type': 'httpGet', 'path': '/healthcheck', 'port': 8080, 'timeout_s': 1, 'period_s': 20, 'failure_threshold': 5, 'initial_delay_s': 0}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5787,6 +6172,7 @@
    "target": "app-h-prod/deployment/app-h-app-p:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 20, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 10}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5795,6 +6181,7 @@
    "target": "app-h-prod/deployment/app-h-app-q-client:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 20, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 10}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5803,6 +6190,7 @@
    "target": "app-h-prod/deployment/app-h-embed:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/health) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/health', 'port': 8000, 'timeout_s': 1, 'period_s': 20, 'failure_threshold': 3, 'initial_delay_s': 60}, readiness {'type': 'httpGet', 'path': '/health', 'port': 8000, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 0}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5811,6 +6199,7 @@
    "target": "app-h-prod/deployment/app-h-excel-agent:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/health) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/health', 'port': 8080, 'timeout_s': 1, 'period_s': 20, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'httpGet', 'path': '/health', 'port': 8080, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 10}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5819,6 +6208,7 @@
    "target": "app-i-prod/deployment/app-i:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 10, 'failure_threshold': 3, 'initial_delay_s': 30}, readiness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 10}, startup present",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5827,6 +6217,7 @@
    "target": "app-l-prod/deployment/app-l-api:api",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/healthz) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/healthz', 'port': 8080, 'timeout_s': 1, 'period_s': 15, 'failure_threshold': 3, 'initial_delay_s': 20}, readiness {'type': 'httpGet', 'path': '/healthz', 'port': 8080, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 5}, startup absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5835,6 +6226,7 @@
    "target": "app-l-prod/deployment/app-l-web:web",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "['liveness and readiness share the same path (/) — a dependency outage becomes a restart loop']. liveness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 15, 'failure_threshold': 3, 'initial_delay_s': 20}, readiness {'type': 'httpGet', 'path': '/', 'port': 3000, 'timeout_s': 1, 'period_s': 5, 'failure_threshold': 3, 'initial_delay_s': 5}, startup absent",
    "source": "summary.json:resilience.probes.rows"
   },
@@ -5843,6 +6235,7 @@
    "target": "app-a-prod/app-a-backend",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5851,6 +6244,7 @@
    "target": "app-a-prod/app-a-frontend",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5859,6 +6253,7 @@
    "target": "app-a-prod/app-a-gateway",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5867,6 +6262,7 @@
    "target": "app-a-prod/app-a-phoenix",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5875,6 +6271,7 @@
    "target": "app-a-prod/app-a-umami",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5883,6 +6280,7 @@
    "target": "app-b-prod/app-b-backend",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5891,6 +6289,7 @@
    "target": "app-b-prod/app-b-frontend",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5899,6 +6298,7 @@
    "target": "app-c-prod/app-c-signaling",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5907,6 +6307,7 @@
    "target": "app-c-prod/app-c-web",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5915,6 +6316,7 @@
    "target": "app-f-prod/app-f",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5923,6 +6325,7 @@
    "target": "app-f-prod/app-f-admin",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5931,6 +6334,7 @@
    "target": "app-f-prod/app-f-mx",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5939,6 +6343,7 @@
    "target": "app-f-prod/app-f-vn",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5947,6 +6352,7 @@
    "target": "app-h-prod/app-h-admin",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5955,6 +6361,7 @@
    "target": "app-h-prod/app-h-app-p",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5963,6 +6370,7 @@
    "target": "app-h-prod/app-h-app-q-client",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5971,6 +6379,7 @@
    "target": "app-h-prod/app-h-embed",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5979,6 +6388,7 @@
    "target": "app-h-prod/app-h-excel-agent",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5987,6 +6397,7 @@
    "target": "app-i-prod/app-i",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -5995,6 +6406,7 @@
    "target": "app-l-prod/app-l-api",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -6003,6 +6415,7 @@
    "target": "app-l-prod/app-l-postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -6011,6 +6424,7 @@
    "target": "app-l-prod/app-l-web",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "no preStop, terminationGracePeriodSeconds 30",
    "source": "objects/deployments.json"
   },
@@ -6019,6 +6433,7 @@
    "target": "app-c-prod/sts/app-c-postgres:postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "pod app-c-postgres-0: 7d memory working set p95 52 MB / request 256 MB = 0.20; database-like: keep the request",
    "source": "metrics/memory_request_p95_ratio_7d,memory_p95_7d_bytes,container_memory_request_bytes"
   },
@@ -6027,6 +6442,7 @@
    "target": "app-h-prod/deploy/app-h-embed:app",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "pod app-h-embed-67f6f74f6c-lb7lj: 7d memory working set p95 638 MB / request 2048 MB = 0.31",
    "source": "metrics/memory_request_p95_ratio_7d,memory_p95_7d_bytes,container_memory_request_bytes"
   },
@@ -6035,6 +6451,7 @@
    "target": "app-h-prod/sts/app-h-qdrant:qdrant",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "pod app-h-qdrant-0: 7d memory working set p95 51 MB / request 256 MB = 0.20; database-like: keep the request",
    "source": "metrics/memory_request_p95_ratio_7d,memory_p95_7d_bytes,container_memory_request_bytes"
   },
@@ -6043,6 +6460,7 @@
    "target": "app-l-prod/deploy/app-l-postgres:postgres",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "pod app-l-postgres-76b69b654d-lzf4d: 7d memory working set p95 65 MB / request 256 MB = 0.25; database-like: keep the request",
    "source": "metrics/memory_request_p95_ratio_7d,memory_p95_7d_bytes,container_memory_request_bytes"
   },
@@ -6051,6 +6469,7 @@
    "target": "app-a-prod/deployment/app-a-backend",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "HPA app-a-prod/app-a-backend: metrics ['cpu'], current CPU 2% / target 70%",
    "source": "summary.json:scaling.hpa.rows"
   },
@@ -6059,6 +6478,7 @@
    "target": "app-a-prod/deployment/app-a-frontend",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "HPA app-a-prod/app-a-frontend: metrics ['cpu'], current CPU 3% / target 70%",
    "source": "summary.json:scaling.hpa.rows"
   },
@@ -6067,6 +6487,7 @@
    "target": "app-a-prod/deployment/app-a-backend",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "HPA app-a-prod/app-a-backend: no behavior (defaults: scaleDown 300s, scaleUp immediate), 3.0 desired changes over 7 days",
    "source": "summary.json:scaling.hpa.rows"
   },
@@ -6075,6 +6496,7 @@
    "target": "app-a-prod/deployment/app-a-frontend",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "HPA app-a-prod/app-a-frontend: no behavior (defaults: scaleDown 300s, scaleUp immediate), 2.0 desired changes over 7 days",
    "source": "summary.json:scaling.hpa.rows"
   },
@@ -6083,6 +6505,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "26 local-path PVs, by node {'node-a': 7, 'node-b': 19}, node disk used {'node-a': 6194, 'node-b': 144743}MB. top: [('logging', 'data-elasticsearch-0', 'node-b', 107797, ['logging/elasticsearch-0']), ('registry', 'registry-data-registry-0', 'node-b', 32732, ['registry/registry-0']), ('app-a-prod', 'app-a-postgres-backup-pvc', 'node-a', 5862, ['app-a-prod/app-a-postgres-backup']), ('app-a-prod', 'data-app-a-postgres-0', 'node-b', 2217, ['app-a-prod/app-a-postgres-0']), ('app-h-prod', 'mysql-data-app-h-mysql-0', 'node-b', 795, ['app-h-prod/app-h-mysql-0']), ('app-g-api', 'app-g-minio-data-app-g-minio-0', 'node-b', 565, ['app-g-api/app-g-minio-0']), ('app-g-api', 'app-g-postgres-data-app-g-postgres-0', 'node-b', 166, ['app-g-api/app-g-postgres-0']), ('app-l-prod', 'app-l-postgres-data', 'node-a', 138, ['app-l-prod/app-l-postgres'])]",
    "source": "summary.json:local_path.summary"
   },
@@ -6091,6 +6514,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "19 of 19 prod PVs are Delete ['app-l-prod/app-l-postgres-data', 'app-f-prod/app-f-postgres-mx-backup-pvc', 'app-i-prod/app-i-postgres-backup-pvc', 'app-f-prod/app-f-postgres-vn-data-app-f-postgres-vn-0', 'app-b-prod/app-b-artifacts', 'app-a-prod/data-app-a-redis-0', 'app-f-prod/app-f-postgres-vn-backup-pvc', 'app-h-prod/app-h-qdrant-data-app-h-qdrant-0', 'app-i-prod/app-i-postgres-data-app-i-postgres-0', 'app-f-prod/app-f-redis-data-app-f-redis-0'], StorageClass reclaim {'local-path': 'Delete', 'local-path-node-b': 'Delete'}, default class local-path",
    "source": "summary.json:local_path.summary"
   },
@@ -6099,6 +6523,7 @@
    "target": "node-a",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "Node node-a (pool (no-pool)): prod pods 32 (['app-a-prod', 'app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']) together with CI pods 1 (['arc-actions-runner-controller-5c9d9ffd65-766b6']). Heavy runners True, minutes above 90% node CPU in 7d 0.0, memory limit total/allocatable 1.04",
    "source": "summary.json:tenancy.isolation.nodes"
   },
@@ -6107,6 +6532,7 @@
    "target": "node-b",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "Node node-b (pool (no-pool)): prod pods 15 (['app-a-prod', 'app-b-prod', 'app-c-prod', 'app-f-prod', 'app-h-prod', 'app-i-prod', 'app-l-prod']) together with CI pods 2 (['lab-a-runner-8tt2w-cpndm', 'lab-a-runner-8tt2w-d2pwq']). Heavy runners True, minutes above 90% node CPU in 7d 0.0, memory limit total/allocatable 0.99",
    "source": "summary.json:tenancy.isolation.nodes"
   },
@@ -6115,6 +6541,7 @@
    "target": "app-a-prod/app-a-prod-quota",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "app-a-prod/app-a-prod-quota: requests entries in hard ['requests.memory'], LimitRange False (default request False), containers without requests right now 0",
    "source": "summary.json:tenancy.quotas.rows"
   },
@@ -6123,6 +6550,7 @@
    "target": "app-b-prod/app-b-prod-quota",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "app-b-prod/app-b-prod-quota: requests entries in hard ['requests.cpu', 'requests.memory', 'requests.storage'], LimitRange False (default request False), containers without requests right now 0",
    "source": "summary.json:tenancy.quotas.rows"
   },
@@ -6131,6 +6559,7 @@
    "target": "app-l-prod/app-l-prod-quota",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "app-l-prod/app-l-prod-quota: requests entries in hard ['requests.cpu', 'requests.memory', 'requests.storage'], LimitRange False (default request False), containers without requests right now 0",
    "source": "summary.json:tenancy.quotas.rows"
   },
@@ -6139,6 +6568,7 @@
    "target": "loadbalancer/ingress-nginx/nginx-ingress-ingress-nginx-controller",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "Service ingress-nginx/nginx-ingress-ingress-nginx-controller: externalTrafficPolicy Local, ports [80, 443], addresses ['192.168.90.201']",
    "source": "summary.json:traffic.lb_services"
   },
@@ -6147,6 +6577,7 @@
    "target": "cluster",
    "status": "warn",
    "severity_default": "low",
+   "nature": "state",
    "evidence": "mode layer2, 1 LoadBalancer services, pool used 1/10, leader node-b (1.0), pinned by nodeSelectors False, 2 nodes",
    "source": "summary.json:metallb.summary"
   },
@@ -6155,6 +6586,7 @@
    "target": "app-a-prod/app-a-gateway",
    "status": "warn",
    "severity_default": "info",
+   "nature": "state",
    "evidence": "replicas 2, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
@@ -6163,6 +6595,7 @@
    "target": "app-a-prod/app-a-phoenix",
    "status": "warn",
    "severity_default": "info",
+   "nature": "state",
    "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
@@ -6171,6 +6604,7 @@
    "target": "app-a-prod/app-a-umami",
    "status": "warn",
    "severity_default": "info",
+   "nature": "state",
    "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
@@ -6179,6 +6613,7 @@
    "target": "app-b-prod/app-b-backend",
    "status": "warn",
    "severity_default": "info",
+   "nature": "state",
    "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
@@ -6187,6 +6622,7 @@
    "target": "app-b-prod/app-b-frontend",
    "status": "warn",
    "severity_default": "info",
+   "nature": "state",
    "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
@@ -6195,6 +6631,7 @@
    "target": "app-c-prod/app-c-signaling",
    "status": "warn",
    "severity_default": "info",
+   "nature": "state",
    "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
@@ -6203,6 +6640,7 @@
    "target": "app-c-prod/app-c-web",
    "status": "warn",
    "severity_default": "info",
+   "nature": "state",
    "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
@@ -6211,6 +6649,7 @@
    "target": "app-h-prod/app-h-embed",
    "status": "warn",
    "severity_default": "info",
+   "nature": "state",
    "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
@@ -6219,6 +6658,7 @@
    "target": "app-h-prod/app-h-excel-agent",
    "status": "warn",
    "severity_default": "info",
+   "nature": "state",
    "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
@@ -6227,6 +6667,7 @@
    "target": "app-l-prod/app-l-api",
    "status": "warn",
    "severity_default": "info",
+   "nature": "state",
    "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   },
@@ -6235,6 +6676,7 @@
    "target": "app-l-prod/app-l-web",
    "status": "warn",
    "severity_default": "info",
+   "nature": "state",
    "evidence": "replicas 1, has container ports and a Service, no HPA or ScaledObject",
    "source": "objects/deployments.json"
   }

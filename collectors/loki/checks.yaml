@@ -130,6 +130,7 @@
   target: "item['target']"
   evidence: "f\"{item['requests_5xx']} 5xx out of {item['requests_total']} requests since start (by route {item['requests_5xx_by_route']}, excluding /ready 503 during startup), panics {item['panics']}, WAL disk full {item['wal_disk_full_failures']}, error log lines {item['log_error_messages']}, rejected {item['discarded_by_reason']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     5xx means a query (series, query_range) died from memory pressure or a timeout, a panic means a bug or corruption, and WAL disk full means ingestion has stopped. Read together with Grafana 429s (grafana.datasource-errors) it separates "too many queries" from "Loki is too small".

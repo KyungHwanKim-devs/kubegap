@@ -1993,6 +1993,7 @@
   target: "'cluster'"
   evidence: "f\"datastore {item['kind']} (servers {item['servers']}), warn lines in 24h {item['lines_24h']}{' (hit the 200-line cap - there were more)' if item['capped'] else ''}: slow apply {item['apply_slow']} (max {item['max_apply_ms']}ms, over 1s {item['apply_over_1s']}), slow fdatasync {item['fdatasync_slow']}, leader changes {item['leader_changes']}, request stats {item['request_stats']}, DB {item['db_mb']}MB\""
   severity_default: high
+  nature: occurrence
   symptom_linked: true
   why: >
     etcd logs "apply request took too long" when an apply exceeds 100ms. When disk fsync is slow (a SATA SSD competing with other I/O such as Elasticsearch, databases or backups), leader heartbeats are delayed, the apiserver times out, and in bad cases the leader changes (on a single server etcd pauses briefly) or nodes flap to NotReady. It is the first thing to make noise when one small k3s cluster server node carries the datastore, the workloads and the log store all at once.

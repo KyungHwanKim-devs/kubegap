@@ -448,6 +448,7 @@
   target: "'cluster'"
   evidence: "f\"syncs since controller start {item['sync_total']}, failed {item['sync_failed']} (ratio {item['sync_failure_ratio']}), apps whose last operation failed {item['last_op_failed']}, k8s API 4xx {item['k8s_api_4xx']} / 5xx+429 {item['k8s_api_errors']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     An app with auto-sync retries after a failure — if the same manifest error (validating webhook rejection, missing CRD, immutable field) fails every few minutes, that app's deployments have effectively stopped and only argocd_app_sync_total{phase="Failed"} keeps climbing.
@@ -3320,6 +3321,7 @@
   target: "'cluster'"
   evidence: "_argocd_backend_text(item)"
   severity_default: medium
+  nature: occurrence
   symptom_linked: true
   why: >
     When Argo CD is slow or apps flicker to Unknown, the cause is usually behind it — cluster cache resync failing (connection_status 0), k8s API 429 (the controller lists and watches too much), Git access failures (expired token, rate limit — argocd_git_lsremote_fail_total), Redis cache failures (manifests re-rendered every time), or a repo-server queue. Each pairs with a log signature (argocd.repo-access, argocd.rate-limit).

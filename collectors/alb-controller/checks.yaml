@@ -909,6 +909,7 @@
   target: "'cluster'"
   evidence: "f\"reconcile errors since leader start {item['reconcile_errors_total']}, apiserver 429/503 responses {item['rest_client_429_503']}, max workqueue depth {item['workqueue_depth_max']}, Ingresses without an LB address {item['ingresses_without_lb']}, stale TargetGroupBindings {item['tgb_stale']}\""
   severity_default: medium
+  nature: occurrence
   symptom_linked: false
   why: >
     A reconcile error means the controller failed to make one Ingress, Service or TargetGroupBinding match AWS (permissions, bad annotation, missing certificate, limits). The counter accumulates since the leader process started, so a small number may be a past event — read it together with the log signature alb-controller.reconcile-error (24 hours).
