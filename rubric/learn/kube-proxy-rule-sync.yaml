@@ -1,0 +1,87 @@
+# What a report teaches when kube-proxy is missing on a node or its rules lag behind the Services. Every page below was opened and read (2026-11-14).
+topic: kube-proxy-rule-sync
+checks: [kubeproxy.daemonset-not-ready, kubeproxy.rules-pending, kubeproxy.restore-failures]
+mechanism: >
+  A Service address is not served by any process. Each node runs its own kube-proxy, which watches the control plane for Service and EndpointSlice
+  objects and configures that node to capture traffic to a Service's ClusterIP and port and redirect it to one of the endpoints. In the default
+  iptables mode these are rules in the kernel: a few for every Service and a few for every endpoint address. What a pod on a node can reach through a
+  Service is whatever that node's kube-proxy wrote last.
+
+
+  So the failure is always per node. A node without a running kube-proxy cannot send traffic to Service addresses; only the pods on that node see
+  connections to every Service fail, while the Service and its endpoints look correct in the API.
+
+
+  The rules are written in syncs. A change queues a sync, and kube-proxy waits at least minSyncPeriod, one second by default, between syncs so that
+  changes arriving together are written together. Since Kubernetes 1.28 a sync writes only what changed. Every syncPeriod, 30 seconds by default,
+  kube-proxy also checks whether another component has interfered with its rules. kube-proxy records when a sync was last queued and when the rules
+  were last synced successfully; when the queued time stays ahead of the successful one, changes are waiting and the node routes on stale rules, which
+  means connections to pod addresses that no longer exist.
+
+
+  When an iptables restore fails, the rules of that sync are not applied. kube-proxy counts failed restores, full and partial, per node; a node
+  where the counter keeps rising is a node whose rules stay behind. Other software that holds the iptables lock on the same node (Docker, a CNI, a
+  host firewall), conflicting rules and a missing kernel module are the causes to look for.
+
+
+  Watching this needs one change. kube-proxy serves its health check on 0.0.0.0:10256 but its metrics on 127.0.0.1:10249, so Prometheus cannot
+  scrape it until the metrics address is opened.
+sources:
+  - { title: "Kubernetes: Virtual IPs and Service Proxies", url: "https://kubernetes.io/docs/reference/networking/virtual-ips/" }
+  - { title: "Kubernetes: kube-proxy command line reference", url: "https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/" }
+  - { title: "Kubernetes: Metrics Reference", url: "https://kubernetes.io/docs/reference/instrumentation/metrics/" }
+detect:
+  - kind: alert
+    what: >
+      Changes that are queued and not yet written, per node: the last queued time minus the last successful sync time. A value that stays above a
+      minute is a node on stale rules.
+    example: |
+      - alert: KubeProxyRulesPending
+        expr: max by (instance) (kubeproxy_sync_proxy_rules_last_queued_timestamp_seconds - kubeproxy_sync_proxy_rules_last_timestamp_seconds) > 60
+        for: 5m
+  - kind: alert
+    what: Failed rule writes. Both counters are zero on a healthy node.
+    example: 'sum by (instance) (increase(kubeproxy_sync_proxy_rules_iptables_restore_failures_total[1h]) + increase(kubeproxy_sync_proxy_rules_iptables_partial_restore_failures_total[1h])) > 0'
+  - kind: alert
+    what: >
+      kube-proxy not reachable at all. The kube-prometheus rule KubeProxyDown fires when no kube-proxy instance has been reachable by the monitoring
+      system for more than 15 minutes; on EKS it also fires while the metrics address is still 127.0.0.1.
+    example: 'KubeProxyDown (kube-prometheus)'
+  - kind: metric
+    what: >
+      How long a change takes from the API to the node's rules, and how long a sync takes. An average sync well above one second is the sign that
+      minSyncPeriod is too small for the cluster.
+    example: 'histogram_quantile(0.99, sum by (le) (rate(kubeproxy_network_programming_duration_seconds_bucket[5m])))'
+  - kind: command
+    what: The health endpoint of one node's kube-proxy, when the metrics are not scraped yet.
+    example: 'curl -s localhost:10256/healthz'
+solutions:
+  - scale: [small]
+    approach: >
+      Leave the sync settings at their defaults. Open the metrics address in the kube-proxy configuration and keep one alert: queued changes that
+      stay unwritten for more than a minute. Keep other iptables managers off the nodes.
+    tools: [kube-proxy, Prometheus]
+    tradeoff: >
+      A node on stale rules is noticed within minutes for one configuration line and one rule. The metrics port then listens on the node's
+      addresses, so it has to stay behind the node firewall or security group.
+    example: |
+      # ConfigMap kube-proxy-config (EKS) / KubeProxyConfiguration
+      metricsBindAddress: 0.0.0.0:10249
+  - scale: [medium, large]
+    approach: >
+      Alert on all three signals (pending changes, restore failures, kube-proxy down) and graph the programming latency. In very large clusters
+      raise minSyncPeriod when the sync duration metric averages well above one second; if an old override of minSyncPeriod or a very large
+      syncPeriod is still in place from before 1.28, remove it.
+    tools: [kube-proxy, kube-prometheus, Grafana]
+    tradeoff: >
+      A larger minSyncPeriod lets kube-proxy write many changes in one sync, which costs less CPU and finishes the whole set sooner, but each single
+      change may wait up to the full period, so the rules spend more time behind the API server.
+    example: |
+      iptables:
+        minSyncPeriod: 1s
+        syncPeriod: 30s
+cases: []
+reading:
+  - { title: "Kubernetes: Virtual IPs and Service Proxies", url: "https://kubernetes.io/docs/reference/networking/virtual-ips/", why: "How each proxy mode captures Service traffic and what minSyncPeriod and syncPeriod trade against each other." }
+  - { title: "Kubernetes: Metrics Reference", url: "https://kubernetes.io/docs/reference/instrumentation/metrics/", why: "Every kubeproxy_ metric with its help text; all of them are alpha, so names can change between versions." }
+  - { title: "kube-prometheus runbook: KubeProxyDown", url: "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubeproxydown/", why: "What the stock alert means and the metrics address change it needs on EKS." }

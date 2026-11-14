@@ -1,0 +1,128 @@
+# What a report teaches when alerts fire but are lost on the way: Prometheus to Alertmanager, Alertmanager to the receiver, or a configuration that was
+# never loaded. Every page below was opened and read (2026-11-14).
+topic: alert-delivery-failures
+checks: [prometheus.alert-delivery-errors, observability.alertmanager-notification-failed, alertmanager.config-reload-or-invalid]
+mechanism: >
+  An alert travels over two hops before a person sees it. Prometheus evaluates the rules and sends what fires to Alertmanager; Alertmanager takes care of
+  deduplicating, grouping and routing it to the correct receiver integration, and that integration calls Slack, a pager or a webhook. Each hop can fail
+  while everything still looks healthy from the outside, because the thing that would report the failure is the thing that failed.
+
+
+  First hop. Prometheus keeps pending notifications in a queue with a default capacity of 10000. Send errors are counted per Alertmanager address
+  (prometheus_notifications_errors_total); what does not fit in the queue any more is dropped (prometheus_notifications_dropped_total). Alertmanager
+  does not persist alerts: Prometheus re-sends firing alerts regularly, so a short Alertmanager restart heals by itself and a long outage does not.
+  Prometheus has to be pointed at every Alertmanager instance directly, not at a load balancer in front of them.
+
+
+  Second hop. Alertmanager counts every notification and every failed one per integration (alertmanager_notifications_total,
+  alertmanager_notifications_failed_total). An expired webhook address, a rotated token or a network policy shows up only there. Alerts with bad labels
+  are rejected on arrival and counted in alertmanager_alerts_invalid_total.
+
+
+  Configuration. Both tools reload their configuration at runtime, on SIGHUP or an HTTP POST to /-/reload, and both behave the same way when the new
+  file is not well-formed: the changes are not applied (Alertmanager also logs an error). The process keeps running on the old configuration. A
+  Prometheus reload also reloads the rule files, so one broken rule file leaves the old rules in place. The new receiver or the new rule that someone
+  believes is active is not, and the only sign is a gauge that went to 0: alertmanager_config_last_reload_successful or
+  prometheus_config_last_reload_successful.
+
+
+  The Watchdog alert exists for exactly this: it is always firing, so it should always arrive at a receiver, and an external system raises the alarm
+  when it stops arriving.
+sources:
+  - { title: "Prometheus: Alertmanager", url: "https://prometheus.io/docs/alerting/latest/alertmanager/" }
+  - { title: "Prometheus: Alertmanager configuration", url: "https://prometheus.io/docs/alerting/latest/configuration/" }
+  - { title: "Prometheus: Alertmanager high availability", url: "https://prometheus.io/docs/alerting/latest/high_availability/" }
+  - { title: "Prometheus: configuration", url: "https://prometheus.io/docs/prometheus/latest/configuration/configuration/" }
+  - { title: "Prometheus: command-line flags", url: "https://prometheus.io/docs/prometheus/latest/command-line/prometheus/" }
+  - { title: "Prometheus Operator runbooks: Watchdog", url: "https://runbooks.prometheus-operator.dev/runbooks/general/watchdog/" }
+  - { title: "Alertmanager README (high availability, amtool)", url: "https://github.com/prometheus/alertmanager" }
+  - { title: "Prometheus Operator: High Availability", url: "https://prometheus-operator.dev/docs/platform/high-availability/" }
+detect:
+  - kind: alert
+    what: >
+      The share of notifications that failed, per integration. The Alertmanager mixin ships this as AlertmanagerFailedToSendAlerts (warning, more than
+      1% failed over 15 minutes, for 5 minutes) and as a critical variant when every instance of a cluster fails for one integration.
+    example: |
+      - alert: AlertmanagerFailedToSendAlerts
+        expr: |
+          rate(alertmanager_notifications_failed_total[15m])
+            / rate(alertmanager_notifications_total[15m]) > 0.01
+        for: 5m
+  - kind: alert
+    what: >
+      Prometheus failing to hand alerts to Alertmanager. The Prometheus mixin ships PrometheusErrorSendingAlertsToSomeAlertmanagers (more than 1% errors
+      to one address for 15 minutes), PrometheusErrorSendingAlertsToAnyAlertmanager (critical), PrometheusNotificationQueueRunningFull and
+      PrometheusNotConnectedToAlertmanagers.
+    example: |
+      - alert: PrometheusErrorSendingAlertsToSomeAlertmanagers
+        expr: |
+          rate(prometheus_notifications_errors_total[5m])
+            / rate(prometheus_notifications_sent_total[5m]) * 100 > 1
+        for: 15m
+  - kind: alert
+    what: >
+      A configuration that was not loaded. AlertmanagerFailedReload and PrometheusBadConfig are both critical and fire when the reload gauge has been 0
+      for 10 minutes.
+    example: |
+      - alert: AlertmanagerFailedReload
+        expr: max_over_time(alertmanager_config_last_reload_successful[5m]) == 0
+        for: 10m
+  - kind: metric
+    what: >
+      Alerts that Prometheus gave up on, and alerts Alertmanager refused. Both should stay at zero.
+    example: 'sum(increase(prometheus_notifications_dropped_total[1d])), sum(increase(alertmanager_alerts_invalid_total[1d]))'
+  - kind: command
+    what: >
+      The configuration Alertmanager is actually running on, to compare with the one that was meant to be applied.
+    example: "curl -s localhost:9093/api/v2/status | jq '.config.original'"
+solutions:
+  - scale: [small]
+    approach: >
+      Keep the alert rules of the Alertmanager and Prometheus mixins (the ones named above) and add the one check that does not depend on the pipeline
+      itself: route the always-firing Watchdog alert to a webhook of an external heartbeat service that notifies when the heartbeat stops.
+    tools: [Alertmanager, "Watchdog alert", "an external heartbeat service"]
+    tradeoff: >
+      The mixin alerts travel through the same path that may be broken, so alone they cover a partial failure (one integration, one address) and not a
+      total one. The heartbeat covers the total failure and makes alerting depend on one service outside the cluster.
+    example: |
+      route:
+        receiver: slack
+        routes:
+          - matchers:
+              - alertname = "Watchdog"
+            receiver: heartbeat
+            repeat_interval: 5m
+      receivers:
+        - name: heartbeat
+          webhook_configs:
+            - url: https://heartbeat.example/ping/<id>
+  - scale: [medium]
+    approach: >
+      The same, and stop broken configuration before it is applied: test in the delivery pipeline where sample label sets end up with
+      amtool config routes test, which prints the receivers an alert would match and can fail the run when they are not the expected ones. Send the
+      alerts about a failing integration through a second integration, so that a dead Slack webhook is not reported to Slack.
+    tools: [amtool, Alertmanager]
+    tradeoff: >
+      A broken route is caught before it reaches the cluster instead of ten minutes after. The routing tests have to be kept up to date with the
+      routing tree, and a second integration is one more credential to rotate.
+    example: |
+      amtool config routes test --config.file=alertmanager.yaml \
+        --verify.receivers=pager severity=critical namespace=shop
+  - scale: [large]
+    approach: >
+      Run Alertmanager as a cluster (the Prometheus Operator manages one when replicas is more than one) and let every Prometheus send to all instances.
+      The instances replicate silences and the notification log by gossip; each one receives the alerts independently.
+    tools: ["Prometheus Operator", "Alertmanager cluster"]
+    tradeoff: >
+      One Alertmanager pod or node can be lost without losing notifications. Delivery is at least once: during a partition Alertmanager prefers duplicate
+      notifications over missed ones, and the cluster itself needs watching (AlertmanagerMembersInconsistent, AlertmanagerConfigInconsistent).
+    example: |
+      alertmanager:
+        alertmanagerSpec:
+          replicas: 3
+cases: []
+reading:
+  - { title: "Prometheus: Alertmanager high availability", url: "https://prometheus.io/docs/alerting/latest/high_availability/", why: "What is replicated between instances, why Prometheus must not go through a load balancer, and why duplicates are preferred over misses." }
+  - { title: "Alertmanager mixin: alerts", url: "https://raw.githubusercontent.com/prometheus/alertmanager/main/doc/alertmanager-mixin/alerts.libsonnet", why: "The rules that watch Alertmanager itself, with their thresholds." }
+  - { title: "Prometheus mixin: alerts", url: "https://raw.githubusercontent.com/prometheus/prometheus/main/documentation/prometheus-mixin/alerts.libsonnet", why: "The rules for the Prometheus side: failed reloads, send errors and a notification queue that is running full." }
+  - { title: "Prometheus Operator runbooks: Watchdog", url: "https://runbooks.prometheus-operator.dev/runbooks/general/watchdog/", why: "How an always-firing alert proves the whole pipeline works, and what to connect it to." }

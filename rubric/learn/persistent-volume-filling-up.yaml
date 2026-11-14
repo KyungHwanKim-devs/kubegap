@@ -1,0 +1,102 @@
+# What a report teaches when a PersistentVolume is nearly full or will be soon. Every page below was opened and read (2026-11-14).
+topic: persistent-volume-filling-up
+checks: [storage.pvc-usage-high, storage.pvc-filling]
+mechanism: >
+  A PersistentVolume has the size it was created with. Nothing in Kubernetes grows it when the data grows, and nothing in Kubernetes warns: the
+  kubelet only measures. For every mounted claim it asks the storage driver for the volume's statistics and publishes them as
+  kubelet_volume_stats_used_bytes, kubelet_volume_stats_available_bytes, kubelet_volume_stats_capacity_bytes and the inode counterparts. A claim
+  that no pod has mounted has no numbers at all.
+
+
+  What happens at 100% is decided by the application, and for a database it is rarely graceful. Writes fail with "No space left on device"; the
+  usual outcomes are a service that degrades or switches to read-only, and in the worse case an append-only file that was cut off in
+  the middle, so the process cannot read its own data when it restarts and loops in crashes. A volume can also run out of inodes while bytes
+  remain.
+
+
+  Growing a volume is possible and mostly online, under conditions. The StorageClass must have allowVolumeExpansion set to true, and the CSI driver
+  must support expansion. The request is an edit of the claim to a larger size; the existing volume is resized, never replaced. The filesystem on
+  it (XFS, ext3 or ext4) is grown when a pod has the claim mounted, at pod start or while the pod runs if the filesystem supports online
+  expansion, so an in-use claim needs no restart. A claim cannot be shrunk below its current size, which makes every expansion permanent. And the
+  size written in a StatefulSet's volume claim template cannot be edited afterwards, so after an expansion the manifests in Git no longer describe
+  what runs.
+
+
+  Usage alone says little about urgency; the rate does. That is why the common alert rule pairs a level with a forecast: little space left and,
+  on the trend of the last hours, zero within days. A forecast from a linear trend is wrong when the pattern changes, for example with a month-end
+  batch.
+sources:
+  - { title: "Kubernetes: Persistent Volumes (Expanding Persistent Volumes Claims)", url: "https://kubernetes.io/docs/concepts/storage/persistent-volumes/" }
+  - { title: "Kubernetes: Metrics Reference", url: "https://kubernetes.io/docs/reference/instrumentation/metrics/" }
+  - { title: "aws-ebs-csi-driver: Metrics", url: "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/blob/master/docs/metrics.md" }
+  - { title: "kubernetes-mixin: storage alerts", url: "https://raw.githubusercontent.com/kubernetes-monitoring/kubernetes-mixin/master/alerts/storage_alerts.libsonnet" }
+  - { title: "Prometheus Operator runbooks: KubePersistentVolumeFillingUp", url: "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepersistentvolumefillingup/" }
+detect:
+  - kind: alert
+    what: >
+      KubePersistentVolumeFillingUp from the kubernetes-mixin, which kube-prometheus-stack installs. It has two forms: critical when less than 3%
+      of the volume is free for one minute, and warning when less than 15% is free and a linear prediction over the last six hours reaches zero
+      within four days, held for an hour. KubePersistentVolumeInodesFillingUp does the same for inodes.
+    example: |
+      - alert: PersistentVolumeFillingUp
+        expr: |
+          kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes < 0.15
+          and predict_linear(kubelet_volume_stats_available_bytes[6h], 4 * 24 * 3600) < 0
+        for: 1h
+  - kind: metric
+    what: The used share of each claim and its daily growth, the two numbers a capacity review reads.
+    example: 'kubelet_volume_stats_used_bytes / kubelet_volume_stats_capacity_bytes'
+  - kind: command
+    what: The view from inside the pod, for a claim whose metrics are missing.
+    example: 'kubectl -n <namespace> exec <pod> -- df -h <mount path>'
+solutions:
+  - scale: [small]
+    approach: >
+      Make sure the StorageClass allows expansion, so that growing a volume is an edit and not a migration, and have the one alert that says a
+      volume is filling. When it fires, first ask what the data is: old data, snapshots and logs with no retention are deleted, not given more
+      disk.
+    tools: [StorageClass, kube-prometheus-stack]
+    tradeoff: >
+      A full volume becomes a warning days ahead and a one-line change. Expansion cannot be undone, and each expansion leaves the size in the
+      StatefulSet manifest behind the real one until someone reconciles them.
+    example: |
+      apiVersion: storage.k8s.io/v1
+      kind: StorageClass
+      metadata:
+        name: gp3
+      provisioner: ebs.csi.aws.com
+      allowVolumeExpansion: true
+  - scale: [medium, large]
+    approach: >
+      Give every stateful workload a retention setting in the application itself (snapshot retention, log and TTL settings) so that growth has a
+      ceiling, route the filling-up alerts to the owner of the data, and write down how a StatefulSet's volume size is changed, because the
+      template is immutable and the obvious workaround (delete and recreate the StatefulSet) restarts every pod of it. At the large scale, review
+      growth per claim on a schedule and expand before the alert.
+    tools: [kubernetes-mixin, Alertmanager, Grafana]
+    tradeoff: >
+      The disk stops being the thing that decides when data is cleaned up. Retention is a product decision that someone has to make for each
+      datastore, and the procedure only helps if it has been run once outside an incident.
+cases:
+  - company: Government of British Columbia (Klamm)
+    year: 2025
+    url: "https://github.com/bcgov/klamm/wiki/Incident-Post%E2%80%90Mortem-Template"
+    summary: >
+      The 50Mi volume of the cache Redis master filled up during a spike of cache requests. Redis failed to fsync its append-only file with "No
+      space left on device", the file was corrupted, and the pod went into a crash loop. Production was unavailable for about 30 minutes; the
+      volume was deleted and rebuilt, with the loss of its data.
+    match: A volume sized once and never watched filled up, and the database could not restart from what the failed write left behind.
+  - company: AdGuard VPN
+    year: 2025
+    url: "https://adguard-vpn.com/en/blog/redis-kubernetes-vpn-incident-post-mortem.html"
+    summary: >
+      Several instances of a Redis cluster ran low on disk space. The volumes were expanded online and that solved the disk. To make the
+      configuration in Git match, the StatefulSet was deleted without cascading and recreated, because its storage template is immutable;
+      Kubernetes then restarted the whole Redis cluster, replicas came back with stale information and the backend ran out of memory under
+      reconnects. About 50 minutes of downtime.
+    match: >
+      The low-disk alert and the online expansion worked as intended; the outage came from the step after it, aligning an immutable StatefulSet
+      template with the new size.
+reading:
+  - { title: "Kubernetes: Persistent Volumes", url: "https://kubernetes.io/docs/concepts/storage/persistent-volumes/", why: "The rules of expanding a claim, including recovery when an expansion fails." }
+  - { title: "Prometheus Operator runbooks: KubePersistentVolumeFillingUp", url: "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepersistentvolumefillingup/", why: "The options when the alert fires, from retention to resizing to migration, in order of cost." }
+  - { title: "AdGuard VPN: Redis incident post-mortem", url: "https://adguard-vpn.com/en/blog/redis-kubernetes-vpn-incident-post-mortem.html", why: "What can go wrong after a successful expansion, told step by step." }

@@ -1,0 +1,94 @@
+# What a report teaches when a node's connection tracking table is close to full or has dropped packets. Every page below was opened and read (2026-11-14).
+topic: conntrack-table-exhaustion
+checks: [node.conntrack-usage, node.conntrack-table-full]
+mechanism: >
+  The Linux kernel keeps one entry per tracked connection in the connection tracking table, and kube-proxy relies on it for the address translation
+  behind Services. The table has a hard size: net.netfilter.nf_conntrack_max is the maximum number of allowed entries and nf_conntrack_count is the
+  number currently allocated. Left alone, the kernel sets the maximum from the size of its hash table, which it derives from the memory of the
+  machine. kube-proxy overrides it when it starts: 32768 entries per CPU core, and never fewer than 131072. Either way the limit belongs to the node
+  and follows the node's size, not the traffic that the pods on it produce.
+
+
+  How full the table is depends on how many connections are opened and how long each entry stays. The kernel keeps an idle established TCP
+  connection for 432000 seconds (5 days) by default and an unanswered UDP flow for 30 seconds; kube-proxy lowers the established TCP timeout to 24
+  hours and sets one hour for connections in CLOSE_WAIT. A workload that opens many short connections, or a proxy that fans one request out to many
+  backends, fills the table far faster than its CPU or memory use suggests.
+
+
+  When the limit is reached, some connections are dropped. The kernel writes "nf_conntrack: table full, dropping packet" to its own log, and that is
+  the only record: Kubernetes has no node condition for it, no pod restarts, and the application sees a peer that did not answer or a connection
+  reset. In the public case below the callers logged "failed to respond" and the proxy counted rising connection resets, on a few nodes only, after
+  the node pool had been moved to machines with half the memory and the number of tracked connections had doubled.
+
+
+  That is why two signals are kept apart. The ratio of entries to the limit says how close a node is; the kernel log line says packets were
+  already dropped.
+sources:
+  - { title: "Linux kernel: Netfilter Conntrack Sysfs variables", url: "https://docs.kernel.org/networking/nf_conntrack-sysctl.html" }
+  - { title: "Kubernetes: kube-proxy command line reference", url: "https://kubernetes.io/docs/reference/command-line-tools-reference/kube-proxy/" }
+  - { title: "Prometheus Operator runbook: NodeHighNumberConntrackEntriesUsed", url: "https://runbooks.prometheus-operator.dev/runbooks/node/nodehighnumberconntrackentriesused/" }
+  - { title: "Kubernetes Networking Problems Due to the Conntrack (Dmitri Lerko)", url: "https://deploy.live/blog/kubernetes-networking-problems-due-to-the-conntrack/" }
+detect:
+  - kind: alert
+    what: >
+      The node_exporter mixin ships this rule: a warning as soon as more than 75% of the entries of a node are in use. node_exporter exports both
+      series with its conntrack collector, which is on by default.
+    example: |
+      - alert: NodeHighNumberConntrackEntriesUsed
+        expr: (node_nf_conntrack_entries / node_nf_conntrack_entries_limit) > 0.75
+        labels:
+          severity: warning
+  - kind: metric
+    what: >
+      The same ratio per node as a graph, to see which nodes are close and whether the usage follows traffic or only ever climbs. The limit series
+      also shows that nodes of different sizes have different limits.
+    example: 'node_nf_conntrack_entries / node_nf_conntrack_entries_limit'
+  - kind: command
+    what: >
+      Whether packets were already dropped. Only the kernel log of the node says so.
+    example: "journalctl -k --since -24h | grep 'table full'"
+solutions:
+  - scale: [small]
+    approach: >
+      Leave the limit that kube-proxy sets and add the one alert on the ratio. On a cluster with little traffic the table of 131072 entries or more
+      is rarely the limit; the alert is what tells you the day it becomes one.
+    tools: ["node_exporter mixin alerts"]
+    tradeoff: >
+      Nothing to run and nothing to tune. What you get is a warning at 75%, not more room: the limit stays where it is.
+  - scale: [medium]
+    approach: >
+      Raise the limit where kube-proxy is configured, so that every node gets it at start and it survives a reboot, and keep the alert. The fields
+      are conntrack.maxPerCore and conntrack.min of the kube-proxy configuration.
+    tools: [kube-proxy, "node_exporter mixin alerts"]
+    tradeoff: >
+      Nodes stop dropping connections at the old limit. A larger table can use more memory, and the author of the public case notes it can add
+      latency; a value written straight on a node with sysctl instead is lost unless it is made persistent across reboots.
+    example: |
+      apiVersion: kubeproxy.config.k8s.io/v1alpha1
+      kind: KubeProxyConfiguration
+      conntrack:
+        maxPerCore: 65536
+        min: 262144
+  - scale: [large]
+    approach: >
+      Treat the table as a capacity figure of the node group. Find the workloads that open the most connections, cap how many of their pods run on
+      one node or give them larger nodes, and shorten the kube-proxy timeouts (conntrack.tcpEstablishedTimeout, conntrack.tcpCloseWaitTimeout) so
+      that idle entries leave sooner.
+    tools: [kube-proxy, "node_exporter mixin alerts"]
+    tradeoff: >
+      The limit is sized to the traffic instead of the machine. It costs a placement rule per heavy workload, and a shorter established timeout is
+      also how long an idle TCP connection is kept open, so long-lived idle connections have to send keep-alives or reconnect.
+cases:
+  - company: loveholidays
+    year: 2020
+    url: "https://deploy.live/blog/kubernetes-networking-problems-due-to-the-conntrack/"
+    summary: >
+      A proxy that handled more than 10,000 requests per second and fanned out to two downstream services showed connection problems and a higher
+      error rate after the node pool was resized to machines with half the memory and the downstream services were sharded, which doubled the tracked
+      connections. Callers logged that the peer failed to respond and HAProxy counted connection resets. Some nodes had run out of conntrack entries.
+      The team moved the service to nodes with more memory, capped the pods per node and added an alert at 75% of the limit.
+    match: The limit followed the size of the node, the traffic did not, and nothing in Kubernetes reported the dropped connections.
+reading:
+  - { title: "Kubernetes Networking Problems Due to the Conntrack (Dmitri Lerko)", url: "https://deploy.live/blog/kubernetes-networking-problems-due-to-the-conntrack/", why: "How the fault looked from the application, the query that found it and the downsides of raising the limit from a pod." }
+  - { title: "Linux kernel: Netfilter Conntrack Sysfs variables", url: "https://docs.kernel.org/networking/nf_conntrack-sysctl.html", why: "Every limit and timeout of the table with its default." }
+  - { title: "Kubernetes: kube-proxy configuration (v1alpha1)", url: "https://kubernetes.io/docs/reference/config-api/kube-proxy-config.v1alpha1/", why: "The conntrack fields kube-proxy applies to a node and what a value of 0 means." }

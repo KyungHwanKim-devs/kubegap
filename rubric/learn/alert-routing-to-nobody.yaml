@@ -1,0 +1,122 @@
+# What a report teaches when alerts fire and are delivered to no one: no Alertmanager, a default receiver without integrations, or a day of alerts with
+# zero notifications. Every page below was opened and read (2026-11-14).
+topic: alert-routing-to-nobody
+checks: [observability.no-alert-router, observability.alertmanager-default-null, alertmanager.notifications-silent]
+mechanism: >
+  Prometheus evaluates alert rules; it does not notify anyone. Alertmanager takes the alerts and takes care of deduplicating, grouping and routing them
+  to the correct receiver integration. Without it a firing rule is a line in the Prometheus interface that somebody has to be looking at.
+
+
+  With it, where an alert ends up is decided by a routing tree. The top-level route must match all alerts and carries a receiver. An alert walks down
+  the child routes; it stops at the first child whose matchers it fulfils (unless that child sets continue), and when no child matches it is handled
+  with the parameters of the node it has reached. For an alert that matches nothing, that node is the root, so the root's receiver is the default
+  receiver. Child routes inherit receiver, group_by and the timing parameters from their parent when they do not set them.
+
+
+  A receiver is a named configuration of notification integrations, and nothing requires it to have any. The kube-prometheus-stack chart ships exactly
+  that: one receiver named 'null' with no integrations, the root route pointing at it, and a child route that sends Watchdog to it as well. The
+  Prometheus Operator's own description of its default is that Alertmanager starts with a minimal configuration that doesn't send any notification when
+  receiving alerts. A freshly installed stack therefore evaluates a large rule set and tells nobody. The same hole remains after real receivers are
+  added if the root still points at 'null': a new rule whose labels match none of the child routes falls through to the default and vanishes.
+
+
+  Few notifications for many alerts is normal. Alerts are grouped, a new group waits group_wait (default 30s), further notifications for the group come
+  every group_interval (default 5m), and an unchanged one is repeated after repeat_interval (default 4h; the chart sets 12h). Inhibition suppresses
+  alerts while certain others fire, and silences mute them for a time. On one measured cluster 17,625 received alerts in a day became 9 Slack
+  messages. Zero is the number that is not normal.
+sources:
+  - { title: "Prometheus: Alertmanager", url: "https://prometheus.io/docs/alerting/latest/alertmanager/" }
+  - { title: "Prometheus: Alertmanager configuration", url: "https://prometheus.io/docs/alerting/latest/configuration/" }
+  - { title: "kube-prometheus-stack: values.yaml", url: "https://raw.githubusercontent.com/prometheus-community/helm-charts/main/charts/kube-prometheus-stack/values.yaml" }
+  - { title: "Prometheus Operator: Alerting routes", url: "https://prometheus-operator.dev/docs/developer/alerting/" }
+  - { title: "Alertmanager README (high availability, amtool)", url: "https://github.com/prometheus/alertmanager" }
+detect:
+  - kind: metric
+    what: >
+      Notifications that left Alertmanager in a day, per integration, next to the alerts that came in. Alertmanager exports both; an integration that is
+      missing from the first series was never used.
+    example: 'sum by (integration) (increase(alertmanager_notifications_total[1d])), sum by (status) (increase(alertmanager_alerts_received_total[1d]))'
+  - kind: alert
+    what: >
+      Alerts keep arriving and nothing was sent. This rule only helps when its own notification has a working route, so it is paired with the external
+      heartbeat below.
+    example: |
+      - alert: AlertmanagerSendsNothing
+        expr: |
+          sum(increase(alertmanager_notifications_total[1d])) == 0
+            and sum(increase(alertmanager_alerts_received_total{status="firing"}[1d])) > 100
+        for: 1h
+  - kind: alert
+    what: >
+      The Watchdog alert, always firing, routed to an external system that notifies when it stops arriving. It is the one signal that shows a route to a
+      human exists at all.
+    example: 'alertname = "Watchdog" routed to an external heartbeat receiver instead of to null'
+  - kind: command
+    what: >
+      Where a label set ends up in the routing tree. amtool prints the receivers an alert with these labels would match.
+    example: 'amtool config routes test --config.file=alertmanager.yaml severity=warning namespace=shop'
+solutions:
+  - scale: [small]
+    approach: >
+      One real receiver, and make it the default. Point the root route at a channel a person reads (a Slack channel or a webhook), and send only what
+      is meant to be discarded to 'null' by an explicit child route. Everything that nobody thought about then lands in front of a person.
+    tools: [Alertmanager, kube-prometheus-stack]
+    tradeoff: >
+      Nothing vanishes silently any more. The default rule set is noisy at first and all of it arrives in that one channel; the noise is removed by
+      adding explicit routes to 'null' for what is not wanted, one decision at a time, instead of by a default that hides everything.
+    example: |
+      alertmanager:
+        config:
+          route:
+            receiver: slack
+            routes:
+              - matchers:
+                  - severity = "info"
+                receiver: "null"
+          receivers:
+            - name: "null"
+            - name: slack
+              slack_configs:
+                - channel: "#alerts"
+                  send_resolved: true
+  - scale: [medium]
+    approach: >
+      Route by severity and keep the default pointed at people: critical to a pager, warning to a channel, info to 'null'. Test the tree with
+      amtool config routes test whenever it changes, with one label set per route and one that matches nothing.
+    tools: [Alertmanager, amtool, PagerDuty]
+    tradeoff: >
+      Urgent and non-urgent alerts stop competing for the same attention. Every rule now needs a sensible severity label, and a wrong one sends a real
+      outage to the quiet channel.
+    example: |
+      route:
+        receiver: slack
+        routes:
+          - matchers:
+              - severity = "critical"
+            receiver: pager
+          - matchers:
+              - severity = "info"
+            receiver: "null"
+  - scale: [large]
+    approach: >
+      Let each team own its routes and receivers as AlertmanagerConfig objects, which the Prometheus Operator selects and merges with the main
+      Alertmanager configuration; the main configuration keeps a default receiver owned by the platform team that catches whatever no team route
+      matched.
+    tools: ["Prometheus Operator", AlertmanagerConfig]
+    tradeoff: >
+      Teams change their own routing without touching a shared file. The merged tree is harder to read than one file, so the catch-all default and a
+      routing test over the merged result carry more weight.
+cases:
+  - company: NU.nl
+    year: 2019
+    url: "https://www.tibobeijen.nl/2019/02/01/learning-from-kubernetes-cluster-failure/"
+    summary: >
+      A newly added ElastAlert rule made the ElastAlert pods use memory without limit, nodes went NotReady one after another and replacements followed.
+      No alerts fired: there were no alerts for CPU, memory or disk, Prometheus Alertmanager was not yet set up, and Prometheus and Grafana ran inside
+      the failing cluster and became unreachable. The team found the cause on a Grafana dashboard once those pods had moved to a stable node.
+    match: Metrics that showed the problem existed; without an alert router nothing carried them to a person, so the outage was found by its symptoms.
+reading:
+  - { title: "Prometheus: Alertmanager configuration", url: "https://prometheus.io/docs/alerting/latest/configuration/", why: "How the routing tree is walked, what child routes inherit, and the grouping timers with their defaults." }
+  - { title: "Prometheus Operator: Alerting routes", url: "https://prometheus-operator.dev/docs/developer/alerting/", why: "The three ways to give Alertmanager its configuration, and what the default does when none is given." }
+  - { title: "Prometheus Operator runbooks: Watchdog", url: "https://runbooks.prometheus-operator.dev/runbooks/general/watchdog/", why: "Why one alert is always firing and what it is meant to be connected to." }
+  - { title: "kube-prometheus-stack: values.yaml", url: "https://raw.githubusercontent.com/prometheus-community/helm-charts/main/charts/kube-prometheus-stack/values.yaml", why: "The configuration the chart installs: the 'null' receiver, the root route and the inhibit rules." }

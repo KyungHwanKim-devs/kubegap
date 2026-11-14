@@ -1,0 +1,85 @@
+# What a report teaches when application workloads run privileged, share host namespaces or add dangerous capabilities. Every page below was opened
+# and read (2026-11-14).
+topic: privileged-pods
+checks: [security.privileged-or-host-access]
+mechanism: >
+  A container is isolated from its node by a set of kernel mechanisms, and a pod spec can switch them off one by one. privileged disables most of
+  them at once. hostPID, hostIPC and hostNetwork put the pod into the node's process, IPC and network namespaces. Added capabilities such as
+  SYS_ADMIN or NET_ADMIN hand over parts of root's power. A hostPath volume mounts a directory of the node, and a container with unrestricted
+  access to the host filesystem can read the data of other containers and abuse the credentials of system services such as the kubelet.
+
+
+  The consequence is that the boundary moves. Someone who can run a privileged pod can use it to gain access to the node, and from there elevate
+  further; someone who takes over a container that is already privileged does not have to break out of anything. System DaemonSets such as the
+  CNI, CSI drivers and node-exporter need this access by design; for an application each such setting needs a reason.
+
+
+  Kubernetes names three levels in the Pod Security Standards. Privileged is unrestricted. Baseline prevents the known privilege escalations and is
+  meant to be easy to adopt for common workloads: it disallows privileged containers, host namespaces, hostPath volumes and any added capability
+  outside a short list (NET_BIND_SERVICE, CHOWN, KILL and similar). Restricted goes on to require dropping ALL capabilities, running as non-root,
+  allowPrivilegeEscalation false and a seccomp profile.
+
+
+  Pod Security Admission applies a level per namespace through labels, in three modes: enforce rejects the pod, audit adds an annotation to the
+  audit log event, warn shows a warning to the user. A namespace can use different levels for different modes. One detail matters when turning it
+  on: enforce is applied to pod objects, not to workload resources. A Deployment that violates the level is accepted, and its pods are rejected
+  when the ReplicaSet tries to create them. audit and warn do apply to the workload resource, so they show the problem at apply time.
+sources:
+  - { title: "Kubernetes: Pod Security Standards", url: "https://kubernetes.io/docs/concepts/security/pod-security-standards/" }
+  - { title: "Kubernetes: Pod Security Admission", url: "https://kubernetes.io/docs/concepts/security/pod-security-admission/" }
+  - { title: "Kubernetes: RBAC Good Practices", url: "https://kubernetes.io/docs/concepts/security/rbac-good-practices/" }
+  - { title: "kube-linter: checks", url: "https://raw.githubusercontent.com/stackrox/kube-linter/main/docs/generated/checks.md" }
+detect:
+  - kind: metric
+    what: >
+      How often Pod Security Admission evaluates a pod and with what outcome. The API server exports pod_security_evaluations_total, the number of
+      policy evaluations that occurred, not counting exempt requests. With warn and audit labels set on the namespaces it shows violations before
+      anything is enforced.
+    example: 'sum(rate(pod_security_evaluations_total[1h]))'
+  - kind: alert
+    what: >
+      The audit annotation Pod Security Admission adds in audit mode. Each violating request leaves an event in the API server audit log, which a
+      log filter can turn into a notification that names the workload and the user.
+    example: |
+      metadata:
+        labels:
+          pod-security.kubernetes.io/audit: baseline
+          pod-security.kubernetes.io/warn: baseline
+  - kind: command
+    what: >
+      The same rules run on manifests in CI. kube-linter enables the checks privileged-container, host-pid, host-ipc, host-network and
+      privilege-escalation-container by default.
+    example: 'privileged-container, host-pid, host-ipc, host-network, privilege-escalation-container'
+solutions:
+  - scale: [small]
+    approach: >
+      Label the application namespaces with warn and audit at baseline first and read what turns up. Fix the few workloads that show: a specific
+      capability instead of privileged, a CSI volume instead of hostPath. Then set enforce to baseline on those namespaces and leave the system
+      namespaces alone.
+    tools: ["Pod Security Admission"]
+    tradeoff: >
+      Built into the API server, nothing to install, and a new privileged pod in an application namespace is refused. The granularity is the
+      namespace, and after enforce a violating Deployment is still accepted while its pods silently fail to appear, so the first weeks need an eye
+      on ReplicaSet events.
+    example: |
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: app
+        labels:
+          pod-security.kubernetes.io/enforce: baseline
+          pod-security.kubernetes.io/warn: restricted
+  - scale: [medium, large]
+    approach: >
+      Enforce baseline in every namespace that is not infrastructure and restricted where the workloads allow it, run the same checks in CI so that
+      a violation fails the pull request, and use a policy engine (Kyverno, OPA Gatekeeper or Kubewarden) where an exception has to be narrower
+      than a whole namespace. Record each exception with its reason.
+    tools: ["Pod Security Admission", kube-linter, Kyverno, "OPA Gatekeeper"]
+    tradeoff: >
+      Exceptions are explicit and reviewed, and developers learn of a violation before deploy. A policy engine is an admission webhook that has to
+      be run, upgraded and kept available itself.
+cases: []
+reading:
+  - { title: "Kubernetes: Pod Security Standards", url: "https://kubernetes.io/docs/concepts/security/pod-security-standards/", why: "Field by field, what Baseline and Restricted forbid and which values are allowed." }
+  - { title: "Kubernetes: Pod Security Admission", url: "https://kubernetes.io/docs/concepts/security/pod-security-admission/", why: "The namespace labels, the three modes, exemptions, and how workload resources are treated." }
+  - { title: "kube-linter: checks", url: "https://raw.githubusercontent.com/stackrox/kube-linter/main/docs/generated/checks.md", why: "Which manifest checks exist for privileges and host access and which run by default." }

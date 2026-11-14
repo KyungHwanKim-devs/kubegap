@@ -1,0 +1,100 @@
+# What a report teaches when the cluster's Kubernetes minor is near or past the end of its support. Every page below was opened and read (2026-11-14).
+topic: kubernetes-version-end-of-support
+checks: [platform.k8s-version-eol]
+mechanism: >
+  The Kubernetes project maintains release branches for the three most recent minor versions. A minor gets patch releases for roughly fourteen
+  months: twelve months of standard support, then two months of maintenance mode in which only fixes for vulnerabilities with a CVE, dependency
+  issues and critical core component issues are released. After that the minor is end of life and nothing is patched, and vulnerabilities that only
+  affect an old version may not even be reported.
+
+
+  A managed platform has its own, later date. On EKS a minor is in standard support for 14 months from the day EKS released it, which is after the
+  upstream release, so the EKS date comes after the upstream one (for 1.34: upstream end of life 2026-10-27, EKS end of standard support
+  2026-12-02). Then extended support runs for 12 more months at an additional cost per cluster hour, billed from the start of the day standard
+  support ends. Extended support is on by default. At its end, or at the end of standard support if it was disabled, EKS upgrades the control plane
+  by itself, at any time after the date and without notice, and only the control plane: nodes and add-ons stay behind.
+
+
+  The cost of waiting comes from one rule: the API server must not skip a minor when upgrading, even in a single-instance cluster. A cluster three
+  minors behind needs three upgrades in a row, each with its own API removals and add-on compatibility to check. kubelets may be up to three minors
+  older than the API server, so nodes can lag, but not without limit. k3s follows the same skew policy: intermediate minors are not skipped and
+  servers are upgraded before agents.
+
+
+  Each minor also removes API versions deprecated earlier. Asking the API server does not reveal which manifests still use them, because it converts
+  and returns objects in whatever version is requested; that is why tools read the manifests and Helm releases instead.
+sources:
+  - { title: "Kubernetes: Patch Releases", url: "https://kubernetes.io/releases/patch-releases/" }
+  - { title: "Kubernetes: Version Skew Policy", url: "https://kubernetes.io/releases/version-skew-policy/" }
+  - { title: "Amazon EKS: Understand the Kubernetes version lifecycle on EKS", url: "https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html" }
+  - { title: "Amazon EKS best practices: Cluster Upgrades", url: "https://docs.aws.amazon.com/eks/latest/best-practices/cluster-upgrades.html" }
+  - { title: "k3s: Manual Upgrades", url: "https://docs.k3s.io/upgrades/manual" }
+  - { title: "Pluto documentation", url: "https://pluto.docs.fairwinds.com/" }
+detect:
+  - kind: metric
+    what: >
+      Whether anything still calls an API version that a later minor removes. The API server exposes apiserver_requested_deprecated_apis with the
+      group, version, resource and the release that removes it; a series that exists is a client to fix before the upgrade. The end-of-support date
+      itself is a calendar fact, not a metric.
+    example: 'apiserver_requested_deprecated_apis{removed_release!=""}'
+  - kind: dashboard
+    what: >
+      On EKS, the Upgrade insights tab of the cluster and the AWS Health Dashboard. EKS checks every cluster against a list of upgrade-blocking
+      issues and refreshes the result every 24 hours, and it sends a notice through AWS Health about twelve months after a version's EKS release, at
+      least 60 days before standard support ends.
+    example: 'aws eks list-insights --cluster-name <cluster>'
+  - kind: command
+    what: The dates EKS applies to each version, including the day extended support billing starts.
+    example: 'aws eks describe-cluster-versions'
+solutions:
+  - scale: [small]
+    approach: >
+      Put the upgrade on the calendar instead of waiting for the date: one minor at a time, a few weeks after the platform offers it. On k3s, a Plan
+      of the system-upgrade-controller that follows a release channel upgrades the servers and then the agents by itself. Before each step, run
+      Pluto over the manifests and Helm releases for API versions the next minor removes.
+    tools: [system-upgrade-controller, Pluto, kubent]
+    tradeoff: >
+      Each upgrade stays a small, known step and the cluster never falls out of patches. An automatic plan upgrades without asking, its jobs run
+      highly privileged on the nodes, and the controller does not protect against an unsupported version jump, so the channel has to be chosen with
+      care (k3s has a channel tied to each Kubernetes minor next to stable and latest).
+    example: |
+      apiVersion: upgrade.cattle.io/v1
+      kind: Plan
+      metadata:
+        name: server-plan
+        namespace: system-upgrade
+      spec:
+        concurrency: 1
+        cordon: true
+        nodeSelector:
+          matchExpressions:
+            - { key: node-role.kubernetes.io/control-plane, operator: In, values: ["true"] }
+        serviceAccountName: system-upgrade
+        upgrade:
+          image: rancher/k3s-upgrade
+        channel: https://update.k3s.io/v1-release/channels/stable
+  - scale: [medium, large]
+    approach: >
+      Make the upgrade a written, rehearsed procedure: review the release notes, clear the upgrade insights, scan manifests for removed APIs in CI,
+      upgrade a non-production cluster first, then control plane, add-ons and nodes in that order, with PodDisruptionBudgets and topology spread in
+      place before nodes are replaced. When several minors have to be crossed at once, weigh a new cluster on the target version and a workload
+      migration against a chain of in-place upgrades.
+    tools: ["EKS cluster insights", Pluto, kubent, eksctl]
+    tradeoff: >
+      Upgrades stop being events. The procedure costs a non-production cluster and engineer time three times a year; a blue/green migration can
+      cross several versions and can be switched back, but runs two clusters in parallel and changes the API endpoint and OIDC issuer that
+      consumers point at.
+cases:
+  - company: ZenML
+    year: 2025
+    url: "https://status.zenml.io/incidents/bnrlb8tck3v0"
+    summary: >
+      The production EKS cluster ran an outdated Kubernetes version and AMI image type. The upgrade covered the VPC and EKS Terraform modules, and
+      enabling KMS secret encryption through Terraform also removed IAM permissions from the worker nodes. The workspaces were down for about eight
+      hours until the node group was recreated.
+    match: An upgrade that had been put off arrived as several changes made in one night, and one of them broke the nodes.
+reading:
+  - { title: "Kubernetes: Patch Releases", url: "https://kubernetes.io/releases/patch-releases/", why: "The support period of a minor, what maintenance mode still fixes, and the end-of-life date of each release." }
+  - { title: "Amazon EKS: Understand the Kubernetes version lifecycle on EKS", url: "https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html", why: "The EKS calendar, what extended support includes and what the automatic upgrade does and does not touch." }
+  - { title: "Amazon EKS best practices: Cluster Upgrades", url: "https://docs.aws.amazon.com/eks/latest/best-practices/cluster-upgrades.html", why: "The order of an in-place upgrade and the tools that find removed APIs before it." }
+  - { title: "k3s: Automated Upgrades", url: "https://docs.k3s.io/upgrades/automated", why: "How a Plan upgrades a k3s cluster node by node and what the controller does not guard against." }

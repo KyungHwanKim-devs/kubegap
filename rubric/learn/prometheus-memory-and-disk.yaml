@@ -1,0 +1,141 @@
+# What a report teaches when Prometheus runs close to its memory limit or its disk: OOM kills, slow restarts, a volume filling up, failed compactions.
+# Every page below was opened and read (2026-11-14).
+topic: prometheus-memory-and-disk
+checks: [prometheus.memory-pressure, prometheus.storage-risk]
+mechanism: >
+  Prometheus keeps the newest data in memory. Ingested samples are grouped into two-hour blocks; the current block for incoming samples (the head) is
+  kept in memory and is not fully persisted, and a write-ahead log on disk, in 128MB segments, secures it against crashes. Memory therefore follows the
+  number of active series, not the retention period. One published estimate for Prometheus 2.x puts it at about 732 bytes per series plus 32 bytes
+  per label pair and 120 bytes per unique label value, all of it doubled because of how Go garbage collection works: around 2GiB per million series
+  for cardinality alone, with up to three hours of samples on top. Queries add to that, since a single query may load up to 50,000,000 samples into
+  memory by default and 20 queries may run concurrently.
+
+
+  When the container reaches its limit it is killed, and Prometheus has to replay the write-ahead log before it serves again. Until then no rule is
+  evaluated and no alert is sent. Replay is where restarts go wrong: one account describes a server that ran at about 30Gi and needed over 50Gi during
+  replay, so every restart ended in another OOM kill; another describes a replay that took longer than the startup probe allowed, so the pod was
+  restarted before it finished, again and again.
+
+
+  Disk has its own way to fail. The two-hour blocks are compacted in the background into longer ones. Retention defaults to 15 days by time, and the
+  size limit is disabled by default, so nothing stops the blocks from outgrowing the volume when the number of series grows. With a full disk
+  compaction fails and in the end writes stop. When both limits are set, whichever triggers first is used, and the documentation recommends a
+  retention size of at most 80-85% of the allocated disk, because the size on disk can briefly exceed the limit around a compaction.
+
+
+  Local storage is not clustered or replicated; it is to be managed like any other single-node database. On an emptyDir volume the whole retention
+  window is gone when the pod leaves its node.
+sources:
+  - { title: "Prometheus: Storage", url: "https://prometheus.io/docs/prometheus/latest/storage/" }
+  - { title: "Prometheus: command-line flags", url: "https://prometheus.io/docs/prometheus/latest/command-line/prometheus/" }
+  - { title: "Robust Perception: How much RAM does Prometheus 2.x need for cardinality and ingestion?", url: "https://www.robustperception.io/how-much-ram-does-prometheus-2-x-need-for-cardinality-and-ingestion/" }
+  - { title: "Kubernetes: Volumes (emptyDir)", url: "https://kubernetes.io/docs/concepts/storage/volumes/" }
+detect:
+  - kind: alert
+    what: >
+      The memory of the Prometheus container against its limit. The headroom has to cover a restart, so the threshold sits well below the limit.
+    example: |
+      - alert: PrometheusMemoryNearLimit
+        expr: |
+          container_memory_working_set_bytes{container="prometheus"}
+            / on (namespace, pod, container) kube_pod_container_resource_limits{resource="memory", container="prometheus"} > 0.75
+        for: 30m
+  - kind: metric
+    what: >
+      The number of series in the head, which is what memory follows. A step up after a deployment is a new high-cardinality metric.
+    example: 'prometheus_tsdb_head_series'
+  - kind: alert
+    what: >
+      The volume filling up, and compactions failing. The kubelet exports used and capacity bytes per claim; the Prometheus mixin ships
+      PrometheusTSDBCompactionsFailing.
+    example: |
+      - alert: PrometheusVolumeFillingUp
+        expr: |
+          kubelet_volume_stats_used_bytes{persistentvolumeclaim=~"prometheus-.*"}
+            / kubelet_volume_stats_capacity_bytes{persistentvolumeclaim=~"prometheus-.*"} > 0.8
+      - alert: PrometheusTSDBCompactionsFailing
+        expr: increase(prometheus_tsdb_compactions_failed_total[3h]) > 0
+        for: 4h
+  - kind: alert
+    what: >
+      Prometheus itself from outside the cluster. A Prometheus that is down evaluates no rules, so only an external health check can report it; in the
+      2023 report below that check was what paged the team.
+    example: 'An external HTTP check of the Prometheus health endpoint, wired to the pager'
+  - kind: command
+    what: >
+      Which metrics hold the series, without a running server: promtool reads the data directory and lists the metrics and labels with the highest
+      cardinality.
+    example: 'promtool tsdb analyze /prometheus'
+solutions:
+  - scale: [small]
+    approach: >
+      One Prometheus, sized on purpose. Give it a persistent volume, a retention size at 80-85% of that volume next to the retention time, and a memory
+      limit taken from the number of head series with room for a restart. Accept that there is a gap in the metrics whenever it restarts.
+    tools: [kube-prometheus-stack, PersistentVolumeClaim]
+    tradeoff: >
+      The disk can no longer fill up and a restart is survivable, with three values in the chart. When the size limit triggers first, the oldest data
+      goes earlier than the retention time says, and one replica still means no alert evaluation while it is down.
+    example: |
+      prometheus:
+        prometheusSpec:
+          retention: 10d
+          retentionSize: "16GiB"
+          resources:
+            requests:
+              memory: 2Gi
+            limits:
+              memory: 3Gi
+          storageSpec:
+            volumeClaimTemplate:
+              spec:
+                resources:
+                  requests:
+                    storage: 20Gi
+  - scale: [medium]
+    approach: >
+      The same, and work on the cause of the growth: find the metrics with the most series with promtool tsdb analyze and drop or fix them, replace
+      long-range dashboard panels with recording rules, give the startup probe enough time for a WAL replay at the real size, and add the external
+      health check.
+    tools: [promtool, "recording rules", "an external health check"]
+    tradeoff: >
+      Memory stops growing with every new label instead of being chased with a higher limit. It takes somebody's attention after each deployment that
+      adds metrics, and dropping a metric breaks any dashboard that used it.
+  - scale: [large]
+    approach: >
+      Two Prometheus instances with the same configuration and one differing external label, which scrape the same targets and evaluate the same rules,
+      with a query layer such as Thanos Querier in front; or a managed Prometheus service that takes the storage out of the cluster.
+    tools: ["Prometheus Operator", Thanos, "Amazon Managed Service for Prometheus"]
+    tradeoff: >
+      One instance can restart or lose its node while rules keep being evaluated by the other. It doubles the memory and disk, the two instances return
+      slightly different results because they do not scrape at the same moment, and the query layer is another system to run.
+cases:
+  - company: UK Ministry of Justice
+    year: 2023
+    url: "https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-25-prometheus-on-live-cluster-down.html"
+    summary: >
+      Prometheus on the live cluster exited with code 137 and kept being OOM killed; its node went NotReady. The platform lost monitoring for close to
+      two hours. The number of namespaces and Prometheus rules had grown until Prometheus needed more memory than the instance size could give. The team
+      moved it to a node type with double the CPU and memory and raised the container limits. An external Pingdom check raised the page.
+    match: Memory followed the growth of what Prometheus watches until it hit the limit; while it was being killed there was no monitoring at all.
+  - company: UK Ministry of Justice
+    year: 2024
+    url: "https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2024-04-15-prometheus.html"
+    summary: >
+      After a planned change Prometheus restarted and never became available: the WAL reload took longer than the startup probe allowed, so the pod was
+      restarted before the reload finished. Monitoring was lost for over three hours until the startup probe was lengthened. Follow-up actions include
+      planning restarts for when the WAL is smaller and evaluating a managed Prometheus.
+    match: The restart, not the steady state, was what failed; replaying the write-ahead log is the expensive moment of a large Prometheus.
+  - company: Saifeddine Rajhi
+    year: 2024
+    url: "https://seifrajhi.github.io/blog/prometheus-manage-memory-overload/"
+    summary: >
+      During an upgrade of the kube-prometheus-stack chart the Prometheus pod stayed unready with OOMKilled as its last termination reason. It ran
+      smoothly at about 30Gi and needed over 50Gi while recovering from the WAL, so raising the limit was not a real fix. The author found the
+      high-cardinality metrics with promtool tsdb analyze.
+    match: A server running close to its limit cannot restart, because WAL replay needs more memory than normal operation.
+reading:
+  - { title: "Prometheus: Storage", url: "https://prometheus.io/docs/prometheus/latest/storage/", why: "Blocks, the write-ahead log, compaction, both retention limits and the formula for sizing the disk." }
+  - { title: "Robust Perception: How much RAM does Prometheus 2.x need for cardinality and ingestion?", url: "https://www.robustperception.io/how-much-ram-does-prometheus-2-x-need-for-cardinality-and-ingestion/", why: "Where the memory goes per series and per label, to estimate a limit from the number of head series." }
+  - { title: "Prometheus Operator: Storage", url: "https://prometheus-operator.dev/docs/platform/storage/", why: "How to give Prometheus a volume claim and what resizing one involves." }
+  - { title: "Prometheus Operator: High Availability", url: "https://prometheus-operator.dev/docs/platform/high-availability/", why: "What two replicas do and do not give, and where a query layer comes in." }
+  - { title: "Saifeddine Rajhi: Prometheus memory overload", url: "https://seifrajhi.github.io/blog/prometheus-manage-memory-overload/", why: "A walk through a Prometheus that could not restart, and how to find the metrics responsible." }

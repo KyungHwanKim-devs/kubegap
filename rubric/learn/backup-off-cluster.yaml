@@ -1,0 +1,100 @@
+# What a report teaches when the only copies of the data are inside the cluster. Every page below was opened and read (2026-11-14).
+topic: backup-off-cluster
+checks: [resilience.no-backup, resilience.backup-same-node, eks.no-backup-policy]
+mechanism: >
+  What a backup protects against is decided by where the copy is. A copy on the same disk as the source brings back data deleted by mistake, and nothing
+  else: the disk fails with both. A copy on another node of the same cluster survives a node failure. It does not survive what reaches the whole
+  cluster: a fire or a theft where the nodes are, an attacker or a script with cluster rights that deletes the volumes, a namespace removed with
+  everything in it. The copy goes with the source.
+
+
+  That is what the 3-2-1 rule answers: keep three copies of an important file (the primary and two backups), on two different media types, and one copy
+  offsite. A cluster whose dumps go to a PersistentVolume of the same cluster has two copies on one kind of media in one place.
+
+
+  Kubernetes itself does not make the offsite copy. A VolumeSnapshot is a point-in-time copy of a volume on the storage system, it exists only for CSI
+  drivers, and with the deletion policy Delete the underlying snapshot is removed together with the VolumeSnapshot object. Volumes of
+  local-path-provisioner are directories on one node: the PersistentVolume carries a node affinity for that host name, the capacity in the claim is not
+  enforced, and the content is cleaned up when the volume is deleted. There is no storage system behind them that could keep a snapshot elsewhere, so
+  the export has to be built.
+
+
+  The cluster state has the same question. k3s takes an etcd snapshot twice a day by default and keeps five per server node, in a directory on that
+  server; the snapshot holds the whole datastore and the cluster CA keys, encrypted with a key derived from the server token. Restoring it on a new host
+  needs that token, so a snapshot without the token restores nothing.
+
+
+  One more thing holds for every backup: a backup that was never restored is not known to work. A dump file that appears every night says the job ran,
+  not that a database comes up from it.
+sources:
+  - { title: "CISA: Data Backup Options", url: "https://www.cisa.gov/sites/default/files/publications/data_backup_options.pdf" }
+  - { title: "Kubernetes: Volume Snapshots", url: "https://kubernetes.io/docs/concepts/storage/volume-snapshots/" }
+  - { title: "local-path-provisioner README", url: "https://github.com/rancher/local-path-provisioner" }
+  - { title: "k3s: etcd-snapshot", url: "https://docs.k3s.io/cli/etcd-snapshot" }
+detect:
+  - kind: alert
+    what: >
+      A backup CronJob that has not succeeded for longer than its schedule allows. kube-state-metrics exports the time of the last successful run; the
+      rule fires on its age.
+    example: |
+      - alert: BackupCronJobStale
+        expr: time() - kube_cronjob_status_last_successful_time{cronjob=~".*backup.*"} > 86400 * 1.5
+        for: 30m
+  - kind: metric
+    what: >
+      Whether the copy left the cluster. The export job is a CronJob too, so the same series shows it; the object storage side shows the newest object
+      and the size of the bucket.
+    example: 'time() - kube_cronjob_status_last_successful_time{cronjob="offsite-backup"}'
+  - kind: command
+    what: >
+      Whether the copy restores. No metric shows this. On a schedule, restore one dump into an empty database and compare a few row counts; for k3s,
+      restore a snapshot on a spare host with the server token.
+    example: 'k3s server --cluster-reset --cluster-reset-restore-path=<snapshot>'
+solutions:
+  - scale: [small]
+    approach: >
+      Keep the dumps that already exist and add one step that sends them to object storage outside the cluster: a CronJob that mounts the dump volume
+      read-only and uploads it with restic or rclone to an S3-compatible bucket. For k3s, turn on the S3 options of the etcd snapshot so that every
+      snapshot is uploaded as well, and keep the server token outside the cluster.
+    tools: [restic, rclone, "k3s --etcd-s3"]
+    tradeoff: >
+      A copy survives the loss of the whole site, for the monthly price of the storage and one credential to keep in a Secret. restic encrypts before
+      it uploads; losing its repository password loses the backups.
+    example: |
+      containers:
+        - name: offsite
+          image: restic/restic
+          args: ["backup", "/dumps"]
+          envFrom:
+            - secretRef: { name: offsite-backup }
+          volumeMounts:
+            - { name: dumps, mountPath: /dumps, readOnly: true }
+  - scale: [medium, large]
+    approach: >
+      Back up the Kubernetes objects and the volumes together with Velero on a Schedule, to object storage in another account or region, and restore
+      into a scratch cluster on a calendar. On EKS, add an AWS Backup plan or a Data Lifecycle Manager policy for the EBS volumes and copy the
+      snapshots to another region.
+    tools: [Velero, "AWS Backup", "Amazon Data Lifecycle Manager"]
+    tradeoff: >
+      Objects and data come back together and the restore is a practised procedure. Velero is one more component to run and upgrade, a restore skips
+      what already exists unless told otherwise, and backups expire after 30 days unless a TTL is set.
+cases:
+  - company: GitLab
+    year: 2017
+    url: "https://about.gitlab.com/blog/2017/02/10/postmortem-of-database-outage-of-january-31/"
+    summary: >
+      An engineer removed the data directory of the production database by mistake. The nightly pg_dump backups had been failing because of a version
+      mismatch, the mails that reported the failure were rejected, and the S3 bucket was empty. The database was recovered from an LVM snapshot taken by
+      hand six hours earlier.
+    match: Backups were configured and believed to exist; nothing told anyone they were not being made, and no one had restored one.
+  - company: InfluxData
+    url: "https://www.influxdata.com/blog/deleting-production-steps-how-fix-it/"
+    summary: >
+      A name collision in the Argo CD configuration made Argo CD delete a whole production environment. The volumes had the reclaim policy Retain, so
+      the data stayed, and the Kubernetes objects were recreated by hand.
+    match: Deletion with cluster rights takes the copies inside the cluster with the source; what was outside its reach is what came back.
+reading:
+  - { title: "GitLab: Postmortem of database outage of January 31", url: "https://about.gitlab.com/blog/2017/02/10/postmortem-of-database-outage-of-january-31/", why: "How believing a backup exists differs from restoring one." }
+  - { title: "k3s: etcd-snapshot", url: "https://docs.k3s.io/cli/etcd-snapshot", why: "The S3 options and the restore procedure, including the token it needs." }
+  - { title: "restic: Preparing a new repository", url: "https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html", why: "The storage back ends restic writes to and how the repository password works." }
+  - { title: "Velero: How Velero Works", url: "https://velero.io/docs/main/how-velero-works/", why: "What a backup, a schedule and a restore do, and what a restore leaves alone." }

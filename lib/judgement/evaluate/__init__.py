@@ -141,7 +141,7 @@ def evaluate(snap: Path, cfg: Config, *, scale_answer: str | None = None, tools_
         "context": inv.get("context"),
         "platform": platform,
         "scale": scale,
-        "checks": {"total": len(checks), "by_status": counts_by("status", results), "load_errors": errors},
+        "checks": {"total": len(checks), "by_status": counts_by("status", results), "load_errors": errors + rubric.load_learn()[1]},
         "severity_rules": rubric.load_severity_rules(),
         "findings": sorted(findings, key=lambda f: (["critical", "high", "medium", "low", "info"].index(f["severity_default"]), f["status"] != "fail", f["id"])),
         "findings_count": {
@@ -152,6 +152,8 @@ def evaluate(snap: Path, cfg: Config, *, scale_answer: str | None = None, tools_
         "suppressed": suppressed,
         "expired_suppressions": expired_sup,
         "llm_checks": [f for f in findings if f["status"] == "llm"],
+        # what the report teaches about the checks that found something (rubric/learn/): how it works, how to watch it, how to solve it at each scale
+        "learn": rubric.learn_for({f["check"] for f in findings}),
         "check_results": results,
     }
     write_private(snap / "findings-draft.json", json.dumps(out, ensure_ascii=False, indent=1, default=str))

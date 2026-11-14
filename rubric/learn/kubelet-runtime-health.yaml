@@ -1,0 +1,97 @@
+# What a report teaches when the kubelet's view of the container runtime is slow or the runtime reports itself not ready. Every page below was opened and read (2026-11-14).
+topic: kubelet-runtime-health
+checks: [node.kubelet-pleg-slow, node.cri-not-ready]
+mechanism: >
+  A node is Ready only while the kubelet can talk to its container runtime and the runtime says it can run pods. Two things are checked.
+
+
+  The first is the Pod Lifecycle Event Generator (PLEG). The kubelet learns what its containers are doing by relisting: it asks the runtime for
+  the list of all pods and containers, compares it with the previous list, and turns the differences into events (a container started, died, was
+  removed). The period is 1 second, but a relist takes as long as the runtime takes to answer, and the next one starts only when the previous one
+  has finished; the time grows with the number of pods and containers on the node and with every slow runtime call. The kubelet's health check
+  asks when the last relist completed. If that is more than 3 minutes ago it reports "PLEG is not healthy", stops synchronising pods, and the node
+  becomes NotReady. A relist that takes whole seconds is far from that threshold, but it is the same quantity on its way there, and meanwhile
+  the kubelet reacts late to every container change.
+
+
+  The second is the runtime's own status. Over the CRI the runtime reports two required conditions: RuntimeReady, the runtime is up and can run
+  basic containers that need only the host network, and NetworkReady, the runtime network is up for containers that need the container network.
+  If either is unmet the node is not ready. The runtime, not the kubelet, loads the CNI plugins (the configuration is read from /etc/cni/net.d
+  by default), so a missing or broken CNI configuration shows up here as NetworkReady false.
+
+
+  What follows is the same in both cases. A node whose Ready condition is False gets the taint node.kubernetes.io/not-ready. Pods carry an
+  automatically added toleration of 300 seconds for it, so they stay bound to the node for 5 minutes and are then evicted; DaemonSet pods tolerate
+  it without a time limit and stay. A node that flaps in and out of Ready repeats this.
+sources:
+  - { title: "Red Hat Developer: Pod Lifecycle Event Generator, understanding the PLEG is not healthy issue", url: "https://developers.redhat.com/blog/2019/11/13/pod-lifecycle-event-generator-understanding-the-pleg-is-not-healthy-issue-in-kubernetes" }
+  - { title: "kubernetes/kubernetes v1.33.5: pkg/kubelet/kubelet.go (relist period and threshold)", url: "https://raw.githubusercontent.com/kubernetes/kubernetes/v1.33.5/pkg/kubelet/kubelet.go" }
+  - { title: "kubernetes/kubernetes v1.33.5: pkg/kubelet/pleg/generic.go (Healthy)", url: "https://raw.githubusercontent.com/kubernetes/kubernetes/v1.33.5/pkg/kubelet/pleg/generic.go" }
+  - { title: "kubernetes/cri-api: api.proto (RuntimeCondition)", url: "https://raw.githubusercontent.com/kubernetes/cri-api/master/pkg/apis/runtime/v1/api.proto" }
+  - { title: "Kubernetes: Network Plugins", url: "https://kubernetes.io/docs/concepts/extend-kubernetes/compute-storage-net/network-plugins/" }
+  - { title: "Kubernetes: Node Status", url: "https://kubernetes.io/docs/reference/node/node-status/" }
+  - { title: "Kubernetes: Taints and Tolerations", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/" }
+detect:
+  - kind: alert
+    what: >
+      The kubernetes-mixin ships a rule on the 99th percentile of the relist duration per node: 10 seconds or more for 5 minutes. It also ships
+      the rules for the outcome, a node that is not Ready for 15 minutes and a node whose readiness changed more than twice in 15 minutes.
+    example: |
+      - alert: KubeletPlegDurationHigh
+        expr: histogram_quantile(0.99, sum by (le, node) (rate(kubelet_pleg_relist_duration_seconds_bucket[5m]))) >= 10
+        for: 5m
+      - alert: KubeNodeNotReady
+        expr: kube_node_status_condition{condition="Ready",status="true"} == 0
+        for: 15m
+  - kind: metric
+    what: >
+      The quantity the health check itself uses. The kubelet exports the time PLEG was last seen active, so the age of the last relist can be
+      graphed and alerted on directly, next to the duration of the runtime operations.
+    example: |
+      time() - kubelet_pleg_last_seen_seconds
+      histogram_quantile(0.99, sum by (le, node) (rate(kubelet_runtime_operations_duration_seconds_bucket[5m])))
+  - kind: metric
+    what: >
+      How loaded the node is with what a relist has to walk through: running pods and containers per kubelet.
+    example: |
+      kubelet_running_pods
+      sum by (node) (kubelet_running_containers)
+  - kind: command
+    what: >
+      The runtime's two conditions and the reason for a network that is not ready, on the node.
+    example: 'crictl info | jq .status'
+solutions:
+  - scale: [small]
+    approach: >
+      Alert on a node that is not Ready and on the relist duration, and leave the rest alone. On a cluster of a few nodes with tens of pods each,
+      a relist takes milliseconds, and a runtime that is not ready shows as a NotReady node; what matters is being told.
+    tools: ["kubernetes-mixin alerts"]
+    tradeoff: >
+      No component to add. Finding the cause still means looking at the node, and with few nodes one NotReady node is a large share of the
+      capacity for the 5 minutes before its pods are moved.
+  - scale: [medium]
+    approach: >
+      Bound what one kubelet has to handle and make runtime health visible as a node condition. Set maxPods in the kubelet configuration to what
+      the node's disk and runtime keep up with (the default is 110), and run node-problem-detector as a DaemonSet; its health checker reports
+      the conditions KubeletUnhealthy and ContainerRuntimeUnhealthy.
+    tools: [KubeletConfiguration, node-problem-detector, "kubernetes-mixin alerts"]
+    tradeoff: >
+      A node cannot be packed past the point where the relist slows down, and an unhealthy runtime is a condition on the node object instead of
+      a line in a log. Fewer pods per node means more nodes for the same workloads, and node-problem-detector is one more DaemonSet to keep up to date.
+    example: |
+      apiVersion: kubelet.config.k8s.io/v1beta1
+      kind: KubeletConfiguration
+      maxPods: 60
+  - scale: [large]
+    approach: >
+      Act on the conditions automatically: node-problem-detector reports them, and a remediation system such as a Cluster API MachineHealthCheck
+      or the Node Health Check Operator of medik8s replaces or remediates the machines whose conditions stay bad.
+    tools: [node-problem-detector, "Cluster API MachineHealthCheck", medik8s]
+    tradeoff: >
+      A node with a stuck runtime is replaced without a person. Two more systems to run, and the conditions they act on have to be chosen and
+      watched like any other automation that removes nodes.
+cases: []
+reading:
+  - { title: "Red Hat Developer: Pod Lifecycle Event Generator, understanding the PLEG is not healthy issue", url: "https://developers.redhat.com/blog/2019/11/13/pod-lifecycle-event-generator-understanding-the-pleg-is-not-healthy-issue-in-kubernetes", why: "A walk through the relist code and the causes of a slow relist: runtime latency, too many pods, a CNI that hangs on pod network status." }
+  - { title: "Kubernetes: Taints and Tolerations", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/", why: "What happens to pods on a node that is not ready, and how the 300 seconds can be set per workload." }
+  - { title: "node-problem-detector", url: "https://github.com/kubernetes/node-problem-detector", why: "How node faults that Kubernetes does not see become conditions and events, and which remediation systems build on them." }

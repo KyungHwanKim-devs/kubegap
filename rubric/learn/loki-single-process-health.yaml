@@ -1,0 +1,91 @@
+# What a report teaches when a Loki that runs as one process was killed for memory or does not answer ready. Every page below was opened and read
+# (2026-11-14).
+topic: loki-single-process-health
+checks: [observability.loki-oomkilled, observability.loki-not-ready]
+mechanism: >
+  In monolithic mode Loki runs all of its components inside a single process: the part that receives logs, the part that holds them in memory and the
+  part that answers queries. It is the mode meant for small volumes, up to approximately 20GB per day. One process also means one memory limit, so a
+  query and the ingestion of new logs compete for the same memory, and when the container is killed all of them stop together.
+
+
+  Queries are what makes memory jump. The defaults are wide: a query may span 30d1h (max_query_length), fetch up to 2,000,000 chunks
+  (max_chunks_per_query) and have up to 32 queries scheduled in parallel for it (max_query_parallelism). A count over a long range across many
+  streams fits well inside those limits and not inside a small container; on one measured cluster a single 24-hour query was enough for an OOMKill.
+
+
+  What the kill costs depends on the write-ahead log. Ingesters temporarily store data in memory: a chunk stays there until it has had no updates for
+  chunk_idle_period (30m), reaches max_chunk_age (2h) or its target size, and only then is flushed to storage. In a crash that data would be lost. The
+  WAL records incoming data on the local file system so that acknowledged data survives; for that the ingester needs the same persistent volume across
+  restarts.
+
+
+  The kill is also why Loki is not ready afterwards. Upon restart Loki replays all of the data in the log before registering itself as ready, and
+  /ready returns HTTP 200 only when the instance is ready to accept traffic. Replay is guarded by a memory ceiling
+  (--ingester.wal-replay-memory-ceiling, default 4GB): past 90% of it Loki flushes to storage instead of holding more. A container whose limit is
+  below that default reaches its own limit first, so the guard has to be set below the container limit to do anything. The WAL also stops accepting
+  writes when its disk is 90% full, and if the log is corrupted or deleted before replay Loki starts anyway and cannot recover all of its data.
+sources:
+  - { title: "Loki: deployment modes", url: "https://grafana.com/docs/loki/latest/get-started/deployment-modes/" }
+  - { title: "Loki: Write Ahead Log", url: "https://grafana.com/docs/loki/latest/operations/storage/wal/" }
+  - { title: "Loki: configuration reference", url: "https://grafana.com/docs/loki/latest/configure/" }
+  - { title: "Loki: HTTP API", url: "https://grafana.com/docs/loki/latest/reference/loki-http-api/" }
+detect:
+  - kind: metric
+    what: >
+      The memory of the Loki container against its limit, over days. The peaks, not the average, are what get it killed; kube-state-metrics exports the
+      limit and the reason of the last termination.
+    example: |
+      max_over_time(container_memory_working_set_bytes{container="loki"}[1d])
+        / on (namespace, pod, container) kube_pod_container_resource_limits{resource="memory", container="loki"}
+  - kind: alert
+    what: >
+      A Loki container whose last termination was an OOM kill and that restarted recently.
+    example: |
+      - alert: LokiOOMKilled
+        expr: |
+          kube_pod_container_status_last_terminated_reason{container="loki", reason="OOMKilled"} == 1
+            and on (namespace, pod, container) increase(kube_pod_container_status_restarts_total{container="loki"}[1h]) > 0
+  - kind: metric
+    what: >
+      Loki's own WAL series: whether a replay is running and how long replays take, whether writes failed because the WAL disk was full, and whether
+      the log was found corrupted.
+    example: 'loki_ingester_wal_replay_active, loki_ingester_wal_replay_duration_seconds, loki_ingester_wal_disk_full_failures_total, loki_ingester_wal_corruptions_total'
+  - kind: command
+    what: >
+      The readiness answer itself, the same one a readiness probe asks for.
+    example: 'kubectl exec -n monitoring loki-0 -- wget -qO- localhost:3100/ready'
+solutions:
+  - scale: [small]
+    approach: >
+      Keep the single process and make it fit. Set the memory limit from the observed peaks, cut the query limits down to what the cluster needs
+      (a shorter max_query_length, a lower max_query_parallelism), and put the Loki data directory with its WAL on a persistent volume.
+    tools: [Loki, PersistentVolumeClaim]
+    tradeoff: >
+      A heavy query is refused instead of taking ingestion down with it, and what was in memory comes back after a restart. Long ranges have to be
+      asked in several shorter queries, and a volume from a node-local provisioner ties Loki to that node.
+    example: |
+      limits_config:
+        max_query_length: 7d
+        max_query_parallelism: 4
+        max_entries_limit_per_query: 5000
+  - scale: [medium]
+    approach: >
+      The same limits and volume, plus the alerts above, a replay memory ceiling set below the container limit, and a second monolithic instance: the documented way to make
+      this mode highly available is two instances with a shared object store, memberlist_config and a replication factor of 3.
+    tools: [Loki, "object storage", Alertmanager]
+    tradeoff: >
+      One instance being killed no longer stops log ingestion. It needs an object store instead of a local directory, and query parallelism is still
+      bounded by the number of instances.
+  - scale: [large]
+    approach: >
+      Run Loki in microservices mode, where the components are distinct processes: ingesters as a StatefulSet with fixed volumes for the WAL, queriers
+      scaled apart from them. A query that runs out of memory then kills a querier and nothing else.
+    tools: ["Loki microservices mode", "object storage"]
+    tradeoff: >
+      Reads and writes fail and scale separately. It is many components to deploy, size and upgrade, and the middle path between the two modes (simple
+      scalable) is deprecated and announced to be removed with Loki 4.0.
+cases: []
+reading:
+  - { title: "Loki: Write Ahead Log", url: "https://grafana.com/docs/loki/latest/operations/storage/wal/", why: "What the WAL protects, how replay and its memory ceiling work, and the metrics that watch it." }
+  - { title: "Loki: deployment modes", url: "https://grafana.com/docs/loki/latest/get-started/deployment-modes/", why: "What one process can carry and what the other modes separate." }
+  - { title: "Loki: configuration reference", url: "https://grafana.com/docs/loki/latest/configure/", why: "The query and ingester limits with their defaults, under limits_config and ingester." }

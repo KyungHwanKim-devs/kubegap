@@ -1,0 +1,87 @@
+# What a report teaches when the EKS API endpoint or the cluster security group accepts traffic from the whole internet. Every page below was
+# opened and read (2026-11-14).
+topic: eks-network-exposure
+checks: [eks.public-endpoint-open, eks.security-group-open-to-world]
+mechanism: >
+  An EKS cluster has two doors and each has its own lock. The first is the API server endpoint. A new cluster gets a public endpoint with private
+  access disabled: the API server is reachable from the internet, and requests from the nodes leave the VPC (though not Amazon's network) to reach
+  it. Access is secured by IAM authentication and Kubernetes RBAC, which is why AWS still calls the default secure. What the open endpoint removes
+  is the second layer: any leaked credential works from anywhere, and so does any flaw in authentication or an overly generous binding.
+
+
+  The lock on this door is the list of public access CIDRs, which limits the addresses that may reach the public endpoint. It does not affect the
+  private endpoint. With the private endpoint enabled as well, traffic from the nodes stays in the VPC; AWS recommends enabling it when the public
+  CIDRs are restricted, or else the list has to include the addresses the nodes come from. With public access disabled, every kubectl command must
+  come from inside the VPC or a connected network.
+
+
+  The second door is the cluster security group. EKS creates it with the cluster and attaches it to the network interfaces of the control plane and
+  of the nodes in managed node groups. Its default inbound rule allows all traffic from the group itself and nothing else, so nodes and control
+  plane talk freely and nobody outside does. It controls connections to the kubelet API and to the private endpoint; it has no effect on the public
+  endpoint.
+
+
+  An inbound rule from 0.0.0.0/0 added to this group therefore opens the nodes themselves: the kubelet on 10250, the NodePort range 30000 to 32767
+  and SSH on 22 become reachable from the internet. Such rules are usually left over from debugging or from exposing one service quickly, and they
+  apply to every node that carries the group.
+sources:
+  - { title: "EKS: Cluster API server endpoint", url: "https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html" }
+  - { title: "EKS: Security group requirements for clusters", url: "https://docs.aws.amazon.com/eks/latest/userguide/sec-group-reqs.html" }
+  - { title: "EKS Best Practices: Identity and Access Management", url: "https://docs.aws.amazon.com/eks/latest/best-practices/identity-and-access-management.html" }
+  - { title: "AWS Config: eks-endpoint-no-public-access", url: "https://docs.aws.amazon.com/config/latest/developerguide/eks-endpoint-no-public-access.html" }
+  - { title: "AWS Config: vpc-sg-open-only-to-authorized-ports", url: "https://docs.aws.amazon.com/config/latest/developerguide/vpc-sg-open-only-to-authorized-ports.html" }
+detect:
+  - kind: alert
+    what: >
+      Security groups open to the world on ports that were not agreed. The AWS Config managed rule vpc-sg-open-only-to-authorized-ports is
+      evaluated on configuration changes and periodically, and is NON_COMPLIANT when a group allows 0.0.0.0/0 or ::/0 on a port outside the
+      authorizedTcpPorts parameter.
+    example: 'VPC_SG_OPEN_ONLY_TO_AUTHORIZED_PORTS with authorizedTcpPorts = 443'
+  - kind: alert
+    what: >
+      A cluster whose endpoint is public. The AWS Config managed rule eks-endpoint-no-public-access is evaluated periodically and is NON_COMPLIANT
+      whenever the endpoint is publicly accessible; it does not look at the CIDR list, so it fits clusters meant to be private only.
+    example: 'EKS_ENDPOINT_NO_PUBLIC_ACCESS'
+  - kind: metric
+    what: >
+      Requests the API server answered with 401. apiserver_request_total carries the response code; on an endpoint open to the world this rate
+      includes requests from strangers, which the API server has to answer like any other.
+    example: 'sum(rate(apiserver_request_total{code="401"}[1h]))'
+  - kind: command
+    what: The current endpoint settings and CIDR list of one cluster.
+    example: 'aws eks describe-cluster --name <cluster> --query cluster.resourcesVpcConfig'
+solutions:
+  - scale: [small]
+    approach: >
+      Keep the public endpoint and restrict the public access CIDRs to the addresses the cluster is operated from, and enable the private endpoint
+      so that the nodes do not depend on that list. In the cluster security group, delete inbound rules with a CIDR source and keep references to
+      security groups only; reach nodes through Systems Manager Session Manager, which needs no inbound port, instead of SSH.
+    tools: ["EKS endpoint access", "AWS Systems Manager Session Manager"]
+    tradeoff: >
+      A leaked credential is useless from anywhere else, at no running cost and with no VPN to maintain. When the operator's address changes the
+      list has to be updated from the AWS API before kubectl works again.
+  - scale: [medium, large]
+    approach: >
+      Disable the public endpoint and reach the API server through a connected network (for example over a transit gateway), a bastion host in the
+      VPC or CloudShell; allow port 443 from that network in the cluster security group. Turn on the two AWS Config rules above so that a public
+      endpoint or a world-open rule is reported when it appears.
+    tools: ["AWS Config", "AWS Transit Gateway", "AWS CloudShell"]
+    tradeoff: >
+      The API server has no internet-facing surface and exposure is detected rather than found by audit. Every person, CI job and tool that talks
+      to the API needs a path into the VPC, which is infrastructure to build and a new way to be locked out.
+cases:
+  - company: Aqua Nautilus (RBAC Buster)
+    year: 2023
+    url: "https://www.aquasec.com/blog/leveraging-kubernetes-rbac-to-backdoor-clusters/"
+    summary: >
+      Attackers found API servers that were reachable and accepted unauthenticated requests from anonymous users with privileges, created an
+      admin-level ClusterRole, a ServiceAccount and a ClusterRoleBinding for persistence, and deployed a DaemonSet mining Monero. The researchers
+      counted at least 60 clusters targeted and found another 60 exposed clusters with traces of the same actor.
+    match: >
+      An API server open to the internet turns any authentication or RBAC mistake into something anyone can find and use; with the endpoint
+      restricted to known addresses the same mistake stays out of reach.
+reading:
+  - { title: "EKS: Cluster API server endpoint", url: "https://docs.aws.amazon.com/eks/latest/userguide/cluster-endpoint.html", why: "The three endpoint combinations in one table, and the ways to reach a private-only API server." }
+  - { title: "EKS: Security group requirements for clusters", url: "https://docs.aws.amazon.com/eks/latest/userguide/sec-group-reqs.html", why: "What the cluster security group is attached to, its default rules and the minimum set if they are narrowed." }
+  - { title: "AWS Systems Manager Session Manager", url: "https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager.html", why: "How to get a shell on a node without an inbound port, a bastion or SSH keys." }
+  - { title: "AWS Config: vpc-sg-open-only-to-authorized-ports", url: "https://docs.aws.amazon.com/config/latest/developerguide/vpc-sg-open-only-to-authorized-ports.html", why: "The managed rule that reports world-open ports, with its parameters." }

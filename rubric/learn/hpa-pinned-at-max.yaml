@@ -1,0 +1,90 @@
+# What a report teaches when an HPA sits at its maximum. Every page below was opened and read (2026-11-14).
+topic: hpa-pinned-at-max
+checks: [scaling.hpa-at-max]
+mechanism: >
+  An HPA computes the replica count that would bring its metric back to the target: desiredReplicas = ceil(currentReplicas x currentMetricValue /
+  desiredMetricValue). The result is then capped: whatever the formula asks for, the HPA never sets more than maxReplicas. When that happens the HPA
+  sets the status condition ScalingLimited, which says that the desired scale was capped by the maximum or minimum replica count.
+
+
+  At the maximum the control loop is still running but has nothing left to do. The metric stays above the target, each pod carries more than it was
+  sized for, and more load is absorbed only by the pods that exist: CPU utilization climbs toward the limit, latency follows. An HPA that spends a
+  large share of its time at the maximum is, for that time, a fixed-size Deployment.
+
+
+  Two different situations look the same in the replica count. In the first the ceiling is too low for the load: the workload needs more pods than it
+  is allowed. In the second the target is wrong. Utilization is measured against the request, so a CPU request that is too small makes a pod look
+  busy at little load and drives the HPA to its maximum without real demand; the runbook for this alert names both, a maximum that is too low and
+  requests that are set too low, and adds that for some services running at the maximum is in fact desired.
+
+
+  Speed is a third thing and a separate one. By default an HPA scales up without a stabilization window and may add 100% of the current replicas or 4
+  pods every 15 seconds, whichever is more, and scales down only after a 300 second window. A workload that reaches its maximum in short peaks and
+  falls back is limited by the ceiling for those minutes only.
+sources:
+  - { title: "Kubernetes: Horizontal Pod Autoscaling", url: "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/" }
+  - { title: "Kubernetes: HorizontalPodAutoscaler Walkthrough", url: "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale-walkthrough/" }
+  - { title: "Prometheus Operator runbooks: KubeHpaMaxedOut", url: "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubehpamaxedout/" }
+  - { title: "kubernetes-mixin: alerts/apps_alerts.libsonnet", url: "https://raw.githubusercontent.com/kubernetes-monitoring/kubernetes-mixin/master/alerts/apps_alerts.libsonnet" }
+detect:
+  - kind: alert
+    what: >
+      The kubernetes-mixin rule KubeHpaMaxedOut: current replicas equal to the maximum for 15 minutes, only for HPAs whose maximum differs from the
+      minimum and whose ScalingLimited condition is true.
+    example: |
+      - alert: KubeHpaMaxedOut
+        expr: |
+          kube_horizontalpodautoscaler_status_current_replicas == kube_horizontalpodautoscaler_spec_max_replicas
+          and on (namespace, horizontalpodautoscaler)
+          kube_horizontalpodautoscaler_spec_max_replicas != kube_horizontalpodautoscaler_spec_min_replicas
+          and on (namespace, horizontalpodautoscaler)
+          kube_horizontalpodautoscaler_status_condition{condition="ScalingLimited", status="true"} == 1
+        for: 15m
+  - kind: metric
+    what: >
+      The share of a long window spent at the maximum, which separates a short peak from a ceiling that is always reached. This is what the check
+      measures over 15 days.
+    example: 'avg_over_time((kube_horizontalpodautoscaler_status_current_replicas >= bool kube_horizontalpodautoscaler_spec_max_replicas)[15d:5m])'
+  - kind: dashboard
+    what: >
+      Current, desired, minimum and maximum replicas of the HPA on one panel, next to the latency and error rate of the same workload. Whether the
+      time at the maximum hurt is visible only where both are side by side.
+    example: 'kube_horizontalpodautoscaler_status_desired_replicas, kube_horizontalpodautoscaler_spec_max_replicas, and the request latency of the workload'
+  - kind: command
+    what: The conditions of one HPA, including the reason for ScalingLimited.
+    example: 'kubectl describe hpa <name> -n <namespace>'
+solutions:
+  - scale: [small]
+    approach: >
+      Decide which of the two situations it is before changing anything. If latency and errors did not move while the HPA was at its maximum, the
+      request is the likely cause: raise the CPU request to what a pod really uses at normal load and the HPA comes off the ceiling. If they did
+      move, raise maxReplicas as far as the nodes have room. On a cluster without a node autoscaler the room on the nodes is the real ceiling.
+    tools: [HorizontalPodAutoscaler, "resource requests"]
+    tradeoff: >
+      One field changes. A higher request reserves more of each node for every pod; a higher maximum only helps while the extra pods can be
+      scheduled.
+  - scale: [medium, large]
+    approach: >
+      Treat maxReplicas as a capacity decision with an alert on it. Set the maximum from a load test rather than from habit, keep the node autoscaler
+      limits above what the maximum of all HPAs can ask for, run KubeHpaMaxedOut, and where the load does not follow CPU scale on a metric that does
+      (requests per second, queue length) through the custom or external metrics API. For peaks that arrive faster than pods start, tune
+      behavior.scaleUp rather than the ceiling.
+    tools: [HorizontalPodAutoscaler, "kubernetes-mixin", KEDA, Karpenter]
+    tradeoff: >
+      The ceiling is reached rarely and someone is told when it is. A higher maximum moves the limit to the nodes and to the bill, and a scaling
+      metric from outside the cluster is one more thing that can be unavailable.
+    example: |
+      spec:
+        maxReplicas: 20
+        behavior:
+          scaleUp:
+            stabilizationWindowSeconds: 0
+            policies:
+              - type: Percent
+                value: 100
+                periodSeconds: 15
+cases: []
+reading:
+  - { title: "Kubernetes: Horizontal Pod Autoscaling", url: "https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/", why: "The formula, the tolerance and the default scale-up and scale-down behavior with their numbers." }
+  - { title: "Prometheus Operator runbooks: KubeHpaMaxedOut", url: "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubehpamaxedout/", why: "A short runbook that asks the right first question: is the maximum too low or are the requests too low." }
+  - { title: "Kubernetes: Node Autoscaling", url: "https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/", why: "What has to be true on the node side before a higher maxReplicas adds anything." }

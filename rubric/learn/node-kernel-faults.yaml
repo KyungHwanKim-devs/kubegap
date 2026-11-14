@@ -1,0 +1,97 @@
+# What a report teaches when a node's kernel log shows lockups, hung tasks, I/O errors or filesystem errors. Every page below was opened and read (2026-11-14).
+topic: node-kernel-faults
+checks: [node.kernel-lockup, node.kernel-io-fs-errors]
+mechanism: >
+  Some node faults exist only as lines in the kernel log. Kubernetes does not read that log, so without something that does, these problems are
+  invisible to the layers above the node and the scheduler keeps placing pods on a node that is going bad.
+
+
+  A soft lockup is a bug that makes the kernel loop in kernel mode for more than 20 seconds without giving other tasks a chance to run. The
+  kernel's watchdog notices it: watchdog_thresh is 10 seconds by default and the soft lockup threshold is twice that. A hung task is a task in
+  uninterruptible sleep (state D, usually waiting for I/O) that was not scheduled for longer than hung_task_timeout_secs; the log line reads
+  "blocked for more than 120 seconds". In both cases the default reaction is only a report: the stack trace is printed and the system stays
+  locked up, a hung task is warned about and operation continues, and an RCU stall does not panic either. For the pods on the node this is time
+  in which the network or the disk did not move, seen from outside as timeouts and latency with no cause in any pod.
+
+
+  I/O errors and filesystem errors are the storage form of the same thing. What the filesystem does next is a mount setting: ext4 can keep going
+  (errors=continue), remount the filesystem read-only (errors=remount-ro) or panic and halt the machine (errors=panic), and the mount option
+  overrides what is stored in the superblock. Once the filesystem that holds the container data, the logs or the datastore of the control plane
+  is read-only, every write on that node fails. On a small cluster where the datastore and the volumes share one disk, that is the cluster.
+
+
+  node-problem-detector closes the gap. Its kernel monitor reads /dev/kmsg and matches these lines: task hung, ext4 errors, I/O errors and
+  kernel oops become Events, and permanent problems become node conditions such as KernelDeadlock and ReadonlyFilesystem.
+sources:
+  - { title: "Linux kernel: Softlockup detector and hardlockup detector", url: "https://docs.kernel.org/admin-guide/lockup-watchdogs.html" }
+  - { title: "Linux kernel: Documentation for /proc/sys/kernel/", url: "https://docs.kernel.org/admin-guide/sysctl/kernel.html" }
+  - { title: "Linux kernel: ext4 General Information", url: "https://docs.kernel.org/admin-guide/ext4.html" }
+  - { title: "node-problem-detector", url: "https://github.com/kubernetes/node-problem-detector" }
+  - { title: "node-problem-detector: config/kernel-monitor.json", url: "https://raw.githubusercontent.com/kubernetes/node-problem-detector/master/config/kernel-monitor.json" }
+detect:
+  - kind: alert
+    what: >
+      A filesystem that went read-only. node_exporter exports the flag per filesystem; the mixin's own disk rules exclude read-only filesystems,
+      so this needs its own rule.
+    example: |
+      - alert: NodeFilesystemReadOnly
+        expr: node_filesystem_readonly{fstype!~"tmpfs|overlay|squashfs|iso9660"} == 1
+        for: 5m
+  - kind: alert
+    what: >
+      A disk that cannot keep up. The node_exporter mixin ships a rule on the I/O queue, held for 30 minutes (the threshold is a setting of
+      the mixin), and one for a degraded RAID array.
+    example: |
+      - alert: NodeDiskIOSaturation
+        expr: rate(node_disk_io_time_weighted_seconds_total[5m]) > 10
+        for: 30m
+  - kind: dashboard
+    what: >
+      The conditions and Events that node-problem-detector writes on the Node object (KernelDeadlock, ReadonlyFilesystem; TaskHung, Ext4Error,
+      IOError, KernelOops). Its Prometheus exporter also serves the problems as metrics on the node, on port 20257 by default.
+    example: 'node condition KernelDeadlock=True, Event reason TaskHung'
+  - kind: command
+    what: >
+      The lines themselves, on the node.
+    example: "journalctl -k --since -24h | grep -E 'soft lockup|blocked for more than|rcu|I/O error|EXT4-fs|XFS'"
+solutions:
+  - scale: [small]
+    approach: >
+      Alert on a read-only filesystem and on a node that is not Ready, and treat any I/O or filesystem error in the kernel log as the notice to
+      copy the data off the node and replace the disk. A single lockup line with nothing else at that time is noted and watched for recurrence.
+    tools: ["node_exporter mixin alerts"]
+    tradeoff: >
+      Nothing to install. The kernel log is only read when someone looks, so an error that does not yet make the filesystem read-only can go
+      unseen between two looks.
+  - scale: [medium]
+    approach: >
+      Run node-problem-detector as a DaemonSet (the Helm chart is the easiest way) with the kernel monitor, so that hung tasks, ext4 and I/O
+      errors become Events and a deadlocked kernel or a read-only filesystem becomes a condition on the node, and alert on those conditions.
+    tools: [node-problem-detector, "node_exporter mixin alerts"]
+    tradeoff: >
+      The kernel log of every node is read all the time and its findings are where the rest of the cluster state is. One more DaemonSet, and a
+      condition by itself moves no pod: something or someone still has to drain the node.
+    example: |
+      # node-problem-detector arguments
+      --config.system-log-monitor=/config/kernel-monitor.json
+      --prometheus-address=0.0.0.0
+      --prometheus-port=20257
+  - scale: [large]
+    approach: >
+      Remediate automatically. A Cluster API MachineHealthCheck or the Node Health Check Operator of medik8s replaces machines whose conditions
+      stay bad, and the kernel is told not to stay locked up: kernel.softlockup_panic and kernel.hung_task_panic turn a detection into a panic,
+      and kernel.panic sets the delay after which the machine reboots.
+    tools: [node-problem-detector, "Cluster API MachineHealthCheck", medik8s, sysctl]
+    tradeoff: >
+      A stuck node leaves the cluster without a person. A panic takes down every pod on the node for a stall it might have recovered
+      from, and automatic replacement needs conditions that are chosen with care.
+    example: |
+      # /etc/sysctl.d/90-lockup.conf
+      kernel.softlockup_panic = 1
+      kernel.hung_task_panic = 1
+      kernel.panic = 10
+cases: []
+reading:
+  - { title: "node-problem-detector", url: "https://github.com/kubernetes/node-problem-detector", why: "Which problem daemons exist, what each reports as a condition or an Event, and how it is installed." }
+  - { title: "Linux kernel: Softlockup detector and hardlockup detector", url: "https://docs.kernel.org/admin-guide/lockup-watchdogs.html", why: "What exactly a lockup is, how the watchdog measures it and what the kernel does when it finds one." }
+  - { title: "Linux kernel: ext4 General Information", url: "https://docs.kernel.org/admin-guide/ext4.html", why: "The errors= mount options that decide whether a filesystem error continues, goes read-only or halts the machine." }

@@ -9622,7 +9622,7 @@
   nature: occurrence
   symptom_linked: false
   why: >
-    Single-binary Loki dies from a memory spike on one big query (count_over_time over a wide time range, many streams). Logs still in memory (chunks not yet flushed) are lost at that moment, and if the storage is emptyDir everything is lost.
+    Single-binary Loki dies from a memory spike on one big query (count_over_time over a wide time range, many streams). Logs still in memory (chunks not yet flushed) are lost at that moment. An emptyDir survives the container restart; it is lost when the pod leaves the node (drain, eviction, node replacement, rollout).
     kubegap's own queries can be the cause, so it only uses a 1-hour window.
   measured: >
     Measured on an EKS cluster: a 24-hour query caused an OOMKill.
@@ -9897,7 +9897,7 @@
   severity_default: { small: medium, medium: high, large: high }
   symptom_linked: false
   why: >
-    Prometheus, Alertmanager, Loki and Grafana data disappears with the pod. When the pod moves to another node or restarts after an OOMKill, metric retention, alert silences, logs and dashboards start from zero.
+    Prometheus, Alertmanager, Loki and Grafana data disappears with the pod. When the pod is deleted or moves to another node (drain, eviction, node replacement, rollout), metric retention, alert silences, logs and dashboards start from zero. A container restart alone, as after an OOMKill, keeps the emptyDir.
     This is the kube-prometheus-stack default (no storageSpec) and the loki-stack default (persistence.enabled=false).
   measured: >
     Observed on the first real runs.
@@ -10830,7 +10830,7 @@
   evidence: "f\"describe-cluster encryptionConfig {item.get('kms_encryption')}\""
   severity_default: high
   symptom_linked: false
-  why: Secrets in etcd are base64 by default (not encryption). EKS can enable envelope encryption with a KMS key; without it, secrets remain in plain text in etcd backups and snapshots. It can be enabled after creation (and cannot be disabled once on).
+  why: Secrets in etcd are base64 by default (not encryption). EKS encrypts the etcd disk on every cluster, and on Kubernetes 1.28 and later it envelope-encrypts all API data by default with an AWS owned key (https://docs.aws.amazon.com/eks/latest/userguide/envelope-encryption.html). What this check reports is that no customer managed KMS key is associated: the key cannot be audited in CloudTrail or disabled by the account. On 1.27 and lower nothing is envelope-encrypted without it. A key can be associated after creation and not removed.
   suggest: "aws eks associate-encryption-config --cluster-name <c> --encryption-config '[{\"resources\":[\"secrets\"],\"provider\":{\"keyArn\":\"<kms>\"}}]' (suggestion only)."
   verify:
     - "aws eks describe-cluster --name <c> --query 'cluster.encryptionConfig'"
@@ -13868,12 +13868,12 @@
     expr: "value >= 3"
     warn_expr: "value >= 1"
   target: "labels.get('node') or labels.get('instance')"
-  evidence: "f\"Node {labels.get('node') or labels.get('instance')}: PLEG relist p99 {value:.2f}s (1h; over 3s means PLEG is not healthy)\""
+  evidence: "f\"Node {labels.get('node') or labels.get('instance')}: PLEG relist p99 {value:.2f}s (1h; a relist normally takes milliseconds, and the kubelet reports PLEG unhealthy when none has completed for 3 minutes)\""
   severity_default: high
   nature: occurrence
   symptom_linked: true
   why: >
-    kubelet periodically asks the container runtime for the status of all pods again (PLEG relist). With many containers or a slow runtime or disk this takes longer, and if it exceeds 3s for 3 minutes kubelet marks the node NotReady with "PLEG is not healthy" -- every pod on that node is evicted. The log signature kubelet.pleg-not-healthy looks after the event; this metric looks before it.
+    kubelet periodically asks the container runtime for the status of all pods again (PLEG relist). The relist runs every second (genericPlegRelistPeriod, kubernetes pkg/kubelet/kubelet.go@v1.33.5). With many containers or a slow runtime or disk it takes longer, and when no relist has completed for 3 minutes (genericPlegRelistThreshold, same file) kubelet marks the node NotReady with "PLEG is not healthy"; pods without a longer toleration are evicted after the default 300 seconds of not-ready, DaemonSet pods stay. The 1s and 3s lines of this check are kubegap's own early warning, far below that threshold. The log signature kubelet.pleg-not-healthy looks after the event; this metric looks before it.
   measured: >
     Measured: p99 5ms on the EKS cluster, 17ms on the small k3s cluster -> pass.
   cases:

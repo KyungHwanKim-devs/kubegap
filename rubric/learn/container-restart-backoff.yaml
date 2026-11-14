@@ -1,0 +1,74 @@
+# What a report teaches when a container keeps restarting. Every page below was opened and read (2026-11-14).
+topic: container-restart-backoff
+checks: [resilience.restarts-crashloop]
+mechanism: >
+  A pod's restartPolicy is Always by default: the kubelet restarts a container after any termination. It does not restart it at once. After
+  containers exit, the kubelet restarts them with an exponential back-off delay of 10 seconds, 20 seconds, 40 seconds and so on, capped at 300
+  seconds. Once a container has run for 10 minutes without problems, the back-off timer for that container is reset.
+
+
+  CrashLoopBackOff is not an error of its own. It is what kubectl shows while that back-off delay is in effect for a container that is failing and
+  restarting repeatedly. At the cap, a container that dies on start is attempted once every five minutes and is down in between.
+
+
+  The loop has several unrelated causes, and the status looks the same for all of them: the application exits with an error; configuration is
+  wrong, such as an incorrect environment variable or a missing configuration file; the container does not have enough memory or CPU to start; or a
+  probe kills it. If a container fails its liveness probe more times than the configured tolerance, the kubelet restarts that container, and a
+  startup probe that fails has the container killed and subjected to the restart policy. A liveness probe does not wait for readiness, so an
+  application that starts slowly can be killed before it has ever served, each time.
+
+
+  What tells the causes apart is recorded on the container's last Terminated state: a reason, an exit code and the start and finish time. A restart
+  count alone does not: it belongs to the current pod and starts from zero when the pod is recreated.
+
+
+  The delay itself is configurable on newer clusters: the kubelet configuration field crashLoopBackOff.maxContainerRestartPeriod sets the maximum
+  between 1 second and 300 seconds per node (beta and enabled by default since v1.35).
+sources:
+  - { title: "Kubernetes: Pod Lifecycle", url: "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/" }
+  - { title: "Prometheus Operator runbooks: KubePodCrashLooping", url: "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepodcrashlooping/" }
+detect:
+  - kind: alert
+    what: >
+      The kubernetes-mixin rule KubePodCrashLooping: a container whose waiting reason was
+      CrashLoopBackOff within the last five minutes, held for 15 minutes, severity warning. The series comes from kube-state-metrics.
+    example: |
+      - alert: KubePodCrashLooping
+        expr: max_over_time(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}[5m]) >= 1
+        for: 15m
+  - kind: metric
+    what: >
+      Restarts over time, which survive what the status hides: a container that restarts a few times a day never stays in back-off long enough to
+      alert, and the counter on the pod is lost when the pod is recreated. kube_pod_container_status_last_terminated_reason says whether the last
+      death was OOMKilled.
+    example: 'sum by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total[24h])) > 5'
+  - kind: command
+    what: The output of the container that died, which the running one no longer shows.
+    example: "kubectl logs -n <namespace> <pod> --previous"
+solutions:
+  - scale: [small]
+    approach: >
+      Carry the KubePodCrashLooping rule and one rule on the restart increase, and fix by cause. For a slow starter, add a startupProbe so the
+      liveness probe does not run until the application is up; for OOMKilled, raise the memory limit to what the container needs to start.
+    tools: [kubernetes-mixin, kube-state-metrics]
+    tradeoff: >
+      Two rules cover both the hard loop and the slow leak of restarts. Reading the cause is still manual: someone looks at the last termination
+      reason and the previous logs.
+    example: |
+      startupProbe:
+        httpGet: { path: /healthz, port: 8080 }
+        periodSeconds: 5
+        failureThreshold: 30
+  - scale: [medium, large]
+    approach: >
+      Split the alert by cause and send it to whoever owns the namespace: OOMKilled restarts go with the memory limit, restarts accompanied by
+      Unhealthy events go with the probe configuration, the rest go to the application's logs. Where restarts follow the node a pod is on, the Descheduler strategy RemovePodsHavingTooManyRestarts evicts pods above a restart threshold so that they are scheduled again.
+    tools: [kubernetes-mixin, kube-state-metrics, Descheduler]
+    tradeoff: >
+      The person paged can act on the alert without triage. Three rules instead of one have to be kept in step, and evicting a pod that crashes
+      because of its own code only moves the loop to another node.
+cases: []
+reading:
+  - { title: "Kubernetes: Pod Lifecycle", url: "https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/", why: "The back-off numbers, the container states, and how liveness and startup probes lead to restarts." }
+  - { title: "Prometheus Operator runbooks: KubePodCrashLooping", url: "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/kubepodcrashlooping/", why: "A checklist of causes that goes beyond the application: missing ConfigMaps and Secrets, permissions, dependencies." }
+  - { title: "kubernetes-mixin: apps alerts", url: "https://github.com/kubernetes-monitoring/kubernetes-mixin/blob/master/alerts/apps_alerts.libsonnet", why: "The source of the rule, next to the related ones for pods not ready and waiting containers." }

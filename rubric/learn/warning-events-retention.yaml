@@ -1,0 +1,70 @@
+# What a report teaches when Warning events recur and nothing keeps them. Every page below was opened and read (2026-11-14).
+topic: warning-events-retention
+checks: [events.tracked-warning-reasons]
+mechanism: >
+  An Event is a report of something that happened somewhere in the cluster: an object it is about, a type (Normal or Warning), a short
+  machine-readable reason, and a count or a series when the same thing keeps happening. Components write them at the moment they fail to do
+  something. The scheduler writes FailedScheduling when no node fits a pod, the kubelet writes BackOff when a container keeps dying, Unhealthy when a
+  probe fails and Evicted when it removes a pod under node pressure.
+
+
+  Events are not kept. The API server retains them for the duration of --event-ttl, which defaults to one hour, and the API reference says so in
+  its own terms: events have a limited retention time and should be treated as informative, best-effort, supplemental data. They are objects in the
+  API, not samples in a time series database, so a Prometheus installation does not hold them unless something exports them.
+
+
+  The consequence is about time. A pod that could not be scheduled for ten minutes at night, an eviction during a nightly batch, a probe that
+  failed forty times last week: one hour later the cluster has no record that any of it happened. What remains is the after-effect, if there is one
+  (a restart count, a gap in a graph), without the reason. A problem that repeats is then met as new each time, because the earlier occurrences
+  cannot be counted.
+
+
+  Reading a reason needs some care. The API reference warns that triggers and messages may evolve, and that consumers should not rely on a given
+  reason reflecting a consistent underlying trigger. A reason is a pointer to where to look, and a rising count of the same reason on the same
+  object is the signal worth acting on.
+sources:
+  - { title: "Kubernetes API reference: Event", url: "https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/event-v1/" }
+  - { title: "Kubernetes: kube-apiserver", url: "https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/" }
+  - { title: "Grafana Alloy: loki.source.kubernetes_events", url: "https://grafana.com/docs/alloy/latest/reference/components/loki/loki.source.kubernetes_events/" }
+detect:
+  - kind: dashboard
+    what: >
+      Events shipped to the log store and counted by reason over days. Grafana Alloy's loki.source.kubernetes_events tails events from the Kubernetes
+      API and turns them into log lines with the labels namespace, job and instance, so they can be queried like any other log long after the API
+      server dropped them.
+    example: 'sum(count_over_time({job="loki.source.kubernetes_events"} |= "FailedScheduling" [1d]))'
+  - kind: metric
+    what: >
+      The state behind the commonest reasons is also a metric in kube-state-metrics, which needs no event pipeline: pods in the Pending phase for
+      FailedScheduling, the container waiting reason for BackOff and image pull failures, restarts for the rest.
+    example: 'kube_pod_container_status_waiting_reason{reason!="ContainerCreating"} == 1'
+  - kind: command
+    what: What the API server still holds, which is the last hour.
+    example: "kubectl get events -A --field-selector reason=<Reason> --sort-by=.lastTimestamp"
+solutions:
+  - scale: [small]
+    approach: >
+      If logs already go to Loki, add the one Alloy component that tails events and forward it to the same place. If there is no log store, do not
+      build one for this: rely on the metrics that mirror the main reasons and accept that the wording of an event is gone after an hour.
+    tools: ["Grafana Alloy", Loki]
+    tradeoff: >
+      Events become searchable for as long as logs are kept, for one more block of configuration. Watching all namespaces needs permission to watch
+      events at cluster scope, and without a log store the reason behind a past incident stays unknown.
+    example: |
+      loki.source.kubernetes_events "cluster" {
+        forward_to = [loki.write.default.receiver]
+      }
+  - scale: [medium, large]
+    approach: >
+      Export events as a pipeline with routing: kubernetes-event-exporter matches events by namespace, kind, labels and type and sends them to
+      receivers, so that Warning events go to the log or search store for history and a chosen few go to the place people are paged. Decide per
+      reason which ones are worth a notification and count the rest.
+    tools: [kubernetes-event-exporter, Loki, Elasticsearch]
+    tradeoff: >
+      Recurring warnings are counted and the important ones reach a person. The exporter is one more workload to run, and routing rules that are too
+      wide turn events into noise.
+cases: []
+reading:
+  - { title: "Kubernetes API reference: Event", url: "https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/event-v1/", why: "What an event carries and the project's own statement on how far to trust it." }
+  - { title: "Grafana Alloy: loki.source.kubernetes_events", url: "https://grafana.com/docs/alloy/latest/reference/components/loki/loki.source.kubernetes_events/", why: "The smallest way to keep events when Loki is already there." }
+  - { title: "kubernetes-event-exporter README", url: "https://github.com/resmoio/kubernetes-event-exporter", why: "Routes, match rules and the list of receivers for a cluster that needs events in more than one place." }

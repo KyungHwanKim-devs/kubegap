@@ -1,0 +1,81 @@
+# What a report teaches when objects or clients still use an API version that the next Kubernetes minor no longer serves. Every page below was opened and read (2026-11-14).
+topic: deprecated-api-removal
+checks: [hygiene.deprecated-api]
+mechanism: >
+  Kubernetes APIs are versioned per group, and old versions are removed on a published clock. A beta API version is deprecated no more than 9
+  months or 3 minor releases after it was introduced, and is no longer served 9 months or 3 minor releases after the deprecation, whichever is
+  longer. GA versions are not removed within a major version. The deprecation guide lists each removal by release: policy/v1beta1
+  PodDisruptionBudget stopped being served in v1.25, storage.k8s.io/v1beta1 CSIStorageCapacity in v1.27, flowcontrol.apiserver.k8s.io/v1beta3 in
+  v1.32.
+
+
+  After the upgrade the API server does not know the removed version any more. Objects that already exist are not lost, because the server must stay
+  able to decode what it stored. What breaks is everything that still speaks the old version: a manifest in Git, a Helm chart, a CI job or a
+  controller that sends apiVersion policy/v1beta1 gets an error, so the next deploy of that workload fails, on the day someone needs it. A
+  replacement version is not always a rename either: in policy/v1 an empty PodDisruptionBudget selector selects every pod in the namespace, where in
+  policy/v1beta1 it selected none.
+
+
+  The difficulty is seeing it beforehand. Asking the cluster does not show which version an object was written with: the API server converts and
+  returns the object in whatever version is asked for. That is why the tools read elsewhere. kubent reads the
+  kubectl.kubernetes.io/last-applied-configuration annotation, Helm v3 release manifests stored as Secrets or ConfigMaps, and local files; Pluto
+  reads manifest files, Helm charts and live Helm releases. An object applied by a client that leaves no such annotation is invisible to the
+  annotation check.
+
+
+  The API server itself reports use, not objects. Since v1.19 a request to a deprecated endpoint sets the gauge apiserver_requested_deprecated_apis
+  to 1, with labels for group, version, resource and subresource and a removed_release label; the client gets a Warning header; and the audit event
+  carries the annotation k8s.io/deprecated: "true".
+sources:
+  - { title: "Kubernetes: Deprecation Policy", url: "https://kubernetes.io/docs/reference/using-api/deprecation-policy/" }
+  - { title: "Kubernetes: Deprecated API Migration Guide", url: "https://kubernetes.io/docs/reference/using-api/deprecation-guide/" }
+  - { title: "Kubernetes blog: Warning: Helpful Warnings Ahead", url: "https://kubernetes.io/blog/2020/09/03/warnings/" }
+  - { title: "kube-no-trouble (kubent) README", url: "https://github.com/doitintl/kube-no-trouble" }
+  - { title: "Pluto documentation", url: "https://pluto.docs.fairwinds.com/" }
+detect:
+  - kind: metric
+    what: >
+      Which deprecated APIs are being called, and by joining with the request counter, how often. The removed_release label lets the query ask only
+      for what the next upgrade removes. This sees clients that call the API; a manifest that nobody applies between now and the upgrade does not appear.
+    example: 'apiserver_requested_deprecated_apis{removed_release="1.32"} * on (group, version, resource, subresource) group_right() apiserver_request_total'
+  - kind: alert
+    what: >
+      The same gauge as a standing rule for the release the cluster moves to next, so that a new caller of a deprecated API is noticed when it
+      appears and not during the upgrade.
+    example: |
+      - alert: DeprecatedApiRemovedNextRelease
+        expr: sum by (group, version, resource) (apiserver_requested_deprecated_apis{removed_release="1.32"}) > 0
+        for: 1h
+  - kind: command
+    what: >
+      The manifests themselves, checked where they live. kubent takes the version to judge against with --target-version and returns a non-zero exit
+      code on findings with --exit-error; Pluto checks a directory of files.
+    example: "kubent --target-version 1.32 --exit-error"
+solutions:
+  - scale: [small]
+    approach: >
+      Before each minor upgrade, look at the gauge for the release you are moving to and run kubent once against the cluster. Change the apiVersion
+      in the manifests and charts it names; kubectl convert rewrites a file to the new version.
+    tools: [kubent, "kubectl convert"]
+    tradeoff: >
+      Ten minutes per upgrade and nothing to run in between. It depends on remembering to do it, and kubectl convert may fill in defaults that are
+      not the ones you want, so the converted file is read before it is committed.
+  - scale: [medium, large]
+    approach: >
+      Move the check to where manifests change: a CI step that runs kubent on the repository's files with the next version as --target-version and
+      --exit-error, or Pluto's detect-files as its documentation shows for a GitHub Action, plus the alert on the gauge for clients that are not in the repository. kubectl apply with --warnings-as-errors in a CI job against a
+      current server catches the same thing from the server's side. Where the API server flags are yours to set, a test cluster with the version
+      switched off by --runtime-config shows what breaks before the upgrade does.
+    tools: [Pluto, kubent, "kubectl --warnings-as-errors"]
+    tradeoff: >
+      A deprecated version cannot enter the repository unnoticed and the upgrade holds no surprise from this side. The CI step has to be told the
+      target version at every upgrade, and a failing build on a chart you do not maintain needs an owner.
+    example: |
+      - name: deprecated APIs
+        run: pluto detect-files -d manifests/
+cases: []
+reading:
+  - { title: "Kubernetes: Deprecated API Migration Guide", url: "https://kubernetes.io/docs/reference/using-api/deprecation-guide/", why: "The list of removals per release with the replacement and the behaviour that changes." }
+  - { title: "Kubernetes blog: Warning: Helpful Warnings Ahead", url: "https://kubernetes.io/blog/2020/09/03/warnings/", why: "The three signals the API server gives: the warning header, the gauge and the audit annotation, with the query." }
+  - { title: "Kubernetes: Deprecation Policy", url: "https://kubernetes.io/docs/reference/using-api/deprecation-policy/", why: "The rules behind the clock, including what is guaranteed for objects already stored." }
+  - { title: "kube-no-trouble (kubent) README", url: "https://github.com/doitintl/kube-no-trouble", why: "Where it reads from, and how to use its exit code in CI." }

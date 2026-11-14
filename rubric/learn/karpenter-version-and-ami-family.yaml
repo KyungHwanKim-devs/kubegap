@@ -1,0 +1,90 @@
+# What a report teaches when Karpenter is too old for the cluster's Kubernetes version or still launches Amazon Linux 2 nodes. Every page below was
+# opened and read (2026-11-14); the behaviour of Karpenter outside its compatibility table is from this repository's source notes (references/sources.md).
+topic: karpenter-version-and-ami-family
+checks: [platform.karpenter-version-compat, karpenter.ec2nodeclass-al2]
+mechanism: >
+  Both checks are about nodes that do not exist yet. The running nodes are fine; what is broken is the configuration the next node will be launched
+  from, and it shows only when the cluster has to scale out or replace a node.
+
+
+  Version. Karpenter is installed and upgraded by the cluster's owner, separately from the control plane; EKS does not upgrade it when the
+  Kubernetes version changes. Each Karpenter release supports a range of Kubernetes minors, published as a compatibility matrix (Kubernetes 1.32
+  needs Karpenter 1.2 or later, 1.33 needs 1.5, 1.34 needs 1.6). Karpenter checks the cluster version against its own range and reports an error
+  when the cluster is outside it ("karpenter is not compatible with kubernetes version" in its log), so a control plane upgraded past the range
+  leaves the autoscaler unable to prepare new nodes. Catching up is not one step: the CRDs are coupled to the Karpenter version and Helm installs
+  them only on the first install, several releases may only be reached through an intermediate one, and a rollback to an older patch can drift
+  every node in the cluster.
+
+
+  AMI family. An EC2NodeClass names the image new nodes boot from, either with amiFamily or with an alias of the form family@version. Kubernetes
+  1.32 is the last version for which EKS released Amazon Linux 2 AMIs, and EKS stopped publishing them altogether on November 26, 2025. A node
+  class that still says AL2 keeps working as long as an image for the cluster's version exists; after an upgrade to 1.33 there is none, and until
+  then the nodes run an image that receives no patches. Amazon Linux 2 itself ends support on June 30, 2026.
+
+
+  The version part of the alias decides how images change. With latest, every new AMI release makes Karpenter mark the nodes as drifted and
+  replace them, which Karpenter's documentation does not recommend for production; with a pinned version, nodes change only when the pin is
+  edited. Drift replaces nodes within the NodePool's disruption budgets, by default 10% of the nodes at a time.
+sources:
+  - { title: "Karpenter: Compatibility", url: "https://karpenter.sh/docs/upgrading/compatibility/" }
+  - { title: "Karpenter: Upgrade Guide", url: "https://karpenter.sh/docs/upgrading/upgrade-guide/" }
+  - { title: "Karpenter: NodeClasses", url: "https://karpenter.sh/docs/concepts/nodeclasses/" }
+  - { title: "Karpenter: Disruption", url: "https://karpenter.sh/docs/concepts/disruption/" }
+  - { title: "Amazon EKS: Guide to EKS AL2 and AL2-Accelerated AMIs transition features", url: "https://docs.aws.amazon.com/eks/latest/userguide/eks-ami-deprecation-faqs.html" }
+  - { title: "Amazon EKS best practices: Cluster Upgrades", url: "https://docs.aws.amazon.com/eks/latest/best-practices/cluster-upgrades.html" }
+detect:
+  - kind: metric
+    what: >
+      Whether Karpenter still produces nodes when pods wait. Pending pods together with a node-creation counter that does not move is the symptom
+      of both states. The mismatch itself is two version strings and one field of the EC2NodeClass; no metric carries it, which is why it is read
+      from the objects before an upgrade rather than alerted on after it.
+    example: 'sum(kube_pod_status_phase{phase="Pending"}) > 0 and sum(increase(karpenter_nodeclaims_created_total[15m])) == 0'
+  - kind: alert
+    what: >
+      A log-based alert on the controller's own complaint, for clusters that ship the Karpenter log to Loki or CloudWatch. Karpenter prints it
+      about once a day, so it is a statement of state, not a rate.
+    example: 'count_over_time({namespace="karpenter"} |= "is not compatible with" [24h]) > 0'
+  - kind: command
+    what: The image family and the selector of every node class.
+    example: "kubectl get ec2nodeclass -o jsonpath='{.items[*].spec.amiSelectorTerms}'"
+solutions:
+  - scale: [small]
+    approach: >
+      Make Karpenter part of the cluster upgrade: before raising the Kubernetes version, read the compatibility matrix and bring Karpenter to a
+      release that supports the target, CRDs first. Change the node class to AL2023 with a pinned alias; the nodes are then replaced through drift,
+      a few at a time.
+    tools: [Helm, "karpenter-crd chart", EC2NodeClass]
+    tradeoff: >
+      New nodes keep launching after the next upgrade and run a supported image. AL2023 uses cgroup v2, so old Java 8 builds and anything that
+      reads cgroup v1 files need a look before the switch, and a pinned image stays unpatched until someone moves the pin.
+    example: |
+      kind: EC2NodeClass
+      spec:
+        amiSelectorTerms:
+          - alias: al2023@v20240807
+  - scale: [medium, large]
+    approach: >
+      Pin the AMI version and promote a new one through a lower environment before production, with the pin in Git. Give each NodePool disruption
+      budgets that allow no drift replacement during the hours that matter. Manage the Karpenter CRDs with their own chart so they move with every
+      Karpenter upgrade, and keep the Karpenter version in the same upgrade checklist as the control plane and the other add-ons.
+    tools: ["karpenter-crd chart", "NodePool disruption budgets", Bottlerocket, AL2023]
+    tradeoff: >
+      Node replacement happens when the team chose it and on an image that was tested. Someone has to move the pin regularly, or the nodes fall
+      behind on patches; budget schedules are in UTC only.
+    example: |
+      kind: NodePool
+      spec:
+        disruption:
+          budgets:
+            - nodes: "10%"
+            - nodes: "0"
+              reasons: [Drifted]
+              schedule: "0 0 * * 1-5"
+              duration: 10h
+cases: []
+reading:
+  - { title: "Karpenter: Compatibility", url: "https://karpenter.sh/docs/upgrading/compatibility/", why: "The matrix of Kubernetes minors and the Karpenter release each one needs." }
+  - { title: "Karpenter: Upgrade Guide", url: "https://karpenter.sh/docs/upgrading/upgrade-guide/", why: "The per-release notes, including the releases that must be passed through and what a rollback does." }
+  - { title: "Karpenter: NodeClasses", url: "https://karpenter.sh/docs/concepts/nodeclasses/", why: "How an alias selects and pins an AMI and what latest means for running nodes." }
+  - { title: "Amazon EKS: Guide to EKS AL2 and AL2-Accelerated AMIs transition features", url: "https://docs.aws.amazon.com/eks/latest/userguide/eks-ami-deprecation-faqs.html", why: "The AL2 end dates and what changes for workloads on AL2023, cgroup v2 above all." }
+  - { title: "Karpenter: Disruption", url: "https://karpenter.sh/docs/concepts/disruption/", why: "How drift is detected and how budgets limit when and how many nodes are replaced." }

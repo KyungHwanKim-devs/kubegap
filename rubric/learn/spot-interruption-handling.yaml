@@ -1,0 +1,87 @@
+# What a report teaches about spot interruptions under Karpenter: whether the warning is received, and how often it comes. Every page below was opened and read (2026-11-14).
+topic: spot-interruption-handling
+checks: [karpenter.interruption-handling]
+mechanism: >
+  A Spot Instance can be taken back at any time. Amazon EC2 issues a Spot Instance interruption notice two minutes before it stops or terminates
+  the instance, as an EventBridge event (EC2 Spot Instance Interruption Warning) and in the instance metadata. The notice is emitted on a best
+  effort basis. Those two minutes are all the time there is to move the pods.
+
+
+  Nothing in Kubernetes listens for that event. Karpenter does, but only when it is given a queue: it handles interruption events by watching an SQS
+  queue, named with the --interruption-queue argument, that receives the events from EventBridge. With the queue, on a spot interruption warning
+  Karpenter taints, drains and terminates the node ahead of the event and starts a replacement node as soon as it sees the warning, so pods are
+  evicted in an orderly drain and have somewhere to go. Without the queue the warning reaches nobody. The
+  instance disappears with its pods still running, cut off without a drain. The same queue
+  carries scheduled maintenance events and instance stopping and terminating events.
+
+
+  A rebalance recommendation is an earlier and weaker signal: the instance is at elevated risk, and the signal can arrive before the two-minute
+  notice or together with it. Karpenter publishes an event to the node for it but does not taint, drain or terminate on a rebalance recommendation.
+
+
+  Handling the warning limits the damage of one interruption; it does not make interruptions rare. How often they come follows from where the
+  capacity is taken. Karpenter launches spot with the price-capacity-optimized strategy, which works better the more instance types it may choose
+  from. A NodePool narrowed to a few types has fewer pools to draw on, and when those are reclaimed and nothing else is allowed, pods stay pending
+  until that capacity returns. A NodePool that allows only spot never launches on-demand; one that allows both prefers spot and falls back.
+sources:
+  - { title: "Amazon EC2: Spot Instance interruption notices", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html" }
+  - { title: "Amazon EC2: EC2 instance rebalance recommendations", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/rebalance-recommendations.html" }
+  - { title: "Karpenter: Disruption", url: "https://karpenter.sh/docs/concepts/disruption/" }
+  - { title: "Karpenter: NodePools", url: "https://karpenter.sh/docs/concepts/nodepools/" }
+  - { title: "Amazon EKS best practices: Karpenter", url: "https://docs.aws.amazon.com/eks/latest/best-practices/karpenter.html" }
+detect:
+  - kind: metric
+    what: >
+      Karpenter counts what arrives on the queue in karpenter_interruption_received_messages_total, by message_type, and what it removes from it
+      in karpenter_interruption_deleted_messages_total. A cluster on spot where the first counter never moves has no working queue. Its rate per day
+      is how often the pool is interrupted.
+    example: 'sum by (message_type) (increase(karpenter_interruption_received_messages_total[1d]))'
+  - kind: alert
+    what: >
+      Messages that wait on the queue. karpenter_interruption_message_queue_duration_seconds is the time a message sits before Karpenter processes
+      it; out of a two-minute warning, every second spent there is taken from the drain.
+    example: |
+      - alert: KarpenterInterruptionQueueSlow
+        expr: histogram_quantile(0.99, sum by (le) (rate(karpenter_interruption_message_queue_duration_seconds_bucket[15m]))) > 10
+        for: 15m
+  - kind: metric
+    what: >
+      Errors from the cloud provider calls, by controller and error, read next to the interruption counters: many received messages with few
+      nodes drained is the reason to look at the permissions on the queue.
+    example: 'sum by (controller, error) (increase(karpenter_cloudprovider_errors_total[1h]))'
+solutions:
+  - scale: [small]
+    approach: >
+      Give Karpenter the interruption queue and leave the instance types wide. For anything that must not blink, run two replicas on different nodes
+      so that one interruption takes one of them.
+    tools: [Karpenter, "Amazon SQS", "Amazon EventBridge"]
+    tradeoff: >
+      Every interruption becomes a drain with a replacement node already starting, for one queue and a few event rules. Two minutes is still the
+      limit: a pod that needs longer than that to stop cleanly is cut off.
+  - scale: [medium]
+    approach: >
+      Allow on-demand next to spot in the NodePool that serves production, so that Karpenter falls back when spot is not available, and protect
+      each workload with a PodDisruptionBudget and a spread across nodes so that the drain of one node never takes all replicas.
+    tools: [Karpenter, PodDisruptionBudget, topologySpreadConstraints]
+    tradeoff: >
+      Production is never left without a node to go to. Whenever the fallback is in use the cluster costs more than planned.
+    example: |
+      requirements:
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+  - scale: [large]
+    approach: >
+      Decide the share on purpose: a separate on-demand NodePool for the workloads that cannot take interruptions, or a fixed ratio by spreading
+      pods over a capacity-spread label that two NodePools divide between spot and on-demand. Watch the interruption rate per NodePool and widen
+      the instance types of the pools that are hit most.
+    tools: [Karpenter, topologySpreadConstraints]
+    tradeoff: >
+      An interruption can never remove more than the spot share of a service. The on-demand share is paid at full price all the time, and the
+      ratio technique is an approximation built from virtual domains, not an exact split.
+cases: []
+reading:
+  - { title: "Karpenter: Disruption", url: "https://karpenter.sh/docs/concepts/disruption/", why: "The interruption section: which events are handled, what Karpenter does on each, and what it does not do for rebalance recommendations." }
+  - { title: "Amazon EC2: Spot Instance interruption notices", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/spot-instance-termination-notices.html", why: "The notice itself: two minutes, best effort, and the two places it is delivered." }
+  - { title: "Amazon EKS best practices: Karpenter", url: "https://docs.aws.amazon.com/eks/latest/best-practices/karpenter.html", why: "Why narrow instance type lists hurt on spot, and the advice against running Node Termination Handler next to Karpenter's own handling." }
+  - { title: "Karpenter: Scheduling", url: "https://karpenter.sh/docs/concepts/scheduling/", why: "The capacity-spread example for a fixed spot to on-demand ratio." }

@@ -1,0 +1,93 @@
+# What a report teaches when Prometheus, Alertmanager, Loki or Grafana keep their data on an emptyDir volume. Every page below was opened and read
+# (2026-11-14).
+topic: observability-stack-emptydir
+checks: [observability.stack-storage-emptydir]
+mechanism: >
+  An emptyDir volume belongs to the pod, not to the workload. It is created when the pod is assigned to a node, and when the pod is removed from the
+  node for any reason the data in it is deleted permanently. A container crashing does not remove the pod from the node: the data in an emptyDir is safe
+  across container crashes, so an OOM kill of the container alone does not empty it. What does empty it is everything that makes a new pod: a node
+  drain or replacement, an eviction, a rollout after a chart upgrade.
+
+
+  This is what an unconfigured stack runs on. By default the Prometheus Operator configures pods to store data on emptyDir volumes, which are not
+  persisted when the pods are redeployed; the kube-prometheus-stack chart leaves both storageSpec (Prometheus) and storage (Alertmanager) empty, and
+  the loki-stack chart has persistence switched off unless it is enabled.
+
+
+  What goes with the pod differs per component. Prometheus loses its blocks and its write-ahead log, which is the whole retention window: the graphs
+  start again at the moment the new pod came up. Alertmanager keeps two snapshot files, silences and
+  the notification log (the record of which notifications were sent, kept to prevent duplicates); without them silences are gone and notifications
+  that were already sent may be sent again. Alerts themselves are not persisted and Prometheus re-sends firing ones, so those come back. Loki's ingesters need the
+  same persistent volume across restarts for the write-ahead log to protect what has not been flushed yet. Grafana on an emptyDir loses the dashboards
+  stored in it.
+
+
+  The loss is silent. A new pod with an empty volume looks healthy; nothing fails, the history is just shorter than the retention setting
+  says.
+sources:
+  - { title: "Kubernetes: Volumes (emptyDir)", url: "https://kubernetes.io/docs/concepts/storage/volumes/" }
+  - { title: "Prometheus Operator: Storage", url: "https://prometheus-operator.dev/docs/platform/storage/" }
+  - { title: "kube-prometheus-stack: values.yaml", url: "https://raw.githubusercontent.com/prometheus-community/helm-charts/main/charts/kube-prometheus-stack/values.yaml" }
+  - { title: "Prometheus: Alertmanager high availability", url: "https://prometheus.io/docs/alerting/latest/high_availability/" }
+  - { title: "Loki: Write Ahead Log", url: "https://grafana.com/docs/loki/latest/operations/storage/wal/" }
+detect:
+  - kind: metric
+    what: >
+      How far back the stored metrics really go, against the configured retention. Prometheus exports the timestamp of its oldest stored sample and
+      its retention limit; a history much shorter than the retention on a server that has been installed for longer means the data was lost on the way.
+    example: 'prometheus_tsdb_lowest_timestamp_seconds, prometheus_tsdb_retention_limit_seconds'
+  - kind: alert
+    what: >
+      The volume, once there is one: a claim that is filling up. The kubelet exports used and capacity bytes per claim.
+    example: |
+      kubelet_volume_stats_used_bytes{namespace="monitoring"}
+        / kubelet_volume_stats_capacity_bytes{namespace="monitoring"} > 0.8
+  - kind: command
+    what: >
+      Which workloads of the monitoring namespace mount an emptyDir.
+    example: |
+      kubectl get sts,deploy -n monitoring -o json | jq -r '.items[] | select(.spec.template.spec.volumes[]? | has("emptyDir")) | .metadata.name'
+solutions:
+  - scale: [small]
+    approach: >
+      Give a claim to the two components whose loss hurts, Prometheus and Loki, through the values of their charts; the cluster's default
+      StorageClass is enough. Alertmanager and Grafana can be left on emptyDir on purpose when silences are short-lived and the dashboards can be
+      recreated from copies kept elsewhere: what is lost is then cheap to lose.
+    tools: [kube-prometheus-stack, PersistentVolumeClaim]
+    tradeoff: >
+      History survives upgrades and node maintenance with a few lines of values. A claim on node-local storage keeps the pod on that node, and the
+      volume now has to be sized: Prometheus needs a retention size below the claim, or it fills.
+    example: |
+      prometheus:
+        prometheusSpec:
+          storageSpec:
+            volumeClaimTemplate:
+              spec:
+                resources:
+                  requests:
+                    storage: 20Gi
+  - scale: [medium, large]
+    approach: >
+      A claim for every stateful component, on a StorageClass that allows volume expansion, declared in the chart values (storageSpec for Prometheus,
+      storage for Alertmanager, persistence for Loki and Grafana). Run Alertmanager with several replicas, which replicate silences and the
+      notification log between them, so that one pod with a fresh volume is filled again by its peers.
+    tools: [kube-prometheus-stack, "Prometheus Operator", "Alertmanager cluster"]
+    tradeoff: >
+      No single pod or node loss costs history, silences or logs. Growing a volume later is a procedure, not a field: the operator has to delete and
+      recreate the StatefulSet around the resized claims.
+    example: |
+      alertmanager:
+        alertmanagerSpec:
+          replicas: 3
+          storage:
+            volumeClaimTemplate:
+              spec:
+                resources:
+                  requests:
+                    storage: 2Gi
+cases: []
+reading:
+  - { title: "Prometheus Operator: Storage", url: "https://prometheus-operator.dev/docs/platform/storage/", why: "The default, the volume claim template, and the steps to resize a volume without an outage." }
+  - { title: "Kubernetes: Volumes (emptyDir)", url: "https://kubernetes.io/docs/concepts/storage/volumes/", why: "Exactly when an emptyDir is created and deleted, and what a container crash does to it." }
+  - { title: "Prometheus: Alertmanager high availability", url: "https://prometheus.io/docs/alerting/latest/high_availability/", why: "What Alertmanager keeps on disk, what it replicates, and what comes back by itself." }
+  - { title: "Prometheus: Storage", url: "https://prometheus.io/docs/prometheus/latest/storage/", why: "What is in the Prometheus data directory and why it is to be treated like a single-node database." }

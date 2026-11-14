@@ -1,0 +1,114 @@
+# What a report teaches when containers spend a large share of their time throttled at the CPU limit. Every page below was opened and read (2026-11-14).
+topic: cpu-limit-throttling
+checks: [resources.cpu-throttling]
+mechanism: >
+  A CPU limit is a hard limit that the kernel enforces by throttling. The kubelet turns it into a quota for the scheduler's bandwidth control
+  (cpuCFSQuota is on by default, with a period of 100ms): within each period the container's cgroup may use up to its quota of CPU time, and once
+  the quota is used up its threads are throttled until the next period refills it. A limit of 2 CPUs is 200ms of CPU time per 100ms period,
+  counted over all threads together.
+
+
+  That is why a container can be throttled while its usage graph looks low. Eight threads that run at the same time spend 200ms of quota in 25ms
+  and then all wait for the remaining 75ms of the period; a request that arrives in that gap waits with them. Averaged over the 15 seconds or more
+  between two scrapes the container used far less than its limit. In the Temporal case below pods were throttled at under 60% CPU usage. A runtime
+  that sizes its thread pools from the cores of the node makes this worse: on 8-core nodes with a limit of 2, Go assumed it could use all 8 cores
+  and spent the budget of 2 on garbage collection and housekeeping as well.
+
+
+  The kernel counts the periods that elapsed and the periods in which the group was throttled, and cAdvisor exports them as
+  container_cpu_cfs_periods_total and container_cpu_cfs_throttled_periods_total. Their ratio is the share of periods in which the container was
+  stopped: at 0.25, a quarter of them.
+
+
+  Two things keep this from being a simple rule. Kernels before the fix that was merged for 4.19 and later throttled containers that were far
+  below their limit, so on an old node kernel the ratio says little about the application. And throttling alone is not harm: the common alert on
+  it has severity info, and its runbook says to act only when the application also misbehaves. Removing the limit removes the throttling and with
+  it the protection: a container without a limit can exhaust the CPU of its node.
+sources:
+  - { title: "Kubernetes: Resource Management for Pods and Containers", url: "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/" }
+  - { title: "Linux kernel: CFS Bandwidth Control", url: "https://docs.kernel.org/scheduler/sched-bwc.html" }
+  - { title: "Kubernetes: Kubelet Configuration (v1beta1)", url: "https://kubernetes.io/docs/reference/config-api/kubelet-config.v1beta1/" }
+  - { title: "Temporal: Tuning Temporal Server request latency on Kubernetes", url: "https://temporal.io/blog/tuning-temporal-server-request-latency-on-kubernetes" }
+  - { title: "Kubernetes: Faster services with no CPU limits (Eric Khun)", url: "https://erickhun.com/posts/kubernetes-faster-services-no-cpu-limits/" }
+  - { title: "Prometheus Operator runbook: CPUThrottlingHigh", url: "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/cputhrottlinghigh/" }
+detect:
+  - kind: alert
+    what: >
+      The kubernetes-mixin ships this rule: more than 25% of the periods throttled over 5 minutes, held for 15 minutes, severity info. In
+      kube-prometheus it is inhibited by default unless another alert fires in the same namespace.
+    example: |
+      - alert: CPUThrottlingHigh
+        expr: |
+          sum by (namespace, pod, container) (increase(container_cpu_cfs_throttled_periods_total{container!=""}[5m]))
+            / sum by (namespace, pod, container) (increase(container_cpu_cfs_periods_total[5m])) > 0.25
+        for: 15m
+        labels:
+          severity: info
+  - kind: metric
+    what: >
+      The same ratio over a day, per container. The 5-minute value says what is happening now; the 24-hour value says whether the container lives
+      throttled, and it is the one to put next to the latency of the service.
+    example: |
+      sum by (namespace, pod, container) (increase(container_cpu_cfs_throttled_periods_total{container!=""}[24h]))
+        / sum by (namespace, pod, container) (increase(container_cpu_cfs_periods_total{container!=""}[24h]))
+  - kind: command
+    what: >
+      The kernel's own counters for one container, on the node: nr_periods and nr_throttled in the cpu.stat file of its cgroup.
+    example: 'cat /sys/fs/cgroup/<pod path>/cpu.stat'
+solutions:
+  - scale: [small]
+    approach: >
+      Watch the 24-hour ratio next to the latency of the service and change something only where both are bad. Then tell the runtime how many
+      CPUs it has (for Go, GOMAXPROCS set to the whole cores of the limit) and, if that is not enough, raise the limit of that one container and
+      leave the request as it is.
+    tools: ["kubernetes-mixin alerts"]
+    tradeoff: >
+      Two lines in one manifest and the protection of a limit stays. It is done per container by hand, and GOMAXPROCS must be an integer, so it
+      only fits limits of whole cores.
+    example: |
+      env:
+        - name: GOMAXPROCS
+          value: "2"
+      resources:
+        limits:
+          cpu: "2"
+  - scale: [medium]
+    approach: >
+      For the services on the critical path of users, remove the CPU limit and keep a request sized from measured usage (Buffer used the peak of
+      several months plus more than 20%), with a HorizontalPodAutoscaler to add pods under load. Keep limits on everything else. Check the node
+      kernel first: upgrading a kernel that throttles wrongly is preferred over removing limits.
+    tools: [HorizontalPodAutoscaler, "kubernetes-mixin alerts"]
+    tradeoff: >
+      Throttling and the latency it adds are gone for those services. A container without a limit can use all the CPU of its node, fewer
+      containers fit on a node because the requests are larger, and capacity sits idle when traffic is low.
+  - scale: [large]
+    approach: >
+      Run the services without CPU limits on their own tainted node group, so that only workloads that were sized and are monitored share those
+      nodes, and alert when the cluster has no spare capacity for the node autoscaler to use.
+    tools: ["taints and tolerations", HorizontalPodAutoscaler, "node autoscaler"]
+    tradeoff: >
+      A noisy service can only disturb others of its kind, and node problems are easier to attribute. It costs a node group to operate and the
+      slack capacity inside it.
+cases:
+  - company: Buffer
+    year: 2020
+    url: "https://erickhun.com/posts/kubernetes-faster-services-no-cpu-limits/"
+    summary: >
+      On a cluster of about 60 nodes and 1,500 containers, services were throttled far below their limits: one API had a limit of 800m and peaked
+      around 200m. The author attributes it to a kernel bug fixed in 4.19 and later. Buffer removed the CPU limits of the services on the critical
+      path of users, moved them to dedicated tainted nodes and sized their requests from months of usage; the landing page became up to 22 times
+      faster. A later update of the post says to prefer upgrading the kernel over removing limits.
+    match: Containers stalled inside the quota period while their usage graphs were far below the limit.
+  - company: Temporal
+    year: 2023
+    url: "https://temporal.io/blog/tuning-temporal-server-request-latency-on-kubernetes"
+    summary: >
+      Request latency of the History service was unstable while its dashboard showed CPU usage below 60%; the pods were being throttled. The nodes
+      had 8 cores and the pods a limit of 2, and the Go runtime sized itself for 8. Setting GOMAXPROCS to the limit made the throttling disappear
+      and lowered CPU usage; the author recommends removing CPU limits and watching requests instead.
+    match: The quota of a limit spent by more threads than the limit has cores, invisible in usage averaged over a scrape interval.
+reading:
+  - { title: "Linux kernel: CFS Bandwidth Control", url: "https://docs.kernel.org/scheduler/sched-bwc.html", why: "Quota, period and slices in the kernel's own words, with the counters that the throttling ratio is built from." }
+  - { title: "Temporal: Tuning Temporal Server request latency on Kubernetes", url: "https://temporal.io/blog/tuning-temporal-server-request-latency-on-kubernetes", why: "A measured case of throttling at low usage and what setting the runtime's thread count changed." }
+  - { title: "Kubernetes: Faster services with no CPU limits (Eric Khun)", url: "https://erickhun.com/posts/kubernetes-faster-services-no-cpu-limits/", why: "What removing limits needs around it (isolation, request sizing, autoscaling) and the caveats added after publication." }
+  - { title: "Prometheus Operator runbook: CPUThrottlingHigh", url: "https://runbooks.prometheus-operator.dev/runbooks/kubernetes/cputhrottlinghigh/", why: "Why the standard alert is informative only and when its authors say to act on it." }

@@ -1,0 +1,89 @@
+# What a report teaches when a database or message queue port is reachable from outside the cluster network. Every page below was opened and read (2026-11-14).
+topic: database-port-exposed
+checks: [traffic.db-exposed]
+mechanism: >
+  Two Service types put a port outside the cluster, and both do more than their name suggests. A Service of type NodePort gets a port from the range
+  30000-32767 and every node proxies that same port into the Service, whether or not a pod of the Service runs there. With kube-proxy in iptables
+  mode the port is available on all addresses of the node by default, including a public one; in nftables mode only on the node's primary address.
+  The set can be narrowed with the nodePortAddresses field of the kube-proxy configuration.
+
+
+  A Service of type LoadBalancer normally starts as a NodePort Service, and the cloud's controller then configures an external load balancer to
+  forward to that node port. Who can connect is decided outside Kubernetes. With the AWS Load Balancer Controller the scheme is internal unless the
+  annotation says internet-facing. The allowed sources are spec.loadBalancerSourceRanges, and when nothing is set the controller uses 0.0.0.0/0: it
+  creates a security group for the load balancer that allows access from those ranges. A Network Load Balancer without any security group lets all
+  client traffic reach its listeners, and a security group cannot be associated later with an NLB that was created without one.
+
+
+  For an HTTP service this is the intended state. For PostgreSQL, MySQL, Redis, MongoDB or Kafka it means the listener of the database is on the
+  internet and the only thing between a stranger and the data is the database's own authentication. Nothing in the cluster reports it: the Service
+  is healthy and the application works.
+
+
+  An allow-list is better and still not the same as being private. The data is not open to everyone, but an internet-facing address in front of a
+  database depends on that list being right every time it is edited.
+sources:
+  - { title: "Kubernetes: Service", url: "https://kubernetes.io/docs/concepts/services-networking/service/" }
+  - { title: "Kubernetes API reference: Service v1", url: "https://kubernetes.io/docs/reference/kubernetes-api/service-resources/service-v1/" }
+  - { title: "AWS Load Balancer Controller: Service annotations", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/service/annotations/" }
+  - { title: "Elastic Load Balancing: Update the security groups for your Network Load Balancer", url: "https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-security-groups.html" }
+detect:
+  - kind: metric
+    what: >
+      What the security group of a Network Load Balancer turns away. The CloudWatch metric SecurityGroupBlockedFlowCount_Inbound counts the flows
+      blocked by the load balancer's security groups; blocked traffic appears in no other metric. Strangers knocking on a database listener show up
+      here once a group is in place.
+    example: 'CloudWatch SecurityGroupBlockedFlowCount_Inbound of the Network Load Balancer, statistic Sum'
+  - kind: dashboard
+    what: >
+      VPC flow logs show the traffic that the security groups of the load balancer accepted or rejected, with source addresses: who actually
+      connected to the database port from outside.
+    example: 'VPC flow logs filtered on the load balancer ENIs and destination port 5432'
+  - kind: command
+    what: The inventory itself, since exposure is a property of the objects and not a time series.
+    example: 'kubectl get svc -A --field-selector spec.type=NodePort'
+solutions:
+  - scale: [small]
+    approach: >
+      Make the database Service ClusterIP and reach it from a workstation through a port-forward, or over a private network such as Tailscale whose
+      interface is the only one the port is reachable on. If a NodePort has to stay, limit the node addresses it listens on with nodePortAddresses.
+    tools: ["kubectl port-forward", Tailscale]
+    tradeoff: >
+      Nothing listens for strangers and nothing has to be kept correct. Access from outside the cluster becomes a step someone performs, which is a
+      nuisance for tools that expect a fixed address.
+    example: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: postgres
+      spec:
+        type: ClusterIP
+        ports:
+          - port: 5432
+  - scale: [medium, large]
+    approach: >
+      Where a load balancer in front of the database is needed, make it internal and reach it through the VPN or peered networks; state the scheme
+      in the manifest instead of relying on the default. Create the NLB with a security group from the start and list the client ranges in
+      spec.loadBalancerSourceRanges. Watch the blocked-flow metric and the flow logs.
+    tools: ["AWS Load Balancer Controller", "security groups", "VPC flow logs"]
+    tradeoff: >
+      The address is not routable from the internet, and the allow-list is a second layer instead of the only one. Every client needs a network path
+      into the VPC, and an NLB that was created without a security group has to be recreated to get one.
+    example: |
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: postgres
+        annotations:
+          service.beta.kubernetes.io/aws-load-balancer-scheme: "internal"
+      spec:
+        type: LoadBalancer
+        loadBalancerSourceRanges:
+          - 10.0.0.0/8
+        ports:
+          - port: 5432
+cases: []
+reading:
+  - { title: "Kubernetes: Service", url: "https://kubernetes.io/docs/concepts/services-networking/service/", why: "What NodePort and LoadBalancer really open, on which node addresses, and the internal load balancer annotation of each cloud." }
+  - { title: "AWS Load Balancer Controller: Service annotations", url: "https://kubernetes-sigs.github.io/aws-load-balancer-controller/latest/guide/service/annotations/", why: "The defaults for scheme, source ranges and security groups that decide who can connect to an NLB." }
+  - { title: "Elastic Load Balancing: Update the security groups for your Network Load Balancer", url: "https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-security-groups.html", why: "What an NLB without a security group lets through, and the metric and logs that show blocked traffic." }

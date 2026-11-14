@@ -1,0 +1,117 @@
+# What a report teaches when pods wait for a node that does not come. Every page below was opened and read (2026-11-14).
+topic: pods-unschedulable
+checks: [controlplane.scheduler-unschedulable, scaling.pod-pending-long]
+mechanism: >
+  The scheduler places a pod in two steps. Filtering finds the nodes where the pod can run at all: enough free resources for its requests, taints it
+  tolerates, affinity and other constraints satisfied. Scoring ranks what is left. The scheduler works from the requests in the pod spec, not from
+  what the containers use. When filtering leaves no node, the pod is not yet schedulable and stays unscheduled until the scheduler is able to place it.
+
+
+  Nothing fails at that point. The scheduler first tries preemption: evicting pods of lower priority to make room. If that does not help, the pod goes
+  back to the scheduling queue and is tried again when something in the cluster changes that might make it fit. A pod can stay Pending this way for as
+  long as nothing changes, and the workload it belongs to runs with fewer replicas than it asked for, or with none.
+
+
+  A node autoscaler exists to make that change. Cluster Autoscaler and Karpenter both provision new nodes for pods that cannot be scheduled on the
+  existing ones. Their documentation says plainly that this is not always attainable: the configured provisioning limits were reached, the
+  provisioning configuration is not compatible with the pods, or the cloud provider has no capacity. With Karpenter these look as follows. If the
+  requirements of the pod and of the NodePool do not overlap, no node is launched. If the NodePool has a taint the pod does not tolerate, that
+  NodePool is not used for the pod. Once the limits of a NodePool are exceeded, provisioning is prevented until some nodes are terminated. A NodePool
+  that allows only spot never launches on-demand capacity, so its pods stay pending until spot capacity can be launched.
+
+
+  Provisioning takes time, so a short Pending is normal on an autoscaled cluster; on the EKS cluster this tool was measured on, a node went from
+  launched to initialized in about a minute at the median. Minutes of Pending mean room cannot be made. A cluster without a node autoscaler has no one
+  to make room at all: a pod that does not fit waits until other pods leave or a node is added by hand.
+sources:
+  - { title: "Kubernetes: Kubernetes Scheduler", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/" }
+  - { title: "Kubernetes: Scheduling Framework", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/scheduling-framework/" }
+  - { title: "Kubernetes: Resource Management for Pods and Containers", url: "https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/" }
+  - { title: "Kubernetes: Node Autoscaling", url: "https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/" }
+  - { title: "Karpenter: NodePools", url: "https://karpenter.sh/docs/concepts/nodepools/" }
+detect:
+  - kind: alert
+    what: >
+      A pod that is not ready for longer than a rollout or a scale-up takes. The kubernetes-mixin rule KubePodNotReady covers Pending pods: it fires
+      on pods in phase Pending or Unknown (and on Running pods that are not ready) for 15 minutes, leaving out pods owned by Jobs.
+    example: |
+      - alert: PodPendingLong
+        expr: (time() - kube_pod_created) * on (namespace, pod) group_left() (kube_pod_status_phase{phase="Pending"} == 1) > 600
+        for: 5m
+  - kind: metric
+    what: >
+      The scheduler's own view. scheduler_pending_pods counts pending pods per queue, where the queue "unschedulable" holds the pods the scheduler
+      tried and could not place; scheduler_unschedulable_pods breaks them down by the plugin that rejected them, which says whether it was resources,
+      taints or affinity. On a managed control plane these series are only there if the provider exposes the scheduler's metrics.
+    example: 'sum(scheduler_pending_pods{queue="unschedulable"})'
+  - kind: metric
+    what: >
+      On Karpenter, how close each NodePool is to its limits, and how many pods Karpenter itself counts as unschedulable.
+    example: 'karpenter_nodepools_usage / on (nodepool, resource_type) karpenter_nodepools_limit'
+  - kind: command
+    what: >
+      The reason for one pod. The FailedScheduling event of the pod names what did not fit on how many nodes. Events are kept for a short time only,
+      so for what happened earlier the scheduler log is the place to look.
+    example: 'kubectl describe pod <pod> -n <namespace>'
+solutions:
+  - scale: [small]
+    approach: >
+      Without a node autoscaler, the room has to be there before it is needed. Set requests on every workload so that the scheduler's arithmetic is
+      true, keep the sum of requests low enough that everything still fits when one node is gone, and alert on a pod that is Pending for ten minutes.
+      Nothing else needs to be installed.
+    tools: ["resource requests", "kube-state-metrics", Alertmanager]
+    tradeoff: >
+      Pods always have a place, also after a node is lost, for the price of capacity that sits idle most of the time. When the cluster outgrows that
+      spare room the alert is the only thing that says so.
+  - scale: [medium]
+    approach: >
+      Let a node autoscaler make room and keep what stops it in view. With Karpenter: NodePools whose requirements are wide (several instance
+      families and sizes, more than one zone), on-demand allowed next to spot so that a spot shortage falls back instead of leaving pods pending,
+      limits set as a cost ceiling, and an alert when usage approaches the limit of a NodePool.
+    tools: [Karpenter, "Cluster Autoscaler"]
+    tradeoff: >
+      Pending becomes a delay of about a node start instead of a wait without end. A limit that protects the bill is also the point where pods stop
+      being placed, and wide requirements mean nodes of sizes and prices that were not picked by hand.
+    example: |
+      spec:
+        limits:
+          cpu: 200
+        template:
+          spec:
+            requirements:
+              - key: karpenter.sh/capacity-type
+                operator: In
+                values: ["spot", "on-demand"]
+  - scale: [large]
+    approach: >
+      Add spare capacity that real pods can take at once: placeholder pods with a negative priority reserve room, the scheduler preempts them when a
+      real pod needs the place, and the autoscaler replaces the reserve in the background. Track how long pods take to be scheduled as a service
+      level, from the scheduler's pending and scheduling-duration metrics.
+    tools: [Karpenter, "PriorityClass", "placeholder Deployment"]
+    tradeoff: >
+      A scale-up no longer waits for a node to start, and the reserve is paid for all the time. Karpenter treats a preferred affinity as a hard rule
+      when it scales nodes, so with the spreading rule of the documented example the number of placeholder replicas also sets a minimum node count.
+    example: |
+      apiVersion: scheduling.k8s.io/v1
+      kind: PriorityClass
+      metadata:
+        name: placeholder
+      value: -1000
+      globalDefault: false
+cases:
+  - company: UK Ministry of Justice
+    year: 2025
+    url: "https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2025-03-18-aws-eks-upgrade-to-1-30.html"
+    summary: >
+      During an EKS upgrade to 1.30, users reported pods being terminated and not restarting, in production and non-production. The team removed the
+      cordon annotation so that pods could be rescheduled, deleted new nodes that were stuck, and added a 20-node group by hand to stabilise the
+      workloads. The root cause is not confirmed on the page. Follow-up actions include an alert for spikes in the pending pod count and a runbook for
+      emergency scaling of a node group.
+    match: >
+      Pods that were removed had to be placed again while the nodes that could take them were cordoned or not usable; they waited until capacity was
+      added by hand, and no alert on pending pods existed.
+reading:
+  - { title: "Kubernetes: Kubernetes Scheduler", url: "https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/", why: "Filtering and scoring in two pages; the vocabulary every FailedScheduling message uses." }
+  - { title: "Kubernetes: Node Autoscaling", url: "https://kubernetes.io/docs/concepts/cluster-administration/node-autoscaling/", why: "What an autoscaler looks at (requests, constraints) and the three reasons it cannot always make pods schedulable." }
+  - { title: "Karpenter: Troubleshooting", url: "https://karpenter.sh/docs/troubleshooting/", why: "The list of concrete reasons a pod stays pending on Karpenter, from volume limits to a pinned instance type." }
+  - { title: "Kubernetes: Overprovision Node Capacity For A Cluster", url: "https://kubernetes.io/docs/tasks/administer-cluster/node-overprovisioning/", why: "The placeholder-pod pattern with its manifests and how to size the reserve." }

@@ -928,8 +928,8 @@
   evidence: "f\"earliest expiry in {(item.get('server') or {}).get('certificates_min_days_left')} days. Expiring within 90 days: {[(c['file'], c['name'], c['days_left']) for c in (item.get('server') or {}).get('certificates_expiring_90d') or []][:6]}\""
   severity_default: high
   symptom_linked: false
-  why: k3s renews certificates that expire within 90 days at startup. So if it runs a year without a restart, the certificates simply expire and the cluster stops (a classic failure in small k3s clusters where k3s has been up for over a year).
-  suggest: "Within 90 days of expiry run `systemctl restart k3s` (auto renewal) or `k3s certificate rotate`."
+  why: k3s renews certificates that are expired or within 120 days of expiring every time it starts (90 days before the May 2025 releases v1.33.1+k3s1, v1.32.5+k3s1, v1.31.9+k3s1, v1.30.13+k3s1; https://docs.k3s.io/cli/certificate). Certificates are valid for 365 days. So if it runs a year without a restart, the certificates simply expire and the cluster stops (a classic failure in small k3s clusters where k3s has been up for over a year).
+  suggest: "Within the renewal window (120 days before expiry; 90 on releases before May 2025) run `systemctl restart k3s` (auto renewal) or `k3s certificate rotate`."
   verify:
     - "sudo k3s certificate check"
   test:

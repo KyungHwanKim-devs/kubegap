@@ -1,0 +1,102 @@
+# What a report teaches when KEDA cannot read the source it scales on. Every page below was opened and read (2026-11-14).
+topic: keda-trigger-unreadable
+checks: [scaling.keda-scaledobject-not-ready, keda.auth-or-secret-missing]
+mechanism: >
+  KEDA does not replace the HPA, it feeds one. For every ScaledObject the operator creates an HPA named keda-hpa-<name> and scales in two phases. The
+  operator itself handles activation, between zero and one replica, by asking the scaler whether the source is active. The HPA handles scaling
+  between one and the maximum, and gets its numbers from the KEDA metrics server, which answers the HPA's requests about every 15 seconds. The source
+  is polled every 30 seconds by default (pollingInterval); minReplicaCount defaults to 0 and maxReplicaCount to 100.
+
+
+  A scaler is a client of something outside the cluster or outside the workload: a Kafka broker, a Prometheus server, a queue. It needs an address
+  and usually a credential. Credentials are kept apart from the ScaledObject in a TriggerAuthentication, a namespaced object that a trigger names in
+  authenticationRef and that can only be used by ScaledObjects in its own namespace. It points at keys of a Secret (secretTargetRef), at environment
+  variables of the workload, at a vault, or at a pod identity. Each of these references is by name. If the TriggerAuthentication or the Secret it
+  names is not there, or the credential in it no longer works, the scaler cannot read its source. Requests to external services time out after 3
+  seconds by default.
+
+
+  What KEDA does then depends on one section. Without a fallback section, the operator sets the Ready condition of the ScaledObject to False with the
+  reason TriggerError ("Triggers defined in ScaledObject are not working correctly") and performs no scaling: the workload keeps the replica count it
+  has, which looks like autoscaling has stopped, and for a worker that was at zero means nothing consumes the queue. With a fallback section, after
+  failureThreshold consecutive failures KEDA hands the HPA a substitute metric that makes it scale to fallback.replicas. Fallback works only for
+  triggers with an AverageValue target; for CPU and memory scalers and for Value targets it is treated as disabled.
+
+
+  Two more states stop scaling on purpose: the annotation autoscaling.keda.sh/paused holds the current replica count until it is removed. And one
+  cluster-wide dependency: only one metrics server can serve external.metrics.k8s.io in a cluster, so when the KEDA metrics server is unreachable from
+  the API server every KEDA HPA loses its metric together.
+sources:
+  - { title: "KEDA: Concepts", url: "https://keda.sh/docs/2.17/concepts/" }
+  - { title: "KEDA: Scaling Deployments, StatefulSets and Custom Resources", url: "https://keda.sh/docs/2.17/concepts/scaling-deployments/" }
+  - { title: "KEDA: ScaledObject specification", url: "https://keda.sh/docs/2.17/reference/scaledobject-spec/" }
+  - { title: "KEDA: Authentication", url: "https://keda.sh/docs/2.17/concepts/authentication/" }
+  - { title: "KEDA: Cluster", url: "https://keda.sh/docs/2.17/operate/cluster/" }
+  - { title: "KEDA: Troubleshooting", url: "https://keda.sh/docs/2.17/troubleshooting/" }
+  - { title: "KEDA source v2.17.2: pkg/scaling/executor/scale_scaledobjects.go", url: "https://github.com/kedacore/keda/blob/v2.17.2/pkg/scaling/executor/scale_scaledobjects.go" }
+detect:
+  - kind: alert
+    what: >
+      Scaler errors per ScaledObject. The operator counts every failed read of a source; the series carries the namespace and the ScaledObject (KEDA
+      2.14 and later). It is only there when Prometheus scrapes the operator, which serves metrics on port 8080 at /metrics.
+    example: |
+      - alert: KedaScalerErrors
+        expr: sum by (namespace, scaledObject) (increase(keda_scaler_detail_errors_total[10m])) > 0
+        for: 10m
+  - kind: metric
+    what: >
+      ScaledObjects that were paused and forgotten, and the availability of the external metrics API that all KEDA HPAs read.
+    example: 'keda_scaled_object_paused == 1'
+  - kind: dashboard
+    what: >
+      The value each scaler returns next to the replica count of its workload. A scaler value that goes flat or disappears while the source is known
+      to be busy is the picture of a trigger that stopped reading.
+    example: 'keda_scaler_metrics_value, keda_scaler_active, kube_horizontalpodautoscaler_status_current_replicas{horizontalpodautoscaler=~"keda-hpa-.*"}'
+  - kind: command
+    what: The READY and ACTIVE columns of every ScaledObject; the conditions of one carry the reason.
+    example: 'kubectl get scaledobject -A'
+solutions:
+  - scale: [small]
+    approach: >
+      Make a broken trigger harmless before making it visible. Give production ScaledObjects a minReplicaCount that carries the normal load, so that
+      a trigger that cannot be read leaves the workload running at its floor instead of at zero, and keep the Secret and the TriggerAuthentication in
+      the same Helm release or kustomization as the ScaledObject so that they are created and removed together. Look at the READY column after every
+      credential change.
+    tools: [KEDA, Helm]
+    tradeoff: >
+      No monitoring to add. Scale-to-zero and its savings are given up for those workloads, and a broken trigger is still found by looking, not by
+      an alert.
+  - scale: [medium]
+    approach: >
+      Add a fallback section to every production ScaledObject whose trigger reads an external source, sized for a busy hour, and scrape the KEDA
+      operator so that the scaler-error alert exists. Where the cloud offers it, replace the stored credential by a pod identity in the
+      TriggerAuthentication, which removes the Secret that can go missing or expire.
+    tools: [KEDA, Prometheus, "TriggerAuthentication podIdentity"]
+    tradeoff: >
+      A source that cannot be read costs a fixed, known number of replicas instead of a missed peak. Fallback replicas run for as long as the error
+      lasts whether there is work or not, and it does not apply to Value targets or to CPU and memory triggers.
+    example: |
+      spec:
+        minReplicaCount: 1
+        fallback:
+          failureThreshold: 3
+          replicas: 4
+        triggers:
+          - type: kafka
+            authenticationRef:
+              name: kafka-auth
+  - scale: [large]
+    approach: >
+      On top of fallback and alerts, run two operator replicas (one is active, the other stands by to shorten failover), alert on the external
+      metrics APIService, and take trigger credentials from the secret manager through the TriggerAuthentication so that rotation is one place.
+    tools: [KEDA, Prometheus, "HashiCorp Vault", "AWS Secrets Manager"]
+    tradeoff: >
+      A node loss or a rotation no longer stops event-driven scaling. More replicas do not add throughput, the metrics server remains a single
+      active instance for the whole cluster, and KEDA now depends on the secret manager being reachable.
+cases: []
+reading:
+  - { title: "KEDA: Scaling Deployments, StatefulSets and Custom Resources", url: "https://keda.sh/docs/2.17/concepts/scaling-deployments/", why: "The two phases (activation by the operator, scaling by the HPA) and the pause annotations." }
+  - { title: "KEDA: ScaledObject specification", url: "https://keda.sh/docs/2.17/reference/scaledobject-spec/", why: "Every default, and the fallback section with the trigger types it does and does not cover." }
+  - { title: "KEDA: Authentication", url: "https://keda.sh/docs/2.17/concepts/authentication/", why: "All the places a TriggerAuthentication can take a credential from, and the namespace rules." }
+  - { title: "KEDA: Troubleshooting", url: "https://keda.sh/docs/2.17/troubleshooting/", why: "The known ways the external metrics APIService becomes unreachable (network policy, proxy, mesh sidecar) with the fix for each." }
+  - { title: "KEDA: Integrate with Prometheus", url: "https://keda.sh/docs/2.17/integrations/prometheus/", why: "The list of operator metrics the alerts above are built from." }

@@ -1,0 +1,76 @@
+# What a report teaches when an ACM certificate behind a load balancer is close to expiry or cannot renew by itself. Every page below was opened and
+# read (2026-11-14).
+topic: acm-certificate-renewal
+checks: [eks.acm-certificate-expiring]
+mechanism: >
+  On EKS the TLS certificate of an ingress is usually an ACM certificate attached to the load balancer, so its renewal happens outside the cluster
+  and nothing in Kubernetes shows it. ACM renews by itself only what is eligible: a certificate it issued that is associated with another AWS
+  service (or was exported). An imported certificate is not eligible, and neither is one that has already expired.
+
+
+  For a certificate issued with DNS validation, ACM checks two things 45 days before expiry: that the certificate is in use by an AWS service, and
+  that every CNAME record it handed out at issuance (one per name on the certificate) is still present and reachable through public DNS. If both
+  hold it renews, and the ARN stays the same, so the load balancer needs no change. Older certificates with a 395 day validity renew 60 days before
+  expiry and come back with 198 days.
+
+
+  If the CNAME is gone, because the zone was moved or the record was cleaned up, renewal fails without any effect on traffic for weeks. ACM publishes
+  an ACM Certificate Renewal Action Required event when the attempt fails 30 days before expiry for a public certificate and tries again at 15, 3
+  and 1 day. If nobody listens, the certificate expires and every host behind it shows a browser warning on the same day.
+
+
+  An imported certificate works like an issued one with a single exception: there is no managed renewal. Watching its expiry and replacing it is
+  the owner's job. Reimporting into the same ARN keeps the associations. ACM sends a daily ACM Certificate Approaching Expiration event from 45
+  days before expiry for imported certificates (30 for public ones), but the ACM Certificate Expired and Renewal Action Required events are not
+  available for imported certificates.
+
+
+  Certificates are regional: the same name in two regions is two certificates that renew independently.
+sources:
+  - { title: "ACM: Managed certificate renewal", url: "https://docs.aws.amazon.com/acm/latest/userguide/managed-renewal.html" }
+  - { title: "ACM: Renewal for domains validated by DNS", url: "https://docs.aws.amazon.com/acm/latest/userguide/dns-renewal-validation.html" }
+  - { title: "ACM: Import certificates", url: "https://docs.aws.amazon.com/acm/latest/userguide/import-certificate.html" }
+  - { title: "ACM: Amazon EventBridge support", url: "https://docs.aws.amazon.com/acm/latest/userguide/supported-events.html" }
+  - { title: "ACM: Supported CloudWatch metrics", url: "https://docs.aws.amazon.com/acm/latest/userguide/cloudwatch-metrics.html" }
+detect:
+  - kind: metric
+    what: >
+      Days left for each certificate. ACM publishes DaysToExpiry in the CloudWatch namespace AWS/CertificateManager twice a day for every
+      certificate, with the dimension CertificateArn, and stops publishing once the certificate has expired. A CloudWatch alarm on the minimum is
+      the alert.
+    example: 'AWS/CertificateManager DaysToExpiry{CertificateArn=<arn>} < 21'
+  - kind: alert
+    what: >
+      The events ACM sends by itself. An EventBridge rule on the two detail types below, with a mail or chat target, tells the operator that a
+      renewal needs a person, weeks before the expiry.
+    example: |
+      {
+        "source": ["aws.acm"],
+        "detail-type": ["ACM Certificate Renewal Action Required", "ACM Certificate Approaching Expiration"]
+      }
+  - kind: command
+    what: Which certificates in use are imported or not eligible for renewal, read once to know what the alarms have to cover.
+    example: "aws acm list-certificates --query 'CertificateSummaryList[?InUse==`true`].[DomainName,NotAfter,RenewalEligibility,Status]' --output table"
+solutions:
+  - scale: [small]
+    approach: >
+      Use ACM-issued certificates with DNS validation, leave the validation CNAME records in the zone, and add one EventBridge rule that mails the
+      two events above. Replace an imported certificate with an issued one where the name allows it.
+    tools: ["AWS Certificate Manager", "Amazon EventBridge"]
+    tradeoff: >
+      Renewal needs no one and a failed renewal reaches a mailbox 30 days ahead, for one rule and one topic. It depends on the CNAME staying where
+      ACM put it, which a later change of DNS provider can undo.
+  - scale: [medium, large]
+    approach: >
+      Add a CloudWatch alarm on DaysToExpiry for every certificate in use, in every region that has one, and route it like any other alert. Where an
+      imported certificate has to stay, automate the reimport from the approaching-expiration event; the ACM documentation shows this with a Lambda
+      function.
+    tools: ["Amazon CloudWatch", "Amazon EventBridge", "AWS Lambda"]
+    tradeoff: >
+      Imported certificates are covered as well, and the alarm does not depend on anyone reading mail. The alarms have to be created per certificate
+      and per region, and ACM stops publishing the metric once a certificate has expired, so an alarm must not read missing data as healthy.
+cases: []
+reading:
+  - { title: "ACM: Renewal for domains validated by DNS", url: "https://docs.aws.amazon.com/acm/latest/userguide/dns-renewal-validation.html", why: "The two conditions ACM checks before it renews, and when it gives notice that it could not." }
+  - { title: "ACM: Amazon EventBridge support", url: "https://docs.aws.amazon.com/acm/latest/userguide/supported-events.html", why: "Every event with its timing and fields, including which ones imported certificates do not get." }
+  - { title: "ACM: Import certificates", url: "https://docs.aws.amazon.com/acm/latest/userguide/import-certificate.html", why: "What changes when the certificate comes from outside, and how a reimport keeps the ARN." }

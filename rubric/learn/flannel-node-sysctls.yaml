@@ -1,0 +1,73 @@
+# What a report teaches when a flannel node has IP forwarding or bridge netfilter switched off. Every page below was opened and read (2026-11-14).
+topic: flannel-node-sysctls
+checks: [traffic.flannel-sysctl-off]
+mechanism: >
+  Pod networking with flannel is ordinary Linux networking on each node, and two kernel settings decide whether it works. On a node the pods are
+  plugged into a bridge in the host network namespace: each pod holds one end of a veth pair and the other end is attached to the bridge, which the
+  CNI bridge plugin names cni0 by default. Between nodes, flannel's default backend in k3s is vxlan, which encapsulates pod packets and sends them
+  over UDP port 8472.
+
+
+  The first setting is net.ipv4.ip_forward. By default the Linux kernel does not route IPv4 packets between interfaces (the default is 0). A packet
+  from a pod to another node has to go from the bridge to the vxlan device or the node's network card, which is forwarding. Most cluster networking
+  implementations set it themselves when needed, but some expect the administrator to do it. With 0, pod traffic that has to leave the node stops.
+
+
+  The second is net.bridge.bridge-nf-call-iptables. With 1 the kernel passes bridged IPv4 traffic to the iptables chains; with 0 it does not. This
+  matters because a Service address exists only as rules: kube-proxy in iptables mode installs rules that redirect traffic for a ClusterIP to a
+  backend pod. Traffic between two pods on the same node crosses only the bridge. With the setting at 0 it never meets those rules, nor the rules of
+  a NetworkPolicy, so a Service works when its pod is on another node and fails when the pod is on the same node, which looks intermittent.
+
+
+  k3s sets both values when it starts, so on a healthy node they are 1. They are runtime values, though: another tool can set them back afterwards, a
+  setting that lived only in a lost sysctl.d file is gone after a reboot, and nothing in Kubernetes reports either. k3s recommends turning firewalld and ufw off on its nodes.
+sources:
+  - { title: "Kubernetes: Container Runtimes (network configuration prerequisites)", url: "https://kubernetes.io/docs/setup/production-environment/container-runtimes/" }
+  - { title: "Linux kernel documentation: IP sysctl", url: "https://docs.kernel.org/networking/ip-sysctl.html" }
+  - { title: "CNI: bridge plugin", url: "https://www.cni.dev/plugins/current/main/bridge/" }
+  - { title: "Kubernetes: Virtual IPs and Service Proxies", url: "https://kubernetes.io/docs/reference/networking/virtual-ips/" }
+  - { title: "k3s: Basic Network Options", url: "https://docs.k3s.io/networking/basic-network-options" }
+  - { title: "k3s: Requirements", url: "https://docs.k3s.io/installation/requirements" }
+detect:
+  - kind: metric
+    what: >
+      The values themselves as time series. node_exporter has a sysctl collector, disabled by default, that exposes the numeric sysctls named with
+      --collector.sysctl.include as node_sysctl_<name with underscores>.
+    example: |
+      # node_exporter flag
+      --collector.sysctl.include=net.ipv4.ip_forward
+      # rule
+      - alert: NodeIpForwardOff
+        expr: node_sysctl_net_ipv4_ip_forward == 0
+  - kind: command
+    what: The direct reading on a node, which is also how the audit collects it.
+    example: 'sysctl net.ipv4.ip_forward net.bridge.bridge-nf-call-iptables'
+solutions:
+  - scale: [small]
+    approach: >
+      Write both settings into a file under /etc/sysctl.d and the br_netfilter module into /etc/modules-load.d, so that they hold after a reboot and
+      do not depend on k3s having started last. Find the tool that turned them off and stop it from doing so.
+    tools: ["sysctl.d", "modules-load.d"]
+    tradeoff: >
+      Two small files per node make the setting survive reboots. Nothing watches it afterwards, so a tool that changes the value at run time is
+      found only by the next audit or the next failing Service.
+    example: |
+      # /etc/sysctl.d/99-kubernetes.conf
+      net.ipv4.ip_forward = 1
+      net.bridge.bridge-nf-call-iptables = 1
+      # /etc/modules-load.d/k8s.conf
+      br_netfilter
+  - scale: [medium, large]
+    approach: >
+      Declare the same two files in whatever builds the nodes (the machine image, cloud-init or the configuration management that installs k3s), so
+      every node is the same, and export the values with the node_exporter sysctl collector to alert when one changes.
+    tools: [node_exporter, "configuration management", Prometheus]
+    tradeoff: >
+      A changed value is noticed within minutes and a new node cannot come up without it. It costs one extra collector flag on every node_exporter
+      and a rule to maintain.
+cases: []
+reading:
+  - { title: "Kubernetes: Container Runtimes", url: "https://kubernetes.io/docs/setup/production-environment/container-runtimes/", why: "The prerequisite as Kubernetes states it, with the sysctl.d snippet that persists across reboots." }
+  - { title: "Linux kernel documentation: IP sysctl", url: "https://docs.kernel.org/networking/ip-sysctl.html", why: "What ip_forward and the bridge-nf-call settings mean in the kernel's own words, with their defaults." }
+  - { title: "k3s: Requirements", url: "https://docs.k3s.io/installation/requirements", why: "The ports flannel needs between nodes and the advice on host firewalls." }
+  - { title: "node_exporter README", url: "https://github.com/prometheus/node_exporter/blob/master/README.md", why: "How the sysctl collector is switched on and how its metric names are formed." }

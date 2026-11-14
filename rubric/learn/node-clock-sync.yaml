@@ -1,0 +1,91 @@
+# What a report teaches when a node's clock is off or is not being synchronised. Every page below was opened and read (2026-11-14).
+topic: node-clock-sync
+checks: [node.ntp-offset, node.clock-unsynced-os]
+mechanism: >
+  Nothing in Kubernetes keeps a node's clock right; that is the work of a time daemon on the node, and a node without one, or with one that
+  cannot reach its servers, drifts. The clock of a virtual machine is less stable than that of a physical one and much larger drifts are possible
+  there.
+
+
+  What breaks is whatever compares a timestamp with the local time. A skewed clock causes problems with TLS and with other time-sensitive
+  applications. Requests signed on the node are rejected when the date in the signature and the date of the request differ: AWS rejects requests
+  from the AWS CLI and the SDKs for this reason. Timestamps in logs stop saying in which order things happened across nodes. The error the
+  operator sees names authentication or a certificate, not the clock.
+
+
+  A time daemon corrects in two ways. By default chronyd adjusts the clock gradually, by slowing it down or speeding it up, so time never jumps
+  for the processes on the node. A large error would take very long to remove that way, so the recommended configuration allows a step, but only
+  in the first few updates after start (makestep 1 3: step if the offset is larger than one second, in the first three updates). A node whose
+  clock is far off long after boot is therefore not brought back quickly by the daemon alone.
+
+
+  Two different questions are asked of a node, and the kernel answers both through node_exporter's timex collector. How far off is the clock:
+  node_timex_offset_seconds. Is anything synchronising it at all: node_timex_sync_status, together with the kernel's estimate of the maximum
+  error. A clock can still read nearly right while nothing synchronises it; the offset then only grows.
+
+
+  On EC2 every instance reaches a local time source at the link-local address 169.254.169.123 without any VPC configuration, and Amazon Linux
+  2023 and recent Amazon Linux 2 images are configured to use it by default.
+sources:
+  - { title: "chrony: Frequently Asked Questions", url: "https://chrony-project.org/faq.html" }
+  - { title: "Amazon EC2: Precision clock and time synchronization on your EC2 instance", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/set-time.html" }
+  - { title: "Amazon EC2: Set the time reference to use the local Amazon Time Sync Service", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configure-ec2-ntp.html" }
+  - { title: "Prometheus Operator runbook: NodeClockSkewDetected", url: "https://runbooks.prometheus-operator.dev/runbooks/node/nodeclockskewdetected/" }
+  - { title: "node_exporter mixin alerts", url: "https://raw.githubusercontent.com/prometheus/node_exporter/master/docs/node-mixin/alerts/alerts.libsonnet" }
+detect:
+  - kind: alert
+    what: >
+      The node_exporter mixin ships both rules. The first fires when the offset is beyond 0.05 seconds and is not shrinking; the second when the
+      kernel reports the clock as unsynchronised and its maximum error estimate has reached 16 seconds.
+    example: |
+      - alert: NodeClockSkewDetected
+        expr: |
+          (node_timex_offset_seconds > 0.05 and deriv(node_timex_offset_seconds[5m]) >= 0)
+          or
+          (node_timex_offset_seconds < -0.05 and deriv(node_timex_offset_seconds[5m]) <= 0)
+        for: 10m
+      - alert: NodeClockNotSynchronising
+        expr: min_over_time(node_timex_sync_status[5m]) == 0 and node_timex_maxerror_seconds >= 16
+        for: 10m
+  - kind: metric
+    what: >
+      The offset per node as a graph. A line that walks away from zero is a daemon that stopped or lost its servers; a line that sits at a constant
+      offset is a source that is itself wrong.
+    example: 'abs(node_timex_offset_seconds)'
+  - kind: command
+    what: >
+      What the daemon on one node thinks: the source it selected and the correction still to be applied (the System time line is the remaining
+      correction).
+    example: 'chronyc tracking'
+solutions:
+  - scale: [small]
+    approach: >
+      Run one time daemon on every node with the minimal configuration and add the two alerts. For chrony with public servers that is four lines;
+      a client should have at least three servers for reliable operation, which a pool directive provides.
+    tools: [chrony, "node_exporter mixin alerts"]
+    tradeoff: >
+      A few lines per node and no service to run. It depends on the nodes reaching public NTP servers, and nobody notices a daemon that stopped
+      unless the alerts exist.
+    example: |
+      pool pool.ntp.org iburst
+      driftfile /var/lib/chrony/drift
+      makestep 1 3
+      rtcsync
+  - scale: [medium, large]
+    approach: >
+      Put the time configuration into the node image or the bootstrap of the node group, so that a new node is right from its first minute and
+      no node is configured by hand. On EC2 point chrony at the local Amazon Time Sync Service; elsewhere name the servers explicitly. Route the two
+      alerts to whoever owns the nodes.
+    tools: [chrony, "Amazon Time Sync Service", "node_exporter mixin alerts"]
+    tradeoff: >
+      Every node has the same, known source and a replaced node cannot come up without it. The image or bootstrap has one more thing to carry.
+      On EC2 the link-local address shares a limit of 1024 packets per second with DNS and instance metadata requests, and its time is leap-smeared,
+      so it should not be mixed with a source that is not.
+    example: |
+      # /etc/chrony.conf, before any other server or pool line
+      server 169.254.169.123 prefer iburst minpoll 4 maxpoll 4
+cases: []
+reading:
+  - { title: "chrony: Frequently Asked Questions", url: "https://chrony-project.org/faq.html", why: "The minimal configuration, when a clock is stepped instead of slewed, and why virtual machines drift more." }
+  - { title: "Amazon EC2: Set the time reference to use the local Amazon Time Sync Service", url: "https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/configure-ec2-ntp.html", why: "The address, which images use it already and how to verify it on a node." }
+  - { title: "Prometheus Operator runbook: NodeClockNotSynchronising", url: "https://runbooks.prometheus-operator.dev/runbooks/node/nodeclocknotsynchronising/", why: "What the alert most clusters already have means and where its mitigation steps are." }

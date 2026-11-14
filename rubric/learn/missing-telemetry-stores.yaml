@@ -1,0 +1,106 @@
+# What a report teaches when the cluster has nowhere to keep metrics, logs or events. Every page below was opened and read (2026-11-14).
+topic: missing-telemetry-stores
+checks: [observability.no-metrics-store, observability.no-logs-store, observability.no-event-retention]
+mechanism: >
+  Kubernetes keeps the present and very little of the past. Each of the three kinds of evidence has its own short horizon, and each needs a store of its
+  own to get past it.
+
+
+  Metrics. The Metrics API that metrics-server implements offers a basic set of metrics for automatic scaling: CPU and memory of nodes and pods, memory
+  as the working set at the instant it was collected. In the words of the documentation it only offers the minimum CPU and memory metrics to enable
+  scaling with HPA or VPA. It answers "how much now", which is what kubectl top prints. It cannot answer "what was it at 3 a.m.", it has no request
+  rates or error counts, and there is nothing in it to evaluate an alert rule against.
+
+
+  Logs. The kubelet writes container output to files on the node and rotates them, by default at 10Mi per file with 5 files per container; kubectl
+  logs returns only the latest file. When a container restarts the kubelet keeps one terminated container with its logs. When a pod is evicted from
+  the node, its containers are evicted along with their logs, and when the node dies the files die with it. Kubernetes does not provide a native
+  storage solution for log data: logs need a separate storage and lifecycle independent of nodes, pods and containers, which the documentation calls
+  cluster-level logging.
+
+
+  Events. FailedScheduling, OOMKilling, Unhealthy and the rest are objects in the API server, and the API server retains events for the duration of
+  --event-ttl, which defaults to 1h0m0s. What happened during the night has been deleted by morning.
+
+
+  The three absences add up. After an incident the questions are when it started, what the error was and what the cluster did about it; without the
+  stores none of them has an answer, and before the incident nothing could have raised an alarm.
+sources:
+  - { title: "Kubernetes: Resource metrics pipeline", url: "https://kubernetes.io/docs/tasks/debug/debug-cluster/resource-metrics-pipeline/" }
+  - { title: "Kubernetes: Logging Architecture", url: "https://kubernetes.io/docs/concepts/cluster-administration/logging/" }
+  - { title: "Kubernetes: kube-apiserver reference", url: "https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/" }
+  - { title: "kube-prometheus-stack chart", url: "https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack" }
+  - { title: "Loki: deployment modes", url: "https://grafana.com/docs/loki/latest/get-started/deployment-modes/" }
+  - { title: "Grafana Alloy: loki.source.kubernetes_events", url: "https://grafana.com/docs/alloy/latest/reference/components/loki/loki.source.kubernetes_events/" }
+  - { title: "kubernetes-event-exporter", url: "https://github.com/resmoio/kubernetes-event-exporter" }
+  - { title: "Fluent Bit: Kubernetes events input", url: "https://docs.fluentbit.io/manual/pipeline/inputs/kubernetes-events" }
+  - { title: "Prometheus Operator runbooks", url: "https://runbooks.prometheus-operator.dev/" }
+detect:
+  - kind: alert
+    what: >
+      Once a metrics store exists, whether it is still being fed. The stock rule set has a rule for scrape targets that are down (Target Down) and one
+      for a Prometheus that is not ingesting samples; the number of series in memory shows the same thing as a graph.
+    example: 'prometheus_tsdb_head_series'
+  - kind: dashboard
+    what: >
+      Once events are shipped to the log store, a saved query over the event stream for the last day: Warning events by reason and namespace. Grafana
+      Alloy turns each event into a log line labelled with namespace, job and instance.
+  - kind: alert
+    what: >
+      The stores themselves from outside the cluster: a health check of the metrics store by an external service, so that its absence is noticed. A
+      store that is down cannot report that it is down.
+    example: 'An external HTTP check of the Prometheus health endpoint, wired to the pager'
+  - kind: command
+    what: >
+      How little the cluster remembers by itself: the oldest event the API server still has is at most one hour old with the default TTL.
+    example: 'kubectl get events -A --sort-by=.lastTimestamp'
+solutions:
+  - scale: [small]
+    approach: >
+      One chart for metrics and one small log store. kube-prometheus-stack installs the Prometheus Operator with Prometheus, kube-state-metrics,
+      node-exporter, Grafana, dashboards and alert rules. For logs, Loki in monolithic mode runs all its components in one process and is meant for
+      small volumes, up to approximately 20GB per day. An agent such as Grafana Alloy ships the container logs, and the same agent tails the
+      Kubernetes events and writes them to Loki as log lines, so events need no store of their own.
+    tools: [kube-prometheus-stack, Loki, "Grafana Alloy"]
+    tradeoff: >
+      Metrics, logs and events outlive the pods that produced them, with two installs. The stores run inside the cluster they watch and take memory and
+      disk from it, so they are unavailable in exactly the outage that takes the cluster down, and they need persistent volumes to be worth anything.
+    example: |
+      loki.source.kubernetes_events "events" {
+        forward_to = [loki.write.local.receiver]
+      }
+
+      loki.write "local" {
+        endpoint {
+          url = sys.env("LOKI_URL")
+        }
+      }
+  - scale: [medium]
+    approach: >
+      The same stores with retention decided on purpose and persistent volumes under them, events exported by whatever already ships logs
+      (kubernetes-event-exporter to Elasticsearch, OpenSearch or Loki; the kubernetes_events input of Fluent Bit), and a health check of the metrics
+      store from outside the cluster.
+    tools: [kube-prometheus-stack, Loki, kubernetes-event-exporter, "Fluent Bit"]
+    tradeoff: >
+      The evidence of last week is there when it is needed and the loss of the monitoring itself is noticed. Retention has to be sized against the
+      disk, and the event exporter is one more workload to run and upgrade.
+    example: |
+      [INPUT]
+          name      kubernetes_events
+          tag       k8s_events
+          kube_url  https://kubernetes.default.svc
+  - scale: [large]
+    approach: >
+      Keep the stores outside the cluster they describe, or run them as their own scaled system: a managed Prometheus service and a managed log service
+      on a cloud provider (on EKS, Amazon Managed Service for Prometheus and CloudWatch Logs), or Loki in microservices mode, where each component
+      runs as its own process.
+    tools: ["Amazon Managed Service for Prometheus", "CloudWatch Logs", "Loki microservices mode"]
+    tradeoff: >
+      Telemetry survives the loss of the cluster and scales apart from it. The data leaves the cluster, another system's limits and access rules have
+      to be learned, and a distributed Loki is many components to operate instead of one.
+cases: []
+reading:
+  - { title: "Kubernetes: Logging Architecture", url: "https://kubernetes.io/docs/concepts/cluster-administration/logging/", why: "Where container logs live on a node, when they are lost, and the ways to get them into a store." }
+  - { title: "Loki: deployment modes", url: "https://grafana.com/docs/loki/latest/get-started/deployment-modes/", why: "Which mode fits which log volume, and what changes when one process is not enough." }
+  - { title: "Grafana Alloy: loki.source.kubernetes_events", url: "https://grafana.com/docs/alloy/latest/reference/components/loki/loki.source.kubernetes_events/", why: "How events become log lines, and what happens to them across restarts." }
+  - { title: "kubernetes-event-exporter", url: "https://github.com/resmoio/kubernetes-event-exporter", why: "Routing and filtering of events to the stores and chat tools it supports." }

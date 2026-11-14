@@ -1,0 +1,126 @@
+# What a report teaches when an EKS node or its subnet runs out of pod addresses. Every page below was opened and read (2026-11-14).
+topic: vpc-cni-ip-exhaustion
+checks: [vpccni.node-ip-exhaustion, vpccni.no-available-ip, vpccni.subnet-ips-low]
+mechanism: >
+  The Amazon VPC CNI gives every pod a real address of the VPC subnet. The addresses sit on the node's network interfaces (ENIs) as secondary
+  addresses; the primary address of each ENI is not given to pods. How many ENIs an instance may attach and how many addresses each holds is fixed by
+  the instance type, so a node has two limits at once: ENIs times (addresses per ENI minus one), and the free addresses left in the subnet,
+  whichever is smaller. A t3.small has 3 ENIs with 4 addresses each, an m4.4xlarge 8 ENIs with 30 each.
+
+
+  A daemon on every node, ipamd, keeps a warm pool so that a new pod gets an address without waiting for an EC2 call. With the default
+  WARM_ENI_TARGET=1 it keeps one whole spare ENI of addresses attached. These spare addresses are taken from the subnet although no pod uses them.
+  They come back slowly: an ENI can be released only when none of its addresses is in use, and a deleted pod's address spends 30 seconds in a
+  cooling period before it can be used again.
+
+
+  That is how a subnet runs dry while pods use far fewer addresses than it has. Nodes, pods, ENIs and load balancers all draw from the same subnet;
+  when it is empty, existing nodes cannot refill their warm pool and new nodes cannot give their pods addresses. On a single node the same thing
+  happens earlier: once the instance limit is reached, ipamd has nothing to hand out and a new pod stays in ContainerCreating with "failed to assign
+  an IP address to container". ipamd counts each such answer since it started, so a non-zero count means it has already happened.
+
+
+  Prefix delegation changes the first limit. With ENABLE_PREFIX_DELEGATION, off by default and available on Nitro instances, ipamd attaches /28
+  prefixes of 16 consecutive addresses to the slots of an ENI instead of single addresses. The subnet limit stays, and each prefix is carved out of
+  the subnet as one block.
+sources:
+  - { title: "amazon-vpc-cni-k8s README", url: "https://github.com/aws/amazon-vpc-cni-k8s/blob/master/README.md" }
+  - { title: "amazon-vpc-cni-k8s: CNI proposal", url: "https://github.com/aws/amazon-vpc-cni-k8s/blob/master/docs/cni-proposal.md" }
+  - { title: "amazon-vpc-cni-k8s: ENI and IP target", url: "https://github.com/aws/amazon-vpc-cni-k8s/blob/master/docs/eni-and-ip-target.md" }
+  - { title: "amazon-vpc-cni-k8s: Prefix and IP target", url: "https://github.com/aws/amazon-vpc-cni-k8s/blob/master/docs/prefix-and-ip-target.md" }
+  - { title: "Neon: AWS CNI lessons from a production outage", url: "https://neon.com/blog/aws-cni-lessons-from-a-production-outage" }
+detect:
+  - kind: metric
+    what: >
+      Addresses given to pods against addresses the node can hold. ipamd publishes Prometheus metrics on port 61678 of every node; the ratio shows
+      how close a node is to its instance limit, and the gap between total and assigned is the warm pool that the subnet pays for.
+    example: 'awscni_assigned_ip_addresses / awscni_ip_max'
+  - kind: alert
+    what: >
+      ipamd has answered "no address available". The counter is cumulative since the process started, so the rule fires on an increase.
+    example: |
+      - alert: VpcCniNoAvailableIP
+        expr: increase(awscni_no_available_ip_addresses[15m]) > 0
+  - kind: dashboard
+    what: >
+      Without a Prometheus that scrapes the nodes, cni-metrics-helper collects the same numbers from every node, aggregates them for the cluster
+      and publishes them to CloudWatch: assignIPAddresses, totalIPAddresses, maxIPAddresses, eniAllocated, eniMaxAvailable, ipamdErr.
+    example: 'CloudWatch: assignIPAddresses / maxIPAddresses, and ipamdErr > 0'
+  - kind: command
+    what: The free addresses of one subnet, the number that no node metric shows.
+    example: 'aws ec2 describe-subnets --subnet-ids <id> --query "Subnets[].AvailableIpAddressCount"'
+solutions:
+  - scale: [small]
+    approach: >
+      Turn on prefix delegation on the aws-node DaemonSet and leave the other settings at their defaults. A handful of nodes then stays far from
+      the instance limit. Look at the free addresses of the node subnets when the cluster grows by a node group.
+    tools: ["Amazon VPC CNI"]
+    tradeoff: >
+      Sixteen times the addresses in each slot of an ENI for one environment variable. Addresses are now reserved 16 at a time, so a small subnet
+      empties in larger steps.
+    example: |
+      # DaemonSet aws-node, container aws-node
+      env:
+        - name: ENABLE_PREFIX_DELEGATION
+          value: "true"
+  - scale: [medium]
+    approach: >
+      Size the warm pool to the real pod density. The project's guidance for a node that runs about 10 pods is a MINIMUM_IP_TARGET slightly above
+      that, like 12, with WARM_IP_TARGET=2. Alert on the "no address available" counter and watch the free addresses of each subnet.
+    tools: ["Amazon VPC CNI", Prometheus, cni-metrics-helper]
+    tradeoff: >
+      Nodes stop holding a whole spare ENI, which gives addresses back to the subnet. WARM_IP_TARGET makes ipamd call the EC2 API more often; the
+      project recommends it only for small clusters or very low pod churn, because when the calls are throttled no instance in the cluster can attach
+      new ENIs or addresses. Neon set WARM_IP_TARGET=1 during an incident and pod starts stalled for 30 seconds after every pod deletion.
+    example: |
+      env:
+        - name: MINIMUM_IP_TARGET
+          value: "12"
+        - name: WARM_IP_TARGET
+          value: "2"
+  - scale: [large]
+    approach: >
+      Take the pods out of the node subnets: custom networking (AWS_VPC_K8S_CNI_CUSTOM_NETWORK_CFG) lets pods use subnets and security groups
+      independent of the node's, typically a secondary CIDR of the VPC. Plan the address space before the cluster grows, and consider IPv6 for new
+      large clusters.
+    tools: ["Amazon VPC CNI custom networking", ENIConfig, Karpenter]
+    tradeoff: >
+      Pod addresses no longer compete with nodes and load balancers. Pod capacity per node has to be recalculated: Adevinta's Karpenter did not
+      account for custom networking and over-packed nodes until it was told to reserve the first ENI (--reserved-enis).
+cases:
+  - company: Neon
+    year: 2025
+    url: "https://neon.com/blog/aws-cni-lessons-from-a-production-outage"
+    summary: >
+      A failing clean-up job let the number of running pods grow from about 5,000 to about 8,000 in a cluster whose three /20 subnets held about
+      12,000 addresses. With the default warm pool about 99% of the addresses were allocated to nodes while only about 8,800 were assigned to pods,
+      and new pods could not get an address. Setting WARM_IP_TARGET=1 during the incident made pod starts stall after each deletion.
+    match: Addresses held by the per-node warm pool, not by pods, emptied the subnets, and ipamd releases them only when a whole ENI is unused.
+  - company: Adevinta
+    year: 2024
+    url: "https://adevinta.com/techblog/how-we-avoided-an-outage-caused-by-running-out-of-ips-in-eks/"
+    summary: >
+      During a migration to EKS an on-call page about failing DaemonSets led to pods with "failed to assign an IP address to container". The cluster
+      was small, but the team saw the free addresses of the VPC falling across the fleet and moved pods to custom networking before the larger
+      clusters ran out. Karpenter had to be told to reserve the first ENI.
+    match: Every pod takes a subnet address, so growth of the cluster consumes the VPC address space until pods cannot be given one.
+  - company: UK Ministry of Justice
+    year: 2023
+    url: "https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-21-vpc-cni-not-allocating-ip-addresses.html"
+    summary: >
+      New deployments on the live cluster stayed in ContainerCreating on six nodes for 4 hours 27 minutes. Prefix delegation was missing from the VPC
+      CNI settings of the live cluster; a comparison with a test cluster found the difference and enabling it resolved the incident.
+    match: Nodes at their address limit cannot start pods, and prefix delegation is the setting that raises that limit.
+  - company: loveholidays
+    year: 2020
+    url: "https://deploy.live/blog/when-gke-ran-out-of-ip-addresses/"
+    summary: >
+      On GKE, a deployment took about an hour because half of the new pods stayed Pending: the autoscaler could not add nodes, the secondary range
+      of the subnet was exhausted. Each node reserved 256 pod addresses for a limit of 110 pods, so a /16 held 256 nodes and not the 595 the team had
+      expected. Lowering the maximum pods per node on some node pools cut the consumption by about 30%.
+    match: Another cloud, the same shape. Addresses are reserved per node ahead of use, and the subnet is empty long before the pods need it.
+reading:
+  - { title: "amazon-vpc-cni-k8s: ENI and IP target", url: "https://github.com/aws/amazon-vpc-cni-k8s/blob/master/docs/eni-and-ip-target.md", why: "Tables of how many ENIs and addresses a node holds for each warm setting, and the throttling warning." }
+  - { title: "amazon-vpc-cni-k8s: Prefix and IP target", url: "https://github.com/aws/amazon-vpc-cni-k8s/blob/master/docs/prefix-and-ip-target.md", why: "How prefixes are allocated to ENIs and which warm settings prefix delegation does not support." }
+  - { title: "Neon: AWS CNI lessons from a production outage", url: "https://neon.com/blog/aws-cni-lessons-from-a-production-outage", why: "What the warm settings really do under high pod churn, checked against the source by a team that got it wrong first." }
+  - { title: "amazon-vpc-cni-k8s: cni-metrics-helper", url: "https://github.com/aws/amazon-vpc-cni-k8s/blob/master/cmd/cni-metrics-helper/README.md", why: "The CloudWatch metrics for address usage when the nodes are not scraped by Prometheus." }
