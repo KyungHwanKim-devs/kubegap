@@ -41,3 +41,17 @@ def test_a_copy_to_another_node_of_the_cluster_is_not_off_the_cluster():
 def test_oom_evidence_tells_the_history_of_replaced_pods_from_the_pod_running_now():
     item = {"kernel_any_node_read": False, "pods_oomkilled": 1, "pods_replaced": 1, "restarts_of_those_pods": 163, "live_pod_restarts_max": 1}
     assert "1 already replaced, 163 restarts in those pods (the pods running now: 1 at most)" in evidence.oom_text(item)
+
+
+def test_a_line_of_code_that_reads_a_credential_is_not_one():
+    """A script kept in a ConfigMap: the lines that read a token from the environment or from a function are not the token; a quoted literal is."""
+    script = "\n".join(
+        [
+            'TOKEN = os.environ["DISCORD_BOT_TOKEN"]',
+            'OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")',
+            '    client_secret=env("x_api_key_secret"),',
+            "token = load_token()",
+            'API_KEY = "sk-live-0123456789abcdef"',
+        ]
+    )
+    assert scrub.secret_like_keys({"bot.py": script}) == ["bot.py:API_KEY"]

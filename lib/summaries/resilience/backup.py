@@ -111,9 +111,6 @@ def backup_locality(cx) -> dict:
         host_paths = [v["hostPath"].get("path") for v in pod.get("volumes") or [] if v.get("hostPath")]
         dest_nodes = {pvc_node.get((ns, c)) for c in claims}
         offsite = bool(OFFSITE_RE.search(_without_copies_to_nodes(text, node_addrs)))
-        src = db_pvcs.get(ns, [])
-        src_nodes = {n for _, _, n in src if n}
-        same_node = bool(dest_nodes & src_nodes) or (bool(host_paths) and bool(pod.get("nodeSelector") or pod.get("nodeName")))
         # Which database this CronJob dumps: its command, args or env values name the database's Service (the host of pg_dump -h, mysqldump -h, a connection
         # string), the workload itself, or its first pod (<statefulset>-0), as a whole token. A name that is only the prefix of another (app-postgres of
         # app-postgres-mx) does not match (#169). The image is not part of the match (a CronJob running the postgres image would claim a database named
@@ -129,6 +126,12 @@ def backup_locality(cx) -> dict:
                 targets_db.append({"target": db["target"], "matched_by": hit})
                 if not sp.get("suspend"):
                     db["backup_cronjobs"].append({"name": md["name"], "matched_by": hit})
+        # The source of the dump is the database the CronJob names. Only when it names none is every store of the namespace taken as a possible source:
+        # a namespace with a MySQL on one node and a vector store on another would otherwise put the MySQL dump "on the node of its source" because of the other store.
+        named = {t["target"] for t in targets_db}
+        src = [x for x in db_pvcs.get(ns, []) if not named or x[0] in named]
+        src_nodes = {n for _, _, n in src if n}
+        same_node = bool(dest_nodes & src_nodes) or (bool(host_paths) and bool(pod.get("nodeSelector") or pod.get("nodeName")))
         rows.append(
             {
                 "namespace": ns,
@@ -143,6 +146,7 @@ def backup_locality(cx) -> dict:
                 "host_paths": host_paths,
                 "offsite_hint": offsite,
                 "source_db": [{"workload": w, "pvc": c, "node": n} for w, c, n in src],
+                "source_by": "named in the command" if named else "every store of the namespace (the command names none)",
                 "source_nodes": sorted(src_nodes),
                 "same_node_as_source": same_node,
                 "local_only": not offsite and (bool(claims) or bool(host_paths)),

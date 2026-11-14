@@ -12,7 +12,7 @@ The key shape of the summary file, moved here from SKILL.md section 5. When a se
 
 ## metrics
 
-`metrics{<query-id>: {source, why, ok, series, stats{min,max,mean,n}, top[{labels, value}], truncated}}`(`top-nodes` and `top-pods` use `head[]`) (`value` is null when Prometheus answered `NaN`, a quantile over no samples; `stats` counts the numbers only. A metric check whose query returned no series reads `metrics/series-present.json`, not this section: every cited name present is a pass counted `empty`, a name with no series a skip, #141)
+`metrics{<query-id>: {source, why, ok, series, stats{min,max,mean,n}, rows[{labels, value}]}}`, every series with every label, largest first (`top-nodes` and `top-pods` are `{source, lines[]}`, the text of `kubectl top` whole) (`value` is null when Prometheus answered `NaN`, a quantile over no samples; `stats` counts the numbers only. A metric check whose query returned no series reads `metrics/series-present.json`, not this section: every cited name present is a pass counted `empty`, a name with no series a skip, #141)
 
 ## objects
 

@@ -7,7 +7,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | kube context / cluster | `default` / default (k3s, v1.33.5+k3s1) |
 | Run time / mode | 2026-11-07T10:22:59+09:00 / full (collection 262.7 s, 0 steps skipped by mode, 7 failed) |
 | Scale | `small` (guessed) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.91 / 1.1.0 |
+| kubegap / rubric / signatures | <kubegap> / 0.1.92 / 1.1.0 |
 | Verified against | Kubernetes v1.33.5+k3s1 (verified 1.30 to 1.37) · Grafana 12.2.1 (verified 10.2 to 13.3) |
 | Nodes / namespaces / pods / CRDs | 2 (Ready 2) / 26 / 153 / 64 |
 | Components (23) | actions-runner-controller, alertmanager, argocd, cert-manager, coredns, elasticsearch-opensearch, external-secrets, flannel, fluent-bit, fluent-bit-events, grafana, ingress-nginx, k3s, keda, kube-proxy, kube-state-metrics, local-path-provisioner, metallb, metrics-server, node-exporter, prometheus, prometheus-operator, reloader |
@@ -42,8 +42,8 @@ Checks 349: evaluated 204, not run on this platform or at this scale 44, skipped
 |---|---|---|---|
 | `argocd.prune-manages-namespace-or-crd.cluster` | high |  | apps with prune enabled that manage a Namespace or CRD as a resource ['argocd/application/app-a-prod', 'argocd/application/app-b-prod', 'argocd/application/app-d', 'argocd/application/app-g-api' … |
 | `platform.k8s-version-eol.cluster` | high |  | server v1.33.5+k3s1: upstream end of life 2026-06-28, 132 days past |
-| `resilience.backup-same-node.app-f-prod/app-f-postgres-backup` | high |  | app-f-prod/app-f-postgres-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b') … |
-| `resilience.backup-same-node.app-f-prod/app-f-postgres-vn-backup` | high |  | app-f-prod/app-f-postgres-vn-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-vn-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b') … |
+| `resilience.backup-same-node.app-f-prod/app-f-postgres-backup` | high |  | app-f-prod/app-f-postgres-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b')], off-node copy hint (s3 … |
+| `resilience.backup-same-node.app-f-prod/app-f-postgres-vn-backup` | high |  | app-f-prod/app-f-postgres-vn-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-vn-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres-vn', 'node-b')], off-node copy … |
 | `resilience.backup-same-node.app-h-prod/app-h-mysql-backup` | high |  | app-h-prod/app-h-mysql-backup: schedule '50 2 * * *', dump PVCs ['mysql-backup-app-h-mysql-0'] → nodes ['node-b'], hostPath [], source DB [('app-h-prod/statefulset/app-h-mysql', 'node-b') … |
 | `resilience.backup-same-node.app-i-prod/app-i-postgres-backup` | high |  | app-i-prod/app-i-postgres-backup: schedule '0 3 * * *', dump PVCs ['app-i-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-i-prod/statefulset/app-i-postgres', 'node-b')], off-node copy hint (s3 … |
 | `resilience.restarts-crashloop.app-c-prod/app-c-coturn-549854dfcb-jgp4h:coturn` | high |  | 11193 restarts, state CrashLoopBackOff, last termination Error (exit 255) 2026-11-07T01:18:42Z, cause class crash (exit 255), Unhealthy events 0, node reboot time None |
@@ -172,18 +172,18 @@ Signature catalog 1.1.1, 19 files, 19941 lines scanned (components: argocd, cert
 | `resilience.no-backup.cluster` | warn | critical | no backup tool (family backup). Alternative signals: etcd snapshots 5, backup-like CronJobs that ran in the last 7 days ['app-a-prod/app-a-postgres-backup', 'app-f-prod/app-f-postgres-backup', 'app-f-prod/app-f-postgres-mx-backup', 'app-f-prod/app-f-postgres-vn-backup' … |
 | `argocd.prune-manages-namespace-or-crd.cluster` | fail | high | apps with prune enabled that manage a Namespace or CRD as a resource ['argocd/application/app-a-prod', 'argocd/application/app-b-prod', 'argocd/application/app-d', 'argocd/application/app-g-api', 'argocd/application/app-k', 'argocd/application/app-n', 'argocd/application/app-l-prod'] (namespaces … |
 | `platform.k8s-version-eol.cluster` | fail | high | server v1.33.5+k3s1: upstream end of life 2026-06-28, 132 days past |
-| `resilience.backup-same-node.app-f-prod/app-f-postgres-backup` | fail | high | app-f-prod/app-f-postgres-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-vn' … |
-| `resilience.backup-same-node.app-f-prod/app-f-postgres-vn-backup` | fail | high | app-f-prod/app-f-postgres-vn-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-vn-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b') … |
-| `resilience.backup-same-node.app-h-prod/app-h-mysql-backup` | fail | high | app-h-prod/app-h-mysql-backup: schedule '50 2 * * *', dump PVCs ['mysql-backup-app-h-mysql-0'] → nodes ['node-b'], hostPath [], source DB [('app-h-prod/statefulset/app-h-mysql', 'node-b'), ('app-h-prod/statefulset/app-h-mysql', 'node-b'), ('app-h-prod/statefulset/app-h-qdrant', 'node-a')], off-node … |
+| `resilience.backup-same-node.app-f-prod/app-f-postgres-backup` | fail | high | app-f-prod/app-f-postgres-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False |
+| `resilience.backup-same-node.app-f-prod/app-f-postgres-vn-backup` | fail | high | app-f-prod/app-f-postgres-vn-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-vn-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres-vn', 'node-b')], off-node copy hint (s3, rclone, restic) False |
+| `resilience.backup-same-node.app-h-prod/app-h-mysql-backup` | fail | high | app-h-prod/app-h-mysql-backup: schedule '50 2 * * *', dump PVCs ['mysql-backup-app-h-mysql-0'] → nodes ['node-b'], hostPath [], source DB [('app-h-prod/statefulset/app-h-mysql', 'node-b'), ('app-h-prod/statefulset/app-h-mysql', 'node-b')], off-node copy hint (s3, rclone, restic) False |
 | `resilience.backup-same-node.app-i-prod/app-i-postgres-backup` | fail | high | app-i-prod/app-i-postgres-backup: schedule '0 3 * * *', dump PVCs ['app-i-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-i-prod/statefulset/app-i-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False |
 | `resilience.restarts-crashloop.app-c-prod/app-c-coturn-549854dfcb-jgp4h:coturn` | fail | high | 11193 restarts, state CrashLoopBackOff, last termination Error (exit 255) 2026-11-07T01:18:42Z, cause class crash (exit 255), Unhealthy events 0, node reboot time None |
 | `security.plaintext-configmap-secret.app-a-prod/configmap/marketing-scripts` | fail | high | app-a-prod/configmap/marketing-scripts: keys ['discord_sales_bot.py:TOKEN', 'discord_sales_bot.py:OPENAI_API_KEY', 'marketing_autopost.py:client_secret', 'marketing_autopost.py:resource_owner_secret'], mounted/referenced by ['app-a-prod/cronjob/marketing-autopost-en' … |
 | `security.plaintext-configmap-secret.app-f-prod/configmap/app-f-marketing-scripts` | fail | high | app-f-prod/configmap/app-f-marketing-scripts: keys ['app-f_ga4_digest.py:DISCORD_BOT_TOKEN', 'app-f_ga4_digest.py:token', 'app-f_policy_radar.py:OPENAI_API_KEY', 'app-f_policy_radar.py:DISCORD_BOT_TOKEN', 'app-f_sales_bot.py:TOKEN', 'app-f_sales_bot.py:OPENAI_API_KEY'], mounted/referenced by … |
 | `tenancy.quota-near-limit.app-l-prod/app-l-prod-quota` | fail | high | app-l-prod/app-l-prod-quota: near limit ['persistentvolumeclaims'] (max ratio 1.0). hard {'limits.cpu': '4', 'limits.memory': '8Gi', 'persistentvolumeclaims': '2', 'requests.cpu': '2', 'requests.memory': '4Gi', 'requests.storage': '30Gi'}, used {'limits.cpu': '1800m', 'limits.memory': '2Gi' … |
 | `prometheus.storage-risk.monitoring/statefulset/prometheus-kube-prometheus-stack-prometheus` | warn | high | storage emptyDir (PVC None), PVC usage None, TSDB 0.0GiB, retention None (size cap None), actual oldest sample None days, failed compactions over 7 days 0, WAL corruptions 0, corruptions at startup None |
-| `resilience.backup-same-node.app-a-prod/app-a-postgres-backup` | warn | high | app-a-prod/app-a-postgres-backup: schedule '15 3 * * *', dump PVCs ['app-a-postgres-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-a-prod/statefulset/app-a-postgres', 'node-b'), ('app-a-prod/statefulset/app-a-redis', 'node-b')], off-node copy hint (s3, rclone, restic) False |
-| `resilience.backup-same-node.app-f-prod/app-f-postgres-mx-backup` | warn | high | app-f-prod/app-f-postgres-mx-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-mx-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b') … |
-| `resilience.backup-same-node.app-g-api/app-g-postgres-backup` | warn | high | app-g-api/app-g-postgres-backup: schedule '50 3 * * *', dump PVCs ['app-g-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-g-api/statefulset/app-g-minio', 'node-b'), ('app-g-api/statefulset/app-g-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False |
+| `resilience.backup-same-node.app-a-prod/app-a-postgres-backup` | warn | high | app-a-prod/app-a-postgres-backup: schedule '15 3 * * *', dump PVCs ['app-a-postgres-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-a-prod/statefulset/app-a-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False |
+| `resilience.backup-same-node.app-f-prod/app-f-postgres-mx-backup` | warn | high | app-f-prod/app-f-postgres-mx-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-mx-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres-mx', 'node-b')], off-node copy hint (s3, rclone, restic) False |
+| `resilience.backup-same-node.app-g-api/app-g-postgres-backup` | warn | high | app-g-api/app-g-postgres-backup: schedule '50 3 * * *', dump PVCs ['app-g-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-g-api/statefulset/app-g-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False |
 | `resilience.restarts-crashloop.app-l-prod/app-l-api-7867899bb6-5xzqb:api` | warn | high | 11 restarts, state Running, last termination Error (exit 1) 2026-10-28T22:06:40Z, cause class crash (exit 1), Unhealthy events 0, node reboot time None |
 | `resilience.restarts-crashloop.arc-systems/arc-actions-runner-controller-5c9d9ffd65-766b6:manager` | warn | high | 65 restarts, state Running, last termination Unknown (exit 255) 2026-10-28T22:06:17Z, cause class Unknown, Unhealthy events 0, node reboot time None |
 | `resilience.restarts-crashloop.cert-manager/cert-manager-7c4b5b58df-4v7td:cert-manager-controller` | warn | high | 12 restarts, state Running, last termination Unknown (exit 255) 2026-10-28T19:25:01Z, cause class Unknown, Unhealthy events 0, node reboot time None |
@@ -565,21 +565,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "workload": "app-f-prod/statefulset/app-f-postgres",
    "pvc": "app-f-postgres-data-app-f-postgres-0",
    "node": "node-b"
-  },
-  {
-   "workload": "app-f-prod/statefulset/app-f-postgres-mx",
-   "pvc": "app-f-postgres-mx-data-app-f-postgres-mx-0",
-   "node": "node-b"
-  },
-  {
-   "workload": "app-f-prod/statefulset/app-f-postgres-vn",
-   "pvc": "app-f-postgres-vn-data-app-f-postgres-vn-0",
-   "node": "node-b"
-  },
-  {
-   "workload": "app-f-prod/statefulset/app-f-redis",
-   "pvc": "app-f-redis-data-app-f-redis-0",
-   "node": "node-b"
   }
  ],
  "suspend": false,
@@ -605,23 +590,8 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "schedule": "30 3 * * *",
  "source_db": [
   {
-   "workload": "app-f-prod/statefulset/app-f-postgres",
-   "pvc": "app-f-postgres-data-app-f-postgres-0",
-   "node": "node-b"
-  },
-  {
-   "workload": "app-f-prod/statefulset/app-f-postgres-mx",
-   "pvc": "app-f-postgres-mx-data-app-f-postgres-mx-0",
-   "node": "node-b"
-  },
-  {
    "workload": "app-f-prod/statefulset/app-f-postgres-vn",
    "pvc": "app-f-postgres-vn-data-app-f-postgres-vn-0",
-   "node": "node-b"
-  },
-  {
-   "workload": "app-f-prod/statefulset/app-f-redis",
-   "pvc": "app-f-redis-data-app-f-redis-0",
    "node": "node-b"
   }
  ],
@@ -656,11 +626,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "workload": "app-h-prod/statefulset/app-h-mysql",
    "pvc": "mysql-data-app-h-mysql-0",
    "node": "node-b"
-  },
-  {
-   "workload": "app-h-prod/statefulset/app-h-qdrant",
-   "pvc": "app-h-qdrant-data-app-h-qdrant-0",
-   "node": "node-a"
   }
  ],
  "suspend": false,
@@ -841,11 +806,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
    "workload": "app-a-prod/statefulset/app-a-postgres",
    "pvc": "data-app-a-postgres-0",
    "node": "node-b"
-  },
-  {
-   "workload": "app-a-prod/statefulset/app-a-redis",
-   "pvc": "data-app-a-redis-0",
-   "node": "node-b"
   }
  ],
  "suspend": false,
@@ -871,23 +831,8 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "schedule": "30 3 * * *",
  "source_db": [
   {
-   "workload": "app-f-prod/statefulset/app-f-postgres",
-   "pvc": "app-f-postgres-data-app-f-postgres-0",
-   "node": "node-b"
-  },
-  {
    "workload": "app-f-prod/statefulset/app-f-postgres-mx",
    "pvc": "app-f-postgres-mx-data-app-f-postgres-mx-0",
-   "node": "node-b"
-  },
-  {
-   "workload": "app-f-prod/statefulset/app-f-postgres-vn",
-   "pvc": "app-f-postgres-vn-data-app-f-postgres-vn-0",
-   "node": "node-b"
-  },
-  {
-   "workload": "app-f-prod/statefulset/app-f-redis",
-   "pvc": "app-f-redis-data-app-f-redis-0",
    "node": "node-b"
   }
  ],
@@ -914,11 +859,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "same_node_as_source": true,
  "schedule": "50 3 * * *",
  "source_db": [
-  {
-   "workload": "app-g-api/statefulset/app-g-minio",
-   "pvc": "app-g-minio-data-app-g-minio-0",
-   "node": "node-b"
-  },
   {
    "workload": "app-g-api/statefulset/app-g-postgres",
    "pvc": "app-g-postgres-data-app-g-postgres-0",

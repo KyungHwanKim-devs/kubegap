@@ -36,7 +36,6 @@ from ..foundations.snapshot import (
 )
 
 WAITING_REASONS = ("CrashLoopBackOff", "ImagePullBackOff", "ErrImagePull", "CreateContainerConfigError", "CreateContainerError", "InvalidImageName", "RunContainerError")
-LABEL_KEEP = ("__name__", "namespace", "pod", "container", "node", "instance", "mountpoint", "qos_class", "reason", "job", "horizontalpodautoscaler", "endpoint", "kind", "phase", "poddisruptionbudget", "service", "deployment")
 
 
 def _rel(snap: Path, p: Path) -> str:
@@ -106,10 +105,6 @@ def summarize_events(snap: Path) -> dict:
 # ---------- metrics ----------
 
 
-def _labels(m: dict) -> dict:
-    return {k: v for k, v in m.items() if k in LABEL_KEEP}
-
-
 def summarize_metrics(snap: Path) -> dict:
     out: dict = {}
     mdir = snap / "metrics"
@@ -123,20 +118,19 @@ def summarize_metrics(snap: Path) -> dict:
         rows = []
         for r in d.get("result", []):
             # Prometheus answers "NaN" for a quantile over no samples; metric_value makes that None, which json.dumps can write (a NaN token is not JSON)
-            rows.append({"labels": _labels(r.get("metric", {})), "value": metric_value(r)})
+            rows.append({"labels": dict(r.get("metric") or {}), "value": metric_value(r)})
         nums = [r["value"] for r in rows if r["value"] is not None]
         if nums:
             rec["stats"] = {"min": min(nums), "max": max(nums), "mean": math.fsum(nums) / len(nums), "n": len(nums)}  # fsum: the same digits on every Python (3.12 changed how sum() adds floats)
         rows.sort(key=lambda r: -(r["value"] if r["value"] is not None else float("-inf")))
-        rec["top"] = rows[:30]
-        rec["truncated"] = max(0, len(rows) - 30)
+        rec["rows"] = rows  # every series, largest first
         out[f.stem] = rec
     # kubectl top
     for name in ("top-nodes.txt", "top-pods.txt"):
         p = mdir / name
         if p.is_file():
             lines = [ln for ln in p.read_text(encoding="utf-8").splitlines() if ln.strip()]
-            out[name.replace(".txt", "")] = {"source": _rel(snap, p), "lines": len(lines), "head": lines[:30]}
+            out[name.replace(".txt", "")] = {"source": _rel(snap, p), "lines": lines}
     return out
 
 

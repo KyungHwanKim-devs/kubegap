@@ -121,8 +121,8 @@ def test_a_nan_sample_is_null_not_a_nan_token(tmp_path):
     (tmp_path / "metrics").mkdir()
     (tmp_path / "metrics" / "q.json").write_text(json.dumps({"ok": True, "result": [{"metric": {"verb": "GET"}, "value": [0, "NaN"]}, {"metric": {"verb": "LIST"}, "value": [0, "0.5"]}]}))
     out = summarize.summarize_metrics(tmp_path)["q"]
-    assert [r["value"] for r in out["top"]] == [0.5, None] and out["stats"] == {"min": 0.5, "max": 0.5, "mean": 0.5, "n": 1}
-    assert not any(isinstance(r["value"], float) and math.isnan(r["value"]) for r in out["top"])
+    assert [r["value"] for r in out["rows"]] == [0.5, None] and out["stats"] == {"min": 0.5, "max": 0.5, "mean": 0.5, "n": 1}
+    assert not any(isinstance(r["value"], float) and math.isnan(r["value"]) for r in out["rows"])
     json.loads(json.dumps(out), parse_constant=lambda c: pytest.fail(f"non-JSON token {c}"))
 
 

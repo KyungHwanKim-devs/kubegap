@@ -70,6 +70,10 @@ ENV_SKIP_RE = re.compile(r"(_FILE|_PATH|_DIR|_NAME|_KEY_ID|_REF|_ENABLED|_URL|_H
 # A line inside a config file such as `HTTP_Passwd xxx`, `password: xxx`, `DB_PASSWORD=xxx`. The key may start with the secret word itself (the earlier form required one leading character and missed a bare `password = ...`).
 _LINE_RE = re.compile(r"(?im)^\s*([A-Za-z0-9_.-]*(?:passw(?:or)?d|secret|token|api[_-]?key)[A-Za-z0-9_.-]*)\s*[:= ]\s*(\S{8,})\s*$")
 _URL_RE = re.compile(r"^[a-z][a-z0-9+.-]*://", re.IGNORECASE)
+# The right-hand side of a line of code that reads the value from somewhere else: a name, optionally dotted, called or indexed
+# (`os.environ["DISCORD_BOT_TOKEN"]`, `os.getenv("X")`, `env("x_secret"),`, `load_token()`). A credential written into the file is a literal,
+# and a literal does not start with a name that is then called or indexed and closed.
+_CODE_READ_RE = re.compile(r"^[A-Za-z_][\w.]*[(\[].*[)\]][,;]?$")
 _ENV_REF_RE = re.compile(r"\$\([A-Za-z_][A-Za-z0-9_]*\)")  # dependent environment variable syntax: the value is another variable's
 
 
@@ -90,6 +94,8 @@ def secret_like_keys(data: dict) -> list[str]:
             keys.append(k)
         elif "\n" in v and len(v) <= 1_048_576:  # etcd caps an object at 1 MiB, so this scans every value; the old 20,000-character cap left large config files unchecked
             for m in _LINE_RE.finditer(v):
+                if _CODE_READ_RE.match(m.group(2)):
+                    continue
                 val = m.group(2).strip("\"'")
                 if val.startswith(("${", "$(", "/", "<", "{{")) or val.lower() in ("changeme", "password", "null", "none") or "secretkeyref" in val.lower():
                     continue
@@ -193,7 +199,7 @@ def scrub_configmap(cm: dict) -> dict:
     dropped_ann = []
     for k in COPY_ANNOTATIONS:
         if k in ann:
-            found = list(dict.fromkeys(found + _secret_like_in_applied(ann[k])))[:8]
+            found = list(dict.fromkeys(found + _secret_like_in_applied(ann[k])))
             ann[k] = {"len": len(str(ann[k])), "shape": shape(ann[k])}
             dropped_ann.append(k)
     labels = meta.get("labels") or {}

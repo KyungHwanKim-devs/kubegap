@@ -73,11 +73,9 @@ storage.py	str(((va.get('status') or {}).get('attachError') or (va.get('status')
 summarize.py	c.get('message') or ''	[:240]	text or a fixed-format prefix/suffix
 summarize.py	e.get('message') or ''	[:300]	text or a fixed-format prefix/suffix
 summarize.py	e['reasons']	[:5]	console progress line, not stored
-summarize.py	lines	[:30]	the head of a raw text file; `lines` carries the total
 summarize.py	list(c['by_kind'].items())	[:6]	console progress line, not stored
 summarize.py	next((c.get('message') for c in (p.get('status') or {}).get('conditions') or [] if c.get('type') == 'PodScheduled' and c.get('status') == 'False'), '')	[:200]	text or a fixed-format prefix/suffix
 summarize.py	r.get('error') or ''	[:200]	text or a fixed-format prefix/suffix
-summarize.py	rows	[:30]	the metric digest shown to the reader: the largest 30, with `truncated` and `stats.n` next to it; checks read metrics/ whole
 summarize.py	w.get('message') or ''	[:200]	text or a fixed-format prefix/suffix
 traffic.py	bound	[:6]	a sentence that names six and says how many more
 traffic.py	t	[:2]	text or a fixed-format prefix/suffix

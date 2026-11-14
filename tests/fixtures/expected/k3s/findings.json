@@ -5,7 +5,7 @@
   "source": "guessed",
   "nodes": 2
  },
- "rubric_version": "0.1.91",
+ "rubric_version": "0.1.92",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -2728,7 +2728,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "app-f-prod/app-f-postgres-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-vn', 'node-b'), ('app-f-prod/statefulset/app-f-redis', 'node-b')], off-node copy hint (s3, rclone, restic) False",
+   "evidence": "app-f-prod/app-f-postgres-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
   {
@@ -2737,7 +2737,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "app-f-prod/app-f-postgres-vn-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-vn-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-vn', 'node-b'), ('app-f-prod/statefulset/app-f-redis', 'node-b')], off-node copy hint (s3, rclone, restic) False",
+   "evidence": "app-f-prod/app-f-postgres-vn-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-vn-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres-vn', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
   {
@@ -2746,7 +2746,7 @@
    "status": "fail",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "app-h-prod/app-h-mysql-backup: schedule '50 2 * * *', dump PVCs ['mysql-backup-app-h-mysql-0'] → nodes ['node-b'], hostPath [], source DB [('app-h-prod/statefulset/app-h-mysql', 'node-b'), ('app-h-prod/statefulset/app-h-mysql', 'node-b'), ('app-h-prod/statefulset/app-h-qdrant', 'node-a')], off-node copy hint (s3, rclone, restic) False",
+   "evidence": "app-h-prod/app-h-mysql-backup: schedule '50 2 * * *', dump PVCs ['mysql-backup-app-h-mysql-0'] → nodes ['node-b'], hostPath [], source DB [('app-h-prod/statefulset/app-h-mysql', 'node-b'), ('app-h-prod/statefulset/app-h-mysql', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
   {
@@ -2854,7 +2854,7 @@
    "status": "warn",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "app-a-prod/app-a-postgres-backup: schedule '15 3 * * *', dump PVCs ['app-a-postgres-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-a-prod/statefulset/app-a-postgres', 'node-b'), ('app-a-prod/statefulset/app-a-redis', 'node-b')], off-node copy hint (s3, rclone, restic) False",
+   "evidence": "app-a-prod/app-a-postgres-backup: schedule '15 3 * * *', dump PVCs ['app-a-postgres-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-a-prod/statefulset/app-a-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
   {
@@ -2863,7 +2863,7 @@
    "status": "warn",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "app-f-prod/app-f-postgres-mx-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-mx-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-mx', 'node-b'), ('app-f-prod/statefulset/app-f-postgres-vn', 'node-b'), ('app-f-prod/statefulset/app-f-redis', 'node-b')], off-node copy hint (s3, rclone, restic) False",
+   "evidence": "app-f-prod/app-f-postgres-mx-backup: schedule '30 3 * * *', dump PVCs ['app-f-postgres-mx-backup-pvc'] → nodes ['node-a'], hostPath [], source DB [('app-f-prod/statefulset/app-f-postgres-mx', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
   {
@@ -2872,7 +2872,7 @@
    "status": "warn",
    "severity_default": "high",
    "nature": "state",
-   "evidence": "app-g-api/app-g-postgres-backup: schedule '50 3 * * *', dump PVCs ['app-g-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-g-api/statefulset/app-g-minio', 'node-b'), ('app-g-api/statefulset/app-g-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False",
+   "evidence": "app-g-api/app-g-postgres-backup: schedule '50 3 * * *', dump PVCs ['app-g-postgres-backup-pvc'] → nodes ['node-b'], hostPath [], source DB [('app-g-api/statefulset/app-g-postgres', 'node-b')], off-node copy hint (s3, rclone, restic) False",
    "source": "summary.json:resilience.backup.rows"
   },
   {

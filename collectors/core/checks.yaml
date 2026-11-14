@@ -17599,7 +17599,7 @@
     expr: "item.get('min_ready_ratio_24h') is not None and item['min_ready_ratio_24h'] < 0.9 and item['prod']"
     warn_expr: "(item.get('min_ready_ratio_24h') is not None and item['min_ready_ratio_24h'] < 0.99) or (item.get('unhealthy_events') or 0) >= 10"
   target: "item['workload']"
-  evidence: "(f\"24h minimum Ready ratio {item.get('min_ready_ratio_24h')} (pod {item.get('worst_pod')}, about {item.get('not_ready_minutes_24h')} min not ready), pods below 0.99 {item['pods_below_99']}, \" if item.get('min_ready_ratio_24h') is not None else 'no Ready ratio metric (kube_pod_status_ready not collected), ') + f\"Unhealthy events {item['unhealthy_events']}\""
+  evidence: "(f\"24h minimum Ready ratio {item.get('min_ready_ratio_24h')} (pod {item.get('worst_pod')}, about {item.get('not_ready_minutes_24h')} min not ready), pods below 0.99 {item['pods_below_99']}, \" if item.get('min_ready_ratio_24h') is not None else 'every running pod was Ready 0.99 of the last 24h or more, ') + f\"Unhealthy events {item['unhealthy_events']}\""
   severity_default: medium
   nature: occurrence
   symptom_linked: true
