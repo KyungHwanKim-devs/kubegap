@@ -11,7 +11,7 @@ kubegap is a skill for AI agents that audits a Kubernetes cluster read-only and 
 /kubegap full     # full audit: reads the whole cluster in depth and writes the long report
 ```
 
-- **What it looks for.** Alerts and dashboards catch what someone set them up to catch. kubegap looks at the rest: backups that never leave the cluster, alerts that reach nobody, every replica on one node, a Kubernetes version past its end of support. There are 411 checks in 12 areas.
+- **What it looks for.** Alerts and dashboards catch what someone set them up to catch. kubegap looks at the rest: backups that never leave the cluster, alerts that reach nobody, every replica on one node, a Kubernetes version past its end of support. There are 412 checks in 12 areas.
 - **What you get.** A Markdown report. It says what is broken now, what happened in the meantime and which few problems matter most, and for each of those what it is, why it matters and what to do, in the names and numbers of your cluster.
 - **What it does not do.** It changes nothing in the cluster: it only reads. It runs no server and installs nothing in the cluster. It is not a monitoring or alerting tool, and it does not fix problems for you.
 
@@ -26,7 +26,7 @@ kubegap is a skill in the [Agent Skills](https://agentskills.io) format: a folde
 | Step | Who | What happens |
 |---|---|---|
 | 1. Collect | scripts | Read objects and events with `kubectl` and query the Prometheus, Alertmanager, Grafana and Loki in the cluster. A full audit also reads the inside of the nodes and the cloud account (AWS for EKS). What was read is saved to one folder on your machine, the snapshot. |
-| 2. Evaluate | scripts | Hold the snapshot against the 411 checks. A check is one rule that says "this state is a problem". Scripts decide, so the same snapshot gives the same result. |
+| 2. Evaluate | scripts | Hold the snapshot against the 412 checks. A check is one rule that says "this state is a problem". Scripts decide, so the same snapshot gives the same result. |
 | 3. Analyse | the agent | Read the verdicts, open the raw material of the snapshot where a verdict needs confirming, join the findings that share a cause, and choose what matters most. |
 | 4. Report | the agent and scripts | The agent writes the text that explains each problem; a script checks its numbers, its links and its form and assembles the report file. A text that fails the check is not assembled. |
 
@@ -154,14 +154,14 @@ For `--compare`, A and B are folder names such as `2026-11-05T08-30-12`. Each au
 
 ## What it checks
 
-There are 411 checks in 12 areas. Each check is one condition that counts as a problem. The full list is in [`docs/CHECKS.md`](docs/CHECKS.md), which also links to the public incidents behind a check where there are any.
+There are 412 checks in 12 areas. Each check is one condition that counts as a problem. The full list is in [`docs/CHECKS.md`](docs/CHECKS.md), which also links to the public incidents behind a check where there are any.
 
 | Area | `focus` name | Checks | Examples |
 |---|---|---|---|
 | Resources | `resources` | 15 | containers requesting more than 3x their 7-day p95 usage, repeated OOMKills, nodes full of requests but with single-digit utilization |
 | Scaling | `scaling` | 27 | HPAs stuck at their minimum for 15 days, expired Karpenter nodes that are not replaced, KEDA external triggers without a fallback |
 | Observability | `observability` | 64 | no symptom-based alerts, alerts firing for 7 days straight, a monitoring stack on emptyDir, ingress controller metrics that are not scraped |
-| Traffic | `traffic` | 61 | database ports open to the internet, unhealthy ALB targets, a deregistration delay longer than the termination grace period |
+| Traffic | `traffic` | 62 | database ports open to the internet, unhealthy ALB targets, a deregistration delay longer than the termination grace period |
 | Resilience | `resilience` | 43 | replicas packed onto one node, no PDB, backup dumps on the same disk as the data, workloads that can run on only one node |
 | Hygiene | `hygiene` | 35 | `latest` tags, deprecated APIs, Helm releases stuck in pending or failed, dependence on hand-applied node labels |
 | Storage | `storage` | 25 | unencrypted EBS volumes, StorageClasses with expansion turned off, local-path volumes over capacity |
@@ -173,7 +173,7 @@ There are 411 checks in 12 areas. Each check is one condition that counts as a p
 
 Of the 37 Node OS checks, 26 can be seen only by reaching the nodes.
 
-Not all 409 apply to every cluster. Checks for a component such as Karpenter, Argo CD or cert-manager run only when that component is installed. A daily audit covers at most 300, leaving out the 111 that need material it does not read, such as the inside of a node or the cloud account.
+Not all 412 apply to every cluster. Checks for a component such as Karpenter, Argo CD or cert-manager run only when that component is installed. A daily audit covers at most 300, leaving out the 112 that need material it does not read, such as the inside of a node or the cloud account.
 
 What is expected depends on the scale you run the cluster at. kubegap asks once per cluster: small (no dedicated SRE or DevOps engineer), medium (someone is responsible for operations and real users depend on it) or large (a dedicated team, outages hit revenue or an SLA). The answer sets how serious each finding is: a missing SLO is low on a small cluster and critical on a large one, while a missing backup is serious at every scale. Without an answer the scale is guessed from the node count and the report says so. The platform (EKS, k3s, other) is detected and only decides which checks can run.
 

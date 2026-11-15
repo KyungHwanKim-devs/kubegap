@@ -5,7 +5,7 @@
   "source": "guessed",
   "nodes": 9
  },
- "rubric_version": "0.1.95",
+ "rubric_version": "0.1.96",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -2646,6 +2646,11 @@
   },
   {
    "id": "vpccni.no-available-ip",
+   "status": "not-collected",
+   "reason": "a daily run does not collect node-os"
+  },
+  {
+   "id": "vpccni.no-available-ip-unexplained",
    "status": "not-collected",
    "reason": "a daily run does not collect node-os"
   },
