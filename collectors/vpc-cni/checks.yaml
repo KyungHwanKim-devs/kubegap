@@ -16,7 +16,7 @@
   symptom_linked: true
   why: >
     VPC CNI gives each pod a VPC IP as a secondary IP on an ENI. The instance type decides how many IPs a node can hold (ENIs x (IPv4 per ENI - 1)). Once they are used up, new pods stall in ContainerCreating with "failed to assign an IP address" — the most common EKS trap.
-    `no_available_ip_events` is how many times ipamd answered "no IP to give" (cumulative since the process started), so any non-zero value means it has already happened at least once. ENIs attached up to the limit (eni_at_max) is normal with WARM_ENI_TARGET=1, so it is not a judgement axis — 4 or fewer remaining IPs (ip_headroom) or 75% usage is warn. max-pods exceeding the IP limit by 2 is normal: that is the hostNetwork pods' share.
+    `no_available_ip_events` is how many times ipamd answered "no IP to give" since the process started, the start-up race of a new node included; whether a recent answer was a shortage is `vpccni.no-available-ip`, which places them with ipamd's log. ENIs attached up to the limit (eni_at_max) is normal with WARM_ENI_TARGET=1, so it is not a judgement axis — 4 or fewer remaining IPs (ip_headroom) or 75% usage is warn. max-pods exceeding the IP limit by 2 is normal: that is the hostNetwork pods' share.
   measured: >
     Measured on a 7-node EKS cluster: an r8gd.xlarge node at ENI 4/4 and IP 42/56 had 4 'no available IP' events. Its max-pods was 58 while IPs stop at 56, so kubelet sees room and the CNI refuses.
   cases:
@@ -213,29 +213,37 @@
           prefix_delegation: false
           hypervisor: null
 - id: vpccni.no-available-ip
-  name: ipamd has already answered "no available IP" on a node
+  name: ipamd ran out of pod IPs on a node in the last 24 hours
   area: traffic
   needs: [node-os]
   type: summary
   each: vpccni.nodes
   rule:
-    needs: "item['metrics_available']"
-    needs_reason: "VPC CNI metrics not read (awscni_no_available_ip_addresses)"
-    expr: "(item['no_available_ip_events'] or 0) > 0"
+    needs: "item['ipamd_log_read']"
+    needs_reason: "ipamd log not read (vpc-cni/ipamd-log, or AWS_VPC_K8S_CNI_LOG_FILE moved it)"
+    expr: "(item['no_available_ip_shortage_24h'] or 0) > 0"
   target: "item['node']"
-  evidence: "f\"node {item['node']} ({item['instance_type']}, pool {item['pool']}): ipamd answered 'no available IP' {item['no_available_ip_events']} times since it started; pod IPs {item['ip_used']}/{item['ip_max']} ({item['ip_usage_ratio']}), ENI {item['metrics'].get('eni_allocated')}/{item['metrics'].get('eni_max')}, max-pods {item['max_pods']}\""
+  evidence: "f\"node {item['node']} ({item['instance_type']}, pool {item['pool']}): {item['no_available_ip_shortage_24h']} 'no available IP' answers in ipamd's 24 h log after its start-up window (started {item['ipamd_started_at']}), last at {item['no_available_ip_last_shortage']}; counter {item['no_available_ip_events']}; pod IPs {item['ip_used']}/{item['ip_max']} ({item['ip_usage_ratio']}), ENI {item['metrics'].get('eni_allocated')}/{item['metrics'].get('eni_max')}, max-pods {item['max_pods']}\""
   severity_default: high
   symptom_linked: true
   why: >
-    `awscni_no_available_ip_addresses` counts the times ipamd had no IP to give a pod since the process started, so any non-zero value means a pod on this node has already stalled in ContainerCreating with "failed to assign an IP address", whatever the usage ratio reads now (a burst that has passed, or max-pods above the IP capacity so the kubelet keeps scheduling into a full node). The companion check `vpccni.node-ip-exhaustion` judges the usage ratio from the API and runs without metrics; this one needs the ipamd metrics and skips without them.
+    When ipamd has no address left for a pod it logs "DataStore has no available IP/Prefix addresses" and counts it in `awscni_no_available_ip_addresses`; the kubelet retries the
+    pod's sandbox, and while the node stays short the pod sits in ContainerCreating with "failed to assign an IP address". The counter alone cannot say which answers those were:
+    it also counts the start-up race. A new node's pods all ask the moment ipamd is up, the first ENI's addresses run out, and the next ENI's addresses reach ipamd seconds later,
+    so one pod is refused once and gets an address on its retry. This check therefore reads ipamd's own log of the last 24 hours and fails on an answer that came more than 120 s
+    after ipamd started: a node out of addresses keeps answering after that, a start-up race does not. Counts the log does not hold are `vpccni.no-available-ip-unexplained`, low.
+    The companion check `vpccni.node-ip-exhaustion` judges the usage ratio from the API and runs without the node.
   measured: >
     Measured on a 7-node EKS cluster: an r8gd.xlarge node at ENI 4/4 and IP 42/56 had 4 'no available IP' events while its usage ratio read 0.75.
+    Measured on a 9-node EKS cluster (VPC CNI v1.19.0, WARM_ENI_TARGET=1): a t8i.small node (3 ENIs x 4 IPv4, 9 pod IPs, max-pods 11, 3 hostNetwork pods) kept the counter at 1
+    for eight days and the former rule failed it as high. Its rotated ipamd log showed the one answer 9.9 s after the aws-node container started, 10 ms before the second
+    ENI's addresses entered the datastore; the same pod got an address 0.5 s later and no FailedCreatePodSandBox event was recorded. The 24-hour log of the audit was empty. (#209)
   cases:
     - { who: Neon 2025, url: https://neon.com/blog/aws-cni-lessons-from-a-production-outage }
     - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-21-vpc-cni-not-allocating-ip-addresses.html }
   suggest: "Find the pods that stalled (kubectl get events -A --field-selector reason=FailedCreatePodSandBox), then give the node room: prefix delegation (ENABLE_PREFIX_DELEGATION=true) or a max-pods that matches the IP capacity (vpccni.max-pods-exceeds-ip-capacity), and spread the pods that packed onto it."
   verify:
-    - "on the node: curl -s localhost:61678/metrics | grep awscni_no_available_ip_addresses"
+    - "on the node: grep 'no available IP' /var/log/aws-routed-eni/ipamd.log | tail"
     - "kubectl get events -A --field-selector reason=FailedCreatePodSandBox | grep -i 'assign'"
   platforms: [eks]
   test:
@@ -243,8 +251,10 @@
       - expect: "skip"
         item:
           node: "ip-10-0-1-139.us-east-1.compute.internal"
-          metrics_available: false
-          no_available_ip_events: null
+          metrics_available: true
+          no_available_ip_events: 4
+          ipamd_log_read: false
+          no_available_ip_shortage_24h: null
       - expect: "fail"
         item:
           node: "ip-10-0-1-139.us-east-1.compute.internal"
@@ -255,24 +265,164 @@
             eni_allocated: 4
             eni_max: 4
           ip_max: 56
-          ip_used: 42
-          ip_usage_ratio: 0.75
+          ip_used: 56
+          ip_usage_ratio: 1.0
           no_available_ip_events: 4
           metrics_available: true
+          ipamd_started_at: "2026-11-01T03:00:05Z"
+          ipamd_log_read: true
+          no_available_ip_startup_24h: 0
+          no_available_ip_shortage_24h: 4
+          no_available_ip_last_shortage: "2026-11-07T01:12:44.310Z"
+          no_available_ip_unexplained: 0
       - expect: "pass"
         item:
-          node: "ip-10-0-1-137.us-east-1.compute.internal"
-          instance_type: "m5.large"
-          pool: "default"
-          max_pods: 29
+          node: "ip-10-0-1-140.us-east-1.compute.internal"
+          instance_type: "t3.small"
+          pool: "system"
+          max_pods: 11
           metrics:
-            eni_allocated: 2
+            eni_allocated: 3
             eni_max: 3
-          ip_max: 27
-          ip_used: 10
-          ip_usage_ratio: 0.37
-          no_available_ip_events: 0
+          ip_max: 9
+          ip_used: 6
+          ip_usage_ratio: 0.667
+          no_available_ip_events: 1
           metrics_available: true
+          ipamd_started_at: "2026-11-07T00:32:31Z"
+          ipamd_log_read: true
+          no_available_ip_startup_24h: 1
+          no_available_ip_shortage_24h: 0
+          no_available_ip_last_shortage: null
+          no_available_ip_unexplained: 0
+      - expect: "pass"
+        item:
+          node: "ip-10-0-1-140.us-east-1.compute.internal"
+          instance_type: "t3.small"
+          pool: "system"
+          max_pods: 11
+          metrics:
+            eni_allocated: 3
+            eni_max: 3
+          ip_max: 9
+          ip_used: 6
+          ip_usage_ratio: 0.667
+          no_available_ip_events: 1
+          metrics_available: true
+          ipamd_started_at: "2026-10-30T00:32:31Z"
+          ipamd_log_read: true
+          no_available_ip_startup_24h: 0
+          no_available_ip_shortage_24h: 0
+          no_available_ip_last_shortage: null
+          no_available_ip_unexplained: 1
+- id: vpccni.no-available-ip-unexplained
+  name: ipamd counted "no available IP" answers its last 24 hours of log do not hold
+  area: traffic
+  needs: [node-os]
+  type: summary
+  each: vpccni.nodes
+  rule:
+    needs: "item['metrics_available']"
+    needs_reason: "VPC CNI metrics not read (awscni_no_available_ip_addresses)"
+    warn_expr: "(item['no_available_ip_unexplained'] or 0) > 0 and not item['no_available_ip_shortage_24h']"
+  target: "item['node']"
+  evidence: "_no_ip_unexplained_text(item)"
+  severity_default: low
+  symptom_linked: false
+  why: >
+    `awscni_no_available_ip_addresses` counts every "no available IP" answer since ipamd started and carries no time. The answers of the last 24 hours are placed by
+    `vpccni.no-available-ip` from ipamd's log; this check is for the counts that log does not hold, because ipamd has run for longer than a day or its log was not read. They may be
+    the start-up race of the node's first seconds, which every node whose first pods outnumber the first ENI's addresses can hit and which the kubelet's retry resolves, or a shortage
+    that has passed. Nothing recurred in the last 24 hours when the log was read, so this is a note, not a shortage: the evidence says when ipamd started and whether max-pods
+    less the hostNetwork pods fits the node's pod IPs. In IPv6 mode ipamd counts without writing the line, so its counts stay here.
+  measured: >
+    Measured on a 9-node EKS cluster: the t8i.small node of #209, eight days old, counter 1, 24-hour log empty; the one answer was the start-up race (see vpccni.no-available-ip).
+    Pods that can need an IP: max-pods 11 - 3 hostNetwork = 8, against 9 pod IPs.
+  suggest: "Nothing to change while the evidence says the pods fit. To see what the count was: on the node, zgrep 'no available IP' /var/log/aws-routed-eni/ipamd*.log* and compare the times with the aws-node container's start; an answer in its first minute that is followed by an address for the same pod is the start-up race. When the pods do not fit, see vpccni.max-pods-exceeds-ip-capacity."
+  verify:
+    - "on the node: zgrep -h 'no available IP' /var/log/aws-routed-eni/ipamd*.log*"
+    - "kubectl -n kube-system get pod -l k8s-app=aws-node --field-selector spec.nodeName=<node> -o jsonpath='{.items[0].status.containerStatuses[?(@.name==\"aws-node\")].state.running.startedAt}'"
+  platforms: [eks]
+  test:
+    cases:
+      - expect: "skip"
+        item:
+          node: "ip-10-0-1-140.us-east-1.compute.internal"
+          metrics_available: false
+          no_available_ip_events: null
+          no_available_ip_unexplained: null
+      - expect: "warn"
+        item:
+          node: "ip-10-0-1-140.us-east-1.compute.internal"
+          instance_type: "t3.small"
+          pool: "system"
+          max_pods: 11
+          ip_max: 9
+          no_available_ip_events: 1
+          metrics_available: true
+          ipamd_started_at: "2026-10-30T00:32:31Z"
+          ipamd_uptime_hours: 192.3
+          ipamd_log_read: true
+          no_available_ip_startup_24h: 0
+          no_available_ip_shortage_24h: 0
+          no_available_ip_unexplained: 1
+          host_network_pods: 3
+          ip_pods_max: 8
+          ip_pods_max_fits: true
+      - expect: "warn"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_pods: 64
+          ip_max: 56
+          no_available_ip_events: 2
+          metrics_available: true
+          ipamd_started_at: "2026-11-06T22:00:05Z"
+          ipamd_uptime_hours: 3.5
+          ipamd_log_read: false
+          no_available_ip_startup_24h: null
+          no_available_ip_shortage_24h: null
+          no_available_ip_unexplained: 2
+          host_network_pods: 4
+          ip_pods_max: 60
+          ip_pods_max_fits: false
+      - expect: "pass"
+        item:
+          node: "ip-10-0-1-140.us-east-1.compute.internal"
+          instance_type: "t3.small"
+          pool: "system"
+          max_pods: 11
+          ip_max: 9
+          no_available_ip_events: 1
+          metrics_available: true
+          ipamd_started_at: "2026-11-07T00:32:31Z"
+          ipamd_uptime_hours: 1.2
+          ipamd_log_read: true
+          no_available_ip_startup_24h: 1
+          no_available_ip_shortage_24h: 0
+          no_available_ip_unexplained: 0
+          host_network_pods: 3
+          ip_pods_max: 8
+          ip_pods_max_fits: true
+      - expect: "pass"
+        item:
+          node: "ip-10-0-1-139.us-east-1.compute.internal"
+          instance_type: "r8gd.xlarge"
+          pool: "default"
+          max_pods: 58
+          ip_max: 56
+          no_available_ip_events: 9
+          metrics_available: true
+          ipamd_started_at: "2026-11-01T03:00:05Z"
+          ipamd_uptime_hours: 142.6
+          ipamd_log_read: true
+          no_available_ip_startup_24h: 0
+          no_available_ip_shortage_24h: 4
+          no_available_ip_unexplained: 5
+          host_network_pods: 2
+          ip_pods_max: 56
+          ip_pods_max_fits: true
 
 - id: vpccni.max-pods-exceeds-ip-capacity
   name: Node max-pods is larger than the number of IPs the CNI can hand out
@@ -383,15 +533,15 @@
   rule:
     needs: "item.get('capacity_read')"
     needs_reason: "pod IP usage of no node read (no ipamd metrics and the instance types' limits not read: ec2:DescribeInstanceTypes)"
-    expr: "not item['prefix_delegation'] and item['nitro_nodes'] > 0 and len(item['nodes_no_available_ip']) > 0"
+    expr: "not item['prefix_delegation'] and item['nitro_nodes'] > 0 and len(item['nodes_ip_shortage_24h']) > 0"
     warn_expr: "not item['prefix_delegation'] and item['nitro_nodes'] > 0 and len(item['nodes_near_ip_limit']) > 0"
   target: "'cluster'"
-  evidence: "f\"ENABLE_PREFIX_DELEGATION false, nitro nodes {item['nitro_nodes']}/{item['nodes']}. nodes above 50% IP usage {item['nodes_near_ip_limit']}, nodes that saw 'no available IP' {item['nodes_no_available_ip']}. warm policy {item['policy']}\""
+  evidence: "f\"ENABLE_PREFIX_DELEGATION false, nitro nodes {item['nitro_nodes']}/{item['nodes']}. nodes above 50% IP usage {item['nodes_near_ip_limit']}, nodes that ran out of pod IPs in the last 24 h {item['nodes_ip_shortage_24h']}. warm policy {item['policy']}\""
   severity_default: medium
   symptom_linked: false
   why: >
     Prefix delegation attaches a /28 prefix (16 IPs) to one ENI secondary IP slot, raising pod IPs per node 16x. On nitro instances (all recent generations) it is a single setting, and the subnet needs contiguous /28 space.
-    If node IPs are more than half used or 'no available IP' has occurred, this setting is the cheapest fix. Note that it reserves the subnet in /28 units per node, so small subnets (/24) run out faster — read together with subnet free IPs (vpccni.subnet-ips-low).
+    If node IPs are more than half used or a node ran out of them in the last 24 hours (`vpccni.no-available-ip`; the start-up race of a new node does not count), this setting is the cheapest fix. Note that it reserves the subnet in /28 units per node, so small subnets (/24) run out faster — read together with subnet free IPs (vpccni.subnet-ips-low).
   cases:
     - { who: UK Ministry of Justice 2023, url: https://runbooks.cloud-platform.service.justice.gov.uk/incidents/2023-07-21-vpc-cni-not-allocating-ip-addresses.html }
   suggest: "Set ENABLE_PREFIX_DELEGATION=true and WARM_PREFIX_TARGET=1 on aws-node (via add-on configurationValues). It applies to new nodes only, so it takes effect as Karpenter replaces nodes. Raise max-pods as well."
@@ -405,7 +555,7 @@
           capacity_read: false
           prefix_delegation: false
           nitro_nodes: 2
-          nodes_no_available_ip: []
+          nodes_ip_shortage_24h: []
           nodes_near_ip_limit: []
       - expect: "fail"
         item:
@@ -421,7 +571,7 @@
           nitro_nodes: 7
           nodes_near_ip_limit:
             - "n1"
-          nodes_no_available_ip:
+          nodes_ip_shortage_24h:
             - "n1"
           metrics_unavailable_nodes:
             - "ip-10-0-1-117.us-east-1.compute.internal"
@@ -445,7 +595,7 @@
           nitro_nodes: 7
           nodes_near_ip_limit:
             - "n1"
-          nodes_no_available_ip: []
+          nodes_ip_shortage_24h: []
           metrics_unavailable_nodes:
             - "ip-10-0-1-117.us-east-1.compute.internal"
             - "ip-10-0-1-139.us-east-1.compute.internal"
@@ -467,7 +617,7 @@
           prefix_delegation: false
           nitro_nodes: 7
           nodes_near_ip_limit: []
-          nodes_no_available_ip: []
+          nodes_ip_shortage_24h: []
           metrics_unavailable_nodes:
             - "ip-10-0-1-117.us-east-1.compute.internal"
             - "ip-10-0-1-139.us-east-1.compute.internal"
@@ -490,7 +640,7 @@
           nitro_nodes: 7
           nodes_near_ip_limit:
             - "n1"
-          nodes_no_available_ip:
+          nodes_ip_shortage_24h:
             - "n1"
           metrics_unavailable_nodes:
             - "ip-10-0-1-117.us-east-1.compute.internal"
@@ -597,7 +747,7 @@
           prefix_delegation: false
           nitro_nodes: 0
           nodes_near_ip_limit: []
-          nodes_no_available_ip: []
+          nodes_ip_shortage_24h: []
           metrics_unavailable_nodes:
             - "ip-10-0-1-117.us-east-1.compute.internal"
             - "ip-10-0-1-139.us-east-1.compute.internal"
@@ -618,7 +768,7 @@
           prefix_delegation: false
           nitro_nodes: 0
           nodes_near_ip_limit: []
-          nodes_no_available_ip: []
+          nodes_ip_shortage_24h: []
           metrics_unavailable_nodes:
             - "ip-10-0-1-117.us-east-1.compute.internal"
             - "ip-10-0-1-139.us-east-1.compute.internal"
@@ -640,7 +790,7 @@
           prefix_delegation: false
           nitro_nodes: 0
           nodes_near_ip_limit: []
-          nodes_no_available_ip: []
+          nodes_ip_shortage_24h: []
           metrics_unavailable_nodes:
             - "ip-10-0-1-117.us-east-1.compute.internal"
             - "ip-10-0-1-139.us-east-1.compute.internal"
@@ -849,7 +999,7 @@
           prefix_delegation: false
           nitro_nodes: 0
           nodes_near_ip_limit: []
-          nodes_no_available_ip: []
+          nodes_ip_shortage_24h: []
           metrics_unavailable_nodes:
             - "ip-10-0-1-117"
             - "ip-10-0-2-60"
@@ -865,7 +1015,7 @@
           prefix_delegation: false
           nitro_nodes: 0
           nodes_near_ip_limit: []
-          nodes_no_available_ip: []
+          nodes_ip_shortage_24h: []
           metrics_unavailable_nodes: []
 
 - id: vpccni.snat-port-randomization-off

@@ -238,3 +238,22 @@ def snat_private_routes_text(item) -> str:
         f"AWS_VPC_K8S_CNI_EXTERNALSNAT false; private routes {where}: peering {item['peering_routes']}, transit gateway {item['transit_gateway_routes']}, VPN {item['vpn_routes']}, "
         f"Outposts local gateway {item['local_gateway_routes']}, appliance {item.get('appliance_routes', 0)}; destinations still SNATed {item['private_destinations'][:6]}{excluded}"
     )
+
+
+def no_ip_unexplained_text(item: dict) -> str:
+    """Evidence of vpccni.no-available-ip-unexplained (#209): what the counter, the 24-hour ipamd log and the node's capacity can say about 'no available IP'
+    answers the log does not place in time, and nothing more. A report once called a start-up race that resolved in half a second an IP shortage."""
+    fits = item.get("ip_pods_max_fits")
+    capacity = "fits" if fits else ("does not fit, so a full node can run out again" if fits is False else "IP capacity unknown")
+    if item.get("ipamd_log_read"):
+        log = (
+            f"{item['no_available_ip_unexplained']} of them are older than its log of the last 24 h, which holds {item['no_available_ip_startup_24h']} in the start-up window of an ipamd start "
+            "and none later, so whether they were the start-up race or a shortage cannot be told from this snapshot"
+        )
+    else:
+        log = "its log was not read, so when they happened cannot be told"
+    return (
+        f"node {item['node']} ({item['instance_type']}, pool {item['pool']}): ipamd answered 'no available IP' {item['no_available_ip_events']} times since it started at "
+        f"{item['ipamd_started_at']} ({item['ipamd_uptime_hours']} h before the snapshot); {log}. Pods that can need an IP: max-pods {item['max_pods']} - {item['host_network_pods']} "
+        f"hostNetwork = {item['ip_pods_max']}, against {item['ip_max']} pod IPs: {capacity}"
+    )

@@ -7,7 +7,7 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | kube context / cluster | `app-u-cluster` / arn:aws:eks:ap-northeast-2:<account>:cluster/app-u-cluster-eks (eks, v1.32.13-eks-577a51e) |
 | Run time / mode | 2026-11-07T10:33:37+09:00 / full (collection 300.7 s, 0 steps skipped by mode, 6 failed) |
 | Scale | `medium` (guessed) |
-| kubegap / rubric / signatures | <kubegap> / 0.1.95 / 1.1.0 |
+| kubegap / rubric / signatures | <kubegap> / 0.1.96 / 1.1.0 |
 | Verified against | Kubernetes v1.32.13-eks-577a51e (verified 1.30 to 1.37) · Prometheus 2.49.1 (verified 2.49 to 3.15) · Alertmanager 0.26.0 (verified 0.26 to 0.34) · Loki 2.6.1 (verified 2.6 to 3.7) · Grafana 10.2.3 (verified 10.2 to 13.3) |
 | Nodes / namespaces / pods / CRDs | 9 (Ready 9) / 26 / 154 / 47 |
 | Components (23) | actions-runner-controller, alb-controller, alertmanager, argocd, coredns, ebs-csi, ecr, eks-managed-addons, external-dns, external-secrets, grafana, karpenter, keda, kube-proxy, kube-state-metrics, loki, metrics-server, node-exporter, prometheus, prometheus-operator, promtail, victoria-metrics, vpc-cni |
@@ -21,12 +21,12 @@ Reference half of the report, assembled by `scripts/kubegap render-details` from
 | Severity (default) | fail | warn | vs. previous run of this mode |
 |---|---|---|---|
 | critical | 1 | 0 | no previous run of this mode |
-| high | 35 | 32 | no previous run of this mode |
-| medium | 118 | 172 | no previous run of this mode |
-| low | 17 | 145 | no previous run of this mode |
+| high | 34 | 32 | no previous run of this mode |
+| medium | 117 | 173 | no previous run of this mode |
+| low | 17 | 146 | no previous run of this mode |
 | info | 1 | 0 | no previous run of this mode |
 
-Checks 367: evaluated 359, not run on this platform or at this scale 3, skipped 3, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
+Checks 368: evaluated 360, not run on this platform or at this scale 3, skipped 3, not collected in this mode 0, errors 0, tool missing 0, LLM-judged 2. Suppressed findings 0.
 
 ### 1-1. Final judgment vs. first pass (adjustments)
 
@@ -75,7 +75,6 @@ Checks 367: evaluated 359, not run on this platform or at this scale 3, skipped 
 | `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | high |  | Target group k8s-lb-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / … |
 | `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | high |  | Target group k8s-lb-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0, health check / … |
 | `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | high |  | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['lb-151c379572.elb.example.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to … |
-| `vpccni.no-available-ip.ip-10-0-1-139.ap-northeast-2.compute.internal` | high |  | node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): ipamd answered 'no available IP' 4 times since it started; pod IPs 36/56 (0.643), ENI 4/4, max-pods 58 |
 
 (consecutive-run counts need diff.json; none for this snapshot)
 
@@ -109,7 +108,7 @@ Expected families missing (inventory): backup, certificates, event-retention, sl
 - Tool missing 0: none
 - Not collected in full mode 0: none
 - Skipped or errored 3: `observability.fluentbit-output-errors` (skip: summary.logs.agents.fluent-bit missing), `traffic.ingress-nginx-vulnerable-version` (skip: summary.traffic.nginx missing), `traffic.ingress-nginx-retired` (skip: summary.traffic.nginx missing)
-- Judged in part 23 (some targets lacked what the rule needs; those are not judged, not passed): `node.kernel-oom-node-level` (2 not judged: node not read (2)), `node.kernel-lockup` (2 not judged: node not read (2)), `node.kernel-io-fs-errors` (2 not judged: node not read (2)), `node.kernel-nic-events` (2 not judged: node not read (2)), `node.conntrack-table-full` (2 not judged: node not read (2)), `node.kernel-net-mem-pressure` (2 not judged: node not read (2)), `node.cgroup-v1` (2 not judged: node not read (2)), `node.sysctl-tuning` (2 not judged: node not read (2)), `node.cri-not-ready` (2 not judged: node not read, or cri not read (2)), `node.cri-exited-containers` (2 not judged: node not read (2)), `node.service-restarts` (2 not judged: node not read (2)), `node.reboot-required` (2 not judged: node not read (2)), `node.os-updates-pending` (2 not judged: node not read (2)), `node.kubelet-reserved-missing` (2 not judged: node not read, or kubelet not read (2)), `node.kubelet-eviction-memory-missing` (2 not judged: node not read, or kubelet not read (2)), `node.clock-unsynced-os` (2 not judged: node not read (2)), `node.zombie-processes` (2 not judged: node not read (2)), `node.kubelet-api-qps-low` (2 not judged: node not read, or kubelet not read (2)), `node.docker-and-containerd` (2 not judged: node not read (2)), `node.container-writable-layer-large` (2 not judged: node not read (2)), `node.large-images` (2 not judged: node not read (2)), `vpccni.no-available-ip` (2 not judged: VPC CNI metrics not read (awscni_no_available_ip_addresses) (2)), `vpccni.ec2-api-errors` (2 not judged: metrics not read (2))
+- Judged in part 24 (some targets lacked what the rule needs; those are not judged, not passed): `node.kernel-oom-node-level` (2 not judged: node not read (2)), `node.kernel-lockup` (2 not judged: node not read (2)), `node.kernel-io-fs-errors` (2 not judged: node not read (2)), `node.kernel-nic-events` (2 not judged: node not read (2)), `node.conntrack-table-full` (2 not judged: node not read (2)), `node.kernel-net-mem-pressure` (2 not judged: node not read (2)), `node.cgroup-v1` (2 not judged: node not read (2)), `node.sysctl-tuning` (2 not judged: node not read (2)), `node.cri-not-ready` (2 not judged: node not read, or cri not read (2)), `node.cri-exited-containers` (2 not judged: node not read (2)), `node.service-restarts` (2 not judged: node not read (2)), `node.reboot-required` (2 not judged: node not read (2)), `node.os-updates-pending` (2 not judged: node not read (2)), `node.kubelet-reserved-missing` (2 not judged: node not read, or kubelet not read (2)), `node.kubelet-eviction-memory-missing` (2 not judged: node not read, or kubelet not read (2)), `node.clock-unsynced-os` (2 not judged: node not read (2)), `node.zombie-processes` (2 not judged: node not read (2)), `node.kubelet-api-qps-low` (2 not judged: node not read, or kubelet not read (2)), `node.docker-and-containerd` (2 not judged: node not read (2)), `node.container-writable-layer-large` (2 not judged: node not read (2)), `node.large-images` (2 not judged: node not read (2)), `vpccni.no-available-ip` (2 not judged: ipamd log not read (vpc-cni/ipamd-log, or AWS_VPC_K8S_CNI_LOG_FILE moved it) (2)), `vpccni.no-available-ip-unexplained` (2 not judged: VPC CNI metrics not read (awscni_no_available_ip_addresses) (2)), `vpccni.ec2-api-errors` (2 not judged: metrics not read (2))
 - Query returned no series 3 (every metric name the query reads has series, so nothing happened; a name with no series would be a skip): `observability.scrape-targets-down`, `controlplane.apiserver-401-rate`, `scaling.pod-pending-long`
 
 ## 7. Appendix
@@ -153,7 +152,7 @@ Deprecated-API tools: kubent 28 of 41 Lists answered (13 refused or not served);
 
 ### 7-2. Checks evaluated
 
-367 checks: disabled 3, done 359, llm 2, skip 3. Load errors: none.
+368 checks: disabled 3, done 360, llm 2, skip 3. Load errors: none.
 
 ### 7-3. Signature matches and unclassified errors
 
@@ -246,7 +245,6 @@ Signature catalog 1.1.1, 40 files, 23879 lines scanned (components: actions-runn
 | `traffic.alb-unhealthy-targets.prod-app-y/app-y-frontend` | fail | high | Target group k8s-lb-032c25d752 (application, port 3003): healthy 0 of 1 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [307]': 1}, 24h UnHealthyHostCount max 1.0, health check / expected codes 200, backends ['deployment/app-y-frontend'] |
 | `traffic.alb-unhealthy-targets.prod-app-z-backend/app-z-backend` | fail | high | Target group k8s-lb-8c88bb317a (application, port 8000): healthy 0 of 2 targets, unhealthy {'Target.ResponseCodeMismatch: Health checks failed with these codes: [404]': 2}, 24h UnHealthyHostCount max 2.0, health check / expected codes 200, backends ['deployment/app-z-backend'] |
 | `traffic.db-exposed.loadbalancer/middleware/kafka-controller-0-external` | fail | high | loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['lb-151c379572.elb.example.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to the internet by the security group |
-| `vpccni.no-available-ip.ip-10-0-1-139.ap-northeast-2.compute.internal` | fail | high | node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): ipamd answered 'no available IP' 4 times since it started; pod IPs 36/56 (0.643), ENI 4/4, max-pods 58 |
 | `controlplane.apiserver-5xx.cluster` | warn | high | 5xx per second 0.004 (code 503) |
 | `controlplane.scheduler-unschedulable.arc-runners/self-hosted-arm64-8msc5-runner` | warn | high | 24h 'Unable to schedule pod; no fit' 36 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(… |
 | `controlplane.scheduler-unschedulable.prod-app-r/app-r-backend` | warn | high | 24h 'Unable to schedule pod; no fit' 4 times (control plane log). Top reason from summary.controlplane.scheduler.reasons: <n>/<n> nodes are available: <n> Insufficient memory, <n> Too many pods, <n> node(s) had untolerated taint {workload-type: build}, <n> node(… |
@@ -396,7 +394,6 @@ Signature catalog 1.1.1, 40 files, 23879 lines scanned (components: actions-runn
 | `traffic.alb-elb-5xx.k8s-lb-b18a4555d7` | fail | medium | ALB k8s-lb-b18a4555d7 (internet-facing): 24h requests 162172.0, ELB 5xx 145.0, target 5xx 152.0, rejected connections 0, idle timeout 300s, target groups 41 |
 | `traffic.ingress-p95-latency.prod-app-s/app-s-api` | fail | medium | ['canary-api-v1.lab-l.example', 'api.v1.lab-l.example']: p95 request-weighted 10.381s, hourly average 15.821s, 1h max 50.6329s, latest hour with requests 16.7603s on 3.0 requests at 2026-11-07T00:35, 287.0 requests/24h (source alb-cloudwatch) |
 | `traffic.shared-alb-group.alb-group/app-u-prod-lb` | fail | medium | ALB group app-u-prod-lb: 41 ingresses, 48 hosts, 16 namespaces ['app-ab-prod', 'argocd', 'dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y', 'middleware', 'monitoring', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend'], kinds … |
-| `vpccni.prefix-delegation-off.cluster` | fail | medium | ENABLE_PREFIX_DELEGATION false, nitro nodes 9/9. nodes above 50% IP usage ['ip-10-0-2-218.ap-northeast-2.compute.internal', 'ip-10-0-1-245.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal' … |
 | `albctl.reconcile-errors.cluster` | warn | medium | reconcile errors since leader start 41, apiserver 429/503 responses 126, max workqueue depth 0.0, Ingresses without an LB address [], stale TargetGroupBindings [] |
 | `argocd.admin-account-no-sso.cluster` | warn | medium | admin.enabled True, SSO (dex/oidc) False, anonymous False, RBAC policy.default '' / policy.csv 0 lines, exec.enabled False, URL https://deploy.lab-k.example |
 | `argocd.components-not-ha.cluster` | warn | medium | components (ready/replicas) {'applicationset-controller': '1/1', 'dex-server': '1/1', 'notifications-controller': '1/1', 'redis': '1/1', 'repo-server': '1/1', 'server': '1/1', 'application-controller': '1/1'}, not ready [], single replica (server, repo-server) ['repo-server', 'server'], version … |
@@ -569,6 +566,7 @@ Signature catalog 1.1.1, 40 files, 23879 lines scanned (components: actions-runn
 | `traffic.ingress-p95-latency.prod-app-r/app-r-backend` | warn | medium | ['app-r-api.lab-k.example']: p95 request-weighted 1.0837s, hourly average 1.0712s, 1h max 3.5461s, latest hour with requests 3.5461s on 591.0 requests at 2026-11-06T08:35, 16 hours before the newest hour, no requests since, 4346.0 requests/24h (source alb-cloudwatch) |
 | `traffic.ingress-p95-latency.prod-app-t/app-t-ai` | warn | medium | ['app-t-ai.lab-k.example']: p95 request-weighted 2.3158s, hourly average 2.4183s, 1h max 2.6907s, latest hour with requests 2.6907s on 1.0 requests at 2026-11-06T06:35, 18 hours before the newest hour, no requests since, 34.0 requests/24h (under 100 requests a day: warn only) (source alb-cloudwatch) |
 | `vpccni.ec2-api-errors.ip-10-0-2-100.ap-northeast-2.compute.internal` | warn | medium | node ip-10-0-2-100.ap-northeast-2.compute.internal: EC2 API failures 10 (by API {'DeleteNetworkInterface': 10}), force-removed ENIs 0 / IPs 0 (cumulative since ipamd start, IMDS 404 excluded) |
+| `vpccni.prefix-delegation-off.cluster` | warn | medium | ENABLE_PREFIX_DELEGATION false, nitro nodes 9/9. nodes above 50% IP usage ['ip-10-0-2-218.ap-northeast-2.compute.internal', 'ip-10-0-1-245.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal' … |
 | `hygiene.no-ephemeral-storage-requests.cluster` | fail | low | Containers with an ephemeral-storage request 1 of 113 (0.009), without one in prod 35. emptyDirs without sizeLimit 22 (prod: ['app-ab-prod/statefulset/app-ab-backend-postgresql', 'prod-app-r/deployment/app-r-backend', 'prod-app-r/statefulset/app-r-postgresql' … |
 | `hygiene.old-replicasets.cluster` | fail | low | Of 428 ReplicaSets, 362 have 0 replicas. Deployment revisionHistoryLimit distribution {'10': 62, '3': 6} |
 | `node.cgroup-v1.ip-10-0-1-137.ap-northeast-2.compute.internal` | fail | low | /sys/fs/cgroup filesystem tmpfs (cgroup v1). OS Amazon Linux 2, kernel 5.10.245-245.983.amzn2.aarch64 |
@@ -731,6 +729,7 @@ Signature catalog 1.1.1, 40 files, 23879 lines scanned (components: actions-runn
 | `tenancy.dev-shares-prod-nodes.ip-10-0-2-60.ap-northeast-2.compute.internal` | warn | low | Node ip-10-0-2-60.ap-northeast-2.compute.internal (pool system_core-20251217040546303900000001): prod pods 2 (['prod-app-s', 'prod-app-v']) together with dev pods 2 (['dev-app-s', 'dev-app-v']). Memory limit total/allocatable 1.49, CPU limit total/allocatable 2.44, containers without a memory limit … |
 | `traffic.alb-protection-off.k8s-lb-b18a4555d7` | warn | low | ALB k8s-lb-b18a4555d7: deletion_protection False, access_logs False, target groups in the ingress group 41 |
 | `vpccni.metrics-unreadable.cluster` | warn | low | 2 of 9 nodes without readable ipamd metrics (localhost:61678): ['ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal'] |
+| `vpccni.no-available-ip-unexplained.ip-10-0-1-139.ap-northeast-2.compute.internal` | warn | low | node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): ipamd answered 'no available IP' 4 times since it started at 2026-09-24T01:02:04Z (1056.5 h before the snapshot); 4 of them are older than its log of the last 24 h, which holds 0 in the start-up window of an ipamd start … |
 | `eks.audit-log-off.cluster` | fail | info | enabled logs ['api', 'authenticator', 'controllerManager', 'scheduler'], disabled logs ['audit'] |
 
 The table cuts each evidence at 300 characters and a check may cut a list in its evidence; nothing is lost. Every finding below carries, folded, the material its rule judged, taken from `findings-draft.json` `details`.
@@ -1500,43 +1499,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  "source_ranges": null,
  "target": "loadbalancer/middleware/kafka-controller-0-external",
  "type": "loadbalancer"
-}
-```
-
-</details>
-<details><summary><code>vpccni.no-available-ip.ip-10-0-1-139.ap-northeast-2.compute.internal</code></summary>
-
-```json
-{
- "instance_type": "r8gd.xlarge",
- "ip_max": 56,
- "ip_usage_ratio": 0.643,
- "ip_used": 36,
- "max_pods": 58,
- "metrics": {
-  "available": true,
-  "assigned": 36,
-  "total": 56,
-  "eni_allocated": 4,
-  "eni_max": 4,
-  "ip_max": 56,
-  "prefixes": 0,
-  "no_available_ip_events": 4,
-  "force_removed_enis": 0,
-  "force_removed_ips": 0,
-  "ec2_api_errors": 0,
-  "ec2_api_errors_by_api": {},
-  "per_eni": {
-   "eni-00657f1eaec0c7270": 3,
-   "eni-0332bb2dc5813e76f": 8,
-   "eni-06c12cc76d6d159e0": 12,
-   "eni-08232a40b6e81d0ca": 13
-  }
- },
- "metrics_available": true,
- "no_available_ip_events": 4,
- "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
- "pool": "default"
 }
 ```
 
@@ -4606,31 +4568,6 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  ],
  "prod": true,
  "target": "alb-group/app-u-prod-lb"
-}
-```
-
-</details>
-<details><summary><code>vpccni.prefix-delegation-off.cluster</code></summary>
-
-```json
-{
- "capacity_read": true,
- "nitro_nodes": 9,
- "nodes": 9,
- "nodes_near_ip_limit": [
-  "ip-10-0-2-218.ap-northeast-2.compute.internal",
-  "ip-10-0-1-245.ap-northeast-2.compute.internal",
-  "ip-10-0-1-241.ap-northeast-2.compute.internal",
-  "ip-10-0-2-60.ap-northeast-2.compute.internal",
-  "ip-10-0-1-139.ap-northeast-2.compute.internal",
-  "ip-10-0-1-117.ap-northeast-2.compute.internal",
-  "ip-10-0-1-137.ap-northeast-2.compute.internal"
- ],
- "nodes_no_available_ip": [
-  "ip-10-0-1-139.ap-northeast-2.compute.internal"
- ],
- "policy": "whole_eni",
- "prefix_delegation": false
 }
 ```
 
@@ -8806,6 +8743,29 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
  },
  "metrics_available": true,
  "node": "ip-10-0-2-100.ap-northeast-2.compute.internal"
+}
+```
+
+</details>
+<details><summary><code>vpccni.prefix-delegation-off.cluster</code></summary>
+
+```json
+{
+ "capacity_read": true,
+ "nitro_nodes": 9,
+ "nodes": 9,
+ "nodes_ip_shortage_24h": [],
+ "nodes_near_ip_limit": [
+  "ip-10-0-2-218.ap-northeast-2.compute.internal",
+  "ip-10-0-1-245.ap-northeast-2.compute.internal",
+  "ip-10-0-1-241.ap-northeast-2.compute.internal",
+  "ip-10-0-2-60.ap-northeast-2.compute.internal",
+  "ip-10-0-1-139.ap-northeast-2.compute.internal",
+  "ip-10-0-1-117.ap-northeast-2.compute.internal",
+  "ip-10-0-1-137.ap-northeast-2.compute.internal"
+ ],
+ "policy": "whole_eni",
+ "prefix_delegation": false
 }
 ```
 
@@ -14160,6 +14120,30 @@ The table cuts each evidence at 300 characters and a check may cut a list in its
   "ip-10-0-2-60.ap-northeast-2.compute.internal"
  ],
  "nodes": 9
+}
+```
+
+</details>
+<details><summary><code>vpccni.no-available-ip-unexplained.ip-10-0-1-139.ap-northeast-2.compute.internal</code></summary>
+
+```json
+{
+ "host_network_pods": 3,
+ "instance_type": "r8gd.xlarge",
+ "ip_max": 56,
+ "ip_pods_max": 55,
+ "ip_pods_max_fits": true,
+ "ipamd_log_read": true,
+ "ipamd_started_at": "2026-09-24T01:02:04Z",
+ "ipamd_uptime_hours": 1056.5,
+ "max_pods": 58,
+ "metrics_available": true,
+ "no_available_ip_events": 4,
+ "no_available_ip_shortage_24h": 0,
+ "no_available_ip_startup_24h": 0,
+ "no_available_ip_unexplained": 4,
+ "node": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+ "pool": "default"
 }
 ```
 

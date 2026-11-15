@@ -5,7 +5,7 @@
   "source": "guessed",
   "nodes": 9
  },
- "rubric_version": "0.1.95",
+ "rubric_version": "0.1.96",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -2938,9 +2938,19 @@
    "status": "done",
    "reason": null,
    "counts": {
+    "pass": 7,
+    "skipped": 2
+   },
+   "skipped_reason": "ipamd log not read (vpc-cni/ipamd-log, or AWS_VPC_K8S_CNI_LOG_FILE moved it) (2)"
+  },
+  {
+   "id": "vpccni.no-available-ip-unexplained",
+   "status": "done",
+   "reason": null,
+   "counts": {
     "pass": 6,
     "skipped": 2,
-    "fail": 1
+    "warn": 1
    },
    "skipped_reason": "VPC CNI metrics not read (awscni_no_available_ip_addresses) (2)"
   },
@@ -2957,7 +2967,7 @@
    "status": "done",
    "reason": null,
    "counts": {
-    "fail": 1
+    "warn": 1
    }
   },
   {
@@ -3332,15 +3342,6 @@
    "nature": "state",
    "evidence": "loadbalancer middleware/kafka-controller-0-external: ports [9094, 443], exposure internet-facing, addresses ['lb-151c379572.elb.example.com'], sourceRanges None, security group open to 0.0.0.0/0 on 9094. DB port open to the internet by the security group",
    "source": "summary.json:traffic.db_exposed"
-  },
-  {
-   "check": "vpccni.no-available-ip",
-   "target": "ip-10-0-1-139.ap-northeast-2.compute.internal",
-   "status": "fail",
-   "severity_default": "high",
-   "nature": "state",
-   "evidence": "node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): ipamd answered 'no available IP' 4 times since it started; pod IPs 36/56 (0.643), ENI 4/4, max-pods 58",
-   "source": "summary.json:vpccni.nodes"
   },
   {
    "check": "controlplane.apiserver-5xx",
@@ -4692,15 +4693,6 @@
    "nature": "state",
    "evidence": "ALB group app-u-prod-lb: 41 ingresses, 48 hosts, 16 namespaces ['app-ab-prod', 'argocd', 'dev-app-aa', 'dev-app-s', 'dev-app-v', 'dev-app-y', 'middleware', 'monitoring', 'prod-app-r', 'prod-app-s', 'prod-app-t', 'prod-app-v', 'prod-app-w', 'prod-app-x', 'prod-app-y', 'prod-app-z-backend'], kinds ['dev', 'other', 'prod'], LB ['k8s-lb-2062640887.ap-northeast-2.elb.amazonaws.com']",
    "source": "summary.json:traffic.alb_groups"
-  },
-  {
-   "check": "vpccni.prefix-delegation-off",
-   "target": "cluster",
-   "status": "fail",
-   "severity_default": "medium",
-   "nature": "state",
-   "evidence": "ENABLE_PREFIX_DELEGATION false, nitro nodes 9/9. nodes above 50% IP usage ['ip-10-0-2-218.ap-northeast-2.compute.internal', 'ip-10-0-1-245.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal', 'ip-10-0-1-139.ap-northeast-2.compute.internal', 'ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-1-137.ap-northeast-2.compute.internal'], nodes that saw 'no available IP' ['ip-10-0-1-139.ap-northeast-2.compute.internal']. warm policy whole_eni",
-   "source": "summary.json:vpccni.warm.summary"
   },
   {
    "check": "albctl.reconcile-errors",
@@ -6291,6 +6283,15 @@
    "source": "summary.json:vpccni.nodes"
   },
   {
+   "check": "vpccni.prefix-delegation-off",
+   "target": "cluster",
+   "status": "warn",
+   "severity_default": "medium",
+   "nature": "state",
+   "evidence": "ENABLE_PREFIX_DELEGATION false, nitro nodes 9/9. nodes above 50% IP usage ['ip-10-0-2-218.ap-northeast-2.compute.internal', 'ip-10-0-1-245.ap-northeast-2.compute.internal', 'ip-10-0-1-241.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal', 'ip-10-0-1-139.ap-northeast-2.compute.internal', 'ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-1-137.ap-northeast-2.compute.internal'], nodes that ran out of pod IPs in the last 24 h []. warm policy whole_eni",
+   "source": "summary.json:vpccni.warm.summary"
+  },
+  {
    "check": "hygiene.no-ephemeral-storage-requests",
    "target": "cluster",
    "status": "fail",
@@ -7753,6 +7754,15 @@
    "nature": "state",
    "evidence": "2 of 9 nodes without readable ipamd metrics (localhost:61678): ['ip-10-0-1-117.ap-northeast-2.compute.internal', 'ip-10-0-2-60.ap-northeast-2.compute.internal']",
    "source": "summary.json:vpccni.warm.summary"
+  },
+  {
+   "check": "vpccni.no-available-ip-unexplained",
+   "target": "ip-10-0-1-139.ap-northeast-2.compute.internal",
+   "status": "warn",
+   "severity_default": "low",
+   "nature": "state",
+   "evidence": "node ip-10-0-1-139.ap-northeast-2.compute.internal (r8gd.xlarge, pool default): ipamd answered 'no available IP' 4 times since it started at 2026-09-24T01:02:04Z (1056.5 h before the snapshot); 4 of them are older than its log of the last 24 h, which holds 0 in the start-up window of an ipamd start and none later, so whether they were the start-up race or a shortage cannot be told from this snapshot. Pods that can need an IP: max-pods 58 - 3 hostNetwork = 55, against 56 pod IPs: fits",
+   "source": "summary.json:vpccni.nodes"
   },
   {
    "check": "eks.audit-log-off",

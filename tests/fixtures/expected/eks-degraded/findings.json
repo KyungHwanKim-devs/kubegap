@@ -5,7 +5,7 @@
   "source": "guessed",
   "nodes": 9
  },
- "rubric_version": "0.1.95",
+ "rubric_version": "0.1.96",
  "check_results": [
   {
    "id": "resources.cpu-throttling",
@@ -2734,6 +2734,14 @@
   },
   {
    "id": "vpccni.no-available-ip",
+   "status": "skip",
+   "reason": "nothing to judge: ipamd log not read (vpc-cni/ipamd-log, or AWS_VPC_K8S_CNI_LOG_FILE moved it) (9)",
+   "counts": {
+    "skipped": 9
+   }
+  },
+  {
+   "id": "vpccni.no-available-ip-unexplained",
    "status": "skip",
    "reason": "nothing to judge: VPC CNI metrics not read (awscni_no_available_ip_addresses) (9)",
    "counts": {
