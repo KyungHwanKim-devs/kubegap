@@ -1,4 +1,4 @@
-# What a report teaches when an EKS node or its subnet runs out of pod addresses. Every page below was opened and read (2026-11-14).
+# What a report teaches when an EKS node or its subnet runs out of pod addresses. Every page below was opened and read (2026-11-14; the two amazon-vpc-cni-k8s source files 2026-11-15).
 topic: vpc-cni-ip-exhaustion
 checks: [vpccni.node-ip-exhaustion, vpccni.no-available-ip, vpccni.subnet-ips-low]
 mechanism: >
@@ -17,7 +17,10 @@ mechanism: >
   That is how a subnet runs dry while pods use far fewer addresses than it has. Nodes, pods, ENIs and load balancers all draw from the same subnet;
   when it is empty, existing nodes cannot refill their warm pool and new nodes cannot give their pods addresses. On a single node the same thing
   happens earlier: once the instance limit is reached, ipamd has nothing to hand out and a new pod stays in ContainerCreating with "failed to assign
-  an IP address to container". ipamd counts each such answer since it started, so a non-zero count means it has already happened.
+  an IP address to container". ipamd counts each such answer since it started, and writes one error line for each in its log on the node. The count also
+  holds the first seconds of a new node: the pods that waited for the node's network all ask the moment ipamd is up, the first ENI's addresses can run
+  out a few seconds before the next ENI's addresses arrive, and the pod refused in that gap gets an address when the kubelet retries it. Only the time
+  of the answer, against the start of ipamd, tells that race from a node that has run out.
 
 
   Prefix delegation changes the first limit. With ENABLE_PREFIX_DELEGATION, off by default and available on Nitro instances, ipamd attaches /28
@@ -29,6 +32,8 @@ sources:
   - { title: "amazon-vpc-cni-k8s: ENI and IP target", url: "https://github.com/aws/amazon-vpc-cni-k8s/blob/master/docs/eni-and-ip-target.md" }
   - { title: "amazon-vpc-cni-k8s: Prefix and IP target", url: "https://github.com/aws/amazon-vpc-cni-k8s/blob/master/docs/prefix-and-ip-target.md" }
   - { title: "Neon: AWS CNI lessons from a production outage", url: "https://neon.com/blog/aws-cni-lessons-from-a-production-outage" }
+  - { title: "amazon-vpc-cni-k8s v1.19.0: the datastore's AssignPodIPv4Address", url: "https://github.com/aws/amazon-vpc-cni-k8s/blob/v1.19.0/pkg/ipamd/datastore/data_store.go" }
+  - { title: "amazon-vpc-cni-k8s v1.19.0: the aws-node entrypoint that starts ipamd", url: "https://github.com/aws/amazon-vpc-cni-k8s/blob/v1.19.0/cmd/aws-vpc-cni/main.go" }
 detect:
   - kind: metric
     what: >
@@ -37,7 +42,8 @@ detect:
     example: 'awscni_assigned_ip_addresses / awscni_ip_max'
   - kind: alert
     what: >
-      ipamd has answered "no address available". The counter is cumulative since the process started, so the rule fires on an increase.
+      ipamd has answered "no address available". The counter is cumulative since the process started, so the rule fires on an increase; an
+      increase in a node's first minute can be the start-up race and needs the ipamd log's time to tell.
     example: |
       - alert: VpcCniNoAvailableIP
         expr: increase(awscni_no_available_ip_addresses[15m]) > 0
