@@ -8,18 +8,104 @@ nodes[per node: ENI/IP limits of the instance type, max-pods, running pods (excl
 subnets[free IPs, usage], warm (total reserved-but-unused IPs), sandbox_failures_24h, gaps. Shape is documented in SKILL.md.
 
 ENI arithmetic: pod IPs a node can hold = ENI count x (IPv4 per ENI - 1). The first IP belongs to the ENI itself. With prefix delegation (/28 prefixes) multiply by 16.
+
+When ipamd answered "no available IP" (#209): the counter awscni_no_available_ip_addresses has no time, so each answer is placed with the ipamd log of the last 24 hours
+(logs/node/<node>/ipamd-24h.log, the `vpc-cni/ipamd-log` node step) and the start of ipamd (the aws-node container's startedAt in objects/pods.json).
+- In IPv4 mode every count writes one error line, "DataStore has no available IP/Prefix addresses", right after the increment: aws/amazon-vpc-cni-k8s
+  pkg/ipamd/datastore/data_store.go:733-734@v1.19.0, :857-858@v1.23.2. The IPv6 path counts without a line (:663@v1.19.0, :776@v1.23.2), so there the count stays unexplained.
+- The counter lives as long as the ipamd process, and ipamd is the child the aws-node container's entrypoint starts and waits for; when it exits the container exits:
+  cmd/aws-vpc-cni/main.go:435,439,466@v1.19.0, :437,441,468@v1.23.2. So the container's startedAt is the start of the process the counter belongs to.
+- The entrypoint writes the CNI configuration only after ipamd answers (main.go:446,459@v1.19.0, :448,461@v1.23.2), so the pods that waited for the node's network all ask
+  at once while the pool holds the first ENI's addresses. The next ENI's addresses enter the datastore only after the pool manager's tick (ipPoolMonitorInterval 5 s,
+  pkg/ipamd/ipamd.go:58@v1.19.0, :61@v1.23.2) and the wait for them in instance metadata (backoff from 100 ms, doubling, 15 % jitter, 12 tries: pkg/awsutils/awsutils.go:1746@v1.19.0,
+  :2251@v1.23.2). An answer in that gap is a start-up race the kubelet retries within a second, not a node out of addresses.
+- IPAMD_STARTUP_WINDOW_S: measured on a 9-node EKS cluster, the race came 9.9 s after the container started and the pod got an address 0.5 s later. 120 s holds a pool tick
+  and the instance-metadata wait through its tenth try (sleeps 0.1 s to 25.6 s, at most 58.8 s with jitter) with room for slow EC2 calls; a node really short of addresses
+  at start keeps answering after it, because the kubelet keeps retrying the sandbox.
 """
 
 from __future__ import annotations
 
 import contextlib
+import datetime as _dt
 import ipaddress
+import json
 import re
 from pathlib import Path
 
 from ..foundations import podmetrics as _pm
 from ..foundations import promtext, versions
-from ..foundations.snapshot import event_count, load_json, objects
+from ..foundations.snapshot import event_count, load_json, objects, parse_ts, taken_at
+
+IPAMD_STARTUP_WINDOW_S = 120
+NO_IP_LINE = "DataStore has no available IP/Prefix addresses"
+# ipamd's log file when AWS_VPC_K8S_CNI_LOG_FILE is unset (aws/amazon-vpc-cni-k8s pkg/utils/logger/config.go:21,24,43-45@v1.19.0, @v1.23.2), the host path the ipamd-log step reads
+IPAMD_LOG_DEFAULT = "/host/var/log/aws-routed-eni/ipamd.log"
+
+
+def _ipamd_starts(pods: list) -> dict[str, list[_dt.datetime]]:
+    """Per node, the starts of ipamd the snapshot can see: the running aws-node container's startedAt first, then the previous container's (a restart)."""
+    out: dict[str, list[_dt.datetime]] = {}
+    for p in pods:
+        md = p.get("metadata") or {}
+        if md.get("namespace") != "kube-system" or not any(o.get("kind") == "DaemonSet" and o.get("name") == "aws-node" for o in md.get("ownerReferences") or []):
+            continue
+        node = (p.get("spec") or {}).get("nodeName")
+        cs = next((c for c in (p.get("status") or {}).get("containerStatuses") or [] if c.get("name") == "aws-node"), None)
+        if not node or not cs:
+            continue
+        starts = [parse_ts(((cs.get("state") or {}).get("running") or {}).get("startedAt")), parse_ts(((cs.get("lastState") or {}).get("terminated") or {}).get("startedAt"))]
+        if starts[0] is not None:  # a pod being replaced (not running) leaves the running one's starts in place
+            out[node] = [s for s in starts if s is not None]
+        else:
+            out.setdefault(node, [])
+    return out
+
+
+def _no_ip_lines(path: Path) -> list[_dt.datetime]:
+    """The times of the 'no available IP' error lines in a node's ipamd-24h.log (zap JSON, one object per line)."""
+    out = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        if NO_IP_LINE not in line:
+            continue
+        try:
+            ts = parse_ts(json.loads(line).get("ts"))
+        except (ValueError, AttributeError):
+            ts = None
+        if ts is not None:
+            out.append(ts)
+    return sorted(out)
+
+
+def _no_ip_placed(snap: Path, node: str, starts: list[_dt.datetime], log_record: dict | None, log_file_setting: str | None, counter: int | None, now: _dt.datetime) -> dict:
+    """Place each 'no available IP' answer of the last 24 hours: inside the start-up window of an ipamd start, or after it (a shortage).
+    The log counts as read when the node step saved it, the step did not fail on that node, and ipamd writes to the file the step reads."""
+    path = snap / "logs" / "node" / node / "ipamd-24h.log"
+    read = path.is_file() and (log_record or {}).get("ok") is not False and log_file_setting in (None, "", IPAMD_LOG_DEFAULT)
+    started = starts[0] if starts else None
+    out = {
+        "ipamd_started_at": started.astimezone(_dt.UTC).isoformat(timespec="seconds").replace("+00:00", "Z") if started else None,
+        "ipamd_uptime_hours": round((now - started).total_seconds() / 3600, 1) if started else None,
+        "ipamd_log_read": read,
+        "ipamd_log_at_limit": bool((log_record or {}).get("at_limit")),
+        "no_available_ip_startup_24h": None,
+        "no_available_ip_shortage_24h": None,
+        "no_available_ip_last_shortage": None,
+        "no_available_ip_unexplained": counter,
+    }
+    if not read:
+        return out
+    window = _dt.timedelta(seconds=IPAMD_STARTUP_WINDOW_S)
+    lines = _no_ip_lines(path)
+    startup = [t for t in lines if any(s <= t <= s + window for s in starts)]  # no known start: every line is a shortage, never a race by default
+    shortage = [t for t in lines if t not in startup]
+    out["no_available_ip_startup_24h"] = len(startup)
+    out["no_available_ip_shortage_24h"] = len(shortage)
+    out["no_available_ip_last_shortage"] = shortage[-1].astimezone(_dt.UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z") if shortage else None
+    if counter is not None:
+        this_process = sum(1 for t in lines if started is None or t >= started)
+        out["no_available_ip_unexplained"] = max(counter - this_process, 0)
+    return out
 
 
 def _count(v) -> int:
@@ -224,10 +310,15 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     pods = objects(snap, "pods")
     ip_pods: dict[str, int] = {}
     prod_pods: dict[str, int] = {}
+    host_pods: dict[str, int] = {}
     for p in pods:
-        if (p.get("status") or {}).get("phase") not in ("Running", "Pending") or p["spec"].get("hostNetwork"):
+        if (p.get("status") or {}).get("phase") not in ("Running", "Pending"):
             continue
         nd = p["spec"].get("nodeName")
+        if p["spec"].get("hostNetwork"):
+            if nd:
+                host_pods[nd] = host_pods.get(nd, 0) + 1
+            continue
         if nd:
             ip_pods[nd] = ip_pods.get(nd, 0) + 1
             if p["metadata"]["namespace"] in prod:
@@ -235,6 +326,10 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     nodes = []
     gaps = []
     warm_idle_total = 0
+    starts = _ipamd_starts(pods)
+    log_records = ((((load_json(snap / "collect-result.json") or {}).get("vpc-cni") or {}).get("steps") or {}).get("ipamd-log") or {}).get("nodes") or {}
+    log_file_setting = (st.get("env") or {}).get("AWS_VPC_K8S_CNI_LOG_FILE")
+    now = taken_at(inv)
     for n in inv_nodes:
         name = n["name"]
         lim = limits.get(n.get("instance_type") or "") or {}
@@ -279,6 +374,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         ip_max = met.get("ip_max") or cap
         used = met.get("assigned") if met["available"] else ip_pods.get(name, 0)
         ratio = round(used / ip_max, 3) if ip_max else None
+        counter = met.get("no_available_ip_events", 0) if met["available"] else None
+        placed = _no_ip_placed(snap, name, starts.get(name) or [], log_records.get(name), log_file_setting, counter, now)
         nodes.append(
             {
                 "node": name,
@@ -299,7 +396,12 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                 "max_pods_exceeds_ip_capacity": bool(ip_max and max_pods > ip_max + 2),
                 "max_pods_over_ip": (max_pods - ip_max) if ip_max else None,
                 "ip_headroom": (ip_max - used) if ip_max is not None else None,
-                "no_available_ip_events": met.get("no_available_ip_events", 0) if met["available"] else None,
+                "no_available_ip_events": counter,
+                **placed,
+                # the most pods that ever need an address: max-pods less the hostNetwork pods that run there now (the DaemonSets that use the node's own address)
+                "host_network_pods": host_pods.get(name, 0),
+                "ip_pods_max": max_pods - host_pods.get(name, 0),
+                "ip_pods_max_fits": (max_pods - host_pods.get(name, 0) <= ip_max) if ip_max else None,
                 "ec2_api_errors": met.get("ec2_api_errors") if met["available"] else None,
                 "metrics_available": met["available"],
                 "prefix_delegation": st["prefix_delegation"],
@@ -340,7 +442,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
     if not st["prefix_delegation"] and st["warm_ip_target"] is None and st["warm_eni_target"] >= 1:
         per_node_reserve = st["warm_eni_target"]
     _near = [r["node"] for r in nodes if (r["ip_usage_ratio"] or 0) >= 0.75]
-    _noip = [r["node"] for r in nodes if (r["no_available_ip_events"] or 0) > 0]
+    _short = [r["node"] for r in nodes if (r["no_available_ip_shortage_24h"] or 0) > 0]
     return {
         "present": True,
         "settings": st,
@@ -354,7 +456,7 @@ def analyze(snap: Path, inv: dict | None) -> dict:
             "warm_eni_target": st["warm_eni_target"],
             "warm_ip_target": st["warm_ip_target"],
             "nodes_near_ip_limit": _near,
-            "nodes_no_available_ip": _noip,
+            "nodes_ip_shortage_24h": _short,
             "nodes_max_pods_over_ip": [r["node"] for r in nodes if r["max_pods_exceeds_ip_capacity"]],
             "min_ip_headroom": min([r["ip_headroom"] for r in nodes if r["ip_headroom"] is not None], default=None),
             "metrics_unavailable_nodes": gaps,
@@ -385,7 +487,8 @@ def analyze(snap: Path, inv: dict | None) -> dict:
         ),
         "nodes_near_ip_limit": [r["node"] for r in nodes if (r["ip_usage_ratio"] or 0) >= 0.75],
         "nodes_eni_at_max": [r["node"] for r in nodes if r["eni_at_max"]],
-        "nodes_no_available_ip": [r["node"] for r in nodes if (r["no_available_ip_events"] or 0) > 0],
+        "nodes_ip_shortage_24h": _short,
+        "ipamd_startup_window_seconds": IPAMD_STARTUP_WINDOW_S,
         "nodes_max_pods_over_ip": [r["node"] for r in nodes if r["max_pods_exceeds_ip_capacity"]],
         "metrics_unavailable_nodes": gaps,
         "subnets": subs,
@@ -411,10 +514,10 @@ def analyze(snap: Path, inv: dict | None) -> dict:
                     r["ip_usage_ratio"] is not None for r in nodes
                 ),  # the pod IP usage of at least one node is known (ipamd metrics, or the instance type's limits from ec2:DescribeInstanceTypes); without it the two node lists are empty for the wrong reason (#141)
                 "nodes_near_ip_limit": [r["node"] for r in nodes if (r["ip_usage_ratio"] or 0) >= 0.5],
-                "nodes_no_available_ip": [r["node"] for r in nodes if (r["no_available_ip_events"] or 0) > 0],
+                "nodes_ip_shortage_24h": _short,
                 "metrics_unavailable_nodes": gaps,
             },
         },
         "sandbox_failures_24h": sandbox,
-        "note": "ip_max is the value reported by ipamd (otherwise computed as ENI count x (IPv4 per ENI - 1)). assigned is the number of IPs ipamd handed to pods, so hostNetwork pods are not included. no_available_ip_events accumulates since the process started.",
+        "note": "ip_max is the value reported by ipamd (otherwise computed as ENI count x (IPv4 per ENI - 1)). assigned is the number of IPs ipamd handed to pods, so hostNetwork pods are not included. no_available_ip_events accumulates since the process started and includes the start-up race; no_available_ip_shortage_24h counts the answers of the last 24 hours of ipamd's log that came more than ipamd_startup_window_seconds after ipamd started, and no_available_ip_unexplained the counts that log does not hold.",
     }
